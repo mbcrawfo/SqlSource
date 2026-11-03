@@ -161,6 +161,13 @@ public static class Cli
             // The command first, and the reporter only after it: the command replaces the reporter.
             var commandExitCode = await RunCommandAsync(args, state, cancellationToken);
             var exitCode = ExitCodeOf(state.Reporter, commandExitCode);
+
+            // A watch ends only when it is stopped, which is how it ends well: each pass reported its own errors.
+            if (state.Watches && state.Cancelled)
+            {
+                exitCode = 0;
+            }
+
             if (state.MayPoint && !state.Cancelled && state.Reporter.Count > state.Reporter.DifferenceCount)
             {
                 await host.Error.WriteLineAsync(RunAgainLine);
@@ -258,6 +265,15 @@ public static class Cli
             commandLine.RunsDescribe
             && logPath is null
             && DescribeCommand.OnlineOf(commandLine.Parsed) == OnlineMode.Off;
+
+        // A watch is stopped and does not fail, and the errors of its passes are behind it by then: no line points
+        // from its end to a log.
+        if (DescribeCommand.Watches(commandLine.Parsed))
+        {
+            state.Watches = true;
+            state.MayPoint = false;
+        }
+
         if (logPath is null)
         {
             return true;
@@ -426,5 +442,8 @@ public static class Cli
         public bool MayPoint { get; set; }
 
         public bool Cancelled { get; set; }
+
+        // Whether the command line runs "describe --watch".
+        public bool Watches { get; set; }
     }
 }

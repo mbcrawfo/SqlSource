@@ -38,6 +38,12 @@ internal static class ProjectEvaluator
     /// <summary>How many lines of MSBuild's output an error shows.</summary>
     public const int MaxOutputLines = 20;
 
+    /// <summary>
+    /// The start of the name of the folder that an evaluation makes in <see cref="ToolHost.TempDirectory" /> for its
+    /// manifests, which a <see cref="Guid" /> of 32 digits ends.  A watch knows its writes there by it.
+    /// </summary>
+    public const string ManifestFolderPrefix = "sqlsource-";
+
     /// <summary>The name of the target of the package that writes the manifest.</summary>
     public const string ManifestTarget = "SqlSourceWriteManifest";
 
@@ -86,7 +92,7 @@ internal static class ProjectEvaluator
 
         // A folder of this run's own, for the manifests: nothing is written into a project.
         var folder = Directory
-            .CreateDirectory(Path.Combine(host.TempDirectory, "sqlsource-" + Guid.NewGuid().ToString("N")))
+            .CreateDirectory(Path.Combine(host.TempDirectory, ManifestFolderPrefix + Guid.NewGuid().ToString("N")))
             .FullName;
         try
         {
@@ -149,10 +155,11 @@ internal static class ProjectEvaluator
             return asked.Failure;
         }
 
-        var state = StateOf(asked.Value.Answer, project);
+        var assetsFile = AssetsFileOf(asked.Value.Answer, project);
+        var state = StateOf(asked.Value.Answer, assetsFile);
         if (state != ProjectState.UsesSqlSource)
         {
-            return new ProjectEvaluation(project, state);
+            return new ProjectEvaluation(project, state, AssetsFile: assetsFile);
         }
 
         var target = await RunManifestTargetAsync(
@@ -162,10 +169,18 @@ internal static class ProjectEvaluator
             [.. asked.Value.FrameworkSwitch, .. solutionSwitches],
             cancellationToken
         );
-        return target.Succeeded
+        var evaluation = target.Succeeded
             ? await ReadManifestAsync(project, manifestFile, target.Value, cancellationToken)
             : target.Failure;
+        return evaluation with { AssetsFile = assetsFile };
     }
+
+    // The full path of the file that a restore of the project writes, or null for a project that has none, as one with
+    // packages.config.
+    private static string? AssetsFileOf(Answer answer, string project) =>
+        answer.ProjectAssetsFile.Length == 0
+            ? null
+            : Path.GetFullPath(answer.ProjectAssetsFile, Path.GetDirectoryName(project) ?? "");
 
     // Evaluates the project and runs no target; a project of several frameworks is evaluated again under its first.
     private static async Task<Outcome<Evaluated, ProjectEvaluation>> AskAsync(
@@ -315,7 +330,7 @@ internal static class ProjectEvaluator
     }
 
     // The first that holds, in the order that "evaluating a project" in docs/architecture/tool.md gives.
-    private static ProjectState StateOf(Answer answer, string project)
+    private static ProjectState StateOf(Answer answer, string? assetsFile)
     {
         if (string.Equals(answer.Imported, "true", StringComparison.OrdinalIgnoreCase))
         {
@@ -330,12 +345,11 @@ internal static class ProjectEvaluator
 
         // A project with packages.config: NuGet writes it no assets file, so nothing says whether it was restored.
         // Such a project imports a package's props by a line of its own, so one that uses SqlSource has the marker.
-        if (answer.ProjectAssetsFile.Length == 0)
+        if (assetsFile is null)
         {
             return ProjectState.DoesNotUseSqlSource;
         }
 
-        var assetsFile = Path.GetFullPath(answer.ProjectAssetsFile, Path.GetDirectoryName(project) ?? "");
         return File.Exists(assetsFile) ? ProjectState.DoesNotUseSqlSource : ProjectState.NotRestored;
     }
 

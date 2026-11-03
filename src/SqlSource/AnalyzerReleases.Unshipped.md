@@ -137,3 +137,4 @@ SQLSRC283 | SqlSource | Error | JSON opt-in does not apply
 SQLSRC284 | SqlSource | Warning | Short name finds a type that only a package brings
 SQLSRC285 | SqlSource | Error | .env file cannot be read
 SQLSRC286 | SqlSource | Error | Connection in .env cannot be read
+SQLSRC287 | SqlSource | Error | The watcher failed

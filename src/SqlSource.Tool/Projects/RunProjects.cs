@@ -27,8 +27,8 @@ internal static class RunProjects
     private static readonly ContinuationLine Restore = new("help", "run 'dotnet restore'");
 
     /// <summary>
-    /// The manifests of the run's projects, in the order of the projects.  A project with an error is reported and
-    /// left out, and the run goes on with the rest.
+    /// The run's projects, and the manifests of those that use SqlSource, in the order of the projects.  A project with
+    /// an error is reported and has no manifest, and the run goes on with the rest.
     /// </summary>
     /// <param name="unit">The solution or the project the run is on.</param>
     /// <param name="named">
@@ -38,7 +38,7 @@ internal static class RunProjects
     /// <param name="host">The working directory, and what MSBuild is run with.</param>
     /// <param name="reporter">Where the errors go.</param>
     /// <param name="cancellationToken">Ends the run.</param>
-    public static async Task<ImmutableArray<ProjectManifest>> FindAsync(
+    public static async Task<FoundProjects> FindAsync(
         RunUnit unit,
         IReadOnlyList<UsageValue> named,
         ToolHost host,
@@ -54,7 +54,7 @@ internal static class RunProjects
             if (!read.Succeeded)
             {
                 reporter.Report(ToolDiagnostic.ForFile(ToolDiagnostics.SolutionCannotBeRead, unit.Path, read.Failure));
-                return [];
+                return FoundProjects.None;
             }
 
             projects = read.Value;
@@ -75,10 +75,16 @@ internal static class RunProjects
         }
 
         var manifests = ImmutableArray.CreateBuilder<ProjectManifest>();
+        var assetsFiles = ImmutableArray.CreateBuilder<(string Project, string AssetsFile)>();
         foreach (var evaluation in await ProjectEvaluator.EvaluateAsync(host, projects, solution, cancellationToken))
         {
             RunEvents.Project(reporter.Trace, evaluation.ProjectPath, evaluation);
             var project = evaluation.ProjectPath;
+            if (evaluation.AssetsFile is { } assetsFile)
+            {
+                assetsFiles.Add((project, assetsFile));
+            }
+
             switch (evaluation.State)
             {
                 case ProjectState.UsesSqlSource:
@@ -123,7 +129,7 @@ internal static class RunProjects
             }
         }
 
-        return manifests.ToImmutable();
+        return new FoundProjects(projects, manifests.ToImmutable(), assetsFiles.ToImmutable());
     }
 
     /// <summary>

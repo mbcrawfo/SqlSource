@@ -1,11 +1,13 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
+using SqlSource.Tool.Watching;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.Describer;
@@ -73,6 +75,67 @@ public sealed class DescribeCommandTests(SqlServerDatabases sqlServer) : IDispos
         var entry = SidecarFiles.Read(_fixtures.PathOf("SqlServer/Queries/Orders.sql")).Queries.ShouldHaveSingleItem();
         entry.Name.ShouldBe("GetOrders");
         entry.Engine.ShouldBe(SidecarValues.Engine.SqlServer);
+    }
+
+    // The real watcher and the real clock over a copy of the project, on the real MSBuild: Orders.sql is saved with
+    // another column, and its sidecar says so.  The copy is under the temporary folder, where a test's host watches.
+    [Fact]
+    public async Task Watch_SqlFileChanged_RewritesItsSidecar()
+    {
+        var project = _fixtures.Copy("SqlServer");
+        var orders = _fixtures.PathOf("SqlServer/Queries/Orders.sql");
+        using var run = CliRun.Real(Path.GetDirectoryName(project)!);
+        run.ReleasedDescribers = true;
+        run.Time = TimeProvider.System;
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+        var running = run.Start(
+            stop.Token,
+            "describe",
+            project,
+            "--watch",
+            "--connection",
+            SqlServerDatabases.Database + "=" + sqlServer.ConnectionString
+        );
+        try
+        {
+            await Eventually.TrueAsync(
+                () => running.Output.Contains(WatchSession.WatchingMarker, StringComparison.Ordinal),
+                "The watch did not finish its first pass.  It wrote: " + running.Output + running.Errors
+            );
+            SidecarColumns(orders).ShouldBe(["id", "total", "note"]);
+
+            await File.WriteAllTextAsync(
+                orders,
+                "-- name: GetOrders\nSELECT id, total, note, user_id FROM dbo.orders WHERE user_id = @userId;\n",
+                TestContext.Current.CancellationToken
+            );
+
+            await Eventually.TrueAsync(
+                () => SidecarColumns(orders).SequenceEqual(["id", "total", "note", "user_id"]),
+                "The watch did not rewrite the sidecar.  It wrote: " + running.Output + running.Errors
+            );
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+
+        var result = await Eventually.WithinAsync(running.Ended, "The watch did not end when it was stopped.");
+        result.ExitCode.ShouldBe(0, result.Error);
+    }
+
+    // The names of the columns of the sidecar's one entry, or none while the sidecar is being replaced.
+    private static string[] SidecarColumns(string sql)
+    {
+        try
+        {
+            return [.. SidecarFiles.Read(sql).Queries.Single().Columns?.Select(static column => column.Name) ?? []];
+        }
+        catch (IOException)
+        {
+            return [];
+        }
     }
 
     [Fact]

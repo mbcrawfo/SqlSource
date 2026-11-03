@@ -157,6 +157,7 @@ To keep the sidecars current:
 |----|----|
 | You add, change, rename or remove a query, the database type or the nullability of a `-- param:` marker (not its C# type after `->`), or a token's default | `dotnet sqlsource describe`, or a build that [runs the tool](#running-in-the-build) |
 | The schema of the database changes | `dotnet sqlsource describe --force`: see [after a schema change](#after-a-schema-change) |
+| While you work on your queries, to describe each one as you save it | `dotnet sqlsource describe --watch`: see [describe on save](#describe-on-save) |
 | You update the tool | `dotnet sqlsource describe`, or a build that runs the tool, which describes every query again |
 | On a build server, to catch a sidecar that someone forgot | `dotnet sqlsource describe --check`: see [check in CI](#check-in-ci) |
 
@@ -238,6 +239,60 @@ billing (postgres): 16 described, 0 skipped, 0 failed
 
 To describe again only the queries of one database, add `--database billing`.
 
+<a id="describe-on-save"></a>
+
+## Describe on save
+
+```console
+$ dotnet sqlsource describe --watch
+billing (postgres): 0 described, 16 skipped, 0 failed
+sqlsource: watching for changes; press Ctrl+C to stop
+sqlsource: change detected; describing
+billing (postgres): 1 described, 15 skipped, 0 failed
+sqlsource: watching for changes; press Ctrl+C to stop
+```
+
+`--watch` keeps the tool running while you work.  It describes once, as `describe` does, then waits, and describes again each time you save a file that can change what it describes, until you stop it.  Each pass is a whole `describe`: it describes only the queries whose sidecar entry is no longer current, writes their sidecars and prints its summary, so the sidecar of a query you just saved is current a moment later.  A pass that reports errors does not stop the watch: fix what it reported and save, and the next pass tries again.
+
+**What starts a pass:**
+
+- **A file that the tool reads is saved**: a `.sql` file of your projects, a [settings file](settings.md#settings-files) that applies to one, or a C# file of a project.
+- **What a project includes may have changed**: a new `.sql`, C# or `sqlsource.json` file, or a new folder, in a project's folder or in a folder that a project lists a file from; a new `sqlsource.json` in a folder above a file the tool reads, up to the root of your repository; a `.sql` file renamed, or deleted and still gone when the pass starts; a project file or a solution file saved; a `Directory.Build.props`, `Directory.Build.targets` or `Directory.Packages.props` saved in the folder of a project or of the solution, below it, or above it up to the root of your repository; and a `dotnet restore`, into the project's `obj` folder or into the `artifacts` folder of `UseArtifactsOutput`.  The pass then reads your projects again before it describes, so a new file, or a new project of the solution, is described.
+- **The [`.env` file](#env-file)** is saved, deleted or created in a folder where the tool looks for it.
+
+Everything else is passed over: the sidecars and the temporary files the tool writes itself, everything under `bin`, `obj` and `.git` but what a restore writes, and every other file.  So the tool's own writes never start a pass.
+
+**When it describes.**  A pass starts 300 ms after the last change it covers, so a save that an editor makes in several writes, or a branch switch that changes hundreds of files, gives one pass.  A change saved while a pass runs gives one more pass once it ends.
+
+**The two lines it writes.**  After every pass the tool writes this line, alone on its line, to standard output:
+
+```text
+sqlsource: watching for changes; press Ctrl+C to stop
+```
+
+and before every pass after the first, this one:
+
+```text
+sqlsource: change detected; describing
+```
+
+A task of your editor can wait for them to know when a pass begins and ends.
+
+**The options.**
+
+- **`--check` cannot be used with `--watch`.**  The tool writes `sqlsource: options '--watch' and '--check' cannot be used together` and exits with `1`.
+- **`--force` forces the first pass only.**  It describes every query once; each later pass describes what the changes made stale.
+- **`--project`, `--database` and `.sql` paths narrow every pass**, as they narrow a run, and **`--connection` and `--verbose` apply to every pass.**
+- **`--log` writes one file for the whole watch**, from its start until it is stopped: see [logs](#logs).
+
+**Stopping it.**  Stop the watch with Ctrl+C, or end it with `SIGTERM` or `SIGHUP`, as closing its terminal does.  A pass under way stops as a stopped `describe` does, and writes no further sidecar.  The tool exits with `0`, whatever its passes reported, since stopping is how a watch ends; each error was written in the pass that found it.  A wrong command line, a project or solution that cannot be found, and a log that cannot be opened end it with `1` before the first pass.  See [exit codes](#exit-codes).
+
+**One watch is enough.**  Run one for a repository.  A second one, or a watch while a build runs, does no harm: each sidecar is written whole, and two passes that describe the same query write the same sidecar.  It only does the work twice.
+
+**Where the system does not report changes.**  The tool asks the system to tell it when a file changes.  A folder mounted into a container or on a network share may not tell it.  Set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1`, in any case, before you start the watch, and the tool looks at the folders every second instead, so a change is found within a second or two.  The .NET SDK's container image, `mcr.microsoft.com/dotnet/sdk`, sets it to `true`, so a watch in a container of that image looks every second; set it to `false` there to use the system's events.  On Linux, a machine with many projects, or other programs that watch folders, can reach one of the system's limits on watching folders: that is [SQLSRC287](diagnostics.md#sqlsrc287), whose section says how to raise each.
+
+**Editors.**  The saves of an editor were checked with Rider on macOS alone.  Visual Studio, VS Code and other editors, and Windows, have not been checked: see [known issues](#known-issues).
+
 <a id="check-in-ci"></a>
 
 ## Check in CI
@@ -285,6 +340,7 @@ Under `--check` the counts are `same`, `differ` and `failed`.  A name given to `
 dotnet sqlsource describe [<path>...] [--project <path>]... [--database <name>]...
                           [--connection <name>=<connection string>]...
                           [--force | --check] [--verbose] [--log <path>]
+                          [--watch]
 ```
 
 `dotnet sqlsource --help` and `dotnet sqlsource describe --help` print the options, and `dotnet sqlsource --version` the version of the tool.
@@ -320,6 +376,7 @@ A relative path is taken from the current folder.
 | `--log <path>` | Writes a record of the run to a file; a path that holds `=` or `;` is refused: see [logs](#logs) |
 | `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  It takes no project or solution, `.sql` path, `--project` or `--database`.  See [running in the build](#running-in-the-build) |
 | `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest` or `--log` path that holds `=` or `;`, as the build's own may, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](#running-in-the-build) |
+| `--watch` | Describes once, then again each time a file of the run changes, until stopped: see [describe on save](#describe-on-save).  Not with `--check` |
 
 A run with `--project`, `--database` or a `.sql` path writes only the sidecars of the files whose queries it selected, and deletes none.
 
@@ -333,8 +390,9 @@ A run with `--project`, `--database` or a `.sql` path writes only the sidecars o
 | `SQLSOURCE_CONNECTION` | The connection of a run with exactly one database |
 | `SQLSOURCE_LOG` | The path of the log, when `--log` is not given.  In a build, any value writes a log of each project's run: see [running in the build](#running-in-the-build) |
 | `SQLSOURCE_DEBUG` | Any value that is not empty adds the stack trace to [SQLSRC200](diagnostics.md#sqlsrc200), for a bug report |
+| `DOTNET_USE_POLLING_FILE_WATCHER` | `true` or `1`, in any case, makes `--watch` look at the folders every second instead of asking the system: see [describe on save](#describe-on-save) |
 
-A connection or log variable that is empty or holds only white space is not set.  Each connection variable can also be set in a [`.env` file](#env-file), and the environment wins over it; `SQLSOURCE_LOG` and `SQLSOURCE_DEBUG` are read from the environment alone.
+A connection or log variable that is empty or holds only white space is not set.  Each connection variable can also be set in a [`.env` file](#env-file), and the environment wins over it; `SQLSOURCE_LOG`, `SQLSOURCE_DEBUG` and `DOTNET_USE_POLLING_FILE_WATCHER` are read from the environment alone.
 
 <a id="exit-codes"></a>
 
@@ -342,8 +400,8 @@ A connection or log variable that is empty or holds only white space is not set.
 
 | Code | When |
 |----|----|
-| `0` | The run reported no error |
-| `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; or the run was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
+| `0` | The run reported no error; or a `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP`, whatever its passes reported |
+| `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; or a run without `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
 | `2` | `--check` found a sidecar out of date, and nothing else went wrong |
 
 A run that is stopped writes no further sidecar.  A second Ctrl+C ends the process at once.
@@ -364,7 +422,7 @@ sqlsource: sidecar '/work/App/Queries/Users.sql.json': written
 postgres (postgres): 1 described, 0 skipped, 0 failed
 ```
 
-`--verbose` prints a line for each project, file, database, query and sidecar, saying what the run decided for it, each starting with `sqlsource:`.  A database's line names where its connection came from, and never the connection: `--connection`, a variable's name, or, for a connection from a [`.env` file](#env-file), the variable and the file, as `connection from SQLSOURCE_CONNECTION_BILLING in /work/.env`.  Use it to see why a query was skipped or a project left out.  Without it the tool prints its errors, the summary, and the line that ends a failed run or says that no project uses SqlSource.
+`--verbose` prints a line for each project, file, database, query and sidecar, saying what the run decided for it, each starting with `sqlsource:`.  A database's line names where its connection came from, and never the connection: `--connection`, a variable's name, or, for a connection from a [`.env` file](#env-file), the variable and the file, as `connection from SQLSOURCE_CONNECTION_BILLING in /work/.env`.  Use it to see why a query was skipped or a project left out.  Under `--watch` it says the same of each pass, and nothing more.  Without it the tool prints its errors, the summary, and the line that ends a failed run or says that no project uses SqlSource.
 
 <a id="logs"></a>
 
@@ -377,7 +435,8 @@ $ dotnet sqlsource describe --log sqlsource.log
 `--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file, one JSON object on each line.  It is what to attach to an issue when the tool does something you did not expect.
 
 - **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).  It refuses a `--log` path that holds `=` or `;` too, which is more likely a connection string typed in the wrong place than a path; a path from `SQLSOURCE_LOG` is not held to that.
-- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it, and nor does the run of a build, which is given no `--log`: see [running in the build](#running-in-the-build) for its logs.
+- **A `--watch` writes one file from its start until it is stopped**, with every pass in it and where each begins and ends.
+- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it, nor does a `--watch`, nor the run of a build, which is given no `--log`: see [running in the build](#running-in-the-build) for its logs.
 
 **Read a log before you share it.**  The tool writes each connection value as `***` wherever it finds it whole: the value of each `--connection` on the command line, and the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message, as written, with the spaces at its ends trimmed, or as the driver writes it again.  It writes each password of a connection string as `***` too, where it stands apart from other letters, digits and underscores and is at least four characters long, and so the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file when the connection string gives none.  In the record of your command line, every value of `--database` and `--connection` is written `***`.  A value typed where a path goes (the path of `describe`, a `.sql` path or a `--project` value) is written `***` too when it holds `=` or `;`, as a connection string does.  A value typed there or after `--log` with neither, such as a password typed alone, can appear as written, and so can a password shorter than four characters, and one that is the name of its logical database or of its dialect, such as `postgres` ([known issues](#known-issues)): search the log for your password before you share it.  The log also holds:
 
@@ -404,4 +463,6 @@ $ dotnet sqlsource describe --log sqlsource.log
 - **A project with several target frameworks is read for its first framework alone**, by `describe` and by a build that runs the tool.  A `.sql` file or a C# file that the project includes only for another framework, and a `[SqlSourceGenerate]` under an `#if` that only another framework defines, are not seen, and their queries are not described: the build for that framework reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be.  A project that references SqlSource for a later framework only is left out of a solution's run without a word, and is [SQLSRC204](diagnostics.md#sqlsrc204) when you name it; its build reports SQLSRC241 in the same way.  Include the `.sql` files and the attributed types for every framework, or for the first one listed.
 - **A `.sql` file that one of your own build targets adds is not described**, by `describe`, nor by the build of a project with several target frameworks.  See [the known issues of settings](settings.md#known-issues) for what goes wrong and the one line that fixes it.
 - **A `.sql` file that two projects list with two outputs** has one sidecar for both, and a run on one of the two projects can leave out, or remove, the entries that only the other needs.  Give the file the same output in both projects, and describe the whole solution in one run.  See [the known issues of `.sql` files](sql-files.md#known-issues).
+- **A save in an editor other than Rider on macOS may not start a pass of `describe --watch`.**  The saves of Visual Studio, VS Code and other editors, and saves on Windows, have not been checked.  If saving a file does not start a pass, stop the watch, set `DOTNET_USE_POLLING_FILE_WATCHER` to `true` and start it again: it then finds a save within a second or two.
+- **A few changes to folders far from your project start no pass of `describe --watch`.**  A folder deleted and made again where the watch was not looking one level above it, such as your repository's own folder on Linux, or, outside a git repository, a folder deleted together with the folder above it, is not seen, and later saves in it start no pass.  A first `dotnet restore` into an `artifacts` folder that does not exist yet and lies above your repository's folder, or outside a repository above the folder of your nearest `Directory.Build.props`, or above your project's folder when there is none, starts no pass either.  Outside a git repository the watch also looks at the folder one level above each folder it covers, such as the folder above your project's folder, so a project or solution file saved there starts a pass that changes nothing.  Stop the watch and start it again after such a change, or work inside a git repository.
 - **A short password, or a connection string typed in the wrong place, can appear in the output or a log.**  The tool writes a connection value as `***` where it finds the whole value, and each password of it, or of `PGPASSWORD` or a PostgreSQL password file, where it stands apart from other letters, digits and underscores.  A password shorter than four characters is not hidden, nor is one that is the name of its logical database or of its dialect, such as `postgres`, words that the tool prints anyway.  A password that is hidden hides each word of a message that equals it, such as a column named like it, and every password of a PostgreSQL password file that the tool reads is hidden so, not only the one the connection uses.  A password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell, is left for the driver to read, and its password is not hidden.  An error of SQL Server about a query can name the login, such as one for a database that the login may not open, and it is printed and logged as the server wrote it.  A connection string typed where a path or a `--project` goes, or after `--database` or `--connection` without its `name=`, is not printed.  In the log, every value of `--database` and `--connection` is written `***`, and so is a path, a `--project` value included, that holds `=` or `;`; a `--log` path that holds either is refused.  A secret with neither, typed alone where a path, a `--project` value or a `--log` path goes, is printed as a path and logged as typed.  Give each connection as `--connection <name>="..."` or in its variable, and search what you share, a log above all, for your password first.

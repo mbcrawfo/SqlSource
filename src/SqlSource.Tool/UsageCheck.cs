@@ -43,6 +43,8 @@ internal static class UsageCheck
         var messages = new List<string>();
         var arguments = new List<string>();
         var values = new List<UsageValue>();
+        // The flags given, each once, in the order they were first given.
+        var flags = new List<Option>();
         // An option that takes one value takes it once: System.CommandLine rejects a second with the value's text.
         var givenOnce = new HashSet<Option>();
         var command = root;
@@ -76,12 +78,17 @@ internal static class UsageCheck
                     var line = IsNearAnOption(root, name)
                         ? $"sqlsource: unknown option '{OneLine.Of(name)}'"
                         : $"sqlsource: unknown option at position {index}";
-                    return new Usage(command, arguments, [], [line]);
+                    return new Usage(command, arguments, [], [line]) { Flags = flags };
                 }
 
                 var hasSeparator = token.Length > name.Length;
                 if (option.Arity.MaximumNumberOfValues == 0)
                 {
+                    if (!flags.Contains(option))
+                    {
+                        flags.Add(option);
+                    }
+
                     if (hasSeparator)
                     {
                         messages.Add($"sqlsource: option '{name}' takes no value");
@@ -131,7 +138,7 @@ internal static class UsageCheck
             }
         }
 
-        return new Usage(command, arguments, values, messages);
+        return new Usage(command, arguments, values, messages) { Flags = flags };
     }
 
     // The names and aliases of every option of the tool, whichever command the walk is in, so that --forse is named

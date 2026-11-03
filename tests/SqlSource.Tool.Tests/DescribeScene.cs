@@ -12,11 +12,12 @@ internal sealed class DescribeScene : IDisposable
     // What ends a "describe" that reported an error and wrote no log.
     public const string RunAgain = "sqlsource: run again with --log <file> for a record of what the run did\n";
 
-    public DescribeScene()
+    // The project is in the working directory, or in the folder below it that is given.
+    public DescribeScene(string directory = "")
     {
         Run.Time = Clock;
         Run.Describers.Add(Describer);
-        Project = Plans.Postgres(Run.Folder, directory: "").AnsweredBy(Run.Processes);
+        Project = Plans.Postgres(Run.Folder, directory: directory).AnsweredBy(Run.Processes);
         Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
         Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
     }
