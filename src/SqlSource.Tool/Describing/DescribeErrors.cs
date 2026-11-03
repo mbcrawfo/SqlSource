@@ -1,11 +1,14 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 
@@ -28,15 +31,30 @@ internal static class DescribeErrors
         );
 
     /// <summary>
-    /// <c>SQLSRC213</c>, with the option, the variable, the names given for no database that are close to one, and
-    /// the positions of the values whose name is far from every database, which may be a secret.
+    /// <c>SQLSRC213</c>, with the option, the variable and where it is looked up, the names given for no database
+    /// that are close to one, the positions of the values whose name is far from every database, which may be a
+    /// secret, and the <c>.env</c> files of the database's projects that the run did not read.
     /// </summary>
-    public static ToolDiagnostic NoConnection(PlannedQuery query, DatabaseConnection connection, Connections all)
+    /// <param name="query">The first query of the database, where the error is reported.</param>
+    /// <param name="connection">The database's connection, which has no value.</param>
+    /// <param name="all">The connections of the run, with where they were looked up.</param>
+    /// <param name="projectFolders">The folders of the projects of the database's queries.</param>
+    /// <param name="readTextFile">The host's, which finds the files that were not read.</param>
+    public static ToolDiagnostic NoConnection(
+        PlannedQuery query,
+        DatabaseConnection connection,
+        Connections all,
+        IEnumerable<string> projectFolders,
+        Func<string, string?> readTextFile
+    )
     {
+        var environment = all.Environment;
         var help = new StringBuilder("pass --connection ")
             .Append(connection.Database)
             .Append("=<connection string>, or set ")
-            .Append(connection.Variable);
+            .Append(connection.Variable)
+            .Append(" in the environment or in ")
+            .Append(environment.FilePath ?? Path.Combine(environment.UnitFolder, DotEnvSearch.FileName));
         if (!all.UnusedNames.IsEmpty)
         {
             _ = help.Append(".  --connection was given for ")
@@ -50,6 +68,15 @@ internal static class DescribeErrors
             _ = help.Append(".  ").Append(UnusedPositionsSentence(all.UnusedPositions));
         }
 
+        var notRead = DotEnvSearch.NotRead(environment.UnitFolder, environment.FilePath, projectFolders, readTextFile);
+        if (!notRead.IsEmpty)
+        {
+            _ = help.Append(".  The run did not read ")
+                .Append(InWords(notRead))
+                .Append(": it reads the .env nearest to ")
+                .Append(environment.UnitFolder);
+        }
+
         return ToolDiagnostic
             .At(ToolDiagnostics.DatabaseHasNoConnection, query.Query.NameLocation, connection.Database)
             .WithLines(new ContinuationLine(Help, help.ToString()));
@@ -61,14 +88,14 @@ internal static class DescribeErrors
     private static string UnusedPositionsSentence(ImmutableArray<int> positions)
     {
         var numbers = positions.Select(static position => position.ToString(CultureInfo.InvariantCulture)).ToList();
-        if (numbers.Count == 1)
-        {
-            return $"The value of --connection at position {numbers[0]} names no database of this run";
-        }
-
-        var list = $"{string.Join(", ", numbers.Take(numbers.Count - 1))} and {numbers[^1]}";
-        return $"The values of --connection at positions {list} name no databases of this run";
+        return numbers.Count == 1
+            ? $"The value of --connection at position {numbers[0]} names no database of this run"
+            : $"The values of --connection at positions {InWords(numbers)} name no databases of this run";
     }
+
+    // a; a and b; a, b and c
+    private static string InWords(IReadOnlyList<string> items) =>
+        items.Count == 1 ? items[0] : $"{string.Join(", ", items.Take(items.Count - 1))} and {items[^1]}";
 
     /// <summary><c>SQLSRC214</c>: the database's variable is another selected database's too.</summary>
     public static ToolDiagnostic SharedVariable(PlannedQuery query, DatabaseConnection connection, string other) =>

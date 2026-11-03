@@ -1,14 +1,17 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.CommandLine;
 using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing;
 
-// Where the connection of a database comes from: the command line, its own variable, or the variable with no name.
+// Where the connection of a database comes from: the command line, its own variable, or the variable with no name,
+// each variable from the environment or else from the run's .env file.
 public sealed class ConnectionTests
 {
     // Every selected database can be described, and the plan has no other.
@@ -32,17 +35,41 @@ public sealed class ConnectionTests
         string[] describable,
         string[] given,
         params (string Name, string Value)[] environment
+    ) => Resolve(planned, selected, describable, given, environment, []);
+
+    // With a .env file at DotEnvPath that holds "file".
+    private static Connections Resolve(
+        string[] planned,
+        string[] selected,
+        string[] describable,
+        string[] given,
+        (string Name, string Value)[] environment,
+        (string Name, string Value)[] file
     )
     {
         var variables = environment.ToDictionary(variable => variable.Name, variable => variable.Value);
+        var dotEnv = new DotEnvFile(
+            file.Length == 0 ? null : DotEnvPath,
+            file.ToImmutableDictionary(variable => variable.Name, variable => variable.Value),
+            []
+        );
         return Connections.Resolve(
             selected,
             describable,
             planned,
             [.. given.Select((text, index) => ConnectionArguments.Parse(text, (2 * index) + 3))],
-            name => variables.GetValueOrDefault(name)
+            ConnectionEnvironment.Of(name => variables.GetValueOrDefault(name), dotEnv, "/work")
         );
     }
+
+    private static Connections ResolveWithFile(
+        string[] selected,
+        string[] given,
+        (string Name, string Value)[] environment,
+        params (string Name, string Value)[] file
+    ) => Resolve(selected, selected, selected, given, environment, file);
+
+    private const string DotEnvPath = "/work/.env";
 
     [Theory]
     [InlineData("billing", "SQLSOURCE_CONNECTION_BILLING")]
@@ -147,6 +174,124 @@ public sealed class ConnectionTests
         connections.For("billing").Value.ShouldBeNull();
         connections.UnnamedIsSetAndNotUsed.ShouldBeFalse();
     }
+
+    [Fact]
+    public void For_VariableOnlyInTheDotEnvFile_IsUsedAndSaysTheFile()
+    {
+        var connection = ResolveWithFile(["billing"], [], [], ("SQLSOURCE_CONNECTION_BILLING", "F")).For("billing");
+
+        connection.Value.ShouldBe("F");
+        connection.Source.ShouldBe("SQLSOURCE_CONNECTION_BILLING in /work/.env");
+    }
+
+    [Fact]
+    public void For_VariableInTheEnvironmentAndInTheDotEnvFile_IsTheEnvironments()
+    {
+        var connection = ResolveWithFile(
+                ["billing"],
+                [],
+                [("SQLSOURCE_CONNECTION_BILLING", "E")],
+                ("SQLSOURCE_CONNECTION_BILLING", "F")
+            )
+            .For("billing");
+
+        connection.Value.ShouldBe("E");
+        connection.Source.ShouldBe("SQLSOURCE_CONNECTION_BILLING");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" \t")]
+    public void For_VariableThatIsBlankInTheEnvironment_IsTheDotEnvFiles(string blank) =>
+        ResolveWithFile(
+                ["billing"],
+                [],
+                [("SQLSOURCE_CONNECTION_BILLING", blank)],
+                ("SQLSOURCE_CONNECTION_BILLING", "F")
+            )
+            .For("billing")
+            .Value.ShouldBe("F");
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" \t")]
+    public void For_VariableThatIsBlankInTheDotEnvFile_IsNotSet(string blank)
+    {
+        var connections = ResolveWithFile(
+            ["billing"],
+            [],
+            [],
+            ("SQLSOURCE_CONNECTION_BILLING", blank),
+            ("SQLSOURCE_CONNECTION", blank)
+        );
+
+        connections.For("billing").Value.ShouldBeNull();
+        connections.UnnamedIsSetAndNotUsed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void For_ValueOnTheCommandLine_WinsOverTheEnvironmentAndTheDotEnvFile()
+    {
+        var connection = ResolveWithFile(
+                ["billing"],
+                ["billing=A"],
+                [("SQLSOURCE_CONNECTION_BILLING", "E")],
+                ("SQLSOURCE_CONNECTION_BILLING", "F")
+            )
+            .For("billing");
+
+        connection.Value.ShouldBe("A");
+        connection.Source.ShouldBe("--connection");
+    }
+
+    [Fact]
+    public void For_VariableOfTheNameInTheDotEnvFile_WinsOverTheVariableWithNoNameInTheEnvironment()
+    {
+        var connection = ResolveWithFile(
+                ["billing"],
+                [],
+                [("SQLSOURCE_CONNECTION", "C")],
+                ("SQLSOURCE_CONNECTION_BILLING", "F")
+            )
+            .For("billing");
+
+        connection.Value.ShouldBe("F");
+        connection.Source.ShouldBe("SQLSOURCE_CONNECTION_BILLING in /work/.env");
+    }
+
+    [Fact]
+    public void For_VariableWithNoNameInTheDotEnvFileAndOneDatabase_IsUsedAndSaysTheFile()
+    {
+        var connection = ResolveWithFile(["billing"], [], [], ("SQLSOURCE_CONNECTION", "C")).For("billing");
+
+        connection.Value.ShouldBe("C");
+        connection.Source.ShouldBe("SQLSOURCE_CONNECTION in /work/.env");
+    }
+
+    [Fact]
+    public void For_VariableWithNoNameInTheDotEnvFileAndTwoDatabases_IsNotUsed()
+    {
+        var connections = ResolveWithFile(["billing", "reports"], [], [], ("SQLSOURCE_CONNECTION", "C"));
+
+        connections.For("billing").Value.ShouldBeNull();
+        connections.For("reports").Value.ShouldBeNull();
+        connections.UnnamedIsSetAndNotUsed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ToString_ConnectionEnvironment_LeavesTheValuesOut() =>
+        ConnectionEnvironment
+            .Of(
+                _ => Secrets.Word,
+                new DotEnvFile(
+                    DotEnvPath,
+                    ImmutableDictionary<string, string>.Empty.Add("SQLSOURCE_CONNECTION", Secrets.Marker),
+                    []
+                ),
+                "/work"
+            )
+            .ToString()
+            .ShouldBe("ConnectionEnvironment { UnitFolder = /work, FilePath = /work/.env, Errors = 0 }");
 
     [Fact]
     public void For_VariableWithNoNameAndTwoSelectedDatabases_IsNotUsed()

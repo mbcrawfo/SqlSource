@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;
@@ -55,5 +56,32 @@ public sealed class ToolHostTests
         }
 
         File.ReadAllText(created).ShouldBe("x");
+    }
+
+    [Fact]
+    public void Create_RealHost_ReadTextFile_GivesTextAndNullForNoFileOrAFolder()
+    {
+        using var folder = new TempFolder();
+        var path = folder.WriteFile(".env", "KEY=value\r\n");
+        var host = ToolHost.Create();
+
+        host.ReadTextFile(path).ShouldBe("KEY=value\r\n");
+        host.ReadTextFile(folder.PathOf("missing/.env")).ShouldBeNull();
+        host.ReadTextFile(folder.PathOf("nothing.env")).ShouldBeNull();
+        host.ReadTextFile(folder.CreateFolder("a-folder")).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Hosts_ReadTextFile_ReadsOnlyUnderTheTemporaryFolder()
+    {
+        using var folder = new TempFolder();
+        var inside = folder.WriteFile(".env", "KEY=value");
+        var outside = Path.Combine(RepositoryRoot.Path(), "README.md");
+        File.Exists(outside).ShouldBeTrue();
+        var host = Hosts.Create(folder.Path, new FakeProcessRunner(), folder.Path);
+
+        host.ReadTextFile(inside).ShouldBe("KEY=value");
+        host.ReadTextFile(outside).ShouldBeNull();
+        Hosts.Real(folder.Path, folder.Path).ReadTextFile(outside).ShouldBeNull();
     }
 }

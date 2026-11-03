@@ -14,9 +14,14 @@ namespace SqlSource.Tool.Describing;
 /// <param name="Databases">
 /// The values of <c>--database</c>, each name once ignoring case, in the order given; the first of a name is kept.
 /// </param>
+/// <param name="UnitFolder">
+/// The full path of the folder of the run's unit, the project or the solution, where the search for its <c>.env</c>
+/// file starts.
+/// </param>
 internal sealed record DescribeOptions(
     RunMode Mode,
     bool HasFilter,
     ImmutableArray<ConnectionArgument> Connections,
-    ImmutableArray<UsageValue> Databases
+    ImmutableArray<UsageValue> Databases,
+    string UnitFolder
 );

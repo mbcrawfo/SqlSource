@@ -25,6 +25,7 @@ Each page is in this folder.
 | `src/SqlSource.Tool/Projects` | `tool.md` | `## A describe run`, `## Folders`; the manifest's reader in `msbuild-and-manifest.md`, `## The manifest` |
 | `src/SqlSource.Tool/Planning` | `tool.md` | `## A describe run`, `## Folders` |
 | `src/SqlSource.Tool/Processes` | `tool.md` | `## Folders` |
+| `src/SqlSource.Tool/DotEnv` | `tool.md` | `### Connections`, under `## A describe run`; `## Folders` |
 | `src/SqlSource.Tool/Describing`, its root | `tool.md` | `## A describe run`, `## Folders` |
 | `src/SqlSource.Tool/Logging` and `src/SqlSource.Tool/Reporting` | `tool.md` | `## Logging and reporting` |
 | `src/SqlSource.Tool/Describing/Describers` | `postgres-describer.md` | `## The describer contract` |

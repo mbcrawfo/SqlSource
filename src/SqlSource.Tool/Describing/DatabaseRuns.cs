@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -59,7 +60,7 @@ internal static class DatabaseRuns
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await RunDatabaseAsync(database, queries, connections, host, reporter, cancellationToken);
+            await RunDatabaseAsync(database, files, queries, connections, host, reporter, cancellationToken);
         }
     }
 
@@ -68,6 +69,7 @@ internal static class DatabaseRuns
     // query.
     private static async Task RunDatabaseAsync(
         PlannedDatabase database,
+        ImmutableArray<FileWork> files,
         List<QueryWork> queries,
         Connections connections,
         ToolHost host,
@@ -90,7 +92,7 @@ internal static class DatabaseRuns
         var connection = connections.For(database.Name);
         if (connection.Value is not { } value)
         {
-            var error = NoConnection(first, connection, connections);
+            var error = NoConnection(first, connection, connections, ProjectFolders(files, queries), host);
             reporter.Report(error);
             Fail(queries, error.Descriptor.Id, reporter.Trace);
             return;
@@ -212,7 +214,13 @@ internal static class DatabaseRuns
             )
             : entry;
 
-    private static ToolDiagnostic NoConnection(PlannedQuery first, DatabaseConnection connection, Connections all)
+    private static ToolDiagnostic NoConnection(
+        PlannedQuery first,
+        DatabaseConnection connection,
+        Connections all,
+        IEnumerable<string> projectFolders,
+        ToolHost host
+    )
     {
         if (connection.SharesVariableWith is { } other)
         {
@@ -221,8 +229,15 @@ internal static class DatabaseRuns
 
         return all.UnnamedIsSetAndNotUsed
             ? DescribeErrors.UnnamedNotUsed(first, all)
-            : DescribeErrors.NoConnection(first, connection, all);
+            : DescribeErrors.NoConnection(first, connection, all, projectFolders, host.ReadTextFile);
     }
+
+    // The folders of the projects that the queries are planned under, in the plan's order.
+    private static IEnumerable<string> ProjectFolders(ImmutableArray<FileWork> files, List<QueryWork> queries) =>
+        files
+            .Where(file => file.Queries.Any(queries.Contains))
+            .Select(static file => Path.GetDirectoryName(file.File.ProjectPath)!)
+            .Distinct(StringComparer.Ordinal);
 
     // The queries of a database that the run decided to describe, in the plan's order.
     private static List<QueryWork> ToDescribe(ImmutableArray<FileWork> files, string database) =>

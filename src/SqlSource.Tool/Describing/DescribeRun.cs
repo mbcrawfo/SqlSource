@@ -25,7 +25,7 @@ internal static class DescribeRun
     /// </summary>
     /// <param name="plan">The plan of the run.</param>
     /// <param name="options">What the command line says of the run, beside its plan.</param>
-    /// <param name="host">The describers, the environment and standard output.</param>
+    /// <param name="host">The describers, the environment, the <c>.env</c> file and standard output.</param>
     /// <param name="reporter">Where the errors go, with the run's trace.</param>
     /// <param name="counted">
     /// Given the counts of each selected database, as <c>run.end</c> holds them, before the summary is written: a
@@ -60,14 +60,21 @@ internal static class DescribeRun
             RunEvents.Query(trace, query);
         }
 
-        // 3: the connection of every selected database is looked up, since the summary says which have none.
+        // 3: the connection of every selected database is looked up, since the summary says which have none, in
+        // the environment and then in the .env file nearest to the unit.  A file that cannot be read gives no value.
+        var environment = ConnectionEnvironment.Load(options.UnitFolder, host);
+        foreach (var error in environment.Errors)
+        {
+            reporter.Report(error);
+        }
+
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(static database => database.Name)],
             [.. RunDecisions.DescribableDatabases(plan).Select(static database => database.Name)],
             [.. plan.Databases.Select(static database => database.Name)],
             options.Connections,
-            host.GetEnvironmentVariable
+            environment
         );
         await DatabaseRuns.RunAsync(selected, files, connections, host, reporter, cancellationToken);
 

@@ -233,7 +233,14 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC284](#sqlsrc284) | Short name finds a type that only a package brings |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
+**A `.env` file**
+
+| Id | Title |
+|----|----|
+| [SQLSRC285](#sqlsrc285) | .env file cannot be read |
+| [SQLSRC286](#sqlsrc286) | Connection in .env cannot be read |
+
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271, 285 and 286 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -1272,14 +1279,14 @@ See: [Arguments](tool.md#arguments)
 
 **Database has no connection**
 
-A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database that can be described: a database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), does not count.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  A variable that is empty or holds only white space is not set.
+A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment, or in a [`.env` file](tool.md#env-file), it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database that can be described: a database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), does not count.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`; the environment wins over the `.env` file, variable by variable.  A variable that is empty or holds only white space is not set.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
-    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES
+    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env
 ```
 
-Give the connection in one of the two ways the `help:` line names, or leave the database out of the run with `--database`.  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.
+Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run read, or, when it found none, the `.env` it would read in the folder of the solution or project it runs on.  A run on a solution reads the `.env` beside the solution or above it, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads the .env nearest to /work`.  Move the file, or its connection variables, to the solution's folder or to the root of the repository.  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.
 
 See: [Connections](tool.md#connections)
 
@@ -2855,3 +2862,41 @@ dotnet_diagnostic.SQLSRC284.severity = none
 ```
 
 See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
+
+## SQLSRC285
+
+**.env file cannot be read**
+
+`sqlsource describe` looks for a `.env` file for the connections of a run, and the file it found cannot be read: the system would not open or read it.  The message names the file and ends with the reason the system gave.  The run goes on as if the file gave no connection at all, so the databases that needed a connection from it report [SQLSRC213](#sqlsrc213), unless another source gives one.
+
+```console
+sqlsource describe /work/App
+/work/.env : error SQLSRC285: '/work/.env' cannot be read: Access to the path '/work/.env' is denied.
+```
+
+Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment.
+
+See: [A `.env` file](tool.md#env-file)
+
+## SQLSRC286
+
+**Connection in .env cannot be read**
+
+A line of the `.env` file sets a connection variable, `SQLSOURCE_CONNECTION` or one that starts with `SQLSOURCE_CONNECTION_`, and the tool cannot tell what it sets.  The error is at the line and the column of the variable's name, and says which variable and why.  The value is never printed, since it is a connection and holds credentials.  A line that sets any other variable is not read by the tool, and is never an error.  The run goes on as if the file gave no connection at all, even from its good lines, since a file that is partly wrong is not one to trust.
+
+The reason is one of six:
+
+- `it has no '='`: the line is the variable's name and nothing else.
+- `the key is not a valid name`: the text before the `=` starts with `SQLSOURCE_CONNECTION` but is not a name of letters, digits and `_` that does not start with a digit, such as `SQLSOURCE_CONNECTION-A`.  A letter or a digit is one of any script, since the variable of a database called `données` is `SQLSOURCE_CONNECTION_DONNÉES`.
+- `a quote is not closed`: the value starts with `'` or `"` and the line ends before the matching quote.
+- `text follows the closing quote`: after the closing quote there is something other than white space or a `#` comment.
+- `a backslash starts no escape that .env takes`: a value in double quotes holds a `\` before a character other than `\`, `"`, `n`, `r` or `t`.  Write a literal backslash as `\\`, or put the value in single quotes, which take every character as it is.
+- `it is not saved as UTF-8`: the variable's name or value holds a `�`, which is what the tool reads for each byte of the file that is not UTF-8, as for the `ä` of a password in a file saved as Windows-1252 or Latin-1.  Only the lines of connection variables are checked, so the rest of the file may be saved as it is.  A value that really holds `�` cannot be given in a `.env` file; give it with `--connection`.
+
+```console
+/work/.env(2,1): error SQLSRC286: The line that sets 'SQLSOURCE_CONNECTION_BILLING' cannot be read: a quote is not closed
+```
+
+Fix the line named; for `it is not saved as UTF-8`, save the file as UTF-8 with the "Save with encoding" command of your editor.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
+
+See: [A `.env` file](tool.md#env-file)

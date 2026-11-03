@@ -92,7 +92,10 @@ internal static class RunEvents
     /// <summary>A selected database: where its connection came from, never what it is.</summary>
     /// <param name="trace">The run's.</param>
     /// <param name="database">The database.</param>
-    /// <param name="connectionSource">Where the connection came from, or null when there is none.</param>
+    /// <param name="connectionSource">
+    /// Where the connection came from, as <see cref="DatabaseConnection.Source" /> says it, or null when
+    /// there is none.
+    /// </param>
     /// <param name="hasDescriber">Whether a describer is registered for the database's engine.</param>
     public static void Database(RunTrace trace, PlannedDatabase database, string? connectionSource, bool hasDescriber)
     {

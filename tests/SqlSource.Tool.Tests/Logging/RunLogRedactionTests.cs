@@ -102,6 +102,49 @@ public sealed class RunLogRedactionTests : IDisposable
         line.GetProperty("list")[0].GetProperty("deep").GetString().ShouldBe("***");
     }
 
+    [Fact]
+    public async Task Run_ConnectionFromTheDotEnvFile_LogsItsSourceAndNotItsValue()
+    {
+        var path = _scene.Run.Folder.WriteFile(
+            ".env",
+            $"SQLSOURCE_CONNECTION_POSTGRES={Secrets.ConnectionWithMarker}\n"
+        );
+
+        var result = await _scene.DescribeAsync("--log", "run.log");
+
+        result.ExitCode.ShouldBe(0);
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.ConnectionWithMarker);
+        LogReader
+            .Events(Log, "database")
+            .ShouldHaveSingleItem()
+            .GetProperty("connectionSource")
+            .GetString()
+            .ShouldBe($"SQLSOURCE_CONNECTION_POSTGRES in {path}");
+        (await File.ReadAllTextAsync(Log, TestContext.Current.CancellationToken)).ShouldNotContain(Secrets.Marker);
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsItsConnectionFromTheDotEnvFile_HasTheMarkInEveryPlaceAndTheValueNowhere()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+            log.Write(
+                "connect " + request.Connection,
+                new(request.Connection, request.Connection),
+                new("message", "cannot connect with '" + request.Connection + "'"),
+                new("list", LogValue.ListOf([LogValue.MapOf(new LogMember("deep", request.Connection))]))
+            );
+        _ = _scene.Run.Folder.WriteFile(".env", $"SQLSOURCE_CONNECTION_POSTGRES='{Secrets.ConnectionWithMarker}'\n");
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        (await File.ReadAllTextAsync(Log, TestContext.Current.CancellationToken)).ShouldNotContain(Secrets.Marker);
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.ConnectionWithMarker);
+        var line = LogReader.Events(Log, "postgres.connect ***").ShouldHaveSingleItem();
+        line.GetProperty("***").GetString().ShouldBe("***");
+        line.GetProperty("message").GetString().ShouldBe("cannot connect with '***'");
+        line.GetProperty("list")[0].GetProperty("deep").GetString().ShouldBe("***");
+    }
+
     // The value is removed before the line is written, so the file holds it neither as it is nor as JSON escapes it.
     [Fact]
     public async Task Run_DescriberThatLogsAConnectionThatJsonEscapes_LeavesTheValueInNeitherForm()

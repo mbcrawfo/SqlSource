@@ -28,6 +28,9 @@ public sealed class SecretTests : IDisposable
 
     public void Dispose() => _scene.Dispose();
 
+    // Where the run looks for its .env file, which none of these tests writes.
+    private string DotEnvPath => _scene.Run.Folder.PathOf(".env");
+
     // A project with every error a describe run reports of its databases and sidecars but SQLSRC215, when "postgres"
     // has a connection:
     // a failure of the describer and SQLSRC217 in Users.sql, SQLSRC213 for "reports", SQLSRC214 for the two "app"
@@ -182,6 +185,60 @@ public sealed class SecretTests : IDisposable
         ShouldHold(result, "213,214,216,217,218,221,999");
     }
 
+    [Fact]
+    public async Task Run_ValueInTheDotEnvFileAndEveryError_IsNeverPrinted()
+    {
+        AddEveryError();
+        _ = WriteDotEnv(
+            $"SQLSOURCE_CONNECTION_POSTGRES={Secrets.ConnectionWithMarker}\n"
+                + $"SQLSOURCE_CONNECTION_APP_V2={Secrets.ConnectionWithMarker}\n"
+        );
+
+        var result = await _scene.DescribeAsync("--log", "run.log");
+
+        ShouldHold(result, "213,214,216,217,218,221,999");
+        _scene.Describer.Opened.ShouldAllBe(request => request.Connection == Secrets.ConnectionWithMarker);
+        (await ReadLogAsync()).ShouldNotContain(Secrets.Marker);
+    }
+
+    [Fact]
+    public async Task Run_ValueInTheDotEnvFileAndEveryErrorWithVerbose_IsNeverSaid()
+    {
+        AddEveryError();
+        var path = WriteDotEnv($"SQLSOURCE_CONNECTION_POSTGRES={Secrets.ConnectionWithMarker}\n");
+
+        var result = await _scene.DescribeAsync("--verbose");
+
+        ShouldHold(result, "213,214,216,217,218,221,999");
+        result.Out.ShouldContain(
+            $"sqlsource: database 'postgres' (postgres): connection from SQLSOURCE_CONNECTION_POSTGRES in {path}\n"
+        );
+    }
+
+    // A line of the tool's that cannot be read is named by its key and why, and never by any part of its value,
+    // whichever part of the line is wrong.
+    [Fact]
+    public async Task Run_MalformedDotEnvLineThatHoldsTheValue_PrintsNothingOfIt()
+    {
+        _ = WriteDotEnv(
+            $"SQLSOURCE_CONNECTION_POSTGRES=\"{Secrets.ConnectionWithMarker}\n"
+                + $"SQLSOURCE_CONNECTION_BILLING=\"{Secrets.ConnectionWithMarker}\" {Secrets.Marker}\n"
+                + $"SQLSOURCE_CONNECTION_REPORTS=\"Host=db;\\q{Secrets.Marker}\"\n"
+                + $"SQLSOURCE_CONNECTION-{Secrets.Marker}=Host=db\n"
+        );
+
+        var result = await _scene.DescribeAsync("--verbose", "--log", "run.log");
+
+        ShouldHold(result, "286,213");
+        (await ReadLogAsync()).ShouldNotContain(Secrets.Marker);
+        _scene.Describer.Opened.ShouldBeEmpty();
+    }
+
+    private string WriteDotEnv(string text) => _scene.Run.Folder.WriteFile(".env", text);
+
+    private Task<string> ReadLogAsync() =>
+        File.ReadAllTextAsync(_scene.Run.Folder.PathOf("run.log"), TestContext.Current.CancellationToken);
+
     // With several databases the variable with no name is used for none, which is SQLSRC215.
     [Fact]
     public async Task Run_ValueInTheVariableWithNoNameAndEveryError_IsNeverPrinted()
@@ -228,7 +285,8 @@ public sealed class SecretTests : IDisposable
 
         ShouldHold(result, "213");
         result.Error.ShouldContain(
-            "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+            "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
+                + $"environment or in {DotEnvPath}.  "
                 + "The value of --connection at position 3 names no database of this run\n"
         );
         result.Error.ShouldNotContain("Host");
@@ -246,7 +304,8 @@ public sealed class SecretTests : IDisposable
 
         ShouldHold(result, "213");
         result.Error.ShouldContain(
-            "    help: pass --connection hosts=<connection string>, or set SQLSOURCE_CONNECTION_HOSTS.  "
+            "    help: pass --connection hosts=<connection string>, or set SQLSOURCE_CONNECTION_HOSTS in the "
+                + $"environment or in {DotEnvPath}.  "
                 + "--connection was given for Host, which is no database of this run\n"
         );
         result.Error.ShouldNotContain("Password");
@@ -267,7 +326,8 @@ public sealed class SecretTests : IDisposable
 
         ShouldHold(result, "213");
         result.Error.ShouldContain(
-            "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+            "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
+                + $"environment or in {DotEnvPath}.  "
                 + "--connection was given for postgress, which is no database of this run.  "
                 + "The values of --connection at positions 3 and 7 name no databases of this run\n"
         );
