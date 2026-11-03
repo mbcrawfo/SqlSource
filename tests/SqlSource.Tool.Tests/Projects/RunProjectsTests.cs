@@ -58,7 +58,10 @@ public sealed class RunProjectsTests : IDisposable
     private Task<ImmutableArray<ProjectManifest>> FindAsync(RunUnit unit, params string[] named) =>
         FindValuesAsync(unit, [.. named.Select((text, index) => new UsageValue(ProjectOption, text, 3 + (2 * index)))]);
 
-    private Task<ImmutableArray<ProjectManifest>> FindValuesAsync(RunUnit unit, params UsageValue[] named) =>
+    private async Task<ImmutableArray<ProjectManifest>> FindValuesAsync(RunUnit unit, params UsageValue[] named) =>
+        (await FindProjectsAsync(unit, named)).Manifests;
+
+    private Task<FoundProjects> FindProjectsAsync(RunUnit unit, params UsageValue[] named) =>
         RunProjects.FindAsync(
             unit,
             named,
@@ -119,6 +122,22 @@ public sealed class RunProjectsTests : IDisposable
         _error.ToString().ShouldBeEmpty();
         // A project alone is given nothing of a solution.
         _runner.Requests.ShouldAllBe(request => FakeProcessRunner.PropertyOf(request, "SolutionDir") == null);
+    }
+
+    // The assets file of each project that MSBuild names one for, full, whether the project uses SqlSource or not and
+    // whether it was restored or not, in the order of the projects: a watch watches where each restore writes.
+    [Fact]
+    public async Task Find_ProjectsWithAnAssetsFile_GiveEachFull()
+    {
+        _runner.Projects[_a] = new FakeProject { ProjectAssetsFile = "../artifacts/obj/A/project.assets.json" };
+        _ = NotRestored(_b);
+
+        var found = await FindProjectsAsync(new RunUnit(RunUnitKind.Solution, _solution));
+
+        found.AssetsFiles.ShouldBe([
+            (_a, _folder.PathOf("artifacts/obj/A/project.assets.json")),
+            (_b, Path.Combine(Path.GetDirectoryName(_b)!, "obj", "project.assets.json")),
+        ]);
     }
 
     [Fact]
@@ -379,6 +398,46 @@ public sealed class RunProjectsTests : IDisposable
 
         _runner.Requests.ShouldBeEmpty();
         _error.ToString().ShouldBe(Sqlsrc207(_b, _a));
+    }
+
+    // A watch watches every project of the run, the ones without a manifest too, and none that --project leaves out.
+    [Fact]
+    public async Task Find_Projects_AreEveryProjectAskedAboutWithOrWithoutAManifest()
+    {
+        _ = NotRestored(_a);
+        _ = DoesNotUse(_b);
+
+        var found = await FindProjectsAsync(new RunUnit(RunUnitKind.Solution, _solution));
+
+        found.Projects.ShouldBe([_a, _b, _c]);
+        found.Manifests.Select(manifest => manifest.ProjectPath).ShouldBe([_c]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectsWithProjectNamed_AreTheNamedOnes()
+    {
+        var found = await FindProjectsAsync(
+            new RunUnit(RunUnitKind.Solution, _solution),
+            new UsageValue(ProjectOption, _b, 3)
+        );
+
+        found.Projects.ShouldBe([_b]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectsOfAProject_AreThatProject()
+    {
+        _ = NotRestored(_a);
+
+        (await FindProjectsAsync(new RunUnit(RunUnitKind.Project, _a))).Projects.ShouldBe([_a]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectsOfASolutionThatCannotBeRead_AreNone()
+    {
+        var solution = _folder.WriteFile("Broken.sln", "this is not a solution\n");
+
+        (await FindProjectsAsync(new RunUnit(RunUnitKind.Solution, solution))).Projects.ShouldBeEmpty();
     }
 
     [Fact]

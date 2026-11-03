@@ -5,6 +5,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Processes;
+using SqlSource.Tool.Watching;
 
 namespace SqlSource.Tool;
 
@@ -33,6 +34,10 @@ namespace SqlSource.Tool;
 /// </param>
 /// <param name="Runtime">The .NET that runs the tool, as the log's <c>run.start</c> names it.</param>
 /// <param name="OperatingSystem">The system the tool runs on, as the log's <c>run.start</c> names it.</param>
+/// <param name="Watch">
+/// Starts watching a folder for changes to its files and tells the request of each; disposing what it gives stops
+/// the watch.
+/// </param>
 internal sealed record ToolHost(
     TextWriter Out,
     TextWriter Error,
@@ -47,7 +52,8 @@ internal sealed record ToolHost(
     Func<string, Stream> CreateFile,
     Func<string, string?> ReadTextFile,
     string Runtime,
-    string OperatingSystem
+    string OperatingSystem,
+    Func<WatchRequest, IDisposable> Watch
 )
 {
     /// <summary>
@@ -69,7 +75,8 @@ internal sealed record ToolHost(
             NewFile,
             ReadText,
             RuntimeInformation.FrameworkDescription,
-            RuntimeInformation.OSDescription
+            RuntimeInformation.OSDescription,
+            WatchFolder
         );
 
     /// <summary>
@@ -78,6 +85,15 @@ internal sealed record ToolHost(
     /// </summary>
     internal static Stream NewFile(string path) =>
         new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+
+    /// <summary>
+    /// The <see cref="Watch"/> of a real run: the system's file events of the folder, or its listing on a timer when
+    /// the request asks to poll.
+    /// </summary>
+    internal static IDisposable WatchFolder(WatchRequest request) =>
+        request.Poll
+            ? new PollingFolderWatcher(request, TimeProvider.System, PollingFolderWatcher.Interval)
+            : new SystemFolderWatcher(request);
 
     /// <summary>
     /// The <see cref="ReadTextFile"/> of a real run: the text of the file, or null when the path is a folder or

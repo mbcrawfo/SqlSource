@@ -9,9 +9,14 @@ namespace SqlSource.Tool.Projects;
 /// <param name="State">What was found.</param>
 /// <param name="Manifest">The manifest, when the project uses SqlSource.</param>
 /// <param name="Failure">The error to report, when the state is <see cref="ProjectState.Failed" />.</param>
+/// <param name="AssetsFile">
+/// The full path of the <c>project.assets.json</c> that a restore of the project writes, whether it exists or not, when
+/// MSBuild was asked about the project and named one.
+/// </param>
 internal sealed record ProjectEvaluation(
     string ProjectPath,
     ProjectState State,
     ProjectManifest? Manifest = null,
-    ToolDiagnostic? Failure = null
+    ToolDiagnostic? Failure = null,
+    string? AssetsFile = null
 );

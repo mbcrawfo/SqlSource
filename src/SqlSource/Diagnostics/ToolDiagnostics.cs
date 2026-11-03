@@ -514,6 +514,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor WatchFailed = new(
+        id: "SQLSRC287",
+        title: "The watcher failed",
+        messageFormat: "watching '{0}' for changes failed: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc287",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -563,6 +574,7 @@ internal static class ToolDiagnostics
             ColumnHasNoName,
             FileNotUtf8,
             DotEnvCannotBeRead,
-            DotEnvLineCannotBeRead
+            DotEnvLineCannotBeRead,
+            WatchFailed
         );
 }

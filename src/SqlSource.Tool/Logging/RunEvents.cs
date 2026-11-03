@@ -249,6 +249,22 @@ internal static class RunEvents
         }
     }
 
+    /// <summary>A pass of <c>describe --watch</c> begins.  An event only: <c>--verbose</c> says nothing.</summary>
+    /// <param name="trace">The session's.</param>
+    /// <param name="pass">The number of the pass, from 1.</param>
+    /// <param name="changes">How many changes with an effect came since the last pass; 0 for the first.</param>
+    /// <param name="evaluated">Whether the pass runs the manifest targets, and not on the manifests it kept.</param>
+    public static void PassStarted(RunTrace trace, int pass, int changes, bool evaluated) =>
+        trace.Log.Write("pass.start", new("pass", pass), new("changes", changes), new("evaluated", evaluated));
+
+    /// <summary>A pass of <c>describe --watch</c> ended.  An event only: <c>--verbose</c> says nothing.</summary>
+    /// <param name="trace">The session's.</param>
+    /// <param name="pass">The number of the pass, from 1.</param>
+    /// <param name="errors">How many errors the pass reported.</param>
+    /// <param name="durationMs">How long the pass took, by the run's clock.</param>
+    public static void PassEnded(RunTrace trace, int pass, int errors, long durationMs) =>
+        trace.Log.Write("pass.end", new("pass", pass), new("errors", errors), new("durationMs", durationMs));
+
     // Nothing says whether a project that was not restored, or that MSBuild failed on, uses SqlSource.
     private static LogValue UsesSqlSource(ProjectState state) =>
         state switch

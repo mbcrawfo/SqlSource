@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Processes;
+using SqlSource.Tool.Watching;
 
 namespace SqlSource.Tool.Testing;
 
@@ -29,6 +30,18 @@ internal static class Hosts
             && !Path.IsPathRooted(relative);
     }
 
+    // A test's host watches only under the system's temporary folder too, with the real watcher, and nothing elsewhere,
+    // so that no test watches a developer's own folders.
+    internal static IDisposable WatchUnderTheTemporaryFolder(WatchRequest request) =>
+        IsUnderTheTemporaryFolder(request.Folder) ? ToolHost.WatchFolder(request) : NoWatch.Instance;
+
+    private sealed class NoWatch : IDisposable
+    {
+        public static NoWatch Instance { get; } = new();
+
+        public void Dispose() { }
+    }
+
     public static ToolHost Create(
         string workingDirectory,
         IProcessRunner processes,
@@ -51,7 +64,8 @@ internal static class Hosts
             ToolHost.NewFile,
             ReadUnderTheTemporaryFolder,
             Runtime,
-            OperatingSystem
+            OperatingSystem,
+            WatchUnderTheTemporaryFolder
         );
 
     // The environment of the test process, for a run of the real "dotnet".
@@ -70,6 +84,7 @@ internal static class Hosts
             ToolHost.NewFile,
             ReadUnderTheTemporaryFolder,
             Runtime,
-            OperatingSystem
+            OperatingSystem,
+            WatchUnderTheTemporaryFolder
         );
 }

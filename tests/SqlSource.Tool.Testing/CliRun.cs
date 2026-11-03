@@ -10,6 +10,7 @@ using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
+using SqlSource.Tool.Watching;
 using Xunit;
 
 namespace SqlSource.Tool.Testing;
@@ -71,6 +72,10 @@ internal sealed class CliRun : IDisposable
     // cannot be read.
     public Func<string, string?>? ReadTextFile { get; set; }
 
+    // Starts the watches of a "--watch" run.  The host's own unless a test brings one, for a watch it raises changes
+    // through.
+    public Func<WatchRequest, IDisposable>? Watch { get; set; }
+
     // Set to stand in for standard output, for a test of a writer that fails.
     public TextWriter? Out { get; set; }
 
@@ -79,6 +84,24 @@ internal sealed class CliRun : IDisposable
     // A run that the test ends itself.
     public Task<CliResult> RunAsync(CancellationToken cancellationToken, params string[] args) =>
         InvokeAsync(args, cancellationToken);
+
+    // A run that goes on while the test reads what it writes, and ends when the token is cancelled or the command
+    // ends by itself: a "describe --watch".
+    public RunningCli Start(CancellationToken cancellationToken, params string[] args)
+    {
+        var output = new SharedWriter();
+        var error = new SharedWriter();
+        var host = CreateHost(output, error);
+        var ended = Task.Run(
+            async () =>
+            {
+                var exitCode = await Cli.RunAsync(args, host, cancellationToken);
+                return new CliResult(exitCode, output.ToString(), error.ToString());
+            },
+            CancellationToken.None
+        );
+        return new RunningCli(output, error, ended);
+    }
 
     public async Task<CliResult> RunCancelledAsync(params string[] args)
     {
@@ -130,6 +153,7 @@ internal sealed class CliRun : IDisposable
             Time = Time,
             CreateFile = CreateFile ?? ToolHost.NewFile,
             ReadTextFile = ReadTextFile ?? host.ReadTextFile,
+            Watch = Watch ?? host.Watch,
         };
     }
 }

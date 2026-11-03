@@ -94,6 +94,27 @@ public sealed class DescribeTests : IDisposable
         _run.Processes.Requests.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Help_Describe_ListsWatch()
+    {
+        var result = await _run.RunAsync("describe", "--help");
+
+        result.ExitCode.ShouldBe(0);
+        result.Out.ShouldContain("--watch");
+        _run.Processes.Requests.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("describe", "--watch", "--check")]
+    [InlineData("describe", "--check", "--watch")]
+    public async Task CheckUsage_WatchWithCheck_IsRefused(params string[] args)
+    {
+        var result = await _run.RunAsync(args);
+
+        result.ShouldBe(new CliResult(1, "", "sqlsource: options '--watch' and '--check' cannot be used together\n"));
+        _run.Processes.Requests.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("describe", "--project")]
     [InlineData("describe", "--project=")]

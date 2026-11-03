@@ -365,6 +365,7 @@ public sealed class UsageCheckTests
             "--verbose",
             "--log",
             "--log=L",
+            "--watch",
             "--help",
             "--",
             "V",
@@ -439,6 +440,31 @@ public sealed class UsageCheckTests
                 $"sqlsource: the value of option '--log' at position {position} holds '=' or ';', which a log's path "
                     + "may not",
             ]);
+
+    [Theory]
+    [InlineData("describe", "--watch", "--check")]
+    [InlineData("describe", "--check", "--watch")]
+    public void CheckUsage_WatchWithCheck_NamesBothOptions(params string[] args) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe(["sqlsource: options '--watch' and '--check' cannot be used together"]);
+
+    [Fact]
+    public void CheckUsage_WatchWithForce_IsAccepted()
+    {
+        var usage = UsageCheck.Check(Cli.BuildCommands(), ["describe", "--watch", "--force"]);
+
+        usage.Messages.ShouldBeEmpty();
+        DescribeCommand.CheckUsage(usage).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Check_FlagsGivenMoreThanOnce_AreGivenOnceEachInTheOrderGiven()
+    {
+        var usage = UsageCheck.Check(Root(), ["describe", "--verbose", "--force", "--verbose", "--force"]);
+
+        usage.Flags.Select(static flag => flag.Name).ShouldBe(["--verbose", "--force"]);
+    }
 
     [Fact]
     public void CheckUsage_AnotherCommand_GivesNoLine() =>
