@@ -496,6 +496,9 @@
           "System.CommandLine": "[2.0.12, )"
         }
       },
+      "sqlsource.tool.standin": {
+        "type": "Project"
+      },
       "sqlsource.tool.testing": {
         "type": "Project",
         "dependencies": {

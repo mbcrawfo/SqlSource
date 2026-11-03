@@ -21,6 +21,7 @@ See [the online build](../../../docs/architecture/msbuild-and-manifest.md#the-on
 - **Compare `SqlSourceOnlineValue` with `Equals`, never `==`**: a condition reads `yes` as `true`.
 - **The texts of `SQLSRC024` to `SQLSRC027` in the targets change with their `SqlDiagnostics` descriptors**; `BuildFileTests` holds them equal.
 - **`SqlSourceToolCommand` is the tests' seam for the tool**, `dotnet sqlsource` by default, and no user setting.
+- **A path in the `Exec` command goes through `Regex::Replace` with `SqlSourceShellSpecial` and `SqlSourceShellEscape`**: `/bin/sh` reads `$`, `` ` ``, `"` and `\` within quotes, and `cmd` reads `%`.
 
 ## The manifest
 

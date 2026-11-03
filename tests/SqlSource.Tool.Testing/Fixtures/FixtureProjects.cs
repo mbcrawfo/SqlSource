@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -14,6 +15,17 @@ namespace SqlSource.Tool.Testing.Fixtures;
 internal sealed class FixtureProjects : IDisposable
 {
     private static readonly string Source = Path.Combine(AppContext.BaseDirectory, "Fixtures");
+
+    private static readonly string[] ClearedForABuild =
+    [
+        "SQLSOURCE_LOG",
+        "CI",
+        "TF_BUILD",
+        "TEAMCITY_VERSION",
+        "JENKINS_URL",
+        "GITHUB_ACTIONS",
+        "MSBUILDLOGALLENVIRONMENTVARIABLES",
+    ];
 
     private readonly TempFolder _folder = new();
 
@@ -38,6 +50,15 @@ internal sealed class FixtureProjects : IDisposable
         }
 
         return Path.Combine(target, file.Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    // Copies the package's build/ to a folder of the name given beside the copies, as another version of the package
+    // is in another folder of NuGet's cache, and gives its full path.
+    public string CopyBuildFolder(string folder)
+    {
+        var target = _folder.PathOf(folder);
+        CopyFolder(Path.Combine(Source, "build"), target);
+        return target;
     }
 
     public string PathOf(string relativePath) => _folder.PathOf(relativePath);
@@ -66,8 +87,42 @@ internal sealed class FixtureProjects : IDisposable
         IEnumerable<string> arguments
     )
     {
+        var result = await Programs.RunAsync(Start("msbuild", project, arguments), Eventually.Patience);
+        return (result.ExitCode, result.Output + result.Error);
+    }
+
+    // Runs "dotnet build" on a project, which restores it first, and gives its exit code and what it wrote, with the
+    // terminal logger off, so that each line is a line of the build, and with no MSBuild node left after it.  The build
+    // has the test process's environment less every variable that could take it online, keep it offline as in CI, or
+    // put a secret in its log, whatever the developer's shell or the runner has, and the variables given.
+    public static async Task<(int ExitCode, string Output)> BuildAsync(
+        string project,
+        IReadOnlyDictionary<string, string> environment,
+        params string[] arguments
+    )
+    {
+        var start = Start("build", project, ["-tl:off", "-nr:false", .. arguments]);
+        foreach (var name in start.Environment.Keys.Where(IsClearedForABuild).ToList())
+        {
+            _ = start.Environment.Remove(name);
+        }
+
+        foreach (var (name, value) in environment)
+        {
+            start.Environment[name] = value;
+        }
+
+        var result = await Programs.RunAsync(start, Eventually.Patience);
+        return (result.ExitCode, result.Output + result.Error);
+    }
+
+    public void Dispose() => _folder.Dispose();
+
+    // A run of dotnet on a project, from the project's folder.
+    private static ProcessStartInfo Start(string command, string project, IEnumerable<string> arguments)
+    {
         var start = new ProcessStartInfo(Programs.Dotnet) { WorkingDirectory = Path.GetDirectoryName(project) };
-        start.ArgumentList.Add("msbuild");
+        start.ArgumentList.Add(command);
         start.ArgumentList.Add(project);
         start.ArgumentList.Add("-nologo");
         foreach (var argument in arguments)
@@ -80,12 +135,14 @@ internal sealed class FixtureProjects : IDisposable
         _ = start.Environment.Remove("MSBuildSDKsPath");
         _ = start.Environment.Remove("MSBuildExtensionsPath");
         start.Environment["DOTNET_NOLOGO"] = "true";
-
-        var result = await Programs.RunAsync(start, Eventually.Patience);
-        return (result.ExitCode, result.Output + result.Error);
+        return start;
     }
 
-    public void Dispose() => _folder.Dispose();
+    // The connections and SQLSOURCE_LOG, the variables of the CI services that the package reads, GitHub's for good
+    // measure, and the one that has MSBuild log every variable with its value.
+    private static bool IsClearedForABuild(string name) =>
+        name.StartsWith("SQLSOURCE_CONNECTION", StringComparison.OrdinalIgnoreCase)
+        || ClearedForABuild.Contains(name, StringComparer.OrdinalIgnoreCase);
 
     private static IEnumerable<string> PropertySwitches(string[] properties)
     {

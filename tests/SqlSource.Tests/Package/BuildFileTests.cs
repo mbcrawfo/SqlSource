@@ -53,6 +53,7 @@ public sealed partial class BuildFileTests
         "TEAMCITY_VERSION",
         "JENKINS_URL",
         "MSBuildWarningsNotAsErrors",
+        "OS",
     ];
 
     // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.

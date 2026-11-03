@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        A stand-in of the sqlsource tool, which the tests of the online build give a real build as SqlSourceToolCommand:
+        it prints, writes, deletes and exits as the test tells it, and records how it was run.  A program of its own,
+        and not a script, so that the same command runs on Windows, macOS and Linux.  tests/SqlSource.Tool.Tests
+        references it, so that it is built into that project's output, and never calls it.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        One target framework, with nothing of SqlSource, that references OnlineMulti, which a test copies beside it:
+        the build of a project with several frameworks for one of them, as a reference builds it.  Its name is not
+        App, since OnlineMulti's assembly is copied into its output.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../OnlineMulti/App.csproj" />
+    </ItemGroup>
+</Project>

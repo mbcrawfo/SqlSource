@@ -382,7 +382,9 @@ public sealed partial class BuildFileTests
     // The tool is run on the manifest this build wrote, from the project's folder, with the value of SqlSourceOnline,
     // and with a log of this project and framework when SQLSOURCE_LOG is set.  Exec reads its errors as a
     // compiler's, ignores the exit code, which would add an error of Exec's own to the tool's, and keeps every line
-    // for the target to read; the summary and the offline line are messages of low importance.
+    // for the target to read; the summary and the offline line are messages of low importance.  Both paths are
+    // escaped for the shell Exec runs the command in, which reads $, `, " and \ within quotes on Unix, each put in
+    // single quotes, since MSBuild turns a \ of a path into a /, and % in cmd, each doubled.
     [Fact]
     public void Targets_RunOnline_ExecsTheToolOnTheManifest()
     {
@@ -394,7 +396,7 @@ public sealed partial class BuildFileTests
                 new Dictionary<string, string>
                 {
                     ["Command"] =
-                        "$(SqlSourceToolCommand) describe --manifest \"$(SqlSourceManifestFile)\""
+                        "$(SqlSourceToolCommand) describe --manifest \"$(SqlSourceToolManifestArgument)\""
                         + " --online $(SqlSourceOnlineValue)$(SqlSourceToolLog)",
                     ["WorkingDirectory"] = "$(MSBuildProjectDirectory)",
                     ["IgnoreExitCode"] = "true",
@@ -422,11 +424,17 @@ public sealed partial class BuildFileTests
             .Elements()
             .Select(Line)
             .ShouldBe([
+                ("SqlSourceShellSpecial", null, "[$`\"\\\\]"),
+                ("SqlSourceShellEscape", null, "\"'$0'\""),
+                ("SqlSourceShellSpecial", "'$(OS)' == 'Windows_NT'", "%"),
+                ("SqlSourceShellEscape", "'$(OS)' == 'Windows_NT'", "%$0"),
+                ("SqlSourceToolManifestArgument", null, ShellEscaped("$(SqlSourceManifestFile)")),
+                ("SqlSourceToolLogFile", null, "$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log"),
                 ("SqlSourceToolLog", null, ""),
                 (
                     "SqlSourceToolLog",
                     "'$(SQLSOURCE_LOG)' != ''",
-                    " --log \"$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log\""
+                    " --log \"" + ShellEscaped("$(SqlSourceToolLogFile)") + "\""
                 ),
             ]);
         target.Elements("PropertyGroup").First().IsBefore(exec).ShouldBeTrue();
@@ -690,6 +698,11 @@ public sealed partial class BuildFileTests
 
     private static Dictionary<string, string> Attributes(XElement element) =>
         element.Attributes().ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value);
+
+    // A path escaped for the shell that Exec runs the command in.
+    private static string ShellEscaped(string path) =>
+        $"$([System.Text.RegularExpressions.Regex]::Replace({path}, "
+        + "$(SqlSourceShellSpecial), $(SqlSourceShellEscape)))";
 
     private static (string Name, string? Condition, string Value) Line(XElement line) =>
         (line.Name.LocalName, line.Attribute("Condition")?.Value, line.Value);

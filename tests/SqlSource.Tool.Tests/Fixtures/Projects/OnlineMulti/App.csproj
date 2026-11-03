@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Two target frameworks, with one .sql file and no sidecar, for the tests of the online build of a project with
+        several.  The props and the targets of build/ are imported into the inner builds alone, and the targets of
+        buildMultiTargeting/ into the outer build alone, as NuGet imports them.
+    -->
+    <ImportGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0'">
+        <Import Project="../build/SqlSource.props" />
+    </ImportGroup>
+    <PropertyGroup>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    </PropertyGroup>
+    <ImportGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0'">
+        <Import Project="../build/SqlSource.targets" />
+    </ImportGroup>
+    <ImportGroup Condition="'$(TargetFramework)' == '' and '$(TargetFrameworks)' != ''">
+        <Import Project="../buildMultiTargeting/SqlSource.targets" />
+    </ImportGroup>
+</Project>

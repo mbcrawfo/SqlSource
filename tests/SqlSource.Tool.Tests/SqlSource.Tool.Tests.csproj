@@ -41,5 +41,7 @@
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
         <ProjectReference Include="../DatabaseTests/TestHarness/TestHarness.csproj" />
         <ProjectReference Include="../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
+        <!-- The stand-in of the tool, which the tests of the online build run as a build's command from the output. -->
+        <ProjectReference Include="../SqlSource.Tool.StandIn/SqlSource.Tool.StandIn.csproj" />
     </ItemGroup>
 </Project>

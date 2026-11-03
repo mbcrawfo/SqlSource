@@ -37,4 +37,5 @@ none .github/*
 none tests/SqlSource.Tests/*
 none tests/SqlSource.Tests.RoslynFloor/*
 none tests/SqlSource.Tool.Tests/*
+none tests/SqlSource.Tool.StandIn/*
 none *.md

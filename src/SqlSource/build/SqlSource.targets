@@ -522,10 +522,14 @@
         framework's build, or from the outer build.
 
         Exec reads the tool's errors as a compiler's, which under online the tool writes on one line each.  It ignores
-        the exit code, since it would otherwise add an error of its own to the tool's, and it keeps every line, of
-        both streams, for this target to read.  The summary and the offline line are messages of low importance: the
-        build says what failed, and -v:d shows the rest.  Under SQLSOURCE_LOG the tool writes its log to a file of
-        this project and framework, since projects built at once would otherwise open one file.
+        the exit code, since it would otherwise add an error of its own to the tool's, and it keeps every line, of both
+        streams, for this target to read.  The summary and the offline line are messages of low importance: the build
+        says what failed, and -v:d shows the rest.  Under SQLSOURCE_LOG the tool writes its log to a file of this
+        project and framework, since projects built at once would otherwise open one file.  Exec runs the command in the
+        system's shell, /bin/sh or cmd, which reads some characters even within quotes, and a project's name or its obj
+        folder can hold them, so each path is escaped for that shell first.  For /bin/sh each $, `, " and \ is put in
+        single quotes between the double ones, and not after a \: MSBuild on Unix turns each \ of a value that names a
+        file that exists into a /.  For cmd each % is doubled, and no path there holds a ".
 
         When dotnet cannot start the tool, it prints its own words, which are localised, and its exit code is no
         guide, so a run that printed no line of the tool's own is a tool that did not start: a line starting
@@ -554,12 +558,18 @@
         Outputs="$(SqlSourceOnlineStamp)"
     >
         <PropertyGroup>
+            <SqlSourceShellSpecial>[$`&quot;\\]</SqlSourceShellSpecial>
+            <SqlSourceShellEscape>&quot;'$0'&quot;</SqlSourceShellEscape>
+            <SqlSourceShellSpecial Condition="'$(OS)' == 'Windows_NT'">%</SqlSourceShellSpecial>
+            <SqlSourceShellEscape Condition="'$(OS)' == 'Windows_NT'">%$0</SqlSourceShellEscape>
+            <SqlSourceToolManifestArgument>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceManifestFile), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))</SqlSourceToolManifestArgument>
+            <SqlSourceToolLogFile>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log</SqlSourceToolLogFile>
             <SqlSourceToolLog />
             <SqlSourceToolLog Condition="'$(SQLSOURCE_LOG)' != ''"
-                > --log &quot;$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log&quot;</SqlSourceToolLog>
+                > --log &quot;$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceToolLogFile), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))&quot;</SqlSourceToolLog>
         </PropertyGroup>
         <Exec
-            Command="$(SqlSourceToolCommand) describe --manifest &quot;$(SqlSourceManifestFile)&quot; --online $(SqlSourceOnlineValue)$(SqlSourceToolLog)"
+            Command="$(SqlSourceToolCommand) describe --manifest &quot;$(SqlSourceToolManifestArgument)&quot; --online $(SqlSourceOnlineValue)$(SqlSourceToolLog)"
             WorkingDirectory="$(MSBuildProjectDirectory)"
             IgnoreExitCode="true"
             ConsoleToMSBuild="true"

@@ -1,0 +1,14 @@
+<Project>
+    <!--
+        Writes the AdditionalFiles items the compiler was given, by their full paths, to obj/compiled.<framework>.txt,
+        since no generator is loaded to show them.  It runs after CoreCompile, which every target that changes the
+        items runs before, and runs when CoreCompile is skipped as up to date too.
+    -->
+    <Target Name="ShowItems" AfterTargets="CoreCompile">
+        <WriteLinesToFile
+            File="$(BaseIntermediateOutputPath)compiled.$(TargetFramework).txt"
+            Lines="@(AdditionalFiles->'%(FullPath)')"
+            Overwrite="true"
+        />
+    </Target>
+</Project>
