@@ -10,6 +10,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
@@ -73,7 +74,7 @@ internal sealed class DatabaseRunsScene : IDisposable
                     given ?? ["postgres=" + Secrets.ConnectionWithWord, "billing=" + Secrets.ConnectionWithWord]
                 ).Select((text, index) => ConnectionArguments.Parse(text, (2 * index) + 3)),
             ],
-            name => Environment.GetValueOrDefault(name)
+            ConnectionEnvironment.Of(name => Environment.GetValueOrDefault(name), NoDotEnv, Folder.Path)
         );
         var host = Hosts.Create(Folder.Path, new FakeProcessRunner(), Folder.Path, environment: Environment) with
         {
@@ -94,6 +95,9 @@ internal sealed class DatabaseRunsScene : IDisposable
 
     public static QueryState[] States(ImmutableArray<FileWork> files) =>
         [.. files.SelectMany(file => file.Queries).Select(query => query.State)];
+
+    // The run of a part has no .env file.
+    private static readonly DotEnvFile NoDotEnv = new(null, [], []);
 
     public void Dispose()
     {

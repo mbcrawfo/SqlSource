@@ -53,6 +53,28 @@ public sealed class DescribeCommandTests(SqlServerDatabases sqlServer) : IDispos
             .ShouldBe([("id", false), ("total", false), ("note", true)]);
     }
 
+    // The connection is in the .env file beside the project alone, in double quotes with the backslash and the quote
+    // escaped, which a connection string may hold.
+    [Fact]
+    public async Task Describe_ConnectionInADotEnvFileAlone_WritesItsSidecar()
+    {
+        var project = _fixtures.Copy("SqlServer");
+        var connection = sqlServer
+            .ConnectionString.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+        _ = _fixtures.WriteFile("SqlServer/.env", $"SQLSOURCE_CONNECTION_FIXTURES=\"{connection}\"\n");
+        using var run = CliRun.Real(Path.GetDirectoryName(project)!);
+        run.ReleasedDescribers = true;
+
+        var result = await run.RunAsync("describe", project);
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        result.Out.ShouldBe("fixtures (mssql): 1 described, 0 skipped, 0 failed\n");
+        var entry = SidecarFiles.Read(_fixtures.PathOf("SqlServer/Queries/Orders.sql")).Queries.ShouldHaveSingleItem();
+        entry.Name.ShouldBe("GetOrders");
+        entry.Engine.ShouldBe(SidecarValues.Engine.SqlServer);
+    }
+
     [Fact]
     public async Task Check_AfterDescribe_IsTheSame()
     {

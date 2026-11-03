@@ -421,3 +421,6 @@ CLAUDE.local.md
 
 # Coverage output
 coverage/
+
+# Connections of the sqlsource tool, which hold credentials
+.env

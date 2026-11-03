@@ -16,6 +16,9 @@ public sealed class DatabaseRunsTests : IDisposable
 
     public void Dispose() => _scene.Dispose();
 
+    // Where the run looks for its .env file, which none of these tests writes.
+    private string DotEnvPath => _scene.Folder.PathOf(".env");
+
     [Fact]
     public async Task Run_NoDescriberForTheDialect_IsSqlsrc216AtEachQuery()
     {
@@ -73,7 +76,8 @@ public sealed class DatabaseRunsTests : IDisposable
             .Error.ToString()
             .ShouldBe(
                 $"{more}(1,10): error SQLSRC213: No connection is given for the database 'postgres'\n"
-                    + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES\n"
+                    + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES "
+                    + $"in the environment or in {DotEnvPath}\n"
                     + Expected.See("SQLSRC213")
             );
     }
@@ -93,7 +97,8 @@ public sealed class DatabaseRunsTests : IDisposable
         _scene
             .Error.ToString()
             .ShouldContain(
-                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
+                    + $"environment or in {DotEnvPath}.  "
                     + "--connection was given for postgress, Billng, which are no databases of this run\n"
             );
     }
@@ -114,7 +119,8 @@ public sealed class DatabaseRunsTests : IDisposable
         _scene
             .Error.ToString()
             .ShouldContain(
-                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
+                    + $"environment or in {DotEnvPath}.  "
                     + "--connection was given for postgress, which is no database of this run.  "
                     + "The values of --connection at positions 5 and 9 name no databases of this run\n"
             );
@@ -148,7 +154,8 @@ public sealed class DatabaseRunsTests : IDisposable
         _scene
             .Error.ToString()
             .ShouldContain(
-                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
+                    + $"environment or in {DotEnvPath}.  "
                     + sentence
                     + "\n"
             );

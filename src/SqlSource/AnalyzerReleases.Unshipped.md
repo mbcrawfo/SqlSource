@@ -131,3 +131,5 @@ SQLSRC281 | SqlSource | Error | A library that is on is not referenced
 SQLSRC282 | SqlSource | Error | A library is older than SqlSource supports
 SQLSRC283 | SqlSource | Error | JSON opt-in does not apply
 SQLSRC284 | SqlSource | Warning | Short name finds a type that only a package brings
+SQLSRC285 | SqlSource | Error | .env file cannot be read
+SQLSRC286 | SqlSource | Error | Connection in .env cannot be read

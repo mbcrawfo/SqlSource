@@ -15,6 +15,20 @@ internal static class Hosts
 
     public const string OperatingSystem = "the system of the test";
 
+    // A test's host reads a text file only under the system's temporary folder, where a test makes its files, and finds
+    // none elsewhere, so that no test reads a developer's own ".env".
+    internal static string? ReadUnderTheTemporaryFolder(string path) =>
+        IsUnderTheTemporaryFolder(path) ? ToolHost.ReadText(path) : null;
+
+    private static bool IsUnderTheTemporaryFolder(string path)
+    {
+        var temporary = Path.GetFullPath(Path.GetTempPath());
+        var relative = Path.GetRelativePath(temporary, Path.GetFullPath(path));
+        return relative != ".."
+            && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            && !Path.IsPathRooted(relative);
+    }
+
     public static ToolHost Create(
         string workingDirectory,
         IProcessRunner processes,
@@ -35,6 +49,7 @@ internal static class Hosts
             static _ => LiveExchange.Instance,
             time ?? new TestClock(),
             ToolHost.NewFile,
+            ReadUnderTheTemporaryFolder,
             Runtime,
             OperatingSystem
         );
@@ -53,6 +68,7 @@ internal static class Hosts
             static _ => LiveExchange.Instance,
             time ?? new TestClock(),
             ToolHost.NewFile,
+            ReadUnderTheTemporaryFolder,
             Runtime,
             OperatingSystem
         );

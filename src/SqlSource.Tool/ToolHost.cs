@@ -27,6 +27,10 @@ namespace SqlSource.Tool;
 /// <param name="CreateFile">
 /// Makes the file at a full path for writing, or empties the one that is there, and gives its stream.
 /// </param>
+/// <param name="ReadTextFile">
+/// The text of the file at a full path, or null when there is no file there: none, or a folder.  It throws an
+/// <see cref="IOException" /> or an <see cref="UnauthorizedAccessException" /> when the file cannot be read.
+/// </param>
 /// <param name="Runtime">The .NET that runs the tool, as the log's <c>run.start</c> names it.</param>
 /// <param name="OperatingSystem">The system the tool runs on, as the log's <c>run.start</c> names it.</param>
 internal sealed record ToolHost(
@@ -41,6 +45,7 @@ internal sealed record ToolHost(
     Func<string, IDescribeExchange> Exchange,
     TimeProvider Time,
     Func<string, Stream> CreateFile,
+    Func<string, string?> ReadTextFile,
     string Runtime,
     string OperatingSystem
 )
@@ -62,6 +67,7 @@ internal sealed record ToolHost(
             static _ => LiveExchange.Instance,
             TimeProvider.System,
             NewFile,
+            ReadText,
             RuntimeInformation.FrameworkDescription,
             RuntimeInformation.OSDescription
         );
@@ -72,4 +78,29 @@ internal sealed record ToolHost(
     /// </summary>
     internal static Stream NewFile(string path) =>
         new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+
+    /// <summary>
+    /// The <see cref="ReadTextFile"/> of a real run: the text of the file, or null when the path is a folder or
+    /// there is no file.
+    /// </summary>
+    internal static string? ReadText(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return File.ReadAllText(path);
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
 }
