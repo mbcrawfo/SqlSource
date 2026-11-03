@@ -52,7 +52,7 @@ public sealed class ExceptionReuseTests
     private const string OtherQueriesSource = """
         namespace Other
         {
-            [SqlSource.SqlSourceGenerate]
+            [SqlSource.SqlSourceGenerate(Source = ".")]
             public partial class OtherQueries;
         }
 
@@ -573,7 +573,7 @@ public sealed class ExceptionReuseTests
     ) =>
         GeneratorHarness.BuildProjectAsync(
             OutputKind.CodeGen,
-            "namespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample; }\n",
+            "namespace App { [SqlSource.SqlSourceGenerate(Source = \".\")] internal partial class Sample; }\n",
             [OwnFile, Sidecars.Of(OwnFile, Entry(OwnFile, "GetOne", [], [Column("id")]))],
             [reference, NpgsqlReferences.Npgsql10],
             dialect: "postgres"
@@ -648,7 +648,7 @@ public sealed class ExceptionReuseTests
 
             namespace App
             {
-                [SqlSource.SqlSourceGenerate]
+                [SqlSource.SqlSourceGenerate(Source = ".")]
                 internal partial class Sample;
 
                 internal static class Calls

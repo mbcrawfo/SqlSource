@@ -67,7 +67,7 @@ App/
     App.csproj
     Queries/
         UserRepository.cs      [SqlSourceGenerate] on UserRepository
-        Users.sql              belongs to UserRepository
+        UserRepository.sql     belongs to UserRepository
     Migrations/
         001_create_users.sql   not claimed by any type
 ```
@@ -713,7 +713,7 @@ Rules: [tokens](parameters-and-tokens.md#tokens), [the signature](generator.md#m
 // App.Tests, which references the SqlSource package too
 using SqlSource;
 
-[SqlSourceGenerate(Path = "Queries")]
+[SqlSourceGenerate(Source = "Queries")]
 internal static partial class TestQueries;
 ```
 

@@ -62,7 +62,7 @@ public sealed class ConverterObsoleteTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 [System.Obsolete("Use another type.")]

@@ -21,7 +21,7 @@ public sealed class ConverterReaderTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public readonly record struct UserId(long Value);

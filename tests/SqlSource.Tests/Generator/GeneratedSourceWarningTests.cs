@@ -29,11 +29,11 @@ public sealed class GeneratedSourceWarningTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
 
             /// <summary>More queries.</summary>
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial struct Other;
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- summary: x < y & z\nSELECT 1 WHERE a < b;\n")
@@ -144,7 +144,7 @@ public sealed class GeneratedSourceWarningTests
 
             namespace App;
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.{{location}})]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.{{location}})]
             public partial class Sample;
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: " + name + "\nSELECT 1;\n")
@@ -172,7 +172,7 @@ public sealed class GeneratedSourceWarningTests
                 public virtual string ListFrom(string table) => table;
             }
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Sample : Base;
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}};\n")
@@ -196,7 +196,7 @@ public sealed class GeneratedSourceWarningTests
                 protected static int Sql => 1;
             }
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample : Base
             {
                 public static string Value => Sql.GetUser;

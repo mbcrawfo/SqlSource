@@ -33,7 +33,7 @@ internal sealed class RealisticRefusalChecks(
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "Cases/Case/query.sql", Output = GeneratorOutput.Models)]
+            [SqlSourceGenerate(Source = "Cases/Case/query.sql", Output = GeneratorOutput.Models)]
             internal static partial class Refused;
         }
         """;

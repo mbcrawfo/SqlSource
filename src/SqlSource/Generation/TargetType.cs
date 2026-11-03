@@ -15,7 +15,7 @@ namespace SqlSource.Generation;
 /// <param name="IsPublic">
 /// Whether the type and every type it is nested in are declared <c>public</c>, which makes its models public.
 /// </param>
-/// <param name="Path">The attribute's <c>Path</c>, or null when it is not set or is empty.</param>
+/// <param name="Source">The attribute's <c>Source</c>, or null when it is not set or is empty.</param>
 /// <param name="FilePath">The path of the source file that carries the attribute.</param>
 /// <param name="AttributeLocation">Where the attribute is.</param>
 /// <param name="Diagnostics">The problems found in the declaration.</param>
@@ -26,7 +26,7 @@ internal sealed record TargetType(
     MethodPlacement MethodPlacement,
     SettingsLevel Settings,
     bool IsPublic,
-    string? Path,
+    string? Source,
     string FilePath,
     LocationInfo AttributeLocation,
     EquatableArray<DiagnosticInfo> Diagnostics

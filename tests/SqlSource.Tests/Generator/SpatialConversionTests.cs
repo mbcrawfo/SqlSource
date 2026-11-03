@@ -105,7 +105,7 @@ public sealed class SpatialConversionTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Sample;
             }
             """;

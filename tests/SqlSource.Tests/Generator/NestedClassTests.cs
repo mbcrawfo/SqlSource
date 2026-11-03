@@ -31,7 +31,7 @@ public sealed class NestedClassTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string Get() => Queries.GetUser;
@@ -53,7 +53,7 @@ public sealed class NestedClassTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".", NestedClass = "Statements")]
             public partial class Sample
             {
                 public static string Get() => Statements.GetUser;
@@ -74,7 +74,7 @@ public sealed class NestedClassTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".", NestedClass = "Statements")]
             public partial class Sample
             {
                 public static string Get() => Statements.GetUser;
@@ -94,7 +94,7 @@ public sealed class NestedClassTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct, NestedClass = "Statements")]
             public partial class Sample
             {
                 public static string Get() => GetUser;
@@ -116,7 +116,7 @@ public sealed class NestedClassTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string Sql => Queries.GetUser;
@@ -139,14 +139,14 @@ public sealed class NestedClassTests
             $$"""
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             {{declaration}}
             """,
             "Queries"
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,19): '{name}' already has a member named 'Queries'.  Rename it, "
+            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): '{name}' already has a member named 'Queries'.  Rename it, "
                 + "or use SqlLocation.Direct.",
         ]);
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
@@ -160,7 +160,7 @@ public sealed class NestedClassTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".", NestedClass = "Statements")]
             public partial class Sample
             {
                 public void Statements() { }
@@ -170,7 +170,7 @@ public sealed class NestedClassTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,47): 'Sample' already has a member named 'Statements'.  Rename "
+            "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,61): 'Sample' already has a member named 'Statements'.  Rename "
                 + "it, or use SqlLocation.Direct.",
         ]);
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
@@ -187,7 +187,7 @@ public sealed class NestedClassTests
                     """
                     using SqlSource;
                     namespace App;
-                    [SqlSourceGenerate]
+                    [SqlSourceGenerate(Source = ".")]
                     public partial class Sample { }
                     """
                 ),
@@ -213,14 +213,14 @@ public sealed class NestedClassTests
             $$"""
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(NestedClass = "{{value}}")]
+            [SqlSourceGenerate(Source = ".", NestedClass = "{{value}}")]
             public partial class Sample { }
             """,
             null
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{37 + value.Length}): '{value}' is not a valid value of "
+            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{51 + value.Length}): '{value}' is not a valid value of "
                 + "NestedClass",
         ]);
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);

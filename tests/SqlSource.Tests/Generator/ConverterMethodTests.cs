@@ -30,7 +30,7 @@ public sealed class ConverterMethodTests
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
         }
 
@@ -60,7 +60,7 @@ public sealed class ConverterMethodTests
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public readonly record struct Id<T>(T Value);
@@ -279,7 +279,7 @@ public sealed class ConverterMethodTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
             }
 
@@ -468,7 +468,7 @@ public sealed class ConverterMethodTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public static class Moments
@@ -578,7 +578,7 @@ public sealed class ConverterMethodTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public static class Money
@@ -625,7 +625,7 @@ public sealed class ConverterMethodTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public sealed record Embedding(float[] Values)
@@ -679,7 +679,7 @@ public sealed class ConverterMethodTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public static class IsoText
@@ -739,7 +739,7 @@ public sealed class ConverterMethodTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public readonly record struct UserId(long Value);

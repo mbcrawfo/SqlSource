@@ -5,7 +5,7 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // type, each taking the connection first; the file's collection type, IReadOnlyList, takes the place of the
 // attribute's.
 [SqlSourceGenerate(
-    Path = "../../SqlServer/EndToEnd/Queries/Shapes.sql",
+    Source = "../../SqlServer/EndToEnd/Queries/Shapes.sql",
     OutputModelType = GeneratorModelType.Record,
     OutputModelSuffix = "View",
     InputModelType = GeneratorModelType.SealedClass,

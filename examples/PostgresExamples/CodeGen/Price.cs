@@ -2,7 +2,7 @@ using SqlSource;
 
 namespace PostgresExamples.CodeGen;
 
-// A price, the type that OrderLines.sql gives its numeric columns with a type override.  The driver reads a
+// A price, the type that OrderLineQueries.sql gives its numeric columns with a type override.  The driver reads a
 // numeric column as a C# decimal and knows nothing of Price, so the generated method reads the decimal and passes it to
 // FromDatabase, and a Price parameter would be sent as the decimal that ToDatabase returns.  See
 // docs/manual/settings.md, "Converters".

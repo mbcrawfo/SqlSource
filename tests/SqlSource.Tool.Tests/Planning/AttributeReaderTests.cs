@@ -15,7 +15,7 @@ namespace SqlSource.Tool.Tests.Planning;
 // The tool's reader of [SqlSourceGenerate] works on syntax: it has no compilation and follows no name.
 public sealed class AttributeReaderTests : IDisposable
 {
-    private const string PathPrefix = "[SqlSourceGenerate(Path = ";
+    private const string SourcePrefix = "[SqlSourceGenerate(Source = ";
     private const string OutputPrefix = "[SqlSourceGenerate(Output = ";
 
     private readonly TempFolder _folder = new();
@@ -71,13 +71,13 @@ public sealed class AttributeReaderTests : IDisposable
         claims.Errors.ShouldBeEmpty();
         var claim = claims.Claims.ShouldHaveSingleItem();
         claim.SourcePath.ShouldBe(Source);
-        claim.Path.ShouldBeNull();
+        claim.Source.ShouldBeNull();
         claim.Output.ShouldBeNull();
     }
 
     [Fact]
     public void Read_Attribute_GivesWhereItStarts() =>
-        Read(OnAClass("[System.Serializable, SqlSourceGenerate(Path = \"Q\")]"))
+        Read(OnAClass("[System.Serializable, SqlSourceGenerate(Source = \"Q\")]"))
             .Claims.ShouldHaveSingleItem()
             .Position.ShouldBe(new LinePosition(2, "[System.Serializable, ".Length));
 
@@ -98,14 +98,14 @@ public sealed class AttributeReaderTests : IDisposable
             {
                 internal partial class Outer
                 {
-                    [SqlSource.SqlSourceGenerate(Path = "Inner")]
+                    [SqlSource.SqlSourceGenerate(Source = "Inner")]
                     private partial class Inner;
                 }
             }
             """
         )
             .Claims.ShouldHaveSingleItem()
-            .Path.ShouldBe("Inner");
+            .Source.ShouldBe("Inner");
 
     [Theory]
     [InlineData("[assembly: SqlSource.SqlSourceGenerate]\ninternal partial class Queries;")]
@@ -125,9 +125,9 @@ public sealed class AttributeReaderTests : IDisposable
 
     [Fact]
     public void Read_TwoAttributesOnOneDeclaration_TakesTheFirst() =>
-        Read(OnAClass("[SqlSourceGenerate(Path = \"A\")]\n[SqlSourceGenerate(Path = \"B\")]"))
+        Read(OnAClass("[SqlSourceGenerate(Source = \"A\")]\n[SqlSourceGenerate(Source = \"B\")]"))
             .Claims.ShouldHaveSingleItem()
-            .Path.ShouldBe("A");
+            .Source.ShouldBe("A");
 
     [Theory]
     [InlineData("\"Queries\"", "Queries")]
@@ -140,10 +140,10 @@ public sealed class AttributeReaderTests : IDisposable
     [InlineData("default", null)]
     public void Read_PathAsALiteral_IsItsValue(string expression, string? expected)
     {
-        var claims = Read(OnAClass(PathPrefix + expression + ")]"));
+        var claims = Read(OnAClass(SourcePrefix + expression + ")]"));
 
         claims.Errors.ShouldBeEmpty();
-        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe(expected);
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe(expected);
     }
 
     [Theory]
@@ -152,39 +152,168 @@ public sealed class AttributeReaderTests : IDisposable
     [InlineData("\"\"\"Requêtes\"\"\"")]
     public void Read_PathOutsideAsciiInAFileThatIsNotUtf8_IsSqlsrc271AtThePathAndNoClaim(string expression)
     {
-        var claims = ReadLatin1(OnAClass(PathPrefix + expression + ")]"));
+        var claims = ReadLatin1(OnAClass(SourcePrefix + expression + ")]"));
 
         claims.Claims.ShouldBeEmpty();
         claims.Errors.ShouldBe([
-            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(2, PathPrefix.Length), Source),
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(2, SourcePrefix.Length), Source),
         ]);
+    }
+
+    [Theory]
+    [InlineData("internal static partial class Queries;", "Queries")]
+    [InlineData("internal partial class Repo<T>;", "Repo")]
+    [InlineData("internal partial class @event;", "event")]
+    [InlineData("internal partial class \\u0041pp;", "App")]
+    [InlineData("internal partial record struct Point;", "Point")]
+    public void Read_Type_GivesItsName(string declaration, string expected) =>
+        Read($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n")
+            .Claims.ShouldHaveSingleItem()
+            .TypeName.ShouldBe(expected);
+
+    [Fact]
+    public void Read_NestedType_GivesItsOwnName() =>
+        Read(
+            "using SqlSource;\n\ninternal partial class Outer\n{\n    [SqlSourceGenerate]\n"
+                + "    private partial class Inner;\n}\n"
+        )
+            .Claims.ShouldHaveSingleItem()
+            .TypeName.ShouldBe("Inner");
+
+    // On Windows the compiler reads the name in the system's code page, so the file named for it would not be the one
+    // the build looks for.
+    [Fact]
+    public void Read_NameOutsideAsciiWithNoSourceInAFileThatIsNotUtf8_IsSqlsrc271AtTheNameAndNoClaim()
+    {
+        var claims = ReadLatin1("using SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class Café;\n");
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBe([
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(3, 23), Source),
+        ]);
+    }
+
+    // The name wherever it stands: after a record's class or struct, after a comment, or with the letter outside ASCII
+    // first.  Each position is the name's first character.
+    [Theory]
+    [InlineData("internal partial record class Café;", 30)]
+    [InlineData("internal partial record struct Café;", 31)]
+    [InlineData("internal partial class /* x */ Café;", 31)]
+    [InlineData("internal partial class Écrit;", 23)]
+    [InlineData("internal partial class Caf\u00e9<T>;", 23)]
+    public void Read_NameOutsideAsciiWrittenAnyWayInAFileThatIsNotUtf8_IsSqlsrc271AtTheName(
+        string declaration,
+        int column
+    )
+    {
+        var claims = ReadLatin1($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n");
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBe([
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(3, column), Source),
+        ]);
+    }
+
+    // A name whose first letter is outside ASCII and that is not on the keyword's line, or that follows an @, leaves no
+    // identifier at all: the error is at that letter.
+    [Theory]
+    [InlineData("internal partial class\n    Écrit;", 4, 4)]
+    [InlineData("internal partial class\r\n    Écrit;", 4, 4)]
+    [InlineData("internal partial class // c\n    Écrit;", 4, 4)]
+    [InlineData("internal partial class @Écrit;", 3, 24)]
+    [InlineData("internal partial record class\n    Écrit;", 4, 4)]
+    public void Read_NameThatLeavesNoIdentifierInAFileThatIsNotUtf8_IsSqlsrc271AtItsFirstLetterOutsideAscii(
+        string declaration,
+        int line,
+        int column
+    )
+    {
+        var claims = ReadLatin1($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n");
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBe([
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(line, column), Source),
+        ]);
+    }
+
+    // A declaration with no name at all, and nothing outside ASCII, is the compiler's error, not this one.
+    [Fact]
+    public void Read_DeclarationWithNoNameInAFileThatIsNotUtf8_IsNotSqlsrc271()
+    {
+        var claims = ReadLatin1("// café\nusing SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class\n{\n}\n");
+
+        claims.Errors.ShouldBeEmpty();
+    }
+
+    // What follows the name is not the name, a comment outside ASCII included.
+    [Theory]
+    [InlineData("internal partial class Queries/*é*/;")]
+    [InlineData("internal partial class Queries /* é */ { }")]
+    [InlineData("internal partial class Queries<T> where T : struct { /* é */ }")]
+    public void Read_AsciiNameFollowedByTextOutsideAsciiInAFileThatIsNotUtf8_IsAClaim(string declaration)
+    {
+        var claims = ReadLatin1($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n");
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().TypeName.ShouldBe("Queries");
+    }
+
+    [Fact]
+    public void Read_NameOutsideAsciiWithASourceInAFileThatIsNotUtf8_IsAClaim()
+    {
+        var claims = ReadLatin1(
+            "using SqlSource;\n\n[SqlSourceGenerate(Source = \".\")]\ninternal partial class Café;\n"
+        );
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe(".");
+    }
+
+    [Fact]
+    public void Read_NameEscapedInAFileThatIsNotUtf8_IsAClaimWithThatName()
+    {
+        var claims = ReadLatin1(
+            "// café\nusing SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class Caf\\u00e9;\n"
+        );
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().TypeName.ShouldBe("Café");
     }
 
     [Fact]
     public void Read_AsciiPathInAFileThatIsNotUtf8_IsAClaim()
     {
-        var claims = ReadLatin1("// café\n" + OnAClass("[SqlSourceGenerate(Path = \"Q\")]"));
+        var claims = ReadLatin1("// café\n" + OnAClass("[SqlSourceGenerate(Source = \"Q\")]"));
 
         claims.Errors.ShouldBeEmpty();
-        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe("Q");
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe("Q");
     }
 
     [Fact]
     public void Read_PathEscapedInAFileThatIsNotUtf8_IsAClaimWithThatPath()
     {
-        var claims = ReadLatin1("// café\n" + OnAClass(PathPrefix + "\"Requ\\u00eates\")]"));
+        var claims = ReadLatin1("// café\n" + OnAClass(SourcePrefix + "\"Requ\\u00eates\")]"));
 
         claims.Errors.ShouldBeEmpty();
-        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe("Requêtes");
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe("Requêtes");
     }
 
     [Fact]
     public void Read_PathOutsideAsciiInUtf8_IsAClaimWithThatPath()
     {
-        var claims = Read(OnAClass(PathPrefix + "\"Requêtes\")]"));
+        var claims = Read(OnAClass(SourcePrefix + "\"Requêtes\")]"));
 
         claims.Errors.ShouldBeEmpty();
-        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe("Requêtes");
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe("Requêtes");
+    }
+
+    [Fact]
+    public void Read_NameOutsideAsciiInUtf8_IsAClaimWithThatName()
+    {
+        var claims = Read("using SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class Café;\n");
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().TypeName.ShouldBe("Café");
     }
 
     [Theory]
@@ -217,15 +346,15 @@ public sealed class AttributeReaderTests : IDisposable
     [InlineData("default(string)")]
     public void Read_PathThatIsNoLiteral_IsSqlsrc208AtTheExpressionAndNoClaim(string expression)
     {
-        var claims = Read(OnAClass(PathPrefix + expression + ")]"));
+        var claims = Read(OnAClass(SourcePrefix + expression + ")]"));
 
         claims.Claims.ShouldBeEmpty();
         claims.Errors.ShouldBe([
             ToolDiagnostic.At(
                 ToolDiagnostics.AttributeArgumentNotLiteral,
                 Source,
-                new LinePosition(2, PathPrefix.Length),
-                "Path"
+                new LinePosition(2, SourcePrefix.Length),
+                "Source"
             ),
         ]);
     }
@@ -253,27 +382,27 @@ public sealed class AttributeReaderTests : IDisposable
 
     [Fact]
     public void Read_BothArgumentsNoLiterals_IsSqlsrc208ForEach() =>
-        Read(OnAClass("[SqlSourceGenerate(Path = Folder, Output = Level)]")).Errors.Length.ShouldBe(2);
+        Read(OnAClass("[SqlSourceGenerate(Source = Folder, Output = Level)]")).Errors.Length.ShouldBe(2);
 
     [Fact]
     public void Read_OtherArgumentsOfTheAttribute_AreNotRead() =>
-        Read(OnAClass("[SqlSourceGenerate(Parameters = Words, ModelNamespace = nameof(App), Path = \"Q\")]"))
+        Read(OnAClass("[SqlSourceGenerate(Parameters = Words, ModelNamespace = nameof(App), Source = \"Q\")]"))
             .Errors.ShouldBeEmpty();
 
     [Fact]
-    public void Read_ArgumentsTheReaderDoesNotExpect_AreSteppedOverAndTheFirstPathIsRead()
+    public void Read_ArgumentsTheReaderDoesNotExpect_AreSteppedOverAndTheFirstSourceIsRead()
     {
-        var claims = Read(OnAClass("[SqlSourceGenerate(\"positional\", Path = \"A\", Path = \"B\", Unknown = 3)]"));
+        var claims = Read(OnAClass("[SqlSourceGenerate(\"positional\", Source = \"A\", Source = \"B\", Unknown = 3)]"));
 
         claims.Errors.ShouldBeEmpty();
-        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe("A");
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe("A");
     }
 
     [Fact]
     public void Read_FileThatDoesNotParse_GivesTheClaimsItCanRead() =>
-        Read("[SqlSource.SqlSourceGenerate(Path = \"Q\")]\ninternal partial class Queries {\n    void Broken( {\n")
+        Read("[SqlSource.SqlSourceGenerate(Source = \"Q\")]\ninternal partial class Queries {\n    void Broken( {\n")
             .Claims.ShouldHaveSingleItem()
-            .Path.ShouldBe("Q");
+            .Source.ShouldBe("Q");
 
     // The text is searched for the word before anything is parsed, so a spelling that hides it is not found.
     [Fact]
@@ -326,7 +455,7 @@ public sealed class AttributeReaderTests : IDisposable
     public void Read_FileOfTheNewestCSharp_IsRead() =>
         Read(
             """
-            [SqlSource.SqlSourceGenerate(Path = "Queries")]
+            [SqlSource.SqlSourceGenerate(Source = "Queries")]
             internal partial class Repository(int size)
             {
                 private readonly int[] _sizes = [1, 2, .. new[] { 3 }];
@@ -340,5 +469,5 @@ public sealed class AttributeReaderTests : IDisposable
             """
         )
             .Claims.ShouldHaveSingleItem()
-            .Path.ShouldBe("Queries");
+            .Source.ShouldBe("Queries");
 }

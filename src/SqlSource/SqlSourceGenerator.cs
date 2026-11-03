@@ -150,7 +150,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         var sqlFiles = context.AdditionalTextsProvider.Where(static file => SqlPath.IsSqlFile(file.Path));
 
-        // The paths alone, so that resolving a type's Path does not depend on the text of any file.
+        // The paths alone, so that resolving a type's Source does not depend on the text of any file.
         var listedPaths = sqlFiles.Select(static (file, _) => SqlFilePath.Create(file.Path)).WhereNotNull().Collect();
 
         var sqlPaths = listedPaths

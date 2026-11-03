@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Realistic;
 
 // The reading of the claims of a corpus's RealisticQueries.cs and RealisticMethods.cs from their source: a class whose
-// attribute's Path names the query.sql of a folder of Cases claims that case at the member of GeneratorOutput its
+// attribute's Source names the query.sql of a folder of Cases claims that case at the member of GeneratorOutput its
 // Output names, and any other path or Output fails naming the class.  The corpus tests that each engine's cases are
 // claimed as they should be are in each engine's project.
 public sealed class RealisticClaimsTests
@@ -16,7 +16,7 @@ public sealed class RealisticClaimsTests
         RealisticClaims
             .Parse(
                 """
-                [SqlSourceGenerate(Path = "../Cases/a-b/query.sql", Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = GeneratorOutput.Models)]
                 internal static partial class ABQuery;
                 """
             )
@@ -29,7 +29,7 @@ public sealed class RealisticClaimsTests
         RealisticClaims
             .Parse(
                 $$"""
-                [{{attribute}}(Path = "../Cases/a-b/query.sql")]
+                [{{attribute}}(Source = "../Cases/a-b/query.sql")]
                 internal static partial class ABQuery;
                 """
             )
@@ -40,7 +40,7 @@ public sealed class RealisticClaimsTests
         RealisticClaims
             .Parse(
                 """
-                [SqlSourceGenerate(Path = "../Cases/a-b/query.sql", Output = GeneratorOutput.CodeGen)]
+                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = GeneratorOutput.CodeGen)]
                 internal static partial class ABMethod;
                 """
             )
@@ -51,7 +51,7 @@ public sealed class RealisticClaimsTests
         RealisticClaims
             .Parse(
                 """
-                [SqlSourceGenerate(Path = "../Cases/a-b/query.sql", Output = SqlSource.GeneratorOutput.CodeGen)]
+                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = SqlSource.GeneratorOutput.CodeGen)]
                 internal static partial class ABMethod;
                 """
             )
@@ -63,7 +63,7 @@ public sealed class RealisticClaimsTests
         var thrown = Should.Throw<InvalidOperationException>(() =>
             RealisticClaims.Parse(
                 """
-                [SqlSourceGenerate(Path = "../Cases/a-b/query.sql", Output = "CodeGen")]
+                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = "CodeGen")]
                 internal static partial class XMethod;
                 """
             )
@@ -86,7 +86,7 @@ public sealed class RealisticClaimsTests
             .ShouldBeEmpty();
 
     [Fact]
-    public void Parse_AttributeWithoutPath_ThrowsNamingTheClass()
+    public void Parse_AttributeWithoutSource_ThrowsNamingTheClass()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
             RealisticClaims.Parse(
@@ -107,7 +107,7 @@ public sealed class RealisticClaimsTests
         var thrown = Should.Throw<InvalidOperationException>(() =>
             RealisticClaims.Parse(
                 """
-                [SqlSourceGenerate(Path = "Queries/x.sql")]
+                [SqlSourceGenerate(Source = "Queries/x.sql")]
                 internal static partial class XQuery;
                 """
             )

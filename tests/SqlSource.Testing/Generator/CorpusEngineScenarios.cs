@@ -57,7 +57,7 @@ internal static partial class QueryMethodCorpus
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public sealed record Email(string Value)
@@ -106,7 +106,7 @@ internal static partial class QueryMethodCorpus
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public sealed record Embedding(float[] Values)
