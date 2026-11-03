@@ -2,7 +2,7 @@
 
 Date: 2026-11-02
 
-Appendix to [the phase 9 design](2026-11-02-query-generation-phase-9-build-integration-design.md) of the [query generation epic](2026-10-07-query-generation-epic-design.md), written by sub-phase 9.0.  Before any code of the online build or the watcher, throwaway projects ran stand-ins of the design's targets with the packed package and the packed tool, MSBuild's `Exec` read the error forms, `FileSystemWatcher` recorded what saves raise, and the CI services' documentation was read for the variables they set.  The owner ran, from the checklist below, what only an IDE shows.  The projects and scripts were not kept; what they ran and what they answered are here.  Each answer is what was run and what it did; a question the spike could not reach names the sub-phase that must answer it.
+Appendix to [the phase 9 design](2026-11-02-query-generation-phase-9-build-integration-design.md) of the [query generation epic](2026-10-07-query-generation-epic-design.md), written by sub-phase 9.0.  Before any code of the online build or the watcher, throwaway projects ran stand-ins of the design's targets with the packed package and the packed tool, MSBuild's `Exec` read the error forms, `FileSystemWatcher` recorded what saves raise, and the CI services' documentation was read for the variables they set.  The owner ran, from the checklist below, what only an IDE shows, in Rider on macOS; the other IDEs and systems are [TD-0097](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md).  The projects and scripts were not kept; what they ran and what they answered are here.  Each answer is what was run and what it did; a question the spike could not reach names the sub-phase that must answer it.
 
 ## The owner's checklist
 
@@ -11,16 +11,16 @@ Items 8 to 11 of the design's 9.0, and the editors' half of item 6, need an IDE,
 ### Setting up
 
 1. On each machine, from a checkout of this branch, pack the generator into a folder of its own: `dotnet pack src/SqlSource/SqlSource.csproj --output ~/sqlsource-spike-feed`.  It is `SqlSource.0.1.0-dev.nupkg`.
-2. Save the script under [The sample](#the-sample) as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash; or run it on the Mac and copy the folder and the feed across, then change the path in the sample's `nuget.config`.  The sample is outside the repository, so nothing of the repository's build applies to it.
+2. Save the script in [TD-0097's procedure](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md#the-script) as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash; or run it on the Mac and copy the folder and the feed across, then change the path in the sample's `nuget.config`.  The sample is outside the repository, so nothing of the repository's build applies to it.
 3. In the sample's folder, run `dotnet build`.  It fails with one error, on purpose: `Queries/Orders.sql(1,10): error SQLSRC241: The query 'ListOrders' has no entry in the sidecar of its file, ...`, since `Orders.sql` has no sidecar yet.
 4. Record the versions:
 
 | | Version |
 |----|----|
-| Machine and OS | |
-| .NET SDK (`dotnet --version` in the sample) | |
+| Machine and OS | Mac |
+| .NET SDK (`dotnet --version` in the sample) | 11.0.100-rc.1.26425.128 |
 | Visual Studio | |
-| Rider | |
+| Rider | 2026.2.4 |
 | VS Code, C# extension, C# Dev Kit | |
 
 The sample holds three queries and a tool that writes their sidecars from a process of its own, as the watcher will.  Every command below is run in a terminal in the sample's folder; a terminal inside the IDE is fine.
@@ -48,9 +48,9 @@ Before each mode: run `swap.cs -- reset`, build once from the IDE, and wait unti
 | Visual Studio | Automatic | R | | | |
 | Visual Studio | Automatic | N | | | |
 | Visual Studio | Automatic | E | | | |
-| Rider | | R | | | |
-| Rider | | N | | | |
-| Rider | | E | | | |
+| Rider | | R | yes | nothing | seconds |
+| Rider | | N | yes | nothing | seconds |
+| Rider | | E | yes | build; this error didn't show in the editor| after build |
 | VS Code | default ( ) | R | | | |
 | VS Code | default | N | | | |
 | VS Code | default | E | | | |
@@ -78,10 +78,10 @@ In each IDE:
 | Visual Studio | 3. save a `.sql` file | | |
 | Visual Studio | 4. save the project file | | |
 | Visual Studio | 5. build | | |
-| Rider | 2. open | | |
-| Rider | 3. save a `.sql` file | | |
-| Rider | 4. save the project file | | |
-| Rider | 5. build | | |
+| Rider | 2. open | 00:09:41.670 DesignTimeBuild=True BuildingProject=False BuildingInsideVisualStudio= SkipCompilerExecution=True BuildingByReSharper=True MSBuildRuntimeType=Core MSBuildVersion=18.11.0\n00:09:46.173 DesignTimeBuild=True BuildingProject=False BuildingInsideVisualStudio= SkipCompilerExecution=True BuildingByReSharper=True MSBuildRuntimeType=Core MSBuildVersion=18.11.0 | file was not created |
+| Rider | 3. save a `.sql` file | no change | file does not exist |
+| Rider | 4. save the project file | 00:13:34.877 DesignTimeBuild=True BuildingProject=False BuildingInsideVisualStudio= SkipCompilerExecution=True BuildingByReSharper=True MSBuildRuntimeType=Core MSBuildVersion=18.11.0 | file does not exist |
+| Rider | 5. build | 00:14:29.511 DesignTimeBuild= BuildingProject=true BuildingInsideVisualStudio= SkipCompilerExecution= BuildingByReSharper= MSBuildRuntimeType=Core MSBuildVersion=18.11.0 | 00:14:29.511 guarded target ran |
 | VS Code | 2. open | | |
 | VS Code | 3. save a `.sql` file | | |
 | VS Code | 4. save the project file | | |
@@ -118,10 +118,10 @@ The guard is right if `guarded.log` gains a line at step 5 and at no other step.
 
 | Step | What happened |
 |----|----|
-| 1. kind of configuration | |
-| 2. the setting's name and place | |
-| 3. starts on open | |
-| 4. the error, and whether it is a link | |
+| 1. kind of configuration | shell script (text) |
+| 2. the setting's name and place | as described |
+| 3. starts on open | yes, terminal pane |
+| 4. the error, and whether it is a link | yes |
 
 ### Item 6, the editors' half: the events of a save
 
@@ -134,271 +134,177 @@ The guard is right if `guarded.log` gains a line at step 5 and at no other step.
 | OS | Editor | Events printed for one save |
 |----|----|----|
 | macOS | VS Code | |
-| macOS | Rider | |
+| macOS | Rider | (backup before saving enabled) 24156 ms Changed  /Users/michael/Projects/sqlsource-spike-sample/Queries/Count.sql~\n24157 ms Created  /Users/michael/Projects/sqlsource-spike-sample/Queries/Count.sql~\n24158 ms Deleted  /Users/michael/Projects/sqlsource-spike-sample/Queries/Count.sql~\n24158 ms Changed  /Users/michael/Projects/sqlsource-spike-sample/Queries/Count.sql |
 | Windows | Visual Studio | |
 | Windows | VS Code | |
 | Windows | Rider | |
 
 ### The sample
 
-<details>
-<summary><code>make-sample.sh</code></summary>
+The script that writes the sample, `make-sample.sh`, is in [TD-0097](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md#the-script), with the procedure for the IDEs and systems not yet run.
 
-```bash
-#!/usr/bin/env bash
-# Writes the phase 9 spike's IDE sample into <folder>, restoring SqlSource 0.1.0-dev from <feed>.
-# Usage: make-sample.sh <folder> <feed>   <feed> is a folder that holds SqlSource.0.1.0-dev.nupkg.
-set -euo pipefail
-[[ $# -eq 2 ]] || { echo "usage: make-sample.sh <folder> <feed>" >&2; exit 2; }
-mkdir -p "$1" && cd "$1" && feed="$(cd "$2" && pwd)"
-mkdir -p Queries tools/sidecars .vscode
-cat >nuget.config <<EOF
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-    <packageSources>
-        <clear />
-        <add key="spike-feed" value="$feed" />
-        <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-    </packageSources>
-</configuration>
-EOF
-cat >Sample.csproj <<'SAMPLE_EOF'
-<Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
-    <ItemGroup>
-        <PackageReference Include="SqlSource" Version="0.1.0-dev" PrivateAssets="all" />
-        <Compile Remove="tools/**" />
-        <AdditionalFiles Remove="tools/**" />
-    </ItemGroup>
-</Project>
-SAMPLE_EOF
-cat >sqlsource.json <<'SAMPLE_EOF'
-{ "root": true, "dialect": "postgres" }
-SAMPLE_EOF
-cat >Directory.Build.targets <<'SAMPLE_EOF'
-<Project>
-    <!--
-        Two targets in the place of the online target: SqlSourceTrackAdditionalFiles runs just before CoreCompile.
-        SpikeProbe has no condition and appends the values its condition would test to obj/probe.log, every time any
-        build of the project reaches it.  SpikeGuarded has the design's condition and appends to obj/guarded.log.
-    -->
-    <Target Name="SpikeProbe" BeforeTargets="SqlSourceTrackAdditionalFiles">
-        <WriteLinesToFile File="$(MSBuildProjectDirectory)/obj/probe.log" Lines="$([System.DateTime]::Now.ToString('HH:mm:ss.fff')) DesignTimeBuild=$(DesignTimeBuild) BuildingProject=$(BuildingProject) BuildingInsideVisualStudio=$(BuildingInsideVisualStudio) SkipCompilerExecution=$(SkipCompilerExecution) BuildingByReSharper=$(BuildingByReSharper) MSBuildRuntimeType=$(MSBuildRuntimeType) MSBuildVersion=$(MSBuildVersion)" />
-    </Target>
-    <Target
-        Name="SpikeGuarded"
-        BeforeTargets="SqlSourceTrackAdditionalFiles"
-        Condition="'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' == 'true'"
-    >
-        <WriteLinesToFile File="$(MSBuildProjectDirectory)/obj/guarded.log" Lines="$([System.DateTime]::Now.ToString('HH:mm:ss.fff')) guarded target ran" />
-    </Target>
-</Project>
-SAMPLE_EOF
-cat >Queries.cs <<'SAMPLE_EOF'
-using SqlSource;
+## What ran
 
-namespace Sample;
+| | Version |
+|----|----|
+| .NET SDK | 10.0.401, the repository's `global.json`; MSBuild `18.9.11+e34a38d2a` (`dotnet msbuild -version`), which reports `MSBuildVersion` `18.11.0` inside a build; the C# compiler `5.9.0-1.26423.113` |
+| MSBuild, cross-checks | 17.11.31, 17.14.51 and 18.11.0, for the `Exec` cases of [item 4](#4-exec-and-the-error-format) |
+| SqlSource and SqlSource.Tool | `0.1.0-dev`, packed from this branch at `adf45187` into a local feed; the tool installed through a tool manifest, as a user installs it |
+| PostgreSQL | `postgres:18.6`, for the sidecars of the sample and the real tool's runs of [item 5](#5-the-cost-of-compile-as-an-input) |
+| Linux | `mcr.microsoft.com/dotnet/sdk:10.0` in Docker 29.8, for [item 6](#6-file-events) |
+| Roslyn's workspace | `Microsoft.CodeAnalysis.Workspaces.MSBuild` 5.9.0 with `Microsoft.Build.Locator` 1.11.2 |
+| Host | macOS on Apple silicon |
 
-[SqlSourceGenerate(Path = "Queries", Output = GeneratorOutput.Models)]
-internal static partial class Queries;
-SAMPLE_EOF
-cat >Program.cs <<'SAMPLE_EOF'
-using Sample;
+Every project was outside the repository, so that none of its `Directory.Build.props`, `Directory.Packages.props` or `.git` applied.  Where the design names a target that 9.2 will write, a stand-in in the probe's `Directory.Build.targets` had the design's name, condition, `Inputs` and `Outputs`, and `Exec`ed a shell script in place of the tool, which logged its arguments and the manifest it was given and created or deleted a sidecar as the probe asked.  `SqlSourceTrackAdditionalFiles` was redefined there with `SqlSourceDescribeOnline` after `SqlSourceFindSettingsFiles` in its `DependsOnTargets`, as the design places it.  Every build cleared `SQLSOURCE_CONNECTION*`, `SQLSOURCE_LOG` and the CI variables from its environment, or set them on purpose.
 
-// Rewritten: with sidecar A, Id is an int and this line has no error.  With sidecar B, Id is a long, and the line
-// shows CS0266.
-int id = new UsersDto(1, "name", null).Id;
-System.Console.WriteLine(id);
-SAMPLE_EOF
-cat >Orders.cs <<'SAMPLE_EOF'
-namespace Sample;
+## 1. The target's place
 
-// New: until Queries/Orders.sql.json exists, OrdersDto does not, and this line shows CS0246.
-internal static class OrdersUse
-{
-    internal static object Make() => new OrdersDto(1, 1, 1m);
-}
-SAMPLE_EOF
-cat >Queries/Users.sql <<'SAMPLE_EOF'
--- name: GetUser
-SELECT id, name, email FROM users WHERE id = @id;
-SAMPLE_EOF
-cat >Queries/Orders.sql <<'SAMPLE_EOF'
--- name: ListOrders -> many
-SELECT id, user_id, total FROM orders WHERE user_id = @userId;
-SAMPLE_EOF
-cat >Queries/Count.sql <<'SAMPLE_EOF'
--- name: CountUsers
-SELECT count(*) AS total FROM users;
-SAMPLE_EOF
-cat >tools/swap.cs <<'SAMPLE_EOF'
-// Writes the sample's sidecars from a process of its own, as the watcher will.  Run from the sample's folder:
-//   dotnet run --file tools/swap.cs -- a | b | new | edited | reset
-using System;
-using System.IO;
+- **It runs before the compiler, after the manifest, in both kinds of project.**  In a project of the SDK the order was `SqlSourceWriteManifest`, the target that lists the sidecars, `SqlSourceRunOnline`, `SqlSourceDescribeOnline`, `SqlSourceTrackAdditionalFiles`, then `CoreCompile`, through `SqlSource.AfterSdk.targets`' hook before `CoreCompile`.  In a project not of the SDK (`Microsoft.Common.props`, the package's props, `Microsoft.CSharp.targets`, the package's targets imported where NuGet would), the same order ran from `GenerateMSBuildEditorConfigFileCore`.  The stand-in was given the manifest the dependency had written a few milliseconds before, in the same build.
+- **The manifest a build writes is not the one the tool gets by name.**  Diffed against `dotnet msbuild -t:SqlSourceWriteManifest`, the build's holds two more `Compile` lines, the SDK's `obj/Debug/net10.0/.NETCoreApp,Version=v10.0.AssemblyAttributes.cs` and `Base.AssemblyInfo.cs`, which targets add on the way to a compile; both are under `obj`, so in `SqlSourceBuildFolders`, and reach no settings file.  With a `.sql` file that a target hooked `BeforeTargets="CoreCompile"` adds (TD-0025's case), the build's manifest also has its `File=` line, which the one by name lacks: inside a build the online run does not have TD-0025's limit, as the design says.
+- **A false `Condition` skips the dependencies.**  With `SqlSourceOnline=false`, and under `auto` with no `.env` and no variable, `obj/Debug/net10.0` held no manifest, stamp, list or value file, the stand-in never ran, and the performance summary listed none of the four targets.  This MSBuild writes no "skipped, due to false condition" line at `-v:d` or `-v:diag`, so the evidence is the files and the summary.
+- **A sidecar the run creates reaches the generator in the same build.**  A project whose `Orders.sql` had no sidecar fails with `Queries/Orders.sql(1,10): error SQLSRC241: The query 'ListOrders' has no entry in the sidecar of its file, and its output 'models' needs one.`  With the stand-in creating the sidecar and the include after it, the same build compiled code that uses `OrdersDto`, and `Csc`'s `AdditionalFiles` ended with `Queries/Orders.sql.json`.  Without the include, the file on disk was not enough: `SQLSRC241` again, since the props' glob had expanded at evaluation.
+- **A sidecar the run deletes must be removed from the items.**  Left in, the compiler fails with `CSC : error CS2001: Source file '.../Queries/Users.sql.json' could not be found.` and the generator adds `Queries/Users.sql.json(1,1): error SQLSRC237: The sidecar cannot be read, because it is not one JSON object.`  With the removal, the build reports only `SQLSRC241` at `Users.sql`, the consequence a deleted sidecar should have.
+- **Up to date, and each input.**  A build with nothing changed printed `Skipping target "SqlSourceRunOnline" because all output files are up-to-date with respect to the input files.` and gave the compiler the same items.  Each input touched alone ran the tool once and the next build skipped it again: a `.sql` file, `sqlsource.json`, a sidecar, a deleted sidecar (through the list), a `.cs` file, `.env`, `dotnet-tools.json`, and `-p:SqlSourceOnline=true` after `auto` and back, through the value file (`Input file "obj/Debug/net10.0/Base.csproj.SqlSource.online" is newer than output file ...`).  A `.env` or tool manifest touched alone ran the tool and skipped `CoreCompile`.
+- **The include and the removal are safe when the run is skipped.**  They are in `SqlSourceDescribeOnline`, which has no `Inputs`, so they run in every build.  A separate probe showed they would be safe inside the skipped target too: MSBuild runs a skipped target's `ItemGroup` and `PropertyGroup` for output inference.
+- **Two costs of the design as written.**  The list of sidecars, written before the run, changes when the run creates or deletes one, so the next build launches the tool once more for nothing (`Input file "obj/Debug/net10.0/Base.csproj.SqlSource.sidecars" is newer than output file ...`).  Writing the list again after the `Exec` and before the stamp's `Touch` removed it, which a variant showed.  And the include appends a created sidecar after the settings files the search added, while the next evaluation's glob puts it among the other sidecars, so `SqlSourceTrackAdditionalFiles`' hash changes and the next build compiles once more; the run is still skipped there.
+- **Multi-targeting.**  A project of `net8.0;net10.0` and a `net10.0` project that references it, each on a tree with no `obj`: `dotnet build`, `dotnet build -f net10.0` and the referencing project's build each ran the tool once, for `net8.0`, with a `net8.0` manifest written in that build, and every framework that compiled saw the sidecar the run created.  Under `dotnet build` the second framework's call reached the configuration the dispatch built (`Target "SqlSourceRunOnline" skipped. Previously built successfully.`); under `-f` and through the reference it built that configuration by name.
+- **The second framework waited for the first framework's whole build.**  Under `dotnet build`, `net10.0`'s call into the `net8.0` configuration was answered only when `net8.0`'s `Build` request ended, after its `CopyFilesToOutputDirectory` and `IncrementalClean`, not when its `SqlSourceRunOnline` did: MSBuild runs one request of a configuration at a time.  So the inner builds ran in series from `SqlSourceDescribeOnline` on.  A variant fixed it: a target of the outer build, `BeforeTargets="DispatchToInnerBuilds"` under `'$(TargetFramework)' == '' and '$(TargetFrameworks)' != ''`, calls `SqlSourceRunOnline` in the first framework's configuration before the dispatch.  The dispatch passes only `TargetFramework` as a global property, as that call does, so its `net8.0` build is the same configuration and printed `Target "SqlSourceRunOnline" skipped. Previously built successfully.`; `net10.0`'s call was answered at once from the cached result and `net10.0` finished before `net8.0`.  The tool still ran once, with a manifest of that build.  `-f` and the reference have no outer build and behave as before.  The `net10.0` configuration, evaluated after the run, found the new sidecar through its own glob.
+- **The first framework.**  `$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))` gave `net8.0`, `net10.0` and `net10.0` for `' ; net8.0 ; net10.0 '`, `'net10.0'` and `'net10.0;'`, as `ProjectEvaluator.FirstFramework` does.  `$(TargetFrameworks.Split(';')[0])` parses, but gives a blank for the first.
+- **A solution built with `-m`.**  Two projects under one `.env` ran their tools at once, on two nodes, overlapping for about two seconds, each with its own manifest and working folder.
 
-var sidecars = Path.Combine("tools", "sidecars");
-void Put(string from, string to)
-{
-    // Written, not copied: a copy keeps the source's time, and an incremental build would not see the change.
-    File.WriteAllBytes(Path.Combine("Queries", to), File.ReadAllBytes(Path.Combine(sidecars, from)));
-    Console.WriteLine($"{DateTime.Now:HH:mm:ss.fff} wrote Queries/{to} from {from}");
-}
+## 2. The connection in the log
 
-switch (args.Length == 1 ? args[0] : "")
-{
-    case "a": Put("Users.a.sql.json", "Users.sql.json"); break;
-    case "b": Put("Users.b.sql.json", "Users.sql.json"); break;
-    case "new": Put("Orders.sql.json", "Orders.sql.json"); break;
-    case "edited": Put("Count.after.sql.json", "Count.sql.json"); break;
-    case "reset":
-        Put("Users.a.sql.json", "Users.sql.json");
-        Put("Count.before.sql.json", "Count.sql.json");
-        File.WriteAllText(Path.Combine("Queries", "Count.sql"), "-- name: CountUsers\nSELECT count(*) AS total FROM users;\n");
-        File.Delete(Path.Combine("Queries", "Orders.sql.json"));
-        Console.WriteLine("reset: Users is A, Count is the first text with its sidecar, Orders has no sidecar");
-        break;
-    default:
-        Console.Error.WriteLine("usage: dotnet run --file tools/swap.cs -- a | b | new | edited | reset");
-        return 2;
-}
-return 0;
-SAMPLE_EOF
-cat >tools/watcher.cs <<'SAMPLE_EOF'
-// A stand-in for "dotnet sqlsource describe --watch": it describes nothing.  It polls the .sql files of Queries
-// every 300 ms and, after a pass, prints the two markers of the design and, for each file that holds "-- BROKEN",
-// one error in the one-line form.  Run from the sample's folder: dotnet run --file tools/watcher.cs
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
+The probe's value was `Host=leak-probe-7f3a;Password=p'a$(x)ss;Database=d`.  Each form ran in a bare `<Project>` and in a project of the SDK with the package, with `-v:diag` to a file and `-bl`; the binary log was searched replayed to text and decompressed.
 
-const string Begin = "sqlsource: change detected; describing";
-const string End = "sqlsource: watching for changes; press Ctrl+C to stop";
+| Form | `-v:diag` | Binary log, replayed | Binary log, raw |
+|----|----|----|----|
+| a. `Condition="'$(SQLSOURCE_CONNECTION)' != ''"` | the value | the value | the value |
+| b. a property set to `$([System.String]::IsNullOrWhiteSpace($([System.Environment]::GetEnvironmentVariable('SQLSOURCE_CONNECTION'))))`, and a condition on it | nothing | nothing | nothing |
+| c. the same expression in the condition itself | nothing | nothing | nothing |
+| d. nothing that names it | nothing | nothing | nothing |
 
-Dictionary<string, DateTime> Snapshot() =>
-    Directory.GetFiles("Queries", "*.sql").ToDictionary(Path.GetFullPath, File.GetLastWriteTimeUtc);
+- Form a leaks through MSBuild's own message, `Property 'SQLSOURCE_CONNECTION' with value '...' expanded from the environment.`, at the condition, with or without any setting.
+- Forms b and c show only the property's `true` or `false`.  The variable's name, never its value, is in the copy of the project files that a binary log embeds as an archive.
+- **With `MSBUILDLOGALLENVIRONMENTVARIABLES=1` every form leaks, d included**: MSBuild then logs the whole environment.  That is the caller's setting, and it exposes every secret of the environment, not only this one.  The manual can say so.
 
-void Pass()
-{
-    foreach (var file in Directory.GetFiles("Queries", "*.sql").Select(Path.GetFullPath).Order())
-    {
-        var lines = File.ReadAllLines(file);
-        var at = Array.FindIndex(lines, line => line.Contains("-- BROKEN"));
-        if (at >= 0)
-        {
-            Console.WriteLine(
-                $"{file}({at + 1},1): error SQLSRC999: stand-in error for the spike; detail: the file says BROKEN; see: https://example.invalid/sqlsrc999"
-            );
-        }
-    }
-    Console.WriteLine($"postgres (postgres): stand-in pass at {DateTime.Now:HH:mm:ss.fff}");
-    Console.WriteLine(End);
-}
+## 3. Design-time builds
 
-Pass();
-var last = Snapshot();
-while (true)
-{
-    Thread.Sleep(300);
-    var now = Snapshot();
-    if (now.Count != last.Count || now.Any(pair => !last.TryGetValue(pair.Key, out var time) || time != pair.Value))
-    {
-        Console.WriteLine(Begin);
-        Pass();
-        last = now;
-    }
-}
-SAMPLE_EOF
-cat >tools/events.cs <<'SAMPLE_EOF'
-// Prints every event FileSystemWatcher raises under the sample's folder, but obj and bin, with the time.  Run from
-// the sample's folder, then save Queries/Users.sql from the editor: dotnet run --file tools/events.cs
-using System;
-using System.Diagnostics;
-using System.IO;
+| Build | `DesignTimeBuild` | `BuildingProject` | `SkipCompilerExecution` | Guarded target |
+|----|----|----|----|----|
+| `dotnet build`, `-t:Build`, `-t:Rebuild`, `publish`, `run` | empty | `true` | empty | ran |
+| `dotnet msbuild -p:DesignTimeBuild=true -p:BuildingProject=false -p:SkipCompilerExecution=true -t:Compile` | `true` | `false` | `true` | did not run |
+| `MSBuildWorkspace.OpenProjectAsync`, through its BuildHost | `True` | `False` | `True` | did not run; an unguarded target at the same place ran once |
+| `dotnet msbuild -t:Compile` or `-t:CoreCompile`, no design-time property | empty | `false` | empty | did not run |
 
-var clock = Stopwatch.StartNew();
-using var watcher = new FileSystemWatcher(Directory.GetCurrentDirectory())
-{
-    IncludeSubdirectories = true,
-    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite
-        | NotifyFilters.Size | NotifyFilters.CreationTime | NotifyFilters.Attributes,
-    InternalBufferSize = 64 * 1024,
-};
-void Print(string kind, string path, string? old = null)
-{
-    if (path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-        || path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-    {
-        return;
-    }
-    Console.WriteLine($"{clock.ElapsedMilliseconds,8} ms {kind,-8} {path}{(old is null ? "" : $" (from {old})")}");
-}
-watcher.Created += (_, e) => Print("Created", e.FullPath);
-watcher.Changed += (_, e) => Print("Changed", e.FullPath);
-watcher.Deleted += (_, e) => Print("Deleted", e.FullPath);
-watcher.Renamed += (_, e) => Print("Renamed", e.FullPath, e.OldFullPath);
-watcher.Error += (_, e) => Console.WriteLine($"{clock.ElapsedMilliseconds,8} ms Error    {e.GetException().Message}");
-watcher.EnableRaisingEvents = true;
-Console.WriteLine($"watching {watcher.Path}; press Ctrl+C to stop");
-System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
-SAMPLE_EOF
-cat >.vscode/tasks.json <<'SAMPLE_EOF'
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "sqlsource watch (stand-in)",
-      "type": "shell",
-      "command": "dotnet run --file tools/watcher.cs",
-      "isBackground": true,
-      "runOptions": { "runOn": "folderOpen" },
-      "presentation": { "reveal": "silent", "panel": "dedicated" },
-      "problemMatcher": {
-        "owner": "sqlsource",
-        "fileLocation": "absolute",
-        "pattern": {
-          "regexp": "^(.+)\\((\\d+),(\\d+)\\): (error|warning) (SQLSRC\\d+): (.*)$",
-          "file": 1,
-          "line": 2,
-          "column": 3,
-          "severity": 4,
-          "code": 5,
-          "message": 6
-        },
-        "background": {
-          "activeBegin": true,
-          "beginsPattern": "^sqlsource: change detected; describing$",
-          "endsPattern": "^sqlsource: watching for changes; press Ctrl\\+C to stop$"
-        }
-      }
-    }
-  ]
-}
-SAMPLE_EOF
-cat >tools/sidecars/Users.a.sql.json <<'SAMPLE_EOF'
-{"_WARNING":"This file was generated by the 'dotnet sqlsource' tool.  Do not edit by hand; use the tool to regenerate it.","$schema":"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json","formatVersion":1,"toolVersion":"0.1.0","queries":{"GetUser":{"hash":"295bdef9619ec0c0710c713894fb719e895cb9a5447d294d1f4a214cd7c67d2a","engine":"postgres","database":"postgres","serverVersion":"18.6","resultKind":"rows","matchesTable":{"schema":"public","table":"users"},"plan":"not-needed","tableMatch":"matched","parameters":[{"name":"id","ordinal":0,"type":{"name":"integer","bindName":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":null,"typeSource":"inferred"}],"columns":[{"ordinal":0,"name":"id","type":{"name":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"id"},"identity":false,"computed":false},{"ordinal":1,"name":"name","type":{"name":"text","kind":"base","schema":"pg_catalog","internalName":"text"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"name"},"identity":false,"computed":false},{"ordinal":2,"name":"email","type":{"name":"text","kind":"base","schema":"pg_catalog","internalName":"text"},"nullable":true,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"email"},"identity":false,"computed":false}]}}}
-SAMPLE_EOF
-cat >tools/sidecars/Users.b.sql.json <<'SAMPLE_EOF'
-{"_WARNING":"This file was generated by the 'dotnet sqlsource' tool.  Do not edit by hand; use the tool to regenerate it.","$schema":"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json","formatVersion":1,"toolVersion":"0.1.0","queries":{"GetUser":{"hash":"295bdef9619ec0c0710c713894fb719e895cb9a5447d294d1f4a214cd7c67d2a","engine":"postgres","database":"postgres","serverVersion":"18.6","resultKind":"rows","matchesTable":{"schema":"public","table":"users"},"plan":"not-needed","tableMatch":"matched","parameters":[{"name":"id","ordinal":0,"type":{"name":"integer","bindName":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":null,"typeSource":"inferred"}],"columns":[{"ordinal":0,"name":"id","type":{"name":"bigint","kind":"base","schema":"pg_catalog","internalName":"int8"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"id"},"identity":false,"computed":false},{"ordinal":1,"name":"name","type":{"name":"text","kind":"base","schema":"pg_catalog","internalName":"text"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"name"},"identity":false,"computed":false},{"ordinal":2,"name":"email","type":{"name":"text","kind":"base","schema":"pg_catalog","internalName":"text"},"nullable":true,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"email"},"identity":false,"computed":false}]}}}
-SAMPLE_EOF
-cat >tools/sidecars/Orders.sql.json <<'SAMPLE_EOF'
-{"_WARNING":"This file was generated by the 'dotnet sqlsource' tool.  Do not edit by hand; use the tool to regenerate it.","$schema":"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json","formatVersion":1,"toolVersion":"0.1.0","queries":{"ListOrders":{"hash":"8d4664c6d5e33fddb6f93f23770b7eb59a8c1e7973408246d743cfbe7476f5fd","engine":"postgres","database":"postgres","serverVersion":"18.6","resultKind":"rows","matchesTable":{"schema":"public","table":"orders"},"plan":"not-needed","tableMatch":"matched","parameters":[{"name":"userId","ordinal":0,"type":{"name":"integer","bindName":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":null,"typeSource":"inferred"}],"columns":[{"ordinal":0,"name":"id","type":{"name":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"orders","column":"id"},"identity":false,"computed":false},{"ordinal":1,"name":"user_id","type":{"name":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"orders","column":"user_id"},"identity":false,"computed":false},{"ordinal":2,"name":"total","type":{"name":"numeric(10,2)","kind":"base","schema":"pg_catalog","internalName":"numeric","precision":10,"scale":2},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"orders","column":"total"},"identity":false,"computed":false}]}}}
-SAMPLE_EOF
-cat >tools/sidecars/Count.before.sql.json <<'SAMPLE_EOF'
-{"_WARNING":"This file was generated by the 'dotnet sqlsource' tool.  Do not edit by hand; use the tool to regenerate it.","$schema":"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json","formatVersion":1,"toolVersion":"0.1.0","queries":{"CountUsers":{"hash":"2c8ee36daa46b3b6620c7b565e37565d83f49afc2bf60df4ce58c062c71cbfc6","engine":"postgres","database":"postgres","serverVersion":"18.6","resultKind":"rows","matchesTable":null,"plan":"walked","tableMatch":"no-origin","parameters":[],"columns":[{"ordinal":0,"name":"total","type":{"name":"bigint","kind":"base","schema":"pg_catalog","internalName":"int8"},"nullable":false,"nullableSource":"expression","origin":null,"identity":null,"computed":null}]}}}
-SAMPLE_EOF
-cat >tools/sidecars/Count.after.sql.json <<'SAMPLE_EOF'
-{"_WARNING":"This file was generated by the 'dotnet sqlsource' tool.  Do not edit by hand; use the tool to regenerate it.","$schema":"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json","formatVersion":1,"toolVersion":"0.1.0","queries":{"CountUsers":{"hash":"c04ce736999d34722e41f40d0b8567c60caa173c33f7fc706e44928b869600bc","engine":"postgres","database":"postgres","serverVersion":"18.6","resultKind":"rows","matchesTable":null,"plan":"walked","tableMatch":"no-origin","parameters":[],"columns":[{"ordinal":0,"name":"total","type":{"name":"bigint","kind":"base","schema":"pg_catalog","internalName":"int8"},"nullable":false,"nullableSource":"expression","origin":null,"identity":null,"computed":null},{"ordinal":1,"name":"top_id","type":{"name":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":null,"nullableSource":"no-origin","origin":null,"identity":null,"computed":null}]}}}
-SAMPLE_EOF
-cp tools/sidecars/Users.a.sql.json Queries/Users.sql.json
-cp tools/sidecars/Count.before.sql.json Queries/Count.sql.json
-echo "sample written to $(pwd); open it in the IDE, or run: dotnet build"
-```
+- The SDK 10.0.401 has no `CompileDesignTime` target (`MSB4057`).
+- The BuildHost also set `ProvideCommandLineArgs` to `True`, and left `BuildingInsideVisualStudio` empty.
+- The last row: a compile that does not go through `Build` leaves `BuildingProject` `false`, so the guard skips the online run there.  No IDE's build does that, which item 9 checks; a user who runs `-t:Compile` gets the committed sidecars.
 
-</details>
+## 4. `Exec` and the error format
+
+- **One line is read whole.**  `/abs/Queries/Users.sql(3,8): error SQLSRC213: <text>; help: <text>; see: <link>`, on standard error or standard output, became an error with the file, line 3, column 8, code `SQLSRC213` and the whole text after the code, `; help:` and `; see:` included.  So did a path with a space, a Windows path, a range, a line alone, no position (`sqlsource : error SQLSRC213: ...`), a text of 6,000 characters, and `$(`, `%(` and `%25` in the text.
+- **The old form.**  A continuation line `    help: ...`, `    see: ...` or `    query: ...` stayed a plain message.  One whose text holds `error:` or `warning:` after a label became a second error: `    server: ERROR: relation "users" does not exist` was read as an error in a file named `server`, with no code and no position, the epic's finding.  The one-line form never meets it.
+- **`Exec` adds its own error beside the tool's.**  With its defaults, a tool that printed an error and exited `1` gave the tool's error and `MSB3073: The command "..." exited with code 1.`  An error line with exit `0` gave `MSB3077: The command "..." exited with return value 0, but errors were detected during execution. ExitCode was set to -1.` on MSBuild 18, and `MSB3073 ... exited with code -1.` on 17.  With `IgnoreExitCode="true"` and `ConsoleToMSBuild="true"`, neither: the tool's errors alone failed the build of a project of the SDK, `ExitCode` reached the target as `1` (or `-1`), and `ConsoleOutput` held every line of both streams.  The design's "the default reading of canonical errors" alone cannot keep `MSB3073` out; `IgnoreExitCode` does.
+- **What `dotnet` does when it cannot start the tool:**
+
+| Case | Exit | Output |
+|----|----|----|
+| No tool manifest names `sqlsource` | `1` | standard error `Could not execute because the specified command or file was not found.`; standard output `Possible reasons for this include:` and three lines starting `* ` |
+| A manifest names it and was never restored, or names `0.0.9`, which no feed has | `1` | standard error `Run "dotnet tool restore" to make the "sqlsource" command available.` |
+| The tool `0.1.0-dev` beside the package `0.1.0-other` | `0` | nothing of `dotnet`'s; the tool runs |
+
+  `Exec`'s default reading takes none of `dotnet`'s lines as an error.  Two surprises: "restored" is a matter of the user's tool cache (`~/.dotnet/toolResolverCache`), not of the folder, so a manifest never restored in this folder still runs a version this user restored anywhere; and in a user profile `dotnet` had not run in, the not-restored case exited `0` or `143` in several of the first ten runs, and always `1` with `DOTNET_CLI_TELEMETRY_OPTOUT=1`, cause not found.
+- **Telling the two apart.**  Not by the exit code: the tool's errors, its usage errors and `dotnet`'s failure all exit `1`, and the last can exit `0`.  Not by `dotnet`'s words, which are localised.  What worked in nine cases and in real builds: with `IgnoreExitCode` and `ConsoleToMSBuild`, count the captured lines that only the tool writes, those starting `sqlsource:`, the `SQLSRCnnn` errors and the summary line `<database> (<engine>): ...`.  None means that the tool did not run.
+- **`StandardOutputImportance` `low`.**  With the console logger (`-tl:off`), the summary and the offline line show at `-v:d` and `-v:diag` only.  With the terminal logger, which `dotnet build` uses in an interactive terminal, they show at no verbosity, nor at `normal` importance.
+- **The terminal logger shows no message at `-v:m` or `-v:n`**, whatever its importance: a `<Message Importance="high">` and an `Exec` with `StandardOutputImportance="high"` showed only at `-v:d`.  A `<Warning>` showed at every verbosity.  And a target's `<Warning>` stays a warning in a project that sets `TreatWarningsAsErrors` `true`, which is the compiler's setting: the build succeeded with `warning SQLSRC099: ...`.  Only `-warnaserror` or `MSBuildTreatWarningsAsErrors=true` made it an error, and `MSBuildWarningsNotAsErrors` naming its code kept it a warning.  So the owner chose a warning: [owner decision 1](#what-the-later-sub-phases-take-from-this).
+
+## 5. The cost of `@(Compile)` as an input
+
+A copy of the base with 202 C# files, one claiming class, its sidecar current, and PostgreSQL up.  Before each build one C# file's body changed, so the C# input was newer than the stamp; five builds after two warm-up builds.
+
+| | Median | Five builds |
+|----|----|----|
+| No online target, the build's `Time Elapsed` | 0.36 s | 0.36, 0.35, 0.36, 0.36, 0.37 |
+| The stand-in running the real `dotnet sqlsource describe` | 1.52 s | 1.52, 1.45, 1.57, 1.59, 1.50 |
+| The target alone, from the performance summary | 1,159 ms | 1,159, 1,105, 1,214, 1,200, 1,135 |
+| `dotnet sqlsource --version`, the launch | 0.287 s | 0.280, 0.315, 0.297, 0.287, 0.284 |
+| The tool's own `dotnet msbuild` for the manifest, from its log | 779 ms | 744, 850, 768, 784, 779 |
+| Reading the claims of the 202 files, from its log | 75 ms | |
+
+- The tool as it is today adds 1.16 s, over the design's "about a second".  Its own `dotnet msbuild` is 779 ms of it, which `--manifest` removes, so a run from the build's manifest should add about 0.38 s: the launch, the claims and about 15 ms of the rest.  That is an estimate from the log, since `--manifest` does not exist yet; the cost of `SqlSourceWriteManifest` inside the build is not in it.  The first cold build took the target to 2.2 s.
+- So `@(Compile)` stays an input, and 9.2 measures the real run from a manifest by the design's rule.
+
+## 6. File events
+
+A console program watched a folder with `FileSystemWatcher` (`IncludeSubdirectories`, every `NotifyFilter`, a 64 KiB buffer) and printed each event with its kind, path, old path and time.  It ran on macOS, and on Linux in `mcr.microsoft.com/dotnet/sdk:10.0`, on the container's own file system and on a bind mount of a macOS folder written from the host.  Docker here is OrbStack 2.2.5, not Docker Desktop.  The saves were emulated; the owner's save from Rider is in [item 6's table](#item-6-the-editors-half-the-events-of-a-save).
+
+| Save | Linux | macOS |
+|----|----|----|
+| In place (`File.WriteAllText`); VS Code saves a file of the workspace this way, by its source (`doWriteFile` in `src/vs/platform/files/node/diskFileSystemProvider.ts` opens it with the flag `w`; the temporary file and rename are for its own settings and state) | one `Changed` | `Changed`, sometimes with a `Created` in the same millisecond |
+| Rider's "safe write", emulated: `Users.sql___jb_tmp___` written, `Users.sql` renamed to `Users.sql___jb_old___`, the temporary file renamed over it, the old one deleted | `Created` and `Changed` of the temporary file, the two `Renamed`, `Deleted` of the old one; no `Created` and no `Changed` of `Users.sql` | `Renamed Users.sql (from ...___jb_tmp___)`, with a `Created` of `Users.sql` in every run and a `Changed` in two of three; the first rename showed only as the old file's `Deleted` |
+| Rider 2026.2.4 itself, by the owner, "back up files before saving" on | | `Changed`, `Created` and `Deleted` of `Count.sql~`, then `Changed` of `Count.sql`: in place |
+| `vim -es -u NONE`, which is Vi-compatible | | in place, after a backup `Users.sql~` created and deleted around it |
+| `vim -es -u NONE -N` | | `Renamed Users.sql~ (from Users.sql)`, then `Changed` and `Created` of `Users.sql`, then `Deleted Users.sql~` |
+| `git checkout` of one changed file | `Deleted`, `Created`, `Changed` within 1 ms | the same |
+| `git checkout` that rewrote 300 files | 900 events in 17 ms | 946 events in 53 ms |
+| `git checkout` that added 300 files in a new folder | the folder's `Created`, and events for 244 of the 300 files; 230, 232, 232, 82 and 232 in five more runs | 690 events in 47 ms, all 300 files, 44 twice |
+
+- **The design's rule for a save by rename holds in part.**  The listed path gets a `Renamed` to it on both systems, but a `Created` on macOS alone, and on macOS a `Changed` in three of five such saves.  And on macOS an in-place write sometimes raises a `Created` beside its `Changed`, with no pattern in the file's age.  So a `Changed`, a `Created` or a `Renamed` to a listed path has to be read as a write of it, and `Created` never as "the file is new".
+- **Linux loses the files of a new directory.**  .NET adds the directory's watch after its `Created` event, and the files written into it before that are never reported.  A created directory has to make the watcher look at the tree again.
+- **The bursts.**  No burst was longer than 141 ms, on the bind mount, and none raised an `Error` or an overflow, so a debounce of 300 ms holds each in one pass.
+- **The bind mount.**  Saves made on the host raised events in the container: in place 54 ms later, the others within 6 ms.  A save by rename showed as two `Renamed X (from X)`, the old path the new one.  A folder created and filled on the host at once raised no event at all, for the folder or its files, nor did a later write into it; a folder created 0.3 s before its file was fine.
+- **inotify.**  This worktree has 1,185 directories, 455 without `bin` and `obj`, and a clone adds 317 under `.git`.  A recursive `FileSystemWatcher` holds one inotify instance and one watch for each directory, whatever its handler ignores, and started in 15 ms.  The container's limits are 1,048,576 watches and instances; on Linux machines the default `fs.inotify.max_user_watches` is often 8,192 or 65,536, which this spike did not run.  With the limit lowered below the count, in a privileged container: `EnableRaisingEvents` did not throw, the watcher raised `Error` with `IOException: The configured user limit (N) on the number of inotify watches has been reached, or the operating system failed to allocate a required resource.` and went on watching part of the tree, 11 of 40 test folders at a limit of 300.  Too few instances makes the start throw.
+- **Polling.**  `FileSystemWatcher` does not read `DOTNET_USE_POLLING_FILE_WATCHER`; `PhysicalFileProvider` (`"1"` or `"true"`, ignoring case) and `dotnet watch` do.  The provider polls every 4 s and fires one change token for a batch of changes, with no path and no kind, 4 to 8 s after the change; it saw the cases inotify lost on the bind mount.  The image `mcr.microsoft.com/dotnet/sdk:10.0` sets `DOTNET_USE_POLLING_FILE_WATCHER=true`, so a watcher in a container of it, or in a dev container built on it, polls unless the user sets the variable to `false`.
+- Not run: Windows, Docker Desktop's bind mounts, and the saves of Visual Studio and VS Code ([TD-0097](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md)).
+
+## 7. The CI variables
+
+| Service | What it sets, from its documentation |
+|----|----|
+| GitHub Actions | `CI`: "Always set to `true`."; `GITHUB_ACTIONS` `true` ([variables](https://docs.github.com/en/actions/reference/workflows-and-actions/variables)) |
+| GitLab | `CI` and `GITLAB_CI`: "`true` when available", for every job ([predefined variables](https://docs.gitlab.com/ci/variables/predefined_variables/)) |
+| Azure Pipelines | `TF_BUILD`: "Set to `True` if a build task runs the script."  No `CI` is documented ([variables](https://learn.microsoft.com/en-us/azure/devops/pipelines/build/variables)) |
+| Buildkite | `CI` and `BUILDKITE`: "Always `true`" ([environment variables](https://buildkite.com/docs/pipelines/configure/environment-variables)) |
+| TeamCity | `env.TEAMCITY_VERSION`, "The version of the TeamCity server", which "can be used to determine if the build runs within TeamCity".  No `CI` is documented ([predefined build parameters](https://www.jetbrains.com/help/teamcity/predefined-build-parameters.html)) |
+| Jenkins | `CI`, "Statically set to the string "true"", since March 2021 ([the change](https://github.com/jenkinsci/jenkins/commit/4f1139764c1f099c326a3fd21a07544633ba76f7), JENKINS-36707); `JENKINS_URL` "only available if Jenkins URL set in system configuration" |
+
+- The design's rule matched every service in an MSBuild condition: `'$(CI)' == 'true'` is true for `true`, `True` and `TRUE`, since MSBuild compares strings ignoring case, and false for `1` and `false`; `TF_BUILD` `True`; `TEAMCITY_VERSION` and `JENKINS_URL` not empty.  `GITHUB_ACTIONS` alone does not match, but GitHub sets `CI` beside it.
+- Jenkins is recognised by `CI` since 2021; `JENKINS_URL` adds an older Jenkins whose URL is configured, and misses one whose URL is not.  The .NET SDK's own test for CI reads the same names, with `BUILD_ID` and `BUILD_URL` for Jenkins (`CIEnvironmentDetectorForTelemetry` in dotnet/sdk).
+- This repository's workflows set and clear none of these names; GitHub sets `CI` on every runner, and the root `Directory.Build.props` already reads `'$(CI)' == 'true'`.  So every workflow step that builds the solution is a CI build under the design's rule, besides the root `SqlSourceOnline=false` that 9.2 adds.
+
+## 8 to 11. What the owner ran
+
+The owner ran the checklist in Rider 2026.2.4 on macOS, with the .NET SDK 11.0.100-rc.1 that the sample, which has no `global.json`, picked up; its answers are in the tables above.  On 2026-11-03 the owner chose to go on from those answers and to record the rest, Visual Studio, VS Code, Rider on other systems and Windows, as [TD-0097](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md), which holds the sample's script and the procedure.
+
+- **Item 8, Rider.**  A sidecar rewritten (R) and one created (N) by another process changed the models within seconds, with nothing else done.  The research had expected Rider to wait for a save of the file, as its issue RIDER-75959 describes for additional files.  For a query edited in the editor and then described by another process (E), the owner recorded the change "after build", and that "this error didn't show in the editor".
+- **Item 9, Rider.**  Its loading builds and the design-time build after a save of the project file reached the online target's place with `DesignTimeBuild=True`, `BuildingProject=False`, `SkipCompilerExecution=True` and `BuildingByReSharper=True`; a save of a `.sql` file ran none.  Its build from the IDE had `DesignTimeBuild` empty and `BuildingProject=true`.  The guarded target ran in the build alone: the guard is right in Rider.  `MSBuildRuntimeType` was `Core` throughout.
+- **Item 10, the VS Code task**, was not run.
+- **Item 11, Rider.**  A Shell Script configuration whose text is the command, added under Settings > Tools > Startup Tasks, started with the solution in a terminal pane, and the stand-in's error line was a link to the file.
+- **Item 6, Rider on macOS.**  With "back up files before saving" on, Rider wrote `Count.sql~` and then the file in place: one `Changed` of the `.sql` file.  The backup's events are of a name that is not a `.sql` file, which the watcher passes over.
+
+## What the later sub-phases take from this
+
+**Owner decisions.**
+
+1. **The tool that cannot start under `auto`** ([item 4](#4-exec-and-the-error-format)).  The owner chose on 2026-11-03, "R3-F2: 2": a targets warning with its own `SQLSRC0xx` code, which the package adds to `MSBuildWarningsNotAsErrors`, and the build goes on with the committed sidecars and the stamp untouched.  The design's "When the tool cannot run" and its diagnostics table say so.
+2. **The IDE checks not run** ([items 8 to 11](#8-to-11-what-the-owner-ran)).  The owner chose on 2026-11-03 to go on from Rider's answers on macOS and to record the rest as [TD-0097](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md), with the sample's script and the procedure.
+
+**Amended in the design**, each a designer's call or a "Verify first" the spike answered, and marked there with the date:
+
+- **9.2, the target**: the order and the false condition confirmed; the list of sidecars written again after the run; `Exec` with `IgnoreExitCode` and `ConsoleToMSBuild`, and a tool that did not start told apart by the absence of the tool's own lines; the cannot-start warning of owner decision 1; `@(Compile)` kept as an input, with the cost measured; the summary and the offline line visible with `-tl:off -v:d` only; the include and the removal confirmed, and the build after a created sidecar compiling once more.
+- **9.2, multi-targeting**: the outer build calls `SqlSourceRunOnline` in the first framework's configuration before `DispatchToInnerBuilds`, so that the inner builds keep running in parallel; the first framework by `Regex::Match`.
+- **9.2, the connection source and CI**: the boolean form confirmed; Jenkins' `CI`.
+- **9.3, the watcher**: a `Changed`, `Created` or `Renamed` to a listed path is a write; a created directory runs the manifest targets again; the inotify limit's `Error` reported once; the tool polls the listed files itself under `DOTNET_USE_POLLING_FILE_WATCHER`, which the SDK's container image sets.
+- **9.4, the recipes**: Rider's startup task confirmed; what Rider shows; Visual Studio and VS Code left to TD-0097.
+- **The epic outline**: its bullet on the error format says that the target sets `IgnoreExitCode`.
+
+**Exact values** the later sub-phases use:
+
+- The connection source: `$([System.String]::IsNullOrWhiteSpace($([System.Environment]::GetEnvironmentVariable('SQLSOURCE_CONNECTION'))))`, never `$(SQLSOURCE_CONNECTION)`.
+- The first framework: `$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))`.
+- The CI rule as the design states it, `'$(CI)' == 'true' or '$(TF_BUILD)' == 'True' or '$(TEAMCITY_VERSION)' != '' or '$(JENKINS_URL)' != ''`, matched every service's documented values.
+- `dotnet`'s lines: `Could not execute because the specified command or file was not found.` and `Run "dotnet tool restore" to make the "sqlsource" command available.`, both with exit `1`, and both localised, so no target matches them.
+- The cost on 202 C# files after a C# change: 1.16 s today, about 0.38 s from a manifest, of which the launch is 0.29 s.
+
+**Where merged code differs from the design**, as of `adf45187`: nowhere the spike reached.  `dotnet new tool-manifest` of the SDK 10.0.401 writes `dotnet-tools.json` at the folder's root, which the design's inputs already name.
+
