@@ -57,15 +57,11 @@ internal static class QueryMethodWriter
     /// <param name="method">
     /// The query's method.  Its <see cref="QueryMethod.Output" /> is set when its shape reads rows.
     /// </param>
-    /// <param name="modifiers"><c>public static</c>, <c>internal static</c> or <c>private static</c>.</param>
-    /// <param name="isExtension">Whether the method extends the connection, which writes <c>this</c> before it.</param>
-    public static void Append(
-        StringBuilder builder,
-        string indent,
-        QueryMethod method,
-        string modifiers,
-        bool isExtension
-    ) => Append(builder, indent, method, modifiers, isExtension, ExecutionCapabilityRules.Of(method));
+    /// <param name="host">
+    /// Where the method goes and how visible it is, which gives its modifiers and whether it extends the connection.
+    /// </param>
+    public static void Append(StringBuilder builder, string indent, QueryMethod method, MethodHost host) =>
+        Append(builder, indent, method, host, ExecutionCapabilityRules.Of(method));
 
     /// <summary>
     /// Appends the documentation comment and the method with the capabilities given, which the tests choose to write
@@ -75,8 +71,7 @@ internal static class QueryMethodWriter
         StringBuilder builder,
         string indent,
         QueryMethod method,
-        string modifiers,
-        bool isExtension,
+        MethodHost host,
         ExecutionCapabilities capabilities
     )
     {
@@ -94,7 +89,7 @@ internal static class QueryMethodWriter
         var blockIndent = bodyIndent + GeneratedText.Indent;
 
         AppendDocumentation(builder, indent, method, arguments, streams, capabilities);
-        AppendSignature(builder, indent, method, modifiers, isExtension, arguments, streams);
+        AppendSignature(builder, indent, method, host, arguments, streams);
         _ = builder.Append(indent).Append("{\n");
         AppendChecks(builder, bodyIndent, method, arguments);
         if (!streams)
@@ -253,14 +248,13 @@ internal static class QueryMethodWriter
         StringBuilder builder,
         string indent,
         QueryMethod method,
-        string modifiers,
-        bool isExtension,
+        MethodHost host,
         MethodArguments arguments,
         bool streams
     )
     {
         // A streaming method is not asynchronous itself: it returns its iterator.
-        _ = builder.Append(indent).Append(modifiers);
+        _ = builder.Append(indent).Append(ModifiersOf(host.Accessibility));
         if (streams)
         {
             _ = builder.Append(' ').Append(GetResultType(method)).Append(' ');
@@ -277,8 +271,16 @@ internal static class QueryMethodWriter
         }
 
         _ = builder.Append(method.Name).Append("(\n");
-        arguments.AppendDeclaration(builder, indent, isExtension);
+        arguments.AppendDeclaration(builder, indent, host);
     }
+
+    private static string ModifiersOf(MethodAccessibility accessibility) =>
+        accessibility switch
+        {
+            MethodAccessibility.Public => "public static",
+            MethodAccessibility.Internal => "internal static",
+            MethodAccessibility.Private => "private static",
+        };
 
     // The type the task gives, or null for a task that gives nothing.
     private static string? GetResultType(QueryMethod method) =>

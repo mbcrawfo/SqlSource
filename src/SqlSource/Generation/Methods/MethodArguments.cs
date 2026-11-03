@@ -149,9 +149,9 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
     /// </summary>
     /// <param name="builder">The source being built.</param>
     /// <param name="indent">The whitespace that starts the method's line.</param>
-    /// <param name="isExtension">Whether the method extends the connection, which writes <c>this</c> before it.</param>
-    public void AppendDeclaration(StringBuilder builder, string indent, bool isExtension) =>
-        Append(builder, indent, isExtension, isIterator: false);
+    /// <param name="host">Where the method goes, which writes <c>this</c> before the connection of an extension.</param>
+    public void AppendDeclaration(StringBuilder builder, string indent, MethodHost host) =>
+        Append(builder, indent, host.IsExtension, isIterator: false);
 
     /// <summary>
     /// Appends the arguments of a streaming method's iterator as <see cref="AppendDeclaration" /> does, without

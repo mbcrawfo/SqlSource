@@ -34,7 +34,7 @@ internal static class MethodEmitter
         bool extensionClassBlocked
     )
     {
-        var isExtension = methods.Placement == MethodPlacement.ExtensionClass;
+        var isExtension = methods.Host.IsExtension;
         var kept = Keep(methods.Methods, dropped, isExtension && extensionClassBlocked);
         if (kept.Count == 0)
         {
@@ -84,7 +84,6 @@ internal static class MethodEmitter
             }
         }
 
-        var modifiers = ModifiersOf(methods.Placement);
         var memberIndent = TypeEmitter.GetIndent(depth);
         var usesRowBuffer = false;
         for (var index = 0; index < kept.Count; index++)
@@ -94,7 +93,7 @@ internal static class MethodEmitter
                 _ = builder.Append('\n');
             }
 
-            QueryMethodWriter.Append(builder, memberIndent, kept[index], modifiers, isExtension);
+            QueryMethodWriter.Append(builder, memberIndent, kept[index], methods.Host);
             usesRowBuffer |= RowBuffer.IsUsedBy(kept[index]);
         }
 
@@ -112,12 +111,4 @@ internal static class MethodEmitter
         EquatableArray<string> dropped,
         bool dropAll
     ) => dropAll ? [] : [.. methods.Where(method => !dropped.Contains(method.Name))];
-
-    private static string ModifiersOf(MethodPlacement placement) =>
-        placement switch
-        {
-            MethodPlacement.Internal => "internal static",
-            MethodPlacement.Private => "private static",
-            MethodPlacement.Public or MethodPlacement.ExtensionClass => "public static",
-        };
 }

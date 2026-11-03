@@ -66,7 +66,7 @@ internal static class MethodPlanner
         return new TypeMethods(
             key,
             HintName.ForMethods(typeQueries.HintName),
-            type.MethodPlacement,
+            MethodHost.Of(type.MethodPlacement),
             type.NamespaceValue,
             type.Namespace,
             type.Types,
