@@ -18,7 +18,7 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// can have any name that <see cref="MethodArguments.IsReserved" /> allows, so every local, and the parameters of the
 /// lambda that builds the SQL, take a name no argument has from one <see cref="LocalNames" />, which
 /// <see cref="QueryMethodLocals" /> holds.  <see cref="RowReaderWriter" /> writes the reading of each row.  What the
-/// engine needs beyond that is a flag of <see cref="ExecutionCapabilities" />, which the writer asks, never the engine,
+/// engine needs beyond that is a flag of <see cref="ExecutionCapabilities" />, which the phases ask, never the engine,
 /// and whose statements <see cref="ExecutionCapabilityWriter" /> writes; only the binder is chosen by the engine.
 /// Every framework type is written from <c>global::</c>, an extension method is called as a static method, and
 /// <c>string</c>, <c>int</c> and <c>bool</c> are written as keywords.

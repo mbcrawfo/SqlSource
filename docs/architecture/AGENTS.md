@@ -12,6 +12,7 @@ Each page is in this folder.
 | `src/SqlSource/Generation`, with `Converters/`, `Models/`, `Paths/`, `Sidecars/` and `Types/`, with `Types/Drivers/`, `Types/Maps/` and `Types/MappedTypes/` | `generator.md` | `## The pipeline`; `### Converters` for `Converters/` |
 | `src/SqlSource/Generation/Chains` | `generator.md` | `#### The chains` and `#### Which files are checked`, under `### Settings files` |
 | `src/SqlSource/Generation/Emitting` | `generator.md` | `## Emitting` |
+| `src/SqlSource/Generation/Emitting/QueryMethods` | `generator.md` | `### Query methods` and `### Extending query methods`, under `## Emitting` |
 | `src/SqlSource/Generation/Methods` | `generator.md` | `### Query methods`, under `## Emitting` |
 | `src/SqlSource/Settings`, with `ClrTypes/`, `ColumnTypes/`, `Libraries/` and `TypeOverrides/` | `generator.md` | `## Settings` |
 | `src/SqlSource/SettingsFiles` | `generator.md` | `### Settings files`, under `## Settings` |
