@@ -2676,7 +2676,7 @@ See: [Query methods](generator.md#query-methods)
 A token of a query whose output is `codegen` has the name of one of the arguments a query method can have: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  A token is an argument of the method too, so it cannot take one of these names, even in a query without parameters, whose method has no `parameters`, and the method is not generated.  The message names the token and the query.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC275: The token 'transaction' of the query 'ListFrom' has the name of an argument that every query method has: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.
+/work/App/Queries/Users.sql(1,10): error SQLSRC275: The token 'transaction' of the query 'ListFrom' has the name of an argument that a query method can have: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.
 ```
 
 Rename the token, everywhere the query writes it and in its `-- token:` marker.  The error is reported at the query's name, once for each such token, and the query's models are still generated.

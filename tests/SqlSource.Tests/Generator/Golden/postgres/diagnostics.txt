@@ -1,7 +1,7 @@
 // The golden output of the query-method corpus case postgres/diagnostics.  Written by SQLSOURCE_UPDATE_GOLDEN=1: see "The golden corpus of query methods" in tests/README.md.
 
 ==== Generator diagnostics
-SQLSRC275 /app/Repo/Users.sql(1,10)-(1,29): The token 'transaction' of the query 'ListFromTransaction' has the name of an argument that every query method has: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.
+SQLSRC275 /app/Repo/Users.sql(1,10)-(1,29): The token 'transaction' of the query 'ListFromTransaction' has the name of an argument that a query method can have: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.
 SQLSRC272 /app/Repo/Users.sql(4,10)-(4,17): The query 'SetName' has the shape 'one', and its statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.
 SQLSRC274 /app/Repo/Users.sql(6,10)-(6,14): The method of the query 'Open' cannot be named 'Open', because DbConnection has a member of that name, which a call on a connection finds before the method.  Rename the query.
 SQLSRC274 /app/Repo/Users.sql(8,10)-(8,26): The method of the query 'SampleExtensions' cannot be named 'SampleExtensions', because the class that holds the method has that name.  Rename the query.

@@ -102,7 +102,7 @@ public sealed class MethodDiagnosticsTests
                 "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,17): The query 'SetName' has the shape 'one', and its "
                     + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
                 "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'transaction' of the query 'SetName' has the "
-                    + "name of an argument that every query method has: connection, parameters, transaction, "
+                    + "name of an argument that a query method can have: connection, parameters, transaction, "
                     + "commandTimeout or cancellationToken.  Rename the token.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
@@ -121,7 +121,7 @@ public sealed class MethodDiagnosticsTests
         run.Problems()
             .ShouldBe([
                 "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,14): The token 'transaction' of the query 'List' has the "
-                    + "name of an argument that every query method has: connection, parameters, transaction, "
+                    + "name of an argument that a query method can have: connection, parameters, transaction, "
                     + "commandTimeout or cancellationToken.  Rename the token.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
