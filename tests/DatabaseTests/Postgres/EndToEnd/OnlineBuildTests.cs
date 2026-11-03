@@ -23,4 +23,8 @@ public sealed class OnlineBuildTests(PostgresDatabases postgres) : IDisposable
     [Fact]
     public async Task Build_OnlineWithAQueryTheServerRefuses_FailsAtTheQuery() =>
         await _builds.ShouldFailAtTheRefusedQueryAsync();
+
+    [Fact]
+    public async Task Build_OnlineWithABrokenSettingsFile_ListsItsErrorOnce() =>
+        await _builds.ShouldListABrokenSettingsFileOnceAsync();
 }

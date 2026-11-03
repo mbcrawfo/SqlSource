@@ -30,6 +30,12 @@ namespace SqlSource.Tool.Reporting;
 /// and <c>; see: link</c> last.  A build reads what the tool writes one line at a time and takes each line with
 /// <c>error</c> in it for an error of its own, so no line but a first line may be written.
 /// </para>
+/// <para>
+/// An error may be <see cref="ReportWithoutWriting">reported without being written</see>, as the build's run does for
+/// an error that the compiler reports too: it has every effect of an error but its line, so the run deletes nothing
+/// after it, and the exit code does not count it, since a build reads a non-zero exit code with no error line as a
+/// tool that failed.
+/// </para>
 /// </remarks>
 /// <param name="error">Where the errors are written.</param>
 /// <param name="trace">
@@ -43,10 +49,12 @@ internal sealed class Reporter(TextWriter error, RunTrace? trace = null, bool on
     private readonly object _gate = new();
 
     private int _count;
+    private int _unwritten;
     private int _differences;
 
     /// <summary>
-    /// How many errors were written.
+    /// How many errors were reported, whether or not their lines were written.  A run that has any deletes no
+    /// sidecar.
     /// </summary>
     public int Count
     {
@@ -55,6 +63,21 @@ internal sealed class Reporter(TextWriter error, RunTrace? trace = null, bool on
             lock (_gate)
             {
                 return _count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// How many of the errors counted by <see cref="Count" /> were reported without being written.  The exit code is
+    /// 1 only for an error that was written.
+    /// </summary>
+    public int UnwrittenCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _unwritten;
             }
         }
     }
@@ -80,7 +103,15 @@ internal sealed class Reporter(TextWriter error, RunTrace? trace = null, bool on
     /// </summary>
     public RunTrace Trace { get; } = trace ?? new RunTrace(NullRunLog.Instance);
 
-    public void Report(ToolDiagnostic diagnostic)
+    public void Report(ToolDiagnostic diagnostic) => Report(diagnostic, write: true);
+
+    /// <summary>
+    /// Reports an error that is not written: it is counted and logged as any is, and its line is left out because
+    /// another reports it, as the compiler does an error of the generator's own that the run found in the same file.
+    /// </summary>
+    public void ReportWithoutWriting(ToolDiagnostic diagnostic) => Report(diagnostic, write: false);
+
+    private void Report(ToolDiagnostic diagnostic, bool write)
     {
         var message = MessageOf(diagnostic);
         var text = oneLine
@@ -88,7 +119,15 @@ internal sealed class Reporter(TextWriter error, RunTrace? trace = null, bool on
             : Format(diagnostic, message, error.NewLine);
         lock (_gate)
         {
-            error.Write(text);
+            if (write)
+            {
+                error.Write(text);
+            }
+            else
+            {
+                _unwritten++;
+            }
+
             _count++;
             if (ReferenceEquals(diagnostic.Descriptor, ToolDiagnostics.SidecarOutOfDate))
             {

@@ -66,6 +66,32 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
         });
     }
 
+    // Builds a copy whose settings file holds a value that is no output, and finds that the build lists the error of
+    // the file once and says nothing of its own about the tool: the tool reads the same file and finds the same error
+    // but leaves it to the compiler, and its exit code is not read as a tool that failed.  The compiler then reports
+    // what follows from the file: here the query has the default output, whose method needs a driver.
+    public async Task ShouldListABrokenSettingsFileOnceAsync()
+    {
+        var project = RealPath(_projects.Copy("ErrorPaths"));
+        var settings = Path.Combine(Path.GetDirectoryName(project)!, "sqlsource.json");
+        var text = await File.ReadAllTextAsync(settings, TestContext.Current.CancellationToken);
+        text.ShouldContain("\"output\": \"models\"");
+        await File.WriteAllTextAsync(
+            settings,
+            text.Replace("\"output\": \"models\"", "\"output\": \"nonsense\"", StringComparison.Ordinal),
+            TestContext.Current.CancellationToken
+        );
+        await engine.WithTableAsync(async () =>
+        {
+            var (exitCode, output) = await BuildAsync(project);
+
+            exitCode.ShouldBe(1, output);
+            var errors = ErrorLines(output);
+            _ = errors.Where(line => line.Contains("SQLSRC019", StringComparison.Ordinal)).ShouldHaveSingleItem(output);
+            errors.Where(static line => line.Contains("SQLSRC02", StringComparison.Ordinal)).ShouldBeEmpty(output);
+        });
+    }
+
     // "dotnet build" of the copy, online, with the tool and the generator beside the tests and the connection in the
     // environment.  The output is searched for the connection before any assertion can print it, so that a failure
     // never shows the value.

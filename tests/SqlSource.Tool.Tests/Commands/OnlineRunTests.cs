@@ -376,6 +376,138 @@ public sealed class OnlineRunTests : IDisposable
         File.Exists(_scene.Run.Folder.PathOf("variable.log")).ShouldBeTrue();
     }
 
+    // A run that has both connections again, after DescribeEverythingAsync took them away.
+    private void GiveBothConnections()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
+    }
+
+    // Something the compiler reports too is wrong.  The path it returns is of a file whose queries cannot be
+    // described, so that it has no sidecar, or null.
+    private string? ArrangeAnErrorTheCompilerReports(string id)
+    {
+        switch (id)
+        {
+            case "SQLSRC015":
+                // A settings file that reaches a listed file, in a folder that the type does not claim.
+                _ = _scene.Project.AddSettings("sub/sqlsource.json", "{ \"output\": ");
+                _ = _scene.Project.AddSql("sub/Sub.sql", "-- name: Sub\nSELECT 9;\n");
+                return null;
+            case "SQLSRC019":
+                _scene.Project.Settings["output"] = "nonsense";
+                return null;
+            case "SQLSRC101":
+                return _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
+            case "SQLSRC209":
+                return _scene.Project.AddSql("Ansi.sql", "-- dialect: ansi\n-- name: One\nSELECT 1;\n");
+            case "SQLSRC210":
+                return _scene.Project.AddSql("Token.sql", "-- name: One\nSELECT 1 {{where}};\n");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(id), id, "No error of this id is arranged.");
+        }
+    }
+
+    // The compiler reports these as well, so the build would list each twice: the settings file's two errors that the
+    // tool reads, a file that does not parse, and the two of the tool's own that the generator reports where the tool
+    // does.  The run still counts and logs the error, so it deletes no sidecar and holds back the file, and it exits 0
+    // with its summary, since a build takes an exit code of 1 with no error line for a tool that failed.
+    [Theory]
+    [InlineData("SQLSRC015", "auto")]
+    [InlineData("SQLSRC015", "true")]
+    [InlineData("SQLSRC019", "auto")]
+    [InlineData("SQLSRC019", "true")]
+    [InlineData("SQLSRC101", "auto")]
+    [InlineData("SQLSRC101", "true")]
+    [InlineData("SQLSRC209", "auto")]
+    [InlineData("SQLSRC209", "true")]
+    [InlineData("SQLSRC210", "auto")]
+    [InlineData("SQLSRC210", "true")]
+    public async Task Run_ErrorTheCompilerReportsToo_IsNotWrittenAndKeepsItsEffect(string id, string mode)
+    {
+        await DescribeEverythingAsync();
+        var stale = AddAStaleSidecar();
+        var held = ArrangeAnErrorTheCompilerReports(id);
+        GiveBothConnections();
+
+        var result = await OnlineAsync(mode, "--log", "run.log");
+
+        result.Error.ShouldBe("");
+        result.ExitCode.ShouldBe(0);
+        result.Out.ShouldNotBeEmpty();
+        result.Out.Split('\n')[..^1].ShouldAllBe(line => line.StartsWith("sqlsource: ", StringComparison.Ordinal));
+        File.Exists(stale).ShouldBeTrue();
+        if (held is not null)
+        {
+            File.Exists(SidecarFormat.PathFor(held)).ShouldBeFalse();
+        }
+
+        var logged = LogReader.Events(_scene.Run.Folder.PathOf("run.log"), "diagnostic");
+        logged.Select(line => line.GetProperty("id").GetString()).ShouldContain(id);
+        LogReader
+            .Events(_scene.Run.Folder.PathOf("run.log"), "run.end")
+            .Single()
+            .GetProperty("exitCode")
+            .GetInt32()
+            .ShouldBe(0);
+    }
+
+    // The same errors without --online: written, in the compiler's form, and the exit code is 1.
+    [Theory]
+    [InlineData("SQLSRC015")]
+    [InlineData("SQLSRC019")]
+    [InlineData("SQLSRC101")]
+    [InlineData("SQLSRC209")]
+    [InlineData("SQLSRC210")]
+    public async Task Run_ErrorTheCompilerReportsTooWithoutOnline_IsWritten(string id)
+    {
+        await DescribeEverythingAsync();
+        var stale = AddAStaleSidecar();
+        _ = ArrangeAnErrorTheCompilerReports(id);
+        GiveBothConnections();
+        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+
+        var result = await _scene.DescribeAsync("--manifest", manifest);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain($": error {id}: ");
+        File.Exists(stale).ShouldBeTrue();
+    }
+
+    // An error that only the tool reports is written under --online, and a run that has one exits 1 even when the
+    // compiler's errors are not written: the build would otherwise not know the tool failed.
+    [Fact]
+    public async Task Run_ErrorOfTheToolsOwnBesideOneTheCompilerReports_IsWrittenAndExitsOne()
+    {
+        await DescribeEverythingAsync();
+        await EditAQueryAsync();
+        _ = _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
+
+        var result = await OnlineAsync("true");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("error SQLSRC213: ");
+        result.Error.ShouldNotContain("SQLSRC101");
+        EveryErrorIsOneLine(result.Error);
+    }
+
+    // An error of the plan that the generator does not report is the tool's alone, so it is written, or the build
+    // would show nothing of it.
+    [Fact]
+    public async Task Run_PlanErrorOfTheToolsOwnUnderOnline_IsWrittenAndExitsOne()
+    {
+        await DescribeEverythingAsync();
+        GiveBothConnections();
+        var source = _scene.Project.AddSource("Other.cs", Plans.TypeNamed("Other", "Path = Folder"));
+
+        var result = await OnlineAsync("true");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith($"{source}(1,");
+        result.Error.ShouldContain(": error SQLSRC208: ");
+        EveryErrorIsOneLine(result.Error);
+    }
+
     [Fact]
     public async Task Run_DatabaseThatCannotBeOpenedUnderOnline_HasHelpThatNamesSqlSourceOnline()
     {

@@ -41,6 +41,52 @@ public sealed class ReporterTests : IDisposable
     }
 
     [Fact]
+    public void ReportWithoutWriting_Error_WritesNothingAndIsCountedAndLogged()
+    {
+        var log = new RecordingLog();
+        var reporter = new Reporter(_error, new RunTrace(log));
+
+        reporter.ReportWithoutWriting(Failure);
+
+        _error.ToString().ShouldBe("");
+        reporter.Count.ShouldBe(1);
+        reporter.UnwrittenCount.ShouldBe(1);
+        log.Events.ShouldHaveSingleItem().Name.ShouldBe("diagnostic");
+    }
+
+    [Fact]
+    public void Report_AfterAnErrorReportedWithoutWriting_CountsOnlyTheWrittenOneAsWritten()
+    {
+        var reporter = new Reporter(_error);
+        reporter.ReportWithoutWriting(Failure);
+
+        reporter.Report(Failure);
+
+        reporter.Count.ShouldBe(2);
+        reporter.UnwrittenCount.ShouldBe(1);
+        _error.ToString().ShouldBe("sqlsource : " + Message + Expected.See("SQLSRC200"));
+    }
+
+    [Fact]
+    public void ExitCodeOf_OnlyErrorsReportedWithoutWriting_IsZero()
+    {
+        var reporter = new Reporter(_error);
+        reporter.ReportWithoutWriting(Failure);
+
+        Cli.ExitCodeOf(reporter, 0).ShouldBe(0);
+    }
+
+    [Fact]
+    public void ExitCodeOf_AWrittenErrorBesideOneReportedWithoutWriting_IsOne()
+    {
+        var reporter = new Reporter(_error);
+        reporter.ReportWithoutWriting(Failure);
+        reporter.Report(Failure);
+
+        Cli.ExitCodeOf(reporter, 0).ShouldBe(1);
+    }
+
+    [Fact]
     public void Report_ErrorAboutNoFile_StartsWithTheNameOfTheTool()
     {
         var reporter = new Reporter(_error);

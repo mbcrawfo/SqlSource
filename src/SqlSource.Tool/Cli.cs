@@ -347,12 +347,14 @@ public static class Cli
     }
 
     /// <summary>
-    /// The exit code of a run: <c>1</c> when an error other than <c>SQLSRC219</c> was reported, else what the
-    /// command gave when that is not <c>0</c>, else <c>2</c> when <c>SQLSRC219</c> was reported.
+    /// The exit code of a run: <c>1</c> when an error other than <c>SQLSRC219</c> was written, else what the
+    /// command gave when that is not <c>0</c>, else <c>2</c> when <c>SQLSRC219</c> was reported.  An error that was
+    /// reported without being written gives no exit code: the build that reads this run takes a non-zero exit code
+    /// with no error line for a tool that failed.
     /// </summary>
     internal static int ExitCodeOf(Reporter reporter, int exitCode)
     {
-        if (reporter.Count > reporter.DifferenceCount)
+        if (reporter.Count - reporter.UnwrittenCount > reporter.DifferenceCount)
         {
             return 1;
         }
