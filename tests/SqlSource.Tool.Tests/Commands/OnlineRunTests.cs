@@ -541,7 +541,7 @@ public sealed class OnlineRunTests : IDisposable
     {
         await DescribeEverythingAsync();
         GiveBothConnections();
-        var source = _scene.Project.AddSource("Other.cs", Plans.TypeNamed("Other", "Path = Folder"));
+        var source = _scene.Project.AddSource("Other.cs", Plans.TypeNamed("Other", "Source = Folder"));
 
         var result = await OnlineAsync("true");
 
