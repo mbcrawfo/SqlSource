@@ -1329,6 +1329,102 @@ public sealed class QueryMethodWriterTests
                     + "                    atRow = true;\n"
             );
 
+    // An engine that drains its later results but needs neither the rollback check nor the drain when a loop is left
+    // at a row, as no engine does yet, yields each row as it builds it and drains after the loop.
+    [Fact]
+    public void Append_StreamsDrainingLaterResultsAlone_DrainsAfterTheLoopWithoutTrackingTheRow()
+    {
+        var text = WriteWith(Stream, ExecutionCapabilities.DrainsLaterResults);
+
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain(CompletedTransactionDocumentation);
+
+        text.ShouldContain("                yield return new global::App.GetUserDto(");
+        text.ShouldContain(");\n            }\n\n" + Drain("            ") + "        }\n        finally\n");
+        text.ShouldNotContain("atRow");
+        text.ShouldNotContain("catch (");
+        ShouldBalanceItsBraces(text);
+    }
+
+    // An engine that checks for a rollback at its read alone builds each row in a try whose catch checks, and yields it
+    // after, with no flag and no drain.
+    [Fact]
+    public void Append_StreamsCheckingRollbackAlone_CatchesAroundEachRowWithoutTrackingIt()
+    {
+        var text = WriteWith(Stream, ExecutionCapabilities.ChecksRollbackAtRead);
+
+        text.ShouldContain("/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">");
+        text.ShouldNotContain(CompletedTransactionDocumentation);
+
+        text.ShouldContain(
+            "                global::App.GetUserDto row;\n"
+                + "                try\n"
+                + "                {\n"
+                + "                    row = new global::App.GetUserDto("
+        );
+        text.ShouldContain(TransactionCheck("                ") + "\n" + "                yield return row;\n");
+        text.ShouldNotContain("atRow");
+        text.ShouldNotContain("NextResultAsync");
+        ShouldBalanceItsBraces(text);
+    }
+
+    // An engine that drains only when a loop is left at a row tracks the row, built into a local with no catch, and
+    // drains in the finally alone.
+    [Fact]
+    public void Append_StreamsDrainingWhenLeftAtARowAlone_TracksTheRowWithoutACatch()
+    {
+        var text = WriteWith(Stream, ExecutionCapabilities.DrainsWhenLeftAtARow);
+
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain(CompletedTransactionDocumentation);
+
+        text.ShouldContain(
+            "                    global::App.GetUserDto row;\n"
+                + "                    row = new global::App.GetUserDto("
+        );
+        text.ShouldContain(
+            "\n\n                    atRow = true;\n"
+                + "                    yield return row;\n"
+                + "                    atRow = false;\n"
+                + "                }\n"
+                + "            }\n"
+                + "            finally\n"
+                + "            {\n"
+                + "                if (atRow)\n"
+                + "                {\n"
+                + Drain("                    ", "global::System.Threading.CancellationToken.None")
+        );
+        text.ShouldNotContain("catch (");
+        text.ShouldNotContain("NextResultAsync(cancellationToken)");
+        ShouldBalanceItsBraces(text);
+    }
+
+    // An engine that refuses a completed transaction alone refuses it, and documents that exception and no other of
+    // the capabilities'.
+    [Fact]
+    public void Append_RefusingCompletedTransactionAlone_DocumentsOnlyThatException()
+    {
+        var text = WriteWith(GetUser, ExecutionCapabilities.RefusesCompletedTransaction);
+
+        text.ShouldContain(CompletedTransactionDocumentation);
+        text.ShouldContain("if (transaction is not null && transaction.Connection is null)\n");
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain("NextResultAsync");
+    }
+
+    // The writer given every flag writes what SQL Server's capabilities write.
+    [Fact]
+    public void Append_EveryCapability_IsTheSqlServerMethod()
+    {
+        var all =
+            ExecutionCapabilities.RefusesCompletedTransaction
+            | ExecutionCapabilities.DrainsLaterResults
+            | ExecutionCapabilities.ChecksRollbackAtRead
+            | ExecutionCapabilities.DrainsWhenLeftAtARow;
+
+        WriteWith(SqlServerStream with { Engine = DatabaseEngine.PostgreSql }, all).ShouldBe(Write(SqlServerStream));
+    }
+
     // A token named as the flag renames the flag, which no argument may hide.
     [Fact]
     public void Append_SqlServerStreamsTokenNamedAtRow_RenamesTheFlag()
@@ -1596,6 +1692,16 @@ public sealed class QueryMethodWriterTests
         + "\"The transaction given to the query 'GetUser' has completed; it is no longer usable.\");\n"
         + indent
         + "}\n";
+
+    private static string WriteWith(QueryMethod method, ExecutionCapabilities capabilities)
+    {
+        var builder = new StringBuilder();
+        QueryMethodWriter.Append(builder, string.Empty, method, "public static", isExtension: true, capabilities);
+        return builder.ToString();
+    }
+
+    private static void ShouldBalanceItsBraces(string text) =>
+        text.Count(static character => character == '{').ShouldBe(text.Count(static character => character == '}'));
 
     private static string Write(QueryMethod method, string modifiers = "public static", bool isExtension = true)
     {

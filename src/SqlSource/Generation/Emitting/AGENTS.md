@@ -14,11 +14,15 @@ See [emitting](../../../../docs/architecture/generator.md#emitting).
 
 - **A query method's argument list comes only from `MethodArguments` of `Generation/Methods/MethodArguments.cs`**: its declaration, its iterator's, the call, the `<param>` documentation and the checks.  A writer never spells an argument's name, type or default, and the body names one through the constants of `MethodArguments`.  See [query methods](../../../../docs/architecture/generator.md#query-methods).
 
+## Engines in a query method
+
+- **`Generation/Emitting/QueryMethodWriter.cs` asks a flag of `ExecutionCapabilities`, never the engine, which it names only for `ParameterBinder.For`.**  The flags come from the one switch in `ExecutionCapabilityRules.cs`, run in the output step and never cached, and the statements and `<exception>` documentation they turn on are in `ExecutionCapabilityWriter.cs`.  See [query methods](../../../../docs/architecture/generator.md#query-methods).
+
 ## Names a token could hide
 
 - **Nothing a token method writes may be hidden by a parameter.**  `Generation/Emitting/MethodWriter.cs` reads the state tuple by position, names the lambda's parameters with `GetUnusedName`, writes framework types from `global::` and `string` as the keyword.  See [token methods](../../../../docs/architecture/generator.md#token-methods).
 - **A new identifier there needs the same care, and a row in both awkward-name tests**: `Run_TokenWithAnAwkwardName_Compiles` of `tests/SqlSource.Tests/Generator/GeneratedSourceMethodTests.cs`, at C# 12 on the Roslyn floor too, and `Run_TokenWithAnAwkwardName_CompilesOnTheNewestCSharp` of `tests/SqlSource.Tests/Generation/Emitting/MethodWriterTests.cs`, at `LanguageVersion.Latest`.
-- **A local of a query's method, from `Generation/Emitting/QueryMethodWriter.cs` or `RowReaderWriter.cs`, takes its name from `LocalNames` in `LocalNames.cs`, held by `QueryMethodLocals` of `QueryMethodLocals.cs`.**  A name a token could hide gets a row in those two tests and in their siblings for a query's method, `Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles` and `Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp`.
+- **A local of a query's method, from `Generation/Emitting/QueryMethodWriter.cs`, `RowReaderWriter.cs` or `ExecutionCapabilityWriter.cs`, takes its name from `LocalNames` in `LocalNames.cs`, held by `QueryMethodLocals` of `QueryMethodLocals.cs`.**  A name a token could hide gets a row in those two tests and in their siblings for a query's method, `Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles` and `Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp`.
 - **The row buffer of `Generation/Emitting/RowBuffer.cs` is one embedded struct for the project, in its own file, that a method names as `RowBuffer.TypeText`, from `global::`**, so no token or type of the user's hides it.  See [the row buffer](../../../../docs/architecture/generator.md#the-row-buffer).
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

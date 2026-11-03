@@ -539,7 +539,7 @@ internal static class MethodPlanner
         !property.IsNullable
         && (
             JsonTypes.IsNode(ClrTypeName.KeywordTextOf(property.Type.Text))
-            || read is { IsSerializer: true, IsByElement: false, MayReturnNull: true }
+            || read is { Kind: ConversionKind.Serializer, IsByElement: false, MayReturnNull: true }
         );
 
     // The ordinals in the order of the model's properties: by name, ordinally, when the model is sorted, as

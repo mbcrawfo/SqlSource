@@ -145,7 +145,13 @@ internal abstract class ParameterBinder
     // The converter's call of the value; for the spatial read path, the shared writer's bytes of it, as SqlBytes.
     private static void AppendCall(StringBuilder builder, Conversion write, string value)
     {
-        if (write.IsSpatial)
+        // The serializer's write is a converter's call of the value.
+        var writesBytes = write.Kind switch
+        {
+            ConversionKind.Converter or ConversionKind.Serializer => false,
+            ConversionKind.Spatial => true,
+        };
+        if (writesBytes)
         {
             _ = builder
                 .Append("new ")

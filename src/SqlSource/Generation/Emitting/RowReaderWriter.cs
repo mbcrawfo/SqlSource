@@ -120,20 +120,26 @@ internal static class RowReaderWriter
             return;
         }
 
-        if (read is { IsSpatial: true })
+        if (read is null)
         {
-            AppendSpatial(builder, column, read, ordinalText, locals);
-            return;
+            AppendGetFieldValue(builder, column, ordinalText, locals);
         }
-
-        if (read is not null)
+        else
         {
+            // The serializer's read is a converter's call of the value; the spatial read path reads the column's bytes.
+            var readsBytes = read.Kind switch
+            {
+                ConversionKind.Converter or ConversionKind.Serializer => false,
+                ConversionKind.Spatial => true,
+            };
+            if (readsBytes)
+            {
+                AppendSpatial(builder, column, read, ordinalText, locals);
+                return;
+            }
+
             _ = builder.Append(read.Method).Append('(');
-        }
-
-        AppendGetFieldValue(builder, column, ordinalText, locals);
-        if (read is not null)
-        {
+            AppendGetFieldValue(builder, column, ordinalText, locals);
             _ = builder.Append(')');
         }
 

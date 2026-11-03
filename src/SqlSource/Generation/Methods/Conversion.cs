@@ -38,23 +38,14 @@ namespace SqlSource.Generation.Methods;
 /// The library whose generated conversion the converter is, for an edge of origin
 /// <see cref="Converters.ConverterOrigin.Library" /> or for the spatial read path; null for any other.
 /// </param>
-/// <param name="IsSpatial">
-/// Whether it is SQL Server's spatial read path, NetTopologySuite's: <paramref name="Method" /> is then the shared
-/// reader or writer of NetTopologySuite.IO.SqlServerBytes that the method calls,
-/// <c>global::SqlSource.NetTopologySuiteConversions.GeographyReader</c>, a column is read through its
-/// <c>GetStream</c>, and <paramref name="DatabaseText" /> is <c>global::System.Data.SqlTypes.SqlBytes</c>, which a
-/// parameter is bound as.
+/// <param name="Kind">
+/// How it converts: a converter's call, System.Text.Json's serializer, or SQL Server's spatial read path.
 /// </param>
 /// <param name="MayReturnNull">
 /// Whether the call, on a read, can return null for a value that is not a <c>NULL</c>: the parse of a JSON
 /// <c>null</c> into a <see cref="Converters.JsonTypes.IsNode" /> type.  A not-null element read by element then
 /// throws on it.  Also every read of the serializer, which gives a JSON <c>null</c> as null: a value type is read as
 /// <c>JsonSerializer.Deserialize&lt;T?&gt;</c> for it.
-/// </param>
-/// <param name="IsSerializer">
-/// Whether the call is System.Text.Json's serializer, <c>JsonSerializer.Deserialize&lt;T&gt;</c> or
-/// <c>JsonSerializer.Serialize&lt;T&gt;</c> with its default options, for a project's own class in a type that holds
-/// JSON, rather than a converter.  It has no <paramref name="Library" />: no class is emitted for it.
 /// </param>
 internal sealed record Conversion(
     string Method,
@@ -65,9 +56,8 @@ internal sealed record Conversion(
     bool ElementIsValueType,
     EquatableArray<string> WarningIds = default,
     SqlLibrary? Library = null,
-    bool IsSpatial = false,
-    bool MayReturnNull = false,
-    bool IsSerializer = false
+    ConversionKind Kind = ConversionKind.Converter,
+    bool MayReturnNull = false
 )
 {
     /// <summary>
