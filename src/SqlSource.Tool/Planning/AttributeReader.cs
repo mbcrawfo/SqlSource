@@ -217,12 +217,33 @@ internal static class AttributeReader
     private static LinePosition StartOf(SyntaxNode node) => node.GetLocation().GetLineSpan().StartLinePosition;
 
     // Where the type's name is written, when it holds a character outside ASCII, and null otherwise.  A character that
-    // is not UTF-8 reads as U+FFFD, which ends the identifier, or, at the name's start, leaves a missing identifier at
-    // its own position, so the name is the characters from the identifier's start that can be part of one.
+    // is not UTF-8 reads as U+FFFD, which ends the identifier, so the name is the characters from the identifier's
+    // start that can be part of one.  A U+FFFD first in the name leaves no identifier, missing or empty, and the name
+    // is then at the first character outside ASCII after the keyword.
     private static LinePosition? WrittenNameOf(TypeDeclarationSyntax declaration)
     {
         var text = declaration.SyntaxTree.GetText();
         var identifier = declaration.Identifier;
+        if (identifier.ValueText.Length == 0)
+        {
+            var keyword =
+                declaration is RecordDeclarationSyntax record && !record.ClassOrStructKeyword.IsKind(SyntaxKind.None)
+                    ? record.ClassOrStructKeyword
+                    : declaration.Keyword;
+            // The character is skipped by the parser, so it is in the trivia of a token after the keyword, not in the
+            // declaration's span: up to the end of the next token that is there in the text.
+            var next = keyword.GetNextToken().Span.End;
+            for (var position = keyword.Span.End; position < next; position++)
+            {
+                if (text[position] > '\u007F')
+                {
+                    return text.Lines.GetLinePosition(position);
+                }
+            }
+
+            return null;
+        }
+
         var start = identifier.SpanStart;
         var end = identifier.Span.End;
         while (end < text.Length && IsInName(text[end]))

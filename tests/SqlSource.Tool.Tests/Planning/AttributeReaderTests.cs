@@ -214,6 +214,37 @@ public sealed class AttributeReaderTests : IDisposable
         ]);
     }
 
+    // A name whose first letter is outside ASCII and that is not on the keyword's line, or that follows an @, leaves no
+    // identifier at all: the error is at that letter.
+    [Theory]
+    [InlineData("internal partial class\n    Écrit;", 4, 4)]
+    [InlineData("internal partial class\r\n    Écrit;", 4, 4)]
+    [InlineData("internal partial class // c\n    Écrit;", 4, 4)]
+    [InlineData("internal partial class @Écrit;", 3, 24)]
+    [InlineData("internal partial record class\n    Écrit;", 4, 4)]
+    public void Read_NameThatLeavesNoIdentifierInAFileThatIsNotUtf8_IsSqlsrc271AtItsFirstLetterOutsideAscii(
+        string declaration,
+        int line,
+        int column
+    )
+    {
+        var claims = ReadLatin1($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n");
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBe([
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(line, column), Source),
+        ]);
+    }
+
+    // A declaration with no name at all, and nothing outside ASCII, is the compiler's error, not this one.
+    [Fact]
+    public void Read_DeclarationWithNoNameInAFileThatIsNotUtf8_IsNotSqlsrc271()
+    {
+        var claims = ReadLatin1("// café\nusing SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class\n{\n}\n");
+
+        claims.Errors.ShouldBeEmpty();
+    }
+
     // What follows the name is not the name, a comment outside ASCII included.
     [Theory]
     [InlineData("internal partial class Queries/*é*/;")]
