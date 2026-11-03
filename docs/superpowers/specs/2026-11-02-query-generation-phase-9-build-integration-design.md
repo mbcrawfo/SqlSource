@@ -1,0 +1,317 @@
+# Query generation, phase 9: build integration - design
+
+Date: 2026-11-02
+
+Phase 9 of the [query generation epic](2026-10-07-query-generation-epic-design.md): it removes the need to run `sqlsource describe` by hand.  A developer who saves a `.sql` file gets its sidecar refreshed by a watcher they started once, and a build of a project that has a connection refreshes its sidecars before it compiles.  It is five sub-phases, 9.0 to 9.4, each one pull request, run by an implementation manager from this document; each sub-phase's plan is written when the sub-phases it builds on have merged.
+
+Written against `main` at `6d67d35e`, after phases 7 and 8, the settings files, and the query-method emission refactor.  The epic's phase 9 section was written on 2026-10-07, before the settings files moved every setting into `sqlsource.json` and before the settings search moved to just before `CoreCompile`; this design replaces it, and the epic outline is amended in the same pull request to point here.  Its [research appendix](2026-11-02-query-generation-phase-9-research.md) is why the watcher is the user's to start.
+
+## How to read this document
+
+Each statement is one of three kinds, as in the phase 7 design:
+
+- **Decided.**  Agreed with the owner on 2026-11-02.  A sub-phase must not contradict it without asking the owner and updating this document and the epic outline.
+- **Designer's call.**  A proposal made while writing this design, which the owner has seen and not changed.  A sub-phase may change one when the code shows a better way, and says so in its pull request.
+- **Verify first.**  A fact about MSBuild, an IDE, a file system or a CI service that the design depends on and that was found by reading documentation or source, not by running it.  Sub-phase 9.0 confirms each before any code depends on it, and lists the ones that only the owner can run.
+
+A statement with no label is Decided.
+
+## Intent
+
+Today a developer edits a query, runs `dotnet sqlsource describe`, and builds.  Forgetting the middle step gives a stale-sidecar error at the query, and the fix is always the same command.  Phase 9 makes the command run itself in the two moments a developer cares about: when they save a `.sql` file, for IntelliSense, and when they build, for a build that is right.  The sidecar stays the contract: the build still never needs a database, CI still checks with `describe --check`, and a machine with no database builds from the committed sidecars as it does today.
+
+The owner's priority is on save.  A developer should not have to build after every edit of a query to see its models change.
+
+## Goals
+
+1. **On save**: `dotnet sqlsource describe --watch` re-describes what changed whenever a `.sql` file, a settings file, a project file or a claiming C# file is saved, and keeps going after an error.
+2. **Started from the editor**: copy-ready recipes in the manual start the watcher with the editor and show its errors there, for VS Code, Rider and Visual Studio.
+3. **On build**: a build of a project with a connection runs `describe` on that project before the compiler, so the build compiles what the schema says, and reports a query the database rejects at the query, in the IDE's error list.
+4. **Connections in a file**: a `.env` file is the third source of connections, after the command line and the environment, so that one file works in every IDE and terminal.
+5. **Proven packed**: `tools/check-package-install.sh` runs the packed tool beside the packed package, through the build's target.
+
+## Non-goals
+
+- **A watcher that the build or the IDE starts in the background.**  Ruled out by the owner on 2026-11-02, after the [research](2026-11-02-query-generation-phase-9-research.md): every established auto-started process is a cache that is safe to kill, a watcher is not, and a background watcher would not refresh IntelliSense in the IDEs' default generator modes anyway.  The watcher is started by the user, by the editor's own mechanism, or in a terminal.  Not deferred work.
+- **An editor extension or a language server.**  Not in the epic.
+- **Running `describe` in a design-time build.**  Design-time builds run on project load and often, and a database round-trip there slows project load and fails it when the database is down.
+- **A build that fails on drift.**  `--check` stays the CI step outside the build, as the epic decided.
+- **Re-describing after a schema change.**  The hash cannot see one; `--force` and `--check` cover it, as today.
+
+## Anti-goals
+
+- **A build that passes by hiding a stale sidecar.**  An unreachable database during an online build is an error, never a silent fall back to offline.
+- **A CI build that rewrites the sidecars it is about to check.**  An online build in CI would make `describe --check` after it pass by construction.
+- **A connection string on the screen, in a log, in the build's output, or in the IDE's error list**, from `.env` as from anywhere else.
+- **A build of this repository that goes online by accident** and rewrites the committed sidecars of its end-to-end projects and examples.
+
+## Constraints
+
+- The generator package stays a development dependency with one DLL under `analyzers/dotnet/cs`: no MSBuild task assembly.
+- The tool targets `net8.0` with `RollForward` `Major`, and everything from outside comes through `ToolHost` ([`src/SqlSource.Tool/AGENTS.md`](../../../src/SqlSource.Tool/AGENTS.md)).
+- Every MSBuild property of the package starts with `SqlSource`, and every property of the SDK the files read is listed in `SdkProperties` of `tests/SqlSource.Tests/Package/BuildFileTests.cs` ([`src/SqlSource/build/AGENTS.md`](../../../src/SqlSource/build/AGENTS.md)).  An environment variable read as a property, such as `CI`, is listed there too.
+- The search for settings files and `SqlSourceTrackAdditionalFiles` run just before `CoreCompile`, from `SqlSource.AfterSdk.targets`, and through `SqlSourceSettingsSearchHook` where that file is not imported ([finding the settings files](../../architecture/msbuild-and-manifest.md#finding-the-settings-files)).  The manifest depends on the search.
+- The tool's error format, `path(line,col): error SQLSRCnnn: message` then continuation lines indented four spaces, is a contract with editors ([`Reporting/Reporter.cs`](../../../src/SqlSource.Tool/Reporting/Reporter.cs)).
+- Root `AGENTS.md`: user documentation describes effects, never internals; every change that a user sees updates its manual page in the same pull request.
+
+## What exists today
+
+- **Connections** come from `--connection`, then `SQLSOURCE_CONNECTION_<NAME>`, then `SQLSOURCE_CONNECTION` when the run has one describable database: `Describing/Connections.cs`, with the variables read through `ToolHost.GetEnvironmentVariable`.  The tool strips connection variables from the environment of the `dotnet msbuild` it runs.
+- **The manifest** is written by `SqlSourceWriteManifest`, which hooks nothing; the tool runs it by name in a `dotnet msbuild` process per project (`Projects/ProjectEvaluator.cs`) and reads it with `Projects/ManifestReader.cs`.  Its default path is `$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.manifest`.
+- **A run** is `DescribeCommand.PlanAsync`, then `Describing/DescribeRun.RunAsync`: plan, resolve connections, describe what is not current, write each sidecar whole through `Describing/SidecarStore.cs` (a temporary file moved over the sidecar), print one summary line per database.  A query whose entry is current is skipped and needs no connection.
+- **Ctrl+C, `SIGTERM` and `SIGHUP`** cancel a run in `Cli.Run`; a stopped run writes no further sidecar and exits `1`.
+- **The generator** reports a query with no current entry (`SQLSRC244` and its neighbours) and never touches a database.
+- **Known limits** that a run inside a build does not have: [TD-0025](../../tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md), a `.sql` file a build hook adds is not in a by-name manifest; [TD-0026](../../tech-debt/TD-0026-manifest-of-a-multi-targeted-project-is-the-first-frameworks.md), a multi-targeted project's manifest is its first framework's.
+- **Placeholders** for this phase: "Build integration" in `docs/architecture/msbuild-and-manifest.md`, "Build integration options" in `docs/architecture/tool.md`, and the phase 9 row of `docs/manual/AGENTS.md`'s phase map.  The user manual has no callout for phase 9; its "What works today" table in `docs/manual/README.md` has the row "Build integration: the tool running in your build", marked Coming.
+
+## Approaches
+
+**Who starts the watcher.**  Weighed: the build starts it in the background, from every build including design-time builds, with an environment variable to opt out; or the user starts it, through recipes for each editor.  Decided: the user starts it.  The research found that a build-started process hangs `Exec` on every MSBuild before the 2026 fix for inherited pipes, needs platform code to detach before .NET 11, runs in design-time builds that must stay fast, is killed or hangs CI agents, locks the tool's files against `dotnet tool update` on Windows, and still would not refresh IntelliSense in the IDEs' default "Balanced" generator mode, which re-runs generators on save and build and not when another process writes a file.  The editor's own mechanisms, a VS Code task that runs when the folder opens and a Rider startup task, tie the watcher to the editor's lifetime and its consent model.
+
+**How the build reports the tool's errors.**  The epic left this open: with its defaults `Exec` reads the first line of an error right, with its file, position and id, and reads an indented continuation line such as `    server: ERROR: relation "users" does not exist` as a second error.  Weighed:
+
+- **A. One line per error under `--online`**, the continuation lines joined to the first.  `Exec` reads it with its defaults; no new DLL; a small change to the reporter.  Long lines in the error list.
+- **B. A file of errors that the target turns into `<Error>` tasks.**  Pure MSBuild, but splitting a line into file, position and id with MSBuild's property functions is fragile, and it is a second format to keep in step.
+- **C. An MSBuild task assembly in the package.**  Full control, but it breaks the one-DLL rule and must run on Visual Studio's .NET Framework MSBuild.
+
+Decided: A.
+
+**How `--watch` works.**  Weighed: a watcher inside the tool that drives the existing run and keeps the manifests between passes; or recipes alone, an editor's file watcher or `dotnet watch` running a one-shot `describe` on each save.  Decided: inside the tool.  A one-shot run starts `dotnet msbuild` for each project's manifest, seconds on every save, and does not follow a change to a project file.
+
+**How the work is split.**  Decided: one design with a section for each sub-phase, as phase 7 had, each sub-phase its own plan and pull request.
+
+## Design
+
+### Connections from a `.env` file
+
+The `.env` file is the third source of a connection, after the command line and the process environment, in every command of the tool and in every mode: a manual run, `--check`, `--watch` and the build's run.
+
+- **Where it is found.**  Designer's call: starting in the folder of the run's unit (the folder of the solution or project file, or of the project in a build's run), the tool walks up and reads the nearest file named `.env`, stopping after the first folder that holds a `.git` directory or file, the repository's root.  Outside a repository only the unit's folder is searched, so that a `.env` in a home folder is never read by surprise.  One file is read; files are never merged.  So a run on a solution does not read a `.env` in a project's folder below the solution's, which the build of that project does: when such a run reports `SQLSRC213`, its help names each `.env` it found between the unit's folder and a project's folder and did not read (designer's call), and the manual says to put the file in the solution's or the repository's folder.
+- **What is read from it.**  Designer's call: only `SQLSOURCE_CONNECTION` and the keys that start with `SQLSOURCE_CONNECTION_`.  Every other key is passed over without a word, since the file is usually the application's own and holds keys of other tools.
+- **Precedence.**  The file fills in what the process environment does not set: for each variable, a value in the environment that is not empty or white space wins, and the file's value is used otherwise.  The resolution of `Connections.Resolve` is then unchanged: the command line, then the variable of the name, then `SQLSOURCE_CONNECTION` for the one describable database.  So a named variable in the file beats `SQLSOURCE_CONNECTION` in the environment, as two named variables in the environment would.  Designer's call; it is what dotenv loaders do, which never override the environment.
+- **Syntax.**  Designer's call, a subset of dotenv that every common loader reads the same way: UTF-8 with or without a byte order mark, `\n` or `\r\n` line ends; blank lines and lines whose first non-blank character is `#` are passed over; an optional `export ` before the key; `KEY=VALUE` with white space around the key and the `=` ignored; an unquoted value is trimmed and ends at a ` #` that starts a comment; a value in single quotes is taken as written; a value in double quotes takes the escapes `\\`, `\"`, `\n`, `\r` and `\t`.  No multi-line value and no `${VAR}` expansion.  A key given twice: the last wins.  A line that cannot be read is passed over, unless its key is one the tool reads, which is an error at the file and the line, naming the key and never the value.
+- **Errors.**  A `.env` that exists and cannot be read, by the system or because a key the tool reads is malformed, is an error for the run (new tool diagnostics, below), and the run goes on as if the file gave nothing.
+- **Where it shows.**  `--verbose` and the log's `connectionSource` say the variable and the file, such as `SQLSOURCE_CONNECTION_BILLING from /work/.env`, and never the value.  A value from the file is a connection's value for every rule of redaction: `Redaction`, `SessionRunLog`, `RunTrace.Without` and the refusal to write one into a sidecar.  The help of `SQLSRC213` names the file as a place to set the variable.  The file's values never reach the environment of a process the tool starts.
+- **The host.**  The tool reads the file through `ToolHost`, so a test gives a run a `.env` of its own; designer's call that this is a new member of `ToolHost` that reads a file's text, not a reuse of `CreateFile`.
+
+### The online build
+
+A target of the package runs `dotnet sqlsource describe` on the project being built, before the compiler, when a connection is configured.  This is SQLx's online and offline split, and the epic's decision.
+
+**`SqlSourceOnline`**, an MSBuild property of the project, alongside `SqlSourceIncludeFiles` and `SqlSourcePublicExceptions`:
+
+| Value | The build |
+|----|----|
+| `auto`, or empty (the default) | Runs the tool when it finds a connection source, below, and not in CI.  When the tool finds no connection for any database with a query to describe, it prints one line saying it is offline and the build goes on with the committed sidecars |
+| `true` | Runs the tool whenever it is not in CI, whether or not a connection source is found.  A database with a query to describe and no connection is an error |
+| `false` | Never runs the tool |
+
+Values are matched ignoring case.  Any other value is a build error from the targets (a new diagnostic, below), as `SqlSourceCheckCompilerVersion` reports `SQLSRC021`.
+
+**A connection source under `auto`** is what an MSBuild condition can see:
+
+- the environment variable `SQLSOURCE_CONNECTION` is set and not blank, tested so that only the answer, never the value, can reach the build's log or a binary log; or
+- `$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.env'))` is not empty.
+
+A condition that names `$(SQLSOURCE_CONNECTION)` would put the connection string in the log of every build at detailed verbosity and in every binary log, since MSBuild logs a condition with its properties expanded and records the environment variables a build reads as properties.  Designer's call: a property function that gives a boolean, such as `IsNullOrWhiteSpace` of `System.Environment.GetEnvironmentVariable`, computed once into a property of the package that holds only `true` or `false` (Verify first: what `-v:diag` and a binary log show of it).  If 9.0 finds no form that keeps the value out of both, `auto` tests `.env` alone, and a project whose only connection is `SQLSOURCE_CONNECTION` in the environment sets `true`.
+
+Designer's call, replacing the epic's test of the project's folder and `$(SolutionDir)`: `GetDirectoryNameOfFileAbove` walks up as the tool does, so a `.env` at the solution's or repository's root starts the tool from any project below it.  It walks past the repository's root, which the tool does not; a `.env` above the root starts a run that finds no connection and prints the offline line, which costs one launch of the tool when an input changes.  A project whose connections are only in named variables of the environment, which a condition cannot list, sets `true`.
+
+**In CI**, neither `auto` nor `true` runs the tool, from the anti-goal.  Decided on 2026-11-02, changing the epic's "`true` always runs it": a project whose connections are only in named variables sets `true` locally, and the same project file must not rewrite its sidecars in the CI job that checks them.  A CI job that wants its sidecars described runs `dotnet sqlsource describe` as a step of its own.  Designer's call: CI is recognised by `$(CI)` equal to `true` ignoring case, which GitHub Actions, GitLab, Buildkite and most others set, `$(TF_BUILD)` equal to `True` for Azure Pipelines, `$(TEAMCITY_VERSION)` not empty, and `$(JENKINS_URL)` not empty (Verify first: the names and values).
+
+**The target**, `SqlSourceDescribeOnline` in `build/SqlSource.targets`:
+
+- **Where it runs.**  After the settings search and the manifest, and before `SqlSourceTrackAdditionalFiles`, so that the hash of the file list includes a sidecar this build created.  Designer's call: `SqlSourceTrackAdditionalFiles` gains `SqlSourceDescribeOnline` in its `DependsOnTargets`, after `SqlSourceFindSettingsFiles`, and `SqlSourceRunOnline`, the target that runs the tool (under Multi-targeting, below), depends on `SqlSourceWriteManifest` and on the target that lists the sidecars and writes the file of `SqlSourceOnline`'s value and the package's folder, so that every input a step writes is written in the configuration that runs the tool, before its up-to-date check, wherever it is called from.  It so runs in both hook paths, just before `CoreCompile` from `SqlSource.AfterSdk.targets` and at `GenerateMSBuildEditorConfigFileCore` where that file is not imported, and adds no hook of its own.  This replaces the epic's "before `GenerateMSBuildEditorConfigFileCore`", which predates the move of the search.  `SqlSourceWriteManifest` itself keeps hooking nothing; it is now also a dependency, in a build that goes online.  Verify first: a target's `Condition` that is false skips its `DependsOnTargets`, so an offline build's `SqlSourceRunOnline` does not write the manifest.
+- **When it runs.**  Not in a design-time build: designer's call, `'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' == 'true'` (Verify first, in Visual Studio, Rider, VS Code's C# tooling and `dotnet build`).  Then by `SqlSourceOnline` and the rules above.
+- **When it is skipped as up to date.**  `Inputs` and `Outputs`, so that a build where nothing changed does not launch the tool, in any IDE, and a project whose files all resolve to `sql`, which has no sidecars by design, does not run it each build.  `Outputs` is one stamp file under `$(IntermediateOutputPath)`, added to `FileWrites`, touched, designer's call, only when the tool exits `0` and did not print the offline line (the target reads the tool's standard output for it), so a failed run and an offline one are tried again by the next build, which finds a connection that was set in the environment since.  Designer's call: the value of `SqlSourceOnline` and `$(MSBuildThisFileDirectory)`, the package's folder, whose path in NuGet's cache names the package's version (`.../sqlsource/<version>/build/`), are written to a file under `obj` with `WriteOnlyWhenDifferent`, by the same target that lists the sidecars, which is an input too, so that changing either describes again.  `Inputs`, designer's call:
+  - the manifest, which `SqlSourceWriteManifest` writes only when it differs;
+  - the `.sql` files and the `sqlsource.json` files among `@(AdditionalFiles)`;
+  - the sidecars among `@(AdditionalFiles)`, so that a sidecar that a checkout replaced is described again;
+  - a list of the sidecars that exist, written under `obj` with `WriteOnlyWhenDifferent` by a target that `SqlSourceRunOnline` depends on, so that a deleted sidecar is described again;
+  - `@(Compile)`, so that a changed `[SqlSourceGenerate]` claims its files at the next build.  Verify first: the cost of the tool's launch and its reading of attributes, on a project of about 200 C# files; if a build of an unchanged query slows by more than about a second, 9.2 drops `@(Compile)` from the inputs, documents that a changed claim needs a save of the `.sql` file or a manual run, and records the choice in `docs/tech-debt`;
+  - the `.env` that the condition found, if any;
+  - the tool manifest, `.config/dotnet-tools.json` or `dotnet-tools.json`, found above the project, which `dotnet tool update` rewrites, so that updating the tool describes again.  The package's update is caught by the package's folder in the file above, not by the targets file: `Inputs` compares times, and NuGet keeps a package's files at the time they were packed.
+  A schema change touches no input: that is the known gap that `--force` and `--check` cover.
+- **The command.**  `Exec` of `dotnet sqlsource describe --manifest "<manifest>" --online <auto|true>` with `WorkingDirectory` the project's folder, the default reading of canonical errors, and `StandardOutputImportance` `low` (designer's call: the summary and the offline line show at `-v:d`, and at `-v:n` the build says only what failed).  The tool is found through the local tool manifest, as `dotnet sqlsource`; bundling it in the package stays rejected.  The environment of the build passes to the tool, so variables set for the IDE reach it.
+- **A log.**  Designer's call: when `SQLSOURCE_LOG` is set, the target passes `--log` with a path of its own for each project and framework, `$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log`, and under `--online` the tool does not read `SQLSOURCE_LOG` itself.  Projects built at once, and the inner builds of a multi-targeted project, would otherwise open one file, and on Windows the second open fails the build.  The manual says where the logs of a build are.  The epic's `SqlSourceLog` property is dropped: no setting is a property any longer, and the variable turns the logs on.
+- **When the tool cannot run.**  When `dotnet` cannot start the tool, because no tool manifest names it or `dotnet tool restore` has not run, `dotnet` prints its own message, which is not in the compiler's format.  Under `true` the target then reports a new diagnostic from the targets that says to install the tool, run `dotnet tool restore`, or set `SqlSourceOnline` to `false`.  Under `auto` it is the offline case: the `.env` that turned `auto` on may be the application's own, and a machine with committed sidecars builds as it does today.  The target writes one message of high importance, never a warning, which `TreatWarningsAsErrors` would make an error, that names `dotnet tool restore`, leaves the stamp untouched, and the build goes on with the committed sidecars.  Verify first: what `dotnet` prints and exits with in each case, how `Exec` reports a non-zero exit code beside the errors it read (the target must not add `MSB3073` to an error the tool already reported), and how the target tells the two apart.
+- **A sidecar the tool created.**  It is not in `@(AdditionalFiles)`, since the props' glob expanded at evaluation.  After the tool runs, the target includes `**/*.sql.json` again, with the props' excludes and under the props' condition on `SqlSourceIncludeFiles`, and adds each file that `@(AdditionalFiles)` lacks; and, designer's call, it removes each sidecar item whose file the tool deleted, which the compiler would otherwise be given though it is gone.  It runs before the compiler reads its inputs, so the same build compiles with what the tool left.  Verify first: the generator sees the added item in the same build, the compiler's error for a missing additional file when the item is not removed, and that the include and the removal are safe when MSBuild skips the target as up to date and infers its outputs.
+- **Errors.**  A query the database rejects, a database that cannot be opened, a missing connection under `true`: the tool's own diagnostics, in the compiler's format, at the `.sql` file and position where they have one.  An unreachable database is an error; under `--online` its help line says to start the database, remove its connection, or set `SqlSourceOnline` to `false`.  The generator then also reports each query of a held-back file that needed a new entry, as the epic accepted: the tool's error names the server's reason and the generator's the consequence.
+- **This repository.**  Its projects that import the package by path set `SqlSourceOnline` to `false` in a `Directory.Build.props` above them (designer's call: the repository's root `Directory.Build.props`, so the end-to-end projects, the examples and the generator's test projects are covered at once).  Their sidecars are written by `tools/describe-end-to-end.sh` against the pinned images, and this repository's tool manifest does not pin `sqlsource`, so an online build would rewrite them or fail.
+
+**The tool's options for the build.**  Both are listed in the command reference as for the build's use.
+
+- **`--manifest <path>`** reads that project manifest instead of running MSBuild: the run's unit is the manifest's project, and no `dotnet msbuild` process starts.  Designer's call: it takes no unit path, no `.sql` path, no `--project` and no `--database`, and not `--watch`; a combination is a usage error from `DescribeCommand.CheckUsage`.  A manifest that cannot be read is `SQLSRC206`, as today.  A run from a manifest searches for `.env` from the manifest's project folder.
+- **`--online <auto|true>`** requires `--manifest` (designer's call).  Under it every error is written on one line: the first line, then each continuation line as `; <label>: <text>`, then `; see: <link>`.  Designer's call on the separator; the rule is that no line but a first line is written.  The log's `diagnostic` event is unchanged.  Designer's call: under `--online` the tool writes no `Cli.RunAgainLine`, since the build's user cannot give the build's run `--log`; the manual's section on the build says that `SQLSOURCE_LOG` turns on the build's logs and where they are.  Under `auto`, when no selected database that has a query to describe has a connection, the tool reports no `SQLSRC213`, and a run where every entry is current is a normal run that needs no connection and prints its summary, so the offline line means that something is stale.  Then it writes one line to standard output, `sqlsource: offline: no connection for <databases>; the build uses the committed sidecars` (designer's call on the words), and exits `0`.  A connection for some of them and not others is `SQLSRC213` for the others, under both values; a bare `SQLSOURCE_CONNECTION` with two databases is `SQLSRC215`, not offline.
+
+**Multi-targeting.**  Designer's call: the tool runs once, for the first framework of `TargetFrameworks`, as the manual run and the watcher read the first framework's manifest alone.  Two frameworks can claim different files or give a file different queries, through constants and conditions, and a run for each would delete or trim what the other just wrote, each build then seeing the other's write as a changed input.  The inner builds run in parallel (`DispatchToInnerBuilds` passes `BuildInParallel`), so another framework would otherwise reach its compile before the first one's run had written its sidecars, and fail the first build after each edit of a query.  So the tool's run, with its `Inputs`, `Outputs` and stamp, is a target of its own, `SqlSourceRunOnline` (designer's call on the name), whose condition keeps the design-time test of `DesignTimeBuild`, `SqlSourceOnline`, the CI rule and the connection source, but not `BuildingProject`: a configuration that another build calls by name starts with `BuildingProject` `false`, which only the SDK's `BuildOnlySettings` makes `true`.  `SqlSourceDescribeOnline` keeps the whole guard and its place in the build.  In the first framework it depends on `SqlSourceRunOnline`; in every other inner build it calls it in the first framework's configuration, `<MSBuild Projects="$(MSBuildProjectFullPath)" Targets="SqlSourceRunOnline" Properties="TargetFramework=<first>" />`, which MSBuild runs once for that configuration and on which a second caller waits, and then includes and removes the sidecars as the first one does.  So a build of one framework alone, by `-f` or through a `ProjectReference` from a project of one framework, still runs the tool, for the first framework; there the first framework's run is a call by name with none of the build's hooks, so TD-0025's limit applies to it, which TD-0025's record says.  The online build keeps TD-0026's limit, which its record says, and the other frameworks' builds report a query only they claim as the manual run leaves it.  Verify first: how the target finds the first framework, as `ProjectEvaluator.FirstFramework` does; that the call reaches the configuration the dispatch built, so the tool runs once; that every framework compiles with the sidecars the run wrote, under `dotnet build`'s default parallelism; and that the tool runs once in a build of the second framework alone, by `-f` and through a `ProjectReference`, on a tree with no `obj`, with a manifest written in that build.  Inside a build the hooks of the build have run, so the online build does not have TD-0025's limit, which its record says.
+
+### `describe --watch`
+
+`dotnet sqlsource describe --watch` runs a normal pass, then waits for changes and runs another pass after each, until it is stopped.
+
+- **A pass** is a whole run of `describe` on the unit with the command line's filters: plan, resolve connections, describe what is not current, write, summary.  Since a run skips every current entry, a pass describes exactly what a change made stale, and the watcher needs no list of what to describe; designer's call.  A pass that reports errors does not stop the watcher.
+- **Markers.**  Before a pass after the first, the tool writes `sqlsource: change detected; describing`; after every pass, `sqlsource: watching for changes; press Ctrl+C to stop`.  Designer's call on the words.  They are a contract with the VS Code recipe's problem matcher, so the tool holds them as constants and a documentation test holds the recipe to them.
+- **What is watched**, designer's call:
+
+  | Change | What the next pass does first |
+  |----|----|
+  | A listed `.sql` file, a settings file the manifest lists, or a `Compile` item is written | Plans again from the manifests it holds |
+  | A project file, the solution file, a `Directory.Build.props`, `Directory.Build.targets` or `Directory.Packages.props` above a project, or `obj/project.assets.json`, is written | Runs the manifest target of each project again |
+  | A `.sql`, `.cs` or `sqlsource.json` file under a project's folder is created, deleted or renamed, its path new to the manifests or a listed path still gone when the pass starts | Runs the manifest target of each project again |
+  | The `.env` the run read is written, deleted, or one is created where the search would find it | Reads the connections again |
+
+  A created or renamed-to path that the manifests already list, and a listed path that was deleted and exists again when the pass starts, is a write of that file (the first row): an editor that saves by renaming a temporary file over the original raises `Renamed` and `Created` and no `Changed`.  Sidecars, temporary files of the store, and everything under `bin`, `obj` (but `project.assets.json`) and `.git` are ignored, so the watcher's own writes do not wake it.
+- **Debounce.**  Designer's call: a pass starts 300 ms after the last change it will cover; a change during a pass schedules one more pass after it.  An editor that saves by writing a temporary file and renaming it, and a branch switch that touches hundreds of files, give one pass.
+- **The watcher.**  `FileSystemWatcher` on the unit's folder and each project's folder, recursively, and on each folder outside them that holds a listed file.  A watcher's overflow or error makes the next pass run every manifest target again.  `DOTNET_USE_POLLING_FILE_WATCHER` set to `true` or `1`, the variable `dotnet watch` reads, makes it poll instead (designer's call), for a mounted volume or a network share that raises no events.  Verify first: the events of each editor's save on macOS, Linux and Windows, and inotify's limits on a large repository.  Everything comes through a new member of `ToolHost`, so a test drives a watcher of its own.
+- **Options.**  `--watch` with `--check` is a usage error.  With `--force`, designer's call, the first pass describes everything and the rest are normal passes.  `--project`, `--database` and `.sql` paths narrow every pass.  `--connection` and `--verbose` apply to every pass.  With `--log`, designer's call: one file for the whole session, written from the start of the first pass, each pass bracketed by events of its own so that phase 10 can read a session's log; the event names are the builder's, within the log's rule that a member is added and never renamed.
+- **Ending.**  Ctrl+C, `SIGTERM` or `SIGHUP` stops the pass under way, as a run is stopped today, and ends the watcher with `0` (designer's call: stopping is how a watcher ends, not a failure).  A wrong command line, and a unit that cannot be found, end it before the first pass with `1`.  Every other error, a project not restored included, is reported in its pass and the watcher keeps going.  `Cli.RunAgainLine` is not written by a watcher.
+- **Beside a build, and several watchers.**  A watcher and an online build running at once is the normal setup, and two watchers on one repository a mistake that does no harm; designer's call, there is no lock.  Each may describe one file at once, and each sidecar is written whole, so the last write wins with the same content.  On Windows the move of the temporary file over a sidecar fails while another process has the sidecar open, as a build or a watcher reading it does: designer's call, `SidecarStore` retries the move a few times over about a second on a sharing violation before it reports, delivered by 9.2, which merges first or beside 9.3.  The manual says to run one watcher.
+
+### Editor recipes
+
+In `docs/manual/recipes.md`, one copy-ready recipe for each editor, as `docs/manual/AGENTS.md` asks of a new task, each linking to the rules of watch mode in `docs/manual/tool.md`; `tool.md` holds those rules and what each IDE shows, below:
+
+- **VS Code**: a `.vscode/tasks.json` task that runs `dotnet sqlsource describe --watch`, with `isBackground`, `runOptions.runOn` `folderOpen`, and a problem matcher that reads the tool's first lines into the Problems panel (`$msCompile`'s pattern, or one of the recipe's own) with a `background` begin and end pattern on the two markers.  It says that VS Code asks once to allow automatic tasks, and never runs them in an untrusted workspace.  Verify first: the matcher reads a first line and passes over a continuation line, and clears the problems of a file at the start of each pass.
+- **Rider**: a run configuration of the command, started with the solution by Rider's startup tasks.  Verify first: the setting's name and place in the current Rider.
+- **Visual Studio**: the command in the Developer PowerShell or a terminal.
+- **When IntelliSense shows the new sidecar.**  Visual Studio and VS Code run generators in "Balanced" mode by default, which re-runs them on a save or a build and not when another process writes a file.  So after the watcher writes a sidecar, the models change at the next save of any file or the next build; in "Automatic" mode they change when the sidecar is written.  Rider shows them at the next save.  The section says how to switch mode in each IDE.  Verify first, each statement, in each IDE, for a sidecar that is rewritten and one that is new.
+
+### The package-install check
+
+`tools/check-package-install.sh` gains the packed tool, so the packed tool, the packed package and the target are proven together once per build, with no database:
+
+- Every build below that tests `SqlSourceOnline`, under `true`, `auto` and `false`, runs with `CI`, `TF_BUILD`, `TEAMCITY_VERSION` and `JENKINS_URL` cleared, since the script runs in CI, where neither `auto` nor `true` runs the tool.
+- The script packs, or takes from its directory, both `SqlSource.<version>.nupkg` and `SqlSource.Tool.<version>.nupkg`, and installs the tool of the same version into the consumer through a tool manifest, from the same local feed.
+- `dotnet sqlsource --version` prints the version, and `dotnet sqlsource describe` with no connection reports `SQLSRC213` for a query the fixture adds for the purpose.
+- A build with `SqlSourceOnline` `true` and no connection fails with the tool's `SQLSRC213` at that query's file and line, on one line.
+- Under `auto`, with a `.env` that holds no key the tool reads: a build whose sidecars are current passes and shows the tool's summary at `-v:d`; a build with a query whose entry is stale prints the offline line and fails with the generator's stale-entry error at that query.
+- A build with `SqlSourceOnline` `false` does not run the tool.
+
+Designer's call: `tools/check-tool-install.sh` stays, since it proves the tool's dependency closure and SqlClient's platform copy load, which this check does not.  The workflow that runs the script gives it both packages.
+
+## Diagnostics
+
+New, each with its section in `docs/manual/diagnostics.md`, its row in `AnalyzerReleases.Unshipped.md`, and the four places `src/SqlSource/Diagnostics/AGENTS.md` lists:
+
+| Where | Condition | Delivered by |
+|----|----|----|
+| Targets, next free `SQLSRC0xx` | `SqlSourceOnline` is not `auto`, `true` or `false` | 9.2 |
+| Targets, next free `SQLSRC0xx` | The online build under `true` could not run the tool: not installed, or not restored | 9.2 |
+| Tool, next free `SQLSRC2xx` | A `.env` the tool found cannot be read | 9.1 |
+| Tool, next free `SQLSRC2xx` | A line of `.env` with a key the tool reads cannot be read; names the key, never the value | 9.1 |
+
+A targets diagnostic's text equals its descriptor's message, with `{0}` for what the target writes, and `BuildFileTests` holds the two equal, as for `SQLSRC021`.  Changed: the help of `SQLSRC213` names `.env`; under `--online` the help of the error for a database that cannot be opened names `SqlSourceOnline`.  The ids are taken when each sub-phase lands, so that work merged meanwhile keeps its own.
+
+## Sub-phases
+
+9.0 comes first.  9.1 can be built beside 9.0.  9.2 and 9.3 each need 9.0 and 9.1 and can be built beside each other; both add options to `DescribeCommand.Create` and `UsageCheck`, so the second to merge resolves that conflict.  9.4 needs 9.2 and 9.3.
+
+### 9.0 Before the build
+
+A spike, as 7.0's and 8.0's were: throwaway code and projects, its findings written as `docs/superpowers/specs/2026-11-xx-query-generation-phase-9-spike.md`, with no product code.  Each answer is what was run and what it did; a question it cannot reach names the sub-phase that must.  A finding that contradicts a Decided item stops at the document and asks the owner, and a finding that changes a designer's call amends this design in the spike's pull request.
+
+The agent runs:
+
+1. **The target's place.**  A target in the position of `SqlSourceDescribeOnline`, in a project of the SDK and one that is not, with `dotnet build`, `dotnet build -m` on a solution of several projects, and a multi-targeted project: does it run before `CoreCompile`; is the manifest it gets as a dependency the same as the one the tool gets by name; does a false `Condition` skip `SqlSourceWriteManifest`; does a sidecar it creates, added to `AdditionalFiles`, reach the generator in the same build, and what does the compiler do with an item whose sidecar it deleted; in a project of two frameworks built with `dotnet build`'s default parallelism, with `-f <second framework>`, and through a `ProjectReference` from a project of the second framework, each on a tree with no `obj`, does the call into the first framework's configuration run the tool once, with a manifest written in that build, and does each framework compile with the sidecars it wrote; does a change of `SqlSourceOnline`'s value alone run the tool in the next build; are the include and the removal safe when the target is skipped as up to date; how a condition names the first framework of `TargetFrameworks`.
+2. **The connection in the log.**  What `-v:diag` and a binary log show of a condition and a property that test `SQLSOURCE_CONNECTION`, in each form the design names, and of the environment.
+3. **Design-time builds.**  The values of `DesignTimeBuild` and `BuildingProject` in `dotnet build`, in a design-time build run with `dotnet msbuild -p:DesignTimeBuild=true -p:BuildingProject=false -p:SkipCompilerExecution=true`, and as Roslyn's BuildHost sets them.
+4. **`Exec` and the error format.**  A one-line error read with its file, line, column and id, and its text whole; that a continuation line written the old way is read as a second error (the epic's finding, again); what `Exec` adds for a non-zero exit code beside errors it read; what `dotnet` prints and exits with when no tool manifest names `sqlsource`, when the tool is not restored, and when the tool and the package differ in version; how `StandardOutputImportance` `low` shows at each verbosity.
+5. **The cost of `@(Compile)` as an input**: the time from a build's start to the end of the target with the real tool on a project of about 200 C# files, when only a C# file changed.
+6. **File events.**  The events `FileSystemWatcher` raises on macOS and Linux (and Windows when a machine is at hand) when VS Code, Rider and `git checkout` write a `.sql` file; inotify's watch limit on a recursive watch of this repository; polling.
+7. **The CI variables** that GitHub Actions, GitLab, Azure Pipelines, Buildkite, TeamCity and Jenkins set, from their documentation, and what this repository's own workflows set.
+
+The owner runs, from a checklist the spike writes, the items an agent cannot drive, and the spike records their answers:
+
+8. **IntelliSense after a sidecar is written**, rewritten and new, in Visual Studio, Rider and VS Code with C# Dev Kit, each in its default generator mode and in "Automatic": does the model change, after what, and how long after.
+9. **The design-time guard in the IDEs**: a stand-in target in the position of `SqlSourceDescribeOnline` that writes `DesignTimeBuild` and `BuildingProject` to a file, in a project opened in Visual Studio, Rider and VS Code with C# Dev Kit: does it write in the IDE's loading and design-time builds, and with what values, and does the guard keep it from running there while a build from the IDE runs it.
+10. **The VS Code task**: does it start on folder open, do its problems appear, and are they cleared at the next pass.
+11. **Rider's startup task** for a run configuration.
+
+### 9.1 `.env`
+
+- Finding, reading and parsing the file; the merge into the variables `Connections.Resolve` reads; the new member of `ToolHost`.
+- The source in `--verbose` and in the log; redaction of the file's values by every existing rule; `SQLSRC213`'s help.
+- The two new tool diagnostics.
+- **Tests**: the parser's syntax table, each rule of the search (nearest wins, the repository's root, outside a repository), precedence against the environment and the command line, a key that is not the tool's, the errors naming no value, and cases in `tests/SqlSource.Tool.Tests/Logging/RunLogRedactionTests.cs` and `tests/SqlSource.Tool.Tests/Commands/SecretTests.cs` for a value from the file.  One end-to-end case in each database project's tool tests that connects through a `.env` only.
+- **Docs**: `docs/manual/tool.md`'s connections (the table gains its third row) and environment variables, with what to keep out of git and a `.env.example`; README step 5 shows the file as the way to keep the connection; a row for `.env` in the "What works today" table of `docs/manual/README.md`; `docs/architecture/tool.md` for the reader.
+
+### 9.2 The online build
+
+- `SqlSourceOnline`, `SqlSourceDescribeOnline`, `SqlSourceRunOnline` and the target that lists the sidecars, with their conditions, inputs, outputs and the sidecar include; the two targets diagnostics; `SqlSourceOnline` set `false` for this repository.
+- `--manifest`, `--online`, the one-line form of the reporter, the offline line, and their usage rules in `CheckUsage` and `UsageCheck`.
+- **`BuildFileTests`** extended in the same pull request, as `src/SqlSource/build/AGENTS.md` requires: the conditions of `SqlSourceDescribeOnline` and `SqlSourceRunOnline`, the place of `SqlSourceDescribeOnline` in the dependencies of `SqlSourceTrackAdditionalFiles` and of `SqlSourceWriteManifest` and the target that lists the sidecars and writes the value file in those of `SqlSourceRunOnline`, that none of the three new targets hooks anything, the SDK properties and environment variables it reads as properties in `SdkProperties` (`DesignTimeBuild`, `BuildingProject`, `TargetFrameworks`, `SQLSOURCE_LOG`, `CI`, `TF_BUILD`, `TEAMCITY_VERSION`, `JENKINS_URL`, and never `SQLSOURCE_CONNECTION`, which no file of the package may read as a property, a test holds), and the targets diagnostics' texts.
+- **Tests**: tool tests of `--manifest` and `--online` through `Cli.RunAsync` (the one-line form, the offline line, the partial case, `SQLSRC215`, no `RunAgainLine` after an error); MSBuild tests in the manner of `tests/SqlSource.Tool.Tests/Projects/ManifestTargetTests.cs`, with a stand-in for `dotnet sqlsource` where a real tool is not needed, of each value of `SqlSourceOnline`, the CI guard, the skip when nothing changed and the run when each kind of input changed, a failed run that leaves no stamp, a change of `SqlSourceOnline`'s value or of the package's folder alone that runs the tool in the next build, a tool that cannot start (a tool manifest that names `sqlsource` and is not restored, and none at all: under `auto` with current sidecars the build passes with the message naming `dotnet tool restore`, no warning and no stamp; under `true` it fails with the targets diagnostic alone, no `MSB3073`), a sidecar created and compiled in the same build, a design-time build that does not run it, a multi-targeted project whose every framework compiles with the sidecar the one run created, under `dotnet build`'s default parallelism, with `-f` of its second framework and through a `ProjectReference` from a project of that framework, on a tree with no `obj`, the tool given a manifest written in that build; and in each database's end-to-end tests one build that goes online against the container and compiles a query whose sidecar it created.
+- **Docs**: `docs/manual/tool.md`, running in the build (when it runs, offline, errors, multi-targeting, CI, one failing query holds back its file); `docs/manual/settings.md`, `SqlSourceOnline` in the MSBuild properties, with its row of the status table; README step 5; the "Build integration" row of the "What works today" table in `docs/manual/README.md` marked Available, narrowed to the build; `docs/manual/diagnostics.md`; `docs/architecture/msbuild-and-manifest.md` and `docs/architecture/tool.md`, their placeholders replaced; `src/SqlSource/build/AGENTS.md` for the new rules of the targets; TD-0025 says the online build does not have its limit but in a build of a later framework alone, and TD-0026 that it does.
+
+### 9.3 `describe --watch`
+
+- The option, the watcher through `ToolHost`, the passes, the markers, the debounce, the manifest cache, the reload of `.env`, the options' rules, the log of a session, the exit codes.
+- **Tests**: through `Cli.RunAsync` with a fake watcher and the fake process runner: each row of what is watched, a save that renames a temporary file over a listed file running no manifest target, the debounce and the pass queued during a pass, a pass with errors that keeps going, stopping, the markers exactly, `--force`, `--check` refused, the filters.  One test with the real `FileSystemWatcher` on a temporary folder, bounded by a timeout.  In each database's end-to-end tests, one watcher that rewrites a sidecar after a `.sql` file changes.
+- **Docs**: `docs/manual/tool.md`, watch mode and its rows in the command reference and the exit codes; a row for watch mode in the "What works today" table of `docs/manual/README.md`; `docs/architecture/tool.md`, its placeholder replaced.
+
+### 9.4 Recipes, the install check, the examples and close
+
+- The editor recipes in `docs/manual/recipes.md`, and in `docs/manual/tool.md` what each IDE shows and when, with what 9.0 found of each IDE; a documentation test that holds the VS Code recipe's patterns to the tool's markers.
+- `tools/check-package-install.sh` as above, `tools/README.md`, the workflow that runs it and `.github/workflows/README.md`.
+- **The examples**: each example project gains a `.env.example`, and its README a section on the watcher and the online build in the example's own workflow.  Designer's call: the projects keep `SqlSourceOnline` `false` from the repository's root, so the README says how a user's project differs.  `examples/AGENTS.md` if a rule changes.
+- A row for the editor recipes in the "What works today" table of `docs/manual/README.md`.
+- The user documentation of phase 9 read whole, as `docs/manual/AGENTS.md`'s "When a phase lands" asks; `CONTRIBUTING.md` if a command changed; the epic outline's phase 9 rows marked Done.  Closes phase 9.
+
+## Testing
+
+- **No test depends on a developer's `.env` or environment**: every tool test gives its host the variables and files it needs, and the MSBuild tests clear `SQLSOURCE_CONNECTION*` and the CI variables from the processes they start, or set them deliberately.
+- **The CI of this repository runs every new test without an IDE.**  What only an IDE shows is the owner's checklist in 9.0, and its answers are in the manual, not in a test.
+- **The floors.**  The MSBuild tests run on the SDK the repository pins; 9.0 records which MSBuild version first reads one-line errors as expected, if any differ.
+
+## Documentation
+
+Each sub-phase updates what it delivers, as listed in its section, in its own pull request.  The README's step 5 changes twice, in 9.1 and 9.2, and is read whole in 9.4.  The phase map row of `docs/manual/AGENTS.md` for phase 9 gains the editor recipes, in this design's pull request.
+
+## Changes to the epic outline
+
+In this design's pull request:
+
+- The phase table's row 9 becomes five rows, 9.0 to 9.4, each Not started with a link to its section here; the paragraph after the table gains their order.
+- The phase 9 section is replaced by a pointer to this design and the decisions that changed: the target's place; the condition's walk up with `GetDirectoryNameOfFileAbove`; `auto` off in CI; `SqlSourceLog` dropped; the one-line form chosen for the error format; the watcher started by the user, with the research appendix as the reason.
+- Workflow's two phase 9 bullets are amended to match, `true` no longer running the tool in CI among them.
+
+## Left to the builder
+
+- The names of records, members and files of the tool; where the `.env` reader and the watcher live in the tool's folders.
+- The exact texts of the diagnostics, the offline line and the markers, within the rules above; the ids, by the rule above.
+- The log events of a watch session.
+- The names of the stamp and list files under `obj`.
+- How the MSBuild tests stand in for the tool.
+- The fixture changes of the package-install consumer.
+
+## Calls made in this design
+
+Not decided with the owner, and open to the review of this design:
+
+- `.env` searched from the unit's folder to the repository's root, nearest file only, unit's folder alone outside a repository.
+- Only `SQLSOURCE_CONNECTION*` keys read from `.env`; the environment wins over the file, variable by variable.
+- The dotenv subset, last key wins, an unreadable line an error only for a key the tool reads.
+- `auto` tests `.env` with `GetDirectoryNameOfFileAbove` instead of the project folder and `$(SolutionDir)`.
+- CI recognised by `CI`, `TF_BUILD`, `TEAMCITY_VERSION` and `JENKINS_URL`.
+- The target's place: a dependency of `SqlSourceTrackAdditionalFiles`, after the search; the tool's run a target of its own without the `BuildingProject` guard, run once for the first framework, the other inner builds calling it in that configuration and waiting on it.
+- The package's folder, which names its version, beside `SqlSourceOnline`'s value, in a file under `obj` that is an input.
+- A solution run's `SQLSRC213` names a `.env` in a project's folder that it did not read.
+- The editor recipes in `recipes.md`, the rules and what each IDE shows in `tool.md`.
+- `SQLSOURCE_CONNECTION` tested by a property function that gives a boolean, or not at all if 9.0 finds it leaks.
+- A log of the build's run under `obj` for each project and framework, when `SQLSOURCE_LOG` is set.
+- The stamp left untouched by an offline run; `SqlSourceOnline`'s value an input; sidecars the tool deleted removed from the build's items.
+- `SidecarStore` retries a move that a sharing violation stops.
+- Under `auto`, a tool that cannot start is the offline case, with one high-importance message.
+- Under `--online`, no `Cli.RunAgainLine`.
+- The inputs, `@(Compile)` among them unless 9.0 finds it too slow, and the tool manifest.
+- `StandardOutputImportance` `low`.
+- `SqlSourceLog` dropped for `SQLSOURCE_LOG`.
+- `--manifest` alone with `--online`, `--connection`, `--verbose` and `--log`; `--online` only with `--manifest`.
+- The one-line form's separator.
+- This repository's projects set `SqlSourceOnline` to `false` at the root `Directory.Build.props`.
+- A watch pass is a whole run; the table of what is watched; 300 ms debounce; polling by `DOTNET_USE_POLLING_FILE_WATCHER`.
+- `--watch` with `--force` forces the first pass only; `--log` is one file for the session.
+- A stopped watcher exits `0`; no single-instance lock.
+- `tools/check-tool-install.sh` kept beside the extended `tools/check-package-install.sh`.
+- The examples keep `SqlSourceOnline` `false` and gain a `.env.example`.
