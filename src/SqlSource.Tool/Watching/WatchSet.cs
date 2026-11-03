@@ -49,6 +49,8 @@ internal sealed class WatchSet
     private readonly string _unitPath;
     private readonly ImmutableArray<string> _projectFolders;
     private readonly HashSet<string> _listed = [with(Comparer)];
+    private readonly HashSet<string> _listedFolders = [with(Comparer)];
+    private readonly HashSet<string> _settingsFolders = [with(Comparer)];
     private readonly HashSet<string> _envFolders = [with(Comparer)];
 
     private WatchSet(string unitPath, string unitFolder, FoundProjects found)
@@ -63,16 +65,25 @@ internal sealed class WatchSet
             _listed.UnionWith(manifest.CompileFiles);
         }
 
+        // A settings file applies to the files of its folder and of the folders below it, so a new one in the folder of
+        // a listed file, or above it up to the root of its repository, may apply to that file.
+        _listedFolders.UnionWith(_listed.Select(FolderOf));
+        foreach (var folder in _listedFolders)
+        {
+            _settingsFolders.UnionWith(DotEnvSearch.FoldersOf(folder));
+        }
+
         _envFolders.UnionWith(DotEnvSearch.FoldersOf(unitFolder));
-        Folders = FoldersOf(unitFolder, found);
+        Folders = FoldersOf(unitFolder, found, _settingsFolders);
     }
 
     /// <summary>
     /// The folders to watch, sorted by ordinal comparison so that two sets compare: the unit's folder, the folder of
     /// each project, with or without a manifest, and the folder of each project's assets file, or the nearest that
     /// exists above it in the project's repository, with their folders below; and each other folder that holds a listed
-    /// file or may hold a <c>.env</c> or a <c>Directory.*</c> file, alone.  None is below another that is watched with
-    /// its folders below, and none is there twice.  A folder may not exist, which the session skips.
+    /// file, or may hold a settings file of one, a <c>.env</c> or a <c>Directory.*</c> file, alone.  None is below
+    /// another that is watched with its folders below, and none is there twice.  A folder may not exist, which the
+    /// session skips.
     /// </summary>
     public ImmutableArray<(string Folder, bool Recursive)> Folders { get; }
 
@@ -153,7 +164,7 @@ internal sealed class WatchSet
             return WatchEffect.Evaluate;
         }
 
-        if (side == Side.Created && IsNewProjectContent(path, name, isFolder))
+        if (side == Side.Created && IsNewContent(path, name, isFolder))
         {
             return WatchEffect.Evaluate;
         }
@@ -173,16 +184,30 @@ internal sealed class WatchSet
         || EvaluationExtensions.Any(extension => name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
         || Comparer.Equals(name, AssetsFileName);
 
-    // A file or a folder that a project's folder did not have, and a project may list now: a .sql or .cs file, a
-    // settings file, or a folder the globs may reach.
-    private bool IsNewProjectContent(string path, string name, bool isFolder) =>
-        _projectFolders.Any(project => IsBelow(path, project))
-        && (
+    // A file or a folder that a project may list now, or a settings file that may apply to a listed file now: a .sql
+    // or .cs file, a settings file, or a folder the globs may reach, below a project's folder; a .sql or .cs file or a
+    // folder in a folder that holds a listed file, as a glob of another folder lists; and a settings file in such a
+    // folder or above it, up to the root of its repository.
+    private bool IsNewContent(string path, string name, bool isFolder)
+    {
+        var settings = Comparer.Equals(name, SettingsFileName);
+        var content =
             isFolder
             || name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
-            || name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
-            || Comparer.Equals(name, SettingsFileName)
-        );
+            || name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+        if (!settings && !content)
+        {
+            return false;
+        }
+
+        if (_projectFolders.Any(project => IsBelow(path, project)))
+        {
+            return true;
+        }
+
+        var folder = FolderOf(path);
+        return _listedFolders.Contains(folder) || (settings && !isFolder && _settingsFolders.Contains(folder));
+    }
 
     // Sidecars and the temporary files the sidecar store makes are the tool's own writes.  Everything in bin, obj and
     // .git is the build's, or the repository's, except the one file that a restore writes, at any depth below obj, as
@@ -225,7 +250,11 @@ internal sealed class WatchSet
         );
     }
 
-    private static ImmutableArray<(string Folder, bool Recursive)> FoldersOf(string unitFolder, FoundProjects found)
+    private static ImmutableArray<(string Folder, bool Recursive)> FoldersOf(
+        string unitFolder,
+        FoundProjects found,
+        IEnumerable<string> settingsFolders
+    )
     {
         var manifests = found.Manifests;
         var recursive = new List<string> { Trim(unitFolder) };
@@ -248,13 +277,8 @@ internal sealed class WatchSet
             }
         }
 
-        foreach (var manifest in manifests)
-        {
-            alone.AddRange(
-                manifest.Files.Concat(manifest.SettingsFiles).Concat(manifest.CompileFiles).Select(FolderOf)
-            );
-        }
-
+        // The folder of each listed file, and each folder above it that may hold a settings file of it.
+        alone.AddRange(settingsFolders);
         alone.AddRange(DotEnvSearch.FoldersOf(unitFolder));
 
         // Sorted first, so that of two spellings in different case the same one stays whatever the order of the lists.

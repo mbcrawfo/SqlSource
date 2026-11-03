@@ -571,6 +571,91 @@ public sealed class WatchSetTests
         set.Folders.ShouldBe([(app, true)]);
     }
 
+    // A repository with a project in src/App that lists a .sql file of its own folder and one of Shared, on the disk
+    // for the .git marker, as a solution in the repository's root or the project alone runs it.
+    private static WatchSet RepositorySet(TempFolder temp, bool solution)
+    {
+        _ = temp.CreateFolder("r/.git");
+        var root = temp.PathOf("r");
+        var app = temp.CreateFolder("r/src/App");
+        _ = temp.CreateFolder("r/Shared");
+        var project = Path.Combine(app, "App.csproj");
+        ImmutableArray<ProjectManifest> manifests =
+        [
+            Manifest(project, [Path.Combine(app, "Users.sql"), temp.PathOf("r/Shared/Common.sql")], [], []),
+        ];
+        return solution
+            ? Of(Path.Combine(root, "App.sln"), root, [project], manifests)
+            : Of(project, app, [project], manifests);
+    }
+
+    // A file or a folder in a folder that holds a listed file, outside every project's folder, which a glob of the
+    // project may list now; and a settings file in the folder of a listed file or above it, up to the repository's
+    // root, which may apply to it now.
+    [Theory]
+    [InlineData("sqlsource.json", true, false)]
+    [InlineData("sqlsource.json", false, false)]
+    [InlineData("src/sqlsource.json", true, false)]
+    [InlineData("src/sqlsource.json", false, false)]
+    [InlineData("Shared/Orders.sql", true, false)]
+    [InlineData("Shared/Orders.sql", false, false)]
+    [InlineData("Shared/Orders.cs", false, false)]
+    [InlineData("Shared/sqlsource.json", true, false)]
+    [InlineData("Shared/sqlsource.json", false, false)]
+    [InlineData("Shared/Queries", true, true)]
+    [InlineData("Shared/Queries", false, true)]
+    [InlineData("src/App/sqlsource.json", false, false)]
+    [InlineData("src/App/New.sql", false, false)]
+    public void Classify_NewContentForAListedFileOutsideTheProject_IsEvaluate(string path, bool solution, bool isFolder)
+    {
+        using var temp = new TempFolder();
+        var set = RepositorySet(temp, solution);
+        var full = temp.PathOf("r/" + path);
+
+        set.Classify(new FileChange(FileChangeKind.Created, full, isFolder)).ShouldBe(WatchEffect.Evaluate);
+        set.Classify(new FileChange(FileChangeKind.Renamed, full, isFolder, temp.PathOf("r/Shared/Old.txt")))
+            .ShouldBe(WatchEffect.Evaluate);
+    }
+
+    // A .sql or C# file, or a folder, only in the folder of a listed file; a settings file only there or above it.
+    [Theory]
+    [InlineData("src/New.sql", false)]
+    [InlineData("New.cs", false)]
+    [InlineData("src/Queries", true)]
+    [InlineData("Other/sqlsource.json", false)]
+    [InlineData("Shared/Queries/sqlsource.json", false)]
+    [InlineData("Shared/Orders.txt", false)]
+    [InlineData("src/sqlsource.json", true)]
+    public void Classify_NewContentThatNoListedFileReaches_IsNone(string path, bool isFolder)
+    {
+        using var temp = new TempFolder();
+        var set = RepositorySet(temp, solution: false);
+
+        set.Classify(new FileChange(FileChangeKind.Created, temp.PathOf("r/" + path), isFolder))
+            .ShouldBe(WatchEffect.None);
+    }
+
+    // The folders above a listed file outside every project's folder, up to the repository's root, are watched, so
+    // that a settings file made there is seen.
+    [Fact]
+    public void Folders_FoldersAboveAListedFileOutsideTheProject_AreWatched()
+    {
+        using var temp = new TempFolder();
+        _ = temp.CreateFolder("r/.git");
+        var app = temp.CreateFolder("r/App");
+        var libs = temp.CreateFolder("r/libs");
+        var shared = temp.CreateFolder("r/libs/Shared");
+        var project = Path.Combine(app, "App.csproj");
+
+        var set = Of(project, app, [project], [Manifest(project, [Path.Combine(shared, "Common.sql")], [], [])]);
+
+        set.Folders.ShouldBe(
+            [(app, true), (temp.PathOf("r"), false), (libs, false), (shared, false)],
+            ignoreOrder: true
+        );
+        set.Classify(Created(Path.Combine(libs, "sqlsource.json"))).ShouldBe(WatchEffect.Evaluate);
+    }
+
     // A new .sql file changes nothing in a project without the package until the package is added, which is a save of
     // its project file.
     [Fact]
