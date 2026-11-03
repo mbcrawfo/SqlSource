@@ -43,11 +43,6 @@ internal static class QueryMethodWriter
     /// </summary>
     internal const string VectorType = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
 
-    // DbCommand and DbDataReader are IAsyncDisposable, whose ConfigureAwait is an extension method.  The generated file
-    // imports no namespace, so it is called by its class.
-    private const string ConfigureAwaitOfDisposable =
-        "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(";
-
     /// <summary>
     /// Appends the documentation comment and the method.
     /// </summary>
@@ -116,7 +111,7 @@ internal static class QueryMethodWriter
         _ = builder
             .Append(");\n\n")
             .Append(bodyIndent)
-            .Append("static async ")
+            .Append(AsyncSpelling.IteratorModifiers)
             .Append(GetResultType(in context))
             .Append(' ')
             .Append(locals.Iterator)
@@ -151,13 +146,11 @@ internal static class QueryMethodWriter
             .Append(locals.Connection)
             .Append(".State == global::System.Data.ConnectionState.Closed;\n");
         AppendIf(builder, indent, locals.WasClosed);
-        _ = builder
-            .Append(blockIndent)
-            .Append("await ")
-            .Append(locals.Connection)
-            .Append(".OpenAsync(")
-            .Append(MethodArguments.CancellationToken)
-            .Append(").ConfigureAwait(false);\n");
+        _ = builder.Append(blockIndent);
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, locals.Connection, "OpenAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
         AppendEnd(builder, indent);
         _ = builder.Append('\n').Append(indent).Append("try\n").Append(indent).Append("{\n");
 
@@ -186,12 +179,9 @@ internal static class QueryMethodWriter
 
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
         AppendIf(builder, blockIndent, locals.WasClosed);
-        _ = builder
-            .Append(blockIndent)
-            .Append(GeneratedText.Indent)
-            .Append("await ")
-            .Append(locals.Connection)
-            .Append(".CloseAsync().ConfigureAwait(false);\n");
+        _ = builder.Append(blockIndent).Append(GeneratedText.Indent);
+        _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Connection, "CloseAsync");
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
         AppendEnd(builder, blockIndent);
         AppendEnd(builder, indent);
     }
@@ -255,13 +245,7 @@ internal static class QueryMethodWriter
         }
         else
         {
-            _ = builder.Append(" async global::System.Threading.Tasks.Task");
-            if (GetResultType(in context) is { } resultType)
-            {
-                _ = builder.Append('<').Append(resultType).Append('>');
-            }
-
-            _ = builder.Append(' ');
+            _ = AsyncSpelling.AppendTaskType(builder, GetResultType(in context)).Append(' ');
         }
 
         _ = builder.Append(context.Method.Name).Append("(\n");
@@ -425,7 +409,7 @@ internal static class QueryMethodWriter
             .Append(" = ")
             .Append(locals.Connection)
             .Append(".CreateCommand();\n");
-        AppendScope(in context, indent, locals.CommandScope, locals.Command);
+        _ = AsyncSpelling.AppendUsing(builder, indent, locals.CommandScope, locals.Command);
         _ = builder
             .Append(builtAtRunTime ? indent + SqlFromTokensStart : string.Empty)
             .Append(indent)
@@ -458,27 +442,22 @@ internal static class QueryMethodWriter
         var locals = context.Locals;
         if (method.Shape is ResultShape.None or ResultShape.RowCount)
         {
-            _ = builder
-                .Append(indent)
-                .Append(method.Shape == ResultShape.RowCount ? "return await " : "await ")
-                .Append(locals.Command)
-                .Append(".ExecuteNonQueryAsync(")
-                .Append(MethodArguments.CancellationToken)
-                .Append(").ConfigureAwait(false);\n");
+            _ = builder.Append(indent).Append(method.Shape == ResultShape.RowCount ? "return " : string.Empty);
+            _ = AsyncSpelling
+                .AppendAwaitedCall(builder, locals.Command, "ExecuteNonQueryAsync")
+                .Append(MethodArguments.CancellationToken);
+            _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
             return;
         }
 
         var output = method.Output!;
-        _ = builder
-            .Append(indent)
-            .Append("var ")
-            .Append(locals.Reader)
-            .Append(" = await ")
-            .Append(locals.Command)
-            .Append(".ExecuteReaderAsync(global::System.Data.CommandBehavior.Default, ")
-            .Append(MethodArguments.CancellationToken)
-            .Append(").ConfigureAwait(false);\n");
-        AppendScope(in context, indent, locals.ReaderScope, locals.Reader);
+        _ = builder.Append(indent).Append("var ").Append(locals.Reader).Append(" = ");
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, locals.Command, "ExecuteReaderAsync")
+            .Append("global::System.Data.CommandBehavior.Default, ")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = AsyncSpelling.AppendUsing(builder, indent, locals.ReaderScope, locals.Reader);
 
         // A streaming method yields each row as it reads it, where any other reads them into its buffer and returns
         // the collection.
@@ -643,23 +622,13 @@ internal static class QueryMethodWriter
         }
     }
 
-    private static void AppendScope(in QueryMethodContext context, string indent, string scope, string disposable) =>
-        _ = context
-            .Builder.Append(indent)
-            .Append("await using var ")
-            .Append(scope)
-            .Append(" = ")
-            .Append(ConfigureAwaitOfDisposable)
-            .Append(disposable)
-            .Append(", false);\n");
-
-    private static void AppendRead(in QueryMethodContext context) =>
-        _ = context
-            .Builder.Append("await ")
-            .Append(context.Locals.Reader)
-            .Append(".ReadAsync(")
-            .Append(MethodArguments.CancellationToken)
-            .Append(").ConfigureAwait(false)");
+    private static void AppendRead(in QueryMethodContext context)
+    {
+        _ = AsyncSpelling
+            .AppendAwaitedCall(context.Builder, context.Locals.Reader, "ReadAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling.AppendAwaitedEnd(context.Builder);
+    }
 
     private static void AppendThrow(in QueryMethodContext context, string indent, bool moreThanOne) =>
         _ = context

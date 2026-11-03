@@ -114,10 +114,10 @@ internal static class ExecutionCapabilityWriter
             .Append(" is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))\n")
             .Append(indent)
             .Append("{\n")
-            .Append(blockIndent)
-            .Append("await ")
-            .Append(locals.Reader)
-            .Append(".DisposeAsync().ConfigureAwait(false);\n")
+            .Append(blockIndent);
+        _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Reader, "DisposeAsync");
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = builder
             .Append(blockIndent)
             .Append("if (")
             .Append(locals.Transaction)
@@ -220,15 +220,9 @@ internal static class ExecutionCapabilityWriter
     private static void AppendDrainLoop(in QueryMethodContext context, string indent, string token)
     {
         var builder = context.Builder;
-        _ = builder
-            .Append(indent)
-            .Append("while (await ")
-            .Append(context.Locals.Reader)
-            .Append(".NextResultAsync(")
-            .Append(token)
-            .Append(").ConfigureAwait(false))\n")
-            .Append(indent)
-            .Append("{\n");
+        _ = builder.Append(indent).Append("while (");
+        _ = AsyncSpelling.AppendAwaitedCall(builder, context.Locals.Reader, "NextResultAsync").Append(token);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(")\n").Append(indent).Append("{\n");
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 }
