@@ -74,7 +74,8 @@ internal sealed class WatchSession
     // The changes that came since the last pass began, and what they ask, those that came during the evaluation under
     // way, null when there is none, which are read when it ends, and the failures that the loop has not reported yet.
     // Also the folders that have a watch, as the loop last opened them, and those of them whose folder a change
-    // removed, whose watch the next evaluation closes.  Guarded by _gate, as _set is.
+    // removed, whose watch the next evaluation closes.  Guarded by _gate, as _set is.  No watch is made or closed while
+    // _gate is held: a watch's callbacks take it, and closing a watch may wait for a callback that is running.
     private readonly object _gate = new();
     private readonly HashSet<string> _gone = [with(RunProjects.PathComparer)];
     private readonly List<WatchFailure> _failures = [];
@@ -484,17 +485,24 @@ internal sealed class WatchSession
             return;
         }
 
+        var dead = new List<IDisposable>();
         lock (_gate)
         {
             foreach (var folder in _stale)
             {
-                if (_watches.Remove(folder, out var dead))
+                if (_watches.Remove(folder, out var stale) && stale.Watch is { } watch)
                 {
-                    dead.Watch?.Dispose();
+                    dead.Add(watch);
                 }
             }
 
             _stale.Clear();
+        }
+
+        // After the lock: closing a watch may wait for a callback of it, which may wait for the lock.
+        foreach (var watch in dead)
+        {
+            watch.Dispose();
         }
 
         var poll = PollsForChanges();

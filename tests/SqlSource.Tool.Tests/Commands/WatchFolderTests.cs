@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Testing;
@@ -215,6 +216,78 @@ public sealed class WatchFolderTests : IAsyncDisposable
         watch.Errors.Split('\n').Count(line => line.Contains("error SQLSRC287", StringComparison.Ordinal)).ShouldBe(1);
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
         WatchTests.PassStarts(watch.Run.Folder.PathOf("run.log")).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
+    }
+
+    // A stale poller closed while it reports a change: its report waits for the session's lock, and closing it waits
+    // for its report, so the session must not hold the lock while it closes a watch.  The poll is held inside its
+    // report until the close begins, which forces the one order that would hang.
+    [Fact]
+    public async Task Watch_StalePollerClosedWhileItReports_DoesNotHang()
+    {
+        WriteSettings();
+        _watch.Run.Environment[WatchSession.PollingVariable] = "true";
+        using var reporting = new ManualResetEventSlim();
+        using var closing = new ManualResetEventSlim();
+        var held = false;
+        _watch.Run.Watch = request =>
+        {
+            if (request.Folder != _shared)
+            {
+                return _watch.Watcher.Watch(request);
+            }
+
+            if (held)
+            {
+                return new PollingFolderWatcher(request, _watch.Clock, PollingFolderWatcher.Interval);
+            }
+
+            held = true;
+            var poller = new PollingFolderWatcher(
+                request with
+                {
+                    Changed = change =>
+                    {
+                        if (!reporting.IsSet)
+                        {
+                            reporting.Set();
+                            _ = closing.Wait(Eventually.Patience, TestContext.Current.CancellationToken);
+                        }
+
+                        request.Changed(change);
+                    },
+                },
+                _watch.Clock,
+                PollingFolderWatcher.Interval
+            );
+            return new OnDispose(() =>
+            {
+                closing.Set();
+                poller.Dispose();
+            });
+        };
+        await StartAsync();
+        _ = _watch.Run.Folder.WriteFile("libs/Shared/New.sql", "SELECT 1;");
+
+        var poll = Task.Run(() => _watch.Clock.Advance(PollingFolderWatcher.Interval), CancellationToken.None);
+        await Eventually.TrueAsync(() => reporting.IsSet, "The poll did not report the new file.");
+        _watch.Raise(Deleted(_shared));
+        await Eventually.TrueAsync(() => _watch.Clock.PendingTimers > 1, "The watch did not begin to wait.");
+        var pass = Task.Run(() => _watch.Clock.Advance(WatchSession.Debounce), CancellationToken.None);
+
+        _ = await Eventually.WithinAsync(
+            Task.WhenAll(poll, pass).ContinueWith(_ => true, TaskScheduler.Default),
+            "The session hung closing a poller that was reporting a change.",
+            TimeSpan.FromSeconds(30)
+        );
+        await _watch.PassesAsync(2);
+        closing.IsSet.ShouldBeTrue();
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
+    // Runs the action when it is disposed.
+    private sealed class OnDispose(Action action) : IDisposable
+    {
+        public void Dispose() => action();
     }
 
     // Waits for the session's timer beside the pollers', moves the clock past it, and waits for the pass.
