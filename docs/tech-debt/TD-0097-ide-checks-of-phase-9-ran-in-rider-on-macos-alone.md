@@ -28,7 +28,7 @@ The procedure needs no database: the sample's sidecars are written in advance, a
 ### Setting up
 
 1. On each machine, from a checkout of the repository, pack the generator into a folder of its own: `dotnet pack src/SqlSource/SqlSource.csproj --output ~/sqlsource-spike-feed`.  The package is `SqlSource.<VersionPrefix>-dev.nupkg`; the sample's `Sample.csproj` names `0.1.0-dev`, so change it if `VersionPrefix` in `Directory.Build.props` has moved.  The sample's sidecars are of `formatVersion` 1, written by the tool `0.1.0` against `postgres:18.6`.
-2. Save the script below as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash, or run it on another machine and copy the folder and the feed across, then change the two paths in the sample's `nuget.config`.  The sample must be outside the repository.
+2. Save the script below as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash, or run it on another machine and copy the folder and the feed across, then change the two paths in the sample's `nuget.config`.  The sample must be outside the repository.  The script gives the sample a packages folder of its own beside it, `~/sqlsource-spike-sample-packages`, so that it restores the package just packed; delete that folder before restoring a new pack of the same version.
 3. In the sample's folder, run `dotnet build`.  It fails with one error, on purpose: `Queries/Orders.sql(1,10): error SQLSRC241: ...`, since `Orders.sql` has no sidecar yet.
 4. Record the machine, the system, `dotnet --version` in the sample, and the version of each IDE and of VS Code's C# extension and C# Dev Kit.
 
