@@ -11,7 +11,7 @@ namespace SqlSource.Generation.Methods;
 /// What the generated methods of every type, compared, leave out: the methods that clash with another type's
 /// (<c>SQLSRC274</c>), and the types whose extension class cannot be written (<c>SQLSRC276</c>).
 /// </summary>
-/// <param name="Dropped">The methods to leave out, by their type's key, then by place.</param>
+/// <param name="Dropped">The methods to leave out, by their type's key, then by name.</param>
 /// <param name="BlockedTypes">The keys of the types that get no extension class, in ordinal order.</param>
 /// <param name="Diagnostics">The problems, each once, in the order of <see cref="MethodPlanner.Distinct" />.</param>
 internal sealed record MethodConflicts(
@@ -66,8 +66,7 @@ internal sealed record MethodConflicts(
             new EquatableArray<DroppedMethod>(
                 dropped
                     .OrderBy(static method => method.TypeKey, StringComparer.Ordinal)
-                    .ThenBy(static method => method.NameLocation.Path, StringComparer.Ordinal)
-                    .ThenBy(static method => method.NameLocation.Span.Start)
+                    .ThenBy(static method => method.Name, StringComparer.Ordinal)
                     .ToImmutableArray()
             ),
             new EquatableArray<string>(blocked.OrderBy(static key => key, StringComparer.Ordinal).ToImmutableArray()),
@@ -77,18 +76,18 @@ internal sealed record MethodConflicts(
         );
     }
 
-    /// <summary>The places of the type's methods to leave out.  Almost always none.</summary>
-    public EquatableArray<LocationInfo> DroppedOf(string typeKey)
+    /// <summary>The names of the type's methods to leave out, in ordinal order.  Almost always none.</summary>
+    public EquatableArray<string> DroppedOf(string typeKey)
     {
         if (Dropped.Count == 0)
         {
-            return EquatableArray<LocationInfo>.Empty;
+            return EquatableArray<string>.Empty;
         }
 
-        return new EquatableArray<LocationInfo>(
+        return new EquatableArray<string>(
             Dropped
                 .Where(method => string.Equals(method.TypeKey, typeKey, StringComparison.Ordinal))
-                .Select(static method => method.NameLocation)
+                .Select(static method => method.Name)
                 .ToImmutableArray()
         );
     }
@@ -197,7 +196,7 @@ internal sealed record MethodConflicts(
                     continue;
                 }
 
-                dropped.Add(new DroppedMethod(method.TypeKey, method.NameLocation));
+                dropped.Add(new DroppedMethod(method.TypeKey, method.Name));
                 diagnostics.Add(
                     DiagnosticInfo.Create(
                         SqlDiagnostics.MethodNameTaken,
@@ -265,7 +264,10 @@ internal sealed record MethodConflicts(
     }
 }
 
-/// <summary>A method that a clash leaves out.</summary>
+/// <summary>
+/// A method that a clash leaves out, known by its type and its name, which is unique in the type once
+/// <see cref="MethodPlanner" /> has planned it.
+/// </summary>
 /// <param name="TypeKey">The type, as <see cref="TypeMethods.TypeKey" /> gives it.</param>
-/// <param name="NameLocation">The method's <see cref="QueryMethod.NameLocation" />.</param>
-internal sealed record DroppedMethod(string TypeKey, LocationInfo NameLocation);
+/// <param name="Name">The method's <see cref="QueryMethod.Name" />.</param>
+internal sealed record DroppedMethod(string TypeKey, string Name);
