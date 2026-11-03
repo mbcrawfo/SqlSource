@@ -88,7 +88,7 @@ flowchart TD
 
 [`RunUnitFinder.Find`](../../src/SqlSource.Tool/Projects/RunUnitFinder.cs) resolves the path of the command line that does not end in `.sql`, or the working directory, to a `RunUnit`: a `.sln`, `.slnx` or `.csproj` file, or the one such file in a directory, looked for among the directory's files alone.  It returns an `Outcome`, and `PlanUnitAsync` reports its failure.  The path arrives as a `UsageValue`, and an error names it with `UsageValue.NamedAsPath`: the full path in quotes, or `The path at position <n>` when the token holds `=` or `;`, which a connection string typed in its place would.  The rule reads the token and not the full path, so a working directory that holds `=` is still printed.  `RunProjects.FindAsync` names a `--project` value and `RunFilters.Create` a `.sql` path the same way, and a file that several paths name is named by the first.
 
-[`RunProjects.FindAsync`](../../src/SqlSource.Tool/Projects/RunProjects.cs) gives the [manifests](README.md#manifest) of the run's projects.  A solution's projects come from [`SolutionReader`](../../src/SqlSource.Tool/Projects/SolutionReader.cs), the C# projects only, with `Microsoft.VisualStudio.SolutionPersistence`, the library the `dotnet` command reads solutions with.  `--project` keeps the ones it names, in the unit's order, which is the ordinal order that `SolutionReader` gives.  `ProjectEvaluator` evaluates the rest, and `RunProjects` reports what each evaluation says, in the order of the projects: what a user sees of it is in the manual's [arguments](../manual/tool.md#arguments).  A run with no manifest left ends after `PlanUnitAsync`, and says so on standard output when nothing was reported.
+[`RunProjects.FindAsync`](../../src/SqlSource.Tool/Projects/RunProjects.cs) gives the run's projects and the [manifests](README.md#manifest) of those that use SqlSource, as a `FoundProjects`; a watch watches the folder of each project, with a manifest or not.  A solution's projects come from [`SolutionReader`](../../src/SqlSource.Tool/Projects/SolutionReader.cs), the C# projects only, with `Microsoft.VisualStudio.SolutionPersistence`, the library the `dotnet` command reads solutions with.  `--project` keeps the ones it names, in the unit's order, which is the ordinal order that `SolutionReader` gives.  `ProjectEvaluator` evaluates the rest, and `RunProjects` reports what each evaluation says, in the order of the projects: what a user sees of it is in the manual's [arguments](../manual/tool.md#arguments).  A run with no manifest left ends after `PlanUnitAsync`, and says so on standard output when nothing was reported.
 
 ### Evaluating a project
 
@@ -213,11 +213,11 @@ flowchart TD
 
 ### The steps a pass reuses
 
-The action that `DescribeCommand.Bind` gives the command checks `DescribeCommand.Watches` first.  A watch finds its unit with `DescribeCommand.FindUnit`, reported on the run's reporter when there is none, and hands it to [`WatchSession.RunAsync`](../../src/SqlSource.Tool/Watching/WatchSession.cs), which returns only by the cancellation of the run's token.  A run's first half is three steps that a pass calls one by one: `FindUnit`, `FindManifestsAsync`, which runs `RunProjects.FindAsync` with the `--project` values, and `PlanFromAsync`, which plans the manifests with the `.sql` paths and `--database` as filters; `PlanUnitAsync` is the three in a row.  Its second half is `DescribePlanAsync`, which runs `DescribeRun.RunAsync` in the mode it is given.  So a pass narrows by the same filters as a run, and takes `--connection` and `--verbose` from the same `Usage` and trace.
+The action that `DescribeCommand.Bind` gives the command checks `DescribeCommand.Watches` first.  A watch finds its unit with `DescribeCommand.FindUnit`, reported on the run's reporter when there is none, and hands it to [`WatchSession.RunAsync`](../../src/SqlSource.Tool/Watching/WatchSession.cs), which returns only by the cancellation of the run's token.  A run's first half is three steps that a pass calls one by one: `FindUnit`, `FindManifestsAsync`, which runs `RunProjects.FindAsync` with the `--project` values and gives its `FoundProjects`, and `PlanFromAsync`, which plans the manifests with the `.sql` paths and `--database` as filters; `PlanUnitAsync` is the three in a row.  Its second half is `DescribePlanAsync`, which runs `DescribeRun.RunAsync` in the mode it is given.  So a pass narrows by the same filters as a run, and takes `--connection` and `--verbose` from the same `Usage` and trace.
 
 ### The session
 
-A `WatchSession` keeps the manifests of its last evaluation, and the `WatchSet` made from them.  Every pass plans again from the manifests it keeps, with `PlanFromAsync`, and runs the manifest targets again first, with `FindManifestsAsync`, only when one of these holds:
+A `WatchSession` keeps the manifests of its last evaluation, and the `WatchSet` made from them and from the evaluation's projects.  Every pass plans again from the manifests it keeps, with `PlanFromAsync`, and runs the manifest targets again first, with `FindManifestsAsync`, only when one of these holds:
 
 - it is the first pass;
 - a change since the last pass asked for it, `WatchEffect.Evaluate`;
@@ -238,7 +238,7 @@ The wait ends once `WatchSession.Debounce`, 300 ms, has passed by `ToolHost.Time
 
 ### What is watched
 
-[`WatchSet`](../../src/SqlSource.Tool/Watching/WatchSet.cs) is pure: it reads nothing but the `.git` markers that `DotEnvSearch.FoldersOf` looks for, and compares paths ignoring case, as `RunProjects.PathComparer` does.  `WatchSet.Folders` is the unit's folder and each project's folder, each with the folders below it, and each other folder that holds a listed file, a `.sql` file, a settings file or a `Compile` item of a manifest, or that is one of `DotEnvSearch.FoldersOf` of the unit's or of a project's folder, alone.  None is below another that is watched with its folders below, and the list is in ordinal order, so that two sets compare.
+[`WatchSet`](../../src/SqlSource.Tool/Watching/WatchSet.cs) is pure: it reads nothing but the `.git` markers that `DotEnvSearch.FoldersOf` looks for, and compares paths ignoring case, as `RunProjects.PathComparer` does.  `WatchSet.Folders` is the unit's folder and the folder of each project the evaluation asked about, with a manifest or not, each with the folders below it, so that a project that was not restored or does not use SqlSource yet still starts a pass when that changes, and each other folder that holds a listed file, a `.sql` file, a settings file or a `Compile` item of a manifest, or that is one of `DotEnvSearch.FoldersOf` of the unit's or of a project's folder, alone.  None is below another that is watched with its folders below, and the list is in ordinal order, so that two sets compare.
 
 `WatchSet.Classify` gives each change its `WatchEffect`, by the first rule that holds:
 
@@ -247,7 +247,7 @@ The wait ends once `WatchSession.Debounce`, 300 ms, has passed by `ToolHost.Time
 | A path that is ignored, below | `None` |
 | A listed path, written: a `Changed`, a `Created`, or a `Renamed` to it | `Describe` |
 | A file that is the unit, a `.csproj`, `.sln` or `.slnx` file, a `Directory.Build.props`, `Directory.Build.targets` or `Directory.Packages.props`, or a `project.assets.json`, of any kind | `Evaluate` |
-| A `.sql`, `.cs` or `sqlsource.json` file, or a folder, created or renamed to under a project's folder | `Evaluate` |
+| A `.sql`, `.cs` or `sqlsource.json` file, or a folder, created or renamed to under the folder of a project with a manifest: in one without, nothing changes until the package is added, a save of its project file | `Evaluate` |
 | A `.env` file in a folder of `DotEnvSearch.FoldersOf` of the unit's folder, of any kind | `Describe` |
 | Anything else | `None` |
 

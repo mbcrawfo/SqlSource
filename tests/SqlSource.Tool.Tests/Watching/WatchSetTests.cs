@@ -48,7 +48,12 @@ public sealed class WatchSetTests
         };
 
     private static WatchSet AppSet() =>
-        WatchSet.Of(AppProject, AppFolder, [Manifest(AppProject, [Users, Common], [Settings], [Compiled])]);
+        WatchSet.Of(
+            AppProject,
+            AppFolder,
+            [AppProject],
+            [Manifest(AppProject, [Users, Common], [Settings], [Compiled])]
+        );
 
     [Theory]
     [InlineData("App/Queries/Users.sql")]
@@ -284,7 +289,12 @@ public sealed class WatchSetTests
         var root = P("bin/w");
         var project = Path.Combine(root, "App", "App.csproj");
         var users = Path.Combine(root, "App", "Users.sql");
-        var set = WatchSet.Of(project, Path.GetDirectoryName(project)!, [Manifest(project, [users], [], [])]);
+        var set = WatchSet.Of(
+            project,
+            Path.GetDirectoryName(project)!,
+            [project],
+            [Manifest(project, [users], [], [])]
+        );
 
         set.Classify(Changed(users)).ShouldBe(WatchEffect.Describe);
     }
@@ -361,6 +371,7 @@ public sealed class WatchSetTests
         var set = WatchSet.Of(
             project,
             app,
+            [project],
             [
                 Manifest(
                     project,
@@ -383,7 +394,7 @@ public sealed class WatchSetTests
         var src = temp.CreateFolder("repo/src");
         var app = temp.CreateFolder("repo/src/App");
         var project = Path.Combine(app, "App.csproj");
-        var set = WatchSet.Of(project, app, [Manifest(project, [Path.Combine(app, "Users.sql")], [], [])]);
+        var set = WatchSet.Of(project, app, [project], [Manifest(project, [Path.Combine(app, "Users.sql")], [], [])]);
 
         set.Folders.ShouldBe([(app, true), (repo, false), (src, false)], ignoreOrder: true);
         set.Folders.Select(entry => entry.Folder)
@@ -404,6 +415,7 @@ public sealed class WatchSetTests
         var set = WatchSet.Of(
             Path.Combine(root, "Sol.sln"),
             root,
+            [projectA, projectB],
             [
                 Manifest(projectA, [Path.Combine(a, "Q", "A.sql")], [], []),
                 Manifest(projectB, [Path.Combine(b, "B.sql")], [Path.Combine(root, "sqlsource.json")], []),
@@ -423,6 +435,7 @@ public sealed class WatchSetTests
         var set = WatchSet.Of(
             project,
             app,
+            [project],
             [
                 Manifest(
                     project,
@@ -436,6 +449,38 @@ public sealed class WatchSetTests
         set.Folders.Length.ShouldBe(2);
     }
 
+    // A project of the solution outside its folder, which has no manifest: not restored, or without the package yet.
+    // Its restore, the package added to its project file, or a Directory.Build.props of its own must still start a
+    // pass.
+    [Fact]
+    public void Folders_ProjectWithoutAManifestOutsideTheSolutionsFolder_IsWatchedWithItsFoldersBelow()
+    {
+        using var temp = new TempFolder();
+        _ = temp.CreateFolder("r/.git");
+        var root = temp.PathOf("r");
+        var build = temp.CreateFolder("r/build");
+        var src = temp.CreateFolder("r/src");
+        var other = temp.CreateFolder("r/src/Other");
+        var set = WatchSet.Of(Path.Combine(build, "App.sln"), build, [Path.Combine(other, "Other.csproj")], []);
+
+        set.Folders.ShouldBe([(build, true), (root, false), (src, false), (other, true)], ignoreOrder: true);
+        set.Classify(Created(Path.Combine(other, "obj", "project.assets.json"))).ShouldBe(WatchEffect.Evaluate);
+        set.Classify(Changed(Path.Combine(other, "Other.csproj"))).ShouldBe(WatchEffect.Evaluate);
+        set.Classify(Changed(Path.Combine(src, "Directory.Build.props"))).ShouldBe(WatchEffect.Evaluate);
+    }
+
+    // A new .sql file changes nothing in a project without the package until the package is added, which is a save of
+    // its project file.
+    [Fact]
+    public void Classify_NewSqlFileInAProjectWithoutAManifest_IsNone()
+    {
+        var other = P("Other");
+        var set = WatchSet.Of(AppProject, AppFolder, [AppProject, P("Other/Other.csproj")], []);
+
+        set.Folders.ShouldContain((other, true));
+        set.Classify(Created(P("Other/New.sql"))).ShouldBe(WatchEffect.None);
+    }
+
     [Fact]
     public void Of_SameInputs_GiveEqualFolders()
     {
@@ -447,6 +492,8 @@ public sealed class WatchSetTests
             Manifest(project, [Path.Combine(temp.PathOf("w/Shared"), "A.sql"), Path.Combine(app, "B.sql")], [], []),
         ];
 
-        WatchSet.Of(project, app, manifests).Folders.ShouldBe(WatchSet.Of(project, app, manifests).Folders);
+        WatchSet
+            .Of(project, app, [project], manifests)
+            .Folders.ShouldBe(WatchSet.Of(project, app, [project], manifests).Folders);
     }
 }

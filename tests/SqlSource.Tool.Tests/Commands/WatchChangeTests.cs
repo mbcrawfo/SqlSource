@@ -93,6 +93,37 @@ public sealed class WatchChangeTests : IAsyncDisposable
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
+    // A project of the solution outside the solution's folder, which has no manifest while it is not restored: its
+    // restore still starts a pass, which describes it.
+    [Fact]
+    public async Task Watch_RestoreOfAProjectOutsideTheSolutionsFolder_RunsTheManifestTarget()
+    {
+        await using var watch = new WatchScene("src/Other");
+        _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
+        _ = watch.Run.Folder.WriteFile(
+            "build/App.slnx",
+            "<Solution><Project Path=\"../src/Other/App.csproj\" /></Solution>"
+        );
+        var project = watch.Run.Processes.Projects[watch.Project.ProjectPath];
+        var assets = watch.Project.PathOf("obj/project.assets.json");
+        project.Imported = "";
+        project.ProjectAssetsFile = assets;
+        project.PackageReferences.Add("SqlSource");
+        await watch.StartAsync("build/App.slnx");
+        watch.Errors.ShouldContain($"error SQLSRC220: '{watch.Project.ProjectPath}' has not been restored");
+        var manifestRuns = watch.ManifestRuns;
+
+        project.Imported = "true";
+        _ = watch.Run.Folder.WriteFile("src/Other/obj/project.assets.json", "{}");
+        await watch.ChangeAsync(Created(assets));
+
+        watch.ManifestRuns.ShouldBeGreaterThan(manifestRuns);
+        watch.Output.ShouldEndWith(
+            $"postgres (postgres): 1 described, 0 skipped, 0 failed\n{WatchSession.WatchingMarker}\n"
+        );
+        (await watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     // The .env is read again for each pass, without the manifest target.
     [Fact]
     public async Task Watch_DotEnvWritten_TheNextPassUsesItsValue()

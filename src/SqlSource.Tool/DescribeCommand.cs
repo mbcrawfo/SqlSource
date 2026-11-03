@@ -437,7 +437,7 @@ internal static class DescribeCommand
             return null;
         }
 
-        var manifests = await FindManifestsAsync(unit, usage, host, reporter, cancellationToken);
+        var manifests = (await FindManifestsAsync(unit, usage, host, reporter, cancellationToken)).Manifests;
         return await PlanFromAsync(unit, manifests, usage, host, reporter, cancellationToken) is { } plan
             ? (unit, plan)
             : null;
@@ -463,10 +463,10 @@ internal static class DescribeCommand
     }
 
     /// <summary>
-    /// The manifests of the projects of the unit that the command line runs, which <c>--project</c> narrows: the
-    /// evaluation of each, and its manifest target.  A project with an error is reported and left out.
+    /// The projects of the unit that the command line runs, which <c>--project</c> narrows, and their manifests: the
+    /// evaluation of each, and its manifest target.  A project with an error is reported and has no manifest.
     /// </summary>
-    internal static Task<ImmutableArray<ProjectManifest>> FindManifestsAsync(
+    internal static Task<FoundProjects> FindManifestsAsync(
         RunUnit unit,
         Usage usage,
         ToolHost host,

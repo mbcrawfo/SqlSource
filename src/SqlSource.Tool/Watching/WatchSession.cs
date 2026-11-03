@@ -82,7 +82,7 @@ internal sealed class WatchSession
         _host = host;
         _session = session;
         _counted = counted;
-        _set = WatchSet.Of(unit.Path, _unitFolder, []);
+        _set = WatchSet.Of(unit.Path, _unitFolder, [], []);
     }
 
     /// <summary>
@@ -196,9 +196,10 @@ internal sealed class WatchSession
     {
         _evaluationFailed = true;
         var errors = reporter.Count;
-        _manifests = await DescribeCommand.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
+        var found = await DescribeCommand.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
+        _manifests = found.Manifests;
         _evaluationFailed = reporter.Count > errors;
-        var set = WatchSet.Of(_unit.Path, _unitFolder, _manifests);
+        var set = WatchSet.Of(_unit.Path, _unitFolder, found.Projects, found.Manifests);
         lock (_gate)
         {
             _set = set;

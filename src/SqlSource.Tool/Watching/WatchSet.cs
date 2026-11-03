@@ -50,7 +50,12 @@ internal sealed class WatchSet
     private readonly HashSet<string> _listed = [with(Comparer)];
     private readonly HashSet<string> _envFolders = [with(Comparer)];
 
-    private WatchSet(string unitPath, string unitFolder, ImmutableArray<ProjectManifest> manifests)
+    private WatchSet(
+        string unitPath,
+        string unitFolder,
+        ImmutableArray<string> projects,
+        ImmutableArray<ProjectManifest> manifests
+    )
     {
         _unitPath = unitPath;
         _projectFolders = [.. manifests.Select(manifest => FolderOf(manifest.ProjectPath)).Distinct(Comparer)];
@@ -62,23 +67,28 @@ internal sealed class WatchSet
         }
 
         _envFolders.UnionWith(DotEnvSearch.FoldersOf(unitFolder));
-        Folders = FoldersOf(unitFolder, manifests);
+        Folders = FoldersOf(unitFolder, projects, manifests);
     }
 
     /// <summary>
-    /// The folders to watch, sorted by ordinal comparison so that two sets compare: the unit's folder and each
-    /// project's folder with their folders below, and each other folder that holds a listed file or may hold a
-    /// <c>.env</c> or a <c>Directory.*</c> file, alone.  None is below another that is watched with its folders below,
-    /// and none is there twice.  A folder may not exist, which the session skips.
+    /// The folders to watch, sorted by ordinal comparison so that two sets compare: the unit's folder and the folder of
+    /// each project, with or without a manifest, with their folders below, and each other folder that holds a listed
+    /// file or may hold a <c>.env</c> or a <c>Directory.*</c> file, alone.  None is below another that is watched with
+    /// its folders below, and none is there twice.  A folder may not exist, which the session skips.
     /// </summary>
     public ImmutableArray<(string Folder, bool Recursive)> Folders { get; }
 
     /// <summary>
     /// Makes the set of a unit: the solution or the project <paramref name="unitPath" /> in
-    /// <paramref name="unitFolder" />, and the manifests of the projects it runs.
+    /// <paramref name="unitFolder" />, the projects it runs, and the manifests of those that use SqlSource.  A project
+    /// without a manifest is watched too, so that its restore, or the package added to it, starts a pass.
     /// </summary>
-    public static WatchSet Of(string unitPath, string unitFolder, ImmutableArray<ProjectManifest> manifests) =>
-        new(unitPath, unitFolder, manifests);
+    public static WatchSet Of(
+        string unitPath,
+        string unitFolder,
+        ImmutableArray<string> projects,
+        ImmutableArray<ProjectManifest> manifests
+    ) => new(unitPath, unitFolder, projects, manifests);
 
     /// <summary>
     /// What the change asks of the session.  A <see cref="FileChangeKind.Renamed" /> asks as much as the larger of its
@@ -222,16 +232,24 @@ internal sealed class WatchSet
 
     private static ImmutableArray<(string Folder, bool Recursive)> FoldersOf(
         string unitFolder,
+        ImmutableArray<string> projects,
         ImmutableArray<ProjectManifest> manifests
     )
     {
         var recursive = new List<string> { Trim(unitFolder) };
         var alone = new List<string>();
-        foreach (var manifest in manifests)
+        var projectFolders = projects
+            .Concat(manifests.Select(manifest => manifest.ProjectPath))
+            .Select(FolderOf)
+            .Distinct(Comparer);
+        foreach (var projectFolder in projectFolders)
         {
-            var projectFolder = FolderOf(manifest.ProjectPath);
             recursive.Add(projectFolder);
             alone.AddRange(DotEnvSearch.FoldersOf(projectFolder));
+        }
+
+        foreach (var manifest in manifests)
+        {
             alone.AddRange(
                 manifest.Files.Concat(manifest.SettingsFiles).Concat(manifest.CompileFiles).Select(FolderOf)
             );

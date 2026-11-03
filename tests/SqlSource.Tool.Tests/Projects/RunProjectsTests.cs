@@ -58,7 +58,10 @@ public sealed class RunProjectsTests : IDisposable
     private Task<ImmutableArray<ProjectManifest>> FindAsync(RunUnit unit, params string[] named) =>
         FindValuesAsync(unit, [.. named.Select((text, index) => new UsageValue(ProjectOption, text, 3 + (2 * index)))]);
 
-    private Task<ImmutableArray<ProjectManifest>> FindValuesAsync(RunUnit unit, params UsageValue[] named) =>
+    private async Task<ImmutableArray<ProjectManifest>> FindValuesAsync(RunUnit unit, params UsageValue[] named) =>
+        (await FindProjectsAsync(unit, named)).Manifests;
+
+    private Task<FoundProjects> FindProjectsAsync(RunUnit unit, params UsageValue[] named) =>
         RunProjects.FindAsync(
             unit,
             named,
@@ -379,6 +382,46 @@ public sealed class RunProjectsTests : IDisposable
 
         _runner.Requests.ShouldBeEmpty();
         _error.ToString().ShouldBe(Sqlsrc207(_b, _a));
+    }
+
+    // A watch watches every project of the run, the ones without a manifest too, and none that --project leaves out.
+    [Fact]
+    public async Task Find_Projects_AreEveryProjectAskedAboutWithOrWithoutAManifest()
+    {
+        _ = NotRestored(_a);
+        _ = DoesNotUse(_b);
+
+        var found = await FindProjectsAsync(new RunUnit(RunUnitKind.Solution, _solution));
+
+        found.Projects.ShouldBe([_a, _b, _c]);
+        found.Manifests.Select(manifest => manifest.ProjectPath).ShouldBe([_c]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectsWithProjectNamed_AreTheNamedOnes()
+    {
+        var found = await FindProjectsAsync(
+            new RunUnit(RunUnitKind.Solution, _solution),
+            new UsageValue(ProjectOption, _b, 3)
+        );
+
+        found.Projects.ShouldBe([_b]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectsOfAProject_AreThatProject()
+    {
+        _ = NotRestored(_a);
+
+        (await FindProjectsAsync(new RunUnit(RunUnitKind.Project, _a))).Projects.ShouldBe([_a]);
+    }
+
+    [Fact]
+    public async Task Find_ProjectsOfASolutionThatCannotBeRead_AreNone()
+    {
+        var solution = _folder.WriteFile("Broken.sln", "this is not a solution\n");
+
+        (await FindProjectsAsync(new RunUnit(RunUnitKind.Solution, solution))).Projects.ShouldBeEmpty();
     }
 
     [Fact]
