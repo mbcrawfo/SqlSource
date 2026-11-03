@@ -29,7 +29,7 @@ Matches the spec, with one detail it does not mention: `Planned` also carries `N
 2. Two types that claim one file share each query's place: a clash between two of them leaves the third its method (`DroppedOf_QueryOfThreeTypesWithAClashBetweenTwo_LeavesTheThirdItsMethod`, kept).
 3. The order of `Dropped` stays independent of the signatures' order (`Find_SignaturesInAnotherOrder_GiveAnEqualValue`, kept).
 4. A clash inside one type (two queries, one name) still reports `SQLSRC274` from `AddPlanned` in the same order: the corpus's `diagnostics` cases.
-5. An edit that moves a clashing query's name: `MethodOutput`'s input is now its names, equal across the move, so the type's file is not written again; no existing caching test asserts otherwise.
+5. An edit that moves a clashing query's name: the type's `TypeMethods` changes with the place, so its file is written again as today, and `CachingMethodTests` stay true.
 
 ---
 
@@ -102,7 +102,7 @@ Expected: all pass, `git status` shows no golden file changed.
 **Files:** `docs/architecture/generator.md`, `### Query methods`.
 
 - After the list of the plan's steps, the `AddPlanned` paragraph: each query's plan holds its methods, a list of one today, and `AddPlanned` names them unique within the type.
-- **Across types.**: a method is known by its type's key and its name; `DroppedMethod` holds both; the place of the query's name, which every method of one query would share, only places `SQLSRC274`.  `DroppedOf` gives the names of the type's dropped methods, so a clashing query whose name moves writes nothing again.
+- **Across types.**: a method is known by its type's key and its name; `DroppedMethod` holds both; the place of the query's name, which every method of one query would share, only places `SQLSRC274`.  `DroppedOf` gives the names of the type's dropped methods.
 - **The file.**: `MethodEmitter.Emit` keeps the methods whose names are not dropped.
 
 No AGENTS.md names `DroppedMethod`, `DroppedOf`, `Keep` or `Planned` (checked), so none changes.  Commit: `docs(architecture): query methods are known by their type and name`.
