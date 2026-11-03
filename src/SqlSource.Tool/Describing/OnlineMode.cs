@@ -9,8 +9,9 @@ internal enum OnlineMode
     Off,
 
     /// <summary>
-    /// <c>--online auto</c>: a database with no connection is left alone and the run goes on, where it would report
-    /// <c>SQLSRC213</c> otherwise.
+    /// <c>--online auto</c>: the run says it is offline, and fails nothing, when no database with a query to describe
+    /// has a connection, <c>SQLSOURCE_CONNECTION</c> is not set for several (<c>SQLSRC215</c>) and no variable that
+    /// two of them share is set (<c>SQLSRC214</c>).  Otherwise a missing connection is reported as in any run.
     /// </summary>
     Auto,
 
