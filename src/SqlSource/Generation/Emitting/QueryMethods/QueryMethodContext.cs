@@ -34,7 +34,8 @@ internal readonly struct QueryMethodContext(
     public List<string> Tokens { get; } = tokens;
 
     /// <summary>
-    /// The tokens as the list that builds the SQL writes them, as <see cref="MethodArguments.SpellTokens" /> gives them.
+    /// The tokens as the list that builds the SQL writes them, as <see cref="MethodArguments.SpellTokens" /> gives
+    /// them.
     /// </summary>
     public List<string> SpelledTokens { get; } = spelledTokens;
 

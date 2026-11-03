@@ -149,7 +149,9 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
     /// </summary>
     /// <param name="builder">The source being built.</param>
     /// <param name="indent">The whitespace that starts the method's line.</param>
-    /// <param name="host">Where the method goes, which writes <c>this</c> before the connection of an extension.</param>
+    /// <param name="host">
+    /// Where the method goes, which writes <c>this</c> before the connection of an extension.
+    /// </param>
     public void AppendDeclaration(StringBuilder builder, string indent, MethodHost host) =>
         Append(builder, indent, host.IsExtension, isIterator: false);
 
