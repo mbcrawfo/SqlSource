@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Diagnostics;
@@ -172,5 +171,5 @@ internal static class TypeEmitter
     }
 
     /// <summary>The indentation of the depth.</summary>
-    internal static string GetIndent(int depth) => string.Concat(Enumerable.Repeat(GeneratedText.Indent, depth));
+    internal static string GetIndent(int depth) => GeneratedText.IndentOf(depth);
 }

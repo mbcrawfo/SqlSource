@@ -12,7 +12,7 @@ See [emitting](../../../../docs/architecture/generator.md#emitting).
 
 ## A query method's arguments
 
-- **A query method's argument list comes only from `MethodArguments` of `Generation/Methods/MethodArguments.cs`**: its declaration, its iterator's, the call, the `<param>` documentation and the checks.  A writer never spells an argument's name, type or default, and the body names one through the constants of `MethodArguments`.  See [query methods](../../../../docs/architecture/generator.md#query-methods).
+- **A query method's argument list comes only from `MethodArguments` of `Generation/Methods/MethodArguments.cs`**: its declaration, its iterator's, the call, the `<param>` documentation and the checks.  A writer never spells an argument's name, type or default, and the body names one through the constants of `MethodArguments`, the connection and the transaction through `QueryMethodLocals`.  See [query methods](../../../../docs/architecture/generator.md#query-methods).
 
 ## Engines in a query method
 

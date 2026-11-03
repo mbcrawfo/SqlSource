@@ -6,12 +6,13 @@ using SqlSource.Generation.Methods;
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
-/// The names of the locals of a query's method and of its lambdas' parameters, none of which an argument has.  The
-/// locals that read rows are named only for a method that reads them, whose output is given, the value of a converted
-/// parameter only for a method that has one, the element of an array and its value only for a method that converts one
-/// by element, the iterator only for a method that streams, the flag of a row being yielded only for one whose
-/// <see cref="ExecutionCapabilities" /> drain when its loop is left at a row, and the exception its catch takes only
-/// for one whose capabilities check for a rollback at its read.
+/// The names of the locals of a query's method and of its lambdas' parameters, none of which an argument has, and of
+/// the connection and the transaction the method runs its query on.  The locals that read rows are named only for a
+/// method that reads them, whose output is given, the value of a converted parameter only for a method that has one,
+/// the element of an array and its value only for a method that converts one by element, the iterator only for a
+/// method that streams, the flag of a row being yielded only for one whose <see cref="ExecutionCapabilities" /> drain
+/// when its loop is left at a row, and the exception its catch takes only for one whose capabilities check for a
+/// rollback at its read.
 /// </summary>
 internal sealed class QueryMethodLocals
 {
@@ -23,6 +24,8 @@ internal sealed class QueryMethodLocals
         ExecutionCapabilities capabilities
     )
     {
+        Connection = MethodArguments.Connection;
+        Transaction = MethodArguments.Transaction;
         var names = new LocalNames(Seed(arguments));
         Sql = names.Take("sql");
         WasClosed = names.Take("wasClosed");
@@ -65,6 +68,13 @@ internal sealed class QueryMethodLocals
             ? names.Take("exception")
             : string.Empty;
     }
+
+    // The connection and the transaction the body runs the query on, today the arguments themselves.  A receiver other
+    // than the connection would take local names for them here, from the method's LocalNames, and copy into them once,
+    // at the start of the method (docs/architecture/generator.md, "Adding a kind of method").
+    public string Connection { get; }
+
+    public string Transaction { get; }
 
     public string Sql { get; }
 
