@@ -239,8 +239,9 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC285](#sqlsrc285) | .env file cannot be read |
 | [SQLSRC286](#sqlsrc286) | Connection in .env cannot be read |
+| [SQLSRC287](#sqlsrc287) | The watcher failed |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271, 285 and 286 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 287 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -2900,3 +2901,19 @@ The reason is one of six:
 Fix the line named; for `it is not saved as UTF-8`, save the file as UTF-8 with the "Save with encoding" command of your editor.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
 
 See: [A `.env` file](tool.md#env-file)
+
+## SQLSRC287
+
+**The watcher failed**
+
+`sqlsource describe --watch` asks the system to tell it when a file changes, and the system refused to watch a folder or failed while it did.  The message names the folder and ends with the reason the system gave.  The watch goes on, and describes again at once, since the folder may have changed unseen; but it may miss later changes in that folder, so a file you save there may not be described until something else changes.  An error that repeats with the same folder and the same reason is written once in a watch.
+
+The usual cause is the limit of watched folders on Linux, which a machine with many projects, or with other tools that watch folders, can reach.
+
+```console
+sqlsource describe /work/App --watch
+/work/App : error SQLSRC287: watching '/work/App' for changes failed: The configured user limit (128) on the number of inotify watches has been reached, or the operating system failed to allocate a required resource.
+    help: set DOTNET_USE_POLLING_FILE_WATCHER=true to poll for changes instead
+```
+
+On Linux, raise the limit with `sudo sysctl fs.inotify.max_user_watches=524288`, and add `fs.inotify.max_user_watches=524288` to `/etc/sysctl.conf` to keep it.  Or set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1` before you start the watch: it then looks at the folders at a fixed interval instead of asking the system, which needs no limit and finds a change within a second or two.  Polling is also the way to watch a folder on a network share or in a container that does not pass on file changes.

@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Diagnostics;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
@@ -41,6 +42,14 @@ internal sealed class WatchSession
     /// <summary>How long a pass waits after the last change it covers: an editor's save is several events.</summary>
     internal static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(300);
 
+    /// <summary>The environment variable that makes the session poll its folders instead of watching them.</summary>
+    internal const string PollingVariable = "DOTNET_USE_POLLING_FILE_WATCHER";
+
+    private static readonly ContinuationLine PollInstead = new(
+        "help",
+        $"set {PollingVariable}=true to poll for changes instead"
+    );
+
     private readonly RunUnit _unit;
     private readonly string _unitFolder;
     private readonly Usage _usage;
@@ -51,6 +60,7 @@ internal sealed class WatchSession
     // The changes that came since the last pass began, and what they ask.  Guarded by _gate, as _set is.
     private readonly object _gate = new();
     private readonly HashSet<string> _gone = [with(RunProjects.PathComparer)];
+    private readonly HashSet<(string Folder, string Message)> _reported = [];
     private int _changes;
     private WatchEffect _effect;
     private long _lastChange;
@@ -264,12 +274,25 @@ internal sealed class WatchSession
     }
 
     // What a watch tells of its failure, a lost batch of events included, and what a watch that cannot start is: the
-    // folder may have changed unseen, so the next pass evaluates.
+    // folder may have changed unseen, so the next pass evaluates.  A lost batch of events is not reported.  Any other
+    // failure is, once for each folder and message of the session, since a limit of the system raises the same error
+    // again and again.
     private void Failed(WatchFailure failure)
     {
+        bool report;
         lock (_gate)
         {
             Keep(WatchEffect.Evaluate);
+            report = !failure.Overflow && _reported.Add((failure.Folder, failure.Message));
+        }
+
+        if (report)
+        {
+            _session.Report(
+                ToolDiagnostic
+                    .ForFile(ToolDiagnostics.WatchFailed, failure.Folder, failure.Message)
+                    .WithLines(PollInstead)
+            );
         }
     }
 
@@ -299,11 +322,12 @@ internal sealed class WatchSession
 
         CloseWatches();
         _watched = set.Folders;
+        var poll = PollsForChanges();
         foreach (var (folder, recursive) in set.Folders.Where(static entry => Directory.Exists(entry.Folder)))
         {
             try
             {
-                _watches.Add(_host.Watch(new WatchRequest(folder, recursive, Poll: false, Changed, Failed)));
+                _watches.Add(_host.Watch(new WatchRequest(folder, recursive, Poll: poll, Changed, Failed)));
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
@@ -311,6 +335,11 @@ internal sealed class WatchSession
             }
         }
     }
+
+    // True or 1, whatever the case, as the variable of .NET's own watchers is read.
+    private bool PollsForChanges() =>
+        _host.GetEnvironmentVariable(PollingVariable) is { } value
+        && (value.Equals("true", StringComparison.OrdinalIgnoreCase) || value == "1");
 
     private void CloseWatches()
     {

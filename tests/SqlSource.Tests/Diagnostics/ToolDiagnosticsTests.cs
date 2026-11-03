@@ -123,6 +123,16 @@ public sealed class ToolDiagnosticsTests
             .ShouldBe("The line that sets 'SQLSOURCE_CONNECTION_A' cannot be read: a quote is not closed");
 
     [Fact]
+    public void WatchFailed_Message_HoldsTheFolderAndTheReason() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.WatchFailed.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/App",
+                "The inotify limit was reached."
+            )
+            .ShouldBe("watching '/work/App' for changes failed: The inotify limit was reached.");
+
+    [Fact]
     public void ProjectCannotBeEvaluated_Message_HoldsTheProject() =>
         string.Format(
                 CultureInfo.InvariantCulture,
