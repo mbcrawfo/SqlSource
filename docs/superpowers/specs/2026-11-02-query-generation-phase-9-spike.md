@@ -11,7 +11,7 @@ Items 8 to 11 of the design's 9.0, and the editors' half of item 6, need an IDE,
 ### Setting up
 
 1. On each machine, from a checkout of this branch, pack the generator into a folder of its own: `dotnet pack src/SqlSource/SqlSource.csproj --output ~/sqlsource-spike-feed`.  It is `SqlSource.0.1.0-dev.nupkg`.
-2. Save the script in [TD-0097's procedure](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md#the-script) as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash; or run it on the Mac and copy the folder and the feed across, then change the path in the sample's `nuget.config`.  The sample is outside the repository, so nothing of the repository's build applies to it.
+2. Save the script in [TD-0097's procedure](../../tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md#the-script) as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash; or run it on the Mac and copy the folder and the feed across, then change the two paths in the sample's `nuget.config`.  The sample is outside the repository, so nothing of the repository's build applies to it.
 3. In the sample's folder, run `dotnet build`.  It fails with one error, on purpose: `Queries/Orders.sql(1,10): error SQLSRC241: The query 'ListOrders' has no entry in the sidecar of its file, ...`, since `Orders.sql` has no sidecar yet.
 4. Record the versions:
 
@@ -147,7 +147,7 @@ The script that writes the sample, `make-sample.sh`, is in [TD-0097](../../tech-
 
 | | Version |
 |----|----|
-| .NET SDK | 10.0.401, the repository's `global.json`; MSBuild `18.9.11+e34a38d2a` (`dotnet msbuild -version`), which reports `MSBuildVersion` `18.11.0` inside a build; the C# compiler `5.9.0-1.26423.113` |
+| .NET SDK | 10.0.401, the repository's `global.json`; MSBuild `18.9.11+e34a38d2a` (`dotnet msbuild -version`); the C# compiler `5.9.0-1.26423.113` |
 | MSBuild, cross-checks | 17.11.31, 17.14.51 and 18.11.0, for the `Exec` cases of [item 4](#4-exec-and-the-error-format) |
 | SqlSource and SqlSource.Tool | `0.1.0-dev`, packed from this branch at `adf45187` into a local feed; the tool installed through a tool manifest, as a user installs it |
 | PostgreSQL | `postgres:18.6`, for the sidecars of the sample and the real tool's runs of [item 5](#5-the-cost-of-compile-as-an-input) |
@@ -214,7 +214,7 @@ The probe's value was `Host=leak-probe-7f3a;Password=p'a$(x)ss;Database=d`.  Eac
 | The tool `0.1.0-dev` beside the package `0.1.0-other` | `0` | nothing of `dotnet`'s; the tool runs |
 
   `Exec`'s default reading takes none of `dotnet`'s lines as an error.  Two surprises: "restored" is a matter of the user's tool cache (`~/.dotnet/toolResolverCache`), not of the folder, so a manifest never restored in this folder still runs a version this user restored anywhere; and in a user profile `dotnet` had not run in, the not-restored case exited `0` or `143` in several of the first ten runs, and always `1` with `DOTNET_CLI_TELEMETRY_OPTOUT=1`, cause not found.
-- **Telling the two apart.**  Not by the exit code: the tool's errors, its usage errors and `dotnet`'s failure all exit `1`, and the last can exit `0`.  Not by `dotnet`'s words, which are localised.  What worked in nine cases and in real builds: with `IgnoreExitCode` and `ConsoleToMSBuild`, count the captured lines that only the tool writes, those starting `sqlsource:`, the `SQLSRCnnn` errors and the summary line `<database> (<engine>): ...`.  None means that the tool did not run.
+- **Telling the two apart.**  Not by the exit code: the tool's errors, its usage errors and `dotnet`'s failure all exit `1`, and the last can exit `0`.  Not by `dotnet`'s words, which are localised.  What worked in nine cases and in real builds: with `IgnoreExitCode` and `ConsoleToMSBuild`, count the captured lines that only the tool writes, those starting `sqlsource:`, the `SQLSRCnnn` errors and the summary line `<database> (<engine>): ...`.  None means that the tool did not run, but for one case this branch's review found (R3-F1): a run with nothing to describe, every query `sql` or no file claimed, exits `0` and prints nothing at all, so the design has the tool write a line of its own under `--online`.
 - **`StandardOutputImportance` `low`.**  With the console logger (`-tl:off`), the summary and the offline line show at `-v:d` and `-v:diag` only.  With the terminal logger, which `dotnet build` uses in an interactive terminal, they show at no verbosity, nor at `normal` importance.
 - **The terminal logger shows no message at `-v:m` or `-v:n`**, whatever its importance: a `<Message Importance="high">` and an `Exec` with `StandardOutputImportance="high"` showed only at `-v:d`.  A `<Warning>` showed at every verbosity.  And a target's `<Warning>` stays a warning in a project that sets `TreatWarningsAsErrors` `true`, which is the compiler's setting: the build succeeded with `warning SQLSRC099: ...`.  Only `-warnaserror` or `MSBuildTreatWarningsAsErrors=true` made it an error, and `MSBuildWarningsNotAsErrors` naming its code kept it a warning.  So the owner chose a warning: [owner decision 1](#what-the-later-sub-phases-take-from-this).
 

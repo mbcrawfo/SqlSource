@@ -28,7 +28,7 @@ The procedure needs no database: the sample's sidecars are written in advance, a
 ### Setting up
 
 1. On each machine, from a checkout of the repository, pack the generator into a folder of its own: `dotnet pack src/SqlSource/SqlSource.csproj --output ~/sqlsource-spike-feed`.  The package is `SqlSource.<VersionPrefix>-dev.nupkg`; the sample's `Sample.csproj` names `0.1.0-dev`, so change it if `VersionPrefix` in `Directory.Build.props` has moved.  The sample's sidecars are of `formatVersion` 1, written by the tool `0.1.0` against `postgres:18.6`.
-2. Save the script below as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash, or run it on another machine and copy the folder and the feed across, then change the path in the sample's `nuget.config`.  The sample must be outside the repository.
+2. Save the script below as `make-sample.sh` and run `bash make-sample.sh ~/sqlsource-spike-sample ~/sqlsource-spike-feed`.  On Windows, run it in Git Bash, or run it on another machine and copy the folder and the feed across, then change the two paths in the sample's `nuget.config`.  The sample must be outside the repository.
 3. In the sample's folder, run `dotnet build`.  It fails with one error, on purpose: `Queries/Orders.sql(1,10): error SQLSRC241: ...`, since `Orders.sql` has no sidecar yet.
 4. Record the machine, the system, `dotnet --version` in the sample, and the version of each IDE and of VS Code's C# extension and C# Dev Kit.
 
@@ -74,11 +74,19 @@ Run `dotnet run --file tools/events.cs` and wait for `watching ...`.  In each ed
 # Usage: make-sample.sh <folder> <feed>   <feed> is a folder that holds SqlSource.0.1.0-dev.nupkg.
 set -euo pipefail
 [[ $# -eq 2 ]] || { echo "usage: make-sample.sh <folder> <feed>" >&2; exit 2; }
-mkdir -p "$1" && cd "$1" && feed="$(cd "$2" && pwd)"
+# A Windows path under Git Bash, which NuGet on Windows can read; elsewhere pwd -W fails and pwd is used.
+winpwd() { pwd -W 2>/dev/null || pwd; }
+mkdir -p "$1" && cd "$1" && feed="$(cd "$2" && winpwd)"
+# A packages folder of the sample's own, beside it, so that a package packed again with the same version is restored
+# from the feed and not from the user's cache of an earlier pack.
+mkdir -p "$(pwd)-packages" && packages="$(cd "$(pwd)-packages" && winpwd)"
 mkdir -p Queries tools/sidecars .vscode
 cat >nuget.config <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
+    <config>
+        <add key="globalPackagesFolder" value="$packages" />
+    </config>
     <packageSources>
         <clear />
         <add key="spike-feed" value="$feed" />

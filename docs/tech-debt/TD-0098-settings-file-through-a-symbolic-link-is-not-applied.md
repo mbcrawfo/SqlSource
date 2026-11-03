@@ -22,7 +22,7 @@ Low.  It takes a build started through a link, which is rare outside macOS's `/t
 
 ## Proposed fix
 
-Give the compiler one spelling of each path.  Either the settings search adds each file by a path relative to the project when it is under the project's folder, as the `.sql` items are, or the generator resolves links on both sides before it compares folders, with `File.ResolveLinkTarget` for each folder, through the host the generator reads files with.  Add a test of each that builds a fixture project through a symbolic link to its folder.  Fix TD-0030 the same way if the generator's comparison is shared with the tool.
+Give the compiler one spelling of each path: the settings search adds every settings file it finds by a path relative to the project's folder, as the `.sql` items are, `../sqlsource.json` for one in the folder above as well as `sqlsource.json` for one beside the project, so that the compiler makes every path full against the same folder.  The review of 9.0 built the sample through `/tmp` with a `sqlsource.json` one folder above the project: listed by its full path through the link, 6 `SQLSRC209`; listed as `../sqlsource.json`, only the error the sample expects.  The generator itself cannot resolve links: it targets `netstandard2.0` and never touches the file system (`src/SqlSource/AGENTS.md`).  Add a test that builds a fixture project, with a settings file beside it and one above it, through a symbolic link to its folder.  TD-0030, the tool's own comparison, is a separate fix in the tool, which may resolve links.
 
 ## Trigger
 
