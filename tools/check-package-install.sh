@@ -311,8 +311,10 @@ if [[ -z "$done_line" || -z "$dispatch_line" || "$done_line" -ge "$dispatch_line
     multi_fails 'did not run the tool in the outer build before it dispatched the inner builds'
 fi
 
+# Under bin/<configuration>/: CI sets CONFIGURATION, which MSBuild reads as the property.
 for framework in netstandard2.1 net10.0; do
-    if [[ ! -f "$multi/bin/Debug/$framework/Multi.dll" ]]; then
+    compiled=("$multi"/bin/*/"$framework"/Multi.dll)
+    if [[ ! -f "${compiled[0]}" ]]; then
         multi_fails "did not compile for $framework"
     fi
 done

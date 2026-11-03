@@ -38,7 +38,12 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
 
             exitCode.ShouldBe(0, output);
             File.Exists(sidecar).ShouldBeTrue(output);
-            ShouldHoldTheModel(Path.Combine(folder, "bin", "Debug", "net10.0", "App.dll"));
+            // Under bin/<configuration>/net10.0: CI sets CONFIGURATION, which MSBuild reads as the property.
+            ShouldHoldTheModel(
+                Directory
+                    .GetFiles(Path.Combine(folder, "bin"), "App.dll", SearchOption.AllDirectories)
+                    .Single(path => Path.GetFileName(Path.GetDirectoryName(path)) == "net10.0")
+            );
         });
     }
 
