@@ -492,6 +492,28 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor DotEnvCannotBeRead = new(
+        id: "SQLSRC285",
+        title: ".env file cannot be read",
+        messageFormat: "{0} cannot be read: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc285",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor DotEnvLineCannotBeRead = new(
+        id: "SQLSRC286",
+        title: "Connection in .env cannot be read",
+        messageFormat: "The line that sets {0} cannot be read: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc286",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -539,6 +561,8 @@ internal static class ToolDiagnostics
             DynamicSql,
             TemporaryTableInBatch,
             ColumnHasNoName,
-            FileNotUtf8
+            FileNotUtf8,
+            DotEnvCannotBeRead,
+            DotEnvLineCannotBeRead
         );
 }

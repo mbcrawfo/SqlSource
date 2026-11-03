@@ -233,6 +233,13 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC284](#sqlsrc284) | Short name finds a type that only a package brings |
 
+**A `.env` file**
+
+| Id | Title |
+|----|----|
+| [SQLSRC285](#sqlsrc285) | .env file cannot be read |
+| [SQLSRC286](#sqlsrc286) | Connection in .env cannot be read |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
@@ -2855,3 +2862,40 @@ dotnet_diagnostic.SQLSRC284.severity = none
 ```
 
 See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
+
+## SQLSRC285
+
+**.env file cannot be read**
+
+`sqlsource describe` looks for a `.env` file for the connections of a run, and the file it found cannot be read: the system would not open or read it.  The message names the file and ends with the reason the system gave.  The run goes on as if the file gave no connection at all, so the databases that needed a connection from it report [SQLSRC213](#sqlsrc213), unless another source gives one.
+
+```console
+sqlsource describe /work/App
+/work/.env : error SQLSRC285: /work/.env cannot be read: Access to the path '/work/.env' is denied.
+```
+
+Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment.
+
+See: [Connections](tool.md#connections)
+
+## SQLSRC286
+
+**Connection in .env cannot be read**
+
+A line of the `.env` file sets a connection variable, `SQLSOURCE_CONNECTION` or one that starts with `SQLSOURCE_CONNECTION_`, and the tool cannot tell what it sets.  The error is at the line and the column of the variable's name, and says which variable and why.  The value is never printed, since it is a connection and holds credentials.  A line that sets any other variable is not read by the tool, and is never an error.  The run goes on as if the file gave no connection at all, even from its good lines, since a file that is partly wrong is not one to trust.
+
+The reason is one of five:
+
+- `it has no '='`: the line is the variable's name and nothing else.
+- `the key is not a valid name`: the text before the `=` starts with `SQLSOURCE_CONNECTION` but is not a name of letters, digits and `_` that does not start with a digit, such as `SQLSOURCE_CONNECTION-A`.
+- `a quote is not closed`: the value starts with `'` or `"` and the line ends before the matching quote.
+- `text follows the closing quote`: after the closing quote there is something other than white space or a `#` comment.
+- `a backslash starts no escape that .env takes`: a value in double quotes holds a `\` before a character other than `\`, `"`, `n`, `r` or `t`.  Write a literal backslash as `\\`, or put the value in single quotes, which take every character as it is.
+
+```console
+/work/.env(2,1): error SQLSRC286: The line that sets SQLSOURCE_CONNECTION_BILLING cannot be read: a quote is not closed
+```
+
+Fix the line named.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
+
+See: [Connections](tool.md#connections)
