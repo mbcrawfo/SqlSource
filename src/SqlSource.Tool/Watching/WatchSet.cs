@@ -13,9 +13,10 @@ namespace SqlSource.Tool.Watching;
 /// Which folders a <c>describe --watch</c> session watches, and what a change to a file in them asks of it.
 /// </summary>
 /// <remarks>
-/// Pure: it reads nothing but the <c>.git</c> markers that <see cref="DotEnvSearch.FoldersOf" /> looks for.  A set is
-/// made from the projects of one evaluation, so a session makes another when it evaluates again.  Every comparison of
-/// paths ignores case, as <see cref="RunProjects.PathComparer" /> does.
+/// It reads nothing but the <c>.git</c> markers that <see cref="DotEnvSearch.FoldersOf" /> looks for, and whether the
+/// folder of a project's assets file, and those above it, exist.  A set is made from the projects of one evaluation,
+/// so a session makes another when it evaluates again.  Every comparison of paths ignores case, as
+/// <see cref="RunProjects.PathComparer" /> does.
 /// </remarks>
 internal sealed class WatchSet
 {
@@ -50,13 +51,9 @@ internal sealed class WatchSet
     private readonly HashSet<string> _listed = [with(Comparer)];
     private readonly HashSet<string> _envFolders = [with(Comparer)];
 
-    private WatchSet(
-        string unitPath,
-        string unitFolder,
-        ImmutableArray<string> projects,
-        ImmutableArray<ProjectManifest> manifests
-    )
+    private WatchSet(string unitPath, string unitFolder, FoundProjects found)
     {
+        var manifests = found.Manifests;
         _unitPath = unitPath;
         _projectFolders = [.. manifests.Select(manifest => FolderOf(manifest.ProjectPath)).Distinct(Comparer)];
         foreach (var manifest in manifests)
@@ -67,12 +64,13 @@ internal sealed class WatchSet
         }
 
         _envFolders.UnionWith(DotEnvSearch.FoldersOf(unitFolder));
-        Folders = FoldersOf(unitFolder, projects, manifests);
+        Folders = FoldersOf(unitFolder, found);
     }
 
     /// <summary>
-    /// The folders to watch, sorted by ordinal comparison so that two sets compare: the unit's folder and the folder of
-    /// each project, with or without a manifest, with their folders below, and each other folder that holds a listed
+    /// The folders to watch, sorted by ordinal comparison so that two sets compare: the unit's folder, the folder of
+    /// each project, with or without a manifest, and the folder of each project's assets file, or the nearest that
+    /// exists above it in the project's repository, with their folders below; and each other folder that holds a listed
     /// file or may hold a <c>.env</c> or a <c>Directory.*</c> file, alone.  None is below another that is watched with
     /// its folders below, and none is there twice.  A folder may not exist, which the session skips.
     /// </summary>
@@ -80,15 +78,12 @@ internal sealed class WatchSet
 
     /// <summary>
     /// Makes the set of a unit: the solution or the project <paramref name="unitPath" /> in
-    /// <paramref name="unitFolder" />, the projects it runs, and the manifests of those that use SqlSource.  A project
-    /// without a manifest is watched too, so that its restore, or the package added to it, starts a pass.
+    /// <paramref name="unitFolder" />, and what an evaluation of it found: the projects it runs, the manifests of those
+    /// that use SqlSource, and the assets files of their restores.  A project without a manifest is watched too, so
+    /// that its restore, or the package added to it, starts a pass.
     /// </summary>
-    public static WatchSet Of(
-        string unitPath,
-        string unitFolder,
-        ImmutableArray<string> projects,
-        ImmutableArray<ProjectManifest> manifests
-    ) => new(unitPath, unitFolder, projects, manifests);
+    public static WatchSet Of(string unitPath, string unitFolder, FoundProjects found) =>
+        new(unitPath, unitFolder, found);
 
     /// <summary>
     /// What the change asks of the session.  A <see cref="FileChangeKind.Renamed" /> asks as much as the larger of its
@@ -230,22 +225,27 @@ internal sealed class WatchSet
         );
     }
 
-    private static ImmutableArray<(string Folder, bool Recursive)> FoldersOf(
-        string unitFolder,
-        ImmutableArray<string> projects,
-        ImmutableArray<ProjectManifest> manifests
-    )
+    private static ImmutableArray<(string Folder, bool Recursive)> FoldersOf(string unitFolder, FoundProjects found)
     {
+        var manifests = found.Manifests;
         var recursive = new List<string> { Trim(unitFolder) };
         var alone = new List<string>();
-        var projectFolders = projects
-            .Concat(manifests.Select(manifest => manifest.ProjectPath))
+        var projectFolders = found
+            .Projects.Concat(manifests.Select(manifest => manifest.ProjectPath))
             .Select(FolderOf)
             .Distinct(Comparer);
         foreach (var projectFolder in projectFolders)
         {
             recursive.Add(projectFolder);
             alone.AddRange(DotEnvSearch.FoldersOf(projectFolder));
+        }
+
+        foreach (var (project, assetsFile) in found.AssetsFiles)
+        {
+            if (AssetsFolderOf(project, assetsFile) is { } assetsFolder)
+            {
+                recursive.Add(assetsFolder);
+            }
         }
 
         foreach (var manifest in manifests)
@@ -281,6 +281,33 @@ internal sealed class WatchSet
                 .Concat(others.Select(folder => (Folder: folder, Recursive: false)))
                 .OrderBy(entry => entry.Folder, StringComparer.Ordinal),
         ];
+    }
+
+    // The folder that a restore writes the project's assets file into, which an artifacts layout may put outside every
+    // folder of the unit.  Before the restore makes it, the nearest folder above it that exists, at or below the root
+    // of the project's repository, or the project's folder outside one, so that the restore is seen; null when there is
+    // none, for an assets file outside the repository whose folder does not exist.
+    private static string? AssetsFolderOf(string project, string assetsFile)
+    {
+        var folder = FolderOf(assetsFile);
+        if (System.IO.Directory.Exists(folder))
+        {
+            return folder;
+        }
+
+        var root = Trim(DotEnvSearch.FoldersOf(FolderOf(project))[^1]);
+        var above = Path.GetDirectoryName(folder);
+        while (above is not null && (Comparer.Equals(Trim(above), root) || IsBelow(above, root)))
+        {
+            if (System.IO.Directory.Exists(above))
+            {
+                return Trim(above);
+            }
+
+            above = Path.GetDirectoryName(above);
+        }
+
+        return null;
     }
 
     private static bool IsAtOrBelowAny(string path, List<string> folders) =>

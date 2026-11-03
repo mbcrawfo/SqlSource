@@ -124,6 +124,22 @@ public sealed class RunProjectsTests : IDisposable
         _runner.Requests.ShouldAllBe(request => FakeProcessRunner.PropertyOf(request, "SolutionDir") == null);
     }
 
+    // The assets file of each project that MSBuild names one for, full, whether the project uses SqlSource or not and
+    // whether it was restored or not, in the order of the projects: a watch watches where each restore writes.
+    [Fact]
+    public async Task Find_ProjectsWithAnAssetsFile_GiveEachFull()
+    {
+        _runner.Projects[_a] = new FakeProject { ProjectAssetsFile = "../artifacts/obj/A/project.assets.json" };
+        _ = NotRestored(_b);
+
+        var found = await FindProjectsAsync(new RunUnit(RunUnitKind.Solution, _solution));
+
+        found.AssetsFiles.ShouldBe([
+            (_a, _folder.PathOf("artifacts/obj/A/project.assets.json")),
+            (_b, Path.Combine(Path.GetDirectoryName(_b)!, "obj", "project.assets.json")),
+        ]);
+    }
+
     [Fact]
     public async Task Find_ProjectThatDoesNotUseSqlSource_IsSqlsrc204()
     {

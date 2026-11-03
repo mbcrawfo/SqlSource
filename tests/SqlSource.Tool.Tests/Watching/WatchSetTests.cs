@@ -47,13 +47,16 @@ public sealed class WatchSetTests
             CompileFiles = [.. compile],
         };
 
+    private static WatchSet Of(
+        string unitPath,
+        string unitFolder,
+        ImmutableArray<string> projects,
+        ImmutableArray<ProjectManifest> manifests,
+        params (string Project, string AssetsFile)[] assetsFiles
+    ) => WatchSet.Of(unitPath, unitFolder, new FoundProjects(projects, manifests, [.. assetsFiles]));
+
     private static WatchSet AppSet() =>
-        WatchSet.Of(
-            AppProject,
-            AppFolder,
-            [AppProject],
-            [Manifest(AppProject, [Users, Common], [Settings], [Compiled])]
-        );
+        Of(AppProject, AppFolder, [AppProject], [Manifest(AppProject, [Users, Common], [Settings], [Compiled])]);
 
     [Theory]
     [InlineData("App/Queries/Users.sql")]
@@ -289,12 +292,7 @@ public sealed class WatchSetTests
         var root = P("bin/w");
         var project = Path.Combine(root, "App", "App.csproj");
         var users = Path.Combine(root, "App", "Users.sql");
-        var set = WatchSet.Of(
-            project,
-            Path.GetDirectoryName(project)!,
-            [project],
-            [Manifest(project, [users], [], [])]
-        );
+        var set = Of(project, Path.GetDirectoryName(project)!, [project], [Manifest(project, [users], [], [])]);
 
         set.Classify(Changed(users)).ShouldBe(WatchEffect.Describe);
     }
@@ -368,7 +366,7 @@ public sealed class WatchSetTests
         var app = temp.CreateFolder("w/App");
         var shared = temp.CreateFolder("w/Shared");
         var project = Path.Combine(app, "App.csproj");
-        var set = WatchSet.Of(
+        var set = Of(
             project,
             app,
             [project],
@@ -394,7 +392,7 @@ public sealed class WatchSetTests
         var src = temp.CreateFolder("repo/src");
         var app = temp.CreateFolder("repo/src/App");
         var project = Path.Combine(app, "App.csproj");
-        var set = WatchSet.Of(project, app, [project], [Manifest(project, [Path.Combine(app, "Users.sql")], [], [])]);
+        var set = Of(project, app, [project], [Manifest(project, [Path.Combine(app, "Users.sql")], [], [])]);
 
         set.Folders.ShouldBe([(app, true), (repo, false), (src, false)], ignoreOrder: true);
         set.Folders.Select(entry => entry.Folder)
@@ -412,7 +410,7 @@ public sealed class WatchSetTests
         var b = temp.CreateFolder("w/B");
         var projectA = Path.Combine(a, "A.csproj");
         var projectB = Path.Combine(b, "B.csproj");
-        var set = WatchSet.Of(
+        var set = Of(
             Path.Combine(root, "Sol.sln"),
             root,
             [projectA, projectB],
@@ -432,7 +430,7 @@ public sealed class WatchSetTests
         var app = temp.CreateFolder("w/App");
         var project = Path.Combine(app, "App.csproj");
         var shared = temp.PathOf("w/Shared");
-        var set = WatchSet.Of(
+        var set = Of(
             project,
             app,
             [project],
@@ -461,12 +459,116 @@ public sealed class WatchSetTests
         var build = temp.CreateFolder("r/build");
         var src = temp.CreateFolder("r/src");
         var other = temp.CreateFolder("r/src/Other");
-        var set = WatchSet.Of(Path.Combine(build, "App.sln"), build, [Path.Combine(other, "Other.csproj")], []);
+        var set = Of(Path.Combine(build, "App.sln"), build, [Path.Combine(other, "Other.csproj")], []);
 
         set.Folders.ShouldBe([(build, true), (root, false), (src, false), (other, true)], ignoreOrder: true);
         set.Classify(Created(Path.Combine(other, "obj", "project.assets.json"))).ShouldBe(WatchEffect.Evaluate);
         set.Classify(Changed(Path.Combine(other, "Other.csproj"))).ShouldBe(WatchEffect.Evaluate);
         set.Classify(Changed(Path.Combine(src, "Directory.Build.props"))).ShouldBe(WatchEffect.Evaluate);
+    }
+
+    // An artifacts layout puts a project's assets file outside every folder of the unit, where its restore must still
+    // start a pass.
+    [Fact]
+    public void Folders_AssetsFolderOutsideTheUnit_IsWatchedWithItsFoldersBelow()
+    {
+        using var temp = new TempFolder();
+        _ = temp.CreateFolder("r/.git");
+        var root = temp.PathOf("r");
+        var src = temp.CreateFolder("r/src");
+        var app = temp.CreateFolder("r/src/App");
+        var assetsFolder = temp.CreateFolder("r/artifacts/obj/App");
+        var project = Path.Combine(app, "App.csproj");
+        var assets = Path.Combine(assetsFolder, "project.assets.json");
+
+        var set = Of(project, app, [project], [], (project, assets));
+
+        set.Folders.ShouldBe([(app, true), (assetsFolder, true), (root, false), (src, false)], ignoreOrder: true);
+        set.Classify(Created(assets)).ShouldBe(WatchEffect.Evaluate);
+    }
+
+    // Before the restore makes the assets file's folder, the nearest folder above it that exists is watched with its
+    // folders below, the repository's root at most.
+    [Theory]
+    [InlineData("artifacts/obj", "artifacts/obj")]
+    [InlineData("artifacts", "artifacts")]
+    [InlineData("", "")]
+    public void Folders_AssetsFolderThatDoesNotExistYet_IsItsNearestFolderThatDoes(string existing, string watched)
+    {
+        using var temp = new TempFolder();
+        _ = temp.CreateFolder("r/.git");
+        _ = temp.CreateFolder("r/src/App");
+        _ = temp.CreateFolder(Path.Combine("r", existing));
+        var app = temp.PathOf("r/src/App");
+        var project = Path.Combine(app, "App.csproj");
+        var assets = temp.PathOf("r/artifacts/obj/App/project.assets.json");
+        var folder = Path.TrimEndingDirectorySeparator(temp.PathOf(Path.Combine("r", watched)));
+
+        var set = Of(project, app, [project], [], (project, assets));
+
+        set.Folders.ShouldContain((folder, true));
+        set.Folders.ShouldNotContain(entry =>
+            entry.Folder != folder
+            && entry.Folder.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+        );
+        set.Classify(Created(assets)).ShouldBe(WatchEffect.Evaluate);
+    }
+
+    // Nothing above the root of the project's repository, or above the project's folder outside one, is watched for an
+    // assets folder that does not exist yet.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Folders_AssetsFolderThatDoesNotExistAboveTheRepository_IsNotWatched(bool repository)
+    {
+        using var temp = new TempFolder();
+        if (repository)
+        {
+            _ = temp.CreateFolder("w/r/.git");
+        }
+
+        var app = temp.CreateFolder("w/r/App");
+        var project = Path.Combine(app, "App.csproj");
+        var assets = temp.PathOf("w/artifacts/obj/App/project.assets.json");
+
+        var set = Of(project, app, [project], [], (project, assets));
+
+        set.Folders.ShouldNotContain(entry => entry.Recursive && entry.Folder != app);
+    }
+
+    // An assets folder that exists is watched wherever it is.
+    [Fact]
+    public void Folders_AssetsFolderOutsideTheRepositoryThatExists_IsWatched()
+    {
+        using var temp = new TempFolder();
+        _ = temp.CreateFolder("w/r/.git");
+        var app = temp.CreateFolder("w/r/App");
+        var assetsFolder = temp.CreateFolder("w/out/obj/App");
+        var project = Path.Combine(app, "App.csproj");
+
+        var set = Of(project, app, [project], [], (project, Path.Combine(assetsFolder, "project.assets.json")));
+
+        set.Folders.ShouldContain((assetsFolder, true));
+    }
+
+    // The default layout's obj folder, there or not yet, is below the project's folder, which is watched already.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Folders_AssetsFolderBelowTheProject_AddsNoFolder(bool restored)
+    {
+        using var temp = new TempFolder();
+        var app = temp.CreateFolder("w/App");
+        if (restored)
+        {
+            _ = temp.CreateFolder("w/App/obj");
+        }
+
+        var project = Path.Combine(app, "App.csproj");
+
+        var set = Of(project, app, [project], [], (project, Path.Combine(app, "obj", "project.assets.json")));
+
+        set.Folders.ShouldBe([(app, true)]);
     }
 
     // A new .sql file changes nothing in a project without the package until the package is added, which is a save of
@@ -475,7 +577,7 @@ public sealed class WatchSetTests
     public void Classify_NewSqlFileInAProjectWithoutAManifest_IsNone()
     {
         var other = P("Other");
-        var set = WatchSet.Of(AppProject, AppFolder, [AppProject, P("Other/Other.csproj")], []);
+        var set = Of(AppProject, AppFolder, [AppProject, P("Other/Other.csproj")], []);
 
         set.Folders.ShouldContain((other, true));
         set.Classify(Created(P("Other/New.sql"))).ShouldBe(WatchEffect.None);
@@ -492,8 +594,6 @@ public sealed class WatchSetTests
             Manifest(project, [Path.Combine(temp.PathOf("w/Shared"), "A.sql"), Path.Combine(app, "B.sql")], [], []),
         ];
 
-        WatchSet
-            .Of(project, app, [project], manifests)
-            .Folders.ShouldBe(WatchSet.Of(project, app, [project], manifests).Folders);
+        Of(project, app, [project], manifests).Folders.ShouldBe(Of(project, app, [project], manifests).Folders);
     }
 }

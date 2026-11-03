@@ -54,7 +54,7 @@ internal static class RunProjects
             if (!read.Succeeded)
             {
                 reporter.Report(ToolDiagnostic.ForFile(ToolDiagnostics.SolutionCannotBeRead, unit.Path, read.Failure));
-                return new FoundProjects([], []);
+                return FoundProjects.None;
             }
 
             projects = read.Value;
@@ -75,10 +75,16 @@ internal static class RunProjects
         }
 
         var manifests = ImmutableArray.CreateBuilder<ProjectManifest>();
+        var assetsFiles = ImmutableArray.CreateBuilder<(string Project, string AssetsFile)>();
         foreach (var evaluation in await ProjectEvaluator.EvaluateAsync(host, projects, solution, cancellationToken))
         {
             RunEvents.Project(reporter.Trace, evaluation.ProjectPath, evaluation);
             var project = evaluation.ProjectPath;
+            if (evaluation.AssetsFile is { } assetsFile)
+            {
+                assetsFiles.Add((project, assetsFile));
+            }
+
             switch (evaluation.State)
             {
                 case ProjectState.UsesSqlSource:
@@ -123,7 +129,7 @@ internal static class RunProjects
             }
         }
 
-        return new FoundProjects(projects, manifests.ToImmutable());
+        return new FoundProjects(projects, manifests.ToImmutable(), assetsFiles.ToImmutable());
     }
 
     // The projects of the unit that --project names, in the unit's order.  A path that names none is reported once.

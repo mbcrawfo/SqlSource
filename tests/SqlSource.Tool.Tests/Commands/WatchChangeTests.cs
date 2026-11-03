@@ -139,6 +139,38 @@ public sealed class WatchChangeTests : IAsyncDisposable
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
+    // A project in a folder of its repository with an artifacts layout, which restores outside every folder of the
+    // unit: its restore still starts a pass, which describes it.
+    [Fact]
+    public async Task Watch_RestoreIntoAnArtifactsFolder_RunsTheManifestTarget()
+    {
+        await using var watch = new WatchScene("src/App");
+        _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
+        _ = watch.Run.Folder.CreateFolder(".git");
+        var project = watch.Run.Processes.Projects[watch.Project.ProjectPath];
+        var assets = watch.Run.Folder.PathOf("artifacts/obj/App/project.assets.json");
+        project.Imported = "";
+        project.ProjectAssetsFile = assets;
+        project.PackageReferences.Add("SqlSource");
+        await watch.StartAsync("src/App/App.csproj");
+        watch.Errors.ShouldContain($"error SQLSRC220: '{watch.Project.ProjectPath}' has not been restored");
+        var manifestRuns = watch.ManifestRuns;
+
+        project.Imported = "true";
+        _ = watch.Run.Folder.WriteFile("artifacts/obj/App/project.assets.json", "{}");
+        await watch.ChangeAsync(Created(assets));
+
+        watch.ManifestRuns.ShouldBeGreaterThan(manifestRuns);
+        watch.Output.ShouldEndWith(
+            $"postgres (postgres): 1 described, 0 skipped, 0 failed\n{WatchSession.WatchingMarker}\n"
+        );
+        // The folder that the restore made is watched in place of the one above it.
+        watch
+            .Watcher.Open.Select(request => request.Folder)
+            .ShouldContain(watch.Run.Folder.PathOf("artifacts/obj/App"));
+        (await watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     // The .env is read again for each pass, without the manifest target.
     [Fact]
     public async Task Watch_DotEnvWritten_TheNextPassUsesItsValue()
