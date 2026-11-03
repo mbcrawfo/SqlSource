@@ -171,6 +171,60 @@ public sealed class OnlineRunTests : IDisposable
         _scene.Describer.Opened.ShouldBeEmpty();
     }
 
+    // Two databases whose names give one variable, SQLSOURCE_CONNECTION_APP_V2, each with a query to describe.
+    private void AddTwoDatabasesThatShareAVariable() =>
+        _ = _scene.Project.AddSql(
+            "Shared.sql",
+            "-- name: One\n-- database: app-v2\nSELECT 4;\n\n-- name: Two\n-- database: app_v2\nSELECT 5;\n"
+        );
+
+    // The variable is set, for one of the two or for both, so the run reports that it cannot say which, as a run by
+    // hand does, wherever the variable is set.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Run_AutoWithAVariableTwoDatabasesShare_IsSqlsrc214AndNotOffline(bool inDotEnv)
+    {
+        AddTwoDatabasesThatShareAVariable();
+        if (inDotEnv)
+        {
+            _ = _scene.Run.Folder.WriteFile(".env", $"SQLSOURCE_CONNECTION_APP_V2={Secrets.Connection}\n");
+        }
+        else
+        {
+            _scene.Run.Environment["SQLSOURCE_CONNECTION_APP_V2"] = Secrets.Connection;
+        }
+
+        var result = await OnlineAsync("auto");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldNotContain("offline");
+        result.Error.ShouldContain(
+            "error SQLSRC214: The databases 'app-v2' and 'app_v2' both read their connection from "
+                + "SQLSOURCE_CONNECTION_APP_V2"
+        );
+        EveryErrorIsOneLine(result.Error);
+        _scene.Describer.Opened.ShouldBeEmpty();
+    }
+
+    // With the variable not set, the two databases have no connection, as the others have none.
+    [Fact]
+    public async Task Run_AutoWithAVariableTwoDatabasesShareNotSet_IsOffline()
+    {
+        AddTwoDatabasesThatShareAVariable();
+
+        var result = await OnlineAsync("auto");
+
+        result.ExitCode.ShouldBe(0);
+        result.Error.ShouldBe("");
+        result.Out.ShouldStartWith(Offline);
+        result
+            .Out[Offline.Length..^Committed.Length]
+            .Split(", ")
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(["app-v2", "app_v2", "billing", "postgres"]);
+    }
+
     [Fact]
     public async Task Run_TrueWithNoConnection_IsSqlsrc213OnOneLineAndNotOffline()
     {

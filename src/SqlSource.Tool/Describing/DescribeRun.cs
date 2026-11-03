@@ -167,8 +167,10 @@ internal static class DescribeRun
     }
 
     // The databases with a query to describe, in the plan's order, when the run is offline; none otherwise.  Under
-    // "auto" the run is offline when none of them has a connection and SQLSOURCE_CONNECTION is not set for several
-    // (SQLSRC215).  A run where every entry is current has no such database and is no offline run.
+    // "auto" the run is offline when none of them has a connection, SQLSOURCE_CONNECTION is not set for several
+    // (SQLSRC215), and no variable that two of them share is set (SQLSRC214): the user gave a connection in each of
+    // those, so the run reports the error, as a run by hand does.  A run where every entry is current has no such
+    // database and is no offline run.
     private static ImmutableArray<string> OfflineDatabases(
         OnlineMode online,
         ImmutableArray<FileWork> files,
@@ -192,8 +194,13 @@ internal static class DescribeRun
             )
             .Select(static database => database.Name)
             .ToImmutableArray();
-        return wanting.Any(name => connections.For(name).Value is not null) ? [] : wanting;
+        return wanting.Any(name => IsGiven(connections.For(name), connections.Environment)) ? [] : wanting;
     }
+
+    // Whether a database has a connection, or shares a variable that is set with another database.
+    private static bool IsGiven(DatabaseConnection connection, ConnectionEnvironment environment) =>
+        connection.Value is not null
+        || (connection.SharesVariableWith is not null && environment.Find(connection.Variable) is not null);
 
     // The names of --database, for the steps that take no position.
     private static ImmutableArray<string> DatabaseNames(DescribeOptions options) =>
