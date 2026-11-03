@@ -277,11 +277,11 @@ The log of a watch is one file: `run.start` once, the events of every pass betwe
 
 ### Deliberate limits
 
-Three cases are left unseen on purpose, and the manual lists the user's side of them under its known issues.  Closing any of them means watching ever higher folders, up to a home folder or `/`, on every watch, for layouts that are rare; the owner chose on 2026-11-03 to keep them as known limitations and not as tech debt.
+Three cases are left unseen on purpose, and the manual lists the user's side of them under its known issues.  Closing any of them means watching ever higher folders, up to a home folder or `/`, on every watch, for layouts that are rare.
 
 - **Watching reaches one level up.**  A folder deleted and made again is seen only by the watch of the folder above it: inside a repository the folders up to its root are watched, so the root itself, deleted and made again, is not seen; outside a repository the folder one level above each watched folder is watched, so a folder deleted together with the one above it is not seen.  The cause is partly the system's: on Linux a watch dies with its folder's inode and raises nothing, even when a folder of the same name is made again.
-- **An assets folder that does not exist yet is looked for within a bound.**  Before a restore, the nearest existing folder above a project's assets folder is watched only at or below the repository's root, or outside a repository the folder of the nearest `Directory.Build.props`.  An `artifacts` folder, or an `ArtifactsPath`, above that bound is watched once it exists, so the first restore into it starts no pass.
-- **Outside a repository the folder above the unit is watched.**  It is the cost of the first limit's watch one level up: a project or solution file saved in that folder, such as `/tmp` or a home folder, starts an evaluating pass that changes nothing.
+- **An assets folder that does not exist yet is looked for within a bound.**  Before a restore, the nearest existing folder above a project's assets folder is watched only at or below the repository's root, or outside a repository the folder of the nearest `Directory.Build.props`, or the project's folder when there is none.  An `artifacts` folder, or an `ArtifactsPath`, above that bound is watched once it exists, so the first restore into it starts no pass.
+- **Outside a repository the folder above each watched folder is watched, the unit's included.**  It is the cost of the first limit's watch one level up: a project or solution file saved in such a folder, such as `/tmp` or a home folder above a project's folder, starts an evaluating pass that changes nothing.
 
 ## Folders
 
