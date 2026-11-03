@@ -13,6 +13,10 @@
 # package of the tool beside it.  Without it, the package is packed into a temporary directory first.
 set -euo pipefail
 
+# MSBuild writes its own lines in the language of the user's interface, "0 Warnung(en)" in German, and the checks
+# below read some of them, so every run of dotnet is in English, whatever the machine's language.
+export DOTNET_CLI_UI_LANGUAGE=en
+
 PACKAGE_ID='SqlSource'
 FIXTURE='tools/package-install'
 PROJECT='Consumer.csproj'

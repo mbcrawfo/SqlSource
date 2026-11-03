@@ -162,6 +162,10 @@ internal sealed class FixtureProjects : IDisposable
         _ = start.Environment.Remove("MSBuildSDKsPath");
         _ = start.Environment.Remove("MSBuildExtensionsPath");
         start.Environment["DOTNET_NOLOGO"] = "true";
+
+        // MSBuild writes its own lines in the language of the user's interface, "0 Warnung(en)" in German, and the
+        // tests read some of them, so every run of dotnet is in English, whatever the machine's language.
+        start.Environment["DOTNET_CLI_UI_LANGUAGE"] = "en";
         return start;
     }
 
