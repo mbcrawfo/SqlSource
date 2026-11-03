@@ -7,7 +7,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
@@ -264,7 +263,13 @@ public static class Cli
             return true;
         }
 
-        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time);
+        var opened = RunLogFile.Open(
+            logPath,
+            host.WorkingDirectory,
+            host.CreateFile,
+            host.Time,
+            DescribeCommand.LogOptionOf(commandLine.Usage)
+        );
         if (!opened.Succeeded)
         {
             state.Reporter.Report(opened.Failure);
@@ -337,9 +342,7 @@ public static class Cli
             return exitCode;
         }
 
-        state.Reporter.Report(
-            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, "written", failure.Message)
-        );
+        state.Reporter.Report(log.NotWritten(failure.Message));
         return 1;
     }
 

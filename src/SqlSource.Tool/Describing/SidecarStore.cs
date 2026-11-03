@@ -322,7 +322,7 @@ internal static class SidecarStore
     }
 
     private static ToolDiagnostic Failure(string path, string tried, Exception exception) =>
-        ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, tried, exception.Message);
+        ToolDiagnostic.NotChanged(path, tried, exception.Message);
 
     private static ToolDiagnostic NotWritten(FileOutcome outcome) =>
         ToolDiagnostic

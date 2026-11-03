@@ -259,7 +259,12 @@ internal static class ProjectEvaluator
             : new ProjectEvaluation(
                 project,
                 ProjectState.Failed,
-                Failure: ToolDiagnostic.ForFile(ToolDiagnostics.ManifestCannotBeRead, project, read.Failure)
+                Failure: ToolDiagnostic.AtFile(
+                    ToolDiagnostics.ManifestCannotBeRead,
+                    project,
+                    $"of {UsageValue.Quoted(project)}",
+                    read.Failure
+                )
             );
     }
 

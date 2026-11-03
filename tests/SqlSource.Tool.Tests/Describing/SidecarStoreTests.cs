@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Shouldly;
-using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
 using SqlSource.Tool.Describing;
@@ -186,7 +185,7 @@ public sealed class SidecarStoreTests : IDisposable
     public void Apply_SidecarThatCouldNotBeOpened_ReportsTheErrorOfItsOutcomeAndLeavesIt()
     {
         _ = Directory.CreateDirectory(_sidecar);
-        var failure = ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, _sidecar, "read", "refused");
+        var failure = ToolDiagnostic.NotChanged(_sidecar, "read", "refused");
 
         Apply(Outcome(FileAction.Unreadable) with { Failure = failure });
 

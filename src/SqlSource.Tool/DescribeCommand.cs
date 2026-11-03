@@ -226,6 +226,7 @@ internal static class DescribeCommand
         var units = 0;
         var connections = new HashSet<string>(DatabaseName.Comparer);
         var hasConnection = usage.Values.Any(static value => value.Option?.Name == ConnectionOption);
+        var isOnline = IsOnline(usage);
         foreach (var value in usage.Values)
         {
             if (value.Option is null)
@@ -256,9 +257,11 @@ internal static class DescribeCommand
                     $"sqlsource: the value of option '{LogOption}' at position {value.Position} is not a path"
                 );
             }
-            else if (value.Option.Name == LogOption && value.Text.AsSpan().IndexOfAny('=', ';') >= 0)
+            else if (value.Option.Name == LogOption && !isOnline && !value.MayBePrintedAsPath)
             {
-                // "=" and ";" are what a connection string is made of: the value may be one typed after --log.
+                // "=" and ";" are what a connection string is made of: the value may be one typed after --log.  The
+                // build's paths may hold them, as a project's name may, and a message names such a path by its
+                // position.
                 messages.Add(
                     $"sqlsource: the value of option '{LogOption}' at position {value.Position} holds '=' or ';', "
                         + "which a log's path may not"
@@ -292,7 +295,8 @@ internal static class DescribeCommand
     private static void CheckManifestUsage(Usage usage, List<string> messages)
     {
         var manifests = ValuesOf(usage, ManifestOption);
-        messages.AddRange(manifests.Select(ProblemOfManifestPath).OfType<string>());
+        var isOnline = IsOnline(usage);
+        messages.AddRange(manifests.Select(manifest => ProblemOfManifestPath(manifest, isOnline)).OfType<string>());
 
         if (manifests.Length > 0)
         {
@@ -322,15 +326,19 @@ internal static class DescribeCommand
         }
     }
 
-    // What is wrong with the value of --manifest as a path, as a whole line, or null.
-    private static string? ProblemOfManifestPath(UsageValue manifest)
+    // Whether the command line has --online: the build's, whose paths of --manifest and --log are its own.
+    private static bool IsOnline(Usage usage) => usage.Values.Any(static value => value.Option?.Name == OnlineOption);
+
+    // What is wrong with the value of --manifest as a path, as a whole line, or null.  Without --online a path that
+    // holds "=" or ";" is refused, as one of --log is: it may be a connection string typed after the option.
+    private static string? ProblemOfManifestPath(UsageValue manifest, bool isOnline)
     {
         if (string.IsNullOrWhiteSpace(manifest.Text))
         {
             return $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} is not a path";
         }
 
-        return manifest.Text.AsSpan().IndexOfAny('=', ';') >= 0
+        return !isOnline && !manifest.MayBePrintedAsPath
             ? $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} holds '=' or ';', "
                 + "which a manifest's path may not"
             : null;
@@ -408,6 +416,12 @@ internal static class DescribeCommand
         var variable = getEnvironmentVariable(LogVariable);
         return string.IsNullOrWhiteSpace(variable) ? null : variable;
     }
+
+    /// <summary>
+    /// The value of <c>--log</c> as <see cref="UsageCheck" /> read it, which names the path in a message, or null when
+    /// the option was not given.
+    /// </summary>
+    public static UsageValue? LogOptionOf(Usage usage) => ValuesOf(usage, LogOption) is [{ } value] ? value : null;
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
@@ -521,6 +535,7 @@ internal static class DescribeCommand
         {
             // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
             manifests = await RunProjects.FromManifestAsync(
+                manifestValue,
                 Path.GetFullPath(manifestValue.Text, host.WorkingDirectory),
                 host,
                 reporter,

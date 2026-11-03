@@ -84,7 +84,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor ManifestCannotBeRead = new(
         id: "SQLSRC206",
         title: "Project manifest cannot be read",
-        messageFormat: "The project manifest of '{0}' cannot be read: {1}",
+        messageFormat: "The project manifest {0} cannot be read: {1}",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -219,7 +219,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor FileCannotBeChanged = new(
         id: "SQLSRC218",
         title: "File could not be changed",
-        messageFormat: "'{0}' could not be {1}: {2}",
+        messageFormat: "{0} could not be {1}: {2}",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

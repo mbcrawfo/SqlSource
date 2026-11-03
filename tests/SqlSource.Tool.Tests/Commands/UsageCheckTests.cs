@@ -532,6 +532,23 @@ public sealed class UsageCheckTests
                     + "manifest's path may not",
             ]);
 
+    // The build's paths may hold them, as a project's name may, and a run under --online is the build's.
+    [Theory]
+    [InlineData("describe", "--manifest", "obj/a;b.manifest", "--online", "auto")]
+    [InlineData("describe", "--manifest=obj/x=y.manifest", "--online", "true")]
+    [InlineData("describe", "--manifest", "m", "--online", "auto", "--log", "obj/a;b.log")]
+    [InlineData("describe", "--online", "auto", "--log=obj/x=y.log", "--manifest", "m")]
+    public void CheckUsage_OnlineManifestOrLogPathWithAnEqualsSignOrASemicolon_GivesNoLine(params string[] args) =>
+        DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
+
+    [Fact]
+    public void CheckUsage_ManifestRunWithoutOnlineAndALogPathWithASemicolon_IsNamedByItsPosition() =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["describe", "--manifest", "m", "--log", "a;b.log"]))
+            .ShouldBe([
+                "sqlsource: the value of option '--log' at position 5 holds '=' or ';', which a log's path may not",
+            ]);
+
     [Fact]
     public void ReadsValuesAs_ManifestAndOnlineReadAsOtherValues_IsFalse()
     {

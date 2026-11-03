@@ -77,6 +77,8 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.ProjectNotInRun,
             ToolDiagnostics.FileNotInRun,
             ToolDiagnostics.DirectoryCannotBeRead,
+            ToolDiagnostics.ManifestCannotBeRead,
+            ToolDiagnostics.FileCannotBeChanged,
         };
         // SQLSRC200 is formatted above, and SQLSRC215 starts with a count, SQLSRC231 with the name of the reader,
         // and SQLSRC266 with a column's position; their own tests format them.
@@ -131,15 +133,26 @@ public sealed class ToolDiagnosticsTests
             )
             .ShouldBe("MSBuild could not evaluate '/work/App.csproj'");
 
-    [Fact]
-    public void ManifestCannotBeRead_Message_HoldsTheProjectAndTheReason() =>
+    // The manifest MSBuild wrote for a project is named by the project, and the file of --manifest by itself or, when
+    // its path holds "=" or ";", by its position.
+    [Theory]
+    [InlineData(
+        "of '/work/App.csproj'",
+        "The project manifest of '/work/App.csproj' cannot be read: it names no project"
+    )]
+    [InlineData(
+        "'/work/obj/App.manifest'",
+        "The project manifest '/work/obj/App.manifest' cannot be read: it names no project"
+    )]
+    [InlineData("at position 3", "The project manifest at position 3 cannot be read: it names no project")]
+    public void ManifestCannotBeRead_Message_HoldsWhatItNamesAndTheReason(string named, string expected) =>
         string.Format(
                 CultureInfo.InvariantCulture,
                 ToolDiagnostics.ManifestCannotBeRead.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                "/work/App.csproj",
+                named,
                 "it names no project"
             )
-            .ShouldBe("The project manifest of '/work/App.csproj' cannot be read: it names no project");
+            .ShouldBe(expected);
 
     [Fact]
     public void ProjectNotInRun_Message_HoldsThePathAndTheUnit() =>
@@ -292,18 +305,20 @@ public sealed class ToolDiagnosticsTests
                 "The sidecar of '/work/Users.sql' was not written, because not every query of the file has an entry"
             );
 
+    // The file is named in quotes, or by its position when it is a log whose path holds "=" or ";".
     [Theory]
-    [InlineData("written")]
-    [InlineData("deleted")]
-    public void FileCannotBeChanged_Message_HoldsTheFileWhatWasTriedAndTheReason(string tried) =>
+    [InlineData("'/work/Users.sql.json'", "written")]
+    [InlineData("'/work/Users.sql.json'", "deleted")]
+    [InlineData("The path at position 7", "written")]
+    public void FileCannotBeChanged_Message_HoldsTheFileWhatWasTriedAndTheReason(string named, string tried) =>
         string.Format(
                 CultureInfo.InvariantCulture,
                 ToolDiagnostics.FileCannotBeChanged.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                "/work/Users.sql.json",
+                named,
                 tried,
                 "Access is denied."
             )
-            .ShouldBe($"'/work/Users.sql.json' could not be {tried}: Access is denied.");
+            .ShouldBe($"{named} could not be {tried}: Access is denied.");
 
     [Fact]
     public void DatabaseCannotBeOpened_Message_HoldsTheDatabase() =>
