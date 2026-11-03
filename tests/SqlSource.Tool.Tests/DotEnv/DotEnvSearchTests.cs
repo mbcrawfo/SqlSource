@@ -133,7 +133,7 @@ public sealed class DotEnvSearchTests : IDisposable
         file.Values.ShouldBeEmpty();
         var error = file.Errors.ShouldHaveSingleItem();
         error.Descriptor.ShouldBeSameAs(ToolDiagnostics.DotEnvCannotBeRead);
-        ReportedLine(error).ShouldBe($"{path} : error SQLSRC285: {path} cannot be read: Disk on fire.");
+        ReportedLine(error).ShouldBe($"{path} : error SQLSRC285: '{path}' cannot be read: Disk on fire.");
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class DotEnvSearchTests : IDisposable
         var line = ReportedLine(error);
         line.ShouldBe(
             $"{path}(2,1): error SQLSRC286: "
-                + "The line that sets SQLSOURCE_CONNECTION_B cannot be read: a quote is not closed"
+                + "The line that sets 'SQLSOURCE_CONNECTION_B' cannot be read: a quote is not closed"
         );
         file.ToString().ShouldNotContain("hunter2");
         line.ShouldNotContain("hunter2");

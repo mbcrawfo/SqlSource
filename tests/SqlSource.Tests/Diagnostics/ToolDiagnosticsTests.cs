@@ -79,16 +79,13 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.DirectoryCannotBeRead,
         };
         // SQLSRC200 is formatted above, and SQLSRC215 starts with a count, SQLSRC231 with the name of the reader,
-        // SQLSRC266 with a column's position, and SQLSRC285 and SQLSRC286 do not quote a path; their own tests format
-        // them.
+        // and SQLSRC266 with a column's position; their own tests format them.
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)
                 .Remove(ToolDiagnostics.UnnamedConnectionNotUsed)
                 .Remove(ToolDiagnostics.ParametersReadDifferently)
                 .Remove(ToolDiagnostics.ColumnHasNoName)
-                .Remove(ToolDiagnostics.DotEnvCannotBeRead)
-                .Remove(ToolDiagnostics.DotEnvLineCannotBeRead)
         )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it
@@ -113,7 +110,7 @@ public sealed class ToolDiagnosticsTests
                 "/work/.env",
                 "Access to the path is denied."
             )
-            .ShouldBe("/work/.env cannot be read: Access to the path is denied.");
+            .ShouldBe("'/work/.env' cannot be read: Access to the path is denied.");
 
     [Fact]
     public void DotEnvLineCannotBeRead_Message_HoldsTheKeyAndTheReason() =>
@@ -123,7 +120,7 @@ public sealed class ToolDiagnosticsTests
                 "SQLSOURCE_CONNECTION_A",
                 "a quote is not closed"
             )
-            .ShouldBe("The line that sets SQLSOURCE_CONNECTION_A cannot be read: a quote is not closed");
+            .ShouldBe("The line that sets 'SQLSOURCE_CONNECTION_A' cannot be read: a quote is not closed");
 
     [Fact]
     public void ProjectCannotBeEvaluated_Message_HoldsTheProject() =>

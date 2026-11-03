@@ -2871,7 +2871,7 @@ See: [Type overrides](settings.md#setting-type-overrides), [column types](settin
 
 ```console
 sqlsource describe /work/App
-/work/.env : error SQLSRC285: /work/.env cannot be read: Access to the path '/work/.env' is denied.
+/work/.env : error SQLSRC285: '/work/.env' cannot be read: Access to the path '/work/.env' is denied.
 ```
 
 Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment.
@@ -2893,7 +2893,7 @@ The reason is one of five:
 - `a backslash starts no escape that .env takes`: a value in double quotes holds a `\` before a character other than `\`, `"`, `n`, `r` or `t`.  Write a literal backslash as `\\`, or put the value in single quotes, which take every character as it is.
 
 ```console
-/work/.env(2,1): error SQLSRC286: The line that sets SQLSOURCE_CONNECTION_BILLING cannot be read: a quote is not closed
+/work/.env(2,1): error SQLSRC286: The line that sets 'SQLSOURCE_CONNECTION_BILLING' cannot be read: a quote is not closed
 ```
 
 Fix the line named.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
