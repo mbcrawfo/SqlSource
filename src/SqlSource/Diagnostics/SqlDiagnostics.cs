@@ -914,8 +914,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor TokenNamedAsAnArgument = new(
         id: "SQLSRC275",
         title: "Token is named as an argument of the method",
-        messageFormat: "The token '{0}' of the query '{1}' has the name of an argument that every query method has: "
-            + "connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.",
+        messageFormat: "The token '{0}' of the query '{1}' has the name of an argument that a query method can "
+            + "have: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
