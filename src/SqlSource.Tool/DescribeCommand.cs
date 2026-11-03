@@ -41,6 +41,8 @@ internal static class DescribeCommand
 
     internal const string LogOption = "--log";
 
+    internal const string WatchOption = "--watch";
+
     /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
     internal const string LogVariable = "SQLSOURCE_LOG";
 
@@ -123,6 +125,12 @@ internal static class DescribeCommand
             Arity = ArgumentArity.ExactlyOne,
         };
 
+        var watch = new Option<bool>(WatchOption)
+        {
+            Description = "Describe again each time a file of the run changes, until stopped with Ctrl+C.",
+            Arity = ArgumentArity.Zero,
+        };
+
         return new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
@@ -133,6 +141,7 @@ internal static class DescribeCommand
             check,
             verbose,
             log,
+            watch,
         };
     }
 
@@ -194,6 +203,16 @@ internal static class DescribeCommand
         }
 
         var messages = new List<string>();
+
+        // A watch writes the sidecars again each time, and a check writes none.
+        if (
+            usage.Flags.Any(static flag => flag.Name == WatchOption)
+            && usage.Flags.Any(static flag => flag.Name == CheckOption)
+        )
+        {
+            messages.Add($"sqlsource: options '{WatchOption}' and '{CheckOption}' cannot be used together");
+        }
+
         var units = 0;
         var connections = new HashSet<string>(DatabaseName.Comparer);
         var hasConnection = usage.Values.Any(static value => value.Option?.Name == ConnectionOption);
@@ -268,6 +287,9 @@ internal static class DescribeCommand
 
     /// <summary>Whether a <c>describe</c> that runs was given <c>--verbose</c>.</summary>
     public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
+
+    /// <summary>Whether a <c>describe</c> that runs was given <c>--watch</c>.</summary>
+    public static bool Watches(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(WatchOption);
 
     /// <summary>
     /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when

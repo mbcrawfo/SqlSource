@@ -19,6 +19,9 @@ internal sealed record Usage(
     IReadOnlyList<string> Messages
 )
 {
+    /// <summary>The options that take no value and were given, in the order they were first given, once each.</summary>
+    public IReadOnlyList<Option> Flags { get; init; } = [];
+
     /// <summary>
     /// Whether System.CommandLine found the same command with the same arguments.  When it did not, a token that
     /// <see cref="UsageCheck" /> took for the value of an option may be an argument, and an argument is printed.
