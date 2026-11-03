@@ -57,7 +57,7 @@ The pages each phase touches, besides those:
 
 | Phase | Pages |
 |----|----|
-| 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode, the new options in the command reference.  `settings.md`: what turns it on.  README: step 5 |
+| 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode, starting the watcher with each editor, the new options in the command reference.  `settings.md`: what turns it on.  README: step 5 |
 | 10. Bug reports | `tool.md`: making a bundle, what it holds before you share it, the new commands in the command reference |
 
 A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A new dialect gets its rows in `dialects.md`'s tables and its name in `SQLSRC019`'s section of `diagnostics.md`, where `dialect` lists the names; `settings.md`'s Dialect row changes only for a dialect with options.
