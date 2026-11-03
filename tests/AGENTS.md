@@ -29,7 +29,7 @@
 
 - **A test starts a program through `Programs.RunAsync`, never `Process.Start`**, and starts `dotnet` as `Programs.Dotnet`, the one the tool runs, never as `"dotnet"`.
 - **A test that waits for what a program or the server does waits through `Eventually`**, never a loop of `Task.Delay`; its `Patience` is the one limit, which `ProcessGate` and every caller of `Programs.RunAsync` use too.
-- **Only one test of a project starts the built tool as a process**: `Commands/TerminationTests.cs` of `tests/SqlSource.Tool.Tests`, and `Describer/ToolProcessTests.cs` of each container project, through `ToolProcess.ShouldDescribeOneQueryAsync`.  Each starts it through `Programs` of `tests/SqlSource.Tool.Testing`: `Programs.ToolStart`, or for the closed console `cmd /c start` with `Programs.ToolPath` and `Programs.SetToolEnvironment` ([why](SqlSource.Tool.Testing/Programs.cs)).
+- **The built tool runs as a process only in `Commands/TerminationTests.cs` of `tests/SqlSource.Tool.Tests`, and `Describer/ToolProcessTests.cs` and the builds of `EndToEnd/OnlineBuildTests.cs` of each container project**, started through `Programs` of `tests/SqlSource.Tool.Testing`: `ToolStart`, `ToolCommand` for a build, or for the closed console `cmd /c start` with `ToolPath` and `SetToolEnvironment` ([why](SqlSource.Tool.Testing/Programs.cs)).
 - **A run, a host and a session of the tests stand on `TestClock` of `tests/SqlSource.Tool.Testing`**, which stands still until a test moves it, unless the test brings a clock: a test that needs the machine's passes `TimeProvider.System` and says why.
 
 ## Flaky tests

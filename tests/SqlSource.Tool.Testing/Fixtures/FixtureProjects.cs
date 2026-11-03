@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -114,6 +116,31 @@ internal sealed class FixtureProjects : IDisposable
 
         var result = await Programs.RunAsync(start, Eventually.Patience);
         return (result.ExitCode, result.Output + result.Error);
+    }
+
+    // The switch that gives a build a property whose value may hold any character of a path.  The value is escaped
+    // for MSBuild, so that no character splits it or is read as a property, and MSBuild gives the property the value
+    // as it was.
+    public static string PropertySwitch(string name, string value)
+    {
+        var escaped = new StringBuilder();
+        foreach (var character in value)
+        {
+            if (char.IsAsciiLetterOrDigit(character) || "/\\.-_: ".Contains(character, StringComparison.Ordinal))
+            {
+                _ = escaped.Append(character);
+            }
+            else if (character < 0x80)
+            {
+                _ = escaped.Append('%').Append(((int)character).ToString("X2", CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                _ = escaped.Append(character);
+            }
+        }
+
+        return $"-p:{name}={escaped}";
     }
 
     public void Dispose() => _folder.Dispose();

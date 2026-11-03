@@ -3,4 +3,6 @@
   "root": true,
   "dialect": "postgres",
   "database": "errors",
+  // The models need no driver in a build of the copy, which a method of "codegen" does.
+  "output": "models",
 }

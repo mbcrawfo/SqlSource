@@ -14,8 +14,11 @@ public sealed class ErrorPathTests(SqlServerDatabases sqlServer) : IDisposable
 {
     private const string Table = "dbo.error_path_widgets";
 
-    private readonly ErrorPaths _paths = new(
-        new ErrorPathEngine(
+    private readonly ErrorPaths _paths = new(Engine(sqlServer), sqlServer.ConnectionString);
+
+    // The table of the query and the statements of SQL Server, which OnlineBuildTests shares.
+    internal static ErrorPathEngine Engine(SqlServerDatabases sqlServer) =>
+        new(
             Table,
             $"CREATE TABLE {Table} (id int PRIMARY KEY, name nvarchar(50) NOT NULL)",
             $"ALTER TABLE {Table} ADD note nvarchar(50) NULL",
@@ -24,9 +27,7 @@ public sealed class ErrorPathTests(SqlServerDatabases sqlServer) : IDisposable
             // The describers of the released tool.
             static run =>
                 run.ReleasedDescribers = true
-        ),
-        sqlServer.ConnectionString
-    );
+        );
 
     public void Dispose() => _paths.Dispose();
 

@@ -1,12 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        The scratch project of ErrorPathTests, never built or restored.  A test copies it beside the package's files and
-        describes the copy, which is why the package's props and targets are imported by path.  Its dialect and its
-        database are in the sqlsource.json beside it.
+        The scratch project of ErrorPathTests and OnlineBuildTests, never built or restored here.  A test copies it
+        beside the package's files and describes or builds the copy, which is why the package's props and targets are
+        imported by path.  Its dialect, its database and its output are in the sqlsource.json beside it.
     -->
     <Import Project="../build/SqlSource.props" />
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
     </PropertyGroup>
+    <!--
+        The generator built beside the tests, whose path OnlineBuildTests gives the build, so that the compile shows the
+        model of the sidecar that the build's run of the tool created.
+    -->
+    <ItemGroup Condition="'$(ErrorPathsGenerator)' != ''">
+        <Analyzer Include="$(ErrorPathsGenerator)" />
+    </ItemGroup>
     <Import Project="../build/SqlSource.targets" />
 </Project>

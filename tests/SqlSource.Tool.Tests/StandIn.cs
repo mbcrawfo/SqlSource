@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Fixtures;
 
 namespace SqlSource.Tool.Tests;
 
@@ -18,11 +17,10 @@ internal static class StandIn
     private const string LogFile = "stand-in.log";
 
     // The switch that makes the stand-in a build's command: the dotnet that started the tests running its DLL, each
-    // path in quotes.  A value of a -p switch is escaped for MSBuild, so that no character of a path splits it or is
-    // read as a property, and MSBuild gives the command its quotes back.
+    // path in quotes.
     public static string CommandSwitch =>
-        "-p:SqlSourceToolCommand="
-        + EscapedForMSBuild(
+        FixtureProjects.PropertySwitch(
+            "SqlSourceToolCommand",
             $"\"{Programs.Dotnet}\" \"{Path.Combine(AppContext.BaseDirectory, "SqlSource.Tool.StandIn.dll")}\""
         );
 
@@ -73,28 +71,6 @@ internal static class StandIn
         );
 
         static string[] Strings(JsonElement array) => [.. array.EnumerateArray().Select(item => item.GetString()!)];
-    }
-
-    private static string EscapedForMSBuild(string value)
-    {
-        var escaped = new StringBuilder();
-        foreach (var character in value)
-        {
-            if (char.IsAsciiLetterOrDigit(character) || "/\\.-_: ".Contains(character, StringComparison.Ordinal))
-            {
-                _ = escaped.Append(character);
-            }
-            else if (character < 0x80)
-            {
-                _ = escaped.Append('%').Append(((int)character).ToString("X2", CultureInfo.InvariantCulture));
-            }
-            else
-            {
-                _ = escaped.Append(character);
-            }
-        }
-
-        return escaped.ToString();
     }
 }
 
