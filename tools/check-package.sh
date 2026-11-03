@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Checks the contents of the two packages.  SqlSource: the generator, the two MSBuild files that hand .sql files and
-# the settings to the compiler, the readme, and nothing under lib/.  SqlSource.Tool: the tool with the generator's
-# assembly, Roslyn, the library that reads a solution, Npgsql with its plugin for NetTopologySuite and the libraries
-# the plugin needs, and Microsoft.Data.SqlClient beside it, SqlClient's copies for Unix and Windows and its native SNI
-# for Windows under runtimes/, the settings that name its command, the readme, and no documentation files.  Both have
-# one version.
+# Checks the contents of the two packages.  SqlSource: the generator, the MSBuild files of build/ that hand .sql files
+# and the settings to the compiler and run the tool in the build, the one of buildMultiTargeting/ that runs it in the
+# outer build of a project with several target frameworks, the readme, and nothing under lib/.  SqlSource.Tool: the
+# tool with the generator's assembly, Roslyn, the library that reads a solution, Npgsql with its plugin for
+# NetTopologySuite and the libraries the plugin needs, and Microsoft.Data.SqlClient beside it, SqlClient's copies for
+# Unix and Windows and its native SNI for Windows under runtimes/, the settings that name its command, the readme, and
+# no documentation files.  Both have one version.
 # Usage: check-package.sh [directory]   The directory holds one SqlSource.<version>.nupkg and one
 # SqlSource.Tool.<version>.nupkg.  Without it, both are packed into a temporary directory first.
 set -euo pipefail
@@ -14,6 +15,7 @@ GENERATOR_REQUIRED=(
     'build/SqlSource.props'
     'build/SqlSource.targets'
     'build/SqlSource.AfterSdk.targets'
+    'buildMultiTargeting/SqlSource.targets'
     'analyzers/dotnet/cs/SqlSource.dll'
     'README.md'
 )

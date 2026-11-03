@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
 
 **Project and attribute**
 
@@ -41,6 +41,15 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC022](#sqlsrc022) | Exceptions are seen in two assemblies |
 | [SQLSRC023](#sqlsrc023) | Exceptions come from another version of SqlSource |
+
+**A build that runs the tool**
+
+| Id | Title |
+|----|----|
+| [SQLSRC024](#sqlsrc024) | SqlSourceOnline is not valid |
+| [SQLSRC025](#sqlsrc025) | Build cannot run the tool |
+| [SQLSRC026](#sqlsrc026) | Build cannot run the tool and uses the committed sidecars |
+| [SQLSRC027](#sqlsrc027) | Tool failed without an error |
 
 **`.sql` files**
 
@@ -240,7 +249,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC285](#sqlsrc285) | .env file cannot be read |
 | [SQLSRC286](#sqlsrc286) | Connection in .env cannot be read |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271, 285 and 286 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271, 285 and 286 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -613,6 +622,60 @@ CSC : error SQLSRC023: The UnexpectedRowCountException and TransactionRolledBack
 Use the same version of SqlSource in every project of the solution, for example with central package management.  The error has no file and line, because it is about the project's references.
 
 See: [Projects that share internals](generator.md#projects-that-share-internals)
+
+## SQLSRC024
+
+**SqlSourceOnline is not valid**
+
+The project sets the MSBuild property `SqlSourceOnline` to a value that is not `auto`, `true` or `false`.  The case of the value and the white space around it do not matter, so ` True ` is `true`, and an empty value is `auto`.  The message names the value, without the white space around it.  The build stops before it compiles anything.
+
+```console
+/repo/App/App.csproj : error SQLSRC024: SqlSourceOnline is 'yes', which is not auto, true or false.  Set it to one of the three, or leave it empty for auto.
+```
+
+Set `SqlSourceOnline` to `auto`, `true` or `false`, or remove it to get `auto`.  The property can come from the project file or from a `Directory.Build.props` above it.
+
+## SQLSRC025
+
+**Build cannot run the tool**
+
+`SqlSourceOnline` is `true`, so a build that is not in CI runs `dotnet sqlsource describe` on the project before it compiles, and it could not start the tool: no tool manifest in the project's folder or a folder above it names `SqlSource.Tool`, or the tool it names was never restored on this machine.  The build stops.
+
+```console
+/repo/App/App.csproj : error SQLSRC025: The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars.
+```
+
+Install the tool as a local tool of the repository, as under [install the tool](tool.md#install-the-tool), or run `dotnet tool restore` where the tool manifest names it already.  To build from the sidecars you have committed, without the tool, set `SqlSourceOnline` to `false`.
+
+See: [The tool](tool.md)
+
+## SQLSRC026
+
+**Build cannot run the tool and uses the committed sidecars**
+
+`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or a `.env` file in the project's folder or a folder above it, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
+
+```console
+/repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.
+```
+
+Run `dotnet tool restore`, or install the tool as under [install the tool](tool.md#install-the-tool), and the next build describes the queries.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too: set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars, which also stops the warning.
+
+See: [The tool](tool.md)
+
+## SQLSRC027
+
+**Tool failed without an error**
+
+The build ran `dotnet sqlsource describe` on the project before it compiled, and the tool ended with an exit code other than 0 without reporting an error of its own, so the build cannot tell whether the sidecars are current, and stops.  The message names the exit code and the first line the tool printed.  The usual cause is a tool older than the `SqlSource` package, which does not know an option the build gives it and prints a line such as `sqlsource: unknown option at position 2`; the message then says to update the tool.
+
+```console
+/repo/App/App.csproj : error SQLSRC027: The sqlsource tool exited with the code 1 and reported no error, so the sidecars may not be current.  The tool may be older than the SqlSource package, and not know the options the build gives it: update it to the package's version with 'dotnet tool update SqlSource.Tool --version <version>'.  It printed first: 'sqlsource: unknown option at position 2'.
+```
+
+Bring the tool to the version of the `SqlSource` package the project uses, with `dotnet tool update SqlSource.Tool --version <version>`: the two are released together under one version number.  If the versions are the same, run `dotnet sqlsource describe` in the project's folder to see what the tool says.
+
+See: [The tool](tool.md)
 
 ## SQLSRC101
 

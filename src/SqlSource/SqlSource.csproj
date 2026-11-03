@@ -45,6 +45,11 @@
         <None Include="build/SqlSource.targets" Pack="true" PackagePath="build" />
         <!-- SqlSource.props has the SDK import this one after its own targets. -->
         <None Include="build/SqlSource.AfterSdk.targets" Pack="true" PackagePath="build" />
+        <!--
+            NuGet imports buildMultiTargeting/<package id>.targets into the outer build of a project with several
+            target frameworks, where build/ is not imported: the online build runs the tool there before the dispatch.
+        -->
+        <None Include="buildMultiTargeting/SqlSource.targets" Pack="true" PackagePath="buildMultiTargeting" />
         <None
             Include="$(OutputPath)$(AssemblyName).dll"
             Pack="true"

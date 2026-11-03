@@ -9,7 +9,8 @@ namespace SqlSource.Tool.Testing.Fixtures;
 
 // The projects of Fixtures/Projects, copied to a temporary folder outside the repository, so that nothing of the
 // repository's own build applies to them.  The package's props and targets are in build/ beside the copies, where
-// each project imports them from, and the repository's global.json picks the SDK.
+// each project imports them from, the outer build's targets in buildMultiTargeting/, and the repository's global.json
+// picks the SDK.
 internal sealed class FixtureProjects : IDisposable
 {
     private static readonly string Source = Path.Combine(AppContext.BaseDirectory, "Fixtures");
@@ -20,6 +21,7 @@ internal sealed class FixtureProjects : IDisposable
     {
         File.Copy(Path.Combine(Source, "global.json"), _folder.PathOf("global.json"));
         CopyFolder(Path.Combine(Source, "build"), _folder.PathOf("build"));
+        CopyFolder(Path.Combine(Source, "buildMultiTargeting"), _folder.PathOf("buildMultiTargeting"));
     }
 
     // The folder that holds the copies.

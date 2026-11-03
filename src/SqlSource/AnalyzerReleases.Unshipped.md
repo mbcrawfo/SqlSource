@@ -25,6 +25,10 @@ SQLSRC020 | SqlSource | Error | Settings file entry repeats a key
 SQLSRC021 | SqlSource | Error | Compiler is too old
 SQLSRC022 | SqlSource | Error | Exceptions are seen in two assemblies
 SQLSRC023 | SqlSource | Error | Exceptions come from another version of SqlSource
+SQLSRC024 | SqlSource | Error | SqlSourceOnline is not valid
+SQLSRC025 | SqlSource | Error | Build cannot run the tool
+SQLSRC026 | SqlSource | Warning | Build cannot run the tool and uses the committed sidecars
+SQLSRC027 | SqlSource | Error | Tool failed without an error
 SQLSRC101 | SqlSource | Error | Quote is not closed
 SQLSRC102 | SqlSource | Error | Comment is not closed
 SQLSRC103 | SqlSource | Error | Query name is not valid

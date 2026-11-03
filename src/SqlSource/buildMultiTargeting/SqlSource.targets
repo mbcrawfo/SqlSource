@@ -1,0 +1,60 @@
+<Project>
+    <!--
+        NuGet imports this file into the outer build of a project with several target frameworks, the build that has
+        TargetFrameworks and no TargetFramework and dispatches a build of each framework, and imports build/ into those
+        inner builds alone.  It holds the one target of the online build that the outer build runs, and no DLL.
+
+        The properties are those its condition reads, defined with the same text as in build/SqlSource.targets, where
+        they are explained; BuildFileTests holds the two equal.  SQLSRC026 is added to MSBuildWarningsNotAsErrors here
+        too, as there.
+
+        The values and conditions are long, and a property as written is on one line, so the check of the line length
+        is off for the file.
+    -->
+    <!-- editorconfig-checker-disable -->
+    <PropertyGroup>
+        <SqlSourceOnlineValue>$(SqlSourceOnline.Trim())</SqlSourceOnlineValue>
+        <SqlSourceOnlineValue
+            Condition="'$(SqlSourceOnlineValue)' == '' or $(SqlSourceOnlineValue.ToLowerInvariant().Equals('auto'))"
+            >auto</SqlSourceOnlineValue>
+        <SqlSourceOnlineValue Condition="$(SqlSourceOnlineValue.ToLowerInvariant().Equals('true'))"
+            >true</SqlSourceOnlineValue>
+        <SqlSourceOnlineValue Condition="$(SqlSourceOnlineValue.ToLowerInvariant().Equals('false'))"
+            >false</SqlSourceOnlineValue>
+        <SqlSourceInCI>false</SqlSourceInCI>
+        <SqlSourceInCI
+            Condition="'$(CI)' == 'true' or '$(TF_BUILD)' == 'True' or '$(TEAMCITY_VERSION)' != '' or '$(JENKINS_URL)' != ''"
+            >true</SqlSourceInCI>
+        <SqlSourceHasConnectionVariable>true</SqlSourceHasConnectionVariable>
+        <SqlSourceHasConnectionVariable
+            Condition="$([System.String]::IsNullOrWhiteSpace($([System.Environment]::GetEnvironmentVariable('SQLSOURCE_CONNECTION'))))"
+            >false</SqlSourceHasConnectionVariable>
+        <SqlSourceEnvFolder>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.env'))</SqlSourceEnvFolder>
+        <SqlSourceFirstFramework>$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))</SqlSourceFirstFramework>
+        <SqlSourceGoesOnline>false</SqlSourceGoesOnline>
+        <SqlSourceGoesOnline
+            Condition="'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true')) or ($(SqlSourceOnlineValue.Equals('auto')) and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceEnvFolder)' != '')))"
+            >true</SqlSourceGoesOnline>
+        <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);SQLSRC026</MSBuildWarningsNotAsErrors>
+    </PropertyGroup>
+    <!--
+        Runs the sqlsource tool for the first framework before the outer build dispatches the inner builds.  The inner
+        builds run side by side, and each framework but the first calls SqlSourceRunOnline in the first framework's
+        configuration; MSBuild runs one request of a configuration at a time, so without this call each would wait for
+        the first framework's whole build.  The dispatch passes only TargetFramework, as this call does, so its build
+        of the first framework is the configuration this call built, and the run is not repeated there; the other
+        frameworks' calls are answered at once.  The condition is SqlSourceRunOnline's, in the outer build alone.
+    -->
+    <Target
+        Name="SqlSourceRunOnlineBeforeDispatch"
+        BeforeTargets="DispatchToInnerBuilds"
+        Condition="'$(TargetFramework)' == '' and '$(TargetFrameworks)' != '' and '$(DesignTimeBuild)' != 'true' and '$(SqlSourceGoesOnline)' == 'true'"
+    >
+        <MSBuild
+            Projects="$(MSBuildProjectFullPath)"
+            Targets="SqlSourceRunOnline"
+            Properties="TargetFramework=$(SqlSourceFirstFramework)"
+        />
+    </Target>
+    <!-- editorconfig-checker-enable -->
+</Project>

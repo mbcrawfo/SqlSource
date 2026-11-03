@@ -8,7 +8,9 @@
         the compiler reads its properties from, or run just before CoreCompile from SqlSource.AfterSdk.targets.
         SqlSourceListFiles and SqlSourceWriteManifest hook nothing: a target of a project that adds a .sql file hooks
         SqlSourceListFiles, which runs it before the search for settings files and before the manifest wherever it is
-        declared, and the sqlsource tool runs the manifest's target by name.
+        declared, and the sqlsource tool runs the manifest's target by name.  The targets of the online build, at the
+        end of the file, hook nothing either: SqlSourceTrackAdditionalFiles depends on SqlSourceDescribeOnline, which
+        runs the rest.
     -->
     <!--
         Gives the generator SqlSourceBuildFolders, the folders the build writes C# files and its outputs into and the
@@ -178,12 +180,13 @@
         of the list and is written only when the hash changes, so a build with the same files does not compile for it.
         It depends on the search, so that a settings file that is added, deleted or moved changes the hash too, and
         runs where the search runs, through SqlSourceSettingsSearchHook, so that a .sql file a late target adds is
-        hashed as well.
+        hashed as well.  It depends on SqlSourceDescribeOnline after the search, so that the online build runs the
+        sqlsource tool in both places the search runs, and the hash holds a sidecar the run created.
     -->
     <Target
         Name="SqlSourceTrackAdditionalFiles"
         BeforeTargets="$(SqlSourceSettingsSearchHook)"
-        DependsOnTargets="SqlSourceFindSettingsFiles"
+        DependsOnTargets="SqlSourceFindSettingsFiles;SqlSourceDescribeOnline"
     >
         <PropertyGroup>
             <SqlSourceFilesCache>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.cache</SqlSourceFilesCache>
@@ -315,6 +318,314 @@
         <ItemGroup Condition="'$(SqlSourceManifestIsDefault)' == 'true'">
             <FileWrites Include="$(SqlSourceManifestFile)" />
         </ItemGroup>
+    </Target>
+    <!-- editorconfig-checker-enable -->
+    <!--
+        The online build: a build runs the sqlsource tool on its project before the compiler reads its inputs, when a
+        connection is configured, so that the compiler is given sidecars of the schema as it is now.  SqlSourceOnline
+        is the project's: auto, or empty, runs the tool when the build finds a connection source and is not in CI,
+        true runs it whenever the build is not in CI, and false never runs it, each matched ignoring case and the
+        white space around it.  SqlSourceOnlineValue is auto, true or false, or the value as written when it is none
+        of them, which SqlSourceDescribeOnline reports as SQLSRC024.  A comparison of a condition reads yes, on and no
+        as booleans, so that 'yes' == 'true' holds, and the value is compared by Equals instead, after
+        ToLowerInvariant until it is one of the three.  No build in CI runs the tool, so that the job
+        that checks the sidecars never rewrites them: CI is recognised by the variables the services set.
+
+        A connection source is the variable SQLSOURCE_CONNECTION set and not blank, or a .env file in the project's
+        folder or a folder above it.  MSBuild logs a variable that a file reads as a property with its value, at the
+        detailed verbosity and in a binary log, so the variable is read by a property function whose answer alone
+        is the property: no file of the package names it as a property, and BuildFileTests holds that.  A project
+        whose connections are only in named variables, which a condition cannot list, sets true.
+
+        SqlSourceToolCommand is how the build starts the tool, a local tool of the repository by default; the tests
+        set it to a stand-in of the tool.  SqlSourceFirstFramework is the framework of TargetFrameworks that the tool
+        describes, as a run by hand does, and SqlSourceDescribeOnline runs the tool itself only there.
+
+        buildMultiTargeting/SqlSource.targets, which NuGet imports into the outer build of a multi-targeted project,
+        where this file is not imported, defines the properties its condition reads with the same text, which
+        BuildFileTests holds equal.  Both add SQLSRC026, the warning of a tool that cannot start under auto, to
+        MSBuildWarningsNotAsErrors, so that -warnaserror leaves it a warning: MSBuild reads that property from the
+        project as evaluated, so it is set here, after the project's content.
+
+        The values and conditions are long, and a property as written is on one line, so the check of the line length
+        is off for the group and the targets after it.
+    -->
+    <!-- editorconfig-checker-disable -->
+    <PropertyGroup>
+        <SqlSourceToolCommand Condition="'$(SqlSourceToolCommand)' == ''">dotnet sqlsource</SqlSourceToolCommand>
+        <SqlSourceOnlineValue>$(SqlSourceOnline.Trim())</SqlSourceOnlineValue>
+        <SqlSourceOnlineValue
+            Condition="'$(SqlSourceOnlineValue)' == '' or $(SqlSourceOnlineValue.ToLowerInvariant().Equals('auto'))"
+            >auto</SqlSourceOnlineValue>
+        <SqlSourceOnlineValue Condition="$(SqlSourceOnlineValue.ToLowerInvariant().Equals('true'))"
+            >true</SqlSourceOnlineValue>
+        <SqlSourceOnlineValue Condition="$(SqlSourceOnlineValue.ToLowerInvariant().Equals('false'))"
+            >false</SqlSourceOnlineValue>
+        <SqlSourceInCI>false</SqlSourceInCI>
+        <SqlSourceInCI
+            Condition="'$(CI)' == 'true' or '$(TF_BUILD)' == 'True' or '$(TEAMCITY_VERSION)' != '' or '$(JENKINS_URL)' != ''"
+            >true</SqlSourceInCI>
+        <SqlSourceHasConnectionVariable>true</SqlSourceHasConnectionVariable>
+        <SqlSourceHasConnectionVariable
+            Condition="$([System.String]::IsNullOrWhiteSpace($([System.Environment]::GetEnvironmentVariable('SQLSOURCE_CONNECTION'))))"
+            >false</SqlSourceHasConnectionVariable>
+        <SqlSourceEnvFolder>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.env'))</SqlSourceEnvFolder>
+        <SqlSourceFirstFramework>$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))</SqlSourceFirstFramework>
+        <SqlSourceGoesOnline>false</SqlSourceGoesOnline>
+        <SqlSourceGoesOnline
+            Condition="'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true')) or ($(SqlSourceOnlineValue.Equals('auto')) and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceEnvFolder)' != '')))"
+            >true</SqlSourceGoesOnline>
+        <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);SQLSRC026</MSBuildWarningsNotAsErrors>
+        <SqlSourceDescribeOnlineDependsOn />
+        <SqlSourceDescribeOnlineDependsOn
+            Condition="'$(TargetFrameworks)' == '' or '$(TargetFramework)' == '$(SqlSourceFirstFramework)'"
+            >SqlSourceRunOnline</SqlSourceDescribeOnlineDependsOn>
+    </PropertyGroup>
+    <!--
+        Describes the project's queries before the compiler reads its inputs, when the build goes online, and gives the
+        compiler the sidecars the run left.  SqlSourceTrackAdditionalFiles depends on it after the search for settings
+        files, so it runs wherever the search runs, just before CoreCompile or before
+        GenerateMSBuildEditorConfigFileCore, and it hooks nothing of its own.  It is no part of a design-time build,
+        which an IDE runs on every edit, nor of a compile by -t:Compile, which leaves BuildingProject false.
+
+        The tool runs once, for the first framework, in SqlSourceRunOnline: two frameworks can claim different files,
+        and a run for each would undo what the other wrote.  In the first framework, or in a project with no
+        TargetFrameworks, this target depends on it, through SqlSourceDescribeOnlineDependsOn, since a target's
+        dependencies are read before it runs.  Every other framework calls it in the first framework's
+        configuration, which MSBuild runs once, a second caller waiting for it.  In a build of every framework the
+        outer build has called it before it dispatched the inner builds, from buildMultiTargeting/SqlSource.targets,
+        so the call is answered at once and the inner builds still run side by side; a build of one framework, by -f
+        or through a ProjectReference, has no outer build and runs it from here.
+
+        A sidecar the tool created is not among the items, since the props' pattern was expanded when the project was
+        evaluated, so the pattern is expanded again, with the props' excludes and under their condition, and each
+        sidecar the items lack is added.  A sidecar the tool deleted is taken out of the items, or the compiler would
+        fail on a file that is not there: a .sql.json item is one whose name, less its .json, ends in .sql.  Both run
+        when the run is skipped as up to date, and give the same items then.
+    -->
+    <Target
+        Name="SqlSourceDescribeOnline"
+        Condition="'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' == 'true'"
+        DependsOnTargets="$(SqlSourceDescribeOnlineDependsOn)"
+    >
+        <Error
+            Code="SQLSRC024"
+            File="$(MSBuildProjectFullPath)"
+            Text="SqlSourceOnline is '$(SqlSourceOnlineValue)', which is not auto, true or false.  Set it to one of the three, or leave it empty for auto."
+            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc024"
+            Condition="!$(SqlSourceOnlineValue.Equals('auto')) and !$(SqlSourceOnlineValue.Equals('true')) and !$(SqlSourceOnlineValue.Equals('false'))"
+        />
+        <MSBuild
+            Projects="$(MSBuildProjectFullPath)"
+            Targets="SqlSourceRunOnline"
+            Properties="TargetFramework=$(SqlSourceFirstFramework)"
+            Condition="'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != '' and '$(TargetFramework)' != '$(SqlSourceFirstFramework)'"
+        />
+        <ItemGroup Condition="'$(SqlSourceGoesOnline)' == 'true' and '$(SqlSourceIncludeFiles)' != 'false'">
+            <SqlSourceSidecarFound
+                Include="**/*.sql.json"
+                Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)"
+            />
+            <AdditionalFiles Include="@(SqlSourceSidecarFound)" Exclude="@(AdditionalFiles)" />
+        </ItemGroup>
+        <ItemGroup Condition="'$(SqlSourceGoesOnline)' == 'true'">
+            <SqlSourceJsonFileGone
+                Include="@(AdditionalFiles)"
+                Condition="'%(Extension)' == '.json' and !Exists('%(FullPath)')"
+            />
+            <SqlSourceJsonFileGoneStem
+                Include="@(SqlSourceJsonFileGone->'%(RootDir)%(Directory)%(Filename)')"
+                SqlSourceItem="%(Identity)"
+            />
+            <SqlSourceSidecarGone
+                Include="@(SqlSourceJsonFileGoneStem->'%(SqlSourceItem)')"
+                Condition="'%(Extension)' == '.sql'"
+            />
+            <AdditionalFiles Remove="@(SqlSourceSidecarGone)" />
+        </ItemGroup>
+    </Target>
+    <!--
+        Prepares the run of the tool, as what SqlSourceRunOnline depends on after the manifest, so that every file
+        the run compares is written in the configuration that runs the tool, before its check of what is up to date,
+        wherever it is called from.  It writes two files under obj, each only when its text changes: the list of the
+        sidecars of the .sql files that exist, so that a deleted sidecar runs the tool again, and the value of
+        SqlSourceOnline with the folder of this file, whose path in NuGet's cache names the package's version, so
+        that a change of either does.  NuGet keeps a package's files at the time they were packed, so the files
+        themselves would not.  WriteLinesToFile writes an empty file for an empty list.
+
+        It gathers the run's inputs too: the manifest; the .sql files and the settings files among the AdditionalFiles
+        items; the sidecars of the .sql files, so that one a checkout replaced is described again; the two files above;
+        the .env that the connection source found; and the tool manifests above the project, which dotnet tool
+        update rewrites.  GetPathOfFileAbove takes no folder in the name, so the tool manifest under .config is found
+        by its folder.  Each found path comes from a property function, which gives it unescaped, so it is escaped
+        before it is an item.
+    -->
+    <Target Name="SqlSourceListSidecars">
+        <PropertyGroup>
+            <SqlSourceSidecarList>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.sidecars</SqlSourceSidecarList>
+            <SqlSourceOnlineValueFile>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.online</SqlSourceOnlineValueFile>
+            <SqlSourceOnlineStamp>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.stamp</SqlSourceOnlineStamp>
+            <SqlSourceToolManifestFolder>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.config/dotnet-tools.json'))</SqlSourceToolManifestFolder>
+            <SqlSourceRootToolManifestFolder>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), 'dotnet-tools.json'))</SqlSourceRootToolManifestFolder>
+        </PropertyGroup>
+        <ItemGroup>
+            <SqlSourceSidecarOfSqlFile
+                Include="@(AdditionalFiles->'%(FullPath).json')"
+                Condition="'%(Extension)' == '.sql'"
+            />
+            <SqlSourceSidecarListed Include="@(SqlSourceSidecarOfSqlFile->Exists())" />
+            <SqlSourceOnlineValueLine Include="$(SqlSourceOnlineValue)" />
+            <SqlSourceOnlineValueLine Include="$(MSBuildThisFileDirectory)" />
+        </ItemGroup>
+        <WriteLinesToFile
+            File="$(SqlSourceSidecarList)"
+            Lines="@(SqlSourceSidecarListed)"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="true"
+        />
+        <WriteLinesToFile
+            File="$(SqlSourceOnlineValueFile)"
+            Lines="@(SqlSourceOnlineValueLine)"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="true"
+        />
+        <ItemGroup>
+            <FileWrites Include="$(SqlSourceSidecarList)" />
+            <FileWrites Include="$(SqlSourceOnlineValueFile)" />
+            <SqlSourceOnlineInput Include="$(SqlSourceManifestFile)" />
+            <SqlSourceOnlineInput
+                Include="@(AdditionalFiles)"
+                Condition="'%(Extension)' == '.sql' or '%(Filename)%(Extension)' == 'sqlsource.json'"
+            />
+            <SqlSourceOnlineInput Include="@(SqlSourceSidecarListed)" />
+            <SqlSourceOnlineInput Include="$(SqlSourceSidecarList)" />
+            <SqlSourceOnlineInput Include="$(SqlSourceOnlineValueFile)" />
+            <SqlSourceOnlineInput
+                Include="$([MSBuild]::Escape($([MSBuild]::NormalizePath($(SqlSourceEnvFolder), '.env'))))"
+                Condition="'$(SqlSourceEnvFolder)' != ''"
+            />
+            <SqlSourceOnlineInput
+                Include="$([MSBuild]::Escape($([MSBuild]::NormalizePath($(SqlSourceToolManifestFolder), '.config', 'dotnet-tools.json'))))"
+                Condition="'$(SqlSourceToolManifestFolder)' != ''"
+            />
+            <SqlSourceOnlineInput
+                Include="$([MSBuild]::Escape($([MSBuild]::NormalizePath($(SqlSourceRootToolManifestFolder), 'dotnet-tools.json'))))"
+                Condition="'$(SqlSourceRootToolManifestFolder)' != ''"
+            />
+        </ItemGroup>
+    </Target>
+    <!--
+        Runs the sqlsource tool on the manifest of this build, unless every input is older than the stamp.  Its
+        condition is the run's alone, and leaves BuildingProject out: a configuration that another build calls by
+        name starts with BuildingProject false.  It depends on the manifest and on SqlSourceListSidecars, so that the
+        files it compares are written first wherever it is called from: from SqlSourceDescribeOnline, from another
+        framework's build, or from the outer build.
+
+        Exec reads the tool's errors as a compiler's, which under online the tool writes on one line each.  It ignores
+        the exit code, since it would otherwise add an error of its own to the tool's, and it keeps every line, of
+        both streams, for this target to read.  The summary and the offline line are messages of low importance: the
+        build says what failed, and -v:d shows the rest.  Under SQLSOURCE_LOG the tool writes its log to a file of
+        this project and framework, since projects built at once would otherwise open one file.
+
+        When dotnet cannot start the tool, it prints its own words, which are localised, and its exit code is no
+        guide, so a run that printed no line of the tool's own is a tool that did not start: a line starting
+        sqlsource:, an error of the tool, or a line of its summary, in the form of RunSummary.Lines of the tool.
+        Under true that fails the build, SQLSRC025; under auto the build goes on with the committed sidecars,
+        SQLSRC026, a warning.  A tool that started, exited other than 0 and reported no error of its own fails the
+        build with SQLSRC027, which names the exit code and its first line, and when that line is the tool's own and
+        is neither the offline nor the online line, as a usage error from a tool older than the package is, says to
+        update the tool.  Their texts are the messages of SqlDiagnostics.OnlineValueInvalid, OnlineToolCannotRun,
+        OnlineToolCannotRunOffline and OnlineToolFailedSilently, with {0}, {1} and {2} where the targets write a
+        property: they change together.  The lines are joined with line breaks, since a line can hold any character
+        but one, and a property function never takes an item's metadata, which MSBuild puts in as text.
+
+        The list of sidecars is written again after the run, from the files on the disk, or a sidecar the run created
+        or deleted would change it and run the tool once more at the next build.  The stamp is touched only after a
+        run that exited with 0 and did not print the offline line, so that a failed or offline run is tried again by
+        the next build.  It is in FileWrites whether or not this run touched it, as it is when the run is skipped,
+        since MSBuild still runs a skipped target's groups: IncrementalClean deletes a file under obj that an earlier
+        build wrote and this one does not list.  The errors come last, since they end the target.
+    -->
+    <Target
+        Name="SqlSourceRunOnline"
+        Condition="'$(DesignTimeBuild)' != 'true' and '$(SqlSourceGoesOnline)' == 'true'"
+        DependsOnTargets="SqlSourceWriteManifest;SqlSourceListSidecars"
+        Inputs="@(SqlSourceOnlineInput);@(Compile)"
+        Outputs="$(SqlSourceOnlineStamp)"
+    >
+        <PropertyGroup>
+            <SqlSourceToolLog />
+            <SqlSourceToolLog Condition="'$(SQLSOURCE_LOG)' != ''"
+                > --log &quot;$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log&quot;</SqlSourceToolLog>
+        </PropertyGroup>
+        <Exec
+            Command="$(SqlSourceToolCommand) describe --manifest &quot;$(SqlSourceManifestFile)&quot; --online $(SqlSourceOnlineValue)$(SqlSourceToolLog)"
+            WorkingDirectory="$(MSBuildProjectDirectory)"
+            IgnoreExitCode="true"
+            ConsoleToMSBuild="true"
+            StandardOutputImportance="low"
+        >
+            <Output TaskParameter="ExitCode" PropertyName="SqlSourceToolExitCode" />
+            <Output TaskParameter="ConsoleOutput" ItemName="SqlSourceToolOutput" />
+        </Exec>
+        <PropertyGroup>
+            <SqlSourceToolOutputText>@(SqlSourceToolOutput, '%0A')</SqlSourceToolOutputText>
+            <SqlSourceToolFirstLine>$([System.Text.RegularExpressions.Regex]::Match($(SqlSourceToolOutputText), '^[^\n]*'))</SqlSourceToolFirstLine>
+            <SqlSourceToolStarted>false</SqlSourceToolStarted>
+            <SqlSourceToolStarted
+                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(SqlSourceToolOutputText), '(?m)^(sqlsource:|.*: error SQLSRC\d{3}:|.* \([^()]+\): (\d+ described, \d+ skipped, \d+ failed|no connection, \d+ skipped)$)'))"
+                >true</SqlSourceToolStarted>
+            <SqlSourceToolReportedError>false</SqlSourceToolReportedError>
+            <SqlSourceToolReportedError
+                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(SqlSourceToolOutputText), ': error SQLSRC\d{3}:'))"
+                >true</SqlSourceToolReportedError>
+            <SqlSourceToolOffline>false</SqlSourceToolOffline>
+            <SqlSourceToolOffline
+                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(SqlSourceToolOutputText), '(?m)^sqlsource: offline:'))"
+                >true</SqlSourceToolOffline>
+            <SqlSourceToolUpdateAdvice />
+            <SqlSourceToolUpdateAdvice
+                Condition="$(SqlSourceToolFirstLine.StartsWith('sqlsource: ')) and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: offline:')) and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: online:'))"
+                >The tool may be older than the SqlSource package, and not know the options the build gives it: update it to the package's version with 'dotnet tool update SqlSource.Tool --version &lt;version&gt;'.  </SqlSourceToolUpdateAdvice>
+        </PropertyGroup>
+        <ItemGroup>
+            <SqlSourceSidecarAfterRun Include="@(SqlSourceSidecarOfSqlFile->Exists())" />
+        </ItemGroup>
+        <WriteLinesToFile
+            File="$(SqlSourceSidecarList)"
+            Lines="@(SqlSourceSidecarAfterRun)"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="true"
+        />
+        <Touch
+            Files="$(SqlSourceOnlineStamp)"
+            AlwaysCreate="true"
+            Condition="'$(SqlSourceToolExitCode)' == '0' and '$(SqlSourceToolStarted)' == 'true' and '$(SqlSourceToolOffline)' != 'true'"
+        />
+        <ItemGroup>
+            <FileWrites Include="$(SqlSourceOnlineStamp)" />
+        </ItemGroup>
+        <Warning
+            Code="SQLSRC026"
+            File="$(MSBuildProjectFullPath)"
+            Text="The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning."
+            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc026"
+            Condition="'$(SqlSourceToolStarted)' != 'true' and $(SqlSourceOnlineValue.Equals('auto'))"
+        />
+        <Error
+            Code="SQLSRC025"
+            File="$(MSBuildProjectFullPath)"
+            Text="The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars."
+            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc025"
+            Condition="'$(SqlSourceToolStarted)' != 'true' and $(SqlSourceOnlineValue.Equals('true'))"
+        />
+        <Error
+            Code="SQLSRC027"
+            File="$(MSBuildProjectFullPath)"
+            Text="The sqlsource tool exited with the code $(SqlSourceToolExitCode) and reported no error, so the sidecars may not be current.  $(SqlSourceToolUpdateAdvice)It printed first: '$(SqlSourceToolFirstLine)'."
+            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc027"
+            Condition="'$(SqlSourceToolStarted)' == 'true' and '$(SqlSourceToolExitCode)' != '0' and '$(SqlSourceToolReportedError)' != 'true'"
+        />
     </Target>
     <!-- editorconfig-checker-enable -->
 </Project>
