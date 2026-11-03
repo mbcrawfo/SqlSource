@@ -16,7 +16,7 @@ public sealed class GeneratedSourceEscapingTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
-            [SqlSource.SqlSourceGenerate(SqlLocation = SqlSource.SqlLocation.Direct)]
+            [SqlSource.SqlSourceGenerate(Source = ".", SqlLocation = SqlSource.SqlLocation.Direct)]
             public partial struct @class
             {
                 public static string Value => GetUser;
@@ -59,7 +59,7 @@ public sealed class GeneratedSourceEscapingTests
             {
                 namespace Data
                 {
-                    [SqlSourceGenerate]
+                    [SqlSourceGenerate(Source = ".")]
                     public partial class Sample
                     {
                         public static string Value => Sql.GetUser;
@@ -88,7 +88,7 @@ public sealed class GeneratedSourceEscapingTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
             new SqlFile(GeneratorHarness.UsersPath, Sql + "\n")
@@ -145,7 +145,7 @@ public sealed class GeneratedSourceEscapingTests
             [
                 new SourceFile(
                     "/app/Dépôt/Sample.cs",
-                    "namespace Données;\n[SqlSource.SqlSourceGenerate]\n"
+                    "namespace Données;\n[SqlSource.SqlSourceGenerate(Source = \".\")]\n"
                         + "public partial class Requêtes { public string V => Sql.Größe; }\n"
                 ),
             ],

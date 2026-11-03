@@ -5,8 +5,9 @@ using SqlSource;
 
 namespace SqlServerExamples.Sql;
 
-// The output sql: Counts.CountUsers is a constant, and Counts.CountRows a method that fills in its token.  NestedClass
-// names the class that holds them, which is Sql by default.
+// The output sql, for the queries of CountQueries.sql, the file named for the class: Counts.CountUsers is a constant,
+// and Counts.CountRows a method that fills in its token.  NestedClass names the class that holds them, which is Sql by
+// default.
 [SqlSourceGenerate(Output = GeneratorOutput.Sql, NestedClass = "Counts")]
 public sealed partial class CountQueries(DbConnection connection)
 {

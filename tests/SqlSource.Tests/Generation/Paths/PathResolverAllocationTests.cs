@@ -20,15 +20,19 @@ public sealed class PathResolverAllocationTests
 
     private const int OwnFiles = 5;
 
-    [Fact]
-    public void Resolve_ProjectWithManyOtherFiles_AllocatesWithinItsBudget()
+    [Theory]
+    // The folder, whose search is the one that could grow with the project.
+    [InlineData(".", OwnFiles)]
+    // The file named for the type, UserRepository.sql, alone.
+    [InlineData(null, 1)]
+    public void Resolve_ProjectWithManyOtherFiles_AllocatesWithinItsBudget(string? source, int files)
     {
         const int Iterations = 20;
-        var type = TestModels.Type();
+        var type = TestModels.Type(source);
         var paths = CreatePaths();
         PathResolver
             .Resolve(type, paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
-            .Files.Count.ShouldBe(OwnFiles);
+            .Files.Count.ShouldBe(files);
 
         // The first calls pay for one-off work: JIT compilation and static initialisers.
         for (var iteration = 0; iteration < Iterations; iteration++)
@@ -52,10 +56,12 @@ public sealed class PathResolverAllocationTests
     private static EquatableArray<string> CreatePaths()
     {
         var paths = new List<string>();
-        for (var file = 0; file < OwnFiles; file++)
+        for (var file = 0; file < OwnFiles - 1; file++)
         {
             paths.Add(string.Create(CultureInfo.InvariantCulture, $"app/Repo/Queries{file}.sql"));
         }
+
+        paths.Add("app/Repo/UserRepository.sql");
 
         for (var file = 0; file < 1000; file++)
         {

@@ -185,7 +185,8 @@ public sealed class DialectTests
     private static SourceFile TypeIn(string name) =>
         new(
             "/app/" + name + "/" + name + ".cs",
-            "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]\n"
+            "using SqlSource;\n\nnamespace App;\n\n"
+                + "[SqlSourceGenerate(Source = \".\", SqlLocation = SqlLocation.Direct)]\n"
                 + "public partial class "
                 + name
                 + ";\n"

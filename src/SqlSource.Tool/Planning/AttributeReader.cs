@@ -19,11 +19,13 @@ namespace SqlSource.Tool.Planning;
 /// symbols, and the tool has no compilation, so there is nothing of it to share.
 /// </summary>
 /// <remarks>
-/// It matches the attribute by its name and reads <c>Path</c> and <c>Output</c> alone, each as it is written:
-/// nothing else on the attribute changes what is described.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>:
-/// an alias, a type of the same name in another namespace, and an attribute inside <c>#if</c> under a configuration
-/// other than the manifest's.  A <c>Path</c> outside ASCII in a file that is not UTF-8 is not read: on Windows the
-/// compiler reads that file in the system's code page, so the text here would not be the text it resolves.
+/// It matches the attribute by its name and reads <c>Source</c> and <c>Output</c> alone, each as it is written, and
+/// the type's name, which names its file when there is no <c>Source</c>: nothing else on the attribute changes what is
+/// described.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>: an alias, a type of the same name in another
+/// namespace, and an attribute inside <c>#if</c> under a configuration other than the manifest's.  A <c>Source</c>
+/// outside ASCII in a file that is not UTF-8 is not read, nor a type's name outside ASCII when there is no
+/// <c>Source</c>: on Windows the compiler reads that file in the system's code page, so the text here would not be the
+/// text it resolves.
 /// </remarks>
 internal static class AttributeReader
 {
@@ -62,9 +64,13 @@ internal static class AttributeReader
                 )
             )
             {
-                if (TargetTypeReader.IsCandidate(node) && FindAttribute((TypeDeclarationSyntax)node) is { } attribute)
+                if (
+                    TargetTypeReader.IsCandidate(node)
+                    && node is TypeDeclarationSyntax declaration
+                    && FindAttribute(declaration) is { } attribute
+                )
                 {
-                    ReadAttribute(attribute, path, contents.CompilerFallsBack, claims, errors);
+                    ReadAttribute(declaration, attribute, path, contents.CompilerFallsBack, claims, errors);
                 }
             }
         }
@@ -94,6 +100,7 @@ internal static class AttributeReader
             .FirstOrDefault(static attribute => LastIdentifier(attribute.Name) is ShortName or LongName);
 
     private static void ReadAttribute(
+        TypeDeclarationSyntax declaration,
         AttributeSyntax attribute,
         string path,
         bool compilerFallsBack,
@@ -101,9 +108,9 @@ internal static class AttributeReader
         ImmutableArray<ToolDiagnostic>.Builder errors
     )
     {
-        string? typePath = null;
+        string? typeSource = null;
         OutputKind? output = null;
-        var readPath = false;
+        var readSource = false;
         var readOutput = false;
         var isRead = true;
         if (attribute.ArgumentList is { } list)
@@ -112,13 +119,13 @@ internal static class AttributeReader
             {
                 // The first of a name, as the generator takes it; the compiler rejects a second.
                 var name = argument.NameEquals?.Name.Identifier.ValueText;
-                if (name == AttributeSource.PathProperty && !readPath)
+                if (name == AttributeSource.SourceProperty && !readSource)
                 {
-                    readPath = true;
-                    if (!TryReadPath(argument.Expression, out typePath))
+                    readSource = true;
+                    if (!TryReadSource(argument.Expression, out typeSource))
                     {
                         isRead = false;
-                        errors.Add(NotALiteral(path, argument.Expression, AttributeSource.PathProperty));
+                        errors.Add(NotALiteral(path, argument.Expression, AttributeSource.SourceProperty));
                     }
                     // By how it is written: an escape such as \u00e9 is ASCII in the file, so it reads the same.
                     else if (compilerFallsBack && argument.Expression.ToString().Any(static c => c > '\u007F'))
@@ -141,22 +148,30 @@ internal static class AttributeReader
             }
         }
 
+        // With no Source, the type's file is named for it, and a name outside ASCII is read as the Source is.
+        var identifier = declaration.Identifier;
+        if (isRead && typeSource is null && compilerFallsBack && WrittenNameOf(declaration) is { } written)
+        {
+            isRead = false;
+            errors.Add(ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, path, written, path));
+        }
+
         // A claim that could not be read is not planned: its files may be described for another type.
         if (isRead)
         {
-            claims.Add(new TypeClaim(path, typePath, output, StartOf(attribute)));
+            claims.Add(new TypeClaim(path, identifier.ValueText, typeSource, output, StartOf(attribute)));
         }
     }
 
-    // A string literal of any kind.  null, default and the empty string are a Path that is not set, as in the
-    // generator, where a string of white space is a path that matches nothing.
-    private static bool TryReadPath(ExpressionSyntax expression, out string? path)
+    // A string literal of any kind.  null, default and the empty string are a Source that is not set, as in the
+    // generator, where a string of white space is a source that matches nothing.
+    private static bool TryReadSource(ExpressionSyntax expression, out string? source)
     {
-        path = null;
+        source = null;
         if (expression.IsKind(SyntaxKind.StringLiteralExpression))
         {
             var text = ((LiteralExpressionSyntax)expression).Token.ValueText;
-            path = text.Length > 0 ? text : null;
+            source = text.Length > 0 ? text : null;
             return true;
         }
 
@@ -200,4 +215,53 @@ internal static class AttributeReader
         ToolDiagnostic.At(ToolDiagnostics.AttributeArgumentNotLiteral, path, StartOf(expression), argument);
 
     private static LinePosition StartOf(SyntaxNode node) => node.GetLocation().GetLineSpan().StartLinePosition;
+
+    // Where the type's name is written, when it holds a character outside ASCII, and null otherwise.  A character that
+    // is not UTF-8 reads as U+FFFD, which ends the identifier, so the name is the characters from the identifier's
+    // start that can be part of one.  A U+FFFD first in the name leaves no identifier, missing or empty, and the name
+    // is then at the first character outside ASCII after the keyword.
+    private static LinePosition? WrittenNameOf(TypeDeclarationSyntax declaration)
+    {
+        var text = declaration.SyntaxTree.GetText();
+        var identifier = declaration.Identifier;
+        if (identifier.ValueText.Length == 0)
+        {
+            var keyword =
+                declaration is RecordDeclarationSyntax record && !record.ClassOrStructKeyword.IsKind(SyntaxKind.None)
+                    ? record.ClassOrStructKeyword
+                    : declaration.Keyword;
+            // The character is skipped by the parser, so it is in the trivia of a token after the keyword, not in the
+            // declaration's span: up to the end of the next token that is there in the text.
+            var next = keyword.GetNextToken().Span.End;
+            for (var position = keyword.Span.End; position < next; position++)
+            {
+                if (text[position] > '\u007F')
+                {
+                    return text.Lines.GetLinePosition(position);
+                }
+            }
+
+            return null;
+        }
+
+        var start = identifier.SpanStart;
+        var end = identifier.Span.End;
+        while (end < text.Length && IsInName(text[end]))
+        {
+            end++;
+        }
+
+        for (var position = start; position < end; position++)
+        {
+            if (text[position] > '\u007F')
+            {
+                return text.Lines.GetLinePosition(start);
+            }
+        }
+
+        return null;
+    }
+
+    // A letter, a digit, an underscore, the backslash of an escape such as \u00e9, or any character outside ASCII.
+    private static bool IsInName(char c) => c > '\u007F' || char.IsAsciiLetterOrDigit(c) || c == '_' || c == '\\';
 }

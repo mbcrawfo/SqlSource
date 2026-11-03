@@ -32,7 +32,7 @@ $ dotnet tool install SqlSource.Tool --prerelease
 
 ### 1. Write your queries
 
-Save this as `Queries/Users.sql`:
+Save this as `Queries/UserRepository.sql`:
 
 ```sql postgres
 -- name: GetUser -> one-optional
@@ -68,7 +68,7 @@ using SqlSource;
 public partial class UserRepository;
 ```
 
-The type gets every `.sql` file in the folder of its C# file.  Once the queries are described, in step 5, the build generates a method for each query that runs it, `GetUser` and `FindUsers`.  Until then it reports an error for each query: by default each query must be described by its database, which needs the dialect of step 3 and the tool of step 5.  More: [the generator](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md), for another folder, one file, or methods on the type itself.
+The type gets the `.sql` file named for it, `UserRepository.sql`, in the folder of its C# file.  Once the queries are described, in step 5, the build generates a method for each query that runs it, `GetUser` and `FindUsers`.  Until then it reports an error for each query: by default each query must be described by its database, which needs the dialect of step 3 and the tool of step 5.  More: [the generator](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md), for every file of a folder, another file, or methods on the type itself.
 
 ### 3. Set the dialect
 
@@ -110,7 +110,7 @@ More: [query methods](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manua
 
 ### 5. Describe your queries
 
-This step works with PostgreSQL and SQL Server: for another database, or for queries that want only their SQL, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `Users.sql.json`.
+This step works with PostgreSQL and SQL Server: for another database, or for queries that want only their SQL, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `UserRepository.sql.json`.
 
 - **That checks every query against your schema**: a table or a column that does not exist, or a parameter whose type cannot be worked out, is an error now and not when the query runs.
 - **The build reads the sidecars**, and reports an error for a query that has no entry in its sidecar, or whose entry is older than the query.  The models and the methods are built from them, so that a build needs no database.
@@ -126,7 +126,7 @@ Then run the tool from the folder of your project or solution, or name it, as in
 ```console
 $ dotnet sqlsource describe
 postgres (postgres): 2 described, 0 skipped, 0 failed
-$ git add Queries/Users.sql.json
+$ git add Queries/UserRepository.sql.json
 ```
 
 `postgres`, in the variable's name and first in the summary, is the name SqlSource gives the database your queries belong to: the dialect's name, until you [name your databases](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  The name in parentheses is its dialect.  The tool reads the `.env` nearest to the project or solution it runs on, up to the root of the repository, and only its `SQLSOURCE_CONNECTION` variables, so the file can be your application's own too: see [the `.env` file](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#env-file).  The same variable set in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.  For SQL Server files the database's name is `mssql`, so the variable is `SQLSOURCE_CONNECTION_MSSQL`, and the connection string is SqlClient's, `Server=localhost,1433;Database=app;User ID=app;Password=secret`, with `TrustServerCertificate=True` for SQL Server in a local container: see [connecting to SQL Server](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#connecting).  The tool needs your schema, not your data.  Commit the sidecars with the project: every build reads them, and a copy of the project without them reports an error for each query.  A project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself, beside its `.sql` files: see [which `.sql` files are included](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#included-files).
@@ -245,7 +245,7 @@ Two things catch a PostgreSQL project out.  Entity Framework Core's `Npgsql.Enti
 
 A project's JSON columns are `string`s until it turns System.Text.Json on, with `"libraryTypes": { "json": "on" }` in a settings file: then PostgreSQL's `json` and `jsonb` and SQL Server's `json` are a `JsonElement` in its query methods.  A type override, a column type or a marker gives a JSON column a `JsonDocument` or a `JsonNode` instead, or a class of your own, which the query methods read and send through System.Text.Json's serializer.  Nothing is registered on the data source, and a column of a string type that holds JSON, such as an `nvarchar(max)`, takes a class by the JSON opt-in, `-> json OrderMetadata`.  See JSON on [PostgreSQL](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#json) and [SQL Server](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#json), and [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#class-in-a-json-column).
 
-The deliveries of [the PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) and [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md), `CodeGen/Deliveries.sql`, show all three libraries in a whole project.
+The deliveries of [the PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) and [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md), `CodeGen/DeliveryQueries.sql`, show all three libraries in a whole project.
 
 ## Custom type mapping
 

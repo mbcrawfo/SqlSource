@@ -4,5 +4,5 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // ones that project runs: the eight collection types that read their rows through the pooled row buffer, each read
 // through it and under no-array-pool without it, as extension methods of the connection in RowBufferQueriesExtensions,
 // the default location.
-[SqlSourceGenerate(Path = "../../SqlServer/EndToEnd/Queries/RowBuffers.sql")]
+[SqlSourceGenerate(Source = "../../SqlServer/EndToEnd/Queries/RowBuffers.sql")]
 internal static partial class RowBufferQueries;

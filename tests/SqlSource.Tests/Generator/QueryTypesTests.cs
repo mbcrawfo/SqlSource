@@ -25,7 +25,7 @@ public sealed class QueryTypesTests
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
         }
 
@@ -614,7 +614,7 @@ public sealed class QueryTypesTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
             }
 

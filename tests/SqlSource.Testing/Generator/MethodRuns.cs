@@ -100,7 +100,7 @@ internal static class MethodRuns
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public readonly record struct UserId(int Value)
@@ -187,7 +187,7 @@ internal static class MethodRuns
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public readonly record struct UserId(long Value)
@@ -259,9 +259,10 @@ internal static class MethodRuns
             subtype: ModelRuns.Int4
         );
 
-    // The source of App.Sample with the attribute's arguments, such as MethodLocation = MethodLocation.Public.
+    // The source of App.Sample with Source = "." and the attribute's arguments, such as
+    // MethodLocation = MethodLocation.Public.
     public static string SampleSource(string arguments) =>
-        "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate("
+        "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\", "
         + arguments
         + ")]\n    public partial class Sample;\n}\n";
 }

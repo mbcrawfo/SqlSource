@@ -21,7 +21,7 @@ internal static partial class QueryMethodCorpus
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public sealed class OrderMetadata

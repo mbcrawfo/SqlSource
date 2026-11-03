@@ -23,7 +23,7 @@ internal static class ModelRuns
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
         }
         """;

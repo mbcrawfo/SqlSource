@@ -52,11 +52,11 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor PathMatchesNothing = new(
+    public static readonly DiagnosticDescriptor SourceMatchesNothing = new(
         id: "SQLSRC004",
-        title: "Path matches no SQL file",
-        messageFormat: "Path '{0}' matches no .sql file.  It is relative to the folder of this file; a value that ends "
-            + "in .sql is one file, and any other value is a folder.",
+        title: "Source matches no SQL file",
+        messageFormat: "Source '{0}' matches no .sql file.  It is relative to the folder of this file; a value that "
+            + "ends in .sql is one file, and any other value is a folder.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -64,10 +64,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor FolderHasNoSqlFile = new(
+    public static readonly DiagnosticDescriptor TypeHasNoSqlFile = new(
         id: "SQLSRC005",
-        title: "Folder has no SQL file",
-        messageFormat: "The folder of this file has no .sql file.  Add one, or set Path.",
+        title: "Type has no SQL file",
+        messageFormat: "No '{0}.sql' beside this file.  Add it, or set Source.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -1143,8 +1143,8 @@ internal static class SqlDiagnostics
             TypeNotPartial,
             TypeIsFileLocal,
             UnsupportedTargetFramework,
-            PathMatchesNothing,
-            FolderHasNoSqlFile,
+            SourceMatchesNothing,
+            TypeHasNoSqlFile,
             InvalidAttributeValue,
             NestedClassNameTaken,
             DuplicateQueryName,

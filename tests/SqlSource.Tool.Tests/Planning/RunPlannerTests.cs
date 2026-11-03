@@ -35,7 +35,7 @@ public sealed class RunPlannerTests : IDisposable
         var project = Postgres();
         _ = project.AddSource(
             "Queries.cs",
-            Plans.TypeNamed("Queries", "Path = \"Queries\", Output = SqlSource.GeneratorOutput.Models")
+            Plans.TypeNamed("Queries", "Source = \"Queries\", Output = SqlSource.GeneratorOutput.Models")
         );
         var sql = project.AddSql(
             "Queries/Users.sql",
@@ -92,7 +92,7 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_PathOfAFile_ClaimsThatFile()
     {
         var project = Postgres();
-        _ = project.AddSource("Repository.cs", Plans.TypeNamed("Repository", "Path = \"Queries/b.SQL\""));
+        _ = project.AddSource("Repository.cs", Plans.TypeNamed("Repository", "Source = \"Queries/b.SQL\""));
         _ = project.AddSql("Queries/A.sql", "SELECT 1;");
         var named = project.AddSql("Queries/B.sql", "SELECT 1;");
 
@@ -118,11 +118,11 @@ public sealed class RunPlannerTests : IDisposable
         var project = Postgres();
         _ = project.AddSource(
             "A.cs",
-            Plans.TypeNamed("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
+            Plans.TypeNamed("A", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
         );
         _ = project.AddSource(
             "B.cs",
-            Plans.TypeNamed("B", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
+            Plans.TypeNamed("B", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
         );
         _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
@@ -136,8 +136,8 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_TwoTypesThatClaimOneFile_HasBothClaimsInTheOrderOfTheirSourceFiles()
     {
         var project = Postgres();
-        var first = project.AddSource("B.cs", Plans.TypeNamed("B", "Path = \"Q\""));
-        var second = project.AddSource("A.cs", Plans.TypeNamed("A", "Path = \"Q/One.sql\""));
+        var first = project.AddSource("B.cs", Plans.TypeNamed("B", "Source = \"Q\""));
+        var second = project.AddSource("A.cs", Plans.TypeNamed("A", "Source = \"Q/One.sql\""));
         _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
         var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
@@ -149,7 +149,7 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_FileThatNoTypeClaims_IsNotReadThoughItDoesNotParse()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Queries\""));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Queries\""));
         _ = project.AddSql("Queries/One.sql", "SELECT 1;");
         _ = project.AddSql("Migrations/Broken.sql", "-- name: Broken\nSELECT 'open\n");
 
@@ -159,7 +159,7 @@ public sealed class RunPlannerTests : IDisposable
         result.Plan.Files.Count.ShouldBe(1);
     }
 
-    // The build reports a Path that matches nothing.
+    // The build reports a Source that matches nothing.
     [Theory]
     [InlineData("Nowhere")]
     [InlineData("Nowhere.sql")]
@@ -167,7 +167,7 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_PathThatNamesNothing_PlansNothingAndReportsNothing(string path)
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", $"Path = \"{path}\""));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", $"Source = \"{path}\""));
         _ = project.AddSql("Q.sql", "SELECT 1;");
 
         var result = Plans.Result(project);
@@ -246,10 +246,10 @@ public sealed class RunPlannerTests : IDisposable
         );
         var first = Postgres("A");
         first.ListSettings(settings);
-        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
+        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
         first.ListSql(shared);
         var second = Postgres("B");
-        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
         second.ListSql(shared);
 
         var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();
@@ -267,7 +267,7 @@ public sealed class RunPlannerTests : IDisposable
         var shared = first.AddSql("X.sql", "SELECT 1;");
         _ = first.AddSql("Only.sql", "SELECT 2;");
         var second = Postgres("B");
-        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../A/X.sql\""));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../A/X.sql\""));
         second.ListSql(shared);
         _ = second.AddSql("Lone.sql", "SELECT 3;");
 
@@ -329,7 +329,7 @@ public sealed class RunPlannerTests : IDisposable
         var second = Postgres("B");
         second.ListSettings(farther);
         second.ListSettings(nearer);
-        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
         second.ListSql(shared);
 
         var file = Plans.Result(first, second).Plan.Files.Single(file => file.Path == shared);
@@ -499,7 +499,7 @@ public sealed class RunPlannerTests : IDisposable
         first.Settings["output"] = "sql";
         var shared = first.AddSql("One.sql", "SELECT 1;");
         var second = Postgres("B");
-        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../A\""));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../A\""));
         second.ListSql(shared);
 
         var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();
@@ -524,12 +524,12 @@ public sealed class RunPlannerTests : IDisposable
         var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
         var first = Postgres("A");
         first.ListSettings(farther);
-        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
+        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
         first.ListSql(shared);
         var second = Postgres("B");
         second.ListSettings(farther);
         second.ListSettings(nearer);
-        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
         second.ListSql(shared);
 
         var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();

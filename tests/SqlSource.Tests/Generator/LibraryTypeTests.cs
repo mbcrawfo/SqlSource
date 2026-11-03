@@ -372,7 +372,7 @@ public sealed class LibraryTypeTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Rows;
             }
             """;
@@ -432,13 +432,13 @@ public sealed class LibraryTypeTests
 
             namespace Methods
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
                 public partial class Repo;
             }
 
             namespace Dtos
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Rows;
             }
             """;
@@ -568,7 +568,7 @@ public sealed class LibraryTypeTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public static class Moments
@@ -793,7 +793,7 @@ public sealed class LibraryTypeTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Rows;
             }
             """;
@@ -818,13 +818,13 @@ public sealed class LibraryTypeTests
 
             namespace First
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Rows;
             }
 
             namespace Second
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Rows;
             }
             """;
@@ -847,13 +847,13 @@ public sealed class LibraryTypeTests
 
             namespace Methods
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
                 public partial class Repo;
             }
 
             namespace Dtos
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Rows;
             }
             """;
@@ -970,7 +970,7 @@ public sealed class LibraryTypeTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Rows;
             }
             """;

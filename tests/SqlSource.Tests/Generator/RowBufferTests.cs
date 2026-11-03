@@ -36,10 +36,10 @@ public sealed class RowBufferTests
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "A.sql")]
+            [SqlSourceGenerate(Source = "A.sql")]
             public partial class First;
 
-            [SqlSourceGenerate(Path = "B.sql")]
+            [SqlSourceGenerate(Source = "B.sql")]
             public partial class Second;
         }
         """;
@@ -300,10 +300,13 @@ public sealed class RowBufferTests
         string id
     )
     {
+        // With no references the compiler cannot read a string argument, so the type takes the file of its name.
+        var source = MethodRuns.Source.Replace("(Source = \".\")", string.Empty, StringComparison.Ordinal);
+        var listUsers = ListUsers with { Path = "/app/Repo/Sample.sql" };
         var run = GeneratorHarness.Run(
             OutputKind.CodeGen,
-            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
-            [ListUsers, Sidecars.Of(ListUsers, Users(ListUsers, "ListUsers"))],
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [listUsers, Sidecars.Of(listUsers, Users(listUsers, "ListUsers"))],
             supportedFramework: supportedFramework,
             languageVersion: languageVersion,
             references: [NpgsqlReferences.Npgsql10],
@@ -326,7 +329,7 @@ public sealed class RowBufferTests
     [InlineData("Private", true)]
     public void Run_EachPlacement_CompilesWithTheBuffer(string placement, bool nested)
     {
-        var attribute = "[SqlSourceGenerate(MethodLocation = MethodLocation." + placement + ")]";
+        var attribute = "[SqlSourceGenerate(Source = \".\", MethodLocation = MethodLocation." + placement + ")]";
         var source = nested
             ? "using SqlSource;\n\nnamespace App\n{\n    public partial class Outer<TKey>\n    {\n        "
                 + attribute
@@ -349,7 +352,7 @@ public sealed class RowBufferTests
 
             namespace App
             {
-                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
                 public partial class SqlSourceRowBuffer<T>;
             }
             """;
@@ -369,7 +372,10 @@ public sealed class RowBufferTests
     [InlineData("namespace App.SqlSource;\n\n")]
     public void Run_TypeInAnyNamespace_NamesTheBufferFromGlobal(string namespaceLine)
     {
-        var source = "using SqlSource;\n\n" + namespaceLine + "[SqlSourceGenerate]\npublic partial class Sample;\n";
+        var source =
+            "using SqlSource;\n\n"
+            + namespaceLine
+            + "[SqlSourceGenerate(Source = \".\")]\npublic partial class Sample;\n";
 
         var run = MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")], source);
 

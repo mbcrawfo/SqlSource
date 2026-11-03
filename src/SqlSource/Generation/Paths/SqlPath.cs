@@ -141,6 +141,13 @@ internal static class SqlPath
         Normalize(normalizedFolder + Separator + relativePath);
 
     /// <summary>
+    /// A name in a normalised folder, for a name that is one segment and neither <c>.</c> nor <c>..</c>, so that the
+    /// result is normalised with no work.
+    /// </summary>
+    public static string InFolder(string normalizedFolder, string name) =>
+        normalizedFolder.Length == 0 ? name : normalizedFolder + Separator + name;
+
+    /// <summary>
     /// The folder of a normalised path: everything before its last segment.  Empty when it has one segment.
     /// </summary>
     public static string GetFolder(string normalizedPath)

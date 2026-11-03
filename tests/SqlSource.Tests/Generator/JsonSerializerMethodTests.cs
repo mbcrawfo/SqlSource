@@ -36,7 +36,7 @@ public sealed class JsonSerializerMethodTests
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public sealed class OrderMetadata

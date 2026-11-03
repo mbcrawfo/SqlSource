@@ -8,11 +8,23 @@ namespace SqlSource.Tool.Testing;
 internal static class Plans
 {
     // A type that claims every .sql file in the folder of its own source file.
-    public const string Type = "[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n";
+    public const string Type =
+        "[SqlSource.SqlSourceGenerate(Source = \".\")]\ninternal static partial class Queries;\n";
 
-    // A type with the attribute and these arguments, in a file of its own.
+    // A type with the attribute and these arguments, in a file of its own.  Unless they set Source, it has
+    // Source = "." too, and claims every .sql file in the folder of its source file.
     public static string TypeNamed(string name, string arguments = "") =>
-        $"[SqlSource.SqlSourceGenerate({arguments})]\ninternal static partial class {name};\n";
+        $"[SqlSource.SqlSourceGenerate({WithFolder(arguments)})]\ninternal static partial class {name};\n";
+
+    private static string WithFolder(string arguments)
+    {
+        if (arguments.Contains("Source =", System.StringComparison.Ordinal))
+        {
+            return arguments;
+        }
+
+        return arguments.Length == 0 ? "Source = \".\"" : "Source = \".\", " + arguments;
+    }
 
     // A project whose settings file says the dialect is postgres, with that type at its root: a .sql file added at the
     // root is claimed.

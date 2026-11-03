@@ -2,5 +2,5 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // The streaming method, by a header marker that gives every many query of the file an IAsyncEnumerable: extension
 // methods of the connection in StreamingQueriesExtensions.
-[SqlSourceGenerate(Path = "Queries/Streaming.sql")]
+[SqlSourceGenerate(Source = "Queries/Streaming.sql")]
 internal static partial class StreamingQueries;

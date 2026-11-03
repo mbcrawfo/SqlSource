@@ -26,7 +26,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = new TestProject(_folder, name);
         project.Settings["dialect"] = dialect;
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Q\""));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Q\""));
         return project;
     }
 
@@ -86,8 +86,8 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = new TestProject(_folder);
         project.Settings["dialect"] = "postgres";
-        _ = project.AddSource("A.cs", Plans.TypeNamed("A", "Path = Folder"));
-        _ = project.AddSource("B.cs", Plans.TypeNamed("B", "Path = \"Other\""));
+        _ = project.AddSource("A.cs", Plans.TypeNamed("A", "Source = Folder"));
+        _ = project.AddSource("B.cs", Plans.TypeNamed("B", "Source = \"Other\""));
         _ = project.AddSql("One.sql", "SELECT 1;");
         var other = project.AddSql("Other/Two.sql", "SELECT 1;");
 
@@ -103,7 +103,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     public void Plan_ProjectWithEveryKindOfError_ReportsThemInOrder()
     {
         var project = Project(dialect: "ansi");
-        _ = project.AddSource("Other.cs", Plans.TypeNamed("Other", "Path = Folder"));
+        _ = project.AddSource("Other.cs", Plans.TypeNamed("Other", "Source = Folder"));
         _ = project.AddSettings(
             "Q/sqlsource.json", /*lang=json,strict*/
             """{"unknown": 1}"""
@@ -304,11 +304,11 @@ public sealed class RunPlannerErrorTests : IDisposable
         project.Settings["dialect"] = "ansi";
         _ = project.AddSource(
             "A.cs",
-            Plans.TypeNamed("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
+            Plans.TypeNamed("A", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
         );
         _ = project.AddSource(
             "B.cs",
-            Plans.TypeNamed("B", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
+            Plans.TypeNamed("B", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
         );
         _ = project.AddSql("Q/Find.sql", "-- name: Find\nSELECT id FROM users {{where}};\n");
 

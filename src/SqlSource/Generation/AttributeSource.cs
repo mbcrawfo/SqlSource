@@ -40,7 +40,7 @@ internal static class AttributeSource
 
     public const string ConverterAttributeMetadataName = "SqlSource.SqlSourceConverterAttribute";
 
-    public const string PathProperty = "Path";
+    public const string SourceProperty = "Source";
 
     public const string LocationProperty = "SqlLocation";
 
@@ -265,10 +265,11 @@ internal static class AttributeSource
             internal sealed class SqlSourceGenerateAttribute : global::System.Attribute
             {
                 /// <summary>
-                /// A folder or one <c>.sql</c> file, relative to the folder of the file that carries the attribute.
-                /// The default is that folder.
+                /// A folder or one <c>.sql</c> file, relative to the folder of the file that carries the attribute:
+                /// <c>"."</c> is every <c>.sql</c> file of that folder.  The default is the file named for the type in
+                /// that folder, <c>UserRepository.sql</c> for <c>UserRepository</c>.
                 /// </summary>
-                public string Path { get; set; }
+                public string Source { get; set; }
 
                 /// <summary>
                 /// Where the generated members go.  The default is

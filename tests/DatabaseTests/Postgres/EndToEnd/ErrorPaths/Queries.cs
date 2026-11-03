@@ -1,4 +1,4 @@
 namespace ErrorPaths;
 
-[SqlSource.SqlSourceGenerate]
+[SqlSource.SqlSourceGenerate(Source = ".")]
 internal static partial class Queries;

@@ -28,7 +28,7 @@ public sealed class TypeOverrideLevelTests
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
         }
 
@@ -109,7 +109,7 @@ public sealed class TypeOverrideLevelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class BQueries;
             }
             """;
