@@ -1362,6 +1362,7 @@ The tool could not write a sidecar, or could not delete one that its `.sql` file
 **Fix:** give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  The rest of the run goes on after an error about a sidecar.
 
 - **A sidecar is never left half written.**  It is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one.
+- **A program that has the sidecar open** can keep the move from succeeding, as an editor or a build can on Windows.  The tool tries again for about a second, so a file that is held only for a moment is written without an error; one that stays open is reported as one that `could not be written`.
 - **A sidecar is deleted only** in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.
 - **A sidecar that the tool cannot open**, for lack of permission, because it is locked or because it is a folder, is not deleted when the file beside it needs no entry, since it may be the file of a newer tool.  It is reported as one that `could not be read`.  Delete it yourself, or give yourself the right to read it.  `describe --check` reports the same, since it could not check the file.
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -207,6 +208,119 @@ public sealed class SidecarStoreTests : IDisposable
 
         File.ReadAllText(other).ShouldBe("{}");
         _error.ToString().Split("error SQLSRC218").Length.ShouldBe(2);
+    }
+
+    private const int SharingViolation = unchecked((int)0x80070020);
+
+    private const int LockViolation = unchecked((int)0x80070021);
+
+    // The move of a temporary file over the sidecar, as the system does it, except that it fails with the given
+    // codes first, one for each try.  The waits are recorded and not slept.
+    private sealed class Moves(params int[] failures)
+    {
+        public int Tries { get; private set; }
+
+        public List<TimeSpan> Waits { get; } = [];
+
+        public void Move(string temporary, string path)
+        {
+            Tries++;
+            if (Tries <= failures.Length)
+            {
+                throw new IOException("The process cannot access the file.", failures[Tries - 1]);
+            }
+
+            File.Move(temporary, path, overwrite: true);
+        }
+
+        public void Wait(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Waits.Add(delay);
+        }
+    }
+
+    private void ApplyWith(Moves moves, CancellationToken cancellationToken, params FileOutcome[] outcomes) =>
+        SidecarStore.Apply(
+            [.. outcomes],
+            new Reporter(_error),
+            _clock,
+            onTheWhole: false,
+            moves.Move,
+            moves.Wait,
+            cancellationToken
+        );
+
+    [Theory]
+    [InlineData(SharingViolation)]
+    [InlineData(LockViolation)]
+    public void Apply_MoveThatAnotherProcessHoldsTwice_IsRetriedAndTheFileIsWritten(int hResult)
+    {
+        File.WriteAllText(_sidecar, "old");
+        var moves = new Moves(hResult, hResult);
+
+        ApplyWith(moves, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
+
+        File.ReadAllText(_sidecar).ShouldBe("new");
+        moves.Tries.ShouldBe(3);
+        moves.Waits.ShouldBe([SidecarStore.RetryDelay, SidecarStore.RetryDelay]);
+        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json", "sqlsource.json"]);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Apply_MoveThatIsHeldEveryTime_IsSqlsrc218AfterTenTriesOverAboutASecondAndKeepsTheOldFile()
+    {
+        File.WriteAllText(_sidecar, "old");
+        var moves = new Moves([.. Enumerable.Repeat(SharingViolation, 20)]);
+
+        ApplyWith(moves, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
+
+        moves.Tries.ShouldBe(SidecarStore.MoveTries);
+        moves.Tries.ShouldBe(10);
+        moves.Waits.Count.ShouldBe(9);
+        moves.Waits.ShouldAllBe(delay => delay == TimeSpan.FromMilliseconds(100));
+        File.ReadAllText(_sidecar).ShouldBe("old");
+        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json", "sqlsource.json"]);
+        _error
+            .ToString()
+            .ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: The process cannot");
+    }
+
+    [Fact]
+    public void Apply_MoveThatFailsForAnotherReason_IsReportedAtOnce()
+    {
+        var moves = new Moves(unchecked((int)0x80070005));
+
+        ApplyWith(moves, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
+
+        moves.Tries.ShouldBe(1);
+        moves.Waits.ShouldBeEmpty();
+        File.Exists(_sidecar).ShouldBeFalse();
+        _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: ");
+    }
+
+    [Fact]
+    public void Apply_RunThatIsCancelledWhileItWaitsToMove_StopsRetryingAndLeavesNoTemporaryFile()
+    {
+        using var cancel = new CancellationTokenSource();
+        var moves = new Moves([.. Enumerable.Repeat(SharingViolation, 20)]);
+
+        _ = Should.Throw<OperationCanceledException>(() =>
+            SidecarStore.Apply(
+                [Outcome(FileAction.Write, "new")],
+                new Reporter(_error),
+                _clock,
+                onTheWhole: false,
+                moves.Move,
+                (_, _) => cancel.Cancel(),
+                cancel.Token
+            )
+        );
+
+        moves.Tries.ShouldBe(1);
+        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "sqlsource.json"]);
+        _error.ToString().ShouldBeEmpty();
     }
 
     [Fact]

@@ -21,6 +21,11 @@ namespace SqlSource.Tool.Describing;
 /// old one, so that a run that is stopped leaves the old file or the new one.
 /// </para>
 /// <para>
+/// The move can fail while a program holds the old sidecar open, as an editor or a build does on Windows, and that
+/// ends in a moment.  The store tries it again, up to <see cref="MoveTries" /> times and about a second in all,
+/// before it reports the failure.
+/// </para>
+/// <para>
 /// A run that is killed between the write and the move leaves the temporary file.  The next run that looks at the
 /// sidecar removes it, and a run that does not look at the sidecar changes nothing beside it.  A run on the whole
 /// removes those of every sidecar in the folders of its files: the <c>.sql</c> file of one may be gone.
@@ -44,6 +49,19 @@ internal static class SidecarStore
     /// </summary>
     internal static readonly TimeSpan LeftoverAge = TimeSpan.FromMinutes(1);
 
+    /// <summary>How many times a move is tried before its failure is reported.</summary>
+    internal const int MoveTries = 10;
+
+    /// <summary>How long the store waits between two tries of a move.</summary>
+    internal static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(100);
+
+    // The Windows errors for a file that another process has open: ERROR_SHARING_VIOLATION and ERROR_LOCK_VIOLATION.
+    // They end when that process lets go, unlike a refusal of access, so only they are tried again.  On other systems
+    // no exception has these codes, and a failed move is reported at once.
+    private const int SharingViolation = unchecked((int)0x80070020);
+
+    private const int LockViolation = unchecked((int)0x80070021);
+
     /// <summary>
     /// Writes and deletes what the outcomes say, and reports <c>SQLSRC217</c> for a file that was held back though
     /// a query of it was described, and <c>SQLSRC218</c> for a file the system would not let it change, or would
@@ -61,6 +79,27 @@ internal static class SidecarStore
         TimeProvider time,
         bool onTheWhole,
         CancellationToken cancellationToken
+    ) => Apply(outcomes, reporter, time, onTheWhole, MoveOverwriting, WaitFor, cancellationToken);
+
+    /// <summary>
+    /// <see cref="Apply(ImmutableArray{FileOutcome}, Reporter, TimeProvider, bool, CancellationToken)" /> with the
+    /// move of a temporary file over a sidecar, and the wait between two tries of it, in the caller's hands.
+    /// </summary>
+    /// <param name="outcomes">What the run does with the sidecar of each file of its plan.</param>
+    /// <param name="reporter">Where the errors go, with the run's trace.</param>
+    /// <param name="time">The clock, which says how old a temporary file is.</param>
+    /// <param name="onTheWhole">Whether the run has no filter, and so knows every file of its projects.</param>
+    /// <param name="move">Moves the first file over the second.</param>
+    /// <param name="wait">Waits for the time given, or until the token is cancelled.</param>
+    /// <param name="cancellationToken">Ends the run.</param>
+    internal static void Apply(
+        ImmutableArray<FileOutcome> outcomes,
+        Reporter reporter,
+        TimeProvider time,
+        bool onTheWhole,
+        Action<string, string> move,
+        Action<TimeSpan, CancellationToken> wait,
+        CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -74,7 +113,10 @@ internal static class SidecarStore
                     var written = Write(
                         outcome.SidecarPath,
                         outcome.Text ?? throw new InvalidOperationException("A file to write has no text."),
-                        reporter
+                        reporter,
+                        move,
+                        wait,
+                        cancellationToken
                     );
                     RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.Write, failed: !written);
                     break;
@@ -182,7 +224,14 @@ internal static class SidecarStore
             : null;
     }
 
-    private static bool Write(string path, string text, Reporter reporter)
+    private static bool Write(
+        string path,
+        string text,
+        Reporter reporter,
+        Action<string, string> move,
+        Action<TimeSpan, CancellationToken> wait,
+        CancellationToken cancellationToken
+    )
     {
         // Beside the file, so that the move is within one volume.  The name ends in neither ".sql" nor ".json":
         // nothing takes a file that a stopped run left for a query file or a sidecar.  SidecarOfTemporary knows it.
@@ -191,8 +240,14 @@ internal static class SidecarStore
         {
             // UTF-8 without a byte order mark, and the line endings of the writer.
             File.WriteAllText(temporary, text);
-            File.Move(temporary, path, overwrite: true);
+            MoveWithRetries(temporary, path, move, wait, cancellationToken);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            // The run is over, and the file it was moving is not to stay beside the sidecar.
+            _ = TryDelete(temporary);
+            throw;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -202,6 +257,42 @@ internal static class SidecarStore
             return false;
         }
     }
+
+    // Only the move is tried again: a program that has the sidecar open lets go of it soon, and the temporary file
+    // is the store's own.  The last failure is thrown for Write to report, as any other.
+    private static void MoveWithRetries(
+        string temporary,
+        string path,
+        Action<string, string> move,
+        Action<TimeSpan, CancellationToken> wait,
+        CancellationToken cancellationToken
+    )
+    {
+        var tries = 0;
+        while (true)
+        {
+            tries++;
+            try
+            {
+                move(temporary, path);
+                return;
+            }
+            catch (IOException exception) when (tries < MoveTries && IsHeldByAnotherProcess(exception))
+            {
+                wait(RetryDelay, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+    }
+
+    private static bool IsHeldByAnotherProcess(IOException exception) =>
+        exception.HResult is SharingViolation or LockViolation;
+
+    private static void MoveOverwriting(string temporary, string path) => File.Move(temporary, path, overwrite: true);
+
+    // Not a measured time, so the host's clock has no part in it.  A cancelled run stops the wait at once.
+    private static void WaitFor(TimeSpan delay, CancellationToken cancellationToken) =>
+        _ = cancellationToken.WaitHandle.WaitOne(delay);
 
     private static bool Delete(string path, Reporter reporter)
     {
