@@ -86,6 +86,49 @@ public sealed class WatchFolderTests : IAsyncDisposable
         WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
+    // A folder beside a watched one whose name starts the same, deleted or renamed away, is not the watched folder or
+    // above it: it closes no watch and asks for nothing, so a save beside it is a pass that does not evaluate.
+    [Theory]
+    [InlineData("lib", false)]
+    [InlineData("lib", true)]
+    [InlineData("libs-old", false)]
+    [InlineData("libs-old", true)]
+    [InlineData("libs/Shar", false)]
+    [InlineData("libs/Shar", true)]
+    public async Task Watch_FolderBesideAWatchedOneRemoved_AsksNothing(string removed, bool renamed)
+    {
+        WriteSettings();
+        await StartAsync();
+        var path = _watch.Run.Folder.PathOf(removed);
+        var change = renamed
+            ? new FileChange(FileChangeKind.Renamed, path + "-gone", IsFolder: true, path)
+            : Deleted(path);
+
+        await _watch.ChangeAsync(change, WatchTests.Changed(_settings));
+
+        RequestsOf(_shared).ShouldBe(1);
+        RequestsOf(_libs).ShouldBe(1);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+        WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);
+    }
+
+    // A folder of the set made while its watch is open, as a poller reports a path that became a folder, or FSEvents
+    // a folder made before its stream began: it is watched already, so it asks for nothing.
+    [Theory]
+    [InlineData("libs")]
+    [InlineData("libs/Shared")]
+    public async Task Watch_WatchedFolderCreated_AsksNothing(string created)
+    {
+        WriteSettings();
+        await StartAsync();
+
+        await _watch.ChangeAsync(CreatedFolder(_watch.Run.Folder.PathOf(created)), WatchTests.Changed(_settings));
+
+        RequestsOf(_shared).ShouldBe(1);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+        WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);
+    }
+
     // Deleted and made again before an evaluation, as a script that writes the folder anew does: the watch of the old
     // folder is closed, and the new folder watched.
     [Fact]
