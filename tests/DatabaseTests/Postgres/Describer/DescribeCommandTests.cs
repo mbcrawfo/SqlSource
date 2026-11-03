@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -12,6 +13,7 @@ using SqlSource.Snapshot.Reading;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
+using SqlSource.Tool.Watching;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.Describer;
@@ -108,6 +110,68 @@ public sealed class DescribeCommandTests : IDisposable
                 .Sidecar.ShouldNotBeNull(fixture.ToString())
                 .Queries.ShouldHaveSingleItem(fixture.ToString());
             Comparable(written).ShouldBe(Comparable(expected), fixture.ToString());
+        }
+    }
+
+    // The real watcher and the real clock over the run's folder: a .sql file that is saved with another column is
+    // described again, and its sidecar says so.  The folder is under the temporary folder, where a test's host watches.
+    [Fact]
+    public async Task Watch_SqlFileChanged_RewritesItsSidecar()
+    {
+        _run.Time = TimeProvider.System;
+        var path = _project.AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+        var running = _run.Start(
+            stop.Token,
+            "describe",
+            "--watch",
+            "--connection",
+            Database + "=" + _postgres.ConnectionString
+        );
+        try
+        {
+            await Eventually.TrueAsync(
+                () => running.Output.Contains(WatchSession.WatchingMarker, StringComparison.Ordinal),
+                "The watch did not finish its first pass.  It wrote: " + running.Output + running.Errors
+            );
+            SidecarFiles
+                .Read(path)
+                .Queries.ShouldHaveSingleItem()
+                .Columns.ShouldNotBeNull()
+                .Select(static column => column.Name)
+                .ShouldBe(["one"]);
+
+            await File.WriteAllTextAsync(
+                path,
+                "-- name: One\nSELECT 1 AS one, 2 AS two;\n",
+                TestContext.Current.CancellationToken
+            );
+
+            await Eventually.TrueAsync(
+                () => SidecarColumns(path).SequenceEqual(["one", "two"]),
+                "The watch did not rewrite the sidecar.  It wrote: " + running.Output + running.Errors
+            );
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+
+        var result = await Eventually.WithinAsync(running.Ended, "The watch did not end when it was stopped.");
+        result.ExitCode.ShouldBe(0, result.Error);
+    }
+
+    // The names of the columns of the sidecar's one entry, or none while the sidecar is being replaced.
+    private static string[] SidecarColumns(string sql)
+    {
+        try
+        {
+            return [.. SidecarFiles.Read(sql).Queries.Single().Columns?.Select(static column => column.Name) ?? []];
+        }
+        catch (IOException)
+        {
+            return [];
         }
     }
 
