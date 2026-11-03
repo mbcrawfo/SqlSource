@@ -102,7 +102,6 @@ public sealed class RunLogRedactionTests : IDisposable
         line.GetProperty("list")[0].GetProperty("deep").GetString().ShouldBe("***");
     }
 
-    // The value is removed before the line is written, so the file holds it neither as it is nor as JSON escapes it.
     [Fact]
     public async Task Run_ConnectionFromTheDotEnvFile_LogsItsSourceAndNotItsValue()
     {
@@ -146,6 +145,7 @@ public sealed class RunLogRedactionTests : IDisposable
         line.GetProperty("list")[0].GetProperty("deep").GetString().ShouldBe("***");
     }
 
+    // The value is removed before the line is written, so the file holds it neither as it is nor as JSON escapes it.
     [Fact]
     public async Task Run_DescriberThatLogsAConnectionThatJsonEscapes_LeavesTheValueInNeitherForm()
     {

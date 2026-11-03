@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.DotEnv;
 using Xunit;
 
@@ -10,6 +11,9 @@ namespace SqlSource.Tool.Tests.DotEnv;
 public sealed class DotEnvParserTests
 {
     private const string Secret = "hunter2";
+
+    // What File.ReadAllText leaves for a byte that is not UTF-8 is U+FFFD.
+    private const string NotUtf8 = "it is not saved as UTF-8";
 
     // Each case names its rule; the pairs are the expected keys and values, in turn.
     public static TheoryData<string, string, string[]> Syntax =>
@@ -112,6 +116,21 @@ public sealed class DotEnvParserTests
             },
             { "an empty text has no values", "", [] },
             { "export is a key when no white space follows it", "export=x", [] },
+            {
+                "a replacement character in a line of another key, or in a comment, is no concern of the tool",
+                "OTHER=caf\uFFFD\nSQLSOURCE_CONNECTION_A=x # caf\uFFFD\n# SQLSOURCE_CONNECTION_B=\uFFFD",
+                ["SQLSOURCE_CONNECTION_A", "x"]
+            },
+            {
+                "a letter outside ASCII is a letter of a name, in either case",
+                "SQLSOURCE_CONNECTION_é=1\nSQLSOURCE_CONNECTION_DONNÉES=2",
+                ["SQLSOURCE_CONNECTION_é", "1", "SQLSOURCE_CONNECTION_DONNÉES", "2"]
+            },
+            {
+                "a digit outside ASCII is a digit of a name",
+                "SQLSOURCE_CONNECTION_A\u0663=1",
+                ["SQLSOURCE_CONNECTION_A\u0663", "1"]
+            },
         };
 
     [Theory]
@@ -172,12 +191,24 @@ public sealed class DotEnvParserTests
                 "SQLSOURCE_CONNECTION_A",
                 "the key is not a valid name"
             },
+            { "SQLSOURCE_CONNECTION_A=Password=p\uFFFDss", 0, 0, "SQLSOURCE_CONNECTION_A", NotUtf8 },
+            { "  export SQLSOURCE_CONNECTION=\uFFFD", 0, 9, "SQLSOURCE_CONNECTION", NotUtf8 },
+            { "SQLSOURCE_CONNECTION_A='Password=p\uFFFDss'", 0, 0, "SQLSOURCE_CONNECTION_A", NotUtf8 },
+            { "x\nSQLSOURCE_CONNECTION_A=\"Password=p\uFFFDss\" # c", 1, 0, "SQLSOURCE_CONNECTION_A", NotUtf8 },
+            {
+                "SQLSOURCE_CONNECTION_A=Host=x # ok\r\nSQLSOURCE_CONNECTION_B=\uFFFD",
+                1,
+                0,
+                "SQLSOURCE_CONNECTION_B",
+                NotUtf8
+            },
+            { "SQLSOURCE_CONNECTION_DONN\uFFFDES=Host=x", 0, 0, "SQLSOURCE_CONNECTION_DONN", NotUtf8 },
             { "SQLSOURCE_CONNECTION A=Password=hunter2", 0, 0, "SQLSOURCE_CONNECTION", "the key is not a valid name" },
             {
-                "﻿ SQLSOURCE_CONNECTION_é=Password=hunter2",
+                "SQLSOURCE_CONNECTION_é-B=Password=hunter2",
                 0,
-                1,
-                "SQLSOURCE_CONNECTION_",
+                0,
+                "SQLSOURCE_CONNECTION_é",
                 "the key is not a valid name"
             },
         };
@@ -219,11 +250,33 @@ public sealed class DotEnvParserTests
     [InlineData("SQLSOURCE_CONNECTIONX", false)]
     [InlineData("sqlsource_connection_a", false)]
     [InlineData("SQLSOURCE_CONNECTION_A-B", false)]
-    [InlineData("SQLSOURCE_CONNECTION_é", false)]
+    [InlineData("SQLSOURCE_CONNECTION_é", true)]
+    [InlineData("SQLSOURCE_CONNECTION_DONNÉES", true)]
+    [InlineData("SQLSOURCE_CONNECTION_名前", true)]
+    [InlineData("SQLSOURCE_CONNECTION_A\u0663", true)]
+    [InlineData("SQLSOURCE_CONNECTION_A\u00b2", false)]
+    [InlineData("SQLSOURCE_CONNECTION_A.B", false)]
     [InlineData("SQLSOURCE_CONNECTION A", false)]
     [InlineData("", false)]
     public void IsToolKey_Key_IsTrueForTheUnnamedAndTheNamedKeys(string key, bool expected) =>
         DotEnvParser.IsToolKey(key).ShouldBe(expected);
+
+    // The key a database's variable is, as ConnectionVariables.For writes it, is a key the file can hold.
+    [Theory]
+    [InlineData("billing")]
+    [InlineData("données")]
+    [InlineData("DÉS")]
+    [InlineData("straße")]
+    [InlineData("名前")]
+    [InlineData("a٣")]
+    [InlineData("my-db.v2")]
+    public void Parse_VariableOfADatabase_IsAKeyOfTheFile(string database)
+    {
+        var contents = DotEnvParser.Parse(ConnectionVariables.For(database) + "=x");
+
+        contents.Errors.ShouldBeEmpty();
+        contents.Values.ShouldBe(new Dictionary<string, string> { [ConnectionVariables.For(database)] = "x" });
+    }
 
     [Fact]
     public void ToString_ContentsWithAValue_LeavesTheValueOut()

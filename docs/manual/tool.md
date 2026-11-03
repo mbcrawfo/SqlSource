@@ -120,7 +120,7 @@ How a line is written:
 - **After a closing quote**, only white space or a comment may follow.
 - **A value is on one line**: a quote that is not closed on its line is an error.  `${NAME}` is not replaced by another variable's value, and stays as written.
 - **A variable set twice** takes the value of its last line.
-- **The file is UTF-8**, with or without a byte order mark, and its lines may end as on Windows or as on Linux and macOS.
+- **The file is UTF-8**, with or without a byte order mark, and its lines may end as on Windows or as on Linux and macOS.  A line of a connection variable that is not saved as UTF-8, as a connection string with an `ä` in a file saved as Windows-1252, is [SQLSRC286](diagnostics.md#sqlsrc286); the other lines of the file may be in any encoding.
 
 A line of a connection variable that cannot be read is [SQLSRC286](diagnostics.md#sqlsrc286), at its line, and a file the system will not let the tool read is [SQLSRC285](diagnostics.md#sqlsrc285).  Either way the run takes no connection from the file, not even from its good lines, and goes on with the other ways.
 

@@ -2884,18 +2884,19 @@ See: [A `.env` file](tool.md#env-file)
 
 A line of the `.env` file sets a connection variable, `SQLSOURCE_CONNECTION` or one that starts with `SQLSOURCE_CONNECTION_`, and the tool cannot tell what it sets.  The error is at the line and the column of the variable's name, and says which variable and why.  The value is never printed, since it is a connection and holds credentials.  A line that sets any other variable is not read by the tool, and is never an error.  The run goes on as if the file gave no connection at all, even from its good lines, since a file that is partly wrong is not one to trust.
 
-The reason is one of five:
+The reason is one of six:
 
 - `it has no '='`: the line is the variable's name and nothing else.
-- `the key is not a valid name`: the text before the `=` starts with `SQLSOURCE_CONNECTION` but is not a name of letters, digits and `_` that does not start with a digit, such as `SQLSOURCE_CONNECTION-A`.
+- `the key is not a valid name`: the text before the `=` starts with `SQLSOURCE_CONNECTION` but is not a name of letters, digits and `_` that does not start with a digit, such as `SQLSOURCE_CONNECTION-A`.  A letter or a digit is one of any script, since the variable of a database called `données` is `SQLSOURCE_CONNECTION_DONNÉES`.
 - `a quote is not closed`: the value starts with `'` or `"` and the line ends before the matching quote.
 - `text follows the closing quote`: after the closing quote there is something other than white space or a `#` comment.
 - `a backslash starts no escape that .env takes`: a value in double quotes holds a `\` before a character other than `\`, `"`, `n`, `r` or `t`.  Write a literal backslash as `\\`, or put the value in single quotes, which take every character as it is.
+- `it is not saved as UTF-8`: the variable's name or value holds a `�`, which is what the tool reads for each byte of the file that is not UTF-8, as for the `ä` of a password in a file saved as Windows-1252 or Latin-1.  Only the lines of connection variables are checked, so the rest of the file may be saved as it is.  A value that really holds `�` cannot be given in a `.env` file; give it with `--connection`.
 
 ```console
 /work/.env(2,1): error SQLSRC286: The line that sets 'SQLSOURCE_CONNECTION_BILLING' cannot be read: a quote is not closed
 ```
 
-Fix the line named.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
+Fix the line named; for `it is not saved as UTF-8`, save the file as UTF-8 with the "Save with encoding" command of your editor.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
 
 See: [A `.env` file](tool.md#env-file)

@@ -56,6 +56,19 @@ public sealed class DotEnvRunTests : IDisposable
         _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=from-the-environment");
     }
 
+    // The variable of a database whose name has a letter outside ASCII is a key of the file.
+    [Fact]
+    public async Task Run_DatabaseWithALetterOutsideAscii_TakesItsConnectionFromTheDotEnvFile()
+    {
+        _ = _scene.Project.AddSql("Donnees.sql", "-- name: GetDonnee\n-- database: données\nSELECT 3;\n");
+        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_DONNÉES=Host=from-the-file\n");
+
+        var result = await _scene.DescribeAsync("--database", "données");
+
+        result.ShouldBe(new CliResult(0, "données (postgres): 1 described, 0 skipped, 0 failed\n", ""));
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=from-the-file");
+    }
+
     // No value of a file with an error is used, so the database has no connection.
     [Fact]
     public async Task Run_DotEnvLineOfTheToolThatCannotBeRead_IsSqlsrc286AndTheDatabaseHasNoConnection()
@@ -180,6 +193,31 @@ public sealed class DotEnvRunTests : IDisposable
                 + $".  The run did not read {listed}: it reads the .env nearest to {_scene.Run.Folder.Path}\n"
         );
         _scene.Describer.Opened.ShouldBeEmpty();
+    }
+
+    // The help of a database names the files of the projects that have its queries, not those of other databases.
+    [Fact]
+    public async Task Run_SolutionWithProjectsOfTwoDatabases_HelpNamesOnlyTheFilesOfTheDatabasesOwnProjects()
+    {
+        var billing = Plans.Postgres(_scene.Run.Folder, "Billing", "Billing").AnsweredBy(_scene.Run.Processes);
+        _ = billing.AddSql("Invoices.sql", Invoices);
+        var reports = Plans.Postgres(_scene.Run.Folder, "Reports", "Reports").AnsweredBy(_scene.Run.Processes);
+        _ = reports.AddSql("Totals.sql", "-- name: GetTotal\n-- database: reports\nSELECT 4;\n");
+        _ = _scene.Run.Folder.WriteFile("Billing/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
+        var reportsEnv = _scene.Run.Folder.WriteFile("Reports/.env", "SQLSOURCE_CONNECTION_REPORTS=Host=db\n");
+        var projects = "<Project Path=\"Billing/Billing.csproj\" /><Project Path=\"Reports/Reports.csproj\" />";
+        _ = _scene.Run.Folder.WriteFile("All.slnx", $"<Solution>{projects}</Solution>");
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = "Host=from-the-environment";
+
+        var result = await _scene.DescribeAsync("All.slnx");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain(
+            "    help: pass --connection reports=<connection string>, or set SQLSOURCE_CONNECTION_REPORTS in the "
+                + $"environment or in {DotEnvPath}.  The run did not read {reportsEnv}: it reads the .env nearest to "
+                + $"{_scene.Run.Folder.Path}\n"
+        );
+        result.Error.ShouldNotContain(_scene.Run.Folder.PathOf("Billing/.env"));
     }
 
     // The tool gives "dotnet msbuild" no variable of its own that holds a connection.

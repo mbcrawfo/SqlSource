@@ -13,15 +13,21 @@ namespace SqlSource.Tool.DotEnv;
 /// <remarks>
 /// A line that is not one of the tool's, whatever it holds, is passed over without a word, since the file is
 /// shared with other programs.  A line of the tool's that cannot be read is an error that names its key and why,
-/// and never any part of its value, which is a secret.
+/// and never any part of its value, which is a secret.  A file that is not saved as UTF-8 is read with U+FFFD in the
+/// place of each byte that is not, and is no error in itself, since it is usually another program's: only a line of
+/// the tool's with a U+FFFD in its key or its value is one.
 /// </remarks>
 internal static class DotEnvParser
 {
     private const string Export = "export";
 
+    private const string NotUtf8 = "it is not saved as UTF-8";
+
+    private const string ReplacementCharacter = "\uFFFD";
+
     /// <summary>
     /// Whether <paramref name="key" /> is a variable of the tool: <c>SQLSOURCE_CONNECTION</c> or that and <c>_</c>
-    /// and more, written as a name of ASCII letters, digits and <c>_</c> that does not start with a digit.
+    /// and more, written as a name of letters, digits and <c>_</c> that does not start with a digit.
     /// </summary>
     public static bool IsToolKey(string key) =>
         IsName(key)
@@ -91,13 +97,21 @@ internal static class DotEnvParser
             // and not the tool's, such as SQLSOURCE_CONNECTIONX, belongs to another program.
             if (key.StartsWith(ConnectionVariables.Unnamed, StringComparison.Ordinal) && !IsName(key))
             {
-                errors.Add(new DotEnvLineError(number, column, LeadingName(key), "the key is not a valid name"));
+                var why = key.Contains(ReplacementCharacter, StringComparison.Ordinal)
+                    ? NotUtf8
+                    : "the key is not a valid name";
+                errors.Add(new DotEnvLineError(number, column, LeadingName(key), why));
             }
 
             return;
         }
 
         var reason = TryReadValue(line, separator + 1, out var value);
+        if (reason is null && value.Contains(ReplacementCharacter, StringComparison.Ordinal))
+        {
+            reason = NotUtf8;
+        }
+
         if (reason is null)
         {
             values[key] = value;
@@ -238,7 +252,7 @@ internal static class DotEnvParser
         return index;
     }
 
-    /// <summary>A name of ASCII letters, digits and <c>_</c> that does not start with a digit.</summary>
+    /// <summary>A name of letters, digits and <c>_</c> that does not start with a digit.</summary>
     private static bool IsName(string text)
     {
         if (text.Length == 0 || char.IsAsciiDigit(text[0]))
@@ -260,5 +274,6 @@ internal static class DotEnvParser
         return key[..length];
     }
 
-    private static bool IsNameCharacter(char character) => char.IsAsciiLetterOrDigit(character) || character == '_';
+    // The characters that ConnectionVariables.For writes for a database's name, letters of any script included.
+    private static bool IsNameCharacter(char character) => char.IsLetterOrDigit(character) || character == '_';
 }

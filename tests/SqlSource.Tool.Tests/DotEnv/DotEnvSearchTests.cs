@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Tool.DotEnv;
@@ -171,6 +172,46 @@ public sealed class DotEnvSearchTests : IDisposable
         );
         file.ToString().ShouldNotContain("hunter2");
         line.ShouldNotContain("hunter2");
+    }
+
+    // The file is usually the application's, saved by an editor that is not told to use UTF-8.
+    [Fact]
+    public void Read_ToolLineNotSavedAsUtf8_ReportsSqlsrc286AtTheLineAndGivesNothing()
+    {
+        var path = _folder.PathOf("unit/.env");
+        _ = _folder.CreateFolder("unit");
+        File.WriteAllBytes(
+            path,
+            Encoding.Latin1.GetBytes($"{KeyA}=Password=p\u00e4ss\nGREETING=caf\u00e9\nSQLSOURCE_CONNECTION_B=Host=b\n")
+        );
+
+        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+
+        file.Path.ShouldBe(path);
+        file.Values.ShouldBeEmpty();
+        var error = file.Errors.ShouldHaveSingleItem();
+        error.Descriptor.ShouldBeSameAs(ToolDiagnostics.DotEnvLineCannotBeRead);
+        var line = ReportedLine(error);
+        line.ShouldBe(
+            $"{path}(1,1): error SQLSRC286: " + $"The line that sets '{KeyA}' cannot be read: it is not saved as UTF-8"
+        );
+        line.ShouldNotContain("Password");
+    }
+
+    // A line of another key that is not UTF-8 is the application's business: the tool's lines are read.
+    [Fact]
+    public void Read_NotSavedAsUtf8OnlyInALineOfAnotherKey_GivesTheToolsValuesAndNoError()
+    {
+        var path = _folder.PathOf("unit/.env");
+        _ = _folder.CreateFolder("unit");
+        File.WriteAllBytes(path, Encoding.Latin1.GetBytes($"GREETING=caf\u00e9\n{KeyA}=Host=a\n"));
+
+        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+
+        file.Path.ShouldBe(path);
+        file.Errors.ShouldBeEmpty();
+        file.Values.Count.ShouldBe(1);
+        file.Values[KeyA].ShouldBe("Host=a");
     }
 
     [Fact]
