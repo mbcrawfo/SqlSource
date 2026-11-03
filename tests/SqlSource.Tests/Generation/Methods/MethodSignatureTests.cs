@@ -5,7 +5,7 @@ using SqlSource.Generation.Methods;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Testing.Snapshot;
-using SqlSource.Tests.Generation.Emitting;
+using SqlSource.Tests.Generation.Emitting.QueryMethods;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Methods;
@@ -43,7 +43,7 @@ public sealed class MethodSignatureTests
         var methods = new TypeMethods(
             "App.Sample",
             "App.Sample.Methods.g.cs",
-            MethodPlacement.ExtensionClass,
+            MethodHost.Of(MethodPlacement.ExtensionClass),
             "App",
             "App",
             TestSidecars.Of(new TypeDeclaration("class", "Sample", "Sample", string.Empty, 0)),

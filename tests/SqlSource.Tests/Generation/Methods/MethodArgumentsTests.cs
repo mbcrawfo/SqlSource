@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Shouldly;
 using SqlSource.Generation.Methods;
+using SqlSource.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Methods;
@@ -70,13 +71,13 @@ public sealed class MethodArgumentsTests
     }
 
     [Theory]
-    [InlineData(true, "this ")]
-    [InlineData(false, "")]
-    public void AppendDeclaration_TokenNamedAwait_IsVerbatim(bool isExtension, string receiverPrefix)
+    [InlineData(nameof(MethodPlacement.ExtensionClass), "this ")]
+    [InlineData(nameof(MethodPlacement.Public), "")]
+    public void AppendDeclaration_TokenNamedAwait_IsVerbatim(string placementName, string receiverPrefix)
     {
         var builder = new StringBuilder();
 
-        Of().AppendDeclaration(builder, "    ", isExtension);
+        Of().AppendDeclaration(builder, "    ", MethodHost.Of(Enum.Parse<MethodPlacement>(placementName)));
 
         builder
             .ToString()
@@ -186,7 +187,7 @@ public sealed class MethodArgumentsTests
         }
 
         _ = builder.Clear();
-        arguments.AppendDeclaration(builder, "    ", isExtension: true);
+        arguments.AppendDeclaration(builder, "    ", MethodHost.Of(MethodPlacement.ExtensionClass));
         arguments.AppendIteratorDeclaration(builder, "    ");
         arguments.AppendCall(builder);
         return count;

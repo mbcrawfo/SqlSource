@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>
@@ -13,4 +15,47 @@ internal static class GeneratedText
 
     /// <summary>One level of indentation, four spaces.</summary>
     public const string Indent = "    ";
+
+    // The indents of levels 0 to 15, built once, so that a writer that goes one level deeper makes no string.
+    private static readonly string[] Indents = BuildIndents();
+
+    /// <summary>
+    /// The indent of <paramref name="depth" /> levels: the cached string up to level 15, and one built for a deeper
+    /// level.
+    /// </summary>
+    public static string IndentOf(int depth) => depth < Indents.Length ? Indents[depth] : Build(depth);
+
+    /// <summary>
+    /// The indent one level deeper than <paramref name="indent" />, which is whole levels: the cached string when
+    /// <paramref name="indent" /> is the cached one of its level, and otherwise <paramref name="indent" /> with
+    /// <see cref="Indent" /> after it.
+    /// </summary>
+    public static string Deeper(string indent)
+    {
+        var next = (indent.Length / Indent.Length) + 1;
+        return next < Indents.Length && ReferenceEquals(indent, Indents[next - 1]) ? Indents[next] : indent + Indent;
+    }
+
+    private static string[] BuildIndents()
+    {
+        var indents = new string[16];
+        indents[0] = string.Empty;
+        for (var depth = 1; depth < indents.Length; depth++)
+        {
+            indents[depth] = indents[depth - 1] + Indent;
+        }
+
+        return indents;
+    }
+
+    private static string Build(int depth)
+    {
+        var builder = new StringBuilder(Indent.Length * depth);
+        for (var level = 0; level < depth; level++)
+        {
+            _ = builder.Append(Indent);
+        }
+
+        return builder.ToString();
+    }
 }

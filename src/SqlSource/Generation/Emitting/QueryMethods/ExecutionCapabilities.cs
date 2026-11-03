@@ -1,6 +1,6 @@
 using System;
 
-namespace SqlSource.Generation.Emitting;
+namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// The behaviours of a query's method beyond running its command and reading its rows, each named for what it does

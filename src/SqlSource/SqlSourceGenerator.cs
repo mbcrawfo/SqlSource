@@ -210,7 +210,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // The names that each type whose methods go on itself already has, which its methods cannot take.  Almost
         // always none, since the methods go into an extension class unless the attribute says otherwise.
         var typeMemberNames = declaredTypes
-            .Where(static declared => declared.Type.MethodPlacement != MethodPlacement.ExtensionClass)
+            .Where(static declared => !MethodHost.Of(declared.Type.MethodPlacement).IsExtension)
             .Select(static (declared, _) => new TypeMemberNames(HintName.NameOf(declared.Type), declared.TakenNames))
             .Collect()
             .Select(

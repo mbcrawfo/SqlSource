@@ -8,6 +8,7 @@ using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using SqlSource.Testing;
 using SqlSource.Testing.Generator;
+using SqlSource.Tests.Generation.Emitting.QueryMethods;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
