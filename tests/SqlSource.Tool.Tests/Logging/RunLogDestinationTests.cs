@@ -195,6 +195,31 @@ public sealed class RunLogDestinationTests : IDisposable
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
     }
 
+    // The build's log path can hold "=" or ";", which a run under --online takes, and a message then names it by its
+    // position and leaves out the system's reason, which may quote it.
+    [Fact]
+    public async Task Run_OnlineLogThatHoldsASemicolonAndStopsBeingWritable_IsSqlsrc218ByItsPosition()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+        _scene.Run.CreateFile = static _ => new FullStream();
+
+        var result = await _scene.DescribeAsync(
+            "--manifest",
+            manifest,
+            "--online",
+            "auto",
+            "--log",
+            "a;" + Secrets.Word + ".log"
+        );
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldBe(
+            "sqlsource : error SQLSRC218: The path at position 7 could not be written: the system would not write it; "
+                + "see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc218\n"
+        );
+    }
+
     // A log whose close fails is reported once the run has ended, after run.end, which holds the run's own exit code:
     // no line written before the close can hold what the close did.
     [Fact]

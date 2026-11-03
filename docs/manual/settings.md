@@ -31,7 +31,7 @@ The first block writes settings as markers in a `.sql` file, the second in a [se
 
 ## All settings
 
-Each name links to its section, which gives its values and its rules.  **Written as** lists every place the setting can be written: a key of a [settings file](#settings-files), a property of the attribute, a marker in the **file header** (the part of a `.sql` file before its first `-- name:` line), and a marker **inside a query** (under a `-- name:` line), as [the marker index](sql-files.md#marker-index) shows.  A place it does not list cannot hold it.
+Each name links to its section, which gives its values and its rules.  **Written as** lists every place the setting can be written: a key of a [settings file](#settings-files), a property of the attribute, a marker in the **file header** (the part of a `.sql` file before its first `-- name:` line), a marker **inside a query** (under a `-- name:` line), as [the marker index](sql-files.md#marker-index) shows, and, for the one setting of the build, a property of the project.  A place it does not list cannot hold it.
 
 ### Settings that work today
 
@@ -53,6 +53,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: the file named for the type in that folder | `Source` on the attribute | Works today |
 | [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | Works today |
 | [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | Works today |
+| [Running the tool in the build](#online-build) | `auto`, `true`, `false`.  Default `auto` | `SqlSourceOnline`, a property of the project | Works today |
 
 A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `Output = GeneratorOutput.Sql`.
 
@@ -842,7 +843,7 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Source`](#setting-source), and a file no type claims is ignored.
+Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A build that [runs the tool](tool.md#running-in-the-build) compiles a sidecar it has just written for the first time, listed or not; every later build, like a build offline or in CI, compiles only the sidecars you list.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Source`](#setting-source), and a file no type claims is ignored.
 
 <a id="public-exceptions"></a>
 
@@ -859,6 +860,30 @@ Turning the default off turns it off for sidecars too, so list them as well, as 
 - **It is a property of the project file**, and not a setting of a settings file: the exceptions are one pair of types for the whole project.
 - **A project that sees the exceptions of a project it references** uses those and gets none of its own, so the property changes nothing there: see [projects that share internals](generator.md#projects-that-share-internals).
 - **Leave it off in a library you publish**, unless its callers must catch the exceptions by type.  Public exceptions are part of its public API, and an app that references two such libraries sees two copies: it gets [SQLSRC022](diagnostics.md#sqlsrc022) if it uses SqlSource, and an error that the name is ambiguous where it names one if it does not.
+
+<a id="online-build"></a>
+
+## Running the tool in the build
+
+```xml
+<PropertyGroup>
+    <SqlSourceOnline>false</SqlSourceOnline>
+</PropertyGroup>
+```
+
+`SqlSourceOnline` says whether a build of the project runs `dotnet sqlsource describe` on it before it compiles, as [running in the build](tool.md#running-in-the-build) describes.  `false` above keeps the build on the committed sidecars on every machine.
+
+| Value | The build runs the tool |
+|----|----|
+| `auto`, empty, or not set | When it finds a connection: the environment variable `SQLSOURCE_CONNECTION`, set and not blank, or a file named `.env` in the project's folder or any folder above it.  When the tool then finds no connection for any database with a query to describe, it says the build is offline, and the build goes on with the committed sidecars |
+| `true` | Always.  A database with a query to describe and no connection is then [SQLSRC213](diagnostics.md#sqlsrc213), and a tool that cannot be started [SQLSRC025](diagnostics.md#sqlsrc025) |
+| `false` | Never |
+
+- **The value is matched ignoring case** and the white space around it, so ` True ` is `true`.  Any other value, such as `yes`, is [SQLSRC024](diagnostics.md#sqlsrc024), and the build stops.
+- **A build in CI never runs the tool**, whatever the value, so that a job builds from the sidecars that were committed.  A build is in CI when the variable `CI` is `true`, ignoring case, `TF_BUILD` is `True`, or `TEAMCITY_VERSION` or `JENKINS_URL` is set: GitHub Actions, GitLab, Buildkite, Azure Pipelines, TeamCity and Jenkins each set one.  `CI=1` is not recognised.
+- **A connection in a variable of a database's name alone**, such as `SQLSOURCE_CONNECTION_BILLING` with no `.env` file, is not found under `auto`.  Set `SqlSourceOnline` to `true` in your own environment, which MSBuild reads as a property of every project, rather than in the project, so that a machine with no database still builds.
+- **Any `.env` file turns `auto` on**, one that holds only your application's settings too, and one above the root of your repository, which the tool does not read.  The tool then finds no connection and the build goes on offline, and each build starts the tool again while it finds none.  Set `false` to stop that.
+- **Where it is written.**  In the project file, in a `Directory.Build.props` above it for every project there, on the command line as `-p:SqlSourceOnline=false`, or as a variable of the environment.  It is a property of the build, not a key of a settings file.
 
 <a id="settings-files"></a>
 
@@ -901,7 +926,7 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 
 **Which files are checked.**  The build reads each settings file that the search of some `.sql` file or C# file of the project reaches, whether or not a type claims that `.sql` file, and reports each mistake in it at its file, line and column.  A `sqlsource.json` beyond the first `"root": true` is never read, so it cannot fail a build.  The C# files that the build writes itself, into its output and intermediate folders, reach no settings file, wherever those folders are.  Nor do the C# files that a NuGet package adds to your project, as Polyfill does, from the folder where NuGet keeps its packages, so a broken `sqlsource.json` above that folder, in your home folder, say, is not read on their account.  Your own `.sql` and C# files still reach such a file when your project is in a folder below it, unless a `"root": true` stands between them, and its mistakes then fail the build and `sqlsource describe`: put `"root": true` in the settings file of your project's folder, or of your repository's.  A C# file that your project lists itself from another folder still reaches the settings files of its own folder.  A value that is wrong is not set by its file, so a farther settings file, or the default, gives the setting meanwhile.  The `sqlsource` tool reads the same settings files.  It reports the mistakes of [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC018](diagnostics.md#sqlsrc018) as the build does, and a value of `dialect`, `output` or `database` that is not valid, once in a run however many projects reach the file.  The build reports a value that is not valid for every key but `database`, which only the tool reads.
 
-**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The MSBuild properties of SqlSource that a project sets are [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included, and [`SqlSourcePublicExceptions`](#public-exceptions), which makes the exceptions of the query methods public.
+**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The MSBuild properties of SqlSource that a project sets are [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included, [`SqlSourcePublicExceptions`](#public-exceptions), which makes the exceptions of the query methods public, and [`SqlSourceOnline`](#online-build), which says whether the build runs the `sqlsource` tool.
 
 See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [SQLSRC016](diagnostics.md#sqlsrc016), a key that is not known; [SQLSRC017](diagnostics.md#sqlsrc017), a key written twice; [SQLSRC018](diagnostics.md#sqlsrc018), a value of the wrong JSON type; [SQLSRC019](diagnostics.md#sqlsrc019), a value that is not valid; [SQLSRC020](diagnostics.md#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`.
 
@@ -920,7 +945,7 @@ See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [S
   </Target>
   ```
 
-  Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.  In a project that is not of the .NET SDK, or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only it reaches, such as the one beside it, with no error; the same line fixes that too.
+  Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.  A build that [runs the tool](tool.md#running-in-the-build) describes such a file without it in a project with one target framework, and leaves it out, as `sqlsource` does, in a project with several.  In a project that is not of the .NET SDK, or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only it reaches, such as the one beside it, with no error; the same line fixes that too.
 - **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
 - **A C# type that is generic can give its model a warning for a `?` inside a type argument**, in a type override, a column type or a `-- param:` marker.  A type argument written with a `?` where a constraint forbids null is [SQLSRC252](diagnostics.md#sqlsrc252) at the query, but a `?` inside a type argument is not.  An override such as `MyApp.Names<System.Collections.Generic.List<string?>>`, where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, is accepted, and the generated model gets the compiler's warning CS8631.  Give the type arguments the nullability that the constraints ask for.  See [type overrides](#setting-type-overrides).
 - **A type made by Vogen or StronglyTypedId needs converters written for it.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and never through a type's `Value` property and its `From` method or constructor, so such a type with no converter is given to the driver as it is, which throws `InvalidCastException`.  Write the two converters in a class of your project, each calling the type's own members:

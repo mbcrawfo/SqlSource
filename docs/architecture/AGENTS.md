@@ -21,12 +21,13 @@ Each page is in this folder.
 | `src/SqlSource/Snapshot`, with `Reading/` | `generator.md`, `sidecar-format.md` | `## Snapshot`; every section of `sidecar-format.md` |
 | `src/SqlSource/Polyfills` | None | It holds the types that `netstandard2.0` lacks, and no design |
 | `src/SqlSource/build` | `msbuild-and-manifest.md` | `## What the props and targets do`, `## The manifest`, `## Known limits` |
-| `src/SqlSource.Tool`, its root | `tool.md` | `## The command line`, `## A describe run` |
+| `src/SqlSource/buildMultiTargeting` | `msbuild-and-manifest.md` | `### The online build`, under `## What the props and targets do` |
+| `src/SqlSource.Tool`, its root | `tool.md` | `## The command line`, `## A describe run`, `## Build integration options` |
 | `src/SqlSource.Tool/Projects` | `tool.md` | `## A describe run`, `## Folders`; the manifest's reader in `msbuild-and-manifest.md`, `## The manifest` |
 | `src/SqlSource.Tool/Planning` | `tool.md` | `## A describe run`, `## Folders` |
 | `src/SqlSource.Tool/Processes` | `tool.md` | `## Folders` |
 | `src/SqlSource.Tool/DotEnv` | `tool.md` | `### Connections`, under `## A describe run`; `## Folders` |
-| `src/SqlSource.Tool/Describing`, its root | `tool.md` | `## A describe run`, `## Folders` |
+| `src/SqlSource.Tool/Describing`, its root | `tool.md` | `## A describe run`, `## Build integration options`, `## Folders` |
 | `src/SqlSource.Tool/Logging` and `src/SqlSource.Tool/Reporting` | `tool.md` | `## Logging and reporting` |
 | `src/SqlSource.Tool/Watching` | `tool.md` | `## Watch mode`, `## Folders` |
 | `src/SqlSource.Tool/Describing/Describers` | `postgres-describer.md` | `## The describer contract` |

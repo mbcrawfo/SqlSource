@@ -41,6 +41,52 @@ public sealed class ReporterTests : IDisposable
     }
 
     [Fact]
+    public void ReportWithoutWriting_Error_WritesNothingAndIsCountedAndLogged()
+    {
+        var log = new RecordingLog();
+        var reporter = new Reporter(_error, new RunTrace(log));
+
+        reporter.ReportWithoutWriting(Failure);
+
+        _error.ToString().ShouldBe("");
+        reporter.Count.ShouldBe(1);
+        reporter.UnwrittenCount.ShouldBe(1);
+        log.Events.ShouldHaveSingleItem().Name.ShouldBe("diagnostic");
+    }
+
+    [Fact]
+    public void Report_AfterAnErrorReportedWithoutWriting_CountsOnlyTheWrittenOneAsWritten()
+    {
+        var reporter = new Reporter(_error);
+        reporter.ReportWithoutWriting(Failure);
+
+        reporter.Report(Failure);
+
+        reporter.Count.ShouldBe(2);
+        reporter.UnwrittenCount.ShouldBe(1);
+        _error.ToString().ShouldBe("sqlsource : " + Message + Expected.See("SQLSRC200"));
+    }
+
+    [Fact]
+    public void ExitCodeOf_OnlyErrorsReportedWithoutWriting_IsZero()
+    {
+        var reporter = new Reporter(_error);
+        reporter.ReportWithoutWriting(Failure);
+
+        Cli.ExitCodeOf(reporter, 0).ShouldBe(0);
+    }
+
+    [Fact]
+    public void ExitCodeOf_AWrittenErrorBesideOneReportedWithoutWriting_IsOne()
+    {
+        var reporter = new Reporter(_error);
+        reporter.ReportWithoutWriting(Failure);
+        reporter.Report(Failure);
+
+        Cli.ExitCodeOf(reporter, 0).ShouldBe(1);
+    }
+
+    [Fact]
     public void Report_ErrorAboutNoFile_StartsWithTheNameOfTheTool()
     {
         var reporter = new Reporter(_error);
@@ -124,6 +170,75 @@ public sealed class ReporterTests : IDisposable
                     + "    server: first second\n"
                     + Expected.See("SQLSRC200")
             );
+    }
+
+    // A build reads the tool's output a line at a time and takes each line with "error" in it for an error.
+    [Fact]
+    public void Report_OneLine_JoinsTheContinuationLinesAndTheLinkToTheFirst()
+    {
+        var reporter = new Reporter(_error, oneLine: true);
+
+        reporter.Report(
+            (Failure with { Path = "/work/App/Users.sql", Position = new LinePosition(2, 9) }).WithLines(
+                new ContinuationLine("help", "create the table"),
+                new ContinuationLine("query", "GetUser, database app")
+            )
+        );
+
+        _error
+            .ToString()
+            .ShouldBe(
+                "/work/App/Users.sql(3,10): "
+                    + Message.TrimEnd('\n')
+                    + "; help: create the table; query: GetUser, database app; see: "
+                    + Expected.See("SQLSRC200").Replace("    see: ", "", StringComparison.Ordinal)
+            );
+    }
+
+    [Fact]
+    public void Report_OneLineWithNoContinuationLines_IsTheFirstLineAndTheLink()
+    {
+        var reporter = new Reporter(_error, oneLine: true);
+
+        reporter.Report(Failure);
+
+        _error
+            .ToString()
+            .ShouldBe(
+                "sqlsource : "
+                    + Message.TrimEnd('\n')
+                    + "; see: "
+                    + Expected.See("SQLSRC200").Replace("    see: ", "", StringComparison.Ordinal)
+            );
+        reporter.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Report_OneLineWithLineBreaksInTheText_IsOneLine()
+    {
+        var reporter = new Reporter(_error, oneLine: true);
+
+        reporter.Report(
+            (Failure with { Path = "/work/odd\nname/App.csproj" }).WithLines(
+                new ContinuationLine("ser\nver", "ERROR: first\r\nDETAIL: second\nthird")
+            )
+        );
+
+        var text = _error.ToString();
+        text.IndexOf('\n', StringComparison.Ordinal).ShouldBe(text.Length - 1);
+        text.ShouldContain("; ser ver: ERROR: first DETAIL: second third; see: ");
+        text.ShouldStartWith("/work/odd name/App.csproj : error SQLSRC200");
+    }
+
+    [Fact]
+    public void Report_OneLine_IsWrittenWithOneCallToTheWriter()
+    {
+        using var writer = new RecordingWriter();
+        var reporter = new Reporter(writer, oneLine: true);
+
+        reporter.Report(Failure.WithLines(new ContinuationLine("help", "try again")));
+
+        writer.Writes.Count.ShouldBe(1);
     }
 
     [Fact]

@@ -238,7 +238,7 @@ public sealed class RunLogFileTests : IDisposable
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.ShouldBeSameAs(ToolDiagnostics.FileCannotBeChanged);
         // The error is at the path, the full one when the system could make one, and quotes it first.
-        failure.Arguments[0].ShouldBe(failure.Path);
+        failure.Arguments[0].ShouldBe($"'{failure.Path}'");
         failure.Arguments[1].ShouldBe("written");
         failure.Arguments[2].ShouldNotBeEmpty();
     }
@@ -260,8 +260,7 @@ public sealed class RunLogFileTests : IDisposable
         opened.Value?.Dispose();
 
         opened.Failure.ShouldBe(
-            ToolDiagnostic.ForFile(
-                ToolDiagnostics.FileCannotBeChanged,
+            ToolDiagnostic.NotChanged(
                 existing,
                 "written",
                 "a log is not written over a .sql file, a sidecar, a project or a solution"

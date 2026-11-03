@@ -232,7 +232,7 @@ public sealed class FileOutcomesTests : IDisposable
         var failure = outcome.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC218");
         failure.Path.ShouldBe(sidecar);
-        failure.Arguments.AsEnumerable().ShouldBe([sidecar, "read", reason]);
+        failure.Arguments.AsEnumerable().ShouldBe([$"'{sidecar}'", "read", reason]);
     }
 
     [Fact]

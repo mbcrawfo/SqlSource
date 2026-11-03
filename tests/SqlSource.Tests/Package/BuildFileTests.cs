@@ -12,13 +12,17 @@ using Xunit;
 namespace SqlSource.Tests.Package;
 
 // build/SqlSource.props, build/SqlSource.targets and build/SqlSource.AfterSdk.targets are the MSBuild files that the
-// package puts into every project that references it.  The end-to-end tests show them working for this project; these
-// read the files for what this project cannot show.
+// package puts into every project that references it, and buildMultiTargeting/SqlSource.targets the one it puts into
+// the outer build of a project with several target frameworks.  The end-to-end tests show them working for this
+// project; these read the files for what this project cannot show.  The rules of the online build are in
+// BuildFileTests.Online.cs.
 public sealed partial class BuildFileTests
 {
     private const string Prefix = "SqlSource";
 
-    // The properties of the SDK that the files read.  Every other property in them belongs to the package.
+    // The properties of the SDK, and the variables of the environment, that the files read or set as properties.
+    // Every other property in them belongs to the package.  SQLSOURCE_CONNECTION is never one:
+    // BuildFiles_ConnectionVariable_IsNeverReadAsAProperty.
     private static readonly string[] SdkProperties =
     [
         "DefaultItemExcludes",
@@ -40,6 +44,16 @@ public sealed partial class BuildFileTests
         "NuGetPackageRoot",
         "NuGetPackageFolders",
         "CompilerApiVersion",
+        "DesignTimeBuild",
+        "BuildingProject",
+        "TargetFrameworks",
+        "SQLSOURCE_LOG",
+        "CI",
+        "TF_BUILD",
+        "TEAMCITY_VERSION",
+        "JENKINS_URL",
+        "MSBuildWarningsNotAsErrors",
+        "OS",
     ];
 
     // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.
@@ -125,14 +139,25 @@ public sealed partial class BuildFileTests
     // hook it through a property, which SqlSource.AfterSdk.targets empties to run them later: see
     // Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked.  The target that writes the manifest is the one
     // that is not of a build, Targets_ManifestTarget_HooksNothing, and the hook for a target that adds .sql files
-    // hooks nothing either, Targets_HookForFilesThatTargetsAdd_RunsBeforeTheSearchAndTheManifest.
+    // hooks nothing either, Targets_HookForFilesThatTargetsAdd_RunsBeforeTheSearchAndTheManifest.  Nor do the targets
+    // of the online build, which the hash depends on: Targets_OnlineTargets_HookNothing.
     [Fact]
     public void Targets_EveryTargetOfABuild_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
     {
         var targets = Targets
             .Root.ShouldNotBeNull()
             .Elements("Target")
-            .Where(target => target.Attribute("Name")!.Value is not (ManifestTarget or ListTarget))
+            .Where(target =>
+                target.Attribute("Name")!.Value
+                    is not (
+                        ManifestTarget
+                        or ListTarget
+                        or DescribeOnlineTarget
+                        or RunOnlineTarget
+                        or ListSidecarsTarget
+                        or CreatedSidecarsTarget
+                    )
+            )
             .ToList();
 
         targets.Count.ShouldBe(5);
@@ -191,16 +216,21 @@ public sealed partial class BuildFileTests
     // A target's DependsOnTargets is read before the target runs, so the list that the manifest target depends on
     // is a property set where the file is imported.  The nesting of a sidecar under its .sql file is read from the
     // evaluated items by the IDEs, so it is outside every target too: see the comment in the file.  So is the
-    // Content item of the settings files: see Targets_SettingsFiles_AreNeverCopied.  Nothing else is outside a
-    // target, and the file has no other condition outside one: a second such element would be read by every
-    // project, in every build.
+    // Content item of the settings files: see Targets_SettingsFiles_AreNeverCopied.  The properties of the online
+    // build are read by the conditions of its targets, so they are set where the file is imported too: see
+    // Targets_OnlineProperties_AreTheDesignsExpressions.  Nothing else is outside a target, and the file has no other
+    // condition outside one but the online group's: a second such element would be read by every project, in every
+    // build.
     [Fact]
-    public void Targets_Root_HoldsTargetsTheManifestsListTheNestingAndTheSettingsFiles()
+    public void Targets_Root_HoldsTargetsTheManifestsListTheNestingTheSettingsFilesAndTheOnlineProperties()
     {
         var root = Targets.Root.ShouldNotBeNull();
 
         var outside = root.Elements().Where(element => element.Name.LocalName != "Target").ToList();
-        outside.Select(element => element.Name.LocalName).ShouldBe(["PropertyGroup", "ItemGroup", "ItemGroup"]);
+        outside
+            .Select(element => element.Name.LocalName)
+            .ShouldBe(["PropertyGroup", "ItemGroup", "ItemGroup", "PropertyGroup"]);
+        outside[3].ShouldBe(OnlineProperties(Targets));
 
         var group = outside[0];
         group.Attributes().ShouldBeEmpty();
@@ -599,7 +629,8 @@ public sealed partial class BuildFileTests
     // writes a hash of the list to a file and names the file as an input, and it writes the file only when the hash
     // changed, or every build would compile.  tools/check-package-install.sh removes a file and shows this at work.
     // The list holds the settings files only once the search has run, and MSBuild promises no order for two targets
-    // that hook the same one, so the target says what it depends on.
+    // that hook the same one, so the target says what it depends on.  The online build runs after the search and
+    // before the hash, so that the hash holds a sidecar the run created, and wherever the search runs.
     [Fact]
     public void Targets_ListOfAdditionalFiles_IsAnInputOfTheCompiler()
     {
@@ -614,7 +645,10 @@ public sealed partial class BuildFileTests
         write.Attribute("WriteOnlyWhenDifferent").ShouldNotBeNull().Value.ShouldBe("true");
         write.Attribute("Overwrite").ShouldNotBeNull().Value.ShouldBe("true");
         input.Attribute("Include").ShouldNotBeNull().Value.ShouldBe(write.Attribute("File").ShouldNotBeNull().Value);
-        target.Attribute("DependsOnTargets").ShouldNotBeNull().Value.ShouldBe(SearchTarget);
+        target
+            .Attribute("DependsOnTargets")
+            .ShouldNotBeNull()
+            .Value.ShouldBe(SearchTarget + ";" + DescribeOnlineTarget);
         target.Attribute("BeforeTargets").ShouldNotBeNull().Value.ShouldBe(SearchHook);
     }
 
@@ -666,7 +700,7 @@ public sealed partial class BuildFileTests
     // as the fixture OddPaths has, would end a quoted argument early, and the whole expression would be the value.
     [Fact]
     public void Targets_ItemMetadata_IsNeverTheArgumentOfAPropertyFunction() =>
-        Values(Targets).ShouldAllBe(value => !MetadataInAPropertyFunction().IsMatch(value));
+        Values(Targets).Concat(Values(Outer)).ShouldAllBe(value => !MetadataInAPropertyFunction().IsMatch(value));
 
     // A .sql file's sidecar goes to the compiler with it.
     [Fact]
@@ -692,13 +726,15 @@ public sealed partial class BuildFileTests
     [InlineData("SqlSource.props")]
     [InlineData("SqlSource.targets")]
     [InlineData("SqlSource.AfterSdk.targets")]
+    [InlineData("buildMultiTargeting/SqlSource.targets")]
     public void BuildFile_EveryPropertyOfThePackage_StartsWithSqlSource(string file)
     {
         var document = file switch
         {
             "SqlSource.props" => Props,
             "SqlSource.targets" => Targets,
-            _ => AfterSdk,
+            "SqlSource.AfterSdk.targets" => AfterSdk,
+            _ => Outer,
         };
 
         var names = PropertiesSet(document)

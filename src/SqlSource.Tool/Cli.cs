@@ -7,8 +7,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
@@ -260,7 +260,11 @@ public static class Cli
     {
         var host = state.Host;
         var logPath = DescribeCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable);
-        state.MayPoint = commandLine.RunsDescribe && logPath is null;
+        // A build's user cannot give the build's run a log, so a run under --online points at none.
+        state.MayPoint =
+            commandLine.RunsDescribe
+            && logPath is null
+            && DescribeCommand.OnlineOf(commandLine.Parsed) == OnlineMode.Off;
 
         // A watch is stopped and does not fail, and the errors of its passes are behind it by then: no line points
         // from its end to a log.
@@ -275,7 +279,13 @@ public static class Cli
             return true;
         }
 
-        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time);
+        var opened = RunLogFile.Open(
+            logPath,
+            host.WorkingDirectory,
+            host.CreateFile,
+            host.Time,
+            DescribeCommand.LogOptionOf(commandLine.Usage)
+        );
         if (!opened.Succeeded)
         {
             state.Reporter.Report(opened.Failure);
@@ -313,7 +323,8 @@ public static class Cli
             // gets its action only now, so that it cannot run with another.
             state.Reporter = new Reporter(
                 host.Error,
-                new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null)
+                new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null),
+                oneLine: DescribeCommand.OnlineOf(parsed) != OnlineMode.Off
             );
             DescribeCommand.Bind(parsed, commandLine.Usage, host, state.Reporter, counts => state.Databases = counts);
         }
@@ -347,19 +358,19 @@ public static class Cli
             return exitCode;
         }
 
-        state.Reporter.Report(
-            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, "written", failure.Message)
-        );
+        state.Reporter.Report(log.NotWritten(failure.Message));
         return 1;
     }
 
     /// <summary>
-    /// The exit code of a run: <c>1</c> when an error other than <c>SQLSRC219</c> was reported, else what the
-    /// command gave when that is not <c>0</c>, else <c>2</c> when <c>SQLSRC219</c> was reported.
+    /// The exit code of a run: <c>1</c> when an error other than <c>SQLSRC219</c> was written, else what the
+    /// command gave when that is not <c>0</c>, else <c>2</c> when <c>SQLSRC219</c> was reported.  An error that was
+    /// reported without being written gives no exit code: the build that reads this run takes a non-zero exit code
+    /// with no error line for a tool that failed.
     /// </summary>
     internal static int ExitCodeOf(Reporter reporter, int exitCode)
     {
-        if (reporter.Count > reporter.DifferenceCount)
+        if (reporter.Count - reporter.UnwrittenCount > reporter.DifferenceCount)
         {
             return 1;
         }

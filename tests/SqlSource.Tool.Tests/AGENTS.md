@@ -11,6 +11,8 @@
 - **No test of the tool waits for a time to pick an order, or changes the test process unseen.**
 - **A test that needs the answers of `tests/SqlSource.Tool.Testing/FakeProcessRunner.cs` in an order, or several open at once, holds them with `ProcessGate.cs`**, and not with `Task.Delay`.
 - **A test that changes the environment of the test process is in the collection `ChangesTheEnvironment`**, which runs alone, and puts back what it changed.
+- **A test runs `dotnet build` of a fixture through `FixtureProjects.BuildAsync`**, which clears the variables that would take the build online, keep it offline as in CI or have MSBuild log every variable, whatever the developer's shell or the runner holds.
+- **A test of the online build gives the build the stand-in of the tool through `StandIn.CommandSwitch` and tells it what to do through `StandIn.Tell`**, never a script, which would not run on Windows.
 - **A test that starts a program of the operating system skips with `Programs.SkipUnlessOnPath`** where the program is missing, and one that needs a program that waits takes it from `Programs.Waiter`, whichever the operating system.
 
 ## Fixture projects

@@ -419,7 +419,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
         var failure = evaluation.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC206");
         failure.Path.ShouldBe(_project);
-        failure.Arguments.ShouldBe([_project, "it names no project"]);
+        failure.Arguments.ShouldBe([$"of '{_project}'", "it names no project"]);
         failure.Lines.ShouldBeEmpty();
     }
 

@@ -7,11 +7,11 @@ using Xunit;
 
 namespace SqlSource.Tool.Testing;
 
-// What an engine gives the error paths: the table the query reads, its statements, and how the run describes.
-// Table is the name the DROP uses.  CreateTable makes the table (an integer key "id" and a text column "name" that is
-// not null), and AddColumn adds a column "note" to it, each a whole statement.  MissingTable names a table the
-// database does not have.  ExecuteAsync runs a statement on the database "fixtures", and UseDescribers sets the
-// describers of the real run.
+// What an engine gives the error paths and the online builds: the table the query reads, its statements, and how the
+// run describes.  Table is the name the DROP uses.  CreateTable makes the table (an integer key "id" and a text column
+// "name" that is not null), and AddColumn adds a column "note" to it, each a whole statement.  MissingTable names a
+// table the database does not have.  ExecuteAsync runs a statement on the database "fixtures", and UseDescribers sets
+// the describers of the error paths' run; an online build runs the tool beside the tests, with the released ones.
 internal sealed record ErrorPathEngine(
     string Table,
     string CreateTable,
@@ -19,7 +19,22 @@ internal sealed record ErrorPathEngine(
     string MissingTable,
     Func<string, Task> ExecuteAsync,
     Action<CliRun> UseDescribers
-);
+)
+{
+    // Runs a test's body with the table of the query made, and drops it again however the body ends.
+    public async Task WithTableAsync(Func<Task> body)
+    {
+        await ExecuteAsync(CreateTable);
+        try
+        {
+            await body();
+        }
+        finally
+        {
+            await ExecuteAsync($"DROP TABLE IF EXISTS {Table}");
+        }
+    }
+}
 
 // The tool on a scratch project, a copy of the fixture ErrorPaths of the engine's test project, with the real MSBuild:
 // a sidecar that no longer matches the query or the server is out of date under "--check", and a query that the
@@ -38,7 +53,7 @@ internal sealed class ErrorPaths(ErrorPathEngine engine, string connection) : ID
     {
         var project = _projects.Copy("ErrorPaths");
         var queries = Path.Combine(Path.GetDirectoryName(project)!, "Widgets.sql");
-        await WithWidgetsTableAsync(async () =>
+        await engine.WithTableAsync(async () =>
         {
             var described = await DescribeAsync(project);
             described.ExitCode.ShouldBe(0, described.Error);
@@ -61,7 +76,7 @@ internal sealed class ErrorPaths(ErrorPathEngine engine, string connection) : ID
     public async Task ShouldFindTheAddedColumnOutOfDateAsync()
     {
         var project = _projects.Copy("ErrorPaths");
-        await WithWidgetsTableAsync(async () =>
+        await engine.WithTableAsync(async () =>
         {
             var described = await DescribeAsync(project);
             described.ExitCode.ShouldBe(0, described.Error);
@@ -86,7 +101,7 @@ internal sealed class ErrorPaths(ErrorPathEngine engine, string connection) : ID
             $"-- name: GetMissing\nSELECT id FROM {engine.MissingTable};\n",
             TestContext.Current.CancellationToken
         );
-        await WithWidgetsTableAsync(async () =>
+        await engine.WithTableAsync(async () =>
         {
             var result = await DescribeAsync(project);
 
@@ -108,19 +123,5 @@ internal sealed class ErrorPaths(ErrorPathEngine engine, string connection) : ID
                 ? ["describe", "--check", project, "--connection", connectionArgument]
                 : ["describe", project, "--connection", connectionArgument]
         );
-    }
-
-    // Runs a test's body with the table of the query made, and drops it again however the body ends.
-    private async Task WithWidgetsTableAsync(Func<Task> body)
-    {
-        await engine.ExecuteAsync(engine.CreateTable);
-        try
-        {
-            await body();
-        }
-        finally
-        {
-            await engine.ExecuteAsync($"DROP TABLE IF EXISTS {engine.Table}");
-        }
     }
 }

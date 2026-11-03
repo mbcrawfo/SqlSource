@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
-using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
@@ -54,7 +53,7 @@ internal static class FileOutcomes
                 // What cannot be opened cannot be told from a newer tool's file, so it stays, and the user is told.
                 return Of(file, path, FileAction.Unreadable) with
                 {
-                    Failure = ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, "read", reason),
+                    Failure = ToolDiagnostic.NotChanged(path, "read", reason),
                 };
             }
 

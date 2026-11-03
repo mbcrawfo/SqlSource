@@ -18,10 +18,14 @@ namespace SqlSource.Tool.Describing;
 /// The full path of the folder of the run's unit, the project or the solution, where the search for its <c>.env</c>
 /// file starts.
 /// </param>
+/// <param name="Online">
+/// What <c>--online</c> said: <see cref="OnlineMode.Off" /> for a run that is not part of a build.
+/// </param>
 internal sealed record DescribeOptions(
     RunMode Mode,
     bool HasFilter,
     ImmutableArray<ConnectionArgument> Connections,
     ImmutableArray<UsageValue> Databases,
-    string UnitFolder
+    string UnitFolder,
+    OnlineMode Online
 );

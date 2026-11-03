@@ -2,13 +2,20 @@
 # Installs the SqlSource package into a project the way a consumer does, runs the project and checks what it prints.
 # Then asks the project what the sqlsource tool asks one: whether it uses SqlSource, and for its project manifest.
 # Then removes a .sql file the project uses and checks that the next build, an incremental one, fails for it.
-# Last, publishes a web project that references the package, and checks that no .sql file, no sidecar and no settings
+# Then publishes a web project that references the package, and checks that no .sql file, no sidecar and no settings
 # file is copied.
+# Last, builds a project of two target frameworks that references the package, with a stand-in for the sqlsource tool,
+# and checks that the outer build ran the tool once, for the first framework, before it dispatched the inner builds.
+# NuGet imports buildMultiTargeting/SqlSource.targets only for a package reference, so no other test reaches it.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
 # own build applies to it, and it restores from the folder that holds the package and from nowhere else.
 # Usage: check-package-install.sh [directory]   The directory holds one SqlSource.<version>.nupkg, and may hold the
 # package of the tool beside it.  Without it, the package is packed into a temporary directory first.
 set -euo pipefail
+
+# MSBuild writes its own lines in the language of the user's interface, "0 Warnung(en)" in German, and the checks
+# below read some of them, so every run of dotnet is in English, whatever the machine's language.
+export DOTNET_CLI_UI_LANGUAGE=en
 
 PACKAGE_ID='SqlSource'
 FIXTURE='tools/package-install'
@@ -108,6 +115,39 @@ dotnet run --project "$PROJECT" --no-build >"$work/actual-output.txt" || {
 
 if ! diff "$EXPECTED" "$work/actual-output.txt"; then
     echo "check-package-install: a project that references $package does not print $FIXTURE/$EXPECTED" >&2
+    exit 1
+fi
+
+# The online build is off unless a connection is configured, so a project with no connection and no SqlSourceOnline
+# builds as it did before the tool ran in the build: no warning, and the tool is never started.  A stand-in is named as
+# the tool so that a run would show in its log, and a build that is not incremental runs every target of the package.
+# This build and the ones below need none of the variables that turn the online build off, and CI sets the first, or
+# on, and no developer's connection.
+unset CI TF_BUILD TEAMCITY_VERSION JENKINS_URL GITHUB_ACTIONS SQLSOURCE_LOG
+while IFS= read -r variable; do
+    unset "$variable"
+done < <(compgen -v SQLSOURCE_CONNECTION)
+
+stand_in="$work/stand-in.sh"
+stand_in_log="$work/stand-in.log"
+# The tool prints a line of its summary when it runs, and silence reads as a tool that could not start.  The arguments
+# of each call are logged, one call to a line.
+cat >"$stand_in" <<EOF
+#!/bin/sh
+echo "\$*" >>"$stand_in_log"
+echo 'sqlsource: summary: orders (postgres): 0 described, 1 skipped, 0 failed'
+EOF
+chmod +x "$stand_in"
+
+dotnet build "$PROJECT" --nologo --no-incremental "-p:SqlSourceToolCommand=$stand_in" >"$work/offline.log" 2>&1 || {
+    cat "$work/offline.log" >&2
+    echo "check-package-install: a project with no connection that references $package does not build" >&2
+    exit 1
+}
+
+if [[ -e "$stand_in_log" ]] || ! grep -q '^ *0 Warning(s)$' "$work/offline.log"; then
+    cat "$work/offline.log" >&2
+    echo "check-package-install: a project with no connection that references $package ran the tool or warned" >&2
     exit 1
 fi
 
@@ -211,7 +251,76 @@ for folder in "$web/bin" "$work/published"; do
     fi
 done
 
+# NuGet imports buildMultiTargeting/SqlSource.targets into the outer build of a project with several target
+# frameworks, and build/ into the inner builds, which no other build tells apart.  The outer build runs the tool once,
+# before it dispatches the inner builds, so that no inner build waits on another's compile.  The first framework is
+# netstandard2.1, whose reference assemblies the SDK brings along with net10.0's, so that the restore still needs no
+# feed but the package's.  netstandard2.1 takes a library, not a program.
+multi="$work/multi"
+mkdir -p "$multi/Queries"
+cp global.json nuget.config "$multi/"
+cat >"$multi/Multi.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFrameworks>netstandard2.1;net10.0</TargetFrameworks>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="$PACKAGE_ID" Version="$version" PrivateAssets="all" />
+    </ItemGroup>
+</Project>
+EOF
+echo 'public static class Marker { }' >"$multi/Marker.cs"
+echo 'SELECT 1 AS one;' >"$multi/Queries/Users.sql"
+echo '{ "root": true, "dialect": "postgres", "output": "Sql" }' >"$multi/sqlsource.json"
+
+rm -f "$stand_in_log"
+# The console shows the errors alone, and the log of the order of the targets is a file of its own.
+dotnet build "$multi/Multi.csproj" --nologo --verbosity quiet "-flp:v=diag;logfile=$work/multi.log" \
+    -p:SqlSourceOnline=true "-p:SqlSourceToolCommand=$stand_in" >"$work/multi-console.log" 2>&1 || {
+    cat "$work/multi-console.log" >&2
+    echo "check-package-install: a project of two target frameworks that references $package does not build" >&2
+    exit 1
+}
+
+multi_fails() {
+    cat "$stand_in_log" >&2 || true
+    echo "check-package-install: the build of a project of two target frameworks that references $package $1" >&2
+    exit 1
+}
+
+if [[ ! -f "$stand_in_log" ]] || [[ "$(wc -l <"$stand_in_log")" -ne 1 ]]; then
+    multi_fails 'did not run the tool exactly once'
+fi
+
+# The manifest of the run is the first framework's, whose folder under obj/ names it.
+manifest_argument='^describe --manifest .*/netstandard2\.1/Multi\.csproj\.SqlSource\.manifest --online true$'
+if ! grep -q "$manifest_argument" "$stand_in_log"; then
+    multi_fails 'did not run the tool for the first framework'
+fi
+
+# The target of buildMultiTargeting/SqlSource.targets finished before the outer build dispatched the inner ones.
+# Without that file an inner build calls the run itself, once and for the same framework, which the checks above
+# cannot tell from this one.  A line that is not in the log is empty, and a grep with no match is not an error here.
+log_line() {
+    grep -n -m 1 -F "$1" "$work/multi.log" | cut -d: -f1 || true
+}
+done_line="$(log_line 'Done building target "SqlSourceRunOnlineBeforeDispatch"')"
+dispatch_line="$(log_line 'Target "DispatchToInnerBuilds:')"
+if [[ -z "$done_line" || -z "$dispatch_line" || "$done_line" -ge "$dispatch_line" ]]; then
+    multi_fails 'did not run the tool in the outer build before it dispatched the inner builds'
+fi
+
+# Under bin/<configuration>/: CI sets CONFIGURATION, which MSBuild reads as the property.
+for framework in netstandard2.1 net10.0; do
+    compiled=("$multi"/bin/*/"$framework"/Multi.dll)
+    if [[ ! -f "${compiled[0]}" ]]; then
+        multi_fails "did not compile for $framework"
+    fi
+done
+
 echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED,"
 echo "check-package-install: which has SqlSourceImported and writes its project manifest,"
 echo "check-package-install: and whose next build compiles again after a .sql file is removed,"
-echo "check-package-install: and into a web project, whose build and publish copy no .sql, sidecar or settings file"
+echo "check-package-install: and into a web project, whose build and publish copy no .sql, sidecar or settings file,"
+echo "check-package-install: and into a project of two target frameworks, whose outer build runs the tool once"

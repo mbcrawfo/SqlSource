@@ -1,0 +1,79 @@
+<Project>
+    <!--
+        ShowItems writes the AdditionalFiles items each framework's compiler was given, by their full paths, to
+        obj/compiled.<framework>.txt, since no generator is loaded to show them.  It runs after CoreCompile, which every
+        target that changes the items runs before, and runs when CoreCompile is skipped as up to date too.
+
+        Under OnlineMultiMeet, each inner build waits after CoreCompile until the other has reached the same point, and
+        fails after a minute without it.  Both pass only when the two run at once: an inner build that waited for the
+        whole of the other's, as one that called the run of the tool in the first framework's configuration while
+        that framework built would, never meets it.
+
+        Under OnlineMultiLate, OnlineMultiAddLate adds ../Late/Late.sql, which a test writes beside the copy with a
+        sqlsource.json that no other file reaches, from a hook of CoreCompile, as a project's own target that writes
+        its .sql files late would, without hooking SqlSourceListFiles.
+
+        Under OnlineMultiOwnItems, with SqlSourceIncludeFiles false, the project lists its .sql files and no sidecar, as
+        a project that lists its own files and forgets its sidecars does.
+    -->
+    <ItemGroup Condition="'$(OnlineMultiOwnItems)' == 'true'">
+        <AdditionalFiles Include="Queries/*.sql" />
+    </ItemGroup>
+    <Target Name="OnlineMultiAddLate" BeforeTargets="CoreCompile" Condition="'$(OnlineMultiLate)' == 'true'">
+        <ItemGroup>
+            <AdditionalFiles Include="../Late/Late.sql" />
+        </ItemGroup>
+    </Target>
+    <Target Name="ShowItems" AfterTargets="CoreCompile">
+        <WriteLinesToFile
+            File="$(BaseIntermediateOutputPath)compiled.$(TargetFramework).txt"
+            Lines="@(AdditionalFiles->'%(FullPath)')"
+            Overwrite="true"
+        />
+    </Target>
+    <UsingTask
+        TaskName="OnlineMultiMeetTask"
+        TaskFactory="RoslynCodeTaskFactory"
+        AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll"
+    >
+        <ParameterGroup>
+            <Folder ParameterType="System.String" Required="true" />
+            <Mine ParameterType="System.String" Required="true" />
+            <Other ParameterType="System.String" Required="true" />
+        </ParameterGroup>
+        <Task>
+            <Code Type="Fragment" Language="cs">
+                <![CDATA[
+                System.IO.File.WriteAllText(System.IO.Path.Combine(Folder, "reached." + Mine), "");
+                var other = System.IO.Path.Combine(Folder, "reached." + Other);
+                var until = System.DateTime.UtcNow.AddMinutes(1);
+                while (!System.IO.File.Exists(other))
+                {
+                    if (System.DateTime.UtcNow > until)
+                    {
+                        Log.LogError("The inner build of " + Other + " never reached the end of its CoreCompile.");
+                        return false;
+                    }
+
+                    System.Threading.Thread.Sleep(50);
+                }
+                ]]>
+            </Code>
+        </Task>
+    </UsingTask>
+    <Target
+        Name="OnlineMultiMeet"
+        AfterTargets="ShowItems"
+        Condition="'$(OnlineMultiMeet)' == 'true' and '$(TargetFramework)' != ''"
+    >
+        <PropertyGroup>
+            <OnlineMultiOther>net10.0</OnlineMultiOther>
+            <OnlineMultiOther Condition="'$(TargetFramework)' == 'net10.0'">net8.0</OnlineMultiOther>
+        </PropertyGroup>
+        <OnlineMultiMeetTask
+            Folder="$(MSBuildProjectDirectory)/$(BaseIntermediateOutputPath)"
+            Mine="$(TargetFramework)"
+            Other="$(OnlineMultiOther)"
+        />
+    </Target>
+</Project>

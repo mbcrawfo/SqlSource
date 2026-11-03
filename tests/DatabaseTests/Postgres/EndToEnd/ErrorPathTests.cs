@@ -15,17 +15,18 @@ public sealed class ErrorPathTests(PostgresDatabases postgres) : IDisposable
 {
     private const string Table = "error_path_widgets";
 
-    private readonly ErrorPaths _paths = new(
-        new ErrorPathEngine(
+    private readonly ErrorPaths _paths = new(Engine(postgres), postgres.ConnectionString);
+
+    // The table of the query and the statements of PostgreSQL, which OnlineBuildTests shares.
+    internal static ErrorPathEngine Engine(PostgresDatabases postgres) =>
+        new(
             Table,
             $"CREATE TABLE {Table} (id integer PRIMARY KEY, name text NOT NULL)",
             $"ALTER TABLE {Table} ADD COLUMN note text",
             "error_path_no_such_table",
             postgres.ExecuteAsync,
             static run => run.Describers.Add(new PostgresDescriber())
-        ),
-        postgres.ConnectionString
-    );
+        );
 
     public void Dispose() => _paths.Dispose();
 

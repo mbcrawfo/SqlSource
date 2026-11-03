@@ -249,6 +249,70 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // The four diagnostics of the online build are reported by the package's MSBuild targets alone: the build runs the
+    // sqlsource tool before the compiler, which loads the generator.  Each target's text is the message, with {0},
+    // {1} and {2} where it writes a property, and BuildFileTests holds the two equal.  SqlSourceDescribeOnline reports
+    // this one, {0} being the value of SqlSourceOnline as written, less the white space around it.
+    public static readonly DiagnosticDescriptor OnlineValueInvalid = new(
+        id: "SQLSRC024",
+        title: "SqlSourceOnline is not valid",
+        messageFormat: "SqlSourceOnline is '{0}', which is not auto, true or false.  Set it to one of the three, or "
+            + "leave it empty for auto.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc024",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // SqlSourceRunOnline reports it when the tool printed no line of its own under SqlSourceOnline true: dotnet could
+    // not start it.
+    public static readonly DiagnosticDescriptor OnlineToolCannotRun = new(
+        id: "SQLSRC025",
+        title: "Build cannot run the tool",
+        messageFormat: "The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install "
+            + "SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set "
+            + "SqlSourceOnline to false to build from the committed sidecars.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc025",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // A warning a project may configure, which SqlSourceRunOnline reports under SqlSourceOnline auto when dotnet could
+    // not start the tool.  The build goes on with the committed sidecars, as one with no connection does: the .env that
+    // turned the online build on may be the application's own, and an error would fail every build of a machine that
+    // has not restored the tool.  The package adds the id to MSBuildWarningsNotAsErrors, so that -warnaserror leaves it
+    // a warning; SqlSourceOnline false, or MSBuildWarningsAsMessages, silences it.
+    public static readonly DiagnosticDescriptor OnlineToolCannotRunOffline = new(
+        id: "SQLSRC026",
+        title: "Build cannot run the tool and uses the committed sidecars",
+        messageFormat: "The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run "
+            + "'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the "
+            + "queries; or set SqlSourceOnline to false to build from the sidecars without this warning.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc026"
+    );
+
+    // SqlSourceRunOnline reports it when the tool started, exited other than 0 and wrote no error of its own.  {0} is
+    // the exit code, {1} the first line the tool printed, and {2} empty, or, when that line is the tool's own and is
+    // neither the offline nor the online line, as a usage error from a tool older than the package is, the advice to
+    // update the tool and two spaces, which the target writes.
+    public static readonly DiagnosticDescriptor OnlineToolFailedSilently = new(
+        id: "SQLSRC027",
+        title: "Tool failed without an error",
+        messageFormat: "The sqlsource tool exited with the code {0} and reported no error, so the sidecars may not be "
+            + "current.  {2}It printed first: '{1}'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc027",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1096,6 +1160,10 @@ internal static class SqlDiagnostics
             CompilerTooOld,
             ExceptionsSeenTwice,
             ExceptionsOfAnotherShape,
+            OnlineValueInvalid,
+            OnlineToolCannotRun,
+            OnlineToolCannotRunOffline,
+            OnlineToolFailedSilently,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

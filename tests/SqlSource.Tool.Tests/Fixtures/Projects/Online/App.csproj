@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        One target framework, with one .sql file and its sidecar, for the tests that build it with the online build on
+        and a stand-in of the tool as its command.  Directory.Build.targets writes what the compiler is given.
+    -->
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>

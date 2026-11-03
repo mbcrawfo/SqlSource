@@ -76,6 +76,11 @@ internal static class Programs
         return start;
     }
 
+    // The tool beside the tests as a command of a shell, started as ToolStart starts it, each path in quotes: what a
+    // build of a fixture runs in place of "dotnet sqlsource".
+    public static string ToolCommand =>
+        $"\"{Dotnet}\" exec --roll-forward LatestMajor --depsfile \"{TestsDepsFile}\" \"{ToolPath}\"";
+
     // Runs the program to its end and gives what it wrote.  It sets the three Redirect* of the start it is given, reads
     // both streams while the program runs, so that neither fills and holds it, and gives the program no input.
     // whileRunning runs once the program has started.

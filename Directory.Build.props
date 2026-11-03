@@ -35,6 +35,13 @@
         <AssemblyVersion>$(VersionPrefix).$(BuildNumber)</AssemblyVersion>
         <FileVersion>$(VersionPrefix).$(BuildNumber)</FileVersion>
         <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+        <!--
+            The projects of this repository that import SqlSource's MSBuild files by path never run the sqlsource tool
+            in their build, whatever connection a developer has set: their sidecars are written against the pinned
+            images by tools/describe-end-to-end.sh, and the tool manifest does not name sqlsource, so an online build
+            would rewrite them or fail.  A test that builds online sets the property itself.
+        -->
+        <SqlSourceOnline>false</SqlSourceOnline>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Roslynator.Analyzers">

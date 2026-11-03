@@ -132,6 +132,82 @@ internal static class RunProjects
         return new FoundProjects(projects, manifests.ToImmutable(), assetsFiles.ToImmutable());
     }
 
+    /// <summary>
+    /// The manifest of a run that the build started: read from the file the build wrote, with no question to MSBuild.
+    /// A file that does not exist or cannot be read, or that is no manifest, is reported and gives none.
+    /// </summary>
+    /// <param name="manifest">
+    /// The value of <c>--manifest</c>.  A message names the file by its position when the value holds <c>=</c> or
+    /// <c>;</c>, which the build's path may, and then leaves out the system's reason, which quotes the path.
+    /// </param>
+    /// <param name="manifestPath">The full path of the manifest file.</param>
+    /// <param name="host">Reads the file.</param>
+    /// <param name="reporter">Where the error goes.</param>
+    /// <param name="cancellationToken">Ends the run.</param>
+    public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(
+        UsageValue manifest,
+        string manifestPath,
+        ToolHost host,
+        Reporter reporter,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        string? text;
+        try
+        {
+            text = host.ReadTextFile(manifestPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            var reason = manifest.MayBePrintedAsPath ? exception.Message : "the system would not read it";
+            return Task.FromResult(Unreadable(manifest, manifestPath, reason, reporter));
+        }
+
+        if (text is null)
+        {
+            return Task.FromResult(Unreadable(manifest, manifestPath, "there is no such file", reporter));
+        }
+
+        var read = ManifestReader.Read(text);
+        if (!read.Succeeded)
+        {
+            return Task.FromResult(Unreadable(manifest, manifestPath, read.Failure, reporter));
+        }
+
+        RunEvents.Project(
+            reporter.Trace,
+            read.Value.ProjectPath,
+            new ProjectEvaluation(read.Value.ProjectPath, ProjectState.UsesSqlSource, read.Value)
+        );
+        return Task.FromResult<ImmutableArray<ProjectManifest>>([read.Value]);
+    }
+
+    // At the file, or at no file when the message names it by its position.
+    private static ImmutableArray<ProjectManifest> Unreadable(
+        UsageValue manifest,
+        string manifestPath,
+        string reason,
+        Reporter reporter
+    )
+    {
+        reporter.Report(
+            manifest.MayBePrintedAsPath
+                ? ToolDiagnostic.AtFile(
+                    ToolDiagnostics.ManifestCannotBeRead,
+                    manifestPath,
+                    UsageValue.Quoted(manifestPath),
+                    reason
+                )
+                : ToolDiagnostic.Create(
+                    ToolDiagnostics.ManifestCannotBeRead,
+                    $"at position {manifest.Position}",
+                    reason
+                )
+        );
+        return [];
+    }
+
     // The projects of the unit that --project names, in the unit's order.  A path that names none is reported once.
     private static ImmutableArray<string> Restrict(
         ImmutableArray<string> projects,

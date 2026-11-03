@@ -35,4 +35,6 @@ $ dotnet sqlsource describe --watch
 - `describe --check` writes nothing, and fails when a sidecar is out of date: run it on a build server.
 - `describe --watch` describes again each time you save a `.sql` file or another file of your project, until you stop it with Ctrl+C: leave it running while you work.
 
+On a machine with that `.env` file, or `SQLSOURCE_CONNECTION` in the environment, `dotnet build` runs `describe` itself before it compiles, and reports a query the database rejects as a build error at the query; a build in CI never does: see [running in the build](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#running-in-the-build).
+
 [The tool's manual page](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md) has the whole workflow, every option and the exit codes.  [The SqlSource readme](https://github.com/mbcrawfo/SqlSource/blob/main/README.md) says what SqlSource does and how to start.

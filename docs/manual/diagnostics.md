@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.  In a build that [runs the tool](tool.md#running-in-the-build), each of its errors is one line, with its other lines after it, each after `; `.
 
 **Project and attribute**
 
@@ -41,6 +41,15 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC022](#sqlsrc022) | Exceptions are seen in two assemblies |
 | [SQLSRC023](#sqlsrc023) | Exceptions come from another version of SqlSource |
+
+**A build that runs the tool**
+
+| Id | Title |
+|----|----|
+| [SQLSRC024](#sqlsrc024) | SqlSourceOnline is not valid |
+| [SQLSRC025](#sqlsrc025) | Build cannot run the tool |
+| [SQLSRC026](#sqlsrc026) | Build cannot run the tool and uses the committed sidecars |
+| [SQLSRC027](#sqlsrc027) | Tool failed without an error |
 
 **`.sql` files**
 
@@ -241,7 +250,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC286](#sqlsrc286) | Connection in .env cannot be read |
 | [SQLSRC287](#sqlsrc287) | The watcher failed |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 287 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 287 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -618,6 +627,62 @@ CSC : error SQLSRC023: The UnexpectedRowCountException and TransactionRolledBack
 Use the same version of SqlSource in every project of the solution, for example with central package management.  The error has no file and line, because it is about the project's references.
 
 See: [Projects that share internals](generator.md#projects-that-share-internals)
+
+## SQLSRC024
+
+**SqlSourceOnline is not valid**
+
+The project sets the MSBuild property `SqlSourceOnline` to a value that is not `auto`, `true` or `false`.  The case of the value and the white space around it do not matter, so ` True ` is `true`, and an empty value is `auto`.  The message names the value, without the white space around it.  The build stops before it compiles anything.
+
+```console
+/repo/App/App.csproj : error SQLSRC024: SqlSourceOnline is 'yes', which is not auto, true or false.  Set it to one of the three, or leave it empty for auto.
+```
+
+Set `SqlSourceOnline` to `auto`, `true` or `false`, or remove it to get `auto`.  The property can come from the project file or from a `Directory.Build.props` above it.
+
+See: [Running the tool in the build](settings.md#online-build)
+
+## SQLSRC025
+
+**Build cannot run the tool**
+
+`SqlSourceOnline` is `true`, so a build that is not in CI runs `dotnet sqlsource describe` on the project before it compiles, and it could not start the tool: no tool manifest in the project's folder or a folder above it names `SqlSource.Tool`, or the tool it names was never restored on this machine.  The build stops.
+
+```console
+/repo/App/App.csproj : error SQLSRC025: The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars.
+```
+
+Install the tool as a local tool of the repository, as under [install the tool](tool.md#install-the-tool), or run `dotnet tool restore` where the tool manifest names it already.  To build from the sidecars you have committed, without the tool, set `SqlSourceOnline` to `false`.
+
+See: [Running in the build](tool.md#running-in-the-build)
+
+## SQLSRC026
+
+**Build cannot run the tool and uses the committed sidecars**
+
+`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or a `.env` file in the project's folder or a folder above it, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
+
+```console
+/repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.
+```
+
+Run `dotnet tool restore`, or install the tool as under [install the tool](tool.md#install-the-tool), and the next build describes the queries.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too: set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars, which also stops the warning.
+
+See: [Running in the build](tool.md#running-in-the-build)
+
+## SQLSRC027
+
+**Tool failed without an error**
+
+The build ran `dotnet sqlsource describe` on the project before it compiled, and the tool ended with an exit code other than 0 without reporting an error of its own, so the build cannot tell whether the sidecars are current, and stops.  The message names the exit code and the first line the tool printed.  The usual cause is a tool older than the `SqlSource` package, which does not know an option the build gives it and prints a line such as `sqlsource: unknown option at position 2`; the message then says to update the tool.
+
+```console
+/repo/App/App.csproj : error SQLSRC027: The sqlsource tool exited with the code 1 and reported no error, so the sidecars may not be current.  The tool may be older than the SqlSource package, and not know the options the build gives it: update it to the package's version with 'dotnet tool update SqlSource.Tool --version <version>'.  It printed first: 'sqlsource: unknown option at position 2'.
+```
+
+Bring the tool to the version of the `SqlSource` package the project uses, with `dotnet tool update SqlSource.Tool --version <version>`: the two are released together under one version number.  If the versions are the same, run `dotnet sqlsource describe` in the project's folder to see what the tool says.
+
+See: [Running in the build](tool.md#running-in-the-build)
 
 ## SQLSRC101
 
@@ -1167,6 +1232,8 @@ $ dotnet sqlsource describe
 
 The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool --prerelease`.  The two are released together under one version number.
 
+When the build runs the tool, the message names the manifest file the build wrote, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, or, when its path holds `=` or `;`, its position on the command line, as `The project manifest at position 3 cannot be read`, with no reason from the operating system, which would quote it.
+
 Any other reason, one that names a line for one, means that the package wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
 See: [Install the tool](tool.md#install-the-tool)
@@ -1291,7 +1358,7 @@ A query that must be described belongs to a database that the run has no connect
     help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env
 ```
 
-Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run read, or, when it found none, the `.env` it would read in the folder of the solution or project it runs on.  A run on a solution reads the `.env` beside the solution or above it, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads the .env nearest to /work`.  Move the file, or its connection variables, to the solution's folder or to the root of the repository.  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.
+Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run read, or, when it found none, the `.env` it would read in the folder of the solution or project it runs on.  A run on a solution reads the `.env` beside the solution or above it, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads the .env nearest to /work`.  Move the file, or its connection variables, to the solution's folder or to the root of the repository.  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](tool.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
 
 See: [Connections](tool.md#connections)
 
@@ -1305,7 +1372,7 @@ The variable of a database's name is the name in upper case with every character
 /work/App/Queries/Users.sql(1,10): error SQLSRC214: The databases 'app-v2' and 'app_v2' both read their connection from SQLSOURCE_CONNECTION_APP_V2
 ```
 
-Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.
+Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.  A build that [runs the tool](tool.md#running-in-the-build) reports it too when the variable is set, in the environment or in the `.env` file, rather than going on with the committed sidecars.
 
 See: [Connections](tool.md#connections)
 
@@ -1367,6 +1434,7 @@ The tool could not write a sidecar, or could not delete one that its `.sql` file
 **Fix:** give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  The rest of the run goes on after an error about a sidecar.
 
 - **A sidecar is never left half written.**  It is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one.
+- **A program that has the sidecar open** can keep the move, or the delete of a sidecar that is no longer needed, from succeeding, as an editor or a build can on Windows.  The tool tries again for about a second, so a file that is held only for a moment is written or deleted without an error; one that stays open is reported as one that `could not be written` or `could not be deleted`.  A refusal of access looks the same to the tool, so a sidecar you have no right to change is reported after that second too.
 - **A sidecar is deleted only** in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.
 - **A sidecar that the tool cannot open**, for lack of permission, because it is locked or because it is a folder, is not deleted when the file beside it needs no entry, since it may be the file of a newer tool.  It is reported as one that `could not be read`.  Delete it yourself, or give yourself the right to read it.  `describe --check` reports the same, since it could not check the file.
 
@@ -1375,6 +1443,7 @@ For a log:
 - **The log cannot be made or emptied as the run starts**, because its folder is not there, it is a folder, or the system will not let the tool write it.  Nothing runs and the exit code is 1.  Give a path that can be written, or run the command from another folder.
 - **The path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`, touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file.  Give the log a name of its own.
 - **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars, the error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
+- **The log of a build whose path holds `=` or `;`**, which the name of a project can give it, is named by its position on the command line, as `The path at position 7 could not be written: the system would not write it`, since the operating system's reason would quote the path.
 
 See: [Logs](tool.md#logs)
 
@@ -1485,7 +1554,7 @@ The tool could not open a session with the database of a query that must be desc
     help: check that the database is running and that the connection string names it
 ```
 
-**Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
+**Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.  In a build that [runs the tool](tool.md#running-in-the-build), the error fails the build, and the `help:` line also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
 
 The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the error, listed in [PostgreSQL's error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
 
@@ -1979,7 +2048,7 @@ The query's output is `models` or `codegen`, which needs a description of the qu
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'codegen' needs one.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](settings.md#settings-files) of the project's folder, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](settings.md#settings-files) of the project's folder, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  When the sidecar exists and has the entry, the build does not see it: a project that sets `SqlSourceIncludeFiles` to `false`, or lists a `.sql` file from outside its folder, lists the sidecar as an `AdditionalFiles` item too, as [included files](settings.md#included-files) says.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
 See: [Output](settings.md#setting-output)
 

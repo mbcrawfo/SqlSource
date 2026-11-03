@@ -17,6 +17,7 @@ public sealed class SqlDiagnosticsTests
     // that says why.  Every other diagnostic is an error that a project cannot turn off.
     private static readonly Dictionary<string, DiagnosticSeverity> Configurable = new(StringComparer.Ordinal)
     {
+        ["SQLSRC026"] = DiagnosticSeverity.Warning,
         ["SQLSRC121"] = DiagnosticSeverity.Warning,
         ["SQLSRC240"] = DiagnosticSeverity.Warning,
         ["SQLSRC245"] = DiagnosticSeverity.Warning,

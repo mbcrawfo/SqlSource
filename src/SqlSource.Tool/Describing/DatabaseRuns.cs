@@ -34,13 +34,29 @@ namespace SqlSource.Tool.Describing;
 /// </remarks>
 internal static class DatabaseRuns
 {
+    /// <summary>
+    /// Runs each selected database.
+    /// </summary>
+    /// <param name="selected">The selected databases, in the plan's order.</param>
+    /// <param name="files">The files, with the queries to describe.</param>
+    /// <param name="connections">The connections of the selected databases.</param>
+    /// <param name="host">The describers, the environment and the clock.</param>
+    /// <param name="reporter">Where the errors go, with the run's trace.</param>
+    /// <param name="cancellationToken">Ends the run.</param>
+    /// <param name="online">What <c>--online</c> said: the help for a database that cannot be opened.</param>
+    /// <param name="offline">
+    /// Whether the run is offline (<see cref="DescribeRun" />): a database with no connection fails its queries and
+    /// reports nothing, where the run would report <c>SQLSRC213</c>.
+    /// </param>
     public static async Task RunAsync(
         ImmutableArray<PlannedDatabase> selected,
         ImmutableArray<FileWork> files,
         Connections connections,
         ToolHost host,
         Reporter reporter,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        OnlineMode online = OnlineMode.Off,
+        bool offline = false
     )
     {
         foreach (var database in selected)
@@ -60,7 +76,16 @@ internal static class DatabaseRuns
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await RunDatabaseAsync(database, files, queries, connections, host, reporter, cancellationToken);
+            await RunDatabaseAsync(
+                database,
+                files,
+                queries,
+                connections,
+                host,
+                reporter,
+                (online, offline),
+                cancellationToken
+            );
         }
     }
 
@@ -74,6 +99,7 @@ internal static class DatabaseRuns
         Connections connections,
         ToolHost host,
         Reporter reporter,
+        (OnlineMode Online, bool Offline) mode,
         CancellationToken cancellationToken
     )
     {
@@ -92,6 +118,13 @@ internal static class DatabaseRuns
         var connection = connections.For(database.Name);
         if (connection.Value is not { } value)
         {
+            if (mode.Offline)
+            {
+                // The queries are held back as for SQLSRC213, and the run says so once, on its own line.
+                Fail(queries, error: null, reporter.Trace);
+                return;
+            }
+
             var error = NoConnection(first, connection, connections, ProjectFolders(files, queries), host);
             reporter.Report(error);
             Fail(queries, error.Descriptor.Id, reporter.Trace);
@@ -122,7 +155,15 @@ internal static class DatabaseRuns
         // either, and an outcome that holds neither is a fault.
         if (opened.Value is not { } session)
         {
-            var failure = ReportFailure(guard, () => opened.Failure, first, database, server: null, reporter);
+            var failure = ReportFailure(
+                guard,
+                () => opened.Failure,
+                first,
+                database,
+                server: null,
+                reporter,
+                mode.Online
+            );
             RunEvents.NotOpened(trace, database, failure.Descriptor.Id);
             Fail(queries, failure.Descriptor.Id, trace);
             return;
@@ -131,7 +172,7 @@ internal static class DatabaseRuns
         var run = new SessionRun(session, guard, host.Time, reporter, trace);
         try
         {
-            await DescribeAllAsync(database, queries, run, cancellationToken);
+            await DescribeAllAsync(database, queries, run, mode.Online, cancellationToken);
         }
         catch
         {
@@ -147,6 +188,7 @@ internal static class DatabaseRuns
         PlannedDatabase database,
         List<QueryWork> queries,
         SessionRun run,
+        OnlineMode online,
         CancellationToken cancellationToken
     )
     {
@@ -179,7 +221,15 @@ internal static class DatabaseRuns
             }
             else
             {
-                var failure = ReportFailure(guard, () => result.Failure, planned, database, server, run.Reporter);
+                var failure = ReportFailure(
+                    guard,
+                    () => result.Failure,
+                    planned,
+                    database,
+                    server,
+                    run.Reporter,
+                    online
+                );
                 query.State = QueryState.Failed;
                 RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);
             }
@@ -194,7 +244,8 @@ internal static class DatabaseRuns
         PlannedQuery planned,
         PlannedDatabase database,
         ServerInfo? server,
-        Reporter reporter
+        Reporter reporter,
+        OnlineMode online
     )
     {
         var secret = guard.Secret;
@@ -202,7 +253,7 @@ internal static class DatabaseRuns
             guard.Call(() => failureOf() ?? throw new InvalidOperationException(Guard.Nothing)),
             secret
         );
-        reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), secret));
+        reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server, online), secret));
         return failure;
     }
 
@@ -250,8 +301,8 @@ internal static class DatabaseRuns
                 ),
         ];
 
-    // The queries fail with one error, which was reported: each has its event.
-    private static void Fail(List<QueryWork> queries, string error, RunTrace trace)
+    // The queries fail with one error, which was reported, or with none when the run is offline: each has its event.
+    private static void Fail(List<QueryWork> queries, string? error, RunTrace trace)
     {
         foreach (var query in queries)
         {

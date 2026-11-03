@@ -53,7 +53,7 @@ export SQLSOURCE_CONNECTION="Host=localhost;Port=55432;Database=examples;Usernam
 dotnet sqlsource describe
 ```
 
-The tool describes the queries that have no current entry in their sidecar.  `dotnet sqlsource describe --check` compares the sidecars with what the database says now, and `--force` describes every query again.
+The tool describes the queries that have no current entry in their sidecar.  `dotnet sqlsource describe --check` compares the sidecars with what the database says now, and `--force` describes every query again.  With the variable set, a build of a project of your own also runs the tool before it compiles, as [running in the build](../../docs/manual/tool.md#running-in-the-build) says; a build of this example does not, since this repository's `Directory.Build.props` sets `SqlSourceOnline` to `false`.
 
 This example's sidecars are committed and current.  They are written by `tools/describe-end-to-end.sh`, which starts a database of its own: see [the recording scripts](../../tools/README.md#recording-scripts).  To compare them with the Compose database, run the tool from its source, from the repository's root, with `SQLSOURCE_CONNECTION` set as above, since the repository pins no published tool and another version of it writes another version into every sidecar:
 
