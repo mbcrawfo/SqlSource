@@ -66,7 +66,7 @@ See [the tool](../../docs/manual/tool.md) for the commands and the connections.
 
 ## Describe as you save, and in the build
 
-In a project of your own, copy [`.env.example`](.env.example) to `.env`, which git ignores, and the tool reads the connection from it, as [the `.env` file](../../docs/manual/tool.md#env-file) says.  Then run:
+In a project of your own, copy [`.env.example`](.env.example) to `.env`, and add `.env` to your `.gitignore`, since it holds your password; the tool reads the connection from it, as [the `.env` file](../../docs/manual/tool.md#env-file) says.  Then run:
 
 ```bash
 dotnet sqlsource describe --watch

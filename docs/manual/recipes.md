@@ -222,7 +222,7 @@ Have your editor start `dotnet sqlsource describe --watch` for you, so the sidec
 }
 ```
 
-- **It starts when you open the folder.**  VS Code asks once whether to allow automatic tasks in the folder, and never runs one in a folder it does not trust.  The watch runs in a terminal panel of its own.
+- **It starts when you open the folder.**  The first time, VS Code asks whether to allow automatic tasks in every folder you trust, and keeps your answer; it never runs one in a folder it does not trust.  The watch runs in a terminal panel of its own.  If it does not start when you open the folder, run **Tasks: Manage Automatic Tasks** from the Command Palette, choose **Allow Automatic Tasks** and open the folder again, or start it once with **Tasks: Run Task** and `sqlsource watch`.
 - **An error at a file is listed in the Problems panel**, at that file, and at the query's line and column when it has one, from the error's first line; the lines under it, such as `see:`, stay in the terminal.  An error about no file, such as [SQLSRC200](diagnostics.md#sqlsrc200), stays in the watch's terminal, which the task does not bring forward: look there when a pass reports errors and the panel shows none.
 - **Open the folder that holds your solution or project.**  If you open a folder above it, add `"options": { "cwd": "${workspaceFolder}/src/App" }` to the task, with the path of that folder.
 

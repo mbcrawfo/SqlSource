@@ -87,7 +87,8 @@ public sealed class EditorRecipeTests
         [
             ReportedLines().First(line => line.StartsWith("    server:", StringComparison.Ordinal)),
             ReportedLines().First(line => line.StartsWith("    see: https://", StringComparison.Ordinal)),
-            "sqlsource : error SQLSRC201: /work/App holds no .sln, .slnx or .csproj file",
+            ReportedLines()
+                .First(line => line.Contains(ToolDiagnostics.UnexpectedFailure.Id, StringComparison.Ordinal)),
             WatchSession.ChangeDetectedMarker,
             WatchSession.WatchingMarker,
             "postgres (postgres): 1 described, 0 skipped, 0 failed",
@@ -99,7 +100,8 @@ public sealed class EditorRecipeTests
         }
     }
 
-    // Two errors as a watch's pass writes them: one at a place in a file, with lines under it, and one at a file.
+    // Three errors as a watch's pass writes them: one at a place in a file, with lines under it, one at a file, and
+    // one about no file.
     private static string[] ReportedLines()
     {
         using var error = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
@@ -120,6 +122,7 @@ public sealed class EditorRecipeTests
                 )
         );
         reporter.Report(ToolDiagnostic.ForFile(ToolDiagnostics.SidecarNotWritten, UnpositionedPath));
+        reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.UnexpectedFailure, "System.Exception", "boom"));
 
         return error.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
     }
