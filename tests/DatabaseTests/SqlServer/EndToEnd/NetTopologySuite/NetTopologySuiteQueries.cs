@@ -4,5 +4,5 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd.NetTopologySuite;
 // that their models and methods take NetTopologySuite's geometries, read through the column's stream and written as
 // SqlBytes by the generated NetTopologySuiteConversions: extension methods of the connection in
 // NetTopologySuiteQueriesExtensions.
-[SqlSourceGenerate(Source = "Queries", SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Source = "Queries")]
 internal static partial class NetTopologySuiteQueries;

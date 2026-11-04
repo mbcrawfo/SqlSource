@@ -2,7 +2,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
-using SqlSource.Settings;
+using SqlSource.Generation.Placement;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tests.Generation.Emitting.QueryMethods;
 using Xunit;
@@ -46,12 +46,13 @@ public sealed class MethodEmitterTests
         var methods = new TypeMethods(
             "App.Sample",
             "App.Sample.Methods.g.cs",
-            MethodHost.Of(MethodPlacement.ExtensionClass),
             "App",
             "App",
             TestSidecars.Of(new TypeDeclaration("class", "Sample", "Sample", string.Empty, 0)),
             "SampleExtensions",
             true,
+            EquatableArray<NestedClassPlacement>.Empty,
+            false,
             TestModels.NameLocation("Sample.cs"),
             TestSidecars.Of(QueryMethodWriterTests.GetUser, ListUsers),
             EquatableArray<DiagnosticInfo>.Empty,

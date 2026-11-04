@@ -1,6 +1,7 @@
 using System.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Placement;
 using SqlSource.Settings;
 
 namespace SqlSource.Generation.Methods;
@@ -10,16 +11,24 @@ namespace SqlSource.Generation.Methods;
 /// </summary>
 /// <param name="TypeKey">The type, as <c>HintName.NameOf</c> gives it.</param>
 /// <param name="HintName">The name of the methods' file, from <c>HintName.ForMethods</c>.</param>
-/// <param name="Host">Where the methods go and how visible they are.</param>
 /// <param name="Namespace">The type's namespace as a value.  Empty for the global namespace.</param>
 /// <param name="NamespaceText">The type's namespace as code writes it.  Empty for the global namespace.</param>
 /// <param name="Types">The type and the types it is nested in, outermost first.</param>
 /// <param name="ExtensionClass">
-/// The name of the class that holds the methods under <see cref="MethodPlacement.ExtensionClass" />: the type's own
+/// The name of the class that holds the methods under <see cref="MemberLocation.ExtensionClass" />: the type's own
 /// name and <c>Extensions</c>.
 /// </param>
-/// <param name="IsPublic">
-/// Whether the type and every type around it are public, which makes the extension class public.
+/// <param name="ExtensionClassIsPublic">
+/// Whether one of the methods in the extension class is public, which makes the class public: it takes the widest
+/// accessibility of its methods.
+/// </param>
+/// <param name="NestedClasses">
+/// The classes nested in the type that hold methods, in the order of the type's placement, each with the accessibility
+/// that the type's file gives it too.
+/// </param>
+/// <param name="DisablesProtectedWarning">
+/// Whether the file disables the compiler's warning CS0628: the type is sealed, and a method on it or a nested class
+/// that holds one is protected.
 /// </param>
 /// <param name="AttributeLocation">Where the type's attribute is.</param>
 /// <param name="Methods">The methods, in the order of the type's files and of their queries.</param>
@@ -48,12 +57,13 @@ namespace SqlSource.Generation.Methods;
 internal sealed record TypeMethods(
     string TypeKey,
     string HintName,
-    MethodHost Host,
     string Namespace,
     string NamespaceText,
     EquatableArray<TypeDeclaration> Types,
     string ExtensionClass,
-    bool IsPublic,
+    bool ExtensionClassIsPublic,
+    EquatableArray<NestedClassPlacement> NestedClasses,
+    bool DisablesProtectedWarning,
     LocationInfo AttributeLocation,
     EquatableArray<QueryMethod> Methods,
     EquatableArray<DiagnosticInfo> Diagnostics,

@@ -26,7 +26,7 @@ public sealed class FileDiagnosticsTests
         {
             partial class Sample
             {
-                private static class Sql
+                private static partial class Sql
                 {
                 }
             }
@@ -376,7 +376,11 @@ public sealed class FileDiagnosticsTests
     [Fact]
     public void Run_NestedLocationAndAQueryNamedSql_IsAnErrorAtTheQuery()
     {
-        var run = GeneratorHarness.Run(OutputKind.Sql, Source, new SqlFile("/app/Repo/Sql.sql", "SELECT 1;\n"));
+        var run = GeneratorHarness.RunInNestedClass(
+            OutputKind.Sql,
+            Source,
+            new SqlFile("/app/Repo/Sql.sql", "SELECT 1;\n")
+        );
 
         run.Diagnostics.ShouldBe([
             "SQLSRC009 /app/Repo/Sql.sql(1,1)-(1,1): A query of 'Sample' cannot be named 'Sql', because its member "
@@ -387,14 +391,14 @@ public sealed class FileDiagnosticsTests
     }
 
     [Fact]
-    public void Run_DirectLocationAndATypeNamedWithAKeyword_LeavesAQueryOfThatNameToTheParser()
+    public void Run_ClassLocationAndATypeNamedWithAKeyword_LeavesAQueryOfThatNameToTheParser()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public partial class @class<T> { }
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: Sql\nSELECT 1;\n"),
@@ -407,14 +411,14 @@ public sealed class FileDiagnosticsTests
     }
 
     [Fact]
-    public void Run_DirectLocationAndAQueryNamedLikeTheType_IsAnErrorAndItsFileGivesNoMembers()
+    public void Run_ClassLocationAndAQueryNamedLikeTheType_IsAnErrorAndItsFileGivesNoMembers()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample { }
             """,
             new SqlFile("/app/Repo/A.sql", "-- name: Kept\nSELECT 1;\n"),

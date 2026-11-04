@@ -258,11 +258,4 @@ internal static class MethodRuns
             internalName: "int4range",
             subtype: ModelRuns.Int4
         );
-
-    // The source of App.Sample with Source = "." and the attribute's arguments, such as
-    // MethodLocation = MethodLocation.Public.
-    public static string SampleSource(string arguments) =>
-        "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\", "
-        + arguments
-        + ")]\n    public partial class Sample;\n}\n";
 }

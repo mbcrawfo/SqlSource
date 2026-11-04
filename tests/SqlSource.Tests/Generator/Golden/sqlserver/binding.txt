@@ -354,7 +354,7 @@ namespace App
     /// <summary>
     /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
     /// </summary>
-    public static partial class SampleExtensions
+    internal static partial class SampleExtensions
     {
         /// <summary>
         /// The <c>BindChar</c> query from <c>Users.sql</c>.
@@ -371,7 +371,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindChar(
+        internal static async global::System.Threading.Tasks.Task BindChar(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindCharParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -457,7 +457,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindVarChar(
+        internal static async global::System.Threading.Tasks.Task BindVarChar(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindVarCharParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -541,7 +541,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindNVarCharMax(
+        internal static async global::System.Threading.Tasks.Task BindNVarCharMax(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindNVarCharMaxParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -617,7 +617,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindNChar(
+        internal static async global::System.Threading.Tasks.Task BindNChar(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindNCharParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -703,7 +703,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindBinary(
+        internal static async global::System.Threading.Tasks.Task BindBinary(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindBinaryParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -789,7 +789,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindVarBinaryMax(
+        internal static async global::System.Threading.Tasks.Task BindVarBinaryMax(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindVarBinaryMaxParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -865,7 +865,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindDecimal(
+        internal static async global::System.Threading.Tasks.Task BindDecimal(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindDecimalParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -943,7 +943,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindNumeric(
+        internal static async global::System.Threading.Tasks.Task BindNumeric(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindNumericParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1029,7 +1029,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindDateTime2(
+        internal static async global::System.Threading.Tasks.Task BindDateTime2(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindDateTime2Params parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1105,7 +1105,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindJson(
+        internal static async global::System.Threading.Tasks.Task BindJson(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindJsonParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1181,7 +1181,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindVector(
+        internal static async global::System.Threading.Tasks.Task BindVector(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindVectorParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1253,7 +1253,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindVectorWithItsBaseType(
+        internal static async global::System.Threading.Tasks.Task BindVectorWithItsBaseType(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindVectorWithItsBaseTypeParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1325,7 +1325,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindInt(
+        internal static async global::System.Threading.Tasks.Task BindInt(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindIntParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1399,7 +1399,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindSqlVariant(
+        internal static async global::System.Threading.Tasks.Task BindSqlVariant(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindSqlVariantParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1473,7 +1473,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindAlias(
+        internal static async global::System.Threading.Tasks.Task BindAlias(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindAliasParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1557,7 +1557,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindWideDecimal(
+        internal static async global::System.Threading.Tasks.Task BindWideDecimal(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindWideDecimalParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1629,7 +1629,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindVectorWithNoDimension(
+        internal static async global::System.Threading.Tasks.Task BindVectorWithNoDimension(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindVectorWithNoDimensionParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1701,7 +1701,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindUnknownType(
+        internal static async global::System.Threading.Tasks.Task BindUnknownType(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindUnknownTypeParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1773,7 +1773,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindHierarchyId(
+        internal static async global::System.Threading.Tasks.Task BindHierarchyId(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindHierarchyIdParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1849,7 +1849,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindHierarchyIdWithNoUserType(
+        internal static async global::System.Threading.Tasks.Task BindHierarchyIdWithNoUserType(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindHierarchyIdWithNoUserTypeParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1925,7 +1925,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindMoney(
+        internal static async global::System.Threading.Tasks.Task BindMoney(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindMoneyParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -2001,7 +2001,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindConvertedVarChar(
+        internal static async global::System.Threading.Tasks.Task BindConvertedVarChar(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindConvertedVarCharParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -2085,7 +2085,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindConvertedInt(
+        internal static async global::System.Threading.Tasks.Task BindConvertedInt(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindConvertedIntParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -2159,7 +2159,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>A task that completes when the query has run.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        public static async global::System.Threading.Tasks.Task BindConvertedNumeric(
+        internal static async global::System.Threading.Tasks.Task BindConvertedNumeric(
             this global::System.Data.Common.DbConnection connection,
             global::App.BindConvertedNumericParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -2236,6 +2236,7 @@ namespace App
 // <auto-generated/>
 #nullable enable
 #pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.
+#pragma warning disable CS8860, CS8981 // A nested class can be named in lower case, or record.
 
 namespace App
 {
@@ -2323,52 +2324,6 @@ namespace SqlSource
 namespace SqlSource
 {
     /// <summary>
-    /// Where the members generated for a type marked with <see cref="SqlSourceGenerateAttribute" /> go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum SqlLocation
-    {
-        /// <summary>
-        /// In a private static class nested in the type, named by
-        /// <see cref="SqlSourceGenerateAttribute.NestedClass" />.
-        /// </summary>
-        Nested = 0,
-
-        /// <summary>
-        /// On the type itself.
-        /// </summary>
-        Direct = 1,
-    }
-
-    /// <summary>
-    /// Where the methods that run the queries of a type go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum MethodLocation
-    {
-        /// <summary>
-        /// In a generated static class beside the type, named after it with <c>Extensions</c>, as extension
-        /// methods of <c>DbConnection</c>.
-        /// </summary>
-        ExtensionClass = 0,
-
-        /// <summary>
-        /// On the type, as public static methods.
-        /// </summary>
-        Public = 1,
-
-        /// <summary>
-        /// On the type, as internal static methods.
-        /// </summary>
-        Internal = 2,
-
-        /// <summary>
-        /// On the type, as private static methods.
-        /// </summary>
-        Private = 3,
-    }
-
-    /// <summary>
     /// Marks a static method of one argument as a conversion from its argument's type to its return type, which
     /// the generated query methods call to read a column into a property of the return type or to bind a
     /// parameter of that type from the argument's.  It is not conditional, unlike
@@ -2399,24 +2354,5 @@ namespace SqlSource
         /// that folder, <c>UserRepository.sql</c> for <c>UserRepository</c>.
         /// </summary>
         public string Source { get; set; }
-
-        /// <summary>
-        /// Where the generated members go.  The default is
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.
-        /// </summary>
-        public SqlLocation SqlLocation { get; set; }
-
-        /// <summary>
-        /// The name of the class that holds the generated members under
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the <c>nestedClass</c> of the
-        /// settings files of the folder of this type's file, else <c>Sql</c>.
-        /// </summary>
-        public string NestedClass { get; set; }
-
-        /// <summary>
-        /// Where the methods that run the queries go.  The default is
-        /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
-        /// </summary>
-        public MethodLocation MethodLocation { get; set; }
     }
 }

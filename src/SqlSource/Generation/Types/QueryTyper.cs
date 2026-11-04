@@ -252,15 +252,13 @@ internal static class QueryTyper
             ? ColumnTypeMap.Find(columnTypes, origin.Schema, table, source)
             : null;
 
-    // The place that wrote an entry of the column types, as SQLSRC250 to SQLSRC252 name it.  The attribute has no
-    // level for them.
+    // The place that wrote an entry of the column types, as SQLSRC250 to SQLSRC252 name it.
     private static string ColumnTypePlaceOf(SettingPlace place) =>
         place.Kind switch
         {
             SettingPlaceKind.FileHeader => "a -- column: marker in the file header",
             SettingPlaceKind.Query => QueryColumnMarker,
             SettingPlaceKind.SettingsFile => "the columnTypes of the settings file " + place.Path,
-            SettingPlaceKind.Attribute => "the attribute",
             _ => throw UnexpectedEnumValueException.Of(place.Kind),
         };
 
@@ -1083,15 +1081,13 @@ internal static class QueryTyper
         private TypeMapping? EntryMapping(TypeOverride entry) =>
             entry.Type is { } name ? MappingOf(_mappedTypes, name, entry.Key, PlaceOf(entry.Place)) : null;
 
-        // The place that wrote an entry, as SQLSRC250 to SQLSRC252 and SQLSRC261 name it.  The attribute has no level
-        // for the type override.
+        // The place that wrote an entry, as SQLSRC250 to SQLSRC252 and SQLSRC261 name it.
         private static string PlaceOf(SettingPlace place) =>
             place.Kind switch
             {
                 SettingPlaceKind.FileHeader => "a -- type-override: marker in the file header",
                 SettingPlaceKind.Query => "a -- type-override: marker of the query",
                 SettingPlaceKind.SettingsFile => "the typeOverrides of the settings file " + place.Path,
-                SettingPlaceKind.Attribute => "the attribute",
                 _ => throw UnexpectedEnumValueException.Of(place.Kind),
             };
     }

@@ -27,7 +27,7 @@ internal readonly struct QueryMethodContext(
     /// <summary>The query's method.  Its <see cref="QueryMethod.Output" /> is set when its shape reads rows.</summary>
     public QueryMethod Method { get; } = method;
 
-    /// <summary>Where the method goes and how visible it is.</summary>
+    /// <summary>Where the method goes and how visible it is, the method's <see cref="QueryMethod.Host" />.</summary>
     public MethodHost Host { get; } = host;
 
     /// <summary>The names of the query's tokens, as <see cref="MethodWriter.GetTokens" /> gives them.</summary>

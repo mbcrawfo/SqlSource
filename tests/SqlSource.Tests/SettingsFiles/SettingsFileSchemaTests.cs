@@ -45,6 +45,8 @@ public sealed class SettingsFileSchemaTests
             { SettingsFileKeys.InputModelType, typeof(ModelKind) },
             { SettingsFileKeys.OutputModelType, typeof(ModelKind) },
             { SettingsFileKeys.CollectionType, typeof(CollectionKind) },
+            { SettingsFileKeys.MemberLocation, typeof(MemberLocation) },
+            { SettingsFileKeys.Visibility, typeof(Visibility) },
         };
 
     public static TheoryData<string> MapKeys => [SettingsFileKeys.TypeOverrides, SettingsFileKeys.ColumnTypes];
@@ -353,6 +355,10 @@ public sealed class SettingsFileSchemaTests
     [InlineData(SettingsFileKeys.Output, "\" Code-Gen \"")]
     [InlineData(SettingsFileKeys.InputModelType, "\"SEALED record\"")]
     [InlineData(SettingsFileKeys.CollectionType, "\"i-read-only-list\"")]
+    [InlineData(SettingsFileKeys.MemberLocation, "\" Nested-Class \"")]
+    [InlineData(SettingsFileKeys.MemberLocation, "\"EXTENSION class\"")]
+    [InlineData(SettingsFileKeys.Visibility, "\" Protected \"")]
+    [InlineData(SettingsFileKeys.Visibility, "\"\"")]
     [InlineData(SettingsFileKeys.Output, "\"\"")]
     [InlineData(SettingsFileKeys.Dialect, "\" MySQL , ANSI_QUOTES \"")]
     [InlineData(SettingsFileKeys.Dialect, "\"tsql\"")]
@@ -580,6 +586,8 @@ public sealed class SettingsFileSchemaTests
             _ when choice == typeof(OutputKind) => ReadChoice<OutputKind>(value),
             _ when choice == typeof(ModelKind) => ReadChoice<ModelKind>(value),
             _ when choice == typeof(CollectionKind) => ReadChoice<CollectionKind>(value),
+            _ when choice == typeof(MemberLocation) => ReadChoice<MemberLocation>(value),
+            _ when choice == typeof(Visibility) => ReadChoice<Visibility>(value),
             _ => throw new ArgumentOutOfRangeException(nameof(choice), choice, "A choice that the test does not know."),
         };
 

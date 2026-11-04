@@ -379,7 +379,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_ModelsCopiesWithADirectLocation_HaveTheConstantsOnTheType()
+    public void Build_ModelsCopiesOnTheClass_HaveTheConstantsOnTheType()
     {
         AllTypesQueries.ListAllTypesForDapper.ShouldBe("SELECT *\nFROM all_types\nORDER BY id;");
         AllTypesQueries.InsertAllTypesForDapper.ShouldStartWith("INSERT INTO all_types (\n    id,\n    bool_value,");
@@ -387,7 +387,7 @@ public sealed class ModelShapeTests
     }
 
     // A query whose output is codegen has its method and no constant: the type that claims it declares no field, and
-    // no nested class, the class Sql of SqlLocation.Nested.
+    // no nested class, the class Sql where a constant goes by default.
     [Theory]
     [InlineData(typeof(AccountQueries))]
     [InlineData(typeof(Reporting.AccountReports))]
@@ -503,7 +503,9 @@ public sealed class ModelShapeTests
             string parameter;
             if (written == EchoCube)
             {
-                _ = typeof(CubeQueriesExtensions).GetMethod(EchoCube).ShouldNotBeNull(key);
+                _ = typeof(CubeQueriesExtensions)
+                    .GetMethod(EchoCube, BindingFlags.NonPublic | BindingFlags.Static)
+                    .ShouldNotBeNull(key);
                 parameter = InternalNameOf(echoCube, "value");
             }
             else

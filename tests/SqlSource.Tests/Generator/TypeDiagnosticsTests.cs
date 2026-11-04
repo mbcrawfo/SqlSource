@@ -1,7 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
-using System;
-using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Settings;
@@ -11,7 +9,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// The problems of the attributed type.  A type with any of them gets no generated file.
+// The problems of the attributed type.  A type with any of them gets no generated file, but for a member named like a
+// nested class of its queries (SQLSRC007), which leaves out the files that use that class.
 public sealed class TypeDiagnosticsTests
 {
     // The files every project gets, and a type with a problem adds none.
@@ -135,7 +134,7 @@ public sealed class TypeDiagnosticsTests
                     namespace App;
                     [SqlSourceGenerate]
                     public partial class First { }
-                    [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+                    [SqlSourceGenerate]
                     public partial class Second { }
                     """
                 ),
@@ -153,7 +152,7 @@ public sealed class TypeDiagnosticsTests
             [
                 "SQLSRC003 /app/Repo/Sample.cs(3,2)-(3,19): SqlSource generates code for .NET 8 and later, and this "
                     + "project targets an older framework",
-                "SQLSRC003 /app/Repo/Sample.cs(5,2)-(5,53): SqlSource generates code for .NET 8 and later, and this "
+                "SQLSRC003 /app/Repo/Sample.cs(5,2)-(5,19): SqlSource generates code for .NET 8 and later, and this "
                     + "project targets an older framework",
             ],
             ignoreOrder: true
@@ -182,7 +181,7 @@ public sealed class TypeDiagnosticsTests
                     {
                         [SqlSourceGenerate(Source = ".")]
                         public partial class First { }
-                        [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+                        [SqlSourceGenerate(Source = "Users.sql")]
                         public partial class Second { }
                     }
                     """
@@ -196,7 +195,7 @@ public sealed class TypeDiagnosticsTests
             [
                 "SQLSRC012 /app/Repo/Sample.cs(4,6)-(4,37): SqlSource generates C# 12 code, and this project's "
                     + $"language version is {version}",
-                "SQLSRC012 /app/Repo/Sample.cs(6,6)-(6,71): SqlSource generates C# 12 code, and this project's "
+                "SQLSRC012 /app/Repo/Sample.cs(6,6)-(6,45): SqlSource generates C# 12 code, and this project's "
                     + $"language version is {version}",
             ],
             ignoreOrder: true
@@ -297,7 +296,7 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate]
             public partial class Sample { }
             """,
             new SqlFile("/app/Repo/sample.SQL", "-- name: First\nSELECT 1;\n"),
@@ -330,37 +329,13 @@ public sealed class TypeDiagnosticsTests
     }
 
     [Theory]
-    [InlineData("(SqlLocation)2", "2")]
-    [InlineData("(SqlLocation)(-1)", "-1")]
-    public void Run_SqlLocationThatIsNotDefined_IsAnErrorAtTheAttribute(string location, string value)
-    {
-        var run = GeneratorHarness.Run(
-            OutputKind.Sql,
-            $$"""
-            using SqlSource;
-            namespace App;
-            [SqlSourceGenerate(Source = ".", SqlLocation = {{location}})]
-            public partial class Sample { }
-            """,
-            GeneratorHarness.UsersFile
-        );
-
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{49 + location.Length}): '{value}' is not a valid value of "
-                + "SqlLocation",
-        ]);
-        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
-        run.CompilationErrors.ShouldBeEmpty();
-    }
-
-    [Theory]
     [InlineData("private string Sql { get; set; } = string.Empty;")]
     [InlineData("private const int Sql = 1;")]
     [InlineData("public static void Sql() { }")]
     [InlineData("private static class Sql { }")]
     public void Run_NestedLocationAndAMemberNamedSql_IsAnErrorAtTheAttribute(string member)
     {
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             $$"""
             using SqlSource;
@@ -374,11 +349,8 @@ public sealed class TypeDiagnosticsTests
             GeneratorHarness.UsersFile
         );
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): 'Sample' already has a member named 'Sql'.  Rename it, or "
-                + "use SqlLocation.Direct.",
-        ]);
-        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
+        run.Diagnostics.ShouldBe([NestedClassTaken("Sample")]);
+        run.Sources.Values.ShouldAllBe(text => !text.Contains("GetUser"));
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -392,7 +364,7 @@ public sealed class TypeDiagnosticsTests
     )
     {
         // A nested class cannot have the name of the type that contains it, or of one of its type parameters.
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             $$"""
             using SqlSource;
@@ -403,23 +375,21 @@ public sealed class TypeDiagnosticsTests
             GeneratorHarness.UsersFile
         );
 
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): '{name}' already has a member named 'Sql'.  Rename it, or "
-                + "use SqlLocation.Direct.",
-        ]);
-        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
+        run.Diagnostics.ShouldBe([NestedClassTaken(name)]);
+        run.Sources.Values.ShouldAllBe(text => !text.Contains("GetUser"));
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    // The run's settings put the members on the type.
     [Fact]
-    public void Run_DirectLocationAndATypeNamedSql_IsAllowed()
+    public void Run_ClassLocationAndATypeNamedSql_IsAllowed()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public static partial class Sql { }
             public static class Consumer { public const string Value = Sql.GetUser; }
             """,
@@ -431,14 +401,14 @@ public sealed class TypeDiagnosticsTests
     }
 
     [Fact]
-    public void Run_DirectLocationAndAMemberNamedSql_IsAllowed()
+    public void Run_ClassLocationAndAMemberNamedSql_IsAllowed()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string Sql => GetUser;
@@ -452,35 +422,6 @@ public sealed class TypeDiagnosticsTests
         run.Sources.Keys.ShouldContain(GeneratorHarness.SampleFile);
     }
 
-    // Each is reported where the attribute reader reads it: the location, the method location, then the nested class.
-    [Fact]
-    public void Run_AttributeWithSeveralValuesThatAreNotValid_ReportsThemInTheOrderTheyAreRead()
-    {
-        var run = GeneratorHarness.Run(
-            OutputKind.Sql,
-            """
-            using SqlSource;
-            namespace App;
-            [SqlSourceGenerate(
-                Source = ".",
-                NestedClass = "My-Sql",
-                MethodLocation = (MethodLocation)93,
-                SqlLocation = (SqlLocation)94)]
-            public partial class Sample;
-            """,
-            GeneratorHarness.UsersFile
-        );
-
-        run.Diagnostics.Select(static diagnostic =>
-                diagnostic[(diagnostic.IndexOf("): ", StringComparison.Ordinal) + 3)..]
-            )
-            .ShouldBe([
-                "'94' is not a valid value of SqlLocation",
-                "'93' is not a valid value of MethodLocation",
-                "'My-Sql' is not a valid value of NestedClass",
-            ]);
-    }
-
     [Fact]
     public void Run_TypeWithSeveralProblems_ReportsThemAll()
     {
@@ -489,21 +430,15 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = "Missing", SqlLocation = (SqlLocation)7)]
-            public class Sample
-            {
-                public int Sql;
-            }
+            [SqlSourceGenerate(Source = "Missing")]
+            public class Sample { }
             """,
             GeneratorHarness.UsersFile
         );
 
-        // A location that is not valid is read as Nested, so the member named Sql is a problem too.
-        run.Diagnostics.Count.ShouldBe(4);
+        run.Diagnostics.Count.ShouldBe(2);
         run.Diagnostics[0].ShouldStartWith("SQLSRC001 /app/Repo/Sample.cs(4,14)-(4,20)");
-        run.Diagnostics[1].ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,69)");
-        run.Diagnostics[2].ShouldStartWith("SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,69)");
-        run.Diagnostics[3].ShouldStartWith("SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,69)");
+        run.Diagnostics[1].ShouldStartWith("SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,39)");
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
@@ -549,4 +484,9 @@ public sealed class TypeDiagnosticsTests
         run.CompilationErrors.Count.ShouldBe(2);
         run.CompilationErrors.ShouldAllBe(error => error.StartsWith("CS0592 "));
     }
+
+    // SQLSRC007 at the attribute of the source, for a member Sql of the type of that name.
+    private static string NestedClassTaken(string name) =>
+        $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): '{name}' already has a member named 'Sql', which a file of it "
+        + "names as its nested class.  Rename the member, or set -- nested-class: or -- member-location: in the file.";
 }

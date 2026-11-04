@@ -46,6 +46,12 @@ internal sealed record QueryMethod(
     /// is asked for.  It is computed, so it takes no part in equality.
     /// </summary>
     public bool Streams => Shape == ResultShape.Many && Collection == CollectionKind.IAsyncEnumerable;
+
+    /// <summary>
+    /// Where the method goes and how visible it is, from its query's placement: the default is a public method of the
+    /// extension class.
+    /// </summary>
+    public MethodHost Host { get; init; }
 }
 
 /// <summary>

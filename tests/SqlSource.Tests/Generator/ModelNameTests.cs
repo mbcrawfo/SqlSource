@@ -458,6 +458,65 @@ public sealed class ModelNameTests
         models.Queries[0].Table.ShouldBeNull();
     }
 
+    // C# refuses these contextual keywords as the name of a type (CS9056, CS9029, CS9062 and, from C# 14, CS9306), so
+    // no part of a model's name or of the models' namespace can be one.  A marker is SQLSRC111 at its value, and the
+    // settings file's value SQLSRC019, after which the models take the type's namespace.
+    [Theory]
+    [InlineData("input-model", "file")]
+    [InlineData("input-model", "required")]
+    [InlineData("input-model", "scoped")]
+    [InlineData("input-model", "extension")]
+    [InlineData("output-model", "file")]
+    [InlineData("output-model", "required")]
+    [InlineData("output-model", "scoped")]
+    [InlineData("output-model", "extension")]
+    [InlineData("modelNamespace", "file")]
+    [InlineData("modelNamespace", "required")]
+    [InlineData("modelNamespace", "scoped")]
+    [InlineData("modelNamespace", "extension")]
+    public void Run_ModelNameWithAContextualKeywordThatCSharpRefusesAsATypeName_IsAnError(string place, string keyword)
+    {
+        // A part alone, in the middle and at the end, so that each part is checked.
+        var value = place switch
+        {
+            "input-model" => keyword,
+            "output-model" => "App." + keyword + ".UserRow",
+            _ => "App." + keyword,
+        };
+        var marker = place == "modelNamespace" ? string.Empty : "-- " + place + ": " + value + "\n";
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n" + marker + "SELECT id FROM users WHERE id = @id;\n"
+        );
+
+        // A file with a marker that is not valid is not described, so it has no entry.
+        var run =
+            place == "modelNamespace"
+                ? ModelRuns.Run(
+                    file,
+                    [Entry(file, "GetUser", [Parameter("id")], [Column("id")])],
+                    $$"""{"modelNamespace": "{{value}}"}"""
+                )
+                : ModelRuns.Run(file);
+
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        if (place == "modelNamespace")
+        {
+            diagnostic.ShouldStartWith($"SQLSRC019 {GeneratorHarness.ProjectSettingsPath}(");
+            diagnostic.ShouldContain($"'{value}' is not a valid value of modelNamespace");
+            run.Sources.ShouldContainKey(GetUserDtoFile);
+        }
+        else
+        {
+            var start = place.Length + 6;
+            diagnostic.ShouldStartWith(
+                $"SQLSRC111 {GeneratorHarness.UsersPath}(2,{start})-(2,{start + value.Length}): "
+            );
+        }
+    }
+
     // Every run compiles, with no warning in the generated code, whatever its diagnostics.
     private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries)
     {

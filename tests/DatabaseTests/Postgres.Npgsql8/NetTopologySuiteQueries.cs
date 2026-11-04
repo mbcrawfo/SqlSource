@@ -4,8 +4,5 @@ namespace SqlSource.DatabaseTests.Postgres.Npgsql8;
 // NetTopologySuite on and name the database "gis": their methods, extension methods of the connection in
 // NetTopologySuiteQueriesExtensions, and their models in NetTopologySuite's Geometry, read and written through
 // Npgsql.NetTopologySuite 8.
-[SqlSourceGenerate(
-    Source = "../Postgres/EndToEnd/NetTopologySuite/Queries/NetTopologySuite.sql",
-    SqlLocation = SqlLocation.Direct
-)]
+[SqlSourceGenerate(Source = "../Postgres/EndToEnd/NetTopologySuite/Queries/NetTopologySuite.sql")]
 internal static partial class NetTopologySuiteQueries;

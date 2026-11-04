@@ -8,10 +8,10 @@ using SqlSource.Settings.TypeOverrides;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// Reads a <see cref="SettingsLevel" /> from a source that is not a marker.  This is the one place that says which
-/// members such a level has, what makes a text, a list of generator parameters, a type override and a column type
-/// valid, in each form a source writes them, and that a text which is empty or white space is not set.  A choice is
-/// decoded by its source, which alone knows how one is written.
+/// Reads a <see cref="SettingsLevel" /> from a settings file, the one source that is not a marker.  This is the one
+/// place that says which members such a level has, what makes a text, a list of generator parameters, a type override
+/// and a column type valid, in each form a file writes them, and that a text which is empty or white space is not set.
+/// A choice is decoded by its source, which alone knows how one is written.
 /// </summary>
 internal static class SettingsLevelReader
 {
@@ -40,7 +40,9 @@ internal static class SettingsLevelReader
             TypeOverrides = ReadTypeOverrides(ref source),
             ColumnTypes = ReadColumnTypes(ref source),
             LibraryTypes = ReadLibraryTypes(ref source),
-            NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsTypeName),
+            NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsNestedClassName),
+            MemberLocation = ReadPlaced<TSource, MemberLocation>(ref source, SettingId.MemberLocation),
+            Visibility = ReadPlaced<TSource, Visibility>(ref source, SettingId.Visibility),
         };
 
         // A source that sets nothing shares the empty level.
@@ -183,6 +185,11 @@ internal static class SettingsLevelReader
             source.RepeatedKey(setting, index, first);
         }
     }
+
+    // A choice with the place of the source that wrote it.
+    private static Placed<T>? ReadPlaced<TSource, T>(ref TSource source, SettingId setting)
+        where TSource : struct, ISettingSource
+        where T : struct, Enum => source.Choice<T>(setting) is { } choice ? new Placed<T>(choice, source.Place) : null;
 
     private static string? ReadText<TSource>(ref TSource source, SettingId setting, Validator isValid)
         where TSource : struct, ISettingSource

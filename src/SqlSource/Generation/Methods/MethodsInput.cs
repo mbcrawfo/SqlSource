@@ -25,9 +25,6 @@ namespace SqlSource.Generation.Methods;
 /// <param name="Assignments">
 /// The models that the type's queries got, ordered by <see cref="ModelAssignment.Order" />.
 /// </param>
-/// <param name="MemberNames">
-/// The names the type already has, sorted ordinally, when its methods go on itself, and empty otherwise.
-/// </param>
 /// <param name="Drivers">Which engines' methods the project's drivers allow.</param>
 /// <param name="Converters">
 /// The converters that touch the type of a property of the type's files' models that a type override, a column type, a
@@ -46,7 +43,6 @@ internal sealed record MethodsInput(
     TypeQueries Type,
     EquatableArray<FileModels> Files,
     EquatableArray<ModelAssignment> Assignments,
-    EquatableArray<string> MemberNames,
     MethodDrivers Drivers,
     EquatableArray<Converter> Converters,
     EquatableArray<LibraryUse> LibrariesBelowTheFloor
@@ -90,13 +86,13 @@ internal sealed record MethodsInput(
     }
 
     /// <summary>
-    /// Takes from what the project gives what the type needs: a search for each of its files, for its assignments and
-    /// for its names, so that the cost does not grow with the other types.
+    /// Takes from what the project gives what the type needs: a search for each of its files and for its assignments,
+    /// so that the cost does not grow with the other types.  The names the type already has are its own, in
+    /// <see cref="TargetType.TakenNames" />.
     /// </summary>
     /// <param name="type">The type with its parsed files.</param>
     /// <param name="allFileModels">The models of every claimed file, sorted by path.</param>
     /// <param name="assignments">Every assignment, ordered by <see cref="ModelAssignment.Order" />.</param>
-    /// <param name="memberNames">The names of every type whose methods go on itself, sorted by key ordinally.</param>
     /// <param name="drivers">Which engines' methods the project's drivers allow.</param>
     /// <param name="converters">Every converter of the project.</param>
     /// <param name="librariesBelowTheFloor">The libraries that the project references older than their floor.</param>
@@ -104,7 +100,6 @@ internal sealed record MethodsInput(
         TypeQueries type,
         EquatableArray<FileModels> allFileModels,
         EquatableArray<ModelAssignment> assignments,
-        EquatableArray<TypeMemberNames> memberNames,
         MethodDrivers drivers,
         ConverterSet converters,
         EquatableArray<LibraryUse> librariesBelowTheFloor
@@ -118,13 +113,11 @@ internal sealed record MethodsInput(
         }
 
         var key = HintName.NameOf(type.Type.Type);
-        var names = SortedSearch.IndexOf(memberNames, key, static names => names.TypeKey, StringComparer.Ordinal);
         var slice = new EquatableArray<FileModels>(files.MoveToImmutable());
         return new MethodsInput(
             type,
             slice,
             SliceOf(assignments, key),
-            names < 0 ? EquatableArray<string>.Empty : memberNames[names].Names,
             drivers,
             ConvertersOf(slice, converters),
             librariesBelowTheFloor

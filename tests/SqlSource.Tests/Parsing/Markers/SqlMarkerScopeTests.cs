@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
@@ -27,6 +28,9 @@ public sealed class SqlMarkerScopeTests
     [InlineData("-- model-namespace: App.Models", true, false)]
     [InlineData("-- type-override: int4 = long", true, true)]
     [InlineData("-- library-types: nodatime=on", true, true)]
+    [InlineData("-- member-location: class", true, true)]
+    [InlineData("-- visibility: internal", true, true)]
+    [InlineData("-- nested-class: Users", true, true)]
     [InlineData("-- token: x", false, true)]
     [InlineData("-- token-ignore: x", false, true)]
     [InlineData("-- param: @a int", false, true)]
@@ -91,6 +95,137 @@ public sealed class SqlMarkerScopeTests
                 new TypeOverride("public.user_status", "global::App.Status", place),
                 new TypeOverride("timestamptz", null, place),
             ]);
+    }
+
+    // The member location and the visibility carry the place of their scope, and the span of the first marker that set
+    // each.  A file with no name marker is one query.
+    // An internal enum cannot be the parameter of a public test method, so a row gives the names.
+    [Theory]
+    [InlineData("Preamble", "FileHeader")]
+    [InlineData("Query", "Query")]
+    [InlineData("WholeFile", "Query")]
+    public void Read_PlacementMarkers_AreTheLevelAtThePlaceOfTheScope(string kind, string placeName)
+    {
+        var place = new SettingPlace(Enum.Parse<SettingPlaceKind>(placeName), null, 0);
+        var (scope, errors) = Scope(
+            Enum.Parse<SqlScopeKind>(kind),
+            "-- member-location: nested-class",
+            "-- visibility: Protected",
+            "-- nested-class: Users"
+        );
+
+        errors.ShouldBeEmpty();
+        scope.Level.MemberLocation.ShouldBe(new Placed<MemberLocation>(MemberLocation.NestedClass, place));
+        scope.Level.Visibility.ShouldBe(new Placed<Visibility>(Visibility.Protected, place));
+        scope.Level.NestedClass.ShouldBe("Users");
+    }
+
+    [Theory]
+    [InlineData("class", "Class")]
+    [InlineData("Class", "Class")]
+    [InlineData("nested-class", "NestedClass")]
+    [InlineData("NestedClass", "NestedClass")]
+    [InlineData("extension class", "ExtensionClass")]
+    public void Read_MemberLocation_IsReadInAnySpelling(string value, string expectedName)
+    {
+        var expected = Enum.Parse<MemberLocation>(expectedName);
+        var (scope, errors) = Scope(SqlScopeKind.Query, "-- member-location: " + value);
+
+        errors.ShouldBeEmpty();
+        scope.Level.MemberLocation.ShouldNotBeNull().Value.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Read_PlacementMarkers_AreTheSpansOfTheFirstMarkerThatSetThem()
+    {
+        const string First = "-- member-location: class";
+        const string Second = "-- member-location: Class";
+        const string Third = "-- visibility: internal";
+        var (scope, errors) = Scope(SqlScopeKind.Query, First, Second, "-- nested-class: A", Third);
+
+        errors.ShouldBeEmpty();
+        scope.MemberLocationMarker.ShouldBe(new TextSpan(0, First.Length));
+        scope.VisibilityMarker.ShouldBe(
+            new TextSpan(First.Length + Second.Length + "-- nested-class: A".Length + 3, Third.Length)
+        );
+    }
+
+    [Fact]
+    public void Read_ScopeWithoutPlacementMarkers_HasNoSpan()
+    {
+        var (scope, _) = Scope(SqlScopeKind.Query, "-- output: sql");
+
+        scope.MemberLocationMarker.ShouldBeNull();
+        scope.VisibilityMarker.ShouldBeNull();
+        scope.Level.MemberLocation.ShouldBeNull();
+        scope.Level.Visibility.ShouldBeNull();
+        scope.Level.NestedClass.ShouldBeNull();
+    }
+
+    // The first marker stands, and its span is the one kept.
+    [Fact]
+    public void Read_TwoMemberLocationsInOneScope_ConflictAtTheSecondAndTheFirstStands()
+    {
+        const string First = "-- member-location: class";
+        var (scope, errors) = Scope(SqlScopeKind.Query, First, "-- member-location: nested-class");
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+        errors[0].Span.ShouldBe(new TextSpan(First.Length + 1 + "-- member-location: ".Length, "nested-class".Length));
+        scope.Level.MemberLocation.ShouldBe(new Placed<MemberLocation>(MemberLocation.Class, SettingPlace.Query));
+        scope.MemberLocationMarker.ShouldBe(new TextSpan(0, First.Length));
+    }
+
+    [Fact]
+    public void Read_TwoVisibilitiesInOneScope_ConflictAtTheSecondAndTheFirstStands()
+    {
+        const string First = "-- visibility: public";
+        var (scope, errors) = Scope(SqlScopeKind.Query, First, "-- visibility: private");
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+        errors[0].Span.ShouldBe(new TextSpan(First.Length + 1 + "-- visibility: ".Length, "private".Length));
+        scope.Level.Visibility.ShouldBe(new Placed<Visibility>(Visibility.Public, SettingPlace.Query));
+        scope.VisibilityMarker.ShouldBe(new TextSpan(0, First.Length));
+    }
+
+    [Fact]
+    public void Read_TwoNestedClassesInOneScope_ConflictAtTheSecondAndTheFirstStands()
+    {
+        const string First = "-- nested-class: A";
+        var (scope, errors) = Scope(SqlScopeKind.Query, First, "-- nested-class: B");
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+        errors[0].Span.ShouldBe(new TextSpan(First.Length + 1 + "-- nested-class: ".Length, "B".Length));
+        scope.Level.NestedClass.ShouldBe("A");
+    }
+
+    [Theory]
+    [InlineData("-- member-location: class", "-- member-location: Class")]
+    [InlineData("-- visibility: public", "-- visibility: PUBLIC")]
+    [InlineData("-- nested-class: A", "-- nested-class: A")]
+    public void Read_SameValueTwiceInOneScope_IsNoConflict(string first, string second)
+    {
+        var (_, errors) = Scope(SqlScopeKind.Query, first, second);
+
+        errors.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("-- member-location: sideways")]
+    [InlineData("-- member-location:")]
+    [InlineData("-- visibility: friend")]
+    [InlineData("-- visibility:")]
+    [InlineData("-- nested-class: class")]
+    [InlineData("-- nested-class: App.Sql")]
+    [InlineData("-- nested-class: two words")]
+    [InlineData("-- nested-class:")]
+    public void Read_PlacementMarkerThatIsNotValid_IsInvalidAndNotApplied(string line)
+    {
+        var (scope, errors) = Scope(SqlScopeKind.Query, line);
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.InvalidMarkerValue]);
+        scope.Level.ShouldBeSameAs(SettingsLevel.None);
+        scope.MemberLocationMarker.ShouldBeNull();
+        scope.VisibilityMarker.ShouldBeNull();
     }
 
     // One value written two ways, and the same entry written twice, are the same value: no conflict.
@@ -287,7 +422,7 @@ public sealed class SqlMarkerScopeTests
         errors.ShouldBe([
             SqlParseError.Create(
                 SqlParseErrorKind.InvalidMarkerValue,
-                new Microsoft.CodeAnalysis.Text.TextSpan(Start, Line.Length - Start),
+                new TextSpan(Start, Line.Length - Start),
                 "type-override: [dbo].[Email]=MyApp.Email",
                 ".  A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case exactly"
             ),

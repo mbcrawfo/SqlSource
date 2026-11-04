@@ -126,6 +126,86 @@ public sealed class QuerySettingsTests
         settings.CollectionType.ShouldBe(CollectionKind.IReadOnlyList);
     }
 
+    [Fact]
+    public void Resolve_PlacementSettings_HaveTheirDefaults()
+    {
+        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
+
+        settings.WrittenMemberLocation.ShouldBeNull();
+        settings.WrittenVisibility.ShouldBeNull();
+        settings.NestedClass.ShouldBe(QuerySettings.DefaultNestedClass);
+        settings.NestedClass.ShouldBe("Sql");
+    }
+
+    [Theory]
+    // An internal enum cannot be the parameter of a public test method, so a row gives the names.
+    [InlineData("Sql", "NestedClass")]
+    [InlineData("Models", "NestedClass")]
+    [InlineData("CodeGen", "ExtensionClass")]
+    public void MemberLocation_NoLevelWritesOne_IsTheDefaultOfTheOutput(string output, string expected)
+    {
+        var level = new SettingsLevel { Output = Enum.Parse<OutputKind>(output) };
+
+        var settings = QuerySettings.Resolve(level, SettingsLevel.None);
+
+        settings.WrittenMemberLocation.ShouldBeNull();
+        settings.MemberLocation.ShouldBe(Enum.Parse<MemberLocation>(expected));
+    }
+
+    [Theory]
+    [InlineData("Sql")]
+    [InlineData("CodeGen")]
+    public void MemberLocation_ALevelWritesOne_IsItWhateverTheOutput(string output)
+    {
+        var file = new SettingsLevel
+        {
+            Output = Enum.Parse<OutputKind>(output),
+            MemberLocation = new Placed<MemberLocation>(MemberLocation.Class, SettingsFile),
+        };
+
+        QuerySettings.Resolve(SettingsLevel.None, file).MemberLocation.ShouldBe(MemberLocation.Class);
+    }
+
+    // The block's markers are the query's over the header's, and that level is over the file's.
+    [Fact]
+    public void Resolve_PlacementSettings_TheQueryWinsOverTheHeaderOverTheFile()
+    {
+        var file = new SettingsLevel
+        {
+            MemberLocation = new Placed<MemberLocation>(MemberLocation.ExtensionClass, SettingsFile),
+            Visibility = new Placed<Visibility>(Visibility.Private, SettingsFile),
+            NestedClass = "FromFile",
+        };
+        var header = new SettingsLevel
+        {
+            MemberLocation = new Placed<MemberLocation>(MemberLocation.NestedClass, SettingPlace.FileHeader),
+            Visibility = new Placed<Visibility>(Visibility.Internal, SettingPlace.FileHeader),
+            NestedClass = "FromHeader",
+        };
+        var query = new SettingsLevel
+        {
+            MemberLocation = new Placed<MemberLocation>(MemberLocation.Class, SettingPlace.Query),
+            NestedClass = "FromQuery",
+        };
+
+        var fromQuery = QuerySettings.Resolve(query.Over(header), file);
+        var fromHeader = QuerySettings.Resolve(header, file);
+        var fromFile = QuerySettings.Resolve(SettingsLevel.None, file);
+
+        fromQuery.WrittenMemberLocation.ShouldBe(new Placed<MemberLocation>(MemberLocation.Class, SettingPlace.Query));
+        fromQuery.WrittenVisibility.ShouldBe(new Placed<Visibility>(Visibility.Internal, SettingPlace.FileHeader));
+        fromQuery.NestedClass.ShouldBe("FromQuery");
+        fromHeader.WrittenMemberLocation.ShouldBe(
+            new Placed<MemberLocation>(MemberLocation.NestedClass, SettingPlace.FileHeader)
+        );
+        fromHeader.NestedClass.ShouldBe("FromHeader");
+        fromFile.WrittenMemberLocation.ShouldBe(
+            new Placed<MemberLocation>(MemberLocation.ExtensionClass, SettingsFile)
+        );
+        fromFile.WrittenVisibility.ShouldBe(new Placed<Visibility>(Visibility.Private, SettingsFile));
+        fromFile.NestedClass.ShouldBe("FromFile");
+    }
+
     // The type override is one exception, the column types the other: each level replaces only the keys it names,
     // and a default stays, so that the lookup of a type finds it in its place.
     [Fact]
@@ -163,19 +243,6 @@ public sealed class QuerySettingsTests
                 new SettingsLevel { Database = markers },
                 new SettingsLevel { Database = file },
                 "postgres"
-            )
-            .ShouldBe(expected);
-
-    [Theory]
-    [InlineData("Statements", "Queries", "Statements")]
-    [InlineData("Statements", null, "Statements")]
-    [InlineData(null, "Queries", "Queries")]
-    [InlineData(null, null, "Sql")]
-    public void ResolveNestedClass_TheAttribute_WinsOverTheChain(string? attribute, string? chain, string expected) =>
-        QuerySettings
-            .ResolveNestedClass(
-                new SettingsLevel { NestedClass = attribute },
-                new SettingsLevel { NestedClass = chain }
             )
             .ShouldBe(expected);
 

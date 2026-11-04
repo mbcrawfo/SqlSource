@@ -19,4 +19,6 @@ internal enum SettingId
     ColumnTypes,
     LibraryTypes,
     NestedClass,
+    MemberLocation,
+    Visibility,
 }

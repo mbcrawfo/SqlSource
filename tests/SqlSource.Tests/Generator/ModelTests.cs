@@ -747,8 +747,8 @@ public sealed class ModelTests
         run.Sources["Other.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int Id);");
     }
 
-    // A query named Sql is SQLSRC009 for First, whose members are nested in a class of that name, and not for
-    // Second, whose members are its own.
+    // A query named Sql is SQLSRC009 in First's file, whose members are nested in a class of that name, and not in
+    // Second's, whose members are on the type.
     [Fact]
     public void Run_FileExcludedBySqlsrc009_GetsNoModelsForThatType()
     {
@@ -757,19 +757,28 @@ public sealed class ModelTests
 
             namespace App
             {
-                [SqlSourceGenerate(Source = ".")]
+                [SqlSourceGenerate(Source = "First.sql")]
                 public partial class First;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+                [SqlSourceGenerate(Source = "Second.sql")]
                 public partial class Second;
             }
             """;
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Sql\nSELECT 1;\n");
+        var first = new SqlFile("/app/Repo/First.sql", "-- member-location: nested-class\n\n-- name: Sql\nSELECT 1;\n");
+        var second = new SqlFile("/app/Repo/Second.sql", "-- member-location: class\n\n-- name: Sql\nSELECT 1;\n");
 
-        var run = Run(source, [file, Sidecars.Of(file, Entry(file, "Sql", [], [Column("one")]))]);
+        var run = Run(
+            source,
+            [
+                first,
+                Sidecars.Of(first, Entry(first, "Sql", [], [Column("one")])),
+                second,
+                Sidecars.Of(second, Entry(second, "Sql", [], [Column("one")])),
+            ]
+        );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC009 ");
         run.CompilationErrors.ShouldBeEmpty();

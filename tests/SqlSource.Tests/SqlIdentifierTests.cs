@@ -36,4 +36,18 @@ public sealed class SqlIdentifierTests
     [InlineData("a​b", false)]
     public void IsUsableName_IdentifierThatIsNotAReservedKeyword_IsUsable(string value, bool expected) =>
         SqlIdentifier.IsUsableName(value).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("Queries", true)]
+    [InlineData("queries", true)]
+    [InlineData("record", true)]
+    [InlineData("where", true)]
+    [InlineData("class", false)]
+    [InlineData("file", false)]
+    [InlineData("required", false)]
+    [InlineData("scoped", false)]
+    [InlineData("extension", false)]
+    [InlineData("@file", false)]
+    public void IsUsableTypeName_NameThatCSharpTakesForAType_IsUsable(string value, bool expected) =>
+        SqlIdentifier.IsUsableTypeName(value).ShouldBe(expected);
 }

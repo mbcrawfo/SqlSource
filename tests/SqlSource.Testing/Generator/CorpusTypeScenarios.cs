@@ -4,16 +4,16 @@ using SqlSource.Snapshot;
 namespace SqlSource.Testing.Generator;
 
 // The part of the golden corpus of query methods that holds the scenarios of the types that claim the queries:
-// placement, where each MethodLocation and each kind of type puts the methods, and diagnostics, the problems that cost
-// a query its method or a type its extension class.  QueryMethodCorpus.cs lists the cases.
+// placement, where each member location and visibility and each kind of type puts the methods, and diagnostics, the
+// problems that cost a query its method or a type its extension class.  QueryMethodCorpus.cs lists the cases.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static partial class QueryMethodCorpus
 {
     // The types of placement, each claiming the file of its name: a public and an internal type whose methods go into
-    // an extension class, a type of each MethodLocation that puts them on the type, a type nested in another, and a
-    // type of the global namespace.
+    // an extension class, a type of each visibility that its file puts the methods on the type with, a type nested in
+    // another, and a type of the global namespace.  Headers gives each file's markers.
     private const string PlacementSource = """
         using SqlSource;
 
@@ -25,18 +25,18 @@ internal static partial class QueryMethodCorpus
             [SqlSourceGenerate(Source = "InternalSample.sql")]
             internal partial class InternalSample;
 
-            [SqlSourceGenerate(Source = "PublicSample.sql", MethodLocation = MethodLocation.Public)]
+            [SqlSourceGenerate(Source = "PublicSample.sql")]
             public partial class PublicSample;
 
-            [SqlSourceGenerate(Source = "InternalPlacement.sql", MethodLocation = MethodLocation.Internal)]
+            [SqlSourceGenerate(Source = "InternalPlacement.sql")]
             public partial class InternalPlacement;
 
-            [SqlSourceGenerate(Source = "PrivatePlacement.sql", MethodLocation = MethodLocation.Private)]
+            [SqlSourceGenerate(Source = "PrivatePlacement.sql")]
             public partial class PrivatePlacement;
 
             public partial class Outer
             {
-                [SqlSourceGenerate(Source = "Inner.sql", MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = "Inner.sql")]
                 public partial class Inner;
             }
         }
@@ -78,28 +78,32 @@ internal static partial class QueryMethodCorpus
         }
         """;
 
+    // The header of each placement type's file: none for the extension class, the default, or the markers that put
+    // the methods on the type with a visibility.
+    private static readonly (string Type, string Header)[] Headers =
+    [
+        ("Sample", ""),
+        ("InternalSample", ""),
+        ("PublicSample", "-- member-location: class\n-- visibility: public\n\n"),
+        ("InternalPlacement", "-- member-location: class\n-- visibility: internal\n\n"),
+        ("PrivatePlacement", "-- member-location: class\n-- visibility: private\n\n"),
+        ("Inner", "-- member-location: class\n-- visibility: public\n\n"),
+        ("GlobalSample", ""),
+    ];
+
     // A one query and a stream of each placement's type, each claiming its file, named after the type so that no two
     // extension classes of one namespace have a method of one signature.
     private static GeneratorRun Placement(CorpusEngine engine)
     {
-        string[] types =
-        [
-            "Sample",
-            "InternalSample",
-            "PublicSample",
-            "InternalPlacement",
-            "PrivatePlacement",
-            "Inner",
-            "GlobalSample",
-        ];
         SidecarParameter[] id = [IdParameter(engine)];
         var columns = IdAndName(engine);
         var files = new List<SqlFile>();
-        foreach (var type in types)
+        foreach (var (type, header) in Headers)
         {
             var file = new SqlFile(
                 "/app/Repo/" + type + ".sql",
-                "-- name: Get"
+                header
+                    + "-- name: Get"
                     + type
                     + " -> one\nSELECT id, name FROM users WHERE id = @id;\n-- name: Stream"
                     + type

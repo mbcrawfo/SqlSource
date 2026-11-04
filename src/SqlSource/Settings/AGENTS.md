@@ -5,11 +5,11 @@ Plain data and the readers of values.  See [settings](../../../docs/architecture
 - **No file access, no symbols, no pipeline types, and nothing from `Parsing/`, `Generation/` or `Diagnostics/`.**  A rule shared with another folder goes in the root namespace, as `SqlIdentifier`, `DatabaseName` and `SystemSchemas` do.
 - **`QuerySettings.Resolve` is the one rule that puts the levels together**, with `ResolveTypeOverrides`, `ResolveColumnTypes`, `ResolveLibraries` and `ResolveDatabase` for the four settings it leaves out.
 - **A setting comes whole from the most specific level that has it, except the type override, the column types and the library types, which merge per key.**
-- **A new setting** is a nullable member of `SettingsLevel`, a line in `Over`, a member of `QuerySettings` with its default, and a `case` in `SqlMarkerScope.Read` when a marker gives it.  When a settings file gives it, it is also a member of `SettingId` and a line in `SettingsLevelReader.Read`, the one reader of the settings files and of the attribute.  Only a setting of the type, as the nested class is, is also a property in the `AttributeSettings` of `TargetTypeReader`.
+- **A new setting** is a nullable member of `SettingsLevel`, a line in `Over`, a member of `QuerySettings` with its default, and a `case` in `SqlMarkerScope.Read` when a marker gives it.  When a settings file gives it, it is also a member of `SettingId` and a line in `SettingsLevelReader.Read`, the one reader of the settings files.  The attribute gives no setting.
 - **An `ISettingSource` only finds a raw value**, as text, as the elements of an array (the generator parameters) or as the members of an object (the type override, the column types and the library types, which the reader reads from members alone); records one that is not valid, and an element or member that is not valid or repeats a key, by its index; and says its `SettingPlace`.  See [reading a level](../../../docs/architecture/generator.md#reading-a-level).
 - **A reader that finds nothing returns `SettingsLevel.None`**, never a new empty level.
 - **A value from a fixed list is read by `SettingValue.TryReadChoice`**, from the names of an enum's members, so renaming a member changes what a user may write, and with it the list and the pattern of that choice in `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against the enum.
-- **`MemberPlacement` and `MethodPlacement` keep the numbers of the attribute's enums.**  `tests/SqlSource.Tests/Generation/AttributeSourceTests.cs` compares each pair.
+- **A setting whose diagnostics name where it was written is a `Placed<T>` in `SettingsLevel`**, as the member location and the visibility are, so that `QuerySettings` tells a written value from a default.
 
 ## Documenting a setting
 
@@ -26,7 +26,7 @@ See [the type override](../../../docs/architecture/generator.md#the-type-overrid
 - **The type override is not part of `QuerySettings.Resolve`**, which runs for each query and each claiming type: compute the type override once for each distinct level of markers.
 - **Every array of entries holds each key once**, in the order of `TypeOverrideMap`: by the key's text ignoring case, then ordinally.  A key's text is its parts' text without quotes and with escapes decoded, compared ordinally.
 - **Keep a key a string in its written form, quotes included, and compare keys only through `TypeOverrideMap`.**
-- **`TypeOverrideGrammar` is its one reader**, of an object's members and of a marker alike; the attribute has no level for it.
+- **`TypeOverrideGrammar` is its one reader**, of an object's members and of a marker alike.
 - **A level's type override is a `PerEngine` of arrays, a slot for each `DatabaseEngine`**, keyed by that engine's rules through `TypeKeys.TryNormalizeEach`.  An entry is absent from the slot of an engine that does not read its key.
 - **An object of a settings file fills every slot; a marker fills only its file's engine's**, by `SqlDescribableDialects.EngineOf`, and a key that engine does not read is `SQLSRC111`.
 - **Code that carries a level's entries carries the whole container** and reads every slot through `DatabaseEngines.All`, as `MappedTypeNames` and `FileTypesInput.TypeSettingsOf` do.

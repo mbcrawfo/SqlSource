@@ -3,29 +3,22 @@
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Settings;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// The name of the class that holds a type's members under SqlLocation.Nested: the attribute's NestedClass, else the
-// nestedClass of the chain of the folder of the type's C# file, which these tests give in the settings file of that
-// folder, else Sql.
+// The name of the class that holds a query's members under the member location nested-class: the query's or the file
+// header's -- nested-class:, else the nestedClass of the chain of the .sql file's folder, which these tests give in the
+// settings file of that folder, else Sql.
 public sealed class NestedClassTests
 {
-    // The files every project gets, and a type with a problem adds none.
-    private static readonly string[] AttributeAndExceptions =
-    [
-        GeneratedFile.EmbeddedAttributeName,
-        "SqlSourceGenerateAttribute.g.cs",
-        "SqlSource-Exceptions.g.cs",
-    ];
-
-    // The settings file of the folder of the type's C# file, GeneratorHarness.SourcePath.
-    private const string TypesFolderSettingsPath = "/app/Repo/sqlsource.json";
+    // The settings file of the folder of the .sql file, GeneratorHarness.UsersPath, which is also the type's.
+    private const string FilesFolderSettingsPath = "/app/Repo/sqlsource.json";
 
     [Fact]
-    public void Run_NestedClassOfTheTypesFolder_NamesTheClass()
+    public void Run_NestedClassOfTheFilesFolder_NamesTheClass()
     {
         var run = Run(
             """
@@ -42,70 +35,77 @@ public sealed class NestedClassTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static class Queries\n");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static partial class Queries\n");
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("class Sql");
     }
 
     [Fact]
-    public void Run_NestedClassOnTheAttribute_WinsOverTheTypesFolder()
+    public void Run_NestedClassMarker_WinsOverTheFilesFolder()
     {
         var run = Run(
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string Get() => Statements.GetUser;
             }
             """,
-            "Queries"
+            "Queries",
+            StatementsFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static class Statements\n");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static partial class Statements\n");
     }
 
     [Fact]
-    public void Run_NestedClassOnTheAttributeWithoutTheTypesFolder_NamesTheClass()
+    public void Run_NestedClassMarkerWithoutTheFilesFolder_NamesTheClass()
     {
         var run = Run(
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string Get() => Statements.GetUser;
             }
             """,
-            null
+            null,
+            StatementsFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    // A folder-wide nestedClass beside a file whose members go on the type is normal.
     [Fact]
-    public void Run_NestedClassAndDirectLocation_IsIgnored()
+    public void Run_NestedClassAndClassLocation_IsIgnored()
     {
         var run = Run(
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct, NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string Get() => GetUser;
             }
             """,
-            "Queries"
+            "Queries",
+            new SqlFile(
+                GeneratorHarness.UsersPath,
+                "-- member-location: class\n-- nested-class: Statements\n\n" + SqlTexts.GetUser
+            )
         );
 
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("static class");
+        run.ShouldBeClean();
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("static partial class");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = ");
     }
 
     // The member named Sql is no problem once the class has another name.
@@ -133,7 +133,7 @@ public sealed class NestedClassTests
     [InlineData("public partial class Sample { private int Queries; }", "Sample")]
     [InlineData("public partial class Sample<Queries> { }", "Sample")]
     [InlineData("public static partial class Queries { }", "Queries")]
-    public void Run_NameOfThePropertyTaken_IsAnErrorAtTheAttribute(string declaration, string name)
+    public void Run_NameOfTheFilesFolderTaken_IsAnErrorAtTheAttribute(string declaration, string name)
     {
         var run = Run(
             $$"""
@@ -146,34 +146,38 @@ public sealed class NestedClassTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): '{name}' already has a member named 'Queries'.  Rename it, "
-                + "or use SqlLocation.Direct.",
+            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): '{name}' already has a member named 'Queries', which a file "
+                + "of it names as its nested class.  Rename the member, or set -- nested-class: or "
+                + "-- member-location: in the file.",
         ]);
-        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
+        run.Sources.Values.ShouldAllBe(text => !text.Contains("GetUser"));
         run.CompilationErrors.ShouldBeEmpty();
     }
 
     [Fact]
-    public void Run_NameOfTheAttributeTaken_IsAnErrorAtTheAttribute()
+    public void Run_NameOfTheMarkerTaken_IsAnErrorAtTheAttribute()
     {
         var run = Run(
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", NestedClass = "Statements")]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public void Statements() { }
             }
             """,
-            null
+            null,
+            StatementsFile
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,61): 'Sample' already has a member named 'Statements'.  Rename "
-                + "it, or use SqlLocation.Direct.",
+            "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): 'Sample' already has a member named 'Statements', which a "
+                + "file of it names as its nested class.  Rename the member, or set -- nested-class: or "
+                + "-- member-location: in the file.",
         ]);
-        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
+        run.CompilationErrors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -192,7 +196,8 @@ public sealed class NestedClassTests
                     """
                 ),
             ],
-            [new SqlFile(GeneratorHarness.UsersPath, "-- name: Queries\nSELECT 1;\n"), TypesFolder("Queries")]
+            [new SqlFile(GeneratorHarness.UsersPath, "-- name: Queries\nSELECT 1;\n"), FilesFolder("Queries")],
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.Diagnostics.ShouldHaveSingleItem()
@@ -202,42 +207,136 @@ public sealed class NestedClassTests
             );
     }
 
+    // The marker's value is not a class name, so the file is left out, and the type keeps its empty class.
     [Theory]
     [InlineData("class")]
     [InlineData("My-Sql")]
     [InlineData("App.Sql")]
     [InlineData("1Sql")]
-    public void Run_NestedClassOnTheAttributeThatIsNotValid_IsAnErrorAtTheAttribute(string value)
+    public void Run_NestedClassMarkerThatIsNotValid_IsAnErrorAtTheMarker(string value)
     {
         var run = Run(
-            $$"""
+            """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Source = ".", NestedClass = "{{value}}")]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample { }
             """,
-            null
+            null,
+            new SqlFile(GeneratorHarness.UsersPath, "-- nested-class: " + value + "\n\n" + SqlTexts.GetUser)
         );
 
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{51 + value.Length}): '{value}' is not a valid value of "
-                + "NestedClass",
-        ]);
-        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
+        run.Diagnostics.ShouldHaveSingleItem()
+            .ShouldStartWith($"SQLSRC111 {GeneratorHarness.UsersPath}(1,18)-(1,{18 + value.Length}): ");
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static partial class Sql\n");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
     }
 
-    // The source with Users, and the nested class, or none, in the settings file of the type's folder.
-    private static GeneratorRun Run(string source, string? nestedClass) =>
+    // C# refuses these contextual keywords as the name of a type (CS9056, CS9029, CS9062 and, from C# 14, CS9306), so
+    // a nested class cannot have one.  Nor can it be var, which the type's query methods would then read as the class
+    // where they declare a local.  The marker is SQLSRC111, and its file is left out; the settings file's value is
+    // SQLSRC019, and the default names the class.
+    [Theory]
+    [InlineData("file", false)]
+    [InlineData("required", false)]
+    [InlineData("scoped", false)]
+    [InlineData("extension", false)]
+    [InlineData("var", false)]
+    [InlineData("file", true)]
+    [InlineData("required", true)]
+    [InlineData("scoped", true)]
+    [InlineData("extension", true)]
+    [InlineData("var", true)]
+    public void Run_ContextualKeywordThatCannotNameTheNestedClass_IsAnError(string value, bool inSettingsFile)
+    {
+        const string Source = """
+            using SqlSource;
+            namespace App;
+            [SqlSourceGenerate(Source = ".")]
+            public partial class Sample { }
+            """;
+
+        var run = inSettingsFile
+            ? Run(Source, value)
+            : Run(
+                Source,
+                null,
+                new SqlFile(GeneratorHarness.UsersPath, "-- nested-class: " + value + "\n\n" + SqlTexts.GetUser)
+            );
+
+        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static partial class Sql\n");
+        if (inSettingsFile)
+        {
+            diagnostic.ShouldStartWith($"SQLSRC019 {FilesFolderSettingsPath}(");
+            diagnostic.ShouldContain($"'{value}' is not a valid value of nestedClass");
+            run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = ");
+        }
+        else
+        {
+            diagnostic.ShouldStartWith($"SQLSRC111 {GeneratorHarness.UsersPath}(1,18)-(1,{18 + value.Length}): ");
+            run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
+        }
+    }
+
+    // A name in lower case, record, and a contextual keyword that C# takes as a type's name are each one the compiler
+    // takes, and warns of (CS8981, and CS8860 for record).  Both files write a part of the class:
+    // the type's file the constant of GetName, and the methods' file the method of GetUser.  Neither warns.
+    [Theory]
+    [InlineData("queries")]
+    [InlineData("record")]
+    [InlineData("dynamic")]
+    [InlineData("nameof")]
+    [InlineData("partial")]
+    public void Run_NestedClassInLowerCase_CompilesWithoutWarningsInBothFiles(string name)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: nested-class\n-- nested-class: "
+                + name
+                + "\n\n-- name: GetName\n-- output: sql\nSELECT name FROM users;\n"
+                + "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])]
+        );
+
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
+        var type = run.Sources[GeneratorHarness.SampleFile];
+        type.ShouldContain("        private static partial class " + name + "\n");
+        type.ShouldContain("            public const string GetName = ");
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("        private static partial class " + name + "\n");
+        methods.ShouldContain(" GetUser(\n");
+    }
+
+    // The file with -- nested-class: Statements in its header.
+    private static readonly SqlFile StatementsFile = new(
+        GeneratorHarness.UsersPath,
+        "-- nested-class: Statements\n\n" + SqlTexts.GetUser
+    );
+
+    // The source with the file, Users unless another is given, and the nested class, or none, in the settings file of
+    // the file's folder.  The members go in the nested class, the default.
+    private static GeneratorRun Run(string source, string? nestedClass, SqlFile? file = null) =>
         GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            nestedClass is null ? [GeneratorHarness.UsersFile] : [GeneratorHarness.UsersFile, TypesFolder(nestedClass)]
+            nestedClass is null
+                ? [file ?? GeneratorHarness.UsersFile]
+                : [file ?? GeneratorHarness.UsersFile, FilesFolder(nestedClass)],
+            settings: GeneratorHarness.InNestedClass
         );
 
-    // The settings file of the type's folder, which names the nested class.
-    private static SqlFile TypesFolder(string nestedClass) =>
+    // The settings file of the file's folder, which names the nested class.
+    private static SqlFile FilesFolder(string nestedClass) =>
         GeneratorHarness.SettingsFile(
-            TypesFolderSettingsPath,
+            FilesFolderSettingsPath,
             GeneratorHarness.Json(new JsonObject { ["nestedClass"] = nestedClass })
         );
 }

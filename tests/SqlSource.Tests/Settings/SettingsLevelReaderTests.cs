@@ -221,6 +221,39 @@ public sealed class SettingsLevelReaderTests
             );
     }
 
+    // A choice that gives the member location or the visibility carries the place of its source, whichever it is.
+    [Fact]
+    public void Read_PlacementChoices_CarryThePlaceOfTheSource()
+    {
+        var place = SettingPlace.OfSettingsFile("/app/Repo/sqlsource.json", 2);
+        var source = new FakeSource(
+            new Dictionary<SettingId, string>
+            {
+                [SettingId.MemberLocation] = "NestedClass",
+                [SettingId.Visibility] = "Protected",
+            },
+            place
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level.MemberLocation.ShouldBe(new Placed<MemberLocation>(MemberLocation.NestedClass, place));
+        level.Visibility.ShouldBe(new Placed<Visibility>(Visibility.Protected, place));
+        source.Invalids.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_PlacementChoicesTheSourceDoesNotSet_AreNull()
+    {
+        var source = new FakeSource(new Dictionary<SettingId, string> { [SettingId.NestedClass] = "Users" });
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level.MemberLocation.ShouldBeNull();
+        level.Visibility.ShouldBeNull();
+        level.NestedClass.ShouldBe("Users");
+    }
+
     // An array with no word is the empty list, which is set, as default is.
     [Fact]
     public void Read_ParametersAsNoElement_AreTheEmptyList()
@@ -447,6 +480,8 @@ public sealed class SettingsLevelReaderTests
             "Members(ColumnTypes)",
             "Members(LibraryTypes)",
             "Text(NestedClass)",
+            "Choice(MemberLocation)",
+            "Choice(Visibility)",
         ]);
     }
 

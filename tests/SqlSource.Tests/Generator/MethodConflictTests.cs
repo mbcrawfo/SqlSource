@@ -186,7 +186,7 @@ public sealed class MethodConflictTests
             .ShouldBe([
                 "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,37): The query methods of 'App.Sample' cannot go into the "
                     + "extension class 'App.SampleExtensions', because the project has a type of that name.  Rename "
-                    + "the type or what has the name, or set the attribute's MethodLocation to put the methods on the "
+                    + "the type or what has the name, or set -- member-location: to put the methods on the "
                     + "type.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
@@ -212,7 +212,7 @@ public sealed class MethodConflictTests
             .ShouldBe([
                 "SQLSRC276 /app/Repo/Sample.cs(3,2)-(3,33): The query methods of 'Sample' cannot go into the "
                     + "extension class 'SampleExtensions', because the project has a type of that name.  Rename the "
-                    + "type or what has the name, or set the attribute's MethodLocation to put the methods on the "
+                    + "type or what has the name, or set -- member-location: to put the methods on the "
                     + "type.",
             ]);
         run.Sources.Keys.ShouldNotContain("Sample-Methods.g.cs");
@@ -236,7 +236,7 @@ public sealed class MethodConflictTests
                 "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,37): The query methods of 'App.Sample' cannot go into the "
                     + "extension class 'App.SampleExtensions', because SqlSource writes "
                     + what
-                    + ".  Rename the type or what has the name, or set the attribute's MethodLocation to put the "
+                    + ".  Rename the type or what has the name, or set -- member-location: to put the "
                     + "methods on the type.",
             ]);
         run.Sources.Keys.ShouldContain(model + "-Model.g.cs");
@@ -264,7 +264,8 @@ public sealed class MethodConflictTests
                 }
             }
             """;
-        var a = new SqlFile(APath, "-- name: GetA\nSELECT id FROM users;\n");
+        // A's method is public, so First's extension class would be, and Second's methods are internal.
+        var a = new SqlFile(APath, "-- visibility: public\n\n-- name: GetA\nSELECT id FROM users;\n");
         var b = new SqlFile(BPath, "-- name: GetB\nSELECT id FROM users;\n");
 
         var run = MethodRuns.Run(
@@ -280,11 +281,11 @@ public sealed class MethodConflictTests
                 "SQLSRC276 /app/Repo/Sample.cs(7,10)-(7,45): The query methods of 'App.First.Queries' cannot go into "
                     + "the extension class 'App.QueriesExtensions', because 'App.Second.Queries' puts its methods "
                     + "there too, and the class would be public for one and internal for the other.  Rename the type "
-                    + "or what has the name, or set the attribute's MethodLocation to put the methods on the type.",
+                    + "or what has the name, or set -- member-location: to put the methods on the type.",
                 "SQLSRC276 /app/Repo/Sample.cs(13,10)-(13,45): The query methods of 'App.Second.Queries' cannot go "
                     + "into the extension class 'App.QueriesExtensions', because 'App.First.Queries' puts its methods "
                     + "there too, and the class would be public for one and internal for the other.  Rename the type "
-                    + "or what has the name, or set the attribute's MethodLocation to put the methods on the type.",
+                    + "or what has the name, or set -- member-location: to put the methods on the type.",
             ]);
         run.Sources.Keys.ShouldNotContain("App.First.Queries-Methods.g.cs");
         run.Sources.Keys.ShouldNotContain("App.Second.Queries-Methods.g.cs");
@@ -305,9 +306,11 @@ public sealed class MethodConflictTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.First.Queries-Methods.g.cs"].ShouldContain("public static partial class QueriesExtensions\n");
+        run.Sources["App.First.Queries-Methods.g.cs"]
+            .ShouldContain("internal static partial class QueriesExtensions\n");
         run.Sources["App.First.Queries-Methods.g.cs"].ShouldContain(" GetA(\n");
-        run.Sources["App.Second.Queries-Methods.g.cs"].ShouldContain("public static partial class QueriesExtensions\n");
+        run.Sources["App.Second.Queries-Methods.g.cs"]
+            .ShouldContain("internal static partial class QueriesExtensions\n");
         run.Sources["App.Second.Queries-Methods.g.cs"].ShouldContain(" GetB(\n");
     }
 }

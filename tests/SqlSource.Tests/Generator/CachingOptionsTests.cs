@@ -274,38 +274,38 @@ public sealed class CachingOptionsTests
             );
     }
 
-    // The class is named again for every type, from the new set, and only the type in the edited folder gets another
-    // name.  No file is parsed.
+    // The nested class is a setting of the files of the folder, as its member location is, so only the type that
+    // claims a file of the edited folder writes its file again, with the class's new name.  No file is parsed.
     [Fact]
-    public void Run_SettingsFileNestedClassChanged_ChecksOnlyTheTypesOfItsFolder()
+    public void Run_SettingsFileNestedClassChanged_RewritesOnlyTheTypesOfItsFolder()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var settings = new InMemoryAdditionalText(
             "/app/Users/sqlsource.json", /*lang=json,strict*/
-            """{"nestedClass":"Queries"}"""
+            """{"memberLocation": "NestedClass", "nestedClass": "Queries"}"""
         );
         var driver = _scene.FirstRunWithSettingsFiles(compilation, settings);
 
         var edited = new InMemoryAdditionalText(
             settings.Path, /*lang=json,strict*/
-            """{"nestedClass":"Statements"}"""
+            """{"memberLocation": "NestedClass", "nestedClass": "Statements"}"""
         );
         var result = Run(driver.ReplaceAdditionalText(settings, edited), compilation);
 
-        Reasons<TargetType>(result, TrackingNames.NestedClassCheck, type => type.Name)
+        AllReasons(result, TrackingNames.ParsedFile)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
+        TypeReasons(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
-                    ["UserQueries"] = IncrementalStepRunReason.Modified,
-                    ["OrderQueries"] = IncrementalStepRunReason.Unchanged,
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
                 },
                 ignoreOrder: true
             );
-        AllReasons(result, TrackingNames.ParsedFile)
-            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
         result
             .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
             .ToString()
-            .ShouldContain("private static class Statements\n");
+            .ShouldContain("private static partial class Statements\n");
     }
 }

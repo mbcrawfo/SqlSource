@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -9,9 +8,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
-using SqlSource.Generation.Methods;
-using SqlSource.Settings;
-using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation;
 
@@ -37,7 +33,7 @@ internal static class TargetTypeReader
     /// Reads the type.  Returns null for every declaration but the one that carries the type's first attribute, so
     /// that a type with the attribute on two partial declarations, which the compiler rejects, gets one file.
     /// </summary>
-    public static DeclaredType? Read(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
+    public static TargetType? Read(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
         var declaration = (TypeDeclarationSyntax)context.TargetNode;
         var symbol = (INamedTypeSymbol)context.TargetSymbol;
@@ -47,32 +43,22 @@ internal static class TargetTypeReader
             return null;
         }
 
-        var attributeLocation = LocationInfo.From(reference.GetSyntax(cancellationToken).GetLocation());
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-        var source = new AttributeSettings(attribute, attributeLocation, diagnostics);
         var types = ReadDeclarations(declaration, diagnostics);
-        var placement = source.Choice<MemberPlacement>(AttributeSource.LocationProperty) ?? MemberPlacement.Nested;
-        var methodPlacement =
-            source.Choice<MethodPlacement>(AttributeSource.MethodLocationProperty) ?? MethodPlacement.ExtensionClass;
-        var type = new TargetType(
+        return new TargetType(
             symbol.ContainingNamespace.IsGlobalNamespace
                 ? string.Empty
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
             new EquatableArray<TypeDeclaration>(types),
-            placement,
-            methodPlacement,
-            SettingsLevelReader.Read(ref source),
             IsPublic(symbol),
+            IsReachableAsProtected(symbol),
+            symbol.IsStatic,
+            symbol.IsSealed,
             ReadSource(attribute),
             reference.SyntaxTree.FilePath,
-            attributeLocation,
+            LocationInfo.From(reference.GetSyntax(cancellationToken).GetLocation()),
+            GetTakenNames(symbol),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
-        );
-        return new DeclaredType(
-            type,
-            placement == MemberPlacement.Nested || !MethodHost.Of(methodPlacement).IsExtension
-                ? GetTakenNames(symbol)
-                : EquatableArray<string>.Empty
         );
     }
 
@@ -91,10 +77,32 @@ internal static class TargetTypeReader
         return true;
     }
 
-    // A nested class, or a method on the type, cannot share its name with a member of the type, with the type itself
-    // or with one of the type's parameters.  The nested class's name is not known until the settings files join, so
-    // every one of them is kept, sorted, for NestedClassCheck and for the methods' check.
-    // MemberNames leaves out the nested types.
+    // A member's accessibility domain leaves the assembly unless the member or a type around it is internal, private or
+    // private protected, which keep it inside.  A protected or protected internal level lets in a derived type of
+    // another assembly, so a type whose levels are all public but for those is reached from there, as protected.
+    private static bool IsReachableAsProtected(INamedTypeSymbol symbol)
+    {
+        var isPublic = true;
+        for (var type = symbol; type is not null; type = type.ContainingType)
+        {
+            var accessibility = type.DeclaredAccessibility;
+            if (accessibility is Accessibility.Protected or Accessibility.ProtectedOrInternal)
+            {
+                isPublic = false;
+            }
+            else if (accessibility != Accessibility.Public)
+            {
+                return false;
+            }
+        }
+
+        return !isPublic;
+    }
+
+    // A nested class, or a member on the type, cannot share its name with a member of the type, with the type itself
+    // or with one of the type's parameters.  The names of the nested classes are not known until the files are parsed,
+    // so every one of them is kept, sorted, for the placement of the queries and for the methods' check.  MemberNames
+    // leaves out the nested types.
     private static EquatableArray<string> GetTakenNames(INamedTypeSymbol symbol) =>
         new(
             symbol
@@ -181,95 +189,6 @@ internal static class TargetTypeReader
         GetNamedArgument(attribute, AttributeSource.SourceProperty) is { Value: string { Length: > 0 } source }
             ? source
             : null;
-
-    // The attribute as a source of settings, of which it gives only the nested class: the output, the generator
-    // parameters and the settings of models and collections are the files'.  A value that is not valid is reported, and
-    // a type with a diagnostic gets no members; every property is still read, so that all the problems of the attribute
-    // are reported together.
-    private readonly struct AttributeSettings(
-        AttributeData attribute,
-        LocationInfo attributeLocation,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
-    ) : ISettingSource
-    {
-        public SettingPlace Place => SettingPlace.Attribute;
-
-        // A string that is empty or white space is not set: the reader of the level says so.  Source is no setting,
-        // and is unset only when it is empty.
-        public string? Text(SettingId setting) =>
-            PropertyOf(setting) is { } property && GetNamedArgument(attribute, property) is { Value: string written }
-                ? written
-                : null;
-
-        // The attribute writes every setting as text or as a choice.
-        public IReadOnlyList<string>? Elements(SettingId setting) => null;
-
-        public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => null;
-
-        public bool IsJsonMember(SettingId setting, int index) => false;
-
-        // The attribute has no level for the library types.
-        public void LibraryEntry(SqlLibrary library, int index) { }
-
-        public T? Choice<T>(SettingId setting)
-            where T : struct, Enum => PropertyOf(setting) is { } property ? Choice<T>(property) : null;
-
-        // An enum argument arrives as its number.  A number that is no member of the generator's own form of the
-        // enum was written with a cast, and is reported.  An argument that is not a constant has no value here; the
-        // compiler reports it.
-        public T? Choice<T>(string property)
-            where T : struct, Enum
-        {
-            if (GetNamedArgument(attribute, property) is not { Value: int value })
-            {
-                return null;
-            }
-
-            if (Enum.IsDefined(typeof(T), value))
-            {
-                return (T)Enum.ToObject(typeof(T), value);
-            }
-
-            Report(property, value.ToString(CultureInfo.InvariantCulture));
-            return null;
-        }
-
-        public void Invalid(SettingId setting, string value)
-        {
-            if (PropertyOf(setting) is { } property)
-            {
-                Report(property, value);
-            }
-        }
-
-        public void InvalidPart(SettingId setting, int index) { }
-
-        public void RepeatedKey(SettingId setting, int index, int first) { }
-
-        private void Report(string property, string value) =>
-            diagnostics.Add(
-                DiagnosticInfo.Create(SqlDiagnostics.InvalidAttributeValue, attributeLocation, value, property)
-            );
-
-        private static string? PropertyOf(SettingId setting) =>
-            setting switch
-            {
-                SettingId.Parameters => null,
-                SettingId.Output => null,
-                SettingId.Database => null,
-                SettingId.InputModelSuffix => null,
-                SettingId.OutputModelSuffix => null,
-                SettingId.ModelNamespace => null,
-                SettingId.InputModelType => null,
-                SettingId.OutputModelType => null,
-                SettingId.CollectionType => null,
-                SettingId.TypeOverrides => null,
-                SettingId.ColumnTypes => null,
-                SettingId.LibraryTypes => null,
-                SettingId.NestedClass => AttributeSource.NestedClassProperty,
-                _ => throw UnexpectedEnumValueException.Of(setting),
-            };
-    }
 
     private static TypedConstant? GetNamedArgument(AttributeData attribute, string name)
     {

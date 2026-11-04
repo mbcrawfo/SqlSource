@@ -1,5 +1,6 @@
 -- The query that is only SQL, claimed by ConstantQueries: it has no models and no sidecar.
 -- output: sql
+-- member-location: class
 
 -- name: CountAccounts
 SELECT count(*) FROM accounts;

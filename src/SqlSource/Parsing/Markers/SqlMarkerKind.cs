@@ -74,4 +74,20 @@ internal enum SqlMarkerKind
     /// <c>-- library-types:</c> turns the types of a library on or off, for a query or for every query of its file.
     /// </summary>
     LibraryTypes,
+
+    /// <summary>
+    /// <c>-- member-location:</c> says where a query's members go, for a query or for every query of its file.
+    /// </summary>
+    MemberLocation,
+
+    /// <summary>
+    /// <c>-- visibility:</c> gives the accessibility of a query's members, for a query or for every query of its file.
+    /// </summary>
+    Visibility,
+
+    /// <summary>
+    /// <c>-- nested-class:</c> names the class that holds a query's members in a nested class, for a query or for every
+    /// query of its file.
+    /// </summary>
+    NestedClass,
 }

@@ -2,21 +2,20 @@ using System.Collections.Immutable;
 using System.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
-using SqlSource.Settings;
 
 namespace SqlSource.Generation.Methods;
 
 /// <summary>
-/// What a call sees of one generated method, and where it is: what the methods of two types are compared by.
+/// What a call sees of one generated extension method, and where it is: what the methods of two types are compared by.
+/// A method on the type or in a class nested in it clashes with no other type's.
 /// </summary>
 /// <param name="TypeKey">The type, as <see cref="TypeMethods.TypeKey" /> gives it.</param>
 /// <param name="TypeName">The type in full, as a diagnostic names it: <c>App.Sample&lt;T&gt;</c>.</param>
 /// <param name="Namespace">The type's namespace as a value.  Empty for the global namespace.</param>
-/// <param name="ExtensionClass">
-/// The class that holds the method under <see cref="MethodPlacement.ExtensionClass" />, and null when the method is on
-/// the type.
+/// <param name="ExtensionClass">The extension class that holds the method.</param>
+/// <param name="IsPublic">
+/// Whether the extension class is public for the type, as <see cref="TypeMethods.ExtensionClassIsPublic" /> says.
 /// </param>
-/// <param name="IsPublic">Whether the extension class is public.</param>
 /// <param name="Name">The method's name.</param>
 /// <param name="QueryName">The query's name.</param>
 /// <param name="ParameterKey">
@@ -29,7 +28,7 @@ internal sealed record MethodSignature(
     string TypeKey,
     string TypeName,
     string Namespace,
-    string? ExtensionClass,
+    string ExtensionClass,
     bool IsPublic,
     string Name,
     string QueryName,
@@ -39,42 +38,40 @@ internal sealed record MethodSignature(
 )
 {
     /// <summary>
-    /// The extension class's full name, from identifier values, as <c>App.SampleExtensions</c>, or null when the method
-    /// is on the type.
+    /// The extension class's full name, from identifier values, as <c>App.SampleExtensions</c>.
     /// </summary>
-    public string? ExtensionClassFullName
-    {
-        get
-        {
-            if (ExtensionClass is null || Namespace.Length == 0)
-            {
-                return ExtensionClass;
-            }
+    public string ExtensionClassFullName => Namespace.Length == 0 ? ExtensionClass : Namespace + "." + ExtensionClass;
 
-            return Namespace + "." + ExtensionClass;
-        }
-    }
-
-    /// <summary>The signature of each of the type's methods, in their order.</summary>
+    /// <summary>The signature of each of the type's extension methods, in their order.</summary>
     public static EquatableArray<MethodSignature> Of(TypeMethods methods)
     {
-        if (methods.Methods.Count == 0)
+        var count = 0;
+        foreach (var method in methods.Methods)
+        {
+            count += method.Host.IsExtension ? 1 : 0;
+        }
+
+        if (count == 0)
         {
             return EquatableArray<MethodSignature>.Empty;
         }
 
-        var extensionClass = methods.Host.IsExtension ? methods.ExtensionClass : null;
         var typeName = methods.DisplayName;
-        var signatures = ImmutableArray.CreateBuilder<MethodSignature>(methods.Methods.Count);
+        var signatures = ImmutableArray.CreateBuilder<MethodSignature>(count);
         foreach (var method in methods.Methods)
         {
+            if (!method.Host.IsExtension)
+            {
+                continue;
+            }
+
             signatures.Add(
                 new MethodSignature(
                     methods.TypeKey,
                     typeName,
                     methods.Namespace,
-                    extensionClass,
-                    methods.IsPublic,
+                    methods.ExtensionClass,
+                    methods.ExtensionClassIsPublic,
                     method.Name,
                     method.QueryName,
                     ParameterKeyOf(method),

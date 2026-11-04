@@ -21,11 +21,11 @@ SELECT id, name FROM users;
 ```
 
 ```csharp
-[SqlSourceGenerate(Source = "Reports", SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Source = "Reports")]
 internal static partial class Reports;
 ```
 
-The first block writes settings as markers in a `.sql` file, the second in a [settings file](#settings-files), `sqlsource.json`, which applies to the `.sql` files of its folder and of every folder below it, the third as properties of the attribute.  Which of the three a setting accepts is in [the tables](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
+The first block writes settings as markers in a `.sql` file, the second in a [settings file](#settings-files), `sqlsource.json`, which applies to the `.sql` files of its folder and of every folder below it, the third as the one property of the attribute.  Which of the three a setting accepts is in [the tables](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
 
 <a id="all-settings"></a>
 
@@ -48,14 +48,14 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [Type overrides](#setting-type-overrides) | Entries `"key": "type"`, each a database type and the C# type it gets, or `"key": "default"`.  Default: none | `typeOverrides` in a settings file; `-- type-override:` in the file header and inside a query | Works today |
 | [Column types](#setting-column-types) | Entries `"key": "type"`, each a column of a table or view, `table.column` or `schema.table.column`, and the C# type it gets, or `"key": "default"`, or `"key": { "type": "type", "json": true }` for a column that holds JSON, the [JSON opt-in](#json-opt-in).  Default: none | `columnTypes` in a settings file; `-- column:` in the file header, and inside a query for a column of the query's result | Works today |
 | [Library types](#setting-library-types) | Entries `"library": "state"`, the library `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`.  Default: on for PostgreSQL where the project references the library's plugin, `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and off otherwise; `json` off | `libraryTypes` in a settings file; `-- library-types:` in the file header and inside a query | Works today |
-| [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
-| [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `NestedClass` on the attribute | Works today |
+| [Member location](#setting-member-location) | `extension-class`, `class`, `nested-class`.  Default `nested-class` for the output `sql` or `models`, and `extension-class` for `codegen` | `memberLocation` in a settings file; `-- member-location:` in the file header and inside a query | Works today |
+| [Visibility](#setting-visibility) | `public`, `internal`, `protected`, `private`.  Default: by the member location, as [its section](#setting-visibility) says | `visibility` in a settings file; `-- visibility:` in the file header and inside a query | Works today |
+| [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `-- nested-class:` in the file header and inside a query | Works today |
 | [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: the file named for the type in that folder | `Source` on the attribute | Works today |
 | [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `-- collection-type:` in the file header and inside a query | Works today |
-| [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | Works today |
 | [Running the tool in the build](#online-build) | `auto`, `true`, `false`.  Default `auto` | `SqlSourceOnline`, a property of the project | Works today |
 
-A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `SqlLocation = SqlLocation.Direct`.
+A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`, and `NestedClass` and `nested-class`.
 
 <a id="precedence"></a>
 
@@ -76,15 +76,15 @@ A query with `-- output: sql` has the output `sql`, whatever the other four say.
 The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
-- **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file or of the attribute that is empty or white space.  `Source` is the exception: see [Source](#setting-source).
+- **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file that is empty or white space.  `Source`, on the attribute, is the exception: see [Source](#setting-source).
 - **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
-- **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model.  Only what belongs to a type can differ: its [nested class](#setting-nested-class), where its members go, and the namespace of the models, which is the type's own unless the [model namespace](#setting-model-namespace) is set.  A type that needs other settings needs a file of its own.
+- **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](#setting-member-location).  Only what follows from the type itself can differ: the namespace of the models, which is the type's own unless the [model namespace](#setting-model-namespace) is set, and the default [visibility](#setting-visibility) of members on the type, which follows the type's own accessibility.  A type that needs other settings needs a file of its own.
 
 Four exceptions, stated plainly:
 
 - **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
-- **`SqlLocation`, `MethodLocation` and `Source` exist only on the attribute.**  They have nothing to choose between.  The nested class has two, the attribute over the settings files, which are those of the folder of the type's C# file.
+- **`Source` exists only on the attribute.**  It has nothing to choose between.
 - **A type override, a column type, or a library of the library types, replaces only the keys it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column or a library, replaces the entry below it for that key, and `default` takes the key out.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types) and [library types](#setting-library-types).
 
 <a id="a-value-that-is-wrong"></a>
@@ -95,7 +95,6 @@ Four exceptions, stated plainly:
 |----|----|----|
 | A marker | [SQLSRC111](diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
 | A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of a list, unless one is `default` beside another, and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.  Of a key, or an entry, written twice, the first applies.  A file that is not a JSON object gives nothing |
-| A property of the attribute | [SQLSRC006](diagnostics.md#sqlsrc006) | The type produces no members until it is fixed |
 
 <a id="setting-output"></a>
 
@@ -262,7 +261,7 @@ SELECT id, name FROM users;
 
 The namespace the generated [models](generator.md#models) go in.  The default is the namespace of the type that claims the file.  Above, the models of `ListUsers` are in `App.Models`.
 
-- The value is C# identifiers joined by periods, none of them a reserved keyword.
+- The value is C# identifiers joined by periods, none of them a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.
 - It stands in the file header only.  It can also be `modelNamespace` in a settings file.
 - A name with a period that `-- input-model:` or `-- output-model:` gives is a full name, and ignores this setting.
 - Two types in two namespaces that claim one file, or read one table, get a model each, one in each namespace, unless this setting gives them one.
@@ -300,7 +299,7 @@ What each shape looks like is on [the generator page](generator.md#model-shape).
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-`-- input-model:` and `-- output-model:` name the [model](generator.md#models) of one query's parameters and of its result rows, whole, with no suffix.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword.  Above, `GetUser` gets `UserArgs`, in the namespace its models would have without the marker, and `UserRow` in the namespace `App.Models`, whatever the [model namespace](#setting-model-namespace) says.
+`-- input-model:` and `-- output-model:` name the [model](generator.md#models) of one query's parameters and of its result rows, whole, with no suffix.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.  Above, `GetUser` gets `UserArgs`, in the namespace its models would have without the marker, and `UserRow` in the namespace `App.Models`, whatever the [model namespace](#setting-model-namespace) says.
 
 - It stands inside a query only.  It has no key in a settings file, since a name is for one query.
 - `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119), and `-- output-model:` on a query whose statement returns no rows is [SQLSRC259](diagnostics.md#sqlsrc259).
@@ -350,7 +349,7 @@ SELECT id, name FROM users ORDER BY id;
 
 ```csharp
 // Generated, shown without global::
-public static IAsyncEnumerable<StreamUsersDto> StreamUsers(
+internal static IAsyncEnumerable<StreamUsersDto> StreamUsers(
     this DbConnection connection,
     DbTransaction? transaction = null,
     int? commandTimeout = null,
@@ -689,24 +688,71 @@ The library types say whether the query methods read and send a library's types,
 
 The `sqlsource` tool does not read `libraryTypes`, and a `-- library-types:` marker changes nothing that is described: adding, changing or removing one leaves the query's sidecar current.
 
-<a id="setting-sql-location"></a>
+<a id="setting-member-location"></a>
 
-## Where the SQL goes
+## Where the members go
 
-```csharp
-// UserQueries.sql has -- output: models in its file header
-[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-public static partial class UserQueries;
+```sql postgres
+-- name: GetUser -> one-optional
+-- member-location: class
+-- visibility: public
+SELECT id, name FROM users WHERE id = @id;
+
+-- name: CountUsers
+-- output: sql
+SELECT count(*) FROM users;
 ```
 
-`SqlLocation` is a property of the attribute and nothing else.  It says where the members generated for the type's queries whose output is `sql` or `models` go.  Each member is a `const string`, or a static method when the query has tokens.  A query whose output is `codegen` has a method in their place, which [`MethodLocation`](#setting-method-location) places.
+```csharp
+[SqlSourceGenerate]
+public static partial class UserQueries
+{
+    public static string CountText => Sql.CountUsers;
+}
 
-| `SqlLocation` | Generated members | Used as |
+// elsewhere
+GetUserDto? user = await UserQueries.GetUser(connection, new GetUserParams(42));
+```
+
+The member location of a query says where its generated members go: its constant or token method, for the output `sql` or `models`, and its [query method](generator.md#query-methods), for `codegen`.  Above, `GetUser` is a public static method of `UserQueries` that takes the connection, and `CountUsers`, which writes no member location, is a constant of the private class `Sql` nested in it.
+
+| Member location | The members are | Used as |
 |----|----|----|
-| `SqlLocation.Nested` (the default) | Public members in a `private static class` nested in the type, named `Sql` unless [the nested class](#setting-nested-class) names it | `Sql.GetUser`, inside the type only |
-| `SqlLocation.Direct` | Public members on the type itself | `UserQueries.GetUser`, wherever the type is visible |
+| `nested-class`, the default for `sql` and `models` | Public static members of a static class nested in the type, `Sql` unless [the nested class](#setting-nested-class) names it.  A query method there takes the connection as its first argument | `Sql.GetUser`, or `Sql.GetUser(connection, ...)` for a query method |
+| `class` | Static members of the type itself.  A query method takes the connection as its first argument | `UserQueries.GetUser`, or `UserQueries.GetUser(connection, ...)` |
+| `extension-class`, the default for `codegen` | Extension methods of `DbConnection`, in a static class beside the type, named after it with `Extensions` after it.  Only a query method can go there | `connection.GetUser(...)` |
 
-With `Nested`, a type that already has a member with the nested class's name is [SQLSRC007](diagnostics.md#sqlsrc007): rename it, give the nested class another name, or use `Direct`.  The members are described on [the generator page](generator.md).
+It is written `-- member-location:`, in the file header or inside a query, and `memberLocation` in a settings file, as `"memberLocation": "class"`.
+
+- **Each query has its own.**  A file may put some of its queries' members on the type, some in a nested class and some in the extension class, and two files of one type may place theirs differently.
+- **A value written in the file header or in a settings file reaches every query below it, whatever its output.**  `extension-class` on a query whose output is `sql` or `models` is [SQLSRC122](diagnostics.md#sqlsrc122), and its file gets no members and no models for the type until it is fixed, since a constant extends nothing.  So `"memberLocation": "ExtensionClass"` in a settings file is an error at every such query of its folder and the folders below it.  Write `-- member-location:` on the queries it does not fit, or leave it out: a query method goes to the extension class by default.
+- **The names a member cannot have**, and how the generated code is laid out, are on [the generator page](generator.md#locations).
+
+<a id="setting-visibility"></a>
+
+### Visibility
+
+```sql postgres
+-- visibility: internal
+
+-- name: GetUser -> one-optional
+-- member-location: class
+SELECT id, name FROM users WHERE id = @id;
+```
+
+The visibility says how visible the members of a query's member location are: `public`, `internal`, `protected` or `private`.  Above, `GetUser` is an `internal static` method of the type.  It is written `-- visibility:`, in the file header or inside a query, and `visibility` in a settings file.  Without one, a query takes the default of its member location, never of its output:
+
+| Member location | `visibility` sets | Default |
+|----|----|----|
+| `class` | Each constant, token method and query method on the type | `public` when the type and every type around it are `public`, and `internal` otherwise |
+| `nested-class` | The nested class's own accessibility.  Its members are always `public` inside it | `private` |
+| `extension-class` | Each query method's accessibility.  The class is `public` when one of the type's methods in it is, and `internal` otherwise | `internal` |
+
+- **A value written in the file header or in a settings file reaches every query below it**, as a member location does, and is [SQLSRC123](diagnostics.md#sqlsrc123) where it does not fit, which leaves its file without members and without models for the type until it is fixed.  A file of `sql` and `codegen` queries with `-- visibility: private` in its header gives its constants a private nested class, and its query methods, which go to the extension class, the error: write `-- visibility:` or `-- member-location:` on those queries.  [The generator page](generator.md#placement-for-a-file) shows such a file.
+- **What does not fit**: `private` or `protected` in the extension class, which a class that is not nested cannot be; `public` in the extension class of a type that is not `public` with every type around it, since the type's models are internal and such a method cannot take or return them; `public` or `protected` for a query method, on the type or for its nested class, when the type, or a type around it, is `protected` or `protected internal`, and none of them is `internal`, `private` or `private protected`, since a class derived from it in another assembly could call the method, and its models are internal; and `protected` where C# forbids it, on the type when it is a static class, a struct or a record struct, and for the nested class of a struct or a record struct.
+- **What fits, with no diagnostic**: `public` for members on a type that is `internal`, which are then internal in effect; `public` or `internal` for a nested class, which code outside the type then uses as `UserRepository.Sql.GetUser`; `protected` on a sealed class or record, which compiles with no warning from the generated code; a protected nested class in a static class; and, on a type that is `protected` or `protected internal`, or inside one, an `internal` or `private` query method or nested class, and constants and token methods of any visibility, which take no models.
+- **A nested class has one visibility.**  A query that writes none for its class takes the one that another query of the type writes for it, in any of the type's files.  Two queries that write two different ones are [SQLSRC124](diagnostics.md#sqlsrc124), and every file with a query in that class gets no members and no models for the type until it is fixed.  A query method that writes none is [SQLSRC123](diagnostics.md#sqlsrc123) when the visibility it takes does not fit it, which leaves its own file without members and models for the type, and not the file that wrote the visibility.
+- **The models do not follow it.**  A query's models are `public` or `internal` by the type that claims it, whatever the visibility of its members: see [accessibility](generator.md#model-accessibility).
 
 <a id="setting-nested-class"></a>
 
@@ -720,38 +766,30 @@ With `Nested`, a type that already has a member with the nested class's name is 
 }
 ```
 
+```sql postgres
+-- nested-class: Statements
+-- output: models
+
+-- name: GetUser
+SELECT id, name FROM users WHERE id = @id;
+```
+
 ```csharp
-// UserRepository.sql has -- output: models in its file header
-[SqlSourceGenerate(NestedClass = "Statements")]
+// UserRepository.cs, beside the UserRepository.sql above
+[SqlSourceGenerate]
 public partial class UserRepository
 {
     public string Get() => Statements.GetUser;
 }
 ```
 
-Under `SqlLocation.Nested`, this names the private class that holds the type's members, those of its queries whose output is `sql` or `models`.  `NestedClass` on the attribute names it for one type, and `nestedClass` in a settings file for each type that does not set it and whose C# file, the one that carries `[SqlSourceGenerate]`, is in the settings file's folder or a folder below it, the nearest such file winning.  Without either, the class is `Sql`.  The setting is read from the settings files of the type's C# file, not of its `.sql` files, and has no marker, since a type's queries can come from several files.
+This names the class nested in the type that holds a query's members when its [member location](#setting-member-location) is `nested-class`.  It is written `-- nested-class:`, in the file header or inside a query, and `nestedClass` in a settings file, and is `Sql` without one.  Above, the queries of the project are in a class `Queries`, and those of `UserRepository.sql` in `Statements`.
 
-The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute, and [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
-
-<a id="setting-method-location"></a>
-
-## Where the methods go
-
-```csharp
-[SqlSourceGenerate(MethodLocation = MethodLocation.Internal)]
-internal static partial class UserQueries;
-```
-
-`MethodLocation` is a property of the attribute and nothing else, as `SqlLocation` is.  It says where the [methods](generator.md#query-methods) that run the type's queries, those whose output is `codegen`, go.
-
-| `MethodLocation` | The methods are | Called as |
-|----|----|----|
-| `ExtensionClass` (the default) | In a generated static class beside the type, named after it with `Extensions` after it, as extension methods of `DbConnection` | `connection.GetUser(...)` |
-| `Public` | On the type, as public static methods | `UserQueries.GetUser(connection, ...)` |
-| `Internal` | On the type, as internal static methods | `UserQueries.GetUser(connection, ...)` |
-| `Private` | On the type, as private static methods | `GetUser(connection, ...)`, inside the type only |
-
-There is no settings file key or marker for it.  `methodLocation` in a settings file is [SQLSRC016](diagnostics.md#sqlsrc016), and `-- method-location:` in a `.sql` file is not read.  The class and its accessibility, and the names a method cannot have, are on [the generator page](generator.md#method-location).
+- **Each query has its own**, so one file can fill two classes, as `Users.Get` and `Orders.List`, and two files of one type can fill one.  A class is written only when a query of the type puts a member in it.
+- **It is a setting of the `.sql` file**, taken from the settings files of its folder and the folders above it, as every other setting is, and not from those of the type's C# file.  For a type that reads the file named for it beside its C# file, as it does without [`Source`](#setting-source), the two are the same folder.
+- **It is ignored where the member location is not `nested-class`**, so a `nestedClass` for a whole project beside a file whose queries go on the type is no error.
+- **The value is one C# identifier that is not a keyword**: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  Nor is `file`, `required`, `scoped` or `extension`, which C# does not take as a class's name, or `var`, with which the query methods of the type would not compile.  A name in lower case, such as `queries`, or `record`, is fine, and gives no compiler warning in the generated code.  A value that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.
+- **A type that already has the name**, as a member, a nested type or a type parameter, or as its own name, is [SQLSRC007](diagnostics.md#sqlsrc007), and every file with a query in that class gets no members and no models for it until it is fixed.  The other names its members cannot have are on [the generator page](generator.md#locations).
 
 <a id="setting-source"></a>
 
@@ -780,7 +818,7 @@ public partial class SharedQueries;
 - A `Source` that matches nothing is [SQLSRC004](diagnostics.md#sqlsrc004), and no file named for the type when there is no `Source` is [SQLSRC005](diagnostics.md#sqlsrc005).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
-This is separate from [which files the compiler is given](#included-files), which comes first: a type can only claim a file that the project includes.  The rest of the attribute is on [the generator page](generator.md).
+This is separate from [which files the compiler is given](#included-files), which comes first: a type can only claim a file that the project includes.  The attribute itself is on [the generator page](generator.md#attribute).
 
 <a id="configure-a-folder"></a>
 
@@ -811,7 +849,7 @@ Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the
 - The dialect is a value of its own too.  Had the project's file set `"mysql,ansi-quotes"` as its dialect, this folder would still be read as plain `mysql`.
 - A file's own marker still wins: a `-- generator: default` or a `-- dialect: mariadb` in one of the files overrides both settings files.  See [which place wins](#precedence).
 
-The file in `Legacy/` applies to the `.sql` files of its subfolders too, `Legacy/Reports/` among them, unless a settings file nearer to them sets the same setting.  It applies to a type, through the folder of the C# file that carries the type's attribute, only for the [nested class](#setting-nested-class): every other setting of a query comes from the settings files of its `.sql` file, whichever type claims it.
+The file in `Legacy/` applies to the `.sql` files of its subfolders too, `Legacy/Reports/` among them, unless a settings file nearer to them sets the same setting.  Every setting of a query comes from the settings files of its `.sql` file, whichever type claims it, and never from those of a type's C# file.
 
 Only the settings whose row in [the tables](#all-settings) lists a settings file can be given this way.  To change a setting for one file, write its marker in the file header, which wins over every settings file.
 
@@ -921,7 +959,6 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 **The settings files of a `.sql` file** are the `sqlsource.json` of its folder and those of each folder above it, to the top of the drive, nearest first.  For each setting the nearest that sets it wins, so a file in a folder sets only what differs from the folders above it; the entries of `typeOverrides`, `columnTypes` and `libraryTypes` add up instead, key by key, as [type overrides](#setting-type-overrides) says.  A file that says `"root": true` is the last: no `sqlsource.json` in a folder above it applies to the files below it.  Put one in the project's folder, or at the top of the repository, so that a settings file above it, elsewhere on the machine, never changes your build.  `"root": false`, or no `root`, lets the search go on.  A file whose text is not JSON ([SQLSRC015](diagnostics.md#sqlsrc015)) gives nothing, its `root` included, so the search goes past it to the folders above.
 
 - **A `.sql` file that the project lists from another folder**, outside the project's folder, takes the settings files of its own folder and the folders above it, not those of the project's folder.
-- **A type's [nested class](#setting-nested-class)** is the one setting taken from the settings files of a C# file: those of the folder of the C# file that carries `[SqlSourceGenerate]`.
 - **A settings file in a folder that holds no `.sql` file and no C# file of the project**, in it or in a folder below it, is not read, and applies to nothing.
 
 **Which files are checked.**  The build reads each settings file that the search of some `.sql` file or C# file of the project reaches, whether or not a type claims that `.sql` file, and reports each mistake in it at its file, line and column.  A `sqlsource.json` beyond the first `"root": true` is never read, so it cannot fail a build.  The C# files that the build writes itself, into its output and intermediate folders, reach no settings file, wherever those folders are, except in a build that names the project through a symbolic link while those folders are outside the project's folder and set by a relative path: see [known issues](#known-issues).  Nor do the C# files that a NuGet package adds to your project, as Polyfill does, from the folder where NuGet keeps its packages, so a broken `sqlsource.json` above that folder, in your home folder, say, is not read on their account.  Your own `.sql` and C# files still reach such a file when your project is in a folder below it, unless a `"root": true` stands between them, and its mistakes then fail the build and `sqlsource describe`: put `"root": true` in the settings file of your project's folder, or of your repository's.  A C# file that your project lists itself from another folder still reaches the settings files of its own folder.  A value that is wrong is not set by its file, so a farther settings file, or the default, gives the setting meanwhile.  The `sqlsource` tool reads the same settings files.  It reports the mistakes of [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC018](diagnostics.md#sqlsrc018) as the build does, and a value of `dialect`, `output` or `database` that is not valid, once in a run however many projects reach the file.  The build reports a value that is not valid for every key but `database`, which only the tool reads.
@@ -946,6 +983,7 @@ See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [S
   ```
 
   Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.  A build that [runs the tool](tool.md#running-in-the-build) describes such a file without it in a project with one target framework, and leaves it out, as `sqlsource` does, in a project with several.  In a project that is not of the .NET SDK, or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only it reaches, such as the one beside it, with no error; the same line fixes that too.
+- **A query method that takes no models can be refused as one that does.**  A `codegen` query with no parameters and no rows, such as `DELETE FROM users;`, gets [SQLSRC123](diagnostics.md#sqlsrc123) where a method that takes or returns models would not compile: `public` in the extension class of a type that is not public, and `public` or `protected` on a type that is `protected` or `protected internal`, or inside one.  Its method would compile.  Write `-- visibility: internal` on the query.  See [visibility](#setting-visibility).
 - **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
 - **A C# type that is generic can give its model a warning for a `?` inside a type argument**, in a type override, a column type or a `-- param:` marker.  A type argument written with a `?` where a constraint forbids null is [SQLSRC252](diagnostics.md#sqlsrc252) at the query, but a `?` inside a type argument is not.  An override such as `MyApp.Names<System.Collections.Generic.List<string?>>`, where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, is accepted, and the generated model gets the compiler's warning CS8631.  Give the type arguments the nullability that the constraints ask for.  See [type overrides](#setting-type-overrides).
 - **A type made by Vogen or StronglyTypedId needs converters written for it.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and never through a type's `Value` property and its `From` method or constructor, so such a type with no converter is given to the driver as it is, which throws `InvalidCastException`.  Write the two converters in a class of your project, each calling the type's own members:

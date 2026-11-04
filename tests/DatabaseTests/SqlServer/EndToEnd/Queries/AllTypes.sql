@@ -17,6 +17,7 @@ ORDER BY id;
 -- summary: ListAllTypes again, at the output models, whose constant the Dapper tests run.
 -- type-override: date = default
 -- output: models
+-- member-location: class
 SELECT *
 FROM dbo.all_types
 ORDER BY id;
@@ -48,6 +49,7 @@ VALUES (
 -- summary: InsertAllTypes again, at the output models, whose constant the Dapper tests run.
 -- type-override: date = default
 -- output: models
+-- member-location: class
 -- input-model: InsertAllTypesArgs
 INSERT INTO dbo.all_types (
     id,

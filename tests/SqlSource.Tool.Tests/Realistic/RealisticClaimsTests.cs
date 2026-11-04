@@ -36,7 +36,7 @@ public sealed class RealisticClaimsTests
 
     [Theory]
     [InlineData("Output = GeneratorOutput.CodeGen", "Output")]
-    [InlineData("SqlLocation = SqlLocation.Direct", "SqlLocation")]
+    [InlineData("Missing = 1", "Missing")]
     public void Parse_ClaimWithAnArgumentOtherThanSource_ThrowsNamingTheClassAndTheArgument(
         string argument,
         string name

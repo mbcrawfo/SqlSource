@@ -44,6 +44,10 @@ internal static class SettingsFileKeys
 
     public const string NestedClass = "nestedClass";
 
+    public const string MemberLocation = "memberLocation";
+
+    public const string Visibility = "visibility";
+
     /// <summary>
     /// The member of a column type written as an object that gives its C# type.  Not a key of the top level.
     /// </summary>
@@ -71,6 +75,8 @@ internal static class SettingsFileKeys
         ColumnTypes,
         LibraryTypes,
         NestedClass,
+        MemberLocation,
+        Visibility,
     ];
 
     /// <summary>Every key, in the order of the design's table.</summary>
@@ -91,7 +97,9 @@ internal static class SettingsFileKeys
             TypeOverrides,
             ColumnTypes,
             LibraryTypes,
-            NestedClass
+            NestedClass,
+            MemberLocation,
+            Visibility
         );
 
     /// <summary>The JSON type the value of a key must have.</summary>

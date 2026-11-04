@@ -140,6 +140,8 @@ public sealed class ListedSettingsFileTests
                 false
             },
             { SettingsFileKeys.NestedClass, "\"class\"", true, false },
+            { SettingsFileKeys.MemberLocation, "\"beside\"", true, false },
+            { SettingsFileKeys.Visibility, "\"friend\"", true, false },
         };
 
     [Theory]

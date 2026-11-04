@@ -3,8 +3,9 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
 // Each realistic case with models is claimed here once, with Source alone: its output, CodeGen, is the project's
 // sqlsource.json's, which gives the case its models and a generated method that runs its query.  The models are those
 // that the Dapper and method tests read, and the Dapper tests' SQL comes from RealisticGeneration, an in-process run at
-// Models.  A CodeGen query has no constant, so these classes set no SqlLocation.  RealisticClaimsTests fails on a case
-// with models that this file lacks, a class of a case without them, or a claim that sets more than Source.
+// Models.  A CodeGen query has no constant, and its method is an extension method of the connection.
+// RealisticClaimsTests fails on a case with models that this file lacks, a class of a case without them, or a claim
+// that sets more than Source.
 
 [SqlSourceGenerate(Source = "../Cases/activity-feed-union-all/query.sql")]
 internal static partial class ActivityFeedUnionAllMethod;

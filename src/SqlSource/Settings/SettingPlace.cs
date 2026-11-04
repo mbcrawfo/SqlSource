@@ -3,9 +3,6 @@ namespace SqlSource.Settings;
 /// <summary>The kind of place a setting was written in.</summary>
 internal enum SettingPlaceKind
 {
-    /// <summary>The attribute of a type.</summary>
-    Attribute,
-
     /// <summary>A marker of a file's header, before its first query.</summary>
     FileHeader,
 
@@ -28,9 +25,6 @@ internal enum SettingPlaceKind
 /// </param>
 internal readonly record struct SettingPlace(SettingPlaceKind Kind, string? Path, int Depth)
 {
-    /// <summary>The attribute of a type.</summary>
-    public static SettingPlace Attribute => new(SettingPlaceKind.Attribute, null, 0);
-
     /// <summary>A marker of a file's header, before its first query.</summary>
     public static SettingPlace FileHeader => new(SettingPlaceKind.FileHeader, null, 0);
 

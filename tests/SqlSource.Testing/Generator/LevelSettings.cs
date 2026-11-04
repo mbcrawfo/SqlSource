@@ -34,6 +34,12 @@ internal sealed record Setting(string Key, string Marker)
     public static readonly Setting GeneratorParameters = new("generatorParameters", "generator");
 
     public static readonly Setting TypeOverrides = new("typeOverrides", "type-override");
+
+    public static readonly Setting MemberLocation = new("memberLocation", "member-location");
+
+    public static readonly Setting Visibility = new("visibility", "visibility");
+
+    public static readonly Setting NestedClass = new("nestedClass", "nested-class");
 }
 
 // Settings, each at its level, and what a run is given for them: the project's settings, and the .sql file with its
