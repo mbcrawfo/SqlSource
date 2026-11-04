@@ -61,6 +61,15 @@ FROM notes AS n
 JOIN accounts AS a ON a.id = n.account_id
 ORDER BY n.id;
 
+-- name: ListNoteKindsForDapper
+-- summary: ListNoteKinds again, at the output models, whose constant the Dapper tests run.
+-- output: models
+-- output-model: ListNoteKindsDto
+SELECT n.kind, a.email
+FROM notes AS n
+JOIN accounts AS a ON a.id = n.account_id
+ORDER BY n.id;
+
 -- name: GetNoteByRef -> one
 -- summary: The note that a ref names, with its ref.
 -- A parameter compared with a column of a domain is described as the domain's base type, so the marker declares it as

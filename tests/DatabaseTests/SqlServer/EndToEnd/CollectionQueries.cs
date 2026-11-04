@@ -1,47 +1,14 @@
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// The collection type of each level that sets it, each class with its methods on itself, so that the claims of one file
-// do not give one extension method twice.  The files share the output model CollectedAccount.
+// The collection type of each level that sets it: the project's settings file, the file headers and a query's marker.
+// There is no attribute level here, since a file will give every claim the same settings.  Each file is claimed once,
+// with its methods on the type.  The files share the output model CollectedAccount.
 
-// The project's settings file, IReadOnlyList: neither the attribute, a header nor a marker sets one.
+// The project's settings file, IReadOnlyList: neither the attribute, a header nor a marker sets one.  The copies of
+// ListCollectedAccounts in the file, such as ListCollectedAccountsAsList, set theirs by a query's marker, and their
+// methods are on the type too.
 [SqlSourceGenerate(Source = "Queries/Collections/Claimed.sql", MethodLocation = MethodLocation.Public)]
 internal static partial class CollectionQueries;
-
-// The attribute's, over the project's settings file.
-[SqlSourceGenerate(
-    Source = "Queries/Collections/Claimed.sql",
-    MethodLocation = MethodLocation.Public,
-    CollectionType = GeneratorCollectionType.IEnumerable
-)]
-internal static partial class EnumerableCollectionQueries;
-
-[SqlSourceGenerate(
-    Source = "Queries/Collections/Claimed.sql",
-    MethodLocation = MethodLocation.Public,
-    CollectionType = GeneratorCollectionType.ICollection
-)]
-internal static partial class CollectionInterfaceCollectionQueries;
-
-[SqlSourceGenerate(
-    Source = "Queries/Collections/Claimed.sql",
-    MethodLocation = MethodLocation.Public,
-    CollectionType = GeneratorCollectionType.IReadOnlyCollection
-)]
-internal static partial class ReadOnlyCollectionQueries;
-
-[SqlSourceGenerate(
-    Source = "Queries/Collections/Claimed.sql",
-    MethodLocation = MethodLocation.Public,
-    CollectionType = GeneratorCollectionType.List
-)]
-internal static partial class ListCollectionQueries;
-
-[SqlSourceGenerate(
-    Source = "Queries/Collections/Claimed.sql",
-    MethodLocation = MethodLocation.Public,
-    CollectionType = GeneratorCollectionType.ImmutableList
-)]
-internal static partial class ImmutableListCollectionQueries;
 
 // The file header of ByMetadata.sql, ImmutableArray, over the project's settings file.
 [SqlSourceGenerate(Source = "Queries/Collections/ByMetadata.sql", MethodLocation = MethodLocation.Public)]

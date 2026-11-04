@@ -110,8 +110,8 @@ public sealed class DapperRecipeTests(PostgresDatabases postgres)
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(token);
-        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes)).Single(static row =>
-            row.Id == AllTypesRows.FullRowId
+        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypesForDapper)).Single(
+            static row => row.Id == AllTypesRows.FullRowId
         );
         var value = typeof(AllTypesDto).GetProperty(property).ShouldNotBeNull(property).GetValue(full);
         var column = ModelReflection.ColumnOf(property);
@@ -179,7 +179,7 @@ public sealed class DapperRecipeTests(PostgresDatabases postgres)
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 
-        var kinds = await connection.QueryAsync<ListNoteKindsDto>(NoteSql.ListNoteKinds);
+        var kinds = await connection.QueryAsync<ListNoteKindsDto>(NoteQueries.ListNoteKindsForDapper);
 
         kinds.ShouldBe([
             new ListNoteKindsDto(NoteKind.Call, new Email("alice@example.com")),

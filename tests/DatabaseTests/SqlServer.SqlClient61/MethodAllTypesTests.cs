@@ -10,11 +10,11 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.SqlClient61;
 
-// Every type of the type map written through a parameter of a generated method and read back through a column of one
-// on SqlClient 6.1, by the methods of AllTypesMethodQueries and NewTypesMethodQueries, as the end-to-end project proves
-// them on SqlClient 7: the seed's rows written again as the row InsertedId, each in a transaction that is rolled back,
-// a rowversion in a WHERE, a C# enum over byte, json and vector, and the null of a vector that its column says cannot
-// be null.  The container is SQL Server 2025, which has json and vector.
+// Every type of the type map written through a parameter of a generated method and read back through a column of one on
+// SqlClient 6.1, by the methods of AllTypesQueriesExtensions and NewTypesQueriesExtensions, as the end-to-end project
+// proves them on SqlClient 7: the seed's rows written again as the row InsertedId, each in a transaction that is rolled
+// back, a rowversion in a WHERE, a C# enum over byte, json and vector, and the null of a vector that its column says
+// cannot be null.  The container is SQL Server 2025, which has json and vector.
 [Collection(UsesApp.Name)]
 public sealed class MethodAllTypesTests(AppContainer app)
 {

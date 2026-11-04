@@ -6,7 +6,7 @@
 - **`JsonQueryTests` and `Types/` are copies of the end-to-end project's `EndToEnd/Json/JsonQueryTests.cs` and `EndToEnd/Json/Types/`**, in this project's namespaces, for the same reason: a change to one changes the other.
 - **It references nothing that brings Microsoft.Data.SqlClient 7**, neither the tool, `tests/SqlSource.Tool.Testing` nor `tests/DatabaseTests/SqlServer`, since a reference to 6.1 under 7 is a package downgrade ([why](../README.md#the-sqlclient-61-project)).
 - **It links `AllTypes.sql`, `NewTypes.sql`, `Streaming.sql` and their sidecars from `tests/DatabaseTests/SqlServer/EndToEnd/Queries/`, `NodaTime.sql`, `NodaTimeOverrides.sql` and their sidecars from `EndToEnd/NodaTime/Queries/`, `NetTopologySuite.sql`, `NetTopologySuiteOverrides.sql` and their sidecars from `EndToEnd/NetTopologySuite/Queries/`, and `Json.sql`, `JsonColumns.sql` and their sidecars from `EndToEnd/Json/Queries/`, and commits none of its own, nor a `sqlsource.json`.**  The linked files take the settings of their own folder, the end-to-end project's, so a setting changed there changes this project's models and methods.
-- **Its two claims at `models` name that output on their attribute**, since the end-to-end project's is `CodeGen`.
+- **It claims each linked file once, and `AllTypes.sql` and `NewTypes.sql` with `SqlLocation.Direct`**, so that Dapper reads by the constants of their `ForDapper` copies, and the methods of their `codegen` queries are in `<Type>Extensions`.
 - **A type that a query of those files names by a type override is in `tests/DatabaseTests/TestHarness`**, as `Level` is.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

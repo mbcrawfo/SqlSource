@@ -52,7 +52,7 @@ public sealed class AllTypesQueryTests(AppContainer app)
         await using var source = SqlClientFactory.Instance.CreateDataSource(app.ConnectionString);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).ToList();
+        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypesForDapper)).ToList();
 
         rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullRow(rows[0]);
@@ -65,7 +65,7 @@ public sealed class AllTypesQueryTests(AppContainer app)
         await using var source = SqlClientFactory.Instance.CreateDataSource(app.ConnectionString);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypesQueries.ListNewTypes)).ToList();
+        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypesQueries.ListNewTypesForDapper)).ToList();
 
         rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullNewTypesRow(rows[0]);

@@ -13,9 +13,42 @@ SELECT *
 FROM dbo.all_types
 ORDER BY id;
 
+-- name: ListAllTypesForDapper
+-- summary: ListAllTypes again, at the output models, whose constant the Dapper tests run.
+-- type-override: date = default
+-- output: models
+SELECT *
+FROM dbo.all_types
+ORDER BY id;
+
 -- name: InsertAllTypes
 -- summary: Inserts a row of all_types with a parameter for each column that Dapper can send, and returns it.
 -- type-override: date = default
+INSERT INTO dbo.all_types (
+    id,
+    bigint_value, int_value, smallint_value, tinyint_value, bit_value, decimal_value, numeric_value, money_value,
+    smallmoney_value, float_value, real_value,
+    date_value, datetime_value, smalldatetime_value, time_value, datetimeoffset_value,
+    char_value, varchar_value, text_value, nchar_value, nvarchar_value, ntext_value, xml_value,
+    binary_value, varbinary_value, image_value,
+    uniqueidentifier_value, sql_variant_value, sysname_value
+)
+OUTPUT INSERTED.*
+VALUES (
+    @id,
+    @bigintValue, @intValue, @smallintValue, @tinyintValue, @bitValue, @decimalValue, @numericValue, @moneyValue,
+    @smallmoneyValue, @floatValue, @realValue,
+    @dateValue, @datetimeValue, @smalldatetimeValue, @timeValue, @datetimeoffsetValue,
+    @charValue, @varcharValue, @textValue, @ncharValue, @nvarcharValue, @ntextValue, @xmlValue,
+    @binaryValue, @varbinaryValue, @imageValue,
+    @uniqueidentifierValue, @sqlVariantValue, @sysnameValue
+);
+
+-- name: InsertAllTypesForDapper
+-- summary: InsertAllTypes again, at the output models, whose constant the Dapper tests run.
+-- type-override: date = default
+-- output: models
+-- input-model: InsertAllTypesArgs
 INSERT INTO dbo.all_types (
     id,
     bigint_value, int_value, smallint_value, tinyint_value, bit_value, decimal_value, numeric_value, money_value,
