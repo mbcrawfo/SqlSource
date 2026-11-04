@@ -929,7 +929,7 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 SELECT * FROM {{class}};
 ```
 
-The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members for that type.
+The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members and no models for that type.
 
 Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
@@ -1090,7 +1090,7 @@ A comment stands inside a token's braces before its default: between `{{` and th
 SELECT id FROM {{table/* users or archive */}};
 ```
 
-The second and third are errors only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
+The second and third are errors only for a type that keeps the query's comments, and that type gets no members and no models from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
 
 See: [Defaults](parameters-and-tokens.md#token-defaults)
 
