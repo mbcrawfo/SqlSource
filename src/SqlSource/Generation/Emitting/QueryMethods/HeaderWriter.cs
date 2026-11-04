@@ -44,6 +44,7 @@ internal static class HeaderWriter
                 ResultShape.OneOptional => "The row, or null when there is none.",
                 ResultShape.RowCount => "The number of rows the query affected.",
                 ResultShape.None => "A task that completes when the query has run.",
+                _ => throw UnexpectedEnumValueException.Of(method.Shape),
             }
         );
         if (method.Shape == ResultShape.One)
@@ -87,6 +88,7 @@ internal static class HeaderWriter
             MethodAccessibility.Public => "public static",
             MethodAccessibility.Internal => "internal static",
             MethodAccessibility.Private => "private static",
+            _ => throw UnexpectedEnumValueException.Of(accessibility),
         };
 
     // The receiver and the input are refused when null, and under validate-tokens each token's text when it is null
@@ -103,6 +105,7 @@ internal static class HeaderWriter
                     ? "global::System.ArgumentException.ThrowIfNullOrWhiteSpace("
                     : null,
                 ArgumentRole.Transaction or ArgumentRole.CommandTimeout or ArgumentRole.Cancellation => null,
+                _ => throw UnexpectedEnumValueException.Of(argument.Role),
             };
             if (check is not null)
             {

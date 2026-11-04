@@ -152,7 +152,7 @@ internal static class SidecarStore
                     // The run did not look at this sidecar: nothing is changed, and nothing is said.
                     break;
                 default:
-                    throw new InvalidOperationException($"Unknown action {outcome.Action}.");
+                    throw UnexpectedEnumValueException.Of(outcome.Action);
             }
         }
     }

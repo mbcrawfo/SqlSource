@@ -372,7 +372,7 @@ internal sealed class WatchSession
             FileChangeKind.Deleted => change.Path,
             FileChangeKind.Renamed => change.OldPath,
             FileChangeKind.Changed or FileChangeKind.Created => null,
-            _ => throw new ArgumentOutOfRangeException(nameof(change), change.Kind, "Not a kind of change."),
+            _ => throw UnexpectedEnumValueException.Of(change.Kind),
         };
         var stale = removed is null
             ? []

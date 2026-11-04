@@ -29,5 +29,6 @@ internal static class SettingsFileSides
                 is SettingsFileKeys.Dialect
                     or SettingsFileKeys.Output
                     or SettingsFileKeys.Database,
+            _ => throw UnexpectedEnumValueException.Of(side),
         };
 }

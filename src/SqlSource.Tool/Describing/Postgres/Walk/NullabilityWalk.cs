@@ -300,7 +300,7 @@ internal static partial class NullabilityWalk
             // The catalog's answer, by ColumnNullability's rule for a query that is not gated.
             Resolution.Preserved => ColumnNullability.Of(origin, gated: false),
             Resolution.Unknown or Resolution.NoCandidate => ColumnNullability.Of(origin, gated: true),
-            _ => throw new InvalidOperationException($"Unknown resolution {resolved}."),
+            _ => throw UnexpectedEnumValueException.Of(resolved),
         };
 
         var mapped = resolved is Resolution.Preserved or Resolution.Extended;
@@ -428,7 +428,7 @@ internal static partial class NullabilityWalk
                     && string.Equals(instance.Relation, origin.Table.Name, StringComparison.Ordinal),
                 InstanceKind.Partitioned => instance.Parents.Contains(origin.Table.Oid),
                 InstanceKind.Plan => true,
-                _ => throw new InvalidOperationException($"Unknown kind {instance.Kind}."),
+                _ => throw UnexpectedEnumValueException.Of(instance.Kind),
             };
             if (
                 !named

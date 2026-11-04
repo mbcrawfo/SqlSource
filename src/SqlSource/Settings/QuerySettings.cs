@@ -91,6 +91,7 @@ internal readonly record struct QuerySettings(
                     markers.SqlServerTypeOverrides,
                     file.SqlServerTypeOverrides
                 ),
+                _ => throw UnexpectedEnumValueException.Of(engine),
             }
         ) ?? EquatableArray<TypeOverride>.Empty;
 

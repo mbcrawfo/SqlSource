@@ -18,5 +18,6 @@ internal readonly record struct MethodHost(MethodAccessibility Accessibility, bo
             MethodPlacement.Public => new MethodHost(MethodAccessibility.Public, IsExtension: false),
             MethodPlacement.Internal => new MethodHost(MethodAccessibility.Internal, IsExtension: false),
             MethodPlacement.Private => new MethodHost(MethodAccessibility.Private, IsExtension: false),
+            _ => throw UnexpectedEnumValueException.Of(placement),
         };
 }

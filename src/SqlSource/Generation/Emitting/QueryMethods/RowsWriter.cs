@@ -227,6 +227,7 @@ internal static class RowsWriter
             ResultShape.OneOptional => context.Method.Output!.TypeText + "?",
             ResultShape.RowCount => "int",
             ResultShape.None => null,
+            _ => throw UnexpectedEnumValueException.Of(context.Method.Shape),
         };
 
     private static string GetCollectionType(CollectionKind collection, string row) =>
@@ -243,6 +244,7 @@ internal static class RowsWriter
             CollectionKind.ImmutableList => "global::System.Collections.Immutable.ImmutableList<" + row + ">",
             CollectionKind.IAsyncEnumerable => "global::System.Collections.Generic.IAsyncEnumerable<" + row + ">",
             CollectionKind.IImmutableList => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
+            _ => throw UnexpectedEnumValueException.Of(collection),
         };
 
     // The buffer the rows are read into, and the expression that gives the collection from it.
@@ -265,6 +267,7 @@ internal static class RowsWriter
                 or CollectionKind.ImmutableList
                 or CollectionKind.IImmutableList
                 or CollectionKind.IAsyncEnumerable => ".ToArray()",
+                _ => throw UnexpectedEnumValueException.Of(method.Collection),
             };
             return ("new " + RowBuffer.TypeText + "<" + row + ">()", rows + toResult);
         }
@@ -293,6 +296,7 @@ internal static class RowsWriter
                 "new global::System.Collections.Generic.List<" + row + ">()",
                 rows + ".ToArray()"
             ),
+            _ => throw UnexpectedEnumValueException.Of(method.Collection),
         };
     }
 }

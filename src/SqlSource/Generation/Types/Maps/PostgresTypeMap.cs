@@ -104,6 +104,7 @@ internal static class PostgresTypeMap
                 TextType
             ),
             PostgresTypeKind.Base or PostgresTypeKind.Composite => TypeMapping.Failed(TypeMappingKind.Unreadable, key),
+            _ => throw UnexpectedEnumValueException.Of(kind),
         };
     }
 

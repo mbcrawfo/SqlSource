@@ -121,11 +121,12 @@ internal sealed class NpgsqlRunLogger(IRunLog log) : ILoggerFactory
                 LogLevel.Warning => "warning",
                 LogLevel.Error => "error",
                 LogLevel.Critical => "critical",
-                LogLevel.Trace or LogLevel.None or _ => throw new ArgumentOutOfRangeException(
+                LogLevel.Trace or LogLevel.None => throw new ArgumentOutOfRangeException(
                     nameof(level),
                     level,
                     "Not a level that is forwarded."
                 ),
+                _ => throw UnexpectedEnumValueException.Of(level),
             };
     }
 

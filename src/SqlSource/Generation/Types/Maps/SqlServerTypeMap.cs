@@ -217,6 +217,7 @@ internal static class SqlServerTypeMap
             SqlClientColumn.OlderThan61 => 1,
             SqlClientColumn.SqlClient61 => 2,
             SqlClientColumn.SqlClient7 => 3,
+            _ => throw UnexpectedEnumValueException.Of(column),
         };
 
     /// <summary>A row of the map.</summary>
@@ -271,6 +272,7 @@ internal static class SqlServerTypeMap
                 SqlClientColumn.SqlClient61 => "6.1",
                 SqlClientColumn.SqlClient7 => "7.0",
                 SqlClientColumn.OlderThan61 or SqlClientColumn.None => string.Empty,
+                _ => throw UnexpectedEnumValueException.Of(column),
             };
     }
 }

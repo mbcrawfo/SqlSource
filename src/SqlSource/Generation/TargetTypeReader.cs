@@ -267,6 +267,7 @@ internal static class TargetTypeReader
                 SettingId.ColumnTypes => null,
                 SettingId.LibraryTypes => null,
                 SettingId.NestedClass => AttributeSource.NestedClassProperty,
+                _ => throw UnexpectedEnumValueException.Of(setting),
             };
     }
 

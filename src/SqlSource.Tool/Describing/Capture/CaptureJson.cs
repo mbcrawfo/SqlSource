@@ -194,6 +194,7 @@ internal static class CaptureJson
             case JsonValueKind.Null:
                 break;
             default:
+                // JsonValueKind is the runtime's, which a newer runtime may extend; a kind it adds holds no string.
                 break;
         }
     }

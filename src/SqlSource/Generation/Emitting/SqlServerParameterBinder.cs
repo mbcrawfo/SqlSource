@@ -86,6 +86,7 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
                 {
                     ConversionKind.Converter or ConversionKind.Serializer => DbNull,
                     ConversionKind.Spatial => SqlBytesNull,
+                    _ => throw UnexpectedEnumValueException.Of(write.Kind),
                 }
                 : DbNull;
             AppendValueOrNull(context, bound, nullText);
@@ -157,8 +158,9 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
             case Facet.None:
             case Facet.Scale7:
             case Facet.Max:
-            default:
                 return true;
+            default:
+                throw UnexpectedEnumValueException.Of(kind);
         }
     }
 
@@ -228,8 +230,9 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
                 break;
             case Facet.None:
             case Facet.Vector:
-            default:
                 break;
+            default:
+                throw UnexpectedEnumValueException.Of(kind);
         }
     }
 
