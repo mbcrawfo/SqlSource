@@ -10,7 +10,6 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tool.Planning;
 
@@ -19,24 +18,19 @@ namespace SqlSource.Tool.Planning;
 /// symbols, and the tool has no compilation, so there is nothing of it to share.
 /// </summary>
 /// <remarks>
-/// It matches the attribute by its name and reads <c>Source</c> and <c>Output</c> alone, each as it is written, and
-/// the type's name, which names its file when there is no <c>Source</c>: nothing else on the attribute changes what is
-/// described.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>: an alias, a type of the same name in another
-/// namespace, and an attribute inside <c>#if</c> under a configuration other than the manifest's.  A <c>Source</c>
-/// outside ASCII in a file that is not UTF-8 is not read, nor a type's name outside ASCII when there is no
-/// <c>Source</c>: on Windows the compiler reads that file in the system's code page, so the text here would not be the
-/// text it resolves.
+/// It matches the attribute by its name and reads <c>Source</c> alone, as it is written, and the type's name, which
+/// names its file when there is no <c>Source</c>: nothing else on the attribute changes what is described, and any
+/// other argument, literal or not, is stepped over.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>: an alias,
+/// a type of the same name in another namespace, and an attribute inside <c>#if</c> under a configuration other than
+/// the manifest's.  A <c>Source</c> outside ASCII in a file that is not UTF-8 is not read, nor a type's name outside
+/// ASCII when there is no <c>Source</c>: on Windows the compiler reads that file in the system's code page, so the text
+/// here would not be the text it resolves.
 /// </remarks>
 internal static class AttributeReader
 {
     private const string ShortName = "SqlSourceGenerate";
 
     private const string LongName = "SqlSourceGenerateAttribute";
-
-    // The generator's attribute no longer has these; the tool reads them until it reads Source alone.
-    private const string OutputProperty = "Output";
-
-    private const string OutputType = "GeneratorOutput";
 
     public static ProjectClaims Read(ProjectManifest manifest, CancellationToken cancellationToken)
     {
@@ -112,9 +106,7 @@ internal static class AttributeReader
     )
     {
         string? typeSource = null;
-        OutputKind? output = null;
         var readSource = false;
-        var readOutput = false;
         var isRead = true;
         if (attribute.ArgumentList is { } list)
         {
@@ -128,7 +120,14 @@ internal static class AttributeReader
                     if (!TryReadSource(argument.Expression, out typeSource))
                     {
                         isRead = false;
-                        errors.Add(NotALiteral(path, argument.Expression, AttributeSource.SourceProperty));
+                        errors.Add(
+                            ToolDiagnostic.At(
+                                ToolDiagnostics.AttributeArgumentNotLiteral,
+                                path,
+                                StartOf(argument.Expression),
+                                AttributeSource.SourceProperty
+                            )
+                        );
                     }
                     // By how it is written: an escape such as \u00e9 is ASCII in the file, so it reads the same.
                     else if (compilerFallsBack && argument.Expression.ToString().Any(static c => c > '\u007F'))
@@ -137,15 +136,6 @@ internal static class AttributeReader
                         errors.Add(
                             ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, path, StartOf(argument.Expression), path)
                         );
-                    }
-                }
-                else if (name == OutputProperty && !readOutput)
-                {
-                    readOutput = true;
-                    if (!TryReadOutput(argument.Expression, out output))
-                    {
-                        isRead = false;
-                        errors.Add(NotALiteral(path, argument.Expression, OutputProperty));
                     }
                 }
             }
@@ -162,7 +152,7 @@ internal static class AttributeReader
         // A claim that could not be read is not planned: its files may be described for another type.
         if (isRead)
         {
-            claims.Add(new TypeClaim(path, identifier.ValueText, typeSource, output, StartOf(attribute)));
+            claims.Add(new TypeClaim(path, identifier.ValueText, typeSource, StartOf(attribute)));
         }
     }
 
@@ -182,40 +172,15 @@ internal static class AttributeReader
             || expression.IsKind(SyntaxKind.DefaultLiteralExpression);
     }
 
-    // A member of GeneratorOutput, GeneratorOutput.Models for one, however GeneratorOutput is qualified.  A name
-    // that is no member of it is not set: the compiler rejects it.
-    private static bool TryReadOutput(ExpressionSyntax expression, out OutputKind? output)
-    {
-        output = null;
-        if (
-            expression is not MemberAccessExpressionSyntax access
-            || !access.IsKind(SyntaxKind.SimpleMemberAccessExpression)
-            || LastIdentifier(access.Expression) != OutputType
-        )
-        {
-            return false;
-        }
-
-        // An identifier is never a number or a list, the two other things Enum.TryParse reads.
-        output = Enum.TryParse<OutputKind>(access.Name.Identifier.ValueText, ignoreCase: false, out var member)
-            ? member
-            : null;
-        return true;
-    }
-
-    // The last identifier of a name, however it is qualified: as the name of an attribute, or as an expression.
-    private static string? LastIdentifier(ExpressionSyntax name) =>
+    // The last identifier of an attribute's name, however it is qualified.
+    private static string? LastIdentifier(NameSyntax name) =>
         name switch
         {
             IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
             QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
             AliasQualifiedNameSyntax alias => alias.Name.Identifier.ValueText,
-            MemberAccessExpressionSyntax access => access.Name.Identifier.ValueText,
             _ => null,
         };
-
-    private static ToolDiagnostic NotALiteral(string path, ExpressionSyntax expression, string argument) =>
-        ToolDiagnostic.At(ToolDiagnostics.AttributeArgumentNotLiteral, path, StartOf(expression), argument);
 
     private static LinePosition StartOf(SyntaxNode node) => node.GetLocation().GetLineSpan().StartLinePosition;
 

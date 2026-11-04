@@ -8,6 +8,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Chains;
+using SqlSource.Generation.Sidecars;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
@@ -18,11 +19,11 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tool.Tests.Planning;
 
-// The plan must agree with the generator on which type claims which file with which output: a query the tool does
-// not describe is a build error, SQLSRC241, and one it describes for nothing costs a description.  The generator
-// reads symbols and the tool reads syntax, so each case runs both over the same sources and file list and compares
-// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text.  The
-// errors of the settings files, SQLSRC015 to SQLSRC020, are compared the same way, where the two reach the same
+// The plan must agree with the generator on which type claims which file, and on which of its queries need an entry: a
+// query the tool does not describe is a build error, SQLSRC241, and one it describes for nothing costs a description.
+// The generator reads symbols and the tool reads syntax, so each case runs both over the same sources and file list and
+// compares what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text.
+// The errors of the settings files, SQLSRC015 to SQLSRC020, are compared the same way, where the two reach the same
 // files.
 public sealed class GeneratorParityTests : IDisposable
 {
@@ -376,6 +377,51 @@ public sealed class GeneratorParityTests : IDisposable
         expected.Length.ShouldBe(types);
     }
 
+    // Two types claim one file, and its header gives the output, so the two sides agree on which of its queries need
+    // an entry: none under sql, and each under models.
+    [Theory]
+    [InlineData("sql")]
+    [InlineData("models")]
+    public void TwoClaims_OfOneFile_DescribeWhatItsHeaderSays(string output)
+    {
+        var project = new TestProject(_folder) { LangVersion = "12.0" };
+        project.Settings["dialect"] = "postgres";
+        const string First = Using + "[SqlSourceGenerate(Source = \"Q\")]\ninternal partial class A;\n";
+        const string Second = Using + "[SqlSourceGenerate(Source = \"Q/One.sql\")]\ninternal partial class B;\n";
+        SourceFile[] sources =
+        [
+            new(project.AddSource("A.cs", First), First),
+            new(project.AddSource("B.cs", Second), Second),
+        ];
+        var text = "-- output: " + output + "\n\n-- name: Find\nSELECT 1;\n";
+        var sql = new SqlFile(project.AddSql("Q/One.sql", text), text);
+
+        var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
+        var settings = GeneratorHarness.SettingsFile(project.SettingsPath, File.ReadAllText(project.SettingsPath));
+        var run = GeneratorHarness.Run(null, sources, [sql, settings]);
+
+        string[] expected =
+        [
+            .. StepOutputs
+                .Of<EquatableArray<FileNeeds>>(run, TrackingNames.FileNeeds)
+                .SelectMany(files => files)
+                .SelectMany(file => file.Queries)
+                .Select(query => query.Name),
+        ];
+        string[] actual =
+        [
+            .. plan
+                .Plan.Files.SelectMany(file => file.Queries)
+                .Where(query => query.NeedsEntry)
+                .Select(query => query.Query.Name),
+        ];
+
+        // Both types claim the file, or the case would prove nothing of two claims.
+        plan.Plan.Files.ShouldHaveSingleItem().Claims.Count.ShouldBe(2);
+        actual.ShouldBe(expected);
+        expected.ShouldBe(output == "sql" ? [] : ["Find"]);
+    }
+
     [Theory]
     [MemberData(nameof(ErrorCaseNames))]
     public void Errors_OfTheSameSourcesAndFiles_AreTheGeneratorsSqlsrc209And210(string name)
@@ -524,8 +570,7 @@ public sealed class GeneratorParityTests : IDisposable
                 .ThenBy(error => error.Message, StringComparer.Ordinal),
         ];
 
-    // What the generator's own step gives for each attributed type.  The output is left unset, as the tool's side
-    // writes no settings file.
+    // What the generator's own step gives for each attributed type.
     private static Claimed[] FromGenerator(SourceFile[] sources, string[] sqlFiles, string[] constants)
     {
         var options = GeneratorHarness.ParseOptions.WithPreprocessorSymbols(constants);
@@ -552,7 +597,6 @@ public sealed class GeneratorParityTests : IDisposable
                     type.Type.AttributeLocation.LineSpan.Start.Line,
                     type.Type.Name,
                     type.Type.Source,
-                    type.Type.Settings.Output?.ToString(),
                     string.Join('|', type.Files)
                 ))
         );
@@ -570,7 +614,6 @@ public sealed class GeneratorParityTests : IDisposable
                 claim.Position.Line,
                 claim.TypeName,
                 claim.Source,
-                claim.Output?.ToString(),
                 string.Join('|', listed.ClaimedBy(claim))
             ))
         );
@@ -579,16 +622,9 @@ public sealed class GeneratorParityTests : IDisposable
     private static Claimed[] Ordered(IEnumerable<Claimed> claims) =>
         [.. claims.OrderBy(claim => claim.SourcePath, StringComparer.Ordinal).ThenBy(claim => claim.Line)];
 
-    // One type as each side sees it: the file and the line of its attribute, the type's name, what the attribute sets,
-    // and the .sql files it claims, in member order.
-    private sealed record Claimed(
-        string SourcePath,
-        int Line,
-        string Name,
-        string? Source,
-        string? Output,
-        string Files
-    );
+    // One type as each side sees it: the file and the line of its attribute, the type's name, its Source, and the .sql
+    // files it claims, in member order.
+    private sealed record Claimed(string SourcePath, int Line, string Name, string? Source, string Files);
 
     private sealed record ErrorCase(string Dialect, OutputKind Output, (string Path, string Text)[] SqlFiles);
 

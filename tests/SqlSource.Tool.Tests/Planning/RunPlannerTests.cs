@@ -33,10 +33,8 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_ExampleOfTheSpec_HasThreeQueriesWithTheirValues()
     {
         var project = Postgres();
-        _ = project.AddSource(
-            "Queries.cs",
-            Plans.TypeNamed("Queries", "Source = \"Queries\", Output = SqlSource.GeneratorOutput.Models")
-        );
+        project.Settings["output"] = "models";
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Queries\""));
         var sql = project.AddSql(
             "Queries/Users.sql",
             """
