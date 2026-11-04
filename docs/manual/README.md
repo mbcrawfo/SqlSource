@@ -30,6 +30,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Have the build describe my queries, or keep it from doing so | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
 | Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](tool.md#connections), [a `.env` file](tool.md#env-file), or the [recipe](recipes.md#use-several-databases) |
 | Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |
+| Set up git for the sidecars, or mend a merge conflict in one | [Sidecars in git](tool.md#sidecars-in-git) |
 | Describe each query as I save it, and have my editor start that | [Describe on save](tool.md#describe-on-save), [what your editor shows](tool.md#what-your-editor-shows), or the [recipe](recipes.md#start-the-watcher-with-your-editor) |
 | Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
 | Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |

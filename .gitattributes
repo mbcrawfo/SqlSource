@@ -12,7 +12,8 @@
 *.slnx text eol=lf
 
 # A sidecar is compared byte for byte with what the writer gives, which uses LF
-*.sql.json text eol=lf
+# It is marked generated, as the manual tells users to do, so that GitHub collapses its diff
+*.sql.json text eol=lf linguist-generated=true
 schemas/*.json text eol=lf
 
 # The golden corpus is compared byte for byte with what the generator writes, at LF

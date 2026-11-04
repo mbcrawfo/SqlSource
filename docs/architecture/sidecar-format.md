@@ -97,7 +97,7 @@ Reading several versions would be possible later, since the version is read firs
 What the tool does, in `RunDecisions` and `FileOutcomes`:
 
 - An entry is current when its `hash` is the query's, its `database` is the query's ignoring case, and its file was written in this format by this tool, `PackageVersion.Prefix` (`SidecarEntry.IsCurrentFor`, `Sidecar.IsWrittenBy`).  `describe` describes every query that has no current entry, so a new version of the tool describes every query again on its first run; `--check` describes every query.
-- A file is written when every query in it that needs an entry was described in this run or has a current entry, and is otherwise left as it was, so an entry from an older tool never stands beside a new one.
+- A file is written when every query in it that needs an entry was described in this run or has a current entry, and is otherwise left as it was, so a run never leaves an entry from an older tool beside a new one.  A git merge can: the version is the file's, so a merge of a branch that updated the tool with one that described a query on the older tool keeps that entry under the new version, unseen by the build and by `describe` (TD-0100).
 - A file of a higher `formatVersion` is a newer tool's: a run that writes reports `SQLSRC221` and leaves it as it is.
 
 ## What `--check` compares
