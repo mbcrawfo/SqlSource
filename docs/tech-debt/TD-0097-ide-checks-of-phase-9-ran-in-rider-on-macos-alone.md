@@ -8,7 +8,7 @@ What the design says of those IDEs is therefore what their documentation and sou
 
 - that Visual Studio and VS Code, in their default "Balanced" generator mode, show a sidecar another process wrote only at the next save or build, and in "Automatic" mode when it is written;
 - that the guard `'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' == 'true'` keeps the online run out of Visual Studio's and VS Code's loading and design-time builds while a build from the IDE runs it (Roslyn's BuildHost, behind VS Code's C# tooling, was run from the command line and was kept out; the IDE was not);
-- that the VS Code task starts on folder open, and its problem matcher shows each one-line error and clears it at the next pass;
+- that the VS Code task of the manual's recipe starts on folder open, and its problem matcher shows the first line of each error, leaves out the lines under it, and clears the error at the next pass;
 - which `FileSystemWatcher` events a save from VS Code and from Visual Studio raises, on macOS and on Windows.
 
 ## Why it exists
@@ -17,13 +17,13 @@ The owner ran the checklist on the machine and IDE at hand and chose, on 2026-11
 
 ## Impact
 
-Sub-phases 9.3 and 9.4 build the watcher and write the manual's recipes and "what each IDE shows" from statements that are unverified outside Rider on macOS.  If one is wrong, the manual tells a Visual Studio or VS Code user something their IDE does not do, such as that a saved file refreshes the models, and the VS Code recipe may not show or clear its problems.
+The watcher of sub-phase 9.3, and the manual's recipes and "what each IDE shows" of sub-phase 9.4, rest on statements that are unverified outside Rider on macOS; the manual says so as a known issue of its page on the tool.  If one is wrong, the manual tells a Visual Studio or VS Code user something their IDE does not do, such as that a saved file refreshes the models, and the VS Code recipe may not show or clear its problems.
 
 ## Proposed fix
 
 Run the procedure below in each IDE and on each system that its tables leave blank, write the answers into the tables of [the spike's checklist](../superpowers/specs/2026-11-02-query-generation-phase-9-spike.md#the-owners-checklist), and correct the design, the recipes and the manual where an answer differs.  Then delete this item.
 
-The procedure needs no database: the sample's sidecars are written in advance, and a tool of the sample writes them from a process of its own, as the watcher will.
+The procedure needs no database but for the VS Code task, which runs the manual's recipe in a project of your own: the sample's sidecars are written in advance, and a tool of the sample writes them from a process of its own, as the watcher does.
 
 ### Setting up
 
@@ -53,14 +53,15 @@ The sample's `Directory.Build.targets` has `SpikeProbe`, with no condition, whic
 
 ### The VS Code task
 
-`.vscode/tasks.json` runs `tools/watcher.cs`, a stand-in for `describe --watch` that checks `Queries/*.sql` every 300 ms and after each change prints `sqlsource: change detected; describing`, then, for each file with a line holding `-- BROKEN`, `<path>(<line>,1): error SQLSRC999: stand-in error for the spike; detail: the file says BROKEN; see: https://example.invalid/sqlsrc999`, then `sqlsource: watching for changes; press Ctrl+C to stop`.
+This check runs [the recipe](../manual/recipes.md#start-the-watcher-with-your-editor) as a user gets it, in a project of your own and not in the sample, which has no VS Code task: the stand-in task it once held ran a stand-in of the watcher, served no other check, and would leave the recipe itself unchecked.  The project references the `SqlSource` package, has the tool in its tool manifest at the package's version, restored, and a `.env` file with a connection to a database that its queries describe against.  Run `dotnet sqlsource describe` in its folder and see it report no error.
 
-1. Open the sample's folder in VS Code.  Record whether it asks to trust the folder and to allow automatic tasks, with the questions' exact words, and allow.
-2. Does the terminal `sqlsource watch (stand-in)` start by itself?
-3. Add `-- BROKEN` as line 2 of `Queries/Count.sql` and save.  Does `SQLSRC999` appear in the Problems panel at line 2, with its whole text?
-4. Remove the line and save.  Does the problem go?
-5. Close and reopen the folder: does the task start again without asking?
-6. In a copy of the folder that VS Code does not trust: does the task start?
+1. Copy the `jsonc` block of the recipe, unchanged, into `.vscode/tasks.json` of the folder that holds the solution or the project.
+2. Open that folder in VS Code.  Record whether it asks to trust the folder and to allow automatic tasks, with the questions' exact words, and allow.
+3. Does the terminal `sqlsource watch` start by itself, and print the summary and `sqlsource: watching for changes; press Ctrl+C to stop`?
+4. In a `.sql` file, change a query's table to one that does not exist, and save.  Does `SQLSRC225` appear in the Problems panel at the query's line and column, with the text of the error's first line, and does none of the lines under it, such as `server:` or `see:`, appear as a problem of its own?
+5. Put the table back and save.  Does the problem go when the pass ends?
+6. Close and reopen the folder: does the task start again without asking?
+7. In a copy of the folder that VS Code does not trust: does the task start?
 
 ### The events of a save
 
@@ -80,7 +81,7 @@ mkdir -p "$1" && cd "$1" && feed="$(cd "$2" && winpwd)"
 # A packages folder of the sample's own, beside it, so that a package packed again with the same version is restored
 # from the feed and not from the user's cache of an earlier pack.
 mkdir -p "$(pwd)-packages" && packages="$(cd "$(pwd)-packages" && winpwd)"
-mkdir -p Queries tools/sidecars .vscode
+mkdir -p Queries tools/sidecars
 cat >nuget.config <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -200,53 +201,6 @@ switch (args.Length == 1 ? args[0] : "")
 }
 return 0;
 SAMPLE_EOF
-cat >tools/watcher.cs <<'SAMPLE_EOF'
-// A stand-in for "dotnet sqlsource describe --watch": it describes nothing.  It polls the .sql files of Queries
-// every 300 ms and, after a pass, prints the two markers of the design and, for each file that holds "-- BROKEN",
-// one error in the one-line form.  Run from the sample's folder: dotnet run --file tools/watcher.cs
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-
-const string Begin = "sqlsource: change detected; describing";
-const string End = "sqlsource: watching for changes; press Ctrl+C to stop";
-
-Dictionary<string, DateTime> Snapshot() =>
-    Directory.GetFiles("Queries", "*.sql").ToDictionary(Path.GetFullPath, File.GetLastWriteTimeUtc);
-
-void Pass()
-{
-    foreach (var file in Directory.GetFiles("Queries", "*.sql").Select(Path.GetFullPath).Order())
-    {
-        var lines = File.ReadAllLines(file);
-        var at = Array.FindIndex(lines, line => line.Contains("-- BROKEN"));
-        if (at >= 0)
-        {
-            Console.WriteLine(
-                $"{file}({at + 1},1): error SQLSRC999: stand-in error for the spike; detail: the file says BROKEN; see: https://example.invalid/sqlsrc999"
-            );
-        }
-    }
-    Console.WriteLine($"postgres (postgres): stand-in pass at {DateTime.Now:HH:mm:ss.fff}");
-    Console.WriteLine(End);
-}
-
-Pass();
-var last = Snapshot();
-while (true)
-{
-    Thread.Sleep(300);
-    var now = Snapshot();
-    if (now.Count != last.Count || now.Any(pair => !last.TryGetValue(pair.Key, out var time) || time != pair.Value))
-    {
-        Console.WriteLine(Begin);
-        Pass();
-        last = now;
-    }
-}
-SAMPLE_EOF
 cat >tools/events.cs <<'SAMPLE_EOF'
 // Prints every event FileSystemWatcher raises under the sample's folder, but obj and bin, with the time.  Run from
 // the sample's folder, then save Queries/Users.sql from the editor: dotnet run --file tools/events.cs
@@ -280,39 +234,6 @@ watcher.EnableRaisingEvents = true;
 Console.WriteLine($"watching {watcher.Path}; press Ctrl+C to stop");
 System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite);
 SAMPLE_EOF
-cat >.vscode/tasks.json <<'SAMPLE_EOF'
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "sqlsource watch (stand-in)",
-      "type": "shell",
-      "command": "dotnet run --file tools/watcher.cs",
-      "isBackground": true,
-      "runOptions": { "runOn": "folderOpen" },
-      "presentation": { "reveal": "silent", "panel": "dedicated" },
-      "problemMatcher": {
-        "owner": "sqlsource",
-        "fileLocation": "absolute",
-        "pattern": {
-          "regexp": "^(.+)\\((\\d+),(\\d+)\\): (error|warning) (SQLSRC\\d+): (.*)$",
-          "file": 1,
-          "line": 2,
-          "column": 3,
-          "severity": 4,
-          "code": 5,
-          "message": 6
-        },
-        "background": {
-          "activeBegin": true,
-          "beginsPattern": "^sqlsource: change detected; describing$",
-          "endsPattern": "^sqlsource: watching for changes; press Ctrl\\+C to stop$"
-        }
-      }
-    }
-  ]
-}
-SAMPLE_EOF
 cat >tools/sidecars/Users.a.sql.json <<'SAMPLE_EOF'
 {"_WARNING":"This file was generated by the 'dotnet sqlsource' tool.  Do not edit by hand; use the tool to regenerate it.","$schema":"https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json","formatVersion":1,"toolVersion":"0.1.0","queries":{"GetUser":{"hash":"295bdef9619ec0c0710c713894fb719e895cb9a5447d294d1f4a214cd7c67d2a","engine":"postgres","database":"postgres","serverVersion":"18.6","resultKind":"rows","matchesTable":{"schema":"public","table":"users"},"plan":"not-needed","tableMatch":"matched","parameters":[{"name":"id","ordinal":0,"type":{"name":"integer","bindName":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":null,"typeSource":"inferred"}],"columns":[{"ordinal":0,"name":"id","type":{"name":"integer","kind":"base","schema":"pg_catalog","internalName":"int4"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"id"},"identity":false,"computed":false},{"ordinal":1,"name":"name","type":{"name":"text","kind":"base","schema":"pg_catalog","internalName":"text"},"nullable":false,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"name"},"identity":false,"computed":false},{"ordinal":2,"name":"email","type":{"name":"text","kind":"base","schema":"pg_catalog","internalName":"text"},"nullable":true,"nullableSource":"catalog","origin":{"schema":"public","table":"users","column":"email"},"identity":false,"computed":false}]}}}
 SAMPLE_EOF
@@ -335,4 +256,4 @@ echo "sample written to $(pwd); open it in the IDE, or run: dotnet build"
 
 ## Trigger
 
-Before sub-phase 9.4 writes the manual's recipes and what each IDE shows, or when a user reports that one of them does not do what the manual says.  If 9.4 ships with this item open, the manual's page on the tool says, as a known issue, which IDEs the statements were checked in.
+When Visual Studio, VS Code, or Rider on another system, is at hand to run the procedure, or when a user reports that a recipe of [starting the watcher with your editor](../manual/recipes.md#start-the-watcher-with-your-editor), or [what your editor shows](../manual/tool.md#what-your-editor-shows), does not do what the manual says.  The manual's page on the tool says, as a known issue, that Visual Studio and VS Code were not checked; the change that closes this item removes it.

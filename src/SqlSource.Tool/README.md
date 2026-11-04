@@ -33,7 +33,7 @@ $ dotnet sqlsource describe --watch
 - `describe` describes each query that is new or changed since its sidecar was written, and writes the sidecars.
 - `describe --force` describes every query again: run it after a change to the database's schema.
 - `describe --check` writes nothing, and fails when a sidecar is out of date: run it on a build server.
-- `describe --watch` describes again each time you save a `.sql` file or another file of your project, until you stop it with Ctrl+C: leave it running while you work.
+- `describe --watch` describes again each time you save a `.sql` file or another file of your project, until you stop it with Ctrl+C: leave it running while you work, or have your editor start it, as [describe on save](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#describe-on-save) says.
 
 On a machine with that `.env` file, or `SQLSOURCE_CONNECTION` in the environment, `dotnet build` runs `describe` itself before it compiles, and reports a query the database rejects as a build error at the query; a build in CI never does: see [running in the build](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#running-in-the-build).
 

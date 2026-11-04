@@ -11,7 +11,7 @@
 ## Keeping them current
 
 2. **The sidecars are written by `tools/describe-end-to-end.sh`, never by hand.**  Run it after a change to a query or to a project's `schema.sql`, and read its diff.
-3. **A project sets no `database`.**  Its queries belong to the default logical database of its dialect, `postgres` or `mssql`, so a run has one database: the README's `SQLSOURCE_CONNECTION` and the connection `postgres=` or `mssql=` in `tools/describe-end-to-end.sh` both depend on it.
+3. **A project sets no `database`.**  Its queries belong to the default logical database of its dialect, `postgres` or `mssql`, so a run has one database: the README's `SQLSOURCE_CONNECTION`, the same line in `.env.example`, and the connection `postgres=` or `mssql=` in `tools/describe-end-to-end.sh` all depend on it.
 4. **`schema.sql` names no owner, role or database.**  The Compose file and the script each run it in a database of their own, PostgreSQL's Compose file as its own user and the script as `postgres`, SQL Server's both as `sa` in a database `examples`, and both must give the sidecars the same answer.  SQL Server's Compose file applies it from a second service, with `sqlcmd -I` and `-d examples`, only when it creates the database.
 7. **Each README's links to the manual are relative.**  It is not a packed readme.
 

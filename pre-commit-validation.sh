@@ -101,13 +101,14 @@ scope_of() {
     scope=both
 }
 
-# A path that can change what is packed or how the packages are checked.  README.md is the generator's readme.  Every
-# .props and .targets file at the root counts, since MSBuild imports the Directory.Build files and
-# Directory.Packages.props on its own, and any of them can import another.
+# A path that can change what is packed or how the packages are checked.  README.md is the generator's readme, and
+# tools/check-package-install.sh copies the example's Users.sql and its sidecar.  Every .props and .targets file at the
+# root counts, since MSBuild imports the Directory.Build files and Directory.Packages.props on its own, and any of them
+# can import another.
 needs_packages() {
     packages=false
     case "$1" in
-    src/* | tools/package-install/* | tools/check-*.sh) packages=true ;;
+    src/* | tools/package-install/* | tools/check-*.sh | examples/PostgresExamples/Models/Users.sql*) packages=true ;;
     */*) ;;
     *.props | *.targets | global.json | *.slnx | dotnet-tools.json | README.md) packages=true ;;
     esac
