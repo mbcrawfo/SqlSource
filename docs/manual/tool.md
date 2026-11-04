@@ -149,7 +149,7 @@ Rider shows each sidecar under its `.sql` file, with nothing to set.  To show ea
 }
 ```
 
-**Never edit a sidecar by hand.**  The tool writes it whole.  To change what a sidecar says, change the query or the schema and run `describe` again.  A sidecar with a merge conflict is no exception: run `describe` after the merge, and it writes the file again.
+**Never edit a sidecar by hand.**  The tool writes it whole.  To change what a sidecar says, change the query or the schema and run `describe` again.  A sidecar with a merge conflict is no exception: see [sidecars in git](#sidecars-in-git).
 
 To keep the sidecars current:
 
@@ -162,6 +162,19 @@ To keep the sidecars current:
 | On a build server, to catch a sidecar that someone forgot | `dotnet sqlsource describe --check`: see [check in CI](#check-in-ci) |
 
 The build tells you when a sidecar is not current.  A query without an entry is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since its entry was written is [SQLSRC244](diagnostics.md#sqlsrc244).  An entry that names no query that must be described is the warning [SQLSRC245](diagnostics.md#sqlsrc245), and a sidecar that another version of the tool wrote the warning [SQLSRC240](diagnostics.md#sqlsrc240).  Each of the first three goes away when you run `describe` and commit what it writes.  SQLSRC240 goes away once the tool and the `SqlSource` package have one version and `describe` has run with that tool.  A sidecar with a merge conflict in it is [SQLSRC237](diagnostics.md#sqlsrc237).
+
+<a id="sidecars-in-git"></a>
+
+### Sidecars in git
+
+```text
+# .gitattributes
+*.sql.json linguist-generated=true
+```
+
+This line in the `.gitattributes` file at the root of your repository marks the sidecars as generated, so that GitHub collapses them in the diff of a pull request.  Give them no other rule.  Git merges two branches that changed one sidecar as it merges any text, and that is safe: the build knows which version of each query an entry was written for, so an entry that a merge leaves older than its query is [SQLSRC244](diagnostics.md#sqlsrc244) until `describe` writes it again.  A rule that stops git merging sidecars, such as `-merge` or `binary`, would turn every sidecar that both branches changed into a conflict, and would keep one side's file whole, losing what the other side's `describe --force` wrote after a schema change.
+
+**After a merge conflict in a sidecar**, leave the conflict in the file and run `dotnet sqlsource describe`.  A sidecar with a conflict in it cannot be read, so the tool describes every query of its file again and writes the file whole: commit what it writes.  Until then the build reports [SQLSRC237](diagnostics.md#sqlsrc237).  If you have already taken one side of the conflict, run `dotnet sqlsource describe --force` on that `.sql` file instead, such as `dotnet sqlsource describe --force Queries/Users.sql`: the side you took may hold entries written before a schema change that the other side described, and plain `describe` keeps an entry whose query has not changed.  Both need a [connection](#connections) to the database.
 
 The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), for the curious.  Nothing in this manual depends on it.
 
