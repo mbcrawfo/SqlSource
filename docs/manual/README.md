@@ -30,6 +30,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](tool.md#connections), [a `.env` file](tool.md#env-file), or the [recipe](recipes.md#use-several-databases) |
 | Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |
 | Describe each query as I save it | [Describe on save](tool.md#describe-on-save) |
+| Refresh the sidecars as I save, from my editor | [Describe on save](tool.md#describe-on-save), [what your editor shows](tool.md#what-your-editor-shows), or the [recipe](recipes.md#start-the-watcher-with-your-editor) |
 | Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
 | Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |
 | Know what the tool needs of my database | [PostgreSQL](postgresql.md#connecting), [SQL Server](sqlserver.md#connecting) |
@@ -66,6 +67,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
 | Connections in a `.env` file | Available | [Connections](tool.md#connections) |
 | Describing on save with `describe --watch` | Available | [Describe on save](tool.md#describe-on-save) |
+| Starting the watcher with your editor: VS Code, Rider and Visual Studio | Available | [The recipe](recipes.md#start-the-watcher-with-your-editor) |
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
 | The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available | [Types](postgresql.md#type-map) |

@@ -7,6 +7,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Use several databases](#use-several-databases)
 - [Check the sidecars in CI](#check-sidecars-in-ci)
 - [Describe again after a schema change](#after-a-migration)
+- [Start the watcher with your editor](#start-the-watcher-with-your-editor)
 - [Run queries in a transaction](#queries-in-a-transaction)
 - [Give an id a type of its own](#strongly-typed-id)
 - [Read a class of your own from a JSON column](#class-in-a-json-column)
@@ -181,6 +182,64 @@ $ git commit -m "Describe the queries again after the migration"
 ```
 
 Rules: [after a schema change](tool.md#after-a-schema-change), [describing again](tool.md#describing-again).
+
+<a id="start-the-watcher-with-your-editor"></a>
+
+## Start the watcher with your editor
+
+Have your editor start `dotnet sqlsource describe --watch` for you, so the sidecars stay current as you save.  The rules are in [describe on save](tool.md#describe-on-save), and what your editor does with a sidecar the watch writes is in [what your editor shows](tool.md#what-your-editor-shows).
+
+### VS Code
+
+```jsonc
+// .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "sqlsource watch",
+      "type": "shell",
+      "command": "dotnet sqlsource describe --watch",
+      "isBackground": true,
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": { "reveal": "silent", "panel": "dedicated" },
+      "problemMatcher": {
+        "owner": "sqlsource",
+        "source": "sqlsource",
+        "fileLocation": ["autoDetect", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(?!sqlsource )(\\S.*?)(?:\\((\\d+),(\\d+)\\))?\\s?: (error|warning) (SQLSRC\\d+): (.*)$",
+          "file": 1, "line": 2, "column": 3, "severity": 4, "code": 5, "message": 6
+        },
+        "background": {
+          "activeBegin": true,
+          "beginsPattern": "^sqlsource: change detected; describing$",
+          "endsPattern": "^sqlsource: watching for changes; press Ctrl\\+C to stop$"
+        }
+      }
+    }
+  ]
+}
+```
+
+- **It starts when you open the folder.**  VS Code asks once whether to allow automatic tasks in the folder, and never runs one in a folder it does not trust.  The watch runs in a terminal panel of its own.
+- **Each error the watch reports is listed in the Problems panel**, at the query's place in its `.sql` file, from the error's first line; the lines under it, such as `see:`, stay in the terminal.
+- **Open the folder that holds your solution or project.**  If you open a folder above it, add `"options": { "cwd": "${workspaceFolder}/src/App" }` to the task, with the path of that folder.
+
+This recipe has not been checked in VS Code.
+
+### Rider
+
+1. **Run > Edit Configurations**, add a **Shell Script** configuration, choose **Script text** and give it `dotnet sqlsource describe --watch`, with the solution's folder as its working directory.
+2. **Settings > Tools > Startup Tasks**, add that configuration.
+
+The watch then starts when the solution opens, in a terminal pane, where the path of each error is a link to its file and line.  Checked in Rider 2026.2 on macOS.
+
+### Visual Studio
+
+Open **View > Terminal**, the Developer PowerShell, and run `dotnet sqlsource describe --watch` in the solution's folder.  It runs until you stop it with Ctrl+C or close the terminal.  This has not been checked in Visual Studio.
+
+Rules: [describe on save](tool.md#describe-on-save), [what your editor shows](tool.md#what-your-editor-shows).
 
 <a id="queries-in-a-transaction"></a>
 
