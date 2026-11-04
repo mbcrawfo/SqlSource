@@ -1,8 +1,8 @@
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
 // The collection type of each level that sets it: the project's settings file, the file headers and a query's marker.
-// There is no attribute level, since a file gives every claim the same settings.  Each file is claimed once, with its
-// methods on the type.  The files share the output model CollectedAccount.
+// There is no attribute level here, since a file will give every claim the same settings.  Each file is claimed once,
+// with its methods on the type.  The files share the output model CollectedAccount.
 
 // The project's settings file, IReadOnlyList: neither the attribute, a header nor a marker sets one.  The copies of
 // ListCollectedAccounts in the file, such as ListCollectedAccountsAsList, set theirs by a query's marker, and their

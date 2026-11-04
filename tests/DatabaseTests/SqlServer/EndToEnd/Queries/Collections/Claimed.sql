@@ -1,9 +1,8 @@
--- The query of the collection types, claimed by a class of CollectionQueries.cs for each of the attribute and of the
--- project's settings file, which the query says none of itself, and the copies of the query, one for each collection
--- type, which each say theirs by its marker.
+-- The query of the collection types, claimed by CollectionQueries alone, which sets none, so that the query takes the
+-- project's settings file's, and its copies, one for each collection type, which each set theirs by its marker.
 
 -- name: ListCollectedAccounts
--- summary: The id and name of every account, in the collection type of the class that claims it.
+-- summary: The id and name of every account, in the collection type of the project's settings file.
 -- output-model: CollectedAccount
 SELECT id, name
 FROM dbo.accounts

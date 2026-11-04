@@ -7,9 +7,11 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
 // A copy of a query in its file, such as SearchAccountsUnpooled of Queries/Shapes.sql, is the query again under one
 // setting, for a test that needs the two apart: the allocation tests of tests/DatabaseTests/QueryMethodAllocation send
-// both through one hand-written SQL.  A query's hash is of its SQL alone, and the project does not build while an
-// entry's hash is not its query's, so the committed entries of the two have one hash as long as the two queries have
-// one SQL.  No server is needed.
+// both through one hand-written SQL, the Dapper tests run the constants of the ForDapper copies, and the method tests
+// call the copies of a collection type or a suffix.  A query's hash is of its SQL, its declared parameters and its
+// tokens' defaults, and the project does not build while an entry's hash is not its query's, so the committed entries
+// of the two have one hash as long as the two queries have one SQL and one declaration of their parameters.  No server
+// is needed.
 public sealed class VariantCopyTests
 {
     [Theory]
