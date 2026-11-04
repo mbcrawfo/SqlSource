@@ -605,6 +605,30 @@ public sealed class SidecarTests
         ]);
     }
 
+    // Two types claim one file, whose query needs an entry: the error is reported once.
+    [Fact]
+    public void Run_TwoTypesThatNeedOneEntry_ReportItOnce()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(Source = \".\")]\n"
+                        + "public partial class First;\n\n"
+                        + "[SqlSourceGenerate(Source = \".\")]\npublic partial class Second;\n"
+                ),
+            ],
+            [GeneratorHarness.UsersFile],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'models' needs one.  Run 'sqlsource describe'.",
+        ]);
+    }
+
     // A type with an error of its own gets no code, but the tool describes its files all the same, so what it needs
     // counts: its entry is no orphan, and a missing one is reported.
     [Fact]

@@ -40,7 +40,10 @@ public sealed class ArrayPoolParameterTests
     // Removed with the attribute level in Task 3.
     [InlineData(On, On, On, Default, null, true)]
     [InlineData(null, null, null, On, null, false)]
+    [InlineData(Default, Other, null, On, null, false)]
+    [InlineData(On, On, null, Default, null, true)]
     [InlineData(null, null, null, On, Other, true)]
+    [InlineData(On, On, null, On, Default, true)]
     // Removed with the attribute level in Task 3.
     [InlineData(On, On, On, On, Default, true)]
     [InlineData(null, null, null, Default, On, false)]

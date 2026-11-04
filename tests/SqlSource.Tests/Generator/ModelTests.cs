@@ -841,6 +841,25 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["Other.GetUserDto-Model.g.cs"]);
     }
 
+    // A keyword in braces in a comment that the file's header keeps is SQLSRC114, and the file gets no models.
+    [Fact]
+    public void Run_FileExcludedByAnErrorInAKeptComment_GetsNoModels()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: keep-comments\n\n-- name: GetUser\nSELECT 1 AS one; -- {{class}}\n"
+        );
+
+        var run = Run(file, Entry(file, "GetUser", [], [Column("one")]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC114 {GeneratorHarness.UsersPath}(4,21)-(4,30): The token name 'class' is a reserved C# keyword",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Run_RecordWithAnArrayColumn_HasAPrivateConstructorWithoutParameters()
     {

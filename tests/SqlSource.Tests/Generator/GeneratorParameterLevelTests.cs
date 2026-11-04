@@ -55,6 +55,7 @@ public sealed class GeneratorParameterLevelTests
     // Removed with the attribute level in Task 3.
     [InlineData(Default, Other, On, null, null)]
     [InlineData(null, null, null, On, null)]
+    [InlineData(Default, Other, null, On, null)]
     [InlineData(null, null, null, Default, On)]
     public void Run_GeneratorParametersWhoseMostSpecificListKeepsComments_KeepTheComment(
         string? projectFile,
@@ -78,6 +79,8 @@ public sealed class GeneratorParameterLevelTests
     [InlineData(null, null, null, null, null)]
     [InlineData(On, Default, null, null, null)]
     [InlineData(On, Other, null, null, null)]
+    [InlineData(On, On, null, Default, null)]
+    [InlineData(On, On, null, On, Default)]
     // Removed with the attribute level in Task 3.
     [InlineData(Other, On, Default, null, null)]
     // Removed with the attribute level in Task 3.
@@ -222,6 +225,49 @@ public sealed class GeneratorParameterLevelTests
         run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
     }
 
+    // A keyword in braces in a kept comment is SQLSRC114 wherever the list that keeps comments is given, and the file
+    // then gives no members.
+    [Theory]
+    [InlineData(SettingLevel.ProjectFile, "(2,13)-(2,22)")]
+    [InlineData(SettingLevel.FolderFile, "(2,13)-(2,22)")]
+    [InlineData(SettingLevel.Header, "(4,13)-(4,22)")]
+    public void Run_ReservedTokenInAKeptComment_IsReportedAndTheFileGivesNoMembers(SettingLevel level, string place)
+    {
+        var run = RunKeepingCommentsAt(level, ReservedTokenInAComment);
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC114 /app/Repo/Q.sql" + place + ": The token name 'class' is a reserved C# keyword",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("string Q");
+    }
+
+    // The token and the comment overlap, so with the comments kept the query reads other tokens: the comment opens a
+    // default that the SQL closes, or stands in a token's head.  It is SQLSRC120 where the project's settings file
+    // keeps comments, and the file then gives no members.
+    [Theory]
+    [InlineData(DefaultOpenedInAComment, "(2,10)-(2,30)", "note")]
+    [InlineData(CommentInATokensHead, "(2,18)-(2,25)", "t")]
+    public void Run_TokenThatCrossesAKeptComment_IsReportedAndTheFileGivesNoMembers(
+        string sql,
+        string place,
+        string token
+    )
+    {
+        var run = RunKeepingCommentsAt(SettingLevel.ProjectFile, sql);
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC120 /app/Repo/Q.sql"
+                + place
+                + ": Token '"
+                + token
+                + "' and a comment overlap, so the token is read differently where comments are kept.  Keep a comment "
+                + "wholly inside the token's default, or outside the token.",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("string Q");
+    }
+
     // No level may keep comments, so the form with them is not built, and the keyword in the comment is never
     // scanned.
     [Fact]
@@ -288,6 +334,23 @@ public sealed class GeneratorParameterLevelTests
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources["App.Plain.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
         run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
+    }
+
+    // The file Q.sql of this text at sql, claimed by Sample alone, under keep-comments given at the level.
+    private static GeneratorRun RunKeepingCommentsAt(SettingLevel level, string sql)
+    {
+        var settings = new LevelSettings().At(
+            level,
+            Setting.GeneratorParameters,
+            LevelSettings.WordsAt(level, "keep-comments")
+        );
+
+        return GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            settings.Files(new SqlFile("/app/Repo/Q.sql", sql)),
+            settings: settings.ProjectSettings
+        );
     }
 
     // The file of Sample for a query ListFrom with a token and a kept comment, with each level's generator parameters
