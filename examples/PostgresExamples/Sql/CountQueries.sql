@@ -1,5 +1,6 @@
--- The queries of Sql/: their output is sql, set by the attribute of CountQueries, so each is only its SQL, a constant
--- or a method, and needs no description, no sidecar and no connection.
+-- The queries of Sql/: their output is sql, set by the marker below, so each is only its SQL, a constant or a method,
+-- and needs no description, no sidecar and no connection.
+-- output: sql
 
 -- name: CountUsers
 -- summary: The number of users.

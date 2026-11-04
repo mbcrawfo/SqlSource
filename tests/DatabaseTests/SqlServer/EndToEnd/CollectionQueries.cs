@@ -4,7 +4,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // There is no attribute level here, since a file will give every claim the same settings.  Each file is claimed once,
 // with its methods on the type.  The files share the output model CollectedAccount.
 
-// The project's settings file, IReadOnlyList: neither the attribute, a header nor a marker sets one.  The copies of
+// The project's settings file, IReadOnlyList: neither a header nor a marker sets one.  The copies of
 // ListCollectedAccounts in the file, such as ListCollectedAccountsAsList, set theirs by a query's marker, and their
 // methods are on the type too.
 [SqlSourceGenerate(Source = "Queries/Collections/Claimed.sql", MethodLocation = MethodLocation.Public)]

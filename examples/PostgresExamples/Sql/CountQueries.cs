@@ -5,10 +5,10 @@ using SqlSource;
 
 namespace PostgresExamples.Sql;
 
-// The output sql, for the queries of CountQueries.sql, the file named for the class: Counts.CountUsers is a constant,
-// and Counts.CountRows a method that fills in its token.  NestedClass names the class that holds them, which is Sql by
-// default.
-[SqlSourceGenerate(Output = GeneratorOutput.Sql, NestedClass = "Counts")]
+// The output sql, which the header of CountQueries.sql, the file named for the class, sets: Counts.CountUsers is a
+// constant, and Counts.CountRows a method that fills in its token.  NestedClass names the class that holds them, which
+// is Sql by default.
+[SqlSourceGenerate(NestedClass = "Counts")]
 public sealed partial class CountQueries(DbConnection connection)
 {
     public Task<long> CountUsersAsync() => connection.ExecuteScalarAsync<long>(Counts.CountUsers);

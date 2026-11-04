@@ -1,4 +1,4 @@
--- The queries of the orders.  Their output is models, set by the attribute of StoreQueries, so each gets a model of
+-- The queries of the orders.  Their output is models, set by this folder's sqlsource.json, so each gets a model of
 -- its parameters and one of its rows, from its entry in Orders.sql.json.  The parameters are in camelCase, which Dapper
 -- binds to the properties of the input model.
 
