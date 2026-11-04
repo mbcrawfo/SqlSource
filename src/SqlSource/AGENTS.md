@@ -13,7 +13,6 @@ The generator runs inside its consumers' C# compiler, which limits what the proj
 - **A change to a hot path states its time and allocation, before and after, in its pull request**, from a `Stopwatch` loop over a `Release` build.
 - **Do not reference `System.Memory`, `System.Buffers` or `System.Collections.Immutable` directly.**  They come with Roslyn at the versions the compiler host loads; a newer one can fail to load.
 - **Keep package references private**, with `PrivateAssets="all"`, so nothing flows to the projects that reference the generator.
-- **A switch expression over an enum names every member, with no `_ =>` arm**, so a new member is CS8509 at each switch; nothing catches a discard yet (TD-0096).  Every `DatabaseEngine` decision is one: see [adding an engine](../../docs/architecture/generator.md#adding-a-database-engine).
 
 ## The pipeline
 

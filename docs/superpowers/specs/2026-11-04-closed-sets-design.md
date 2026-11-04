@@ -4,7 +4,7 @@
 
 When a new database, a new setting value or any other new enum member is added, no code may quietly take a default branch and do the wrong thing, where only a test would notice.  The build fails at each decision the new member needs, and a value that is no member at all fails loudly at run time.
 
-The earlier [query-method emission refactor](2026-10-30-query-method-emission-refactor-design.md), PR 2, made `DatabaseEngine` a closed set in the generator by forbidding discard arms.  This work replaces that rule with one that the built-in analyzers enforce, resolves [TD-0096](../../tech-debt/TD-0096-no-check-keeps-a-catch-all-out-of-an-enum-switch.md) that way, and closes the places no switch over an enum reaches: per-engine fields, the sidecar's type records, the tool's describer registry, and `if` checks on an enum.
+The earlier [query-method emission refactor](2026-10-30-query-method-emission-refactor-design.md), PR 2, made `DatabaseEngine` a closed set in the generator by forbidding discard arms.  This work replaces that rule with one that the built-in analyzers enforce, resolves TD-0096 that way, and closes the places no switch over an enum reaches: per-engine fields, the sidecar's type records, the tool's describer registry, and `if` checks on an enum.
 
 What we found in the tool: no tool code names an engine outside `Describing/Postgres/` and `Describing/SqlServer/`, except the registration in `ToolHost.Create`.  Its gaps are the registry, filled at run time, and its discard arms.
 
