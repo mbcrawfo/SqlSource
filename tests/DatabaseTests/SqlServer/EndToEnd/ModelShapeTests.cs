@@ -459,14 +459,15 @@ public sealed class ModelShapeTests
             .ShouldBe(["GetInvoice", "ListInvoices"]);
     }
 
-    // A claim at the output models with a direct location has the constants on the type, which the Dapper tests run.
+    // A query at the output models, on a claim with a direct location, has its constant on the type, which the Dapper
+    // tests run.
     [Fact]
-    public void Build_ModelsClaimWithADirectLocation_HasTheConstantsOnTheType()
+    public void Build_ModelsCopiesWithADirectLocation_HaveTheConstantsOnTheType()
     {
-        AllTypesDapperQueries.ListAllTypes.ShouldBe("SELECT *\nFROM dbo.all_types\nORDER BY id;");
-        WriteDapperQueries.RenameAccount.ShouldBe(
-            "UPDATE dbo.accounts\nSET name = @name\nOUTPUT DELETED.name AS old_name, INSERTED.name AS new_name\n"
-                + "WHERE id = @accountId;"
+        AllTypesQueries.ListAllTypesForDapper.ShouldBe("SELECT *\nFROM dbo.all_types\nORDER BY id;");
+        WriteQueries.AddNoteForDapper.ShouldBe(
+            "INSERT INTO dbo.notes (account_id, kind, body, written_at)\nOUTPUT INSERTED.id, INSERTED.kind\n"
+                + "VALUES (@accountId, @kind, @body, @writtenAt);"
         );
     }
 
