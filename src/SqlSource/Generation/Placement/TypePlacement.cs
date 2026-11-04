@@ -394,6 +394,7 @@ internal sealed class TypePlacement
                         SqlDiagnostics.MemberLocationNotFit,
                         query.MemberLocationMarker ?? query.NameLocation,
                         query.Name,
+                        TypeName,
                         PlaceText.Of(writtenLocation.Place),
                         OutputText(settings.Output)
                     )
@@ -412,6 +413,7 @@ internal sealed class TypePlacement
                         SqlDiagnostics.VisibilityNotFit,
                         query.VisibilityMarker ?? query.MemberLocationMarker ?? query.NameLocation,
                         query.Name,
+                        TypeName,
                         PlacementChecks.KeywordOf(written.Value),
                         PlaceText.Of(written.Place),
                         PlacementChecks.TextOf(location),

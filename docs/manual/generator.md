@@ -136,7 +136,7 @@ SELECT id, name FROM users WHERE id = @id;
 ```
 
 ```text
-error SQLSRC123: The query 'GetUser' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
+error SQLSRC123: The query 'GetUser' of 'App.UserRepository' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
 ```
 
 `CountUsers` would be a constant of a private nested class, its default anyway, and `GetUser`, whose method goes to the extension class, cannot be private.  Write the visibility on the query that needs another, which wins over the header, or give it a member location where it fits:

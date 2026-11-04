@@ -1,5 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
+using System;
+using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
@@ -34,9 +36,9 @@ public sealed class PlacementDiagnosticsTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC123 /app/Repo/Users.sql(6,10)-(6,17): The query 'GetUser' cannot be private, which the file "
-                    + "header sets, at the member location extension-class, because an extension method is public or "
-                    + "internal.  Write -- visibility: or -- member-location: on the query.",
+                "SQLSRC123 /app/Repo/Users.sql(6,10)-(6,17): The query 'GetUser' of 'App.Sample' cannot be private, "
+                    + "which the file header sets, at the member location extension-class, because an extension method "
+                    + "is public or internal.  Write -- visibility: or -- member-location: on the query.",
             ]);
         var type = run.Sources[GeneratorHarness.SampleFile];
         type.ShouldNotContain("GetName");
@@ -182,9 +184,9 @@ public sealed class PlacementDiagnosticsTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC123 /app/Repo/Users.sql{span}: The query 'GetUser' cannot be {visibility}, which {place} sets, "
-                    + $"at the member location {location}, because {reason}.  Write -- visibility: or "
-                    + "-- member-location: on the query.",
+                $"SQLSRC123 /app/Repo/Users.sql{span}: The query 'GetUser' of 'App.Sample' cannot be {visibility}, "
+                    + $"which {place} sets, at the member location {location}, because {reason}.  Write "
+                    + "-- visibility: or -- member-location: on the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
         run.Sources.Values.ShouldContain(source => source.Contains(" const string Kept = \"SELECT 9;\";"));
@@ -328,11 +330,88 @@ public sealed class PlacementDiagnosticsTests
         type.ShouldContain("            public const string Free = \"SELECT 2;\";\n");
     }
 
+    // Two types claim one file, so each reports the file's one error at one place.  The messages name the type, which
+    // is all that tells the two lines apart.
+    [Fact]
+    public void Run_TwoTypesClaimingAFileWithSqlsrc122_NamesEachType()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = "Users.sql")]
+                public partial class Sample;
+
+                [SqlSourceGenerate(Source = "Users.sql")]
+                public partial class Other;
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: extension-class\n\n-- name: CountUsers\n-- output: sql\nSELECT count(*) FROM users;\n"
+        );
+
+        var run = GeneratorHarness.Run(OutputKind.Sql, Source, file);
+
+        var problems = run.Problems();
+        problems.Distinct().Count().ShouldBe(2);
+        problems
+            .Order(StringComparer.Ordinal)
+            .ShouldBe([
+                "SQLSRC122 /app/Repo/Users.sql(3,10)-(3,20): The query 'CountUsers' of 'App.Other' cannot go in the "
+                    + "extension class, which the file header sets, because its output is sql and only a query method "
+                    + "extends the connection.  Use class or nested-class.  Write -- visibility: or "
+                    + "-- member-location: on the query.",
+                "SQLSRC122 /app/Repo/Users.sql(3,10)-(3,20): The query 'CountUsers' of 'App.Sample' cannot go in the "
+                    + "extension class, which the file header sets, because its output is sql and only a query method "
+                    + "extends the connection.  Use class or nested-class.  Write -- visibility: or "
+                    + "-- member-location: on the query.",
+            ]);
+    }
+
+    // The same for SQLSRC123, which two types report at one place too.
+    [Fact]
+    public void Run_TwoTypesClaimingAFileWithSqlsrc123_NamesEachType()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = "Users.sql")]
+                public partial class Sample;
+
+                [SqlSourceGenerate(Source = "Users.sql")]
+                public partial class Other;
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- visibility: private\n\n-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(Source, file, Sidecars.Of(file, UserEntry(file)));
+
+        var problems = run.Problems();
+        problems.Distinct().Count().ShouldBe(2);
+        problems
+            .Order(StringComparer.Ordinal)
+            .ShouldBe([
+                "SQLSRC123 /app/Repo/Users.sql(3,10)-(3,17): The query 'GetUser' of 'App.Other' cannot be private, "
+                    + "which the file header sets, at the member location extension-class, because an extension method "
+                    + "is public or internal.  Write -- visibility: or -- member-location: on the query.",
+                "SQLSRC123 /app/Repo/Users.sql(3,10)-(3,17): The query 'GetUser' of 'App.Sample' cannot be private, "
+                    + "which the file header sets, at the member location extension-class, because an extension method "
+                    + "is public or internal.  Write -- visibility: or -- member-location: on the query.",
+            ]);
+    }
+
     // SQLSRC122 at a query at sql, set by the place.
     private static string Sqlsrc122(string span, string query, string place) =>
-        $"SQLSRC122 {GeneratorHarness.UsersPath}{span}: The query '{query}' cannot go in the extension class, which "
-        + $"{place} sets, because its output is sql and only a query method extends the connection.  Use class or "
-        + "nested-class.  Write -- visibility: or -- member-location: on the query.";
+        $"SQLSRC122 {GeneratorHarness.UsersPath}{span}: The query '{query}' of 'App.Sample' cannot go in the "
+        + $"extension class, which {place} sets, because its output is sql and only a query method extends the "
+        + "connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.";
 
     // The entry of GetUser, which takes an id and reads it, written for the file's hash.
     private static SidecarEntry UserEntry(SqlFile file) => Entry(file, "GetUser", [Parameter("id")], [Column("id")]);

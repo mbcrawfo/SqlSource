@@ -218,6 +218,7 @@ public sealed class TypePlacementTests
                 SqlDiagnostics.MemberLocationNotFit,
                 At("Users.sql", 0),
                 "GetUser",
+                "App.UserRepository",
                 "the settings file '/app/sqlsource.json'",
                 "sql"
             ),
@@ -225,6 +226,7 @@ public sealed class TypePlacementTests
                 SqlDiagnostics.MemberLocationNotFit,
                 At("Users.sql", 3),
                 "ListUsers",
+                "App.UserRepository",
                 "the settings file '/app/sqlsource.json'",
                 "models"
             ),
@@ -253,6 +255,7 @@ public sealed class TypePlacementTests
                 SqlDiagnostics.MemberLocationNotFit,
                 At("Users.sql", 1),
                 "GetUser",
+                "App.UserRepository",
                 "its own marker",
                 "sql"
             ),
@@ -278,6 +281,7 @@ public sealed class TypePlacementTests
                 SqlDiagnostics.VisibilityNotFit,
                 At("Users.sql", 3),
                 "ListUsers",
+                "App.UserRepository",
                 "private",
                 "the file header",
                 "extension-class",
@@ -307,6 +311,7 @@ public sealed class TypePlacementTests
                 SqlDiagnostics.VisibilityNotFit,
                 At("Users.sql", 2),
                 "GetUser",
+                "App.UserRepository",
                 "public",
                 "its own marker",
                 "extension-class",
@@ -385,6 +390,7 @@ public sealed class TypePlacementTests
                 SqlDiagnostics.VisibilityNotFit,
                 At("Users.sql", 0),
                 "GetUser",
+                "App.UserRepository",
                 "protected",
                 "the file header",
                 PlacementChecks.TextOf(location),

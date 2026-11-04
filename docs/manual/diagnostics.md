@@ -1131,7 +1131,7 @@ See: [Parameters](parameters-and-tokens.md#query-parameters)
 
 **Member location does not fit the query**
 
-A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](generator.md#locations) is `extension-class`.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql` or `models`.  The message names the query and where the value was written.
+A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](generator.md#locations) is `extension-class`.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql` or `models`.  The message names the query, the type that claims the file and where the value was written; two types that claim one file each report the error.
 
 ```sql
 -- member-location: extension-class
@@ -1142,7 +1142,7 @@ SELECT count(*) FROM users;
 ```
 
 ```console
-/work/App/Queries/Users.sql(3,10): error SQLSRC122: The query 'CountUsers' cannot go in the extension class, which the file header sets, because its output is sql and only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.
+/work/App/Queries/Users.sql(3,10): error SQLSRC122: The query 'CountUsers' of 'App.UserRepository' cannot go in the extension class, which the file header sets, because its output is sql and only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.
 ```
 
 The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `codegen`.
@@ -1153,7 +1153,7 @@ See: [Where the members go](generator.md#locations)
 
 **Visibility does not fit the member location**
 
-A query's visibility and its [member location](generator.md#locations) together are something C# cannot write.  The message names the query, the visibility, where it was written, the member location and the reason, one of these:
+A query's visibility and its [member location](generator.md#locations) together are something C# cannot write.  The message names the query, the type that claims the file, the visibility, where it was written, the member location and the reason, one of these:
 
 - the member location is `extension-class` and the visibility `private` or `protected`: the extension class is a class of the namespace, and its methods are public or internal;
 - the member location is `extension-class` and the visibility `public`, and the type is not public, or a type around it is not: the models the method takes and returns are internal then, and a public method cannot take them;
@@ -1173,7 +1173,7 @@ SELECT id, name FROM users WHERE id = @id;
 ```
 
 ```console
-/work/App/Queries/Users.sql(7,10): error SQLSRC123: The query 'GetUser' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
+/work/App/Queries/Users.sql(7,10): error SQLSRC123: The query 'GetUser' of 'App.UserRepository' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
 ```
 
 The error is at the query's `-- visibility:` marker when it has one, else at its `-- member-location:` marker, else at its name, and the file produces no members for the type until it is fixed.  Write `-- visibility:` on the query, as `-- visibility: internal` on `GetUser` above, or write `-- member-location: class` or `-- member-location: nested-class` on it, where a member can be private.  `protected` is allowed on a sealed class or record, and in a nested class of a static class.

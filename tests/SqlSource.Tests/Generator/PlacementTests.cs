@@ -18,6 +18,14 @@ public sealed class PlacementTests
 {
     private const string AtSql = "-- output: sql\n\n";
 
+    // The type the compiler warns of a protected member of (CS0628), and the line that turns the warning off.
+    private const string SealedSample =
+        "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\")]\n"
+        + "    public sealed partial class Sample;\n}\n";
+
+    private const string ProtectedPragma =
+        "#pragma warning disable CS0628 // A file asks for protected members of a sealed type.\n";
+
     // A query at codegen, whose method takes an id and reads it.
     private static readonly SqlFile Users = new(
         GeneratorHarness.UsersPath,
@@ -223,6 +231,96 @@ public sealed class PlacementTests
         methods.ShouldContain(
             "            public static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> "
                 + "ListUsers(\n"
+        );
+    }
+
+    // A sealed class whose only protected item is a nested class that holds constants: the type's file writes it, so
+    // the type's file turns the compiler's warning off.
+    [Fact]
+    public void Run_ProtectedNestedClassOfConstantsOnASealedClass_CompilesWithoutWarnings()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            SealedSample,
+            new SqlFile(
+                GeneratorHarness.UsersPath,
+                "-- member-location: nested-class\n-- visibility: protected\n\n" + SqlTexts.GetUser
+            )
+        );
+
+        run.ShouldBeClean();
+        var type = run.Sources[GeneratorHarness.SampleFile];
+        type.ShouldContain(ProtectedPragma);
+        type.ShouldContain("        protected static partial class Sql\n");
+    }
+
+    // A sealed class whose only protected item is a nested class that holds query methods: the methods' file writes
+    // it, so the methods' file turns the warning off.
+    [Fact]
+    public void Run_ProtectedNestedClassOfMethodsOnASealedClass_CompilesWithoutWarnings()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: nested-class\n-- visibility: protected\n\n" + Users.Text
+        );
+
+        var run = MethodRuns.Run(file, [UserEntry(file)], SealedSample);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(ProtectedPragma);
+        methods.ShouldContain("        protected static partial class Sql\n");
+    }
+
+    // Two methods of one name in two classes do not clash: the method of Get on the type, which async-method-suffix
+    // names GetAsync, and the method of GetAsync in the extension class.
+    [Theory]
+    [InlineData("class", "    partial class Sample\n    {\n")]
+    [InlineData("nested-class", "        private static partial class Sql\n        {\n")]
+    public void Run_SameMethodNameInTwoClasses_GeneratesBoth(string location, string host)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: Get\n-- generator: async-method-suffix\n-- member-location: "
+                + location
+                + "\nSELECT id FROM users;\n"
+                + "-- name: GetAsync\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "Get", [], [Column("id")]), Entry(file, "GetAsync", [], [Column("id")])]
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(host);
+        methods.ShouldContain(" static async global::System.Threading.Tasks.Task<global::App.GetDto[]> GetAsync(\n");
+        methods.ShouldContain("    internal static partial class SampleExtensions\n    {\n");
+        methods.ShouldContain(
+            "        internal static async global::System.Threading.Tasks.Task<global::App.GetAsyncDto[]> GetAsync(\n"
+        );
+    }
+
+    // Only an extension method widens the extension class: a public method on the type leaves it internal.
+    [Fact]
+    public void Run_PublicMethodOnTheType_LeavesTheExtensionClassInternal()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- member-location: class\n-- visibility: public\n"
+                + "SELECT id FROM users WHERE id = @id;\n"
+                + "-- name: ListUsers\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [UserEntry(file), Entry(file, "ListUsers", [], [Column("id")])]);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("    internal static partial class SampleExtensions\n");
+        methods.ShouldNotContain("public static partial class SampleExtensions");
+        methods.ShouldContain(
+            "        public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
         );
     }
 

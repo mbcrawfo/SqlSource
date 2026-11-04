@@ -543,14 +543,15 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc121"
     );
 
-    // {0} is the query, {1} the place that wrote the location, as "the file header", and {2} the query's output.
-    // Reported at the query's own -- member-location: marker, else at its name.
+    // {0} is the query, {1} the type in full, {2} the place that wrote the location, as "the file header", and {3} the
+    // query's output.  Two types may claim one file, so the type tells their lines apart.  Reported at the query's own
+    // -- member-location: marker, else at its name.
     public static readonly DiagnosticDescriptor MemberLocationNotFit = new(
         id: "SQLSRC122",
         title: "Member location does not fit the query",
-        messageFormat: "The query '{0}' cannot go in the extension class, which {1} sets, because its output is {2} "
-            + "and only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or "
-            + "-- member-location: on the query.",
+        messageFormat: "The query '{0}' of '{1}' cannot go in the extension class, which {2} sets, because its output "
+            + "is {3} and only a query method extends the connection.  Use class or nested-class.  Write "
+            + "-- visibility: or -- member-location: on the query.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -558,14 +559,14 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the query, {1} the visibility, {2} the place that wrote it, as "the file header", {3} the location, and
-    // {4} why the two do not fit, as "an extension method is public or internal".  Reported at the query's own
-    // -- visibility: marker, else at its -- member-location: marker, else at its name.
+    // {0} is the query, {1} the type in full, {2} the visibility, {3} the place that wrote it, as "the file header",
+    // {4} the location, and {5} why the two do not fit, as "an extension method is public or internal".  Reported at
+    // the query's own -- visibility: marker, else at its -- member-location: marker, else at its name.
     public static readonly DiagnosticDescriptor VisibilityNotFit = new(
         id: "SQLSRC123",
         title: "Visibility does not fit the member location",
-        messageFormat: "The query '{0}' cannot be {1}, which {2} sets, at the member location {3}, because {4}.  Write "
-            + "-- visibility: or -- member-location: on the query.",
+        messageFormat: "The query '{0}' of '{1}' cannot be {2}, which {3} sets, at the member location {4}, because "
+            + "{5}.  Write -- visibility: or -- member-location: on the query.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
