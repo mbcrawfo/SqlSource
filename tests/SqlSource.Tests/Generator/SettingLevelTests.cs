@@ -243,7 +243,7 @@ public sealed class SettingLevelTests
     // The file owns its output: two types that claim it, under a project's file of models, both take its header's sql,
     // so each gets the constant, neither gets models, and the query needs no entry.
     [Fact]
-    public void TwoTypes_ClaimingOneFile_BothTakeItsHeaderOutput()
+    public void Run_TwoTypesClaimingOneFile_BothTakeItsHeaderOutput()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Models,
@@ -268,7 +268,7 @@ public sealed class SettingLevelTests
 
     // The header is more specific than the settings file of the file's folder.
     [Fact]
-    public void HeaderOutput_OverSettingsFileOutput_Wins()
+    public void Run_HeaderOutputOverSettingsFileOutput_Wins()
     {
         var run = GeneratorHarness.Run(
             null,

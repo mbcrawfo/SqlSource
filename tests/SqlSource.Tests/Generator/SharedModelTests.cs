@@ -322,6 +322,67 @@ public sealed class SharedModelTests
         run.Sources["App.GetUserModel-Model.g.cs"].ShouldContain("/// The parameters of the query <c>GetUser</c>");
     }
 
+    // Equal suffixes give one query's two models one name, for each of two types of one name that claim its file.  Repo
+    // comes before Repo<T> whatever the order of their declarations, so the message names Repo.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Run_GenericAndPlainTypeOfOneName_AreOrderedByArity(bool genericFirst)
+    {
+        const string Generic = """
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Repo<T>;
+            """;
+        const string Plain = """
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Repo;
+            """;
+        var source =
+            "using SqlSource;\n\nnamespace App\n{\n"
+            + (genericFirst ? Generic + "\n\n" + Plain : Plain + "\n\n" + Generic)
+            + "\n}\n";
+
+        var run = RunWithEqualSuffixes(source);
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same as "
+                + "the input model of that name of the query 'GetUser' in Users.sql, for the type App.Repo: one is "
+                + $"an input model and the other an output model.{Help257}",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBe(["App.GetUserModel-Model.g.cs"]);
+    }
+
+    // The earlier type is generic, which the message names as it is declared.
+    [Fact]
+    public void Run_TwoGenericTypesOfOneName_NameTheEarlierWithItsTypeParameters()
+    {
+        var source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Repo<TKey, TValue>;
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Repo<TKey>;
+            }
+            """;
+
+        var run = RunWithEqualSuffixes(source);
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same as "
+                + "the input model of that name of the query 'GetUser' in Users.sql, for the type App.Repo<TKey>: one "
+                + $"is an input model and the other an output model.{Help257}",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBe(["App.GetUserModel-Model.g.cs"]);
+    }
+
     [Fact]
     public void Run_TwoTypesOfOneNamespace_ShareOneModel()
     {
@@ -839,6 +900,16 @@ public sealed class SharedModelTests
     }
 
     // The sidecar of the file with an entry of the query that has rows of the columns and no parameters.
+    // Users and its sidecar, claimed by the types of the source, under a project's settings file whose input and output
+    // suffixes are equal.
+    private static GeneratorRun RunWithEqualSuffixes(string source) =>
+        Run(
+            source,
+            [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [Parameter("id")], [Column("id")]))],
+            settings: /*lang=json,strict*/
+            """{"inputModelSuffix": "Model", "outputModelSuffix": "Model"}"""
+        );
+
     private static SqlFile Sidecar(SqlFile file, string name, SidecarColumn[] columns) =>
         Sidecars.Of(file, Entry(file, name, [], columns));
 }
