@@ -130,10 +130,11 @@ public sealed class EndToEndTests
     public void ProjectWithParameters_FileWithAHeader_UsesTheListOfItsHeader() =>
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
-    // Plain.sql has no header, so the settings file's list, without keep-comments, leaves its comment out.
+    // Plain.sql has no header, so the settings file's list applies.  Without keep-comments it leaves the comment out,
+    // and with no-token-validation the method takes the blank text of its token, which it would throw on otherwise.
     [Fact]
     public void ProjectWithParameters_FileWithoutAHeader_UsesTheListOfTheSettingsFile() =>
-        ParameterQueries.Plain.ShouldBe("SELECT 2   AS two;");
+        ParameterQueries.Plain("").ShouldBe("SELECT 2   AS two;");
 
     [Fact]
     public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
