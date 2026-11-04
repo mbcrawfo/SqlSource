@@ -65,4 +65,17 @@ internal sealed record SqlQuery(
     ModelMarker? OutputModel,
     EquatableArray<ColumnMarker> ColumnMarkers,
     EquatableArray<DiagnosticInfo> KeptErrors
-);
+)
+{
+    /// <summary>
+    /// Where the query's own <c>-- member-location:</c> marker is, never its header's, or null.  A query whose file is
+    /// one query has the marker of the whole file.
+    /// </summary>
+    public LocationInfo? MemberLocationMarker { get; init; }
+
+    /// <summary>
+    /// Where the query's own <c>-- visibility:</c> marker is, never its header's, or null.  A query whose file is one
+    /// query has the marker of the whole file.
+    /// </summary>
+    public LocationInfo? VisibilityMarker { get; init; }
+}

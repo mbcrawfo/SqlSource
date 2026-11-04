@@ -77,11 +77,20 @@ internal sealed record SettingsLevel
     public EquatableArray<LibrarySetting>? LibraryTypes { get; init; }
 
     /// <summary>
-    /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  The
-    /// attribute and the chain of the folder of the type's C# file give it; no <c>.sql</c> file's level does, since a
-    /// type's queries can come from several files.
+    /// The name of the class that holds a query's members in <see cref="MemberLocation.NestedClass" /> location.  A
+    /// marker, a settings file and, for now, the attribute of a type give it.
     /// </summary>
     public string? NestedClass { get; init; }
+
+    /// <summary>
+    /// Where a query's members go, with the place that wrote it.  A marker or a settings file gives it.
+    /// </summary>
+    public Placed<MemberLocation>? MemberLocation { get; init; }
+
+    /// <summary>
+    /// The accessibility of a query's members, with the place that wrote it.  A marker or a settings file gives it.
+    /// </summary>
+    public Placed<Visibility>? Visibility { get; init; }
 
     /// <summary>Whether the level gives a list that has <c>keep-comments</c>.</summary>
     public bool KeepsComments => Parameters is { } list && (list & GeneratorParameters.KeepComments) != 0;
@@ -119,6 +128,8 @@ internal sealed record SettingsLevel
             ColumnTypes = ColumnTypeMap.Over(ColumnTypes, other.ColumnTypes),
             LibraryTypes = LibrarySettings.Over(LibraryTypes, other.LibraryTypes),
             NestedClass = NestedClass ?? other.NestedClass,
+            MemberLocation = MemberLocation ?? other.MemberLocation,
+            Visibility = Visibility ?? other.Visibility,
         };
     }
 }

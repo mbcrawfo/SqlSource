@@ -267,6 +267,8 @@ internal static class TargetTypeReader
                 SettingId.ColumnTypes => null,
                 SettingId.LibraryTypes => null,
                 SettingId.NestedClass => AttributeSource.NestedClassProperty,
+                SettingId.MemberLocation => null,
+                SettingId.Visibility => null,
             };
     }
 

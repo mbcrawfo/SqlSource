@@ -58,6 +58,30 @@ public sealed class SettingLevelTests
             },
         };
 
+    public static TheoryData<SettingLevel, string, string> PlacementSettingsAtEachLevel
+    {
+        get
+        {
+            var rows = new TheoryData<SettingLevel, string, string>();
+            foreach (
+                var level in new[]
+                {
+                    SettingLevel.ProjectFile,
+                    SettingLevel.FolderFile,
+                    SettingLevel.Header,
+                    SettingLevel.Query,
+                }
+            )
+            {
+                rows.Add(level, "member-location", "nested-class");
+                rows.Add(level, "visibility", "private");
+                rows.Add(level, "nested-class", "Users");
+            }
+
+            return rows;
+        }
+    }
+
     // Each level with each output.  The project's file is the least specific level, and codegen is both the default and
     // the output MethodRuns gives the project, so a project's file of codegen would decide nothing: that row is left
     // out.
@@ -178,6 +202,28 @@ public sealed class SettingLevelTests
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUser(\n");
         ModelRuns.ModelFiles(run).ShouldBe([ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
+    }
+
+    // The member location, the visibility and the nested class are read at every level, and until a later change gives
+    // them an effect they leave the generated files as they are.  A row gives the setting's marker, as the type of a
+    // setting is internal, and a value that is valid for it.
+    [Theory]
+    [MemberData(nameof(PlacementSettingsAtEachLevel))]
+    public void Run_PlacementSettingAtEachLevel_IsAcceptedAndChangesNothing(
+        SettingLevel level,
+        string marker,
+        string value
+    )
+    {
+        var entry = new[] { Setting.MemberLocation, Setting.Visibility, Setting.NestedClass }.Single(setting =>
+            setting.Marker == marker
+        );
+        var plain = RunPlacement(new LevelSettings());
+
+        var run = RunPlacement(new LevelSettings().At(level, entry, LevelSettings.StringAt(level, value)));
+
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
+        run.Sources[MethodRuns.MethodsFile].ShouldBe(plain.Sources[MethodRuns.MethodsFile]);
     }
 
     [Theory]
@@ -302,6 +348,23 @@ public sealed class SettingLevelTests
 
     // GetUser of Users as a constant of Sample.
     private const string GetUserConstant = "public const string GetUser = \"SELECT id FROM users WHERE id = @id;\";\n";
+
+    // Users, the level of the settings given, and an entry of GetUser, run at the default output.
+    private static GeneratorRun RunPlacement(LevelSettings settings)
+    {
+        var files = settings.Files(Users);
+        var file = files[0];
+        var run = MethodRuns.Run(
+            file,
+            [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
+            MethodRuns.Source,
+            settings: settings.ProjectSettings,
+            otherFiles: files[1..]
+        );
+
+        run.ShouldBeClean();
+        return run;
+    }
 
     // Users with the output at the level, and the other output at the project's file below it unless the level is the
     // project's file, with an entry of GetUser when one is given.  An output of the project's file among the settings

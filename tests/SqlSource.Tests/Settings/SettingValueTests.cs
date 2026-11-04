@@ -48,6 +48,33 @@ public sealed class SettingValueTests
     }
 
     [Theory]
+    [InlineData("class", 1)]
+    [InlineData("Class", 1)]
+    [InlineData("nested-class", 2)]
+    [InlineData("NestedClass", 2)]
+    [InlineData("nested class", 2)]
+    [InlineData("extension class", 0)]
+    [InlineData("Extension-Class", 0)]
+    public void TryReadChoice_MemberLocation_IsRead(string value, int expected)
+    {
+        SettingValue.TryReadChoice<MemberLocation>(value.AsSpan(), out var location).ShouldBeTrue();
+
+        ((int)location).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("public", 0)]
+    [InlineData("Internal", 1)]
+    [InlineData("PROTECTED", 2)]
+    [InlineData("private", 3)]
+    public void TryReadChoice_Visibility_IsRead(string value, int expected)
+    {
+        SettingValue.TryReadChoice<Visibility>(value.AsSpan(), out var visibility).ShouldBeTrue();
+
+        ((int)visibility).ShouldBe(expected);
+    }
+
+    [Theory]
     [InlineData("billing", true)]
     [InlineData("billing-v2", true)]
     [InlineData("app_1.read", true)]

@@ -29,6 +29,9 @@ internal static class SqlMarkerReader
         ("type-override:", SqlMarkerKind.TypeOverride),
         ("column:", SqlMarkerKind.Column),
         ("library-types:", SqlMarkerKind.LibraryTypes),
+        ("member-location:", SqlMarkerKind.MemberLocation),
+        ("visibility:", SqlMarkerKind.Visibility),
+        ("nested-class:", SqlMarkerKind.NestedClass),
     ];
 
     /// <summary>

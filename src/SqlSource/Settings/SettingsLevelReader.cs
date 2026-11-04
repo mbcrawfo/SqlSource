@@ -42,6 +42,8 @@ internal static class SettingsLevelReader
             ColumnTypes = ReadColumnTypes(ref source),
             LibraryTypes = ReadLibraryTypes(ref source),
             NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsTypeName),
+            MemberLocation = ReadPlaced<TSource, MemberLocation>(ref source, SettingId.MemberLocation),
+            Visibility = ReadPlaced<TSource, Visibility>(ref source, SettingId.Visibility),
         };
 
         // A source that sets nothing shares the empty level.
@@ -191,6 +193,11 @@ internal static class SettingsLevelReader
             source.RepeatedKey(setting, index, first);
         }
     }
+
+    // A choice with the place of the source that wrote it.
+    private static Placed<T>? ReadPlaced<TSource, T>(ref TSource source, SettingId setting)
+        where TSource : struct, ISettingSource
+        where T : struct, Enum => source.Choice<T>(setting) is { } choice ? new Placed<T>(choice, source.Place) : null;
 
     private static string? ReadText<TSource>(ref TSource source, SettingId setting, Validator isValid)
         where TSource : struct, ISettingSource

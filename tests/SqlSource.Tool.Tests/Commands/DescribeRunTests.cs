@@ -107,6 +107,24 @@ public sealed class DescribeRunTests : IDisposable
         result.ShouldBe(new CliResult(0, "postgres (postgres): 0 described, 2 skipped, 0 failed\n", ""));
     }
 
+    // The three placement markers are settings of the generator: describing reads them as it reads any marker of a
+    // header or a query, and neither reports them nor changes what is described.
+    [Fact]
+    public async Task Run_FileWithPlacementMarkersInTheHeaderAndInAQuery_IsDescribedWithoutError()
+    {
+        const string Text =
+            "-- member-location: class\n-- visibility: internal\n-- nested-class: Users\n\n"
+            + "-- name: GetPlaced\n-- member-location: nested-class\n-- visibility: private\n"
+            + "-- nested-class: Orders\nSELECT 1;\n"
+            + "-- name: ListPlaced\nSELECT 2;\n";
+        var placed = _scene.Project.AddSql("Placed.sql", Text);
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(new CliResult(0, "postgres (postgres): 4 described, 0 skipped, 0 failed\n", ""));
+        SidecarFiles.Read(placed).Queries.Select(entry => entry.Name).ShouldBe(["GetPlaced", "ListPlaced"]);
+    }
+
     private async Task ShouldBeWrittenAgainAsync(Func<string, Sidecar, string> replace)
     {
         _ = await _scene.DescribeAsync();

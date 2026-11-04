@@ -18,6 +18,14 @@ namespace SqlSource.Settings;
 /// <param name="InputModelType">The shape of the type of the query's parameters.</param>
 /// <param name="OutputModelType">The shape of the type of a row.</param>
 /// <param name="CollectionType">The type a method returns many rows in.</param>
+/// <param name="WrittenMemberLocation">
+/// The member location a marker or a settings file wrote, with where, or null when none did.
+/// <see cref="MemberLocation" /> is the one in effect.
+/// </param>
+/// <param name="WrittenVisibility">
+/// The visibility a marker or a settings file wrote, with where, or null when none did.
+/// </param>
+/// <param name="NestedClass">The name of the class that holds the query's members in a nested class.</param>
 internal readonly record struct QuerySettings(
     GeneratorParameters Parameters,
     OutputKind Output,
@@ -26,7 +34,10 @@ internal readonly record struct QuerySettings(
     string? ModelNamespace,
     ModelKind InputModelType,
     ModelKind OutputModelType,
-    CollectionKind CollectionType
+    CollectionKind CollectionType,
+    Placed<MemberLocation>? WrittenMemberLocation,
+    Placed<Visibility>? WrittenVisibility,
+    string NestedClass
 )
 {
     /// <summary>What ends the name of the type of a query's parameters, unless a level says otherwise.</summary>
@@ -36,10 +47,18 @@ internal readonly record struct QuerySettings(
     public const string DefaultOutputModelSuffix = "Dto";
 
     /// <summary>
-    /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement, unless a
-    /// level says otherwise.
+    /// The name of the class that holds a query's members in <see cref="MemberLocation.NestedClass" /> location, unless
+    /// a level says otherwise.
     /// </summary>
     public const string DefaultNestedClass = "Sql";
+
+    /// <summary>
+    /// Where the query's members go: the one written, else the default of its output, a nested class for the output
+    /// that has no method and the extension class for the one that has.
+    /// </summary>
+    public MemberLocation MemberLocation =>
+        WrittenMemberLocation?.Value
+        ?? (Output == OutputKind.CodeGen ? MemberLocation.ExtensionClass : MemberLocation.NestedClass);
 
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
@@ -66,7 +85,10 @@ internal readonly record struct QuerySettings(
             markers.ModelNamespace ?? file.ModelNamespace,
             markers.InputModelType ?? file.InputModelType ?? ModelKind.SealedRecord,
             markers.OutputModelType ?? file.OutputModelType ?? ModelKind.SealedRecord,
-            markers.CollectionType ?? file.CollectionType ?? CollectionKind.Array
+            markers.CollectionType ?? file.CollectionType ?? CollectionKind.Array,
+            markers.MemberLocation ?? file.MemberLocation,
+            markers.Visibility ?? file.Visibility,
+            markers.NestedClass ?? file.NestedClass ?? DefaultNestedClass
         );
 
     /// <summary>

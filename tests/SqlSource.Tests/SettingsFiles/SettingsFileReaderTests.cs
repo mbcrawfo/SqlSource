@@ -50,6 +50,8 @@ public sealed class SettingsFileReaderTests
         [SettingsFileKeys.OutputModelType] = static level => level.OutputModelType,
         [SettingsFileKeys.CollectionType] = static level => level.CollectionType,
         [SettingsFileKeys.NestedClass] = static level => level.NestedClass,
+        [SettingsFileKeys.MemberLocation] = static level => level.MemberLocation,
+        [SettingsFileKeys.Visibility] = static level => level.Visibility,
     };
 
     [Fact]
@@ -90,7 +92,9 @@ public sealed class SettingsFileReaderTests
                 "inputModelType": "sealed record",
                 "outputModelType": "class",
                 "collectionType": "ireadonlylist",
-                "nestedClass": "Queries"
+                "nestedClass": "Queries",
+                "memberLocation": "nested-class",
+                "visibility": "protected"
             }
             """;
 
@@ -110,6 +114,8 @@ public sealed class SettingsFileReaderTests
                 OutputModelType = ModelKind.Class,
                 CollectionType = CollectionKind.IReadOnlyList,
                 NestedClass = "Queries",
+                MemberLocation = new Placed<MemberLocation>(MemberLocation.NestedClass, Place),
+                Visibility = new Placed<Visibility>(Visibility.Protected, Place),
             }
         );
     }
@@ -302,6 +308,10 @@ public sealed class SettingsFileReaderTests
     [InlineData("dialect", "ansi,ansi-quotes")]
     [InlineData("dialect", " pgsql ")]
     [InlineData("collectionType", " lists ")]
+    [InlineData("memberLocation", "beside")]
+    [InlineData("memberLocation", " nested classes ")]
+    [InlineData("visibility", "friend")]
+    [InlineData("visibility", " protected internal ")]
     public void Read_ValueThatIsNotValid_IsInvalidValueAndSetsNothing(string key, string value)
     {
         var text = $$"""{"{{key}}": "{{value}}"}""";

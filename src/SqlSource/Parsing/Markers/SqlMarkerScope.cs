@@ -60,6 +60,10 @@ internal sealed class SqlMarkerScope(
 
     private CollectionKind? _collectionType;
 
+    // The placement settings, made at the first marker of one: a scope of most queries has none, and the parser's
+    // allocation budget holds.
+    private Placement? _placement;
+
     private string? _inputModel;
 
     private string? _outputModel;
@@ -73,6 +77,16 @@ internal sealed class SqlMarkerScope(
 
     // The library types of the scope: sorted by library as LibrarySettings keeps them, each library once.
     private List<LibrarySetting>? _libraryTypes;
+
+    /// <summary>
+    /// The whole comment of the first <c>-- member-location:</c> marker that set the scope's member location, or null.
+    /// </summary>
+    public TextSpan? MemberLocationMarker => _placement?.MemberLocationMarker;
+
+    /// <summary>
+    /// The whole comment of the first <c>-- visibility:</c> marker that set the scope's visibility, or null.
+    /// </summary>
+    public TextSpan? VisibilityMarker => _placement?.VisibilityMarker;
 
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
@@ -180,6 +194,19 @@ internal sealed class SqlMarkerScope(
             case SqlMarkerKind.CollectionType:
                 SetChoice(ref _collectionType, marker);
                 break;
+            case SqlMarkerKind.MemberLocation:
+                ReadMemberLocation(marker, _placement ??= new Placement());
+                break;
+            case SqlMarkerKind.Visibility:
+                ReadVisibility(marker, _placement ??= new Placement());
+                break;
+            case SqlMarkerKind.NestedClass:
+                SetText(
+                    ref (_placement ??= new Placement()).NestedClass,
+                    marker,
+                    SettingValue.IsTypeName(Value(marker))
+                );
+                break;
             case SqlMarkerKind.InputModel:
                 SetText(ref _inputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
                 if (_inputModel is { } inputModel && InputModel is null)
@@ -229,7 +256,10 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.InputModel
                 or SqlMarkerKind.OutputModel
                 or SqlMarkerKind.TypeOverride
-                or SqlMarkerKind.LibraryTypes;
+                or SqlMarkerKind.LibraryTypes
+                or SqlMarkerKind.MemberLocation
+                or SqlMarkerKind.Visibility
+                or SqlMarkerKind.NestedClass;
 
     internal static bool IsAllowedInPreamble(SqlMarkerKind kind) =>
         kind
@@ -244,7 +274,10 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.CollectionType
                 or SqlMarkerKind.TypeOverride
                 or SqlMarkerKind.Column
-                or SqlMarkerKind.LibraryTypes;
+                or SqlMarkerKind.LibraryTypes
+                or SqlMarkerKind.MemberLocation
+                or SqlMarkerKind.Visibility
+                or SqlMarkerKind.NestedClass;
 
     private SettingsLevel BuildLevel()
     {
@@ -261,6 +294,9 @@ internal sealed class SqlMarkerScope(
             && _typeOverrides is null
             && _columnTypes is null
             && _libraryTypes is null
+            && _placement is not { MemberLocation: not null }
+            && _placement is not { Visibility: not null }
+            && _placement is not { NestedClass: not null }
         )
         {
             return SettingsLevel.None;
@@ -290,8 +326,16 @@ internal sealed class SqlMarkerScope(
             LibraryTypes = _libraryTypes is null
                 ? null
                 : new EquatableArray<LibrarySetting>(_libraryTypes.ToImmutableArray()),
+            NestedClass = _placement?.NestedClass,
+            MemberLocation = _placement?.MemberLocation is { } location
+                ? new Placed<MemberLocation>(location, Place)
+                : null,
+            Visibility = _placement?.Visibility is { } visibility ? new Placed<Visibility>(visibility, Place) : null,
         };
     }
+
+    // The place a marker of the scope is written in: a file's header for its preamble, a query for any other.
+    private SettingPlace Place => scopeKind == SqlScopeKind.Preamble ? SettingPlace.FileHeader : SettingPlace.Query;
 
     // The engine of the file, whose rules read its type override's keys and whose entries its markers give.
     private DatabaseEngine Engine => SqlDescribableDialects.EngineOf(rules.Dialect);
@@ -300,6 +344,26 @@ internal sealed class SqlMarkerScope(
         _typeOverrides is null ? null : new EquatableArray<TypeOverride>(_typeOverrides.ToImmutableArray());
 
     private ReadOnlySpan<char> Value(SqlMarker marker) => text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length);
+
+    // The first marker that sets the member location is the one its span is kept for.
+    private void ReadMemberLocation(SqlMarker marker, Placement placement)
+    {
+        SetChoice(ref placement.MemberLocation, marker);
+        if (placement.MemberLocation is not null)
+        {
+            placement.MemberLocationMarker ??= marker.Span;
+        }
+    }
+
+    // The first marker that sets the visibility is the one its span is kept for.
+    private void ReadVisibility(SqlMarker marker, Placement placement)
+    {
+        SetChoice(ref placement.Visibility, marker);
+        if (placement.Visibility is not null)
+        {
+            placement.VisibilityMarker ??= marker.Span;
+        }
+    }
 
     // A value from a fixed list.  The same value twice is fine; another value is a conflict, and the first stands.
     private void SetChoice<T>(ref T? field, SqlMarker marker)
@@ -345,7 +409,7 @@ internal sealed class SqlMarkerScope(
     // their text, so int and System.Int32 are two.  A file's header is the place of its preamble's entries.
     private void ReadTypeOverride(SqlMarker marker)
     {
-        var place = scopeKind == SqlScopeKind.Preamble ? SettingPlace.FileHeader : SettingPlace.Query;
+        var place = Place;
         if (!TypeOverrideGrammar.TryReadEntry(Value(marker), place, Engine, out var entry))
         {
             AddInvalid(marker, TypeOverrideGrammar.BracketHelp(Value(marker)));
@@ -368,7 +432,7 @@ internal sealed class SqlMarkerScope(
     // header is the place of its preamble's entries.
     private void ReadLibraryTypes(SqlMarker marker)
     {
-        var place = scopeKind == SqlScopeKind.Preamble ? SettingPlace.FileHeader : SettingPlace.Query;
+        var place = Place;
         var rest = Value(marker).TrimStart();
         if (rest.IsEmpty)
         {
@@ -857,4 +921,19 @@ internal sealed class SqlMarkerScope(
         );
 
     private static TextSpan PlaceOf(SqlMarker marker) => marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan;
+
+    // What a scope's placement markers gave, with the whole comment of the first marker that set the member location
+    // and of the first that set the visibility.  Fields, so that SetChoice and SetText can set them by reference.
+    private sealed class Placement
+    {
+        public MemberLocation? MemberLocation;
+
+        public Visibility? Visibility;
+
+        public string? NestedClass;
+
+        public TextSpan? MemberLocationMarker;
+
+        public TextSpan? VisibilityMarker;
+    }
 }

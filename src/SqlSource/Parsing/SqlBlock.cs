@@ -59,4 +59,17 @@ internal sealed record SqlBlock(
     SqlModelName? OutputModel,
     EquatableArray<SqlColumnMarker> ColumnMarkers,
     EquatableArray<SqlParseError> KeptErrors
-);
+)
+{
+    /// <summary>
+    /// The whole comment of the query's own <c>-- member-location:</c> marker, never its header's, or null.  A query
+    /// whose file is one query has the marker of the whole file.
+    /// </summary>
+    public TextSpan? MemberLocationMarker { get; init; }
+
+    /// <summary>
+    /// The whole comment of the query's own <c>-- visibility:</c> marker, never its header's, or null.  A query whose
+    /// file is one query has the marker of the whole file.
+    /// </summary>
+    public TextSpan? VisibilityMarker { get; init; }
+}
