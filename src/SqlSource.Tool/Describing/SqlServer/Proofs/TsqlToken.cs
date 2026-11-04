@@ -62,6 +62,6 @@ internal readonly record struct TsqlToken(TsqlTokenKind Kind, string Text, int S
             TsqlTokenKind.String => Text[(Text.IndexOf('\'', StringComparison.Ordinal) + 1)..^1]
                 .Replace("''", "'", StringComparison.Ordinal),
             TsqlTokenKind.Number or TsqlTokenKind.Parameter or TsqlTokenKind.Symbol => null,
-            _ => null,
+            _ => throw UnexpectedEnumValueException.Of(Kind),
         };
 }

@@ -113,7 +113,7 @@ internal sealed class WatchSet
             FileChangeKind.Created => EffectOf(change.Path, change.IsFolder, Side.Created),
             FileChangeKind.Deleted => EffectOf(change.Path, isFolder: false, Side.Removed),
             FileChangeKind.Renamed => EffectOfRename(change),
-            _ => throw new ArgumentOutOfRangeException(nameof(change), change.Kind, "Not a kind of change."),
+            _ => throw UnexpectedEnumValueException.Of(change.Kind),
         };
 
     /// <summary>

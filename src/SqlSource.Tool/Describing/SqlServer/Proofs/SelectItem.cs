@@ -74,7 +74,7 @@ internal sealed record SelectItem(TokenRange Expression, string? Name, bool IsSt
             TsqlTokenKind.Word => !OperandWords.Contains(token.Text),
             TsqlTokenKind.Number or TsqlTokenKind.String or TsqlTokenKind.QuotedName or TsqlTokenKind.Parameter => true,
             TsqlTokenKind.Symbol => token.Text == ")",
-            _ => false,
+            _ => throw UnexpectedEnumValueException.Of(token.Kind),
         };
 
     // Parts that are names, a word or a quoted name, each followed by "." but the last.  A word that starts with "@",
