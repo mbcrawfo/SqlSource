@@ -10,7 +10,8 @@ using Xunit;
 namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
 
 // Each case with models is run over the seed through Dapper into its generated output model, once for each sample,
-// with its generated input model's values as the parameters under the SQL's names, and every row is read.  It asserts
+// with its generated input model's values as the parameters under the SQL's names, and every row is read.  The SQL is
+// what the generator writes for the case at Models, from an in-process run by RealisticGeneration.  It asserts
 // no value, which is the oracle's business, but that some sample reads a row, so that a run that reads nothing cannot
 // pass.  A case runs in a transaction that is rolled back, since some write, and that every Dapper call is given, since
 // SqlClient refuses a command on a connection that holds a transaction it was not given.  The sample's values are
@@ -27,7 +28,7 @@ public sealed class RealisticDapperTests(SqlServerDatabases sqlServer)
         var entry = RealisticModels.EntryOf(found);
         var output = RealisticCases.Models.OutputModelOf(entry);
         var input = RealisticCases.Models.InputModelOf(entry);
-        var sql = RealisticCases.Models.SqlOf(RealisticCases.Corpus, found, entry);
+        var sql = RealisticGeneration.SqlOf(RealisticCases.Corpus, found, entry);
         await using var connection = EndToEndSources.Realistic(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 

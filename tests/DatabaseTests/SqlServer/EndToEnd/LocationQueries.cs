@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// Each MethodLocation of Queries/Locations.sql, and the suffix of the generator parameter async-method-suffix.
+// Each MethodLocation of Queries/Locations.sql.
 
 // The default, ExtensionClass: an extension of the connection in LocationQueriesExtensions.
 [SqlSourceGenerate(Source = "Queries/Locations.sql")]
@@ -26,11 +26,3 @@ internal static partial class PrivateLocationQueries
         CancellationToken cancellationToken
     ) => ListAccountNames(connection, cancellationToken: cancellationToken);
 }
-
-// The method's name ends in Async: ListAccountNamesAsync.
-[SqlSourceGenerate(
-    Source = "Queries/Locations.sql",
-    MethodLocation = MethodLocation.Public,
-    Parameters = "async-method-suffix"
-)]
-internal static partial class SuffixLocationQueries;

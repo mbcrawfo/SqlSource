@@ -6,9 +6,9 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// The query of Queries/Locations.sql run through the method of each MethodLocation, and through the method that
-// async-method-suffix names, on the seed of "app", by the classes of LocationQueries.cs.  Each test reads where the
-// method is and how it can be called, and the rows.
+// The query of Queries/Locations.sql run through the method of each MethodLocation, and its copy
+// ListAccountNamesWithSuffix through the method that async-method-suffix names, on the seed of "app", by the classes of
+// LocationQueries.cs.  Each test reads where the method is and how it can be called, and the rows.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodLocationTests(SqlServerDatabases sqlServer)
 {
@@ -76,16 +76,16 @@ public sealed class MethodLocationTests(SqlServerDatabases sqlServer)
     }
 
     [Fact]
-    public async Task ListAccountNamesAsync_AsyncMethodSuffix_EndsTheNameInAsync()
+    public async Task ListAccountNamesWithSuffixAsync_AsyncMethodSuffixByTheQuerysMarker_EndsTheNameInAsync()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var accounts = await SuffixLocationQueries.ListAccountNamesAsync(
+        var accounts = await PublicLocationQueries.ListAccountNamesWithSuffixAsync(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         accounts.ShouldBe(Accounts);
-        typeof(SuffixLocationQueries).GetMethod("ListAccountNames", Statics).ShouldBeNull();
+        typeof(PublicLocationQueries).GetMethod("ListAccountNamesWithSuffix", Statics).ShouldBeNull();
     }
 }

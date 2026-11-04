@@ -1,27 +1,14 @@
 namespace SqlSource.DatabaseTests.SqlServer.SqlClient61;
 
-// The queries of every type of the type map that SQL Server 2017 has, linked from the end-to-end project, and their
-// models under SqlClient 6.1, which Dapper reads.  The linked file's folder takes the end-to-end project's settings
-// file, whose output is codegen, so the claim names the output models.
-[SqlSourceGenerate(
-    Source = "../SqlServer/EndToEnd/Queries/AllTypes.sql",
-    Output = GeneratorOutput.Models,
-    SqlLocation = SqlLocation.Direct
-)]
+// The queries of every type of the type map that SQL Server 2017 has, linked from the end-to-end project: their
+// methods, extension methods of the connection in AllTypesQueriesExtensions, and their models under SqlClient 6.1,
+// which Dapper reads.  The linked file's folder takes the end-to-end project's settings file, whose output is codegen,
+// which this claim keeps.  The direct location puts the constants of the file's ForDapper copies, at the output models,
+// on the type, for the Dapper test.
+[SqlSourceGenerate(Source = "../SqlServer/EndToEnd/Queries/AllTypes.sql", SqlLocation = SqlLocation.Direct)]
 internal static partial class AllTypesQueries;
 
-// The types that SQL Server 2025 brings, json and vector, linked from the end-to-end project.
-[SqlSourceGenerate(
-    Source = "../SqlServer/EndToEnd/Queries/NewTypes.sql",
-    Output = GeneratorOutput.Models,
-    SqlLocation = SqlLocation.Direct
-)]
+// The types that SQL Server 2025 brings, json and vector, linked from the end-to-end project: their methods, extension
+// methods of the connection in NewTypesQueriesExtensions, and the constant of the file's ForDapper copy.
+[SqlSourceGenerate(Source = "../SqlServer/EndToEnd/Queries/NewTypes.sql", SqlLocation = SqlLocation.Direct)]
 internal static partial class NewTypesQueries;
-
-// The same two files a second time, at the output codegen, for their methods on SqlClient 6.1.  Each claim is in the
-// namespace of the models' claim, so the two share the files' models, which the methods and Dapper both read.
-[SqlSourceGenerate(Source = "../SqlServer/EndToEnd/Queries/AllTypes.sql", Output = GeneratorOutput.CodeGen)]
-internal static partial class AllTypesMethodQueries;
-
-[SqlSourceGenerate(Source = "../SqlServer/EndToEnd/Queries/NewTypes.sql", Output = GeneratorOutput.CodeGen)]
-internal static partial class NewTypesMethodQueries;

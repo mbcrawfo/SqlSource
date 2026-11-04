@@ -27,7 +27,7 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // hand-written method that reads them into RowBufferByHand of this project, the same buffer by hand; and
 // SearchAccountsUnpooled, a copy of the query under no-array-pool, which reads them into a List, against a hand-written
 // method that does the same.  The copy is a query of its own because SearchAccounts' own list of generator parameters,
-// sort-input, replaces the list of any claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  The
+// sort-input, replaces the list of any claim's attribute, and VariantCopyTests holds its SQL to SearchAccounts'.  The
 // numbers queries of RowBufferQueries have a pair of each kind for the List, IList, ICollection and ImmutableArray, at
 // 3 rows: the pooled method against rows read into RowBufferByHand and copied by ToList or ToImmutableArray, and its
 // twin under no-array-pool against a List that is returned as it is or an ImmutableArray builder that is drained, since

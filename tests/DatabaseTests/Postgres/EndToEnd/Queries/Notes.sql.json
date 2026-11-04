@@ -400,6 +400,68 @@
         }
       ]
     },
+    "ListNoteKindsForDapper": {
+      "hash": "b654a4beb2dae0e6919cf65ede9436db3748e41526371cdac46d1dcdef414c85",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "several-tables",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "kind",
+          "type": {
+            "name": "public.note_kind",
+            "kind": "enum",
+            "schema": "public",
+            "internalName": "note_kind",
+            "labels": [
+              "call",
+              "email",
+              "visit"
+            ]
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "kind"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type": {
+            "name": "public.email",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "email",
+            "base": {
+              "name": "text",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "text"
+            }
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "email"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "GetNoteByRef": {
       "hash": "bcb871a9c07a0fda56d1fd1bd8fd47b8bcc463e90d6bb4001a276031f985e701",
       "engine": "postgres",

@@ -10,7 +10,7 @@ internal static class RealisticCases
 {
     public static RealisticCorpus Corpus => RealisticCorpus.Postgres;
 
-    // The models of the classes of Realistic/Generation/RealisticQueries.cs, named as the generator names them.
+    // The models of the classes of Realistic/Generation/RealisticMethods.cs, named as the generator names them.
     public static RealisticModels Models { get; } =
         new(
             typeof(RealisticCases).Assembly,

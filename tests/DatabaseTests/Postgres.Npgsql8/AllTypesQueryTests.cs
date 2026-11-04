@@ -11,10 +11,10 @@ using Xunit;
 namespace SqlSource.DatabaseTests.Postgres.Npgsql8;
 
 // The type map on Npgsql 8, the oldest driver that is supported: the models the generator gives under it, both rows of
-// all_types read through ListAllTypes' method and through Dapper into AllTypesDto, and every column written through
-// InsertEveryType's method and read back, and the columns that InsertAllTypes writes by its method, each in a
-// transaction that is rolled back.  The end-to-end project proves the same table on Npgsql 10.  The data source maps
-// nothing: all_types reads its enum as a string.
+// all_types read through ListAllTypes' method and, by the constant of its copy ListAllTypesForDapper, through Dapper
+// into AllTypesDto, and every column written through InsertEveryType's method and read back, and the columns that
+// InsertAllTypes writes by its method, each in a transaction that is rolled back.  The end-to-end project proves the
+// same table on Npgsql 10.  The data source maps nothing: all_types reads its enum as a string.
 [Collection(UsesApp.Name)]
 public sealed class AllTypesQueryTests(AppContainer app)
 {
@@ -131,7 +131,7 @@ public sealed class AllTypesQueryTests(AppContainer app)
         await using var source = NpgsqlDataSource.Create(app.ConnectionString);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes)).ToList();
+        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypesForDapper)).ToList();
 
         rows.Count.ShouldBe(2);
         AllTypesRows.ShouldBeTheFullRow(rows[0]);

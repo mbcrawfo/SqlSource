@@ -22,9 +22,10 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
 // both sides; and it reads each column by its ordinal with GetFieldValue into the same model, and the rows into an
 // array, the collection the method returns, through what the generated method reads them into.  So each query has two
 // pairs: its method of AccountQueries, which reads its rows into the pooled buffer, against a hand-written method that
-// reads them into RowBufferByHand of this project, the same buffer by hand; and its method of
-// UnpooledAccountQueries, the same query under no-array-pool, which reads them into a List and copies it, against a
-// hand-written method that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
+// reads them into RowBufferByHand of this project, the same buffer by hand; and the method of
+// its copy GetAccountNameUnpooled, ListAccountsUnpooled or ListClosedBeforeUnpooled in the same file, the same query
+// under no-array-pool by its own marker, which reads them into a List and copies it, against a hand-written method
+// that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
 // List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against rows read into RowBufferByHand and
 // copied by ToList or ToImmutableArray, and its twin under no-array-pool against a List that is returned as it is or an
 // ImmutableArray builder that is drained, since those are what the generated method returns.  Three more tests hold
@@ -169,7 +170,7 @@ public sealed class AllocationTests(PostgresApp postgres)
         await using var connection = source.CreateConnection();
         await Allocations.InStateAsync(connection, State, token);
         var parameters = new GetAccountNameArgs(1);
-        (await UnpooledAccountQueries.GetAccountName(connection, parameters, cancellationToken: token)).ShouldBe([
+        (await connection.GetAccountNameUnpooled(parameters, cancellationToken: token)).ShouldBe([
             new AccountName(1, "alice"),
         ]);
         (await GetAccountNameUnpooledByHandAsync(connection, 1, cancellationToken: token)).ShouldBe([
@@ -177,7 +178,7 @@ public sealed class AllocationTests(PostgresApp postgres)
         ]);
 
         await Allocations.ShouldAllocateNoMoreThanByHandAsync(
-            () => UnpooledAccountQueries.GetAccountName(connection, parameters, cancellationToken: token),
+            () => connection.GetAccountNameUnpooled(parameters, cancellationToken: token),
             () => GetAccountNameUnpooledByHandAsync(connection, 1, cancellationToken: token),
             MarginInBytesPerCall,
             Settings
@@ -210,12 +211,12 @@ public sealed class AllocationTests(PostgresApp postgres)
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
         await using var connection = source.CreateConnection();
         await Allocations.InStateAsync(connection, State, token);
-        var accounts = await UnpooledAccountQueries.ListAccounts(connection, cancellationToken: token);
+        var accounts = await connection.ListAccountsUnpooled(cancellationToken: token);
         accounts.Count.ShouldBe(3);
         (await ListAccountsUnpooledByHandAsync(connection, cancellationToken: token)).ShouldBe(accounts);
 
         await Allocations.ShouldAllocateNoMoreThanByHandAsync(
-            () => UnpooledAccountQueries.ListAccounts(connection, cancellationToken: token),
+            () => connection.ListAccountsUnpooled(cancellationToken: token),
             () => ListAccountsUnpooledByHandAsync(connection, cancellationToken: token),
             MarginInBytesPerCall,
             Settings
@@ -252,15 +253,13 @@ public sealed class AllocationTests(PostgresApp postgres)
         await using var connection = source.CreateConnection();
         await Allocations.InStateAsync(connection, State, token);
         var parameters = new ListClosedBeforeArgs(null);
-        (await UnpooledAccountQueries.ListClosedBefore(connection, parameters, cancellationToken: token)).ShouldBe(
-            ClosedBeforeRows
-        );
+        (await connection.ListClosedBeforeUnpooled(parameters, cancellationToken: token)).ShouldBe(ClosedBeforeRows);
         (await ListClosedBeforeUnpooledByHandAsync(connection, null, cancellationToken: token)).ShouldBe(
             ClosedBeforeRows
         );
 
         await Allocations.ShouldAllocateNoMoreThanByHandAsync(
-            () => UnpooledAccountQueries.ListClosedBefore(connection, parameters, cancellationToken: token),
+            () => connection.ListClosedBeforeUnpooled(parameters, cancellationToken: token),
             () => ListClosedBeforeUnpooledByHandAsync(connection, null, cancellationToken: token),
             MarginInBytesPerCall,
             Settings

@@ -11,29 +11,21 @@ using Xunit;
 
 namespace SqlSource.Tool.Testing.Realistic;
 
-// A class of a corpus's RealisticQueries.cs or RealisticMethods.cs, the case whose query.sql its attribute claims and
-// the member of GeneratorOutput the attribute names as its Output, null when it sets none.
-internal sealed record RealisticClaim(string TypeName, string Case, string? Output);
+// A class of a corpus's RealisticMethods.cs and the case whose query.sql its attribute claims.
+internal sealed record RealisticClaim(string TypeName, string Case);
 
-// The claims of a corpus's RealisticQueries.cs and RealisticMethods.cs, read from their source with Roslyn and not by
-// reflection, so that a test of them names the case and the class and needs no generated type.
+// The claims of a corpus's RealisticMethods.cs, read from its source with Roslyn and not by reflection, so that a test
+// of them names the case and the class and needs no generated type.
 internal static partial class RealisticClaims
 {
-    // The output of a claim that the first file makes, which gives the case its models and the SQL of its query.
-    public const string ModelsOutput = "Models";
-
-    // The output of a claim that the second file makes, which gives the case its method.
-    public const string CodeGenOutput = "CodeGen";
-
     // The attribute as the generator names it, without its namespace and the suffix Attribute, as the file writes it.
     private static readonly string AttributeName = AttributeSource
         .AttributeMetadataName[(AttributeSource.AttributeMetadataName.LastIndexOf('.') + 1)..]
         .Replace("Attribute", "", StringComparison.Ordinal);
 
-    // Every claim of the corpus's two files, those of Queries then those of Methods, each in its order, read afresh
-    // each time.
+    // Every claim of the corpus's file, in its order, read afresh each time.
     public static IReadOnlyList<RealisticClaim> AllOf(RealisticCorpus corpus) =>
-        [.. Parse(File.ReadAllText(corpus.Queries)), .. Parse(File.ReadAllText(corpus.Methods))];
+        Parse(File.ReadAllText(corpus.Methods));
 
     public static IReadOnlyList<RealisticClaim> Parse(string source) =>
         [
@@ -45,29 +37,25 @@ internal static partial class RealisticClaims
                 .SelectMany(static type =>
                     type.AttributeLists.SelectMany(static list => list.Attributes)
                         .Where(static attribute => NameOf(attribute) == AttributeName)
-                        .Select(attribute => new RealisticClaim(
-                            type.Identifier.ValueText,
-                            CaseOf(type, attribute),
-                            OutputOf(type, attribute)
-                        ))
+                        .Select(attribute => new RealisticClaim(type.Identifier.ValueText, CaseOf(type, attribute)))
                 ),
         ];
 
-    // The one claim of the case at the output, which a case with models has at each of the two.
-    public static RealisticClaim Of(RealisticCorpus corpus, RealisticCase found, string output)
+    // The one claim of the case, which a case with models has.
+    public static RealisticClaim Of(RealisticCorpus corpus, RealisticCase found)
     {
-        var claims = AllOf(corpus).Where(claim => claim.Case == found.Name && claim.Output == output).ToList();
+        var claims = AllOf(corpus).Where(claim => claim.Case == found.Name).ToList();
         if (claims.Count != 1)
         {
-            Assert.Fail(ClaimedBy(corpus, found, output, claims.Count));
+            Assert.Fail(ClaimedBy(corpus, found, claims.Count));
         }
 
         return claims[0];
     }
 
-    // How a failure says that a case has a count of claims at an output it should not.
-    public static string ClaimedBy(RealisticCorpus corpus, RealisticCase found, string output, int count) =>
-        $"{found} is claimed at {output} by {count} classes of {corpus.Queries} and {corpus.Methods}";
+    // How a failure says that a case has a count of claims it should not.
+    public static string ClaimedBy(RealisticCorpus corpus, RealisticCase found, int count) =>
+        $"{found} is claimed by {count} classes of {corpus.Methods}";
 
     // The attribute's name without what qualifies it: SqlSource.SqlSourceGenerate and global::SqlSourceGenerate claim
     // as SqlSourceGenerate does.
@@ -83,6 +71,19 @@ internal static partial class RealisticClaims
     // The case of the attribute's Source, which names the query of a folder of Cases relative to this file's folder.
     private static string CaseOf(ClassDeclarationSyntax type, AttributeSyntax attribute)
     {
+        var other = attribute
+            .ArgumentList?.Arguments.Select(static argument =>
+                argument.NameEquals?.Name.Identifier.ValueText ?? argument.ToString()
+            )
+            .FirstOrDefault(static name => name != AttributeSource.SourceProperty);
+        if (other is not null)
+        {
+            throw new InvalidOperationException(
+                $"The class {type.Identifier.ValueText} sets {other}, and a claim of the corpus sets Source alone: "
+                    + "its output and every other setting are its settings files'."
+            );
+        }
+
         var path = attribute
             .ArgumentList?.Arguments.Where(static argument =>
                 argument.NameEquals?.Name.Identifier.ValueText == AttributeSource.SourceProperty
@@ -99,27 +100,6 @@ internal static partial class RealisticClaims
                 $"The class {type.Identifier.ValueText} claims {path ?? "no path"}, which is not the query.sql of a "
                     + "folder of ../Cases."
             );
-    }
-
-    // The member of GeneratorOutput that the attribute's Output names, GeneratorOutput.X or qualified, or null when it
-    // sets none.  Any other expression is not a member the file names, so it fails naming the class.
-    private static string? OutputOf(ClassDeclarationSyntax type, AttributeSyntax attribute)
-    {
-        var expressions = attribute
-            .ArgumentList?.Arguments.Where(static argument =>
-                argument.NameEquals?.Name.Identifier.ValueText == AttributeSource.OutputProperty
-            )
-            .Select(static argument => argument.Expression)
-            .ToList();
-        return expressions?.SingleOrDefault() switch
-        {
-            null => null,
-            MemberAccessExpressionSyntax access => access.Name.Identifier.ValueText,
-            var other => throw new InvalidOperationException(
-                $"The class {type.Identifier.ValueText} claims the Output {other}, which is not a member of "
-                    + "GeneratorOutput."
-            ),
-        };
     }
 
     [GeneratedRegex(@"^\.\./Cases/(?<case>[^/]+)/query\.sql$", RegexOptions.CultureInvariant)]

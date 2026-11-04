@@ -8,9 +8,10 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// Each of the ten collection types of a many query, set by the project's settings file, the attribute, the file
-// header and a query's marker, run through the methods of the classes of CollectionQueries.cs on the seed of
-// "app".  Each test reads the type the method returns, the collection that holds the rows, and the rows.
+// Each of the ten collection types of a many query, set by the project's settings file, the file header of each of two
+// files and a query's marker, the last on the copies of ListCollectedAccounts in Claimed.sql, run through the methods
+// of the classes of CollectionQueries.cs on the seed of "app".  Each test reads the type the method returns, the
+// collection that holds the rows, and the rows.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodCollectionTests(SqlServerDatabases sqlServer)
 {
@@ -34,86 +35,86 @@ public sealed class MethodCollectionTests(SqlServerDatabases sqlServer)
     }
 
     [Fact]
-    public async Task ListCollectedAccounts_IEnumerableByTheAttribute_HoldsAnArray()
+    public async Task ListCollectedAccountsAsIEnumerable_IEnumerableByTheQuerysMarker_HoldsAnArray()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var rows = await EnumerableCollectionQueries.ListCollectedAccounts(
+        var rows = await CollectionQueries.ListCollectedAccountsAsIEnumerable(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         ShouldHold<IEnumerable<CollectedAccount>, CollectedAccount[]>(
-            typeof(EnumerableCollectionQueries),
-            nameof(EnumerableCollectionQueries.ListCollectedAccounts),
+            typeof(CollectionQueries),
+            nameof(CollectionQueries.ListCollectedAccountsAsIEnumerable),
             rows
         );
     }
 
     [Fact]
-    public async Task ListCollectedAccounts_ICollectionByTheAttribute_HoldsAList()
+    public async Task ListCollectedAccountsAsICollection_ICollectionByTheQuerysMarker_HoldsAList()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var rows = await CollectionInterfaceCollectionQueries.ListCollectedAccounts(
+        var rows = await CollectionQueries.ListCollectedAccountsAsICollection(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         ShouldHold<ICollection<CollectedAccount>, List<CollectedAccount>>(
-            typeof(CollectionInterfaceCollectionQueries),
-            nameof(CollectionInterfaceCollectionQueries.ListCollectedAccounts),
+            typeof(CollectionQueries),
+            nameof(CollectionQueries.ListCollectedAccountsAsICollection),
             rows
         );
     }
 
     [Fact]
-    public async Task ListCollectedAccounts_IReadOnlyCollectionByTheAttribute_HoldsAnArray()
+    public async Task ListCollectedAccountsAsIReadOnlyCollection_IReadOnlyCollectionByTheQuerysMarker_HoldsAnArray()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var rows = await ReadOnlyCollectionQueries.ListCollectedAccounts(
+        var rows = await CollectionQueries.ListCollectedAccountsAsIReadOnlyCollection(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         ShouldHold<IReadOnlyCollection<CollectedAccount>, CollectedAccount[]>(
-            typeof(ReadOnlyCollectionQueries),
-            nameof(ReadOnlyCollectionQueries.ListCollectedAccounts),
+            typeof(CollectionQueries),
+            nameof(CollectionQueries.ListCollectedAccountsAsIReadOnlyCollection),
             rows
         );
     }
 
     [Fact]
-    public async Task ListCollectedAccounts_ListByTheAttribute_HoldsAList()
+    public async Task ListCollectedAccountsAsList_ListByTheQuerysMarker_HoldsAList()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var rows = await ListCollectionQueries.ListCollectedAccounts(
+        var rows = await CollectionQueries.ListCollectedAccountsAsList(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         ShouldHold<List<CollectedAccount>, List<CollectedAccount>>(
-            typeof(ListCollectionQueries),
-            nameof(ListCollectionQueries.ListCollectedAccounts),
+            typeof(CollectionQueries),
+            nameof(CollectionQueries.ListCollectedAccountsAsList),
             rows
         );
     }
 
     [Fact]
-    public async Task ListCollectedAccounts_ImmutableListByTheAttribute_HoldsAnImmutableList()
+    public async Task ListCollectedAccountsAsImmutableList_ImmutableListByTheQuerysMarker_HoldsAnImmutableList()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var rows = await ImmutableListCollectionQueries.ListCollectedAccounts(
+        var rows = await CollectionQueries.ListCollectedAccountsAsImmutableList(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         ShouldHold<ImmutableList<CollectedAccount>, ImmutableList<CollectedAccount>>(
-            typeof(ImmutableListCollectionQueries),
-            nameof(ImmutableListCollectionQueries.ListCollectedAccounts),
+            typeof(CollectionQueries),
+            nameof(CollectionQueries.ListCollectedAccountsAsImmutableList),
             rows
         );
     }

@@ -7,8 +7,8 @@ using SqlSource.Testing;
 namespace SqlSource.Tool.Testing.Realistic;
 
 // The realistic corpus of an engine, the folder Realistic/ of that engine's project, read from the repository: the
-// schema and the seed of its database "realistic", the folder of its cases, the two files of the classes that claim
-// them, and the engine its cases are read for.  A case folder that is wrong fails naming the case and the fault.
+// schema and the seed of its database "realistic", the folder of its cases, the file of the classes that claim them,
+// and the engine its cases are read for.  A case folder that is wrong fails naming the case and the fault.
 internal sealed class RealisticCorpus
 {
     private const string SettingsFileName = "sqlsource.json";
@@ -53,10 +53,7 @@ internal sealed class RealisticCorpus
     // The settings file of Cases/, which every query of the corpus is below: its database and its type override.
     public string CasesSettingsFile => Path.Combine(Cases, SettingsFileName);
 
-    // The classes that claim each case with models as a query of the project, at the output Models.
-    public string Queries => Path.Combine(Folder, "Generation", "RealisticQueries.cs");
-
-    // The classes that claim each case with models a second time, at the output CodeGen, so that it has a method.
+    // The classes that claim each case with models, once.
     public string Methods => Path.Combine(Folder, "Generation", "RealisticMethods.cs");
 
     // The name of every folder of Cases, in order: each is a case, and a folder that is no case fails when it is
