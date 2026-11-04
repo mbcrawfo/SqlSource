@@ -78,21 +78,26 @@ internal static class SettingValue
     }
 
     /// <summary>
-    /// Whether <paramref name="value" /> can name a generated type: one identifier that is not a reserved keyword.
+    /// Whether <paramref name="value" /> can name a generated nested class: one identifier that
+    /// <see cref="SqlIdentifier.IsUsableTypeName" /> takes, and not <c>var</c>.  C# takes <c>var</c> as a type's name,
+    /// but inside the type it would then stand for the class in place of the keyword, and the query methods on the
+    /// type and in its nested classes declare their locals with <c>var</c>.
     /// </summary>
-    public static bool IsTypeName(ReadOnlySpan<char> value) => SqlIdentifier.IsUsableName(value.ToString());
+    public static bool IsNestedClassName(ReadOnlySpan<char> value) =>
+        !value.SequenceEqual("var".AsSpan()) && SqlIdentifier.IsUsableTypeName(value.ToString());
 
     /// <summary>
-    /// Whether <paramref name="value" /> is identifiers that are not reserved keywords, joined by periods.  It is
-    /// the rule of a namespace and of the name of a type, which is one identifier or a full name: nothing in the
-    /// text tells the two apart.
+    /// Whether <paramref name="value" /> is identifiers joined by periods, each of which
+    /// <see cref="SqlIdentifier.IsUsableTypeName" /> takes.  It is the rule of a namespace and of the name of a type,
+    /// which is one identifier or a full name: nothing in the text tells the two apart, so a part of a namespace
+    /// follows the rule of a type's name too.
     /// </summary>
     public static bool IsQualifiedName(ReadOnlySpan<char> value)
     {
         while (true)
         {
             var period = value.IndexOf('.');
-            if (!SqlIdentifier.IsUsableName((period < 0 ? value : value.Slice(0, period)).ToString()))
+            if (!SqlIdentifier.IsUsableTypeName((period < 0 ? value : value.Slice(0, period)).ToString()))
             {
                 return false;
             }

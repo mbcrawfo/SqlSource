@@ -17,11 +17,15 @@ internal static class TypeEmitter
     // A query can be named like a member the type inherits: "GetType" hides object.GetType in the nested class, and
     // on the type a query can hide a member of a base class.  That is what was asked for, and the compiler's request
     // to add "new" (CS0108) is one that nobody can act on in generated code.  Neither is its request to add "new" or
-    // "override" (CS0114) to a method that has the name and the parameters of an inherited virtual method.  A file of
-    // methods on the type starts with the same lines.
+    // "override" (CS0114) to a method that has the name and the parameters of an inherited virtual method.  A nested
+    // class can be named in lower case, as "queries", or "record", which are legal names that a user chose and which
+    // the compiler warns of (CS8981, CS8860) at each part of the class, the generated ones too; the user's own type
+    // with such a name is warned of in the user's file all the same.  A file of methods on the type starts with the
+    // same lines.
     internal const string HeaderLines =
         GeneratedText.Header
-        + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n";
+        + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n"
+        + "#pragma warning disable CS8860, CS8981 // A nested class can be named in lower case, or record.\n";
 
     // The lines, and the empty line after them.
     internal const string Header = HeaderLines + "\n";

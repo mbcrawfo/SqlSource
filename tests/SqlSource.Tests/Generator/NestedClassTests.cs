@@ -233,6 +233,88 @@ public sealed class NestedClassTests
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
     }
 
+    // C# refuses these contextual keywords as the name of a type (CS9056, CS9029, CS9062 and, from C# 14, CS9306), so
+    // a nested class cannot have one.  Nor can it be var, which the type's query methods would then read as the class
+    // where they declare a local.  The marker is SQLSRC111, and its file is left out; the settings file's value is
+    // SQLSRC019, and the default names the class.
+    [Theory]
+    [InlineData("file", false)]
+    [InlineData("required", false)]
+    [InlineData("scoped", false)]
+    [InlineData("extension", false)]
+    [InlineData("var", false)]
+    [InlineData("file", true)]
+    [InlineData("required", true)]
+    [InlineData("scoped", true)]
+    [InlineData("extension", true)]
+    [InlineData("var", true)]
+    public void Run_ContextualKeywordThatCannotNameTheNestedClass_IsAnError(string value, bool inSettingsFile)
+    {
+        const string Source = """
+            using SqlSource;
+            namespace App;
+            [SqlSourceGenerate(Source = ".")]
+            public partial class Sample { }
+            """;
+
+        var run = inSettingsFile
+            ? Run(Source, value)
+            : Run(
+                Source,
+                null,
+                new SqlFile(GeneratorHarness.UsersPath, "-- nested-class: " + value + "\n\n" + SqlTexts.GetUser)
+            );
+
+        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static partial class Sql\n");
+        if (inSettingsFile)
+        {
+            diagnostic.ShouldStartWith($"SQLSRC019 {FilesFolderSettingsPath}(");
+            diagnostic.ShouldContain($"'{value}' is not a valid value of nestedClass");
+            run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = ");
+        }
+        else
+        {
+            diagnostic.ShouldStartWith($"SQLSRC111 {GeneratorHarness.UsersPath}(1,18)-(1,{18 + value.Length}): ");
+            run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
+        }
+    }
+
+    // A name in lower case, record, and a contextual keyword that C# takes as a type's name are each one the compiler
+    // takes, and warns of (CS8981, and CS8860 for record).  Both files write a part of the class:
+    // the type's file the constant of GetName, and the methods' file the method of GetUser.  Neither warns.
+    [Theory]
+    [InlineData("queries")]
+    [InlineData("record")]
+    [InlineData("dynamic")]
+    [InlineData("nameof")]
+    [InlineData("partial")]
+    public void Run_NestedClassInLowerCase_CompilesWithoutWarningsInBothFiles(string name)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: nested-class\n-- nested-class: "
+                + name
+                + "\n\n-- name: GetName\n-- output: sql\nSELECT name FROM users;\n"
+                + "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])]
+        );
+
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
+        var type = run.Sources[GeneratorHarness.SampleFile];
+        type.ShouldContain("        private static partial class " + name + "\n");
+        type.ShouldContain("            public const string GetName = ");
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("        private static partial class " + name + "\n");
+        methods.ShouldContain(" GetUser(\n");
+    }
+
     // The file with -- nested-class: Statements in its header.
     private static readonly SqlFile StatementsFile = new(
         GeneratorHarness.UsersPath,

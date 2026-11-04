@@ -41,7 +41,7 @@ internal static class SettingsLevelReader
             SqlServerTypeOverrides = sqlServerTypeOverrides,
             ColumnTypes = ReadColumnTypes(ref source),
             LibraryTypes = ReadLibraryTypes(ref source),
-            NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsTypeName),
+            NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsNestedClassName),
             MemberLocation = ReadPlaced<TSource, MemberLocation>(ref source, SettingId.MemberLocation),
             Visibility = ReadPlaced<TSource, Visibility>(ref source, SettingId.Visibility),
         };

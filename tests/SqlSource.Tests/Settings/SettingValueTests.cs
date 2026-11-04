@@ -141,8 +141,19 @@ public sealed class SettingValueTests
     [InlineData("1Sql", false)]
     [InlineData("@Sql", false)]
     [InlineData("Sql\u200B", false)]
-    public void IsTypeName_OneIdentifierThatIsNotAReservedKeyword_IsAName(string value, bool expected) =>
-        SettingValue.IsTypeName(value.AsSpan()).ShouldBe(expected);
+    // The contextual keywords that C# refuses as a type's name.
+    [InlineData("file", false)]
+    [InlineData("required", false)]
+    [InlineData("scoped", false)]
+    [InlineData("extension", false)]
+    [InlineData("File", true)]
+    [InlineData("record", true)]
+    [InlineData("partial", true)]
+    // The keyword of the locals of a query method, which a class of its name would stand for.
+    [InlineData("var", false)]
+    [InlineData("Var", true)]
+    public void IsNestedClassName_OneIdentifierThatCanNameANestedClass_IsAName(string value, bool expected) =>
+        SettingValue.IsNestedClassName(value.AsSpan()).ShouldBe(expected);
 
     // The rule of a namespace and of a type's name, which is one identifier or a full name.
     [Theory]
@@ -160,6 +171,13 @@ public sealed class SettingValueTests
     [InlineData("global::App", false)]
     [InlineData("User Row", false)]
     [InlineData("UserRow<T>", false)]
+    // A contextual keyword that C# refuses as a type's name, as any part.
+    [InlineData("file", false)]
+    [InlineData("required.App", false)]
+    [InlineData("App.scoped.UserRow", false)]
+    [InlineData("App.extension", false)]
+    [InlineData("App.where.UserRow", true)]
+    [InlineData("App.var", true)]
     public void IsQualifiedName_IdentifiersJoinedByPeriods_IsAName(string value, bool expected) =>
         SettingValue.IsQualifiedName(value.AsSpan()).ShouldBe(expected);
 

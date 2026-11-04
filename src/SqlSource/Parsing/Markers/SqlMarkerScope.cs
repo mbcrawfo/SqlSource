@@ -204,7 +204,7 @@ internal sealed class SqlMarkerScope(
                 SetText(
                     ref (_placement ??= new Placement()).NestedClass,
                     marker,
-                    SettingValue.IsTypeName(Value(marker))
+                    SettingValue.IsNestedClassName(Value(marker))
                 );
                 break;
             case SqlMarkerKind.InputModel:

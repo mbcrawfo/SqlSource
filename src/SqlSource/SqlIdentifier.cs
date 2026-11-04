@@ -32,6 +32,15 @@ internal static class SqlIdentifier
     /// <summary>True when <paramref name="value" /> can be the name of a generated member or parameter.</summary>
     public static bool IsUsableName(string value) => IsValid(value) && !IsReservedKeyword(value);
 
+    /// <summary>
+    /// True when <paramref name="value" /> can be the name of a generated type: a usable name that is not one of the
+    /// contextual keywords that C# refuses as the name of a type, <c>file</c> (CS9056), <c>required</c> (CS9029),
+    /// <c>scoped</c> (CS9062) and, from C# 14, <c>extension</c> (CS9306).  They are refused in every version of the
+    /// language, so that a project keeps building when it moves to a newer one.
+    /// </summary>
+    public static bool IsUsableTypeName(string value) =>
+        IsUsableName(value) && value is not ("file" or "required" or "scoped" or "extension");
+
     private static bool IsFormatCharacter(char character) =>
         char.GetUnicodeCategory(character) == UnicodeCategory.Format;
 }

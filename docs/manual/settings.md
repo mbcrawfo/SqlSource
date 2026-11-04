@@ -261,7 +261,7 @@ SELECT id, name FROM users;
 
 The namespace the generated [models](generator.md#models) go in.  The default is the namespace of the type that claims the file.  Above, the models of `ListUsers` are in `App.Models`.
 
-- The value is C# identifiers joined by periods, none of them a reserved keyword.
+- The value is C# identifiers joined by periods, none of them a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.
 - It stands in the file header only.  It can also be `modelNamespace` in a settings file.
 - A name with a period that `-- input-model:` or `-- output-model:` gives is a full name, and ignores this setting.
 - Two types in two namespaces that claim one file, or read one table, get a model each, one in each namespace, unless this setting gives them one.
@@ -299,7 +299,7 @@ What each shape looks like is on [the generator page](generator.md#model-shape).
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-`-- input-model:` and `-- output-model:` name the [model](generator.md#models) of one query's parameters and of its result rows, whole, with no suffix.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword.  Above, `GetUser` gets `UserArgs`, in the namespace its models would have without the marker, and `UserRow` in the namespace `App.Models`, whatever the [model namespace](#setting-model-namespace) says.
+`-- input-model:` and `-- output-model:` name the [model](generator.md#models) of one query's parameters and of its result rows, whole, with no suffix.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.  Above, `GetUser` gets `UserArgs`, in the namespace its models would have without the marker, and `UserRow` in the namespace `App.Models`, whatever the [model namespace](#setting-model-namespace) says.
 
 - It stands inside a query only.  It has no key in a settings file, since a name is for one query.
 - `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119), and `-- output-model:` on a query whose statement returns no rows is [SQLSRC259](diagnostics.md#sqlsrc259).
@@ -788,7 +788,7 @@ This names the class nested in the type that holds a query's members when its [m
 - **Each query has its own**, so one file can fill two classes, as `Users.Get` and `Orders.List`, and two files of one type can fill one.  A class is written only when a query of the type puts a member in it.
 - **It is a setting of the `.sql` file**, taken from the settings files of its folder and the folders above it, as every other setting is, and not from those of the type's C# file.  For a type that reads the file named for it beside its C# file, as it does without [`Source`](#setting-source), the two are the same folder.
 - **It is ignored where the member location is not `nested-class`**, so a `nestedClass` for a whole project beside a file whose queries go on the type is no error.
-- **The value is one C# identifier that is not a keyword**: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.
+- **The value is one C# identifier that is not a keyword**: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  Nor is `file`, `required`, `scoped` or `extension`, which C# does not take as a class's name, or `var`, with which the query methods of the type would not compile.  A name in lower case, such as `queries`, or `record`, is fine, and gives no compiler warning in the generated code.  A value that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.
 - **A type that already has the name**, as a member, a nested type or a type parameter, or as its own name, is [SQLSRC007](diagnostics.md#sqlsrc007), and every file with a query in that class gets no members for it until it is fixed.  The other names its members cannot have are on [the generator page](generator.md#locations).
 
 <a id="setting-source"></a>
