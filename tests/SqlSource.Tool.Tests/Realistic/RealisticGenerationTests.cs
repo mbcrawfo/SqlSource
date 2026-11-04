@@ -57,6 +57,34 @@ public sealed class RealisticGenerationTests
         settings["inputModelSuffix"].ShouldNotBeNull().GetValue<string>().ShouldBe("Args");
     }
 
+    // Cases/sqlsource.json reaches the run: its type override gives back the type map's own C# type for the column
+    // that the project's file overrides, timestamptz on PostgreSQL and date on SQL Server, so a run without it would
+    // write the project's type in the case's models.
+    [Theory]
+    [InlineData("Postgres", "cte-chain", "DateTimeOffset")]
+    [InlineData("SqlServer", "invoices-full-join-payments", "DateOnly")]
+    public void RunAtModels_CaseWithAColumnTheProjectOverrides_GivesTheCasesSettingsType(
+        string engine,
+        string name,
+        string projectType
+    )
+    {
+        var corpus = engine == "Postgres" ? RealisticCorpus.Postgres : RealisticCorpus.SqlServer;
+        var found = corpus.ReadNamed(name);
+        var query = RealisticGeneration.QueryOf(found);
+
+        var run = RealisticGeneration.RunAtModels(
+            corpus,
+            query,
+            RealisticGeneration.CommittedSidecarOf(found, query),
+            []
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.Sources.ShouldNotBeEmpty();
+        run.Sources.Values.ShouldAllBe(source => !source.Contains(projectType, StringComparison.Ordinal));
+    }
+
     // A raise of VersionPrefix before the sidecars are described again: the generator gives SQLSRC240, a warning the
     // build keeps, and the SQL is still the query's.
     [Fact]
