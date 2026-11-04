@@ -32,5 +32,6 @@ internal static class SqlDescribableDialects
             or SqlDialect.Sqlite
             or SqlDialect.Oracle
             or SqlDialect.CockroachDb => DatabaseEngine.PostgreSql,
+            _ => throw UnexpectedEnumValueException.Of(dialect),
         };
 }

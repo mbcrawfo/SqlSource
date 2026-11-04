@@ -437,6 +437,7 @@ internal static class ModelCollector
                     TakenReason.NamespacePartIsType => "'"
                         + taken.Part
                         + "' is a type of this project, and a part of its namespace",
+                    _ => throw UnexpectedEnumValueException.Of(taken.Reason),
                 };
             }
 

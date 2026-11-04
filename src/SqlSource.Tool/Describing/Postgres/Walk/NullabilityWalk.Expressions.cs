@@ -462,7 +462,7 @@ internal static partial class NullabilityWalk
                 case InstanceKind.Plan:
                     return [];
                 default:
-                    throw new InvalidOperationException($"Unknown kind {instance.Kind}.");
+                    throw UnexpectedEnumValueException.Of(instance.Kind);
             }
         }
 

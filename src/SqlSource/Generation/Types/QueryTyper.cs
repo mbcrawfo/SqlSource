@@ -259,6 +259,7 @@ internal static class QueryTyper
             SettingPlaceKind.FileHeader => "a -- column: marker in the file header",
             SettingPlaceKind.Query => QueryColumnMarker,
             SettingPlaceKind.SettingsFile => "the columnTypes of the settings file " + place.Path,
+            _ => throw UnexpectedEnumValueException.Of(place.Kind),
         };
 
     // The query's parameter of the name, ignoring case, when its marker gives it a C# type, or null.
@@ -351,12 +352,14 @@ internal static class QueryTyper
     private static TypeMapping MappingOf(EquatableArray<MappedType> mappedTypes, string name, string key, string place)
     {
         var mapped = MappedTypeResolver.Find(mappedTypes, name);
-        var kind = (mapped?.Status ?? MappedTypeStatus.NotFound) switch
+        var status = mapped?.Status ?? MappedTypeStatus.NotFound;
+        var kind = status switch
         {
             MappedTypeStatus.Found => TypeMappingKind.Mapped,
             MappedTypeStatus.NotAccessible => TypeMappingKind.MappedTypeNotAccessible,
             MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
             MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous => TypeMappingKind.MappedTypeNotFound,
+            _ => throw UnexpectedEnumValueException.Of(status),
         };
         if (kind != TypeMappingKind.Mapped)
         {
@@ -699,6 +702,7 @@ internal static class QueryTyper
                     typeName,
                     "Reference Microsoft.Data.SqlClient"
                 ),
+                _ => throw UnexpectedEnumValueException.Of(engine),
             },
             TypeMappingKind.NeedsNewerSqlClient => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeNeedsNewerSqlClient,
@@ -791,6 +795,7 @@ internal static class QueryTyper
                 typeName,
                 "Map it with the type override, as " + AsAKey(key, engine) + "=<a C# type>"
             ),
+            _ => throw UnexpectedEnumValueException.Of(failure.Kind),
         };
     }
 
@@ -817,6 +822,7 @@ internal static class QueryTyper
             && string.Equals(normalized, key, StringComparison.Ordinal)
                 ? key
                 : SystemSchemas.SqlServer + "." + key,
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
     }
 
@@ -1011,11 +1017,13 @@ internal static class QueryTyper
             {
                 DatabaseEngine.PostgreSql => Find,
                 DatabaseEngine.SqlServer => null,
+                _ => throw UnexpectedEnumValueException.Of(engine),
             };
             OfSqlServer = engine switch
             {
                 DatabaseEngine.PostgreSql => null,
                 DatabaseEngine.SqlServer => Find,
+                _ => throw UnexpectedEnumValueException.Of(engine),
             };
         }
 
@@ -1080,6 +1088,7 @@ internal static class QueryTyper
                 SettingPlaceKind.FileHeader => "a -- type-override: marker in the file header",
                 SettingPlaceKind.Query => "a -- type-override: marker of the query",
                 SettingPlaceKind.SettingsFile => "the typeOverrides of the settings file " + place.Path,
+                _ => throw UnexpectedEnumValueException.Of(place.Kind),
             };
     }
 }

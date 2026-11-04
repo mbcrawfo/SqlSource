@@ -519,6 +519,7 @@ internal sealed class TypePlacement
                 MemberLocation.NestedClass => settings.NestedClass,
                 MemberLocation.Class => settings.Output == OutputKind.CodeGen ? null : type.Name,
                 MemberLocation.ExtensionClass => null,
+                _ => throw UnexpectedEnumValueException.Of(location),
             };
 
         // Whether the constant or token method of the query goes on the type and takes a name the type declares, which
@@ -547,6 +548,7 @@ internal sealed class TypePlacement
                 OutputKind.Sql => "sql",
                 OutputKind.Models => "models",
                 OutputKind.CodeGen => "codegen",
+                _ => throw UnexpectedEnumValueException.Of(output),
             };
 
         // Every file that has a query in one of the classes, left out.

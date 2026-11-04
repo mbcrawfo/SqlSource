@@ -226,10 +226,10 @@ internal sealed class SqlMarkerScope(
             case SqlMarkerKind.Name:
             case SqlMarkerKind.Summary:
             case SqlMarkerKind.Dialect:
-            default:
-                // The parser reads the first three itself and no scope allows them, so only an allowed kind with no
-                // case reaches this, which a test of every kind catches.
+                // The parser reads these three itself and no scope allows them.
                 throw new InvalidOperationException($"No reading of the marker {marker.Kind}.");
+            default:
+                throw UnexpectedEnumValueException.Of(marker.Kind);
         }
     }
 
@@ -239,6 +239,7 @@ internal sealed class SqlMarkerScope(
             SqlScopeKind.Preamble => IsAllowedInPreamble(kind),
             SqlScopeKind.Query => IsAllowedInQuery(kind),
             SqlScopeKind.WholeFile => IsAllowedInQuery(kind) || IsAllowedInPreamble(kind),
+            _ => throw UnexpectedEnumValueException.Of(scopeKind),
         };
 
     internal static bool IsAllowedInQuery(SqlMarkerKind kind) =>
@@ -308,6 +309,7 @@ internal sealed class SqlMarkerScope(
         {
             DatabaseEngine.PostgreSql => false,
             DatabaseEngine.SqlServer => true,
+            _ => throw UnexpectedEnumValueException.Of(Engine),
         };
         return new SettingsLevel
         {

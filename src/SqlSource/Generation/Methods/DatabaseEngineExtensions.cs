@@ -10,6 +10,7 @@ internal static class DatabaseEngineExtensions
         {
             DatabaseEngine.PostgreSql => CodeGenEngines.Postgres,
             DatabaseEngine.SqlServer => CodeGenEngines.SqlServer,
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
 
     /// <summary>The database's name as a diagnostic gives it: <c>PostgreSQL</c> or <c>SQL Server</c>.</summary>
@@ -18,5 +19,6 @@ internal static class DatabaseEngineExtensions
         {
             DatabaseEngine.PostgreSql => "PostgreSQL",
             DatabaseEngine.SqlServer => "SQL Server",
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
 }

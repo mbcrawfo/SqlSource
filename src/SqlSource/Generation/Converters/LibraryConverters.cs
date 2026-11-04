@@ -44,6 +44,7 @@ internal static class LibraryConverters
             SqlLibrary.NodaTime => NodaTimeConversions.Source,
             SqlLibrary.NetTopologySuite => NetTopologySuiteConversions.Source,
             SqlLibrary.Json => JsonConversions.Source,
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     /// <summary>

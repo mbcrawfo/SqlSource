@@ -273,7 +273,7 @@ internal static class RunEvents
             ProjectState.DoesNotUseSqlSource => false,
             ProjectState.NotRestored => LogValue.Null,
             ProjectState.Failed => LogValue.Null,
-            _ => throw new InvalidOperationException($"Unknown state {state}."),
+            _ => throw UnexpectedEnumValueException.Of(state),
         };
 
     private static void SidecarEvent(RunTrace trace, string path, string action, string said)
@@ -293,7 +293,7 @@ internal static class RunEvents
             // The action is itself the failure: a sidecar that could not be read was neither written nor deleted.
             FileAction.Unreadable => SidecarFailed,
             FileAction.None => throw new InvalidOperationException("A file with no action has no event."),
-            _ => throw new InvalidOperationException($"Unknown action {action}."),
+            _ => throw UnexpectedEnumValueException.Of(action),
         };
 
     private static string StateOf(PlannedFileState state) =>
@@ -303,7 +303,7 @@ internal static class RunEvents
             PlannedFileState.HasParseErrors => "has-parse-errors",
             PlannedFileState.NotDescribable => "not-describable",
             PlannedFileState.NotUtf8 => "not-utf-8",
-            _ => throw new InvalidOperationException($"Unknown state {state}."),
+            _ => throw UnexpectedEnumValueException.Of(state),
         };
 
     private static string StateInWords(PlannedFileState state) =>
@@ -313,7 +313,7 @@ internal static class RunEvents
             PlannedFileState.HasParseErrors => "has parse errors",
             PlannedFileState.NotDescribable => "cannot be described",
             PlannedFileState.NotUtf8 => "is not saved as UTF-8",
-            _ => throw new InvalidOperationException($"Unknown state {state}."),
+            _ => throw UnexpectedEnumValueException.Of(state),
         };
 
     // A query that is still to be described has no event yet: it gets one when its describe ends.
@@ -327,6 +327,6 @@ internal static class RunEvents
             QueryState.NotNeeded or QueryState.ToDescribe => throw new InvalidOperationException(
                 $"A query in the state {state} has no event."
             ),
-            _ => throw new InvalidOperationException($"Unknown state {state}."),
+            _ => throw UnexpectedEnumValueException.Of(state),
         };
 }

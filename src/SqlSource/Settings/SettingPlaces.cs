@@ -13,5 +13,6 @@ internal static class SettingPlaces
             SettingPlaceKind.Query => int.MaxValue,
             SettingPlaceKind.FileHeader => int.MaxValue - 1,
             SettingPlaceKind.SettingsFile => 1 + place.Depth,
+            _ => throw UnexpectedEnumValueException.Of(place.Kind),
         };
 }

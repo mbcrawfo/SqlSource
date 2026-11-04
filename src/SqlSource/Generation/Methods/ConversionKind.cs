@@ -3,7 +3,8 @@ namespace SqlSource.Generation.Methods;
 /// <summary>
 /// How a <see cref="Conversion" /> converts between the property's type and the database's.  The kinds exclude each
 /// other; <see cref="Conversion.IsByElement" /> and <see cref="Conversion.MayReturnNull" /> combine with a kind.  Each
-/// switch on it names every member with no discard, so a new kind fails the build where it must be handled.
+/// switch on it names every member and ends in a discard that throws <see cref="UnexpectedEnumValueException" />, so a
+/// new kind fails the build where it must be handled.
 /// </summary>
 internal enum ConversionKind
 {

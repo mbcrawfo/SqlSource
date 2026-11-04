@@ -24,6 +24,7 @@ internal static class PlacementChecks
             MemberLocation.NestedClass => Visibility.Private,
             MemberLocation.Class => typeIsPublic ? Visibility.Public : Visibility.Internal,
             MemberLocation.ExtensionClass => Visibility.Internal,
+            _ => throw UnexpectedEnumValueException.Of(location),
         };
 
     /// <summary>
@@ -54,6 +55,7 @@ internal static class PlacementChecks
                     + "' is not public, so its models are internal, which a public extension method cannot take or "
                     + "return",
                 Visibility.Public or Visibility.Internal => null,
+                _ => throw UnexpectedEnumValueException.Of(visibility),
             },
             // CS1057 and CS0666.
             MemberLocation.Class when visibility == Visibility.Protected && type.IsStatic => StaticReason(type),
@@ -71,6 +73,7 @@ internal static class PlacementChecks
                 + "' is reachable as protected, so its models are internal, which a method reachable from another "
                 + "assembly cannot take or return",
             MemberLocation.Class or MemberLocation.NestedClass => null,
+            _ => throw UnexpectedEnumValueException.Of(location),
         };
 
     /// <summary>The visibility as C# writes it, which is also how a marker writes it.</summary>
@@ -81,6 +84,7 @@ internal static class PlacementChecks
             Visibility.Internal => "internal",
             Visibility.Protected => "protected",
             Visibility.Private => "private",
+            _ => throw UnexpectedEnumValueException.Of(visibility),
         };
 
     /// <summary>The location as a marker writes it.</summary>
@@ -90,6 +94,7 @@ internal static class PlacementChecks
             MemberLocation.ExtensionClass => "extension-class",
             MemberLocation.Class => "class",
             MemberLocation.NestedClass => "nested-class",
+            _ => throw UnexpectedEnumValueException.Of(location),
         };
 
     /// <summary>The type in full, as a diagnostic of placement names it: <c>App.Sample&lt;T&gt;</c>.</summary>

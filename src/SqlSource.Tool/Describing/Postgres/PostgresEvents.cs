@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
@@ -371,7 +370,7 @@ internal static class PostgresEvents
             NullExtension.Inner => "inner",
             NullExtension.Outer => "outer",
             NullExtension.Both => "both",
-            _ => throw new InvalidOperationException($"Unknown null extension {extension}."),
+            _ => throw UnexpectedEnumValueException.Of(extension),
         };
 
     private static LogValue ErrorOf(PostgresServerError error) =>

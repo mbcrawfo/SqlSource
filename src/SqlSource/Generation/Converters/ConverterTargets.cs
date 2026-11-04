@@ -42,5 +42,6 @@ internal static class ConverterTargetsExtensions
         {
             DatabaseEngine.PostgreSql => npgsqlAtLeast10 ? ConverterTargets.Npgsql10 : ConverterTargets.NpgsqlBefore10,
             DatabaseEngine.SqlServer => ConverterTargets.SqlServer,
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
 }

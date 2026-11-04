@@ -215,6 +215,7 @@ internal static class MethodPlanner
                 placement.Location,
                 null
             ),
+            _ => throw UnexpectedEnumValueException.Of(placement.Location),
         };
 
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
@@ -361,6 +362,7 @@ internal static class MethodPlanner
             SqlLibrary.NetTopologySuite => "NetTopologySuite",
             SqlLibrary.Json => "System.Text.Json",
             SqlLibrary.NodaTime => "NodaTime",
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     // The libraries that the query uses, each with its engine, added to the type's, which are made only when the first
@@ -654,6 +656,7 @@ internal static class MethodPlanner
                     + TypeModels.ClaimingTypeOf(type).Name
                     + "' has a constant or method of that name"
                 : null,
+            _ => throw UnexpectedEnumValueException.Of(host.Location),
         };
     }
 
@@ -803,6 +806,7 @@ internal static class MethodPlanner
             ResultShape.Many => "many",
             ResultShape.None => "none",
             ResultShape.RowCount => "rowcount",
+            _ => throw UnexpectedEnumValueException.Of(shape),
         };
 
     // The values that planning one query reads from its type and its file: the type's input and key, the query's file

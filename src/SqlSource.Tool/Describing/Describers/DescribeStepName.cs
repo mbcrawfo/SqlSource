@@ -1,5 +1,3 @@
-using System;
-
 namespace SqlSource.Tool.Describing.Describers;
 
 /// <summary>
@@ -19,6 +17,6 @@ internal static class DescribeStepName
             DescribeStep.TableMatch => "table match",
             DescribeStep.ResolveType => "resolve type",
             DescribeStep.WriteSidecar => "write sidecar",
-            _ => throw new ArgumentOutOfRangeException(nameof(step), step, null),
+            _ => throw UnexpectedEnumValueException.Of(step),
         };
 }

@@ -125,7 +125,7 @@ internal static class RunProjects
                     break;
 
                 default:
-                    break;
+                    throw UnexpectedEnumValueException.Of(evaluation.State);
             }
         }
 

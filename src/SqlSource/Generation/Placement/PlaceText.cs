@@ -18,5 +18,6 @@ internal static class PlaceText
             SettingPlaceKind.Query => "its own marker",
             SettingPlaceKind.FileHeader => "the file header",
             SettingPlaceKind.SettingsFile => "the settings file '" + place.Path + "'",
+            _ => throw UnexpectedEnumValueException.Of(place.Kind),
         };
 }

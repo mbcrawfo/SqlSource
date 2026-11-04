@@ -126,6 +126,13 @@ public sealed class NpgsqlRunLoggerTests
         _recording.Events.ShouldBeEmpty();
     }
 
+    // A level above Critical passes IsEnabled, and no switch names it.
+    [Fact]
+    public void Log_ListedIdAtALevelThatIsNoMember_Throws() =>
+        Should.Throw<UnexpectedEnumValueException>(() =>
+            Write("Npgsql.Command", (LogLevel)7, "text", eventId: NpgsqlEventId.ExecutingCommand)
+        );
+
     // A message that is dropped is never built.
     [Fact]
     public void Log_IdNotListed_DoesNotFormatTheMessage()

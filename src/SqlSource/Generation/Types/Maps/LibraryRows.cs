@@ -88,6 +88,7 @@ internal sealed class LibraryRows
             SqlLibrary.NetTopologySuite => "the NetTopologySuite library",
             SqlLibrary.Json => "the System.Text.Json library",
             SqlLibrary.NodaTime => "the NodaTime library",
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     /// <summary>
@@ -185,6 +186,7 @@ internal sealed class LibraryRows
             SqlLibrary.NetTopologySuite => (Empty(), Empty()),
             SqlLibrary.Json => (JsonRows(), JsonSqlServerRows()),
             SqlLibrary.NodaTime => (NodaTimeRows(), NodaTimeSqlServerRows()),
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     // No rows, which a set only reads to copy, so it needs no comparer: NetTopologySuite has none in pg_catalog, and no

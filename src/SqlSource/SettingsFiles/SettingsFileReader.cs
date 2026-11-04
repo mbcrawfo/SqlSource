@@ -167,6 +167,7 @@ internal static class SettingsFileReader
                 SettingsFileValueType.ArrayOfStrings => kind == SidecarTokenKind.ArrayStart,
                 SettingsFileValueType.ObjectOfStrings or SettingsFileValueType.ObjectOfColumnTypes => kind
                     == SidecarTokenKind.ObjectStart,
+                _ => throw UnexpectedEnumValueException.Of(type),
             };
 
         // Blank sets nothing, as for every other text.

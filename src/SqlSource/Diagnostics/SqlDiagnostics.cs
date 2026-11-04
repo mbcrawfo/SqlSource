@@ -1311,5 +1311,6 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
             SqlParseErrorKind.TokenCrossesComment => TokenCrossesComment,
             SqlParseErrorKind.ParameterInTwoSpellings => ParameterInTwoSpellings,
+            _ => throw UnexpectedEnumValueException.Of(kind),
         };
 }
