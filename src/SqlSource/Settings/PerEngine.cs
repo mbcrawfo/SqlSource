@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace SqlSource.Settings;
 
@@ -51,10 +50,13 @@ internal readonly struct PerEngine<T> : IEquatable<PerEngine<T>>
             throw UnexpectedEnumValueException.Of(engine);
         }
 
-        var slots = new T[DatabaseEngines.All.Length];
-        _slots?.CopyTo(slots, 0);
-        slots[(int)engine] = value;
-        return Create(slots);
+        T[]? slots = null;
+        foreach (var each in DatabaseEngines.All)
+        {
+            Store(ref slots, each, each == engine ? value : this[each]);
+        }
+
+        return From(slots);
     }
 
     /// <summary>The container of <paramref name="selector" /> applied to each slot.</summary>
@@ -62,13 +64,13 @@ internal readonly struct PerEngine<T> : IEquatable<PerEngine<T>>
     /// <param name="selector">The function from a value to its replacement.</param>
     public PerEngine<TResult> Select<TResult>(Func<T, TResult> selector)
     {
-        var slots = new TResult[DatabaseEngines.All.Length];
+        TResult[]? slots = null;
         foreach (var engine in DatabaseEngines.All)
         {
-            slots[(int)engine] = selector(this[engine]);
+            PerEngine<TResult>.Store(ref slots, engine, selector(this[engine]));
         }
 
-        return PerEngine<TResult>.Create(slots);
+        return PerEngine<TResult>.From(slots);
     }
 
     /// <summary>The container of <paramref name="combine" /> applied to each pair of slots, this one's first.</summary>
@@ -78,13 +80,13 @@ internal readonly struct PerEngine<T> : IEquatable<PerEngine<T>>
     /// <param name="combine">The function from a pair of values to the new one.</param>
     public PerEngine<TResult> Zip<TOther, TResult>(PerEngine<TOther> other, Func<T, TOther, TResult> combine)
     {
-        var slots = new TResult[DatabaseEngines.All.Length];
+        TResult[]? slots = null;
         foreach (var engine in DatabaseEngines.All)
         {
-            slots[(int)engine] = combine(this[engine], other[engine]);
+            PerEngine<TResult>.Store(ref slots, engine, combine(this[engine], other[engine]));
         }
 
-        return PerEngine<TResult>.Create(slots);
+        return PerEngine<TResult>.From(slots);
     }
 
     public bool Equals(PerEngine<T> other)
@@ -119,23 +121,26 @@ internal readonly struct PerEngine<T> : IEquatable<PerEngine<T>>
         return hash;
     }
 
-    // The one way every other member builds a container: the default one, with no array, when every slot is
-    // default(T), so a container that says nothing allocates nothing.  The caller hands over the array, of one slot
-    // for each engine, and never touches it again: it is neither copied nor checked beyond its length.
-    internal static PerEngine<T> Create(T[] slots)
+    // The two steps by which every member builds a container, so that one that says nothing allocates nothing: the
+    // array is made at the first slot that is not default(T), and a build that finds none never makes it.  The
+    // builder keeps `slots` local, and hands it to `From` once, so the array is never shared.
+    internal static void Store(ref T[]? slots, DatabaseEngine engine, T value)
     {
-        Debug.Assert(slots.Length == DatabaseEngines.All.Length, "A container has one slot for each engine.");
-        var comparer = EqualityComparer<T>.Default;
-        for (var at = 0; at < slots.Length; at++)
+        if (slots is null)
         {
-            if (!comparer.Equals(slots[at], default!))
+            if (EqualityComparer<T>.Default.Equals(value, default!))
             {
-                return new PerEngine<T>(slots);
+                return;
             }
+
+            slots = new T[DatabaseEngines.All.Length];
         }
 
-        return default;
+        slots[(int)engine] = value;
     }
+
+    // The default container, with no array, when `slots` was never made.
+    internal static PerEngine<T> From(T[]? slots) => slots is null ? default : new PerEngine<T>(slots);
 }
 
 /// <summary>The ways to build a <see cref="PerEngine{T}" />.</summary>
@@ -150,13 +155,13 @@ internal static class PerEngine
     /// <param name="valueOf">The function from an engine to its value.</param>
     public static PerEngine<T> Of<T>(Func<DatabaseEngine, T> valueOf)
     {
-        var slots = new T[DatabaseEngines.All.Length];
+        T[]? slots = null;
         foreach (var engine in DatabaseEngines.All)
         {
-            slots[(int)engine] = valueOf(engine);
+            PerEngine<T>.Store(ref slots, engine, valueOf(engine));
         }
 
-        return PerEngine<T>.Create(slots);
+        return PerEngine<T>.From(slots);
     }
 
     /// <summary>

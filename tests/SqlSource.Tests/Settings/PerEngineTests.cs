@@ -19,7 +19,7 @@ public sealed class PerEngineTests
     }
 
     [Fact]
-    public void Of_CallsTheFunctionOnceForEachEngineInOrder()
+    public void Of_AFunction_IsCalledOnceForEachEngineInOrder()
     {
         var called = new List<DatabaseEngine>();
 
@@ -33,7 +33,7 @@ public sealed class PerEngineTests
     }
 
     [Fact]
-    public void Default_HoldsDefaultInEverySlot()
+    public void Default_EverySlot_IsDefault()
     {
         foreach (var engine in DatabaseEngines.All)
         {
@@ -52,7 +52,7 @@ public sealed class PerEngineTests
     }
 
     [Fact]
-    public void Only_FillsItsEngineAlone()
+    public void Only_OneEngine_FillsItsSlotAlone()
     {
         var perEngine = PerEngine.Only<string?>(DatabaseEngine.SqlServer, "a");
 
@@ -82,7 +82,7 @@ public sealed class PerEngineTests
     }
 
     [Fact]
-    public void Select_MapsEachSlot()
+    public void Select_EachSlot_IsMapped()
     {
         var mapped = PerEngine.Of(engine => (int)engine).Select(n => n * 10);
 
@@ -109,7 +109,7 @@ public sealed class PerEngineTests
     }
 
     [Fact]
-    public void Zip_CombinesSlotBySlot()
+    public void Zip_TwoContainers_CombineSlotBySlot()
     {
         var combined = PerEngine.Of(engine => (int)engine).Zip(PerEngine.Of(_ => 10), (a, b) => a + b);
 
