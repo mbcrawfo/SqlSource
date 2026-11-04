@@ -5,10 +5,9 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Realistic;
 
-// The reading of the claims of a corpus's RealisticQueries.cs and RealisticMethods.cs from their source: a class whose
-// attribute's Source names the query.sql of a folder of Cases claims that case at the member of GeneratorOutput its
-// Output names, and any other path or Output fails naming the class.  The corpus tests that each engine's cases are
-// claimed as they should be are in each engine's project.
+// The reading of the claims of a corpus's RealisticMethods.cs from its source: a class whose attribute's Source names
+// the query.sql of a folder of Cases claims that case, and any other path, or any argument but Source, fails naming the
+// class.  The corpus tests that each engine's cases are claimed as they should be are in each engine's project.
 public sealed class RealisticClaimsTests
 {
     [Fact]
@@ -16,11 +15,11 @@ public sealed class RealisticClaimsTests
         RealisticClaims
             .Parse(
                 """
-                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = GeneratorOutput.Models)]
-                internal static partial class ABQuery;
+                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql")]
+                internal static partial class ABMethod;
                 """
             )
-            .ShouldBe([new RealisticClaim("ABQuery", "a-b", "Models")]);
+            .ShouldBe([new RealisticClaim("ABMethod", "a-b")]);
 
     [Theory]
     [InlineData("SqlSource.SqlSourceGenerate")]
@@ -30,46 +29,30 @@ public sealed class RealisticClaimsTests
             .Parse(
                 $$"""
                 [{{attribute}}(Source = "../Cases/a-b/query.sql")]
-                internal static partial class ABQuery;
-                """
-            )
-            .ShouldBe([new RealisticClaim("ABQuery", "a-b", null)]);
-
-    [Fact]
-    public void Parse_ClaimAtCodeGen_HasThatOutput() =>
-        RealisticClaims
-            .Parse(
-                """
-                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = GeneratorOutput.CodeGen)]
                 internal static partial class ABMethod;
                 """
             )
-            .ShouldBe([new RealisticClaim("ABMethod", "a-b", "CodeGen")]);
+            .ShouldBe([new RealisticClaim("ABMethod", "a-b")]);
 
-    [Fact]
-    public void Parse_QualifiedOutput_IsItsMemberName() =>
-        RealisticClaims
-            .Parse(
-                """
-                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = SqlSource.GeneratorOutput.CodeGen)]
-                internal static partial class ABMethod;
-                """
-            )
-            .ShouldBe([new RealisticClaim("ABMethod", "a-b", "CodeGen")]);
-
-    [Fact]
-    public void Parse_OutputThatIsNotAMemberAccess_ThrowsNamingTheClass()
+    [Theory]
+    [InlineData("Output = GeneratorOutput.CodeGen", "Output")]
+    [InlineData("SqlLocation = SqlLocation.Direct", "SqlLocation")]
+    public void Parse_ClaimWithAnArgumentOtherThanSource_ThrowsNamingTheClassAndTheArgument(
+        string argument,
+        string name
+    )
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
             RealisticClaims.Parse(
-                """
-                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", Output = "CodeGen")]
+                $$"""
+                [SqlSourceGenerate(Source = "../Cases/a-b/query.sql", {{argument}})]
                 internal static partial class XMethod;
                 """
             )
         );
 
         thrown.Message.ShouldContain("XMethod");
+        thrown.Message.ShouldContain(name);
     }
 
     [Fact]
@@ -91,13 +74,13 @@ public sealed class RealisticClaimsTests
         var thrown = Should.Throw<InvalidOperationException>(() =>
             RealisticClaims.Parse(
                 """
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
-                internal static partial class XQuery;
+                [SqlSourceGenerate]
+                internal static partial class XMethod;
                 """
             )
         );
 
-        thrown.Message.ShouldContain("XQuery");
+        thrown.Message.ShouldContain("XMethod");
         thrown.Message.ShouldContain("no path");
     }
 
