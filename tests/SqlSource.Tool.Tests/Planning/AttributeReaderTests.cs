@@ -16,7 +16,6 @@ namespace SqlSource.Tool.Tests.Planning;
 public sealed class AttributeReaderTests : IDisposable
 {
     private const string SourcePrefix = "[SqlSourceGenerate(Source = ";
-    private const string OutputPrefix = "[SqlSourceGenerate(Output = ";
 
     private readonly TempFolder _folder = new();
 
@@ -72,7 +71,6 @@ public sealed class AttributeReaderTests : IDisposable
         var claim = claims.Claims.ShouldHaveSingleItem();
         claim.SourcePath.ShouldBe(Source);
         claim.Source.ShouldBeNull();
-        claim.Output.ShouldBeNull();
     }
 
     [Fact]
@@ -317,27 +315,6 @@ public sealed class AttributeReaderTests : IDisposable
     }
 
     [Theory]
-    [InlineData("GeneratorOutput.Sql", "Sql")]
-    [InlineData("GeneratorOutput.Models", "Models")]
-    [InlineData("GeneratorOutput.CodeGen", "CodeGen")]
-    [InlineData("SqlSource.GeneratorOutput.Models", "Models")]
-    [InlineData("global::SqlSource.GeneratorOutput.CodeGen", "CodeGen")]
-    // The compiler rejects a member that does not exist.
-    [InlineData("GeneratorOutput.Other", null)]
-    // The compiler compares the case, so the reader does.
-    [InlineData("GeneratorOutput.models", null)]
-    [InlineData("GeneratorOutput.CODEGEN", null)]
-    public void Read_OutputAsAMember_IsThatMember(string expression, string? expected)
-    {
-        var claims = Read(OnAClass(OutputPrefix + expression + ")]"));
-
-        claims.Errors.ShouldBeEmpty();
-        var output = claims.Claims.ShouldHaveSingleItem().Output;
-        // Not "output?.ToString().ShouldBe": that would assert nothing for an output that is not set.
-        (output?.ToString()).ShouldBe(expected);
-    }
-
-    [Theory]
     [InlineData("Folder")]
     [InlineData("nameof(Queries)")]
     [InlineData("\"a\" + \"b\"")]
@@ -359,30 +336,29 @@ public sealed class AttributeReaderTests : IDisposable
         ]);
     }
 
+    // The attribute has no Output, and the compiler rejects one: the reader steps over it however it is written.
     [Theory]
-    [InlineData("(GeneratorOutput)1")]
-    [InlineData("Level")]
-    [InlineData("default")]
-    [InlineData("GeneratorOutput.Models | GeneratorOutput.CodeGen")]
-    [InlineData("Other.Models")]
-    public void Read_OutputThatIsNoMember_IsSqlsrc208AtTheExpressionAndNoClaim(string expression)
+    [InlineData("Output = GeneratorOutput.Sql")]
+    [InlineData("Output = (GeneratorOutput)1")]
+    public void Read_OutputArgument_IsIgnoredWithoutError(string argument)
     {
-        var claims = Read(OnAClass(OutputPrefix + expression + ")]"));
+        var claims = Read(OnAClass("[SqlSourceGenerate(Source = \"a.sql\", " + argument + ")]"));
 
-        claims.Claims.ShouldBeEmpty();
-        claims.Errors.ShouldBe([
-            ToolDiagnostic.At(
-                ToolDiagnostics.AttributeArgumentNotLiteral,
-                Source,
-                new LinePosition(2, OutputPrefix.Length),
-                "Output"
-            ),
-        ]);
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe("a.sql");
     }
 
     [Fact]
-    public void Read_BothArgumentsNoLiterals_IsSqlsrc208ForEach() =>
-        Read(OnAClass("[SqlSourceGenerate(Source = Folder, Output = Level)]")).Errors.Length.ShouldBe(2);
+    public void Read_PathThatIsNoLiteralBesideAnOutput_IsSqlsrc208OfThePathAlone() =>
+        Read(OnAClass("[SqlSourceGenerate(Source = Folder, Output = Level)]"))
+            .Errors.ShouldBe([
+                ToolDiagnostic.At(
+                    ToolDiagnostics.AttributeArgumentNotLiteral,
+                    Source,
+                    new LinePosition(2, SourcePrefix.Length),
+                    "Source"
+                ),
+            ]);
 
     [Fact]
     public void Read_OtherArgumentsOfTheAttribute_AreNotRead() =>

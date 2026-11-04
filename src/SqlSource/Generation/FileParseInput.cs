@@ -18,9 +18,8 @@ namespace SqlSource.Generation;
 /// <see cref="SqlDialect.Ansi" />.
 /// </param>
 /// <param name="CommentsWanted">
-/// Whether a level the parser cannot see may ask for <c>keep-comments</c>: the chain's list, or the attribute of a
-/// type that claims the file.  It may be true where no query ends up keeping its comments; it is never false where one
-/// does.
+/// Whether the level the parser cannot see, the chain's list, asks for <c>keep-comments</c>.  It may be true where no
+/// query ends up keeping its comments, since a marker's list replaces the chain's.
 /// </param>
 internal sealed record FileParseInput(
     AdditionalText File,
@@ -32,18 +31,7 @@ internal sealed record FileParseInput(
     /// <summary>
     /// The input of <paramref name="file" />, whose path <see cref="SqlPath.Normalize" /> gives as
     /// <paramref name="normalizedPath" />, under <paramref name="chain" />, the chain of its folder.
-    /// <paramref name="commentPaths" /> are the files of the types whose attribute asks for comments, sorted by
-    /// <see cref="SqlPath.Comparer" />.
     /// </summary>
-    public static FileParseInput Resolve(
-        AdditionalText file,
-        string? normalizedPath,
-        SettingsChain chain,
-        EquatableArray<string> commentPaths
-    )
-    {
-        var commentsWanted =
-            chain.Level.KeepsComments || (normalizedPath is not null && SqlPath.Contains(commentPaths, normalizedPath));
-        return new FileParseInput(file, normalizedPath, chain.Dialect ?? default, commentsWanted);
-    }
+    public static FileParseInput Resolve(AdditionalText file, string? normalizedPath, SettingsChain chain) =>
+        new(file, normalizedPath, chain.Dialect ?? default, chain.Level.KeepsComments);
 }

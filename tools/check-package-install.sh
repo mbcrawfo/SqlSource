@@ -355,9 +355,9 @@ cat >"$online/Online.csproj" <<EOF
     </ItemGroup>
 </Project>
 EOF
-echo '{ "root": true, "dialect": "postgres" }' >"$online/sqlsource.json"
+echo '{ "root": true, "dialect": "postgres", "output": "models" }' >"$online/sqlsource.json"
 cat >"$online/Queries.cs" <<'EOF'
-[SqlSource.SqlSourceGenerate(Source = "Queries", Output = SqlSource.GeneratorOutput.Models)]
+[SqlSource.SqlSourceGenerate(Source = "Queries")]
 internal static partial class Queries;
 EOF
 

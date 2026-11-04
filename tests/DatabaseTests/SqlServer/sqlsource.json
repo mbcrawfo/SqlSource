@@ -13,6 +13,6 @@
     // The C# type that date is read as, in place of the default of the type map.
     "date": "System.DateOnly",
   },
-  // The collection type of a query's rows, where no marker, attribute or nearer settings file sets one.
+  // The collection type of a query's rows, where no marker or nearer settings file sets one.
   "collectionType": "IReadOnlyList",
 }

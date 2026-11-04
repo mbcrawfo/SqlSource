@@ -95,7 +95,6 @@ public sealed class CachingParseTests
             TrackingNames.UnsupportedLanguageVersion,
             TrackingNames.TypeFiles,
             TrackingNames.ClaimedPaths,
-            TrackingNames.CommentPaths,
             TrackingNames.FileParseInput,
             TrackingNames.FileClaim,
             TrackingNames.ParsedFile,

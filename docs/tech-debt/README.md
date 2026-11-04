@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0100`
+Next id: `TD-0101`
 
 ## Active items
 
@@ -21,7 +21,7 @@ Next id: `TD-0100`
 | [TD-0027](TD-0027-manifest-target-depends-on-a-target-of-the-sdk.md) | Open | 2026-10-09 | Low | The target that writes the project manifest depends on `AddImplicitDefineConstants`, a target of the SDK whose name is no contract |
 | [TD-0030](TD-0030-project-option-through-a-symbolic-link-is-not-found.md) | Open | 2026-10-10 | Low | A full path given to `--project` through a symbolic link to the working directory is `SQLSRC207`, and a `.sql` path given the same way is `SQLSRC212`: paths are compared as text |
 | [TD-0031](TD-0031-attribute-reader-of-the-tool-is-syntax-only.md) | Open | 2026-10-10 | Low | The `sqlsource` tool reads `[SqlSourceGenerate]` as syntax: an alias for the attribute is not seen, a type of the same name is taken for it, and an attribute inside `#if` is read under the configuration of the manifest alone; the build reports the queries of a type the tool did not see as having no entry |
-| [TD-0033](TD-0033-sql-file-that-two-projects-list-has-one-sidecar.md) | Open | 2026-10-10 | Low | A `.sql` file that two projects list, with two outputs, has one sidecar: a run on one of the two sees the needs of that one alone, and each project's build warns of the entries that only the other needs |
+| [TD-0033](TD-0033-sql-file-that-two-projects-list-has-one-sidecar.md) | Open | 2026-10-10 | Low | A `.sql` file that two projects list, when one of them misses a settings file of it that the other finds, through a late target or a settings file in another case that one lists, can need entries for one project alone in its one sidecar: a run on one of the two sees the needs of that one alone, and each project's build warns of the entries that only the other needs |
 | [TD-0034](TD-0034-redaction-of-a-describers-text-has-holes.md) | Open | 2026-10-10 | Low | The `sqlsource` tool removes each whole form of a connection's value, and its passwords where they stand as tokens, those of PostgreSQL's environment and password file among them, from what it prints, says under `--verbose` and logs, refuses a capture that holds either, and searches a sidecar's entry for the whole forms alone: not a password shorter than four characters or equal to the database's name or the engine's, a value in pieces that no joined search puts side by side, or a password from a source the describer does not read, nor a login's name in a message of SQL Server or what else a server's message in a capture names; and every password of a password file is removed, so one can hide a word that equals it |
 | [TD-0037](TD-0037-logging-and-the-steps-of-a-run-refer-to-each-other.md) | Open | 2026-10-10 | Low | `Logging/` and `Describing`, `Planning` and `Projects` refer to each other in a circle: `RunEvents` takes the steps' types, and the steps call `RunEvents` |
 | [TD-0042](TD-0042-allocations-a-parse-could-avoid.md) | Open | 2026-10-11 | Low | A summary of one line makes a list and, on .NET Framework, a copy, and a marker scope holds the name of its input model twice |
@@ -41,6 +41,7 @@ Next id: `TD-0100`
 | [TD-0094](TD-0094-roslyn-4-14-features-are-not-used-yet.md) | Open | 2026-10-31 | Low | Only the compiler's handling of `Microsoft.CodeAnalysis.EmbeddedAttribute` was adopted when the floor moved from Roslyn 4.8.0 to 4.14.0; the rest of the API that 4.9 to 4.14 added for pipelines, caching and allocation was not looked at, and four style rules about collection expressions on `ImmutableArray<T>` are suggestions for `src/SqlSource` until its calls are measured |
 | [TD-0095](TD-0095-a-cref-to-a-reused-exception-can-be-ambiguous.md) | Open | 2026-11-02 | Low | A project that uses a referenced copy of the exceptions and also references another SqlSource assembly whose copy it cannot see gets CS0419 at its own bound crefs to either exception, and CS1574 at those to a member of either, since a cref is bound without regard to accessibility |
 | [TD-0097](TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md) | Open | 2026-11-03 | Medium | What phase 9's design says Visual Studio and VS Code show of a sidecar another process wrote, their design-time builds, the VS Code task and the file events of their saves was checked in Rider on macOS alone |
+| [TD-0100](TD-0100-a-merge-can-keep-an-older-tools-entry.md) | Open | 2026-11-04 | Medium | A sidecar records the tool's version for the whole file, so a git merge of a branch that updated the tool with one that described a query on the older tool can leave that query's entry under the new version, and neither the build nor `describe` sees it; only `describe --check` does |
 
 ## Columns
 

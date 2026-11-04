@@ -8,7 +8,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // The queries of Queries/Shapes.sql, run on the seed of "app" through the static methods that ShapeQueries gets under
 // MethodLocation.Public, with their class input models as the parameters, into their record and class output models,
-// in an IReadOnlyList by the marker of SearchAccounts and in a List by the attribute for the others.  Half the tests
+// in an IReadOnlyList by the marker of SearchAccounts and in a List by the file header for the others.  Half the tests
 // give the method an open connection and half a closed one, which the method opens.  The tests read this project's own
 // generated models, which the other engine's project does not have, so they are not shared.
 [Collection(UsesPostgres.Name)]

@@ -130,12 +130,11 @@ public sealed class EndToEndTests
     public void ProjectWithParameters_FileWithAHeader_UsesTheListOfItsHeader() =>
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
+    // Plain.sql has no header, so the settings file's list applies.  Without keep-comments it leaves the comment out,
+    // and with no-token-validation the method takes the blank text of its token, which it would throw on otherwise.
     [Fact]
-    public void ProjectWithParameters_TwoTypesClaimOneFile_EachUsesItsOwnAttribute()
-    {
-        ParameterQueries.Shared.ShouldBe("SELECT 2   AS two;");
-        KeptQueries.Shared.ShouldBe("SELECT 2 /* kept by the attribute */ AS two;");
-    }
+    public void ProjectWithParameters_FileWithoutAHeader_UsesTheListOfTheSettingsFile() =>
+        ParameterQueries.Plain("").ShouldBe("SELECT 2   AS two;");
 
     [Fact]
     public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
@@ -170,7 +169,6 @@ public sealed class EndToEndTests
     [InlineData(typeof(TokenQueries))]
     [InlineData(typeof(DialectQueries))]
     [InlineData(typeof(ParameterQueries))]
-    [InlineData(typeof(KeptQueries))]
     public void Attribute_OnAGeneratedType_IsNotInItsMetadata(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)
@@ -185,9 +183,6 @@ public sealed class EndToEndTests
         [
             AttributeSource.AttributeMetadataName,
             AttributeSource.LocationMetadataName,
-            AttributeSource.OutputMetadataName,
-            AttributeSource.ModelTypeMetadataName,
-            AttributeSource.CollectionTypeMetadataName,
             AttributeSource.MethodLocationMetadataName,
             AttributeSource.ConverterAttributeMetadataName,
         ];

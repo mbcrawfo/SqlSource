@@ -1,5 +1,10 @@
--- The queries of the shapes of models, claimed by ShapeQueries.
+-- The queries of the shapes of models, claimed by ShapeQueries, here and in tests/DatabaseTests/QueryMethodAllocation,
+-- which links this file: its header gives both claims their models' shapes, suffixes and namespace.
 -- input-model-suffix: Filter
+-- output-model-suffix: View
+-- input-model-type: sealed-class
+-- output-model-type: record
+-- model-namespace: SqlSource.DatabaseTests.SqlServer.EndToEnd.Shapes
 -- collection-type: IReadOnlyList
 
 -- name: SearchAccounts -> many
@@ -12,7 +17,7 @@ ORDER BY id;
 
 -- name: SearchAccountsUnpooled -> many
 -- summary: SearchAccounts under no-array-pool, which reads its rows into a List, for the allocation tests: the query's
--- summary: own list of generator parameters replaces the attribute's, so a second claim could not give it one.
+-- summary: own list of generator parameters replaces every other list, so only a copy of it can take another.
 -- generator: sort-input no-array-pool
 -- input-model: SearchAccountsFilter
 -- output-model: SearchAccountsView

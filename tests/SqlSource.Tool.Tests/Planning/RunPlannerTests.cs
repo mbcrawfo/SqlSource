@@ -33,10 +33,8 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_ExampleOfTheSpec_HasThreeQueriesWithTheirValues()
     {
         var project = Postgres();
-        _ = project.AddSource(
-            "Queries.cs",
-            Plans.TypeNamed("Queries", "Source = \"Queries\", Output = SqlSource.GeneratorOutput.Models")
-        );
+        project.Settings["output"] = "models";
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Queries\""));
         var sql = project.AddSql(
             "Queries/Users.sql",
             """
@@ -110,21 +108,16 @@ public sealed class RunPlannerTests : IDisposable
         Plans.Result(project).Plan.Files.Select(file => file.Path).ShouldBe([a, b]);
     }
 
+    // The file owns its output, so the two types agree on what it needs.
     [Theory]
-    [InlineData("Sql", "Models", true)]
-    [InlineData("Sql", "Sql", false)]
-    public void Plan_TwoTypesThatClaimOneFile_NeedWhatEitherNeeds(string first, string second, bool needsEntry)
+    [InlineData("models", true)]
+    [InlineData("sql", false)]
+    public void Plan_TwoTypesThatClaimOneFile_NeedWhatItsHeaderNeeds(string output, bool needsEntry)
     {
         var project = Postgres();
-        _ = project.AddSource(
-            "A.cs",
-            Plans.TypeNamed("A", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
-        );
-        _ = project.AddSource(
-            "B.cs",
-            Plans.TypeNamed("B", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
-        );
-        _ = project.AddSql("Q/One.sql", "SELECT 1;");
+        _ = project.AddSource("A.cs", Plans.TypeNamed("A", "Source = \"Q\""));
+        _ = project.AddSource("B.cs", Plans.TypeNamed("B", "Source = \"Q\""));
+        _ = project.AddSql("Q/One.sql", "-- output: " + output + "\n\nSELECT 1;\n");
 
         var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
 
@@ -465,17 +458,6 @@ public sealed class RunPlannerTests : IDisposable
         _ = project.AddSql("Q.sql", "SELECT 1;");
 
         OnlyFile(project).Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBe(needsEntry);
-    }
-
-    [Fact]
-    public void Plan_AttributesOutput_WinsOverTheChain()
-    {
-        var project = Postgres();
-        project.Settings["output"] = "sql";
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Output = SqlSource.GeneratorOutput.Models"));
-        _ = project.AddSql("Q.sql", "SELECT 1;");
-
-        OnlyFile(project).Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
     }
 
     [Fact]

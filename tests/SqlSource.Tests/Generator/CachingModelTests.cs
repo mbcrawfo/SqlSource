@@ -570,10 +570,7 @@ public sealed class CachingModelTests
         var compilation = ModelsCompilation();
         var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
 
-        var result = Run(
-            driver,
-            WithArgumentsOnUserQueries(compilation, "CollectionType = GeneratorCollectionType.List")
-        );
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "MethodLocation = MethodLocation.Internal"));
 
         Reasons<TypeQueries>(result, TrackingNames.TypeQueries, type => type.HintName)["App.Users.UserQueries.g.cs"]
             .ShouldBe(IncrementalStepRunReason.Modified);

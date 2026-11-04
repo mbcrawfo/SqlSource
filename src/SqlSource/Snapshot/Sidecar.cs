@@ -30,7 +30,8 @@ internal sealed record Sidecar(int FormatVersion, string ToolVersion, EquatableA
     /// <summary>
     /// Whether the file has the format of this version and was written by the tool of
     /// <paramref name="toolVersion" />.  With <see cref="SidecarEntry.IsCurrentFor" /> it is the test of a current
-    /// entry: an entry from an older tool is never kept.
+    /// entry: an entry from an older tool is never kept.  A git merge can still put one there, since the version is
+    /// the file's (TD-0100).
     /// </summary>
     public bool IsWrittenBy(string toolVersion) =>
         FormatVersion == SidecarFormat.Version && string.Equals(ToolVersion, toolVersion, StringComparison.Ordinal);

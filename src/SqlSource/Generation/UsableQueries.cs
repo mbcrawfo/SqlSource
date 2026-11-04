@@ -45,8 +45,7 @@ internal static class UsableQueries
                 // its method's name.  The settings are resolved only for a query of that name, which is rare.
                 if (
                     string.Equals(query.Name, containingTypeName, StringComparison.Ordinal)
-                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index]).Output
-                        != OutputKind.CodeGen
+                    && QuerySettings.Resolve(query.Markers, fileSettings[index]).Output != OutputKind.CodeGen
                 )
                 {
                     diagnostics?.Add(
@@ -76,7 +75,7 @@ internal static class UsableQueries
                 // The settings are resolved only for a query whose kept form has an error, which is rare.
                 if (
                     query.KeptErrors.Count > 0
-                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index]).KeepComments
+                    && QuerySettings.Resolve(query.Markers, fileSettings[index]).KeepComments
                 )
                 {
                     diagnostics?.AddRange(query.KeptErrors);

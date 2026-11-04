@@ -5,13 +5,12 @@ using SqlSource.Generation.Chains;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
-using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation;
 
 // What a file's parse depends on, stage one of the settings: the dialect and whether comments may be wanted, from the
-// chain of its folder and the types whose attribute asks for comments.
+// chain of its folder.
 public sealed class FileParseInputTests
 {
     [Theory]
@@ -51,22 +50,6 @@ public sealed class FileParseInputTests
         Resolve(new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""), ChainOf(null, chainParameters))
             .CommentsWanted.ShouldBe(expected);
 
-    // A type that claims the file asks for comments, whatever the chain says.
-    [Fact]
-    public void Resolve_FileOfATypeThatKeepsComments_WantsThemWhateverTheChainSays() =>
-        Resolve(
-            new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""),
-            ChainOf(null, "default"),
-            GeneratorHarness.UsersNormalizedPath
-        )
-            .CommentsWanted.ShouldBeTrue();
-
-    // A type that claims another file asks for nothing of this one.
-    [Fact]
-    public void Resolve_FileOfNoTypeThatKeepsComments_WantsNone() =>
-        Resolve(new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""), SettingsChain.None, "app/Repo/Other.sql")
-            .CommentsWanted.ShouldBeFalse();
-
     [Fact]
     public void Resolve_SameFileAndSettings_GivesEqualValues()
     {
@@ -93,14 +76,11 @@ public sealed class FileParseInputTests
         return new SettingsChain(
             parameters is null
                 ? SettingsLevel.None
-                : new SettingsLevel { Parameters = GeneratorParameterList.Parse(parameters, []) },
+                : new SettingsLevel { Parameters = GeneratorParameterList.ReadElements(parameters.Split(' '), []) },
             choice
         );
     }
 
-    private static FileParseInput Resolve(
-        InMemoryAdditionalText file,
-        SettingsChain chain,
-        params string[] commentPaths
-    ) => FileParseInput.Resolve(file, GeneratorHarness.UsersNormalizedPath, chain, TestSidecars.Of(commentPaths));
+    private static FileParseInput Resolve(InMemoryAdditionalText file, SettingsChain chain) =>
+        FileParseInput.Resolve(file, GeneratorHarness.UsersNormalizedPath, chain);
 }
