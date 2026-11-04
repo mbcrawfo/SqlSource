@@ -387,7 +387,11 @@ public sealed class QueryTyperTests
             []
         );
         invalid.ShouldBeEmpty();
-        return new SettingsLevel { TypeOverrides = lists.PostgreSql, SqlServerTypeOverrides = lists.SqlServer };
+        return new SettingsLevel
+        {
+            TypeOverrides = lists[DatabaseEngine.PostgreSql],
+            SqlServerTypeOverrides = lists[DatabaseEngine.SqlServer],
+        };
     }
 
     // The entry GetUser, with a parameter p<n> and a column c<n> of each type.

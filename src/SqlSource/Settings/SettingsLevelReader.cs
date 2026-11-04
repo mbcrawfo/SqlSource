@@ -83,8 +83,9 @@ internal static class SettingsLevelReader
         var overrides = TypeOverrideGrammar.ReadMembers(members, source.Place, indexes, repeated);
         ReportParts(ref source, SettingId.TypeOverrides, indexes, repeated);
 
-        sqlServer = overrides.SqlServer.Count == 0 ? null : overrides.SqlServer;
-        return overrides.PostgreSql.Count == 0 ? null : overrides.PostgreSql;
+        // Until a level holds the container, its two arrays are set from the two slots.
+        sqlServer = overrides[DatabaseEngine.SqlServer] is { Count: > 0 } sqlServerEntries ? sqlServerEntries : null;
+        return overrides[DatabaseEngine.PostgreSql] is { Count: > 0 } postgreSqlEntries ? postgreSqlEntries : null;
     }
 
     // An entry that is not valid is recorded by its index, and the other entries apply.  A list with no valid entry is

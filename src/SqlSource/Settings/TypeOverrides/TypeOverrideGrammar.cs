@@ -52,63 +52,64 @@ internal static class TypeOverrideGrammar
     }
 
     /// <summary>
-    /// Reads the members of an object, as a settings file writes the type override, which serves both engines.  A
+    /// Reads the members of an object, as a settings file writes the type override, which serves every engine.  A
     /// member's key and type are trimmed, and each entry goes in the list of each engine that reads its key.  The index
-    /// of a member that neither engine reads, or whose type is not valid or is empty, is added to
-    /// <paramref name="invalid" />.  A member whose key either list already has, by the identity of
-    /// <see cref="TypeOverrideMap" />, goes in neither, and is added to <paramref name="repeated" /> with the index of
+    /// of a member that no engine reads, or whose type is not valid or is empty, is added to
+    /// <paramref name="invalid" />.  A member whose key an engine's list already has, by the identity of
+    /// <see cref="TypeOverrideMap" />, goes in no list, and is added to <paramref name="repeated" /> with the index of
     /// the earlier member that put the key: of two members for one key, the first wins.  The other members apply.
-    /// Each list is in the order of <see cref="TypeOverrideMap" />, and empty when it has no entry.
+    /// Each engine's list is in the order of <see cref="TypeOverrideMap" />, and empty when it has no entry.
     /// </summary>
-    public static TypeOverrideLists ReadMembers(
+    public static PerEngine<EquatableArray<TypeOverride>> ReadMembers(
         IReadOnlyList<KeyValuePair<string, string>> members,
         SettingPlace place,
         List<int> invalid,
         List<(int Index, int First)> repeated
     )
     {
-        // Beside each list, the index of the member that put each of its entries.
-        var (postgreSql, postgreSqlMembers) = (new List<TypeOverride>(), new List<int>());
-        var (sqlServer, sqlServerMembers) = (new List<TypeOverride>(), new List<int>());
+        // For each engine, its list and beside it the index of the member that put each of its entries.
+        var lists = PerEngine.Of(_ => (Entries: new List<TypeOverride>(), Members: new List<int>()));
         for (var index = 0; index < members.Count; index++)
         {
             if (
                 !TryReadType(members[index].Value.AsSpan().Trim(), out var type)
-                || !TypeKeys.TryNormalizeEach(
-                    members[index].Key.AsSpan().Trim(),
-                    out var postgreSqlKey,
-                    out var sqlServerKey
-                )
+                || !TypeKeys.TryNormalizeEach(members[index].Key.AsSpan().Trim(), out var keys)
             )
             {
                 invalid.Add(index);
                 continue;
             }
 
-            var postgreSqlAt = postgreSqlKey is null ? (int?)null : TypeOverrideMap.IndexOf(postgreSql, postgreSqlKey);
-            var sqlServerAt = sqlServerKey is null ? (int?)null : TypeOverrideMap.IndexOf(sqlServer, sqlServerKey);
-            var first = Math.Min(MemberAt(postgreSqlMembers, postgreSqlAt), MemberAt(sqlServerMembers, sqlServerAt));
+            // Where each engine's list has the key, or the complement of where it goes; null for an engine that does
+            // not read it.
+            var positions = keys.Zip(
+                lists,
+                static (key, list) => key is null ? (int?)null : TypeOverrideMap.IndexOf(list.Entries, key)
+            );
+            var first = int.MaxValue;
+            foreach (var engine in DatabaseEngines.All)
+            {
+                first = Math.Min(first, MemberAt(lists[engine].Members, positions[engine]));
+            }
+
             if (first != int.MaxValue)
             {
                 repeated.Add((index, first));
                 continue;
             }
 
-            // Neither list has the key, so each search gave the complement of where it goes.
-            if (postgreSqlAt is { } postgreSqlGap)
+            // No list has the key, so each search gave the complement of where it goes.
+            foreach (var engine in DatabaseEngines.All)
             {
-                postgreSql.Insert(~postgreSqlGap, new TypeOverride(postgreSqlKey!, type, place));
-                postgreSqlMembers.Insert(~postgreSqlGap, index);
-            }
-
-            if (sqlServerAt is { } sqlServerGap)
-            {
-                sqlServer.Insert(~sqlServerGap, new TypeOverride(sqlServerKey!, type, place));
-                sqlServerMembers.Insert(~sqlServerGap, index);
+                if (positions[engine] is { } gap)
+                {
+                    lists[engine].Entries.Insert(~gap, new TypeOverride(keys[engine]!, type, place));
+                    lists[engine].Members.Insert(~gap, index);
+                }
             }
         }
 
-        return new TypeOverrideLists(ToArray(postgreSql), ToArray(sqlServer));
+        return lists.Select(static list => ToArray(list.Entries));
     }
 
     /// <summary>
