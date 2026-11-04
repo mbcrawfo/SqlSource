@@ -58,16 +58,26 @@ public sealed class EditorRecipeTests
 
         var matches = ReportedLines().Select(line => pattern.Match(line)).Where(match => match.Success).ToList();
 
+        // Each value is read from the group the recipe maps it to, so a recipe that maps a value to the wrong group
+        // fails as a pattern that captures the wrong text does.
         matches.Count.ShouldBe(2);
-        matches[0].Groups[1].Value.ShouldBe(PositionedPath);
-        matches[0].Groups[2].Value.ShouldBe("4");
-        matches[0].Groups[3].Value.ShouldBe("10");
-        matches[0].Groups[4].Value.ShouldBe("error");
-        matches[0].Groups[5].Value.ShouldBe(ToolDiagnostics.ServerRejectedQuery.Id);
-        matches[1].Groups[1].Value.ShouldBe(UnpositionedPath);
-        matches[1].Groups[2].Value.ShouldBe("");
-        matches[1].Groups[5].Value.ShouldBe(ToolDiagnostics.SidecarNotWritten.Id);
+        Captured(matches[0], "file").ShouldBe(PositionedPath);
+        Captured(matches[0], "line").ShouldBe("4");
+        Captured(matches[0], "column").ShouldBe("10");
+        Captured(matches[0], "severity").ShouldBe("error");
+        Captured(matches[0], "code").ShouldBe(ToolDiagnostics.ServerRejectedQuery.Id);
+        Captured(matches[0], "message")
+            .ShouldBe("The server rejected the query 'GetUser': relation \"user\" does not exist");
+        Captured(matches[1], "file").ShouldBe(UnpositionedPath);
+        Captured(matches[1], "line").ShouldBe("");
+        Captured(matches[1], "column").ShouldBe("");
+        Captured(matches[1], "code").ShouldBe(ToolDiagnostics.SidecarNotWritten.Id);
+        Captured(matches[1], "message").ShouldStartWith($"The sidecar of '{UnpositionedPath}' was not written");
     }
+
+    // The text of the group that the recipe's pattern names for a value, such as "line".
+    private static string Captured(Match match, string value) =>
+        match.Groups[ProblemPatternElement().GetProperty(value).GetInt32()].Value;
 
     [Fact]
     public void VsCodeTask_Pattern_PassesOverEveryOtherLine()
@@ -114,8 +124,10 @@ public sealed class EditorRecipeTests
         return error.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
     }
 
-    private static string ProblemPattern() =>
-        VsCodeTask().GetProperty("problemMatcher").GetProperty("pattern").GetProperty("regexp").GetString()!;
+    private static string ProblemPattern() => ProblemPatternElement().GetProperty("regexp").GetString()!;
+
+    private static JsonElement ProblemPatternElement() =>
+        VsCodeTask().GetProperty("problemMatcher").GetProperty("pattern");
 
     private static string Background(string name) =>
         VsCodeTask().GetProperty("problemMatcher").GetProperty("background").GetProperty(name).GetString()!;

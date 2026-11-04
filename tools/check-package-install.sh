@@ -392,6 +392,10 @@ if [[ "$tool_version" != "$version" && "$tool_version" != "$version+"* ]]; then
         "$work/online-version.log"
 fi
 
+# A .env is a connection source, so auto runs the tool, and it holds no key the tool reads.  It is written before the
+# build with false, so that false is told apart from auto there: auto would start the tool, and false must not.
+echo 'APP_SETTING=1' >.env
+
 # false never starts the tool, whose command line a detailed log shows when it does.
 dotnet build Online.csproj --nologo -tl:off -v:d -p:SqlSourceOnline=false >"$work/online-false.log" 2>&1 ||
     online_fails 'does not build with SqlSourceOnline false' "$work/online-false.log"
@@ -399,9 +403,8 @@ if grep -q -F 'describe --manifest' "$work/online-false.log"; then
     online_fails 'ran the tool with SqlSourceOnline false' "$work/online-false.log"
 fi
 
-# A .env is a connection source, so auto runs the tool, and it holds no key the tool reads.  The entry is current, so
-# the database needs no connection and the tool's summary says so.
-echo 'APP_SETTING=1' >.env
+# Under auto, with the .env, the tool runs.  The entry is current, so the database needs no connection and the tool's
+# summary says so.
 dotnet build Online.csproj --nologo -tl:off -v:d >"$work/online-auto.log" 2>&1 ||
     online_fails 'does not build under auto with a .env and current sidecars' "$work/online-auto.log"
 if ! grep -q 'sqlsource: summary: ' "$work/online-auto.log"; then
