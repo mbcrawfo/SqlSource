@@ -91,6 +91,24 @@ public sealed class PerEngineTests
     }
 
     [Fact]
+    public void Select_EverySlotToDefault_EqualsDefault()
+    {
+        var mapped = PerEngine.Of(engine => (int)engine).Select(_ => (string?)null);
+
+        mapped.ShouldBe(default);
+        mapped.GetHashCode().ShouldBe(default(PerEngine<string?>).GetHashCode());
+    }
+
+    [Fact]
+    public void Zip_EverySlotToDefault_EqualsDefault()
+    {
+        var combined = PerEngine.Of(engine => (int)engine).Zip(PerEngine.Of(_ => 10), (_, _) => (string?)null);
+
+        combined.ShouldBe(default);
+        combined.GetHashCode().ShouldBe(default(PerEngine<string?>).GetHashCode());
+    }
+
+    [Fact]
     public void Zip_CombinesSlotBySlot()
     {
         var combined = PerEngine.Of(engine => (int)engine).Zip(PerEngine.Of(_ => 10), (a, b) => a + b);
@@ -121,6 +139,14 @@ public sealed class PerEngineTests
         (left == right).ShouldBeFalse();
         (left != right).ShouldBeTrue();
     }
+
+    [Fact]
+    public void With_ValueOfNoMember_Throws() =>
+        _ = Should.Throw<UnexpectedEnumValueException>(() => default(PerEngine<string?>).With((DatabaseEngine)7, "a"));
+
+    [Fact]
+    public void Only_ValueOfNoMember_Throws() =>
+        _ = Should.Throw<UnexpectedEnumValueException>(() => PerEngine.Only<string?>((DatabaseEngine)7, "a"));
 
     [Fact]
     public void Indexer_ValueOfNoMember_Throws()

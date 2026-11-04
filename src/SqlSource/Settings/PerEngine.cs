@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
 
 namespace SqlSource.Settings;
 
@@ -89,8 +89,19 @@ internal readonly struct PerEngine<T> : IEquatable<PerEngine<T>>
 
     public bool Equals(PerEngine<T> other)
     {
-        var (comparer, self) = (EqualityComparer<T>.Default, this);
-        return DatabaseEngines.All.All(engine => comparer.Equals(self[engine], other[engine]));
+        var comparer = EqualityComparer<T>.Default;
+        for (var at = 0; at < DatabaseEngines.All.Length; at++)
+        {
+            // A container with no array holds default(T) in every slot.
+            var mine = _slots is null ? default! : _slots[at];
+            var theirs = other._slots is null ? default! : other._slots[at];
+            if (!comparer.Equals(mine, theirs))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public override bool Equals(object? obj) => obj is PerEngine<T> other && Equals(other);
@@ -109,11 +120,21 @@ internal readonly struct PerEngine<T> : IEquatable<PerEngine<T>>
     }
 
     // The one way every other member builds a container: the default one, with no array, when every slot is
-    // default(T), so a container that says nothing allocates nothing.
+    // default(T), so a container that says nothing allocates nothing.  The caller hands over the array, of one slot
+    // for each engine, and never touches it again: it is neither copied nor checked beyond its length.
     internal static PerEngine<T> Create(T[] slots)
     {
+        Debug.Assert(slots.Length == DatabaseEngines.All.Length, "A container has one slot for each engine.");
         var comparer = EqualityComparer<T>.Default;
-        return slots.Any(slot => !comparer.Equals(slot, default!)) ? new PerEngine<T>(slots) : default;
+        for (var at = 0; at < slots.Length; at++)
+        {
+            if (!comparer.Equals(slots[at], default!))
+            {
+                return new PerEngine<T>(slots);
+            }
+        }
+
+        return default;
     }
 }
 
