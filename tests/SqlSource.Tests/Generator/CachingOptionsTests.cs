@@ -145,51 +145,29 @@ public sealed class CachingOptionsTests
             .ShouldContain("SELECT 1; -- c");
     }
 
-    // Removed with the attribute level in Task 3.
+    // An edit of the settings file of Users' folder that gives it a list without keep-comments: no file is read again,
+    // since the list is no part of what a parse depends on, and only the type of that folder is emitted again, which
+    // comes out equal.  The set of settings files changed, so each file's input was resolved again from it and came out
+    // equal, Unchanged.
     [Fact]
-    public void Run_AttributeGainsKeepComments_ParsesOnlyTheFilesOfThatType()
+    public void Run_FolderFileGainsAParameterThatIsNotKeepComments_ParsesNoFileAndEmitsOnlyItsType()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+        var folder = new InMemoryAdditionalText("/app/Users/sqlsource.json", "{}");
+        var driver = _scene.FirstRun(compilation, _scene.Users, ProjectFile(OutputKind.Sql), folder);
 
-        var result = Run(driver, WithParametersOnUserQueries(compilation, "keep-comments"));
+        var edited = new InMemoryAdditionalText(
+            folder.Path, /*lang=json,strict*/
+            """{"generatorParameters": ["sort-input"]}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(folder, edited), compilation);
 
-        AllReasons(result, TrackingNames.CommentPaths).ShouldBe([IncrementalStepRunReason.Modified]);
-
-        // Users.sql is read again, as it has to be: its type now asks for comments.  Orders.sql is not: the step that
-        // resolves its input ran, because the list of paths it takes changed, and gave the value it had.
         ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
-                    [_scene.Users.Path] = IncrementalStepRunReason.Modified,
+                    [_scene.Users.Path] = IncrementalStepRunReason.Unchanged,
                     [_scene.Orders.Path] = IncrementalStepRunReason.Unchanged,
-                },
-                ignoreOrder: true
-            );
-        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)["Orders.sql"]
-            .ShouldBe(IncrementalStepRunReason.Cached);
-    }
-
-    // Removed with the attribute level in Task 3.
-    [Fact]
-    public void Run_AttributeGainsAParameterThatIsNotKeepComments_ParsesNoFileAndEmitsOnlyItsType()
-    {
-        var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
-
-        var result = Run(driver, WithParametersOnUserQueries(compilation, "sort-input"));
-
-        AllReasons(result, TrackingNames.CommentPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-
-        // No file was read.
-        ParseInputs(result)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    [_scene.Users.Path] = IncrementalStepRunReason.Cached,
-                    [_scene.Orders.Path] = IncrementalStepRunReason.Cached,
                 },
                 ignoreOrder: true
             );

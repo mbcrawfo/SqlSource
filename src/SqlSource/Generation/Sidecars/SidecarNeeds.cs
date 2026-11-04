@@ -21,7 +21,6 @@ internal static class SidecarNeeds
     /// <param name="type">The type and its parsed files.</param>
     public static EquatableArray<FileNeeds> OfType(TypeQueries type)
     {
-        var attribute = type.Type.Type.Settings;
         var files = ImmutableArray.CreateBuilder<FileNeeds>();
         for (var index = 0; index < type.Files.Count; index++)
         {
@@ -29,7 +28,7 @@ internal static class SidecarNeeds
             var queries = ImmutableArray.CreateBuilder<QueryNeed>();
             foreach (var query in file.Queries)
             {
-                var output = QuerySettings.Resolve(query.Markers, attribute, type.FileSettings[index]).Output;
+                var output = QuerySettings.Resolve(query.Markers, type.FileSettings[index]).Output;
                 if (output != OutputKind.Sql)
                 {
                     queries.Add(new QueryNeed(query.Name, output));

@@ -452,9 +452,7 @@ public sealed class TypeDiagnosticsTests
         run.Sources.Keys.ShouldContain(GeneratorHarness.SampleFile);
     }
 
-    // Each is reported where the attribute reader reads it: the location, the method location, then the settings in
-    // the order of SettingId.
-    // Removed with the attribute level in Task 3.
+    // Each is reported where the attribute reader reads it: the location, the method location, then the nested class.
     [Fact]
     public void Run_AttributeWithSeveralValuesThatAreNotValid_ReportsThemInTheOrderTheyAreRead()
     {
@@ -465,14 +463,7 @@ public sealed class TypeDiagnosticsTests
             namespace App;
             [SqlSourceGenerate(
                 Source = ".",
-                CollectionType = (GeneratorCollectionType)91,
-                OutputModelType = (GeneratorModelType)96,
-                InputModelType = (GeneratorModelType)95,
-                ModelNamespace = "App..Models",
-                OutputModelSuffix = "a b",
-                InputModelSuffix = "a-b",
-                Output = (GeneratorOutput)92,
-                Parameters = "nope",
+                NestedClass = "My-Sql",
                 MethodLocation = (MethodLocation)93,
                 SqlLocation = (SqlLocation)94)]
             public partial class Sample;
@@ -486,14 +477,7 @@ public sealed class TypeDiagnosticsTests
             .ShouldBe([
                 "'94' is not a valid value of SqlLocation",
                 "'93' is not a valid value of MethodLocation",
-                "'nope' is not a valid value of Parameters",
-                "'92' is not a valid value of Output",
-                "'a-b' is not a valid value of InputModelSuffix",
-                "'a b' is not a valid value of OutputModelSuffix",
-                "'App..Models' is not a valid value of ModelNamespace",
-                "'95' is not a valid value of InputModelType",
-                "'96' is not a valid value of OutputModelType",
-                "'91' is not a valid value of CollectionType",
+                "'My-Sql' is not a valid value of NestedClass",
             ]);
     }
 

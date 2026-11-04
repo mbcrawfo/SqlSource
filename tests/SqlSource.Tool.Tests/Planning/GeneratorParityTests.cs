@@ -131,23 +131,6 @@ public sealed class GeneratorParityTests : IDisposable
             ],
             ["Root.sql", "Q/One.sql", "A.sql", "B.sql", "F.sql"]
         ),
-        ["each output"] = new(
-            5,
-            [
-                (
-                    "Types.cs",
-                    Using
-                        + "[SqlSourceGenerate(Output = GeneratorOutput.Sql)]\ninternal partial class A;\n"
-                        + "[SqlSourceGenerate(Output = GeneratorOutput.Models)]\ninternal partial class B;\n"
-                        + "[SqlSourceGenerate(Output = SqlSource.GeneratorOutput.CodeGen)]\ninternal partial class C;\n"
-                        + "[SqlSourceGenerate(Output = global::SqlSource.GeneratorOutput.Models, Source = \"Q\")]\n"
-                        + "internal partial class D;\n"
-                        + "[SqlSourceGenerate(Parameters = \"keep-comments\", ModelNamespace = \"App.Models\")]\n"
-                        + "internal partial class E;\n"
-                ),
-            ],
-            ["Root.sql", "Q/One.sql", "A.sql", "B.sql", "C.sql", "E.sql"]
-        ),
         ["each name of the attribute"] = new(
             4,
             [

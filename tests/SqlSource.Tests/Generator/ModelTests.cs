@@ -206,13 +206,7 @@ public sealed class ModelTests
 
     // The levels that give a setting of a model, from the least specific.
     public static TheoryData<SettingLevel> Levels =>
-        [
-            SettingLevel.ProjectFile,
-            SettingLevel.FolderFile,
-            // Removed with the attribute level in Task 3.
-            SettingLevel.Attribute,
-            SettingLevel.Header,
-        ];
+        [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Header];
 
     [Fact]
     public void Run_RowsAndParameters_EmitsBothModels()
@@ -360,7 +354,7 @@ public sealed class ModelTests
         var file = files[0];
 
         var run = Run(
-            settings.Source(Source),
+            Source,
             [.. files, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
             settings: settings.ProjectSettings
         );
@@ -416,7 +410,7 @@ public sealed class ModelTests
         var file = files[0];
 
         var run = Run(
-            settings.Source(Source),
+            Source,
             [.. files, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
             settings: settings.ProjectSettings
         );
@@ -685,33 +679,6 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe([GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 
-    // The type that asks for the SQL alone gets no models, and the other type's are in its namespace.
-    // Removed with the attribute level in Task 3.
-    [Fact]
-    public void Run_QueryClaimedAtSqlAndAtModels_GetsTheModelsTypesModels()
-    {
-        var source = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Sql)]
-                public partial class First;
-            }
-
-            namespace Other
-            {
-                [SqlSourceGenerate(Source = ".")]
-                public partial class Second;
-            }
-            """;
-
-        var run = Run(source, [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [Parameter("id")], [Column("id")]))]);
-
-        run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["Other.GetUserDto-Model.g.cs", "Other.GetUserParams-Model.g.cs"]);
-    }
-
     // A type with a diagnostic of its own gets no models, and the other type claiming the file does.
     [Fact]
     public void Run_TypeWithADiagnostic_GetsNoModels()
@@ -808,37 +775,6 @@ public sealed class ModelTests
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         ModelFiles(run).ShouldBe(["Other.SqlDto-Model.g.cs"]);
-    }
-
-    // A keyword in braces in a comment is SQLSRC114 for First, which keeps the comments, and not for Second, which
-    // does not.
-    // Removed with the attribute level in Task 3.
-    [Fact]
-    public void Run_FileExcludedByAnErrorInAKeptComment_GetsNoModelsForThatType()
-    {
-        var source = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Parameters = "keep-comments")]
-                public partial class First;
-            }
-
-            namespace Other
-            {
-                [SqlSourceGenerate(Source = ".")]
-                public partial class Second;
-            }
-            """;
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1 AS one; -- {{class}}\n");
-
-        var run = Run(source, [file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("one")]))]);
-
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC114 ");
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        ModelFiles(run).ShouldBe(["Other.GetUserDto-Model.g.cs"]);
     }
 
     // A keyword in braces in a comment that the file's header keeps is SQLSRC114, and the file gets no models.

@@ -25,32 +25,21 @@ public sealed class ArrayPoolParameterTests
     private const string Default = "default";
 
     [Theory]
-    // project's file, folder's file, attribute, preamble, query
-    [InlineData(null, null, null, null, null, true)]
-    [InlineData(On, null, null, null, null, false)]
-    [InlineData(On, Default, null, null, null, true)]
-    [InlineData(On, Other, null, null, null, true)]
-    [InlineData(null, On, null, null, null, false)]
-    // Removed with the attribute level in Task 3.
-    [InlineData(Other, On, Default, null, null, true)]
-    // Removed with the attribute level in Task 3.
-    [InlineData(null, null, On, null, null, false)]
-    // Removed with the attribute level in Task 3.
-    [InlineData(Default, Other, On, null, null, false)]
-    // Removed with the attribute level in Task 3.
-    [InlineData(On, On, On, Default, null, true)]
-    [InlineData(null, null, null, On, null, false)]
-    [InlineData(Default, Other, null, On, null, false)]
-    [InlineData(On, On, null, Default, null, true)]
-    [InlineData(null, null, null, On, Other, true)]
-    [InlineData(On, On, null, On, Default, true)]
-    // Removed with the attribute level in Task 3.
-    [InlineData(On, On, On, On, Default, true)]
-    [InlineData(null, null, null, Default, On, false)]
+    // project's file, folder's file, preamble, query
+    [InlineData(null, null, null, null, true)]
+    [InlineData(On, null, null, null, false)]
+    [InlineData(On, Default, null, null, true)]
+    [InlineData(On, Other, null, null, true)]
+    [InlineData(null, On, null, null, false)]
+    [InlineData(null, null, On, null, false)]
+    [InlineData(Default, Other, On, null, false)]
+    [InlineData(On, On, Default, null, true)]
+    [InlineData(null, null, On, Other, true)]
+    [InlineData(On, On, On, Default, true)]
+    [InlineData(null, null, Default, On, false)]
     public void Run_NoArrayPool_ComesWholeFromTheMostSpecificLevelThatGivesAList(
         string? projectFile,
         string? folderFile,
-        string? attribute,
         string? preamble,
         string? query,
         bool expected
@@ -72,7 +61,7 @@ public sealed class ArrayPoolParameterTests
             + (query is null ? string.Empty : "-- generator: " + query + "\n")
             + "SELECT id, name FROM users;\n";
 
-        var run = Run(settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)), attribute, projectFile);
+        var run = Run(settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)), projectFile);
 
         run.ShouldBeClean();
         Method(run).UseArrayPool.ShouldBe(expected);
@@ -124,27 +113,13 @@ public sealed class ArrayPoolParameterTests
 
         var unpooledFile = file with { Text = "-- generator: no-array-pool\n\n" + file.Text };
 
-        var pooled = Run([file], null, null, hasRows: hasRows);
-        var unpooled = Run([unpooledFile], null, null, hasRows: hasRows);
+        var pooled = Run([file], null, hasRows: hasRows);
+        var unpooled = Run([unpooledFile], null, hasRows: hasRows);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
         Method(unpooled).UseArrayPool.ShouldBeFalse();
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
-    }
-
-    // Removed with the attribute level in Task 3.
-    [Fact]
-    public void Run_AttributeWithAMisspeltWordBesideNoArrayPool_IsAnErrorAtTheAttributeAndGivesNoMethods()
-    {
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
-
-        var run = Run([file], "no-array-pool nope", null);
-
-        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
-        diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(");
-        diagnostic.ShouldEndWith("'nope' is not a valid value of Parameters");
-        run.Sources.ShouldNotContainKey(MethodRuns.MethodsFile);
     }
 
     // ListUsers of the collection type, without and with no-array-pool, each clean.
@@ -155,8 +130,8 @@ public sealed class ArrayPoolParameterTests
         var file = new SqlFile(GeneratorHarness.UsersPath, collectionType + query);
         var unpooledFile = file with { Text = collectionType + "-- generator: no-array-pool\n" + query };
 
-        var pooled = Run([file], null, null);
-        var unpooled = Run([unpooledFile], null, null);
+        var pooled = Run([file], null);
+        var unpooled = Run([unpooledFile], null);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
@@ -170,19 +145,15 @@ public sealed class ArrayPoolParameterTests
         StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods).Methods.ShouldHaveSingleItem();
 
     // The first of the files, a .sql file, with its sidecar, and the others, at CodeGen under postgres on Npgsql 10, on
-    // App.Sample with the attribute's Parameters, and the generator parameters of the project's settings file.  The
-    // entry of ListUsers has the rows id and name, or none.
-    private static GeneratorRun Run(SqlFile[] files, string? attribute, string? projectFile, bool hasRows = true)
+    // App.Sample, with the generator parameters of the project's settings file.  The entry of ListUsers has the rows id
+    // and name, or none.
+    private static GeneratorRun Run(SqlFile[] files, string? projectFile, bool hasRows = true)
     {
         var file = files[0];
-        // Removed with the attribute level in Task 3.
-        var source = attribute is null
-            ? MethodRuns.Source
-            : MethodRuns.SampleSource("Parameters = \"" + attribute + "\"");
 
         return GeneratorHarness.Run(
             OutputKind.CodeGen,
-            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
             [.. files, Sidecars.Of(file, Entries(file, hasRows))],
             references: [NpgsqlReferences.Npgsql10],
             generatorParameters: projectFile,

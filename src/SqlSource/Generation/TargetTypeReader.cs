@@ -182,9 +182,10 @@ internal static class TargetTypeReader
             ? source
             : null;
 
-    // The attribute as a source of settings.  A word that is no generator parameter is reported, and a type with a
-    // diagnostic gets no members, so nothing of this level applies then; every property is still read, so that all
-    // the problems of the attribute are reported together.
+    // The attribute as a source of settings, of which it gives only the nested class: the output, the generator
+    // parameters and the settings of models and collections are the files'.  A value that is not valid is reported, and
+    // a type with a diagnostic gets no members; every property is still read, so that all the problems of the attribute
+    // are reported together.
     private readonly struct AttributeSettings(
         AttributeData attribute,
         LocationInfo attributeLocation,
@@ -253,17 +254,15 @@ internal static class TargetTypeReader
         private static string? PropertyOf(SettingId setting) =>
             setting switch
             {
-                SettingId.Parameters => AttributeSource.ParametersProperty,
-                SettingId.Output => AttributeSource.OutputProperty,
-                // The attribute has no property for the database.
+                SettingId.Parameters => null,
+                SettingId.Output => null,
                 SettingId.Database => null,
-                SettingId.InputModelSuffix => AttributeSource.InputModelSuffixProperty,
-                SettingId.OutputModelSuffix => AttributeSource.OutputModelSuffixProperty,
-                SettingId.ModelNamespace => AttributeSource.ModelNamespaceProperty,
-                SettingId.InputModelType => AttributeSource.InputModelTypeProperty,
-                SettingId.OutputModelType => AttributeSource.OutputModelTypeProperty,
-                SettingId.CollectionType => AttributeSource.CollectionTypeProperty,
-                // The type override, the column types and the library types have no attribute level.
+                SettingId.InputModelSuffix => null,
+                SettingId.OutputModelSuffix => null,
+                SettingId.ModelNamespace => null,
+                SettingId.InputModelType => null,
+                SettingId.OutputModelType => null,
+                SettingId.CollectionType => null,
                 SettingId.TypeOverrides => null,
                 SettingId.ColumnTypes => null,
                 SettingId.LibraryTypes => null,

@@ -51,24 +51,21 @@ internal readonly record struct QuerySettings(
 
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
-    /// the attribute, then the file's level, then the default.  The file's level is the chain of its folder, so the
-    /// nearest settings file that has a setting gives it.  The type override, the column types and the library types
-    /// are not among them: <see cref="ResolveTypeOverrides" />, <see cref="ResolveColumnTypes" /> and
-    /// <see cref="ResolveLibraries" /> give them.
+    /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file
+    /// that has a setting gives it.  The type override, the column types and the library types are not among them:
+    /// <see cref="ResolveTypeOverrides" />, <see cref="ResolveColumnTypes" /> and <see cref="ResolveLibraries" /> give
+    /// them.
     /// </summary>
-    public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel attribute, SettingsLevel file) =>
+    public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel file) =>
         new(
-            markers.Parameters ?? attribute.Parameters ?? file.Parameters ?? GeneratorParameters.None,
-            markers.Output ?? attribute.Output ?? file.Output ?? OutputKind.CodeGen,
-            markers.InputModelSuffix ?? attribute.InputModelSuffix ?? file.InputModelSuffix ?? DefaultInputModelSuffix,
-            markers.OutputModelSuffix
-                ?? attribute.OutputModelSuffix
-                ?? file.OutputModelSuffix
-                ?? DefaultOutputModelSuffix,
-            markers.ModelNamespace ?? attribute.ModelNamespace ?? file.ModelNamespace,
-            markers.InputModelType ?? attribute.InputModelType ?? file.InputModelType ?? ModelKind.SealedRecord,
-            markers.OutputModelType ?? attribute.OutputModelType ?? file.OutputModelType ?? ModelKind.SealedRecord,
-            markers.CollectionType ?? attribute.CollectionType ?? file.CollectionType ?? CollectionKind.Array
+            markers.Parameters ?? file.Parameters ?? GeneratorParameters.None,
+            markers.Output ?? file.Output ?? OutputKind.CodeGen,
+            markers.InputModelSuffix ?? file.InputModelSuffix ?? DefaultInputModelSuffix,
+            markers.OutputModelSuffix ?? file.OutputModelSuffix ?? DefaultOutputModelSuffix,
+            markers.ModelNamespace ?? file.ModelNamespace,
+            markers.InputModelType ?? file.InputModelType ?? ModelKind.SealedRecord,
+            markers.OutputModelType ?? file.OutputModelType ?? ModelKind.SealedRecord,
+            markers.CollectionType ?? file.CollectionType ?? CollectionKind.Array
         );
 
     /// <summary>
@@ -118,9 +115,8 @@ internal readonly record struct QuerySettings(
 
     /// <summary>
     /// The database of a query: the markers', then the file's level's, else the name of the dialect, which the caller
-    /// gives since <c>Settings/</c> does not use <c>Parsing/</c>.  The file's level is the chain of its folder.  The
-    /// attribute has no level for it, so it is kept apart from <see cref="Resolve" />, as
-    /// <see cref="ResolveTypeOverrides" /> is.
+    /// gives since <c>Settings/</c> does not use <c>Parsing/</c>.  The file's level is the chain of its folder.  It
+    /// needs that name, so it is kept apart from <see cref="Resolve" />.
     /// </summary>
     public static string ResolveDatabase(SettingsLevel markers, SettingsLevel file, string dialectName) =>
         markers.Database ?? file.Database ?? dialectName;

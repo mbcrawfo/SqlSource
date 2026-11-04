@@ -322,68 +322,6 @@ public sealed class SharedModelTests
         run.Sources["App.GetUserModel-Model.g.cs"].ShouldContain("/// The parameters of the query <c>GetUser</c>");
     }
 
-    // Repo comes before Repo<T> whatever the order of their declarations, so the same type's request is the first.
-    // Removed with the attribute level in Task 3.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Run_GenericAndPlainTypeOfOneName_AreOrderedByArity(bool genericFirst)
-    {
-        const string Generic = """
-                [SqlSourceGenerate(Source = ".", OutputModelType = GeneratorModelType.Class)]
-                public partial class Repo<T>;
-            """;
-        const string Plain = """
-                [SqlSourceGenerate(Source = ".")]
-                public partial class Repo;
-            """;
-        var source =
-            "using SqlSource;\n\nnamespace App\n{\n"
-            + (genericFirst ? Generic + "\n\n" + Plain : Plain + "\n\n" + Generic)
-            + "\n}\n";
-
-        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
-
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC257 {GetUserName}: The output model 'App.GetUserDto' of the query 'GetUser' is not the same as the "
-                + "output model of that name of the query 'GetUser' in Users.sql, for the type App.Repo: it is a "
-                + $"'class' here and a 'sealed record' there.{Help257}",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources[GetUserDtoFile].ShouldContain("public sealed record GetUserDto(int Id);");
-    }
-
-    // The earlier request is of a generic type, which the message names as it is declared.
-    // Removed with the attribute level in Task 3.
-    [Fact]
-    public void Run_TwoGenericTypesOfOneName_NameTheEarlierWithItsTypeParameters()
-    {
-        var source = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", OutputModelType = GeneratorModelType.Class)]
-                public partial class Repo<TKey, TValue>;
-
-                [SqlSourceGenerate(Source = ".")]
-                public partial class Repo<TKey>;
-            }
-            """;
-
-        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
-
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC257 {GetUserName}: The output model 'App.GetUserDto' of the query 'GetUser' is not the same as the "
-                + "output model of that name of the query 'GetUser' in Users.sql, for the type App.Repo<TKey>: it is a "
-                + $"'class' here and a 'sealed record' there.{Help257}",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources[GetUserDtoFile].ShouldContain("public sealed record GetUserDto(int Id);");
-    }
-
     [Fact]
     public void Run_TwoTypesOfOneNamespace_ShareOneModel()
     {

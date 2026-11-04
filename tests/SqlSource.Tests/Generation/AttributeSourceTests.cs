@@ -11,7 +11,6 @@ using SqlSource.Generation;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
 using RoslynOutputKind = Microsoft.CodeAnalysis.OutputKind;
 
 namespace SqlSource.Tests.Generation;
@@ -26,23 +25,10 @@ public sealed partial class AttributeSourceTests
     // The generator's own forms are internal, so a public theory names them and the test looks them up.
     [Theory]
     [InlineData("SqlLocation", nameof(MemberPlacement))]
-    // Removed with the attribute level in Task 3.
-    [InlineData("GeneratorOutput", nameof(OutputKind))]
-    // Removed with the attribute level in Task 3.
-    [InlineData("GeneratorModelType", nameof(ModelKind))]
-    // Removed with the attribute level in Task 3.
-    [InlineData("GeneratorCollectionType", nameof(CollectionKind))]
     [InlineData("MethodLocation", nameof(MethodPlacement))]
     public void EmittedEnum_ComparedWithTheGeneratorsOwnForm_HasTheSameMembersAndNumbers(string emitted, string ownName)
     {
-        var own = new[]
-        {
-            typeof(MemberPlacement),
-            typeof(OutputKind),
-            typeof(ModelKind),
-            typeof(CollectionKind),
-            typeof(MethodPlacement),
-        }.Single(type => type.Name == ownName);
+        var own = new[] { typeof(MemberPlacement), typeof(MethodPlacement) }.Single(type => type.Name == ownName);
         var body = Regex
             .Match(AttributeSource.Text, @"internal enum " + emitted + @"\s*\{(?<body>[^}]*)\}")
             .Groups["body"]
@@ -59,6 +45,17 @@ public sealed partial class AttributeSourceTests
         );
     }
 
+    // The settings of output, generator parameters, models and collections are the files' alone.
+    [Theory]
+    [InlineData("GeneratorOutput")]
+    [InlineData("GeneratorModelType")]
+    [InlineData("GeneratorCollectionType")]
+    [InlineData("public string Parameters")]
+    [InlineData("public GeneratorOutput Output")]
+    [InlineData("public string ModelNamespace")]
+    public void Text_RemovedSettings_AreNotDeclared(string declaration) =>
+        AttributeSource.Text.ShouldNotContain(declaration);
+
     // A project that sees the internals of another one that uses SqlSource sees none of the other's copies.
     [Fact]
     public void Text_EveryType_IsEmbedded()
@@ -71,7 +68,7 @@ public sealed partial class AttributeSourceTests
             .Where(type => type.ContainingNamespace.ToDisplayString() == "SqlSource")
             .ToList();
 
-        types.Count.ShouldBe(7);
+        types.Count.ShouldBe(4);
         types.ShouldAllBe(type =>
             type.GetAttributes()
                 .Any(attribute =>

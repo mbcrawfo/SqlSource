@@ -416,58 +416,6 @@ public sealed class LibraryTypeTests
         entry.State.ShouldBe(LibraryState.On);
     }
 
-    // The types of one file's queries are the same for every type that claims it, and the output of the claim picks: a
-    // Models claim's model has the base map's, and a CodeGen claim's model and method have the library's.
-    // Removed with the attribute level in Task 3.
-    [Fact]
-    public void ModelsClaim_GetsTheBaseTypes_MethodsGetTheLibrarys()
-    {
-        const string TwoNamespaces = """
-            using SqlSource;
-
-            namespace Methods
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
-                public partial class Repo;
-            }
-
-            namespace Dtos
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Rows;
-            }
-            """;
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            "-- name: ListEvents\nSELECT at FROM events WHERE at > @since;\n"
-        );
-        var entry = Entry(
-            file,
-            "ListEvents",
-            [Parameter("since", Timestamptz with { BindName = "timestamptz" })],
-            [Column("at", Timestamptz, origin: EventsAt)]
-        );
-
-        var run = MethodRuns.Run(file, [entry], TwoNamespaces, WithThePlugin);
-
-        run.ShouldBeClean();
-        ModelFiles(run)
-            .ShouldBe([
-                "Dtos.ListEventsDto-Model.g.cs",
-                "Dtos.ListEventsParams-Model.g.cs",
-                "Methods.ListEventsDto-Model.g.cs",
-                "Methods.ListEventsParams-Model.g.cs",
-            ]);
-        run.Sources["Dtos.ListEventsDto-Model.g.cs"].ShouldContain("(" + DateTime + " At);");
-        run.Sources["Dtos.ListEventsParams-Model.g.cs"].ShouldContain("(" + DateTime + " Since);");
-        run.Sources["Methods.ListEventsDto-Model.g.cs"].ShouldContain("(" + Instant + " At);");
-        run.Sources["Methods.ListEventsParams-Model.g.cs"].ShouldContain("(" + Instant + " Since);");
-        var methods = run.Sources["Methods.Repo-Methods.g.cs"];
-        methods.ShouldContain("reader.GetFieldValue<" + Instant + ">(0)");
-        methods.ShouldContain("new global::Npgsql.NpgsqlParameter<" + Instant + ">();");
-        methods.ShouldContain(" parameter.DataTypeName = \"pg_catalog.timestamptz\";\n");
-    }
-
     // Every row of NodaTime's, as a parameter and a column that can and cannot be null, and an array of one, compile
     // with no error and no warning in what is generated, against the newest Npgsql, plugin and NodaTime and
     // the oldest.
@@ -821,38 +769,6 @@ public sealed class LibraryTypeTests
         run.CompilationErrors.ShouldBeEmpty();
         run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
         ModelFiles(run).ShouldBeEmpty();
-    }
-
-    // One query claimed by a type at CodeGen and by another at Models: the first's model and method have Geometry,
-    // and the second gets SQLSRC246, once, and no models.
-    // Removed with the attribute level in Task 3.
-    [Fact]
-    public void Run_CodegenAndModelsClaims_EachGetsItsOwn()
-    {
-        const string TwoNamespaces = """
-            using SqlSource;
-
-            namespace Methods
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
-                public partial class Repo;
-            }
-
-            namespace Dtos
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Rows;
-            }
-            """;
-        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
-
-        var run = MethodRuns.Run(file, [ShapesEntry(file)], TwoNamespaces, WithNetTopologySuite);
-
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
-        ModelFiles(run).ShouldBe(["Methods.ListShapesDto-Model.g.cs"]);
-        run.Sources["Methods.ListShapesDto-Model.g.cs"].ShouldContain("(" + Geometry + " Shape);");
-        run.Sources["Methods.Repo-Methods.g.cs"].ShouldContain("reader.GetFieldValue<" + Geometry + ">(0)");
     }
 
     // The type override names PostGIS's type by its schema, and wins over the library's row: the column is a Point,

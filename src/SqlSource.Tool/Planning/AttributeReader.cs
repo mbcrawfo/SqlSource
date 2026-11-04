@@ -33,6 +33,9 @@ internal static class AttributeReader
 
     private const string LongName = "SqlSourceGenerateAttribute";
 
+    // The generator's attribute no longer has these; the tool reads them until it reads Source alone.
+    private const string OutputProperty = "Output";
+
     private const string OutputType = "GeneratorOutput";
 
     public static ProjectClaims Read(ProjectManifest manifest, CancellationToken cancellationToken)
@@ -136,13 +139,13 @@ internal static class AttributeReader
                         );
                     }
                 }
-                else if (name == AttributeSource.OutputProperty && !readOutput)
+                else if (name == OutputProperty && !readOutput)
                 {
                     readOutput = true;
                     if (!TryReadOutput(argument.Expression, out output))
                     {
                         isRead = false;
-                        errors.Add(NotALiteral(path, argument.Expression, AttributeSource.OutputProperty));
+                        errors.Add(NotALiteral(path, argument.Expression, OutputProperty));
                     }
                 }
             }

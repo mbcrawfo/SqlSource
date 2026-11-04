@@ -58,10 +58,6 @@ public sealed class AttributeConflictTests
             "[global::SqlSource.SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }",
             "internal class Sample { object o = typeof(SqlSource.SqlLocation); }",
             "internal class Sample { object o = SqlSource.SqlLocation.Direct; }",
-            // Removed with the attribute level in Task 3.
-            "internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }",
-            // Removed with the attribute level in Task 3.
-            "internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }",
             "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
         ];
         var uses = new TheoryData<string, bool>();
@@ -109,41 +105,14 @@ public sealed class AttributeConflictTests
         build.ShouldBeEmpty();
     }
 
-    // Removed with the attribute level in Task 3.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Build_AttributeThatSetsTheOutput_HasNoConflictForTheEnum(bool compilationReference)
+    public async Task Build_AttributeThatSetsTheMethods_HasNoConflictForTheEnum(bool compilationReference)
     {
         const string Source = """
             using SqlSource;
-            [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Sql)]
-            internal partial class Sample { }
-            """;
-
-        var build = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql, compilationReference)]
-        );
-
-        build.ShouldBeEmpty();
-    }
-
-    // Removed with the attribute level in Task 3.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Build_AttributeThatSetsTheModelsAndTheMethods_HasNoConflictForTheEnums(bool compilationReference)
-    {
-        const string Source = """
-            using SqlSource;
-            [SqlSourceGenerate(
-                Source = ".",
-                InputModelType = GeneratorModelType.Class,
-                CollectionType = GeneratorCollectionType.List,
-                MethodLocation = MethodLocation.Internal)]
+            [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Internal)]
             internal partial class Sample { }
             """;
 
@@ -206,7 +175,7 @@ public sealed class AttributeConflictTests
     [Theory]
     [InlineData("Mine", "SqlLocation")]
     [InlineData("Mine", "SqlSourceGenerateAttribute")]
-    [InlineData("Mine", "GeneratorOutput")]
+    [InlineData("Mine", "MethodLocation")]
     [InlineData("SqlSource", "Shared")]
     [InlineData("SqlSource.Inner", "SqlLocation")]
     public async Task Build_UseOfATypeThatBothProjectsDeclare_IsStillAConflict(string @namespace, string name)

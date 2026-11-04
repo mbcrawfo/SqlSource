@@ -189,7 +189,7 @@ internal static class RunPlanner
     // wanted: the hash comes from the SQL without them.
     private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
     {
-        var input = FileParseInput.Resolve(owner.Text, owner.NormalizedPath, owner.Chain, EquatableArray<string>.Empty);
+        var input = FileParseInput.Resolve(owner.Text, owner.NormalizedPath, owner.Chain);
         return SqlFileReader.Read(
             owner.Text,
             owner.NormalizedPath,
@@ -305,7 +305,7 @@ internal static class RunPlanner
         {
             foreach (var claim in claimant.Claims)
             {
-                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level).Output;
+                var output = QuerySettings.Resolve(query.Markers, claimant.Level).Output;
                 if (output > greatest)
                 {
                     greatest = output;

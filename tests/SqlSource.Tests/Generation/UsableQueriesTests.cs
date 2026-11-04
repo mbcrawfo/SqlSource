@@ -22,8 +22,11 @@ public sealed class UsableQueriesTests
         var third = TestModels.Query("GetOrder", "SELECT 3;", nameLocation: TestModels.NameLocation("Orders.sql"));
         var fourth = TestModels.Query("ListOrders", "SELECT 4;", nameLocation: TestModels.NameLocation("Orders.sql"));
         var type = Queries(
-            TestModels.Type(settings: new SettingsLevel { Output = OutputKind.Models }),
-            [SettingsLevel.None, new SettingsLevel { OutputModelSuffix = "Row" }],
+            TestModels.Type(),
+            [
+                new SettingsLevel { Output = OutputKind.Models },
+                new SettingsLevel { Output = OutputKind.Models, OutputModelSuffix = "Row" },
+            ],
             File("Users.sql", first, second),
             File("Orders.sql", third, fourth)
         );
