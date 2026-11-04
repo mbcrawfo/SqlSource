@@ -368,7 +368,7 @@ public partial class UserRepository
 /work/App/Queries/UserRepository.cs(3,2): error SQLSRC007: 'UserRepository' already has a member named 'Sql', which a file of it names as its nested class.  Rename the member, or set -- nested-class: or -- member-location: in the file.
 ```
 
-The error is reported at the type's `[SqlSourceGenerate]`, once for each name that is taken.  Each file of the type with a query whose members would go in a class of that name produces no members for it, and the type's other files keep theirs.
+The error is reported at the type's `[SqlSourceGenerate]`, once for each name that is taken.  Each file of the type with a query whose members would go in a class of that name produces no members and no models for it, and the type's other files keep theirs.
 
 Rename the member, the type or the type parameter, give the nested class another name with `-- nested-class:` in the file or `nestedClass` in a settings file, or write `-- member-location: class` so that the queries become members of the type itself.
 
@@ -1146,7 +1146,7 @@ SELECT count(*) FROM users;
 /work/App/Queries/Users.sql(3,10): error SQLSRC122: The query 'CountUsers' of 'App.UserRepository' cannot go in the extension class, which the file header sets, because its output is sql and only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.
 ```
 
-The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `codegen`.
+The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members and no models for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `codegen`.
 
 See: [Where the members go](generator.md#locations)
 
@@ -1177,7 +1177,7 @@ SELECT id, name FROM users WHERE id = @id;
 /work/App/Queries/Users.sql(7,10): error SQLSRC123: The query 'GetUser' of 'App.UserRepository' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
 ```
 
-The error is at the query's `-- visibility:` marker when it has one, else at its `-- member-location:` marker, else at its name, and the file produces no members for the type until it is fixed.  Write `-- visibility:` on the query, as `-- visibility: internal` on `GetUser` above, or write `-- member-location: class` or `-- member-location: nested-class` on it, where a member can be private.  `protected` is allowed on a sealed class or record, and in a nested class of a static class.
+The error is at the query's `-- visibility:` marker when it has one, else at its `-- member-location:` marker, else at its name, and the file produces no members and no models for the type until it is fixed.  Write `-- visibility:` on the query, as `-- visibility: internal` on `GetUser` above, or write `-- member-location: class` or `-- member-location: nested-class` on it, where a member can be private.  `protected` is allowed on a sealed class or record, and in a nested class of a static class.
 
 See: [Where the methods go](generator.md#method-location)
 
@@ -1191,7 +1191,7 @@ Queries of one type, in one file or in two, put their members in one nested clas
 /work/App/Queries/Orders.sql(3,10): error SQLSRC124: The nested class 'Sql' of 'App.UserRepository' cannot be internal, which the file header sets for the query 'GetOrder', since the file header sets it public for the query 'GetUser'.  Write one visibility for the queries of the class, or write -- nested-class: or -- member-location: on the query.
 ```
 
-The error is at the query that writes the second visibility, at its `-- visibility:` marker when it has one, else at its name.  Every file of the type with a query in that class produces no members for the type until it is fixed, since neither visibility is more right than the other; two nested classes of one type, each of its own visibility, are fine.  Write one visibility for the class, or write it for one query and leave it to the others, or give the queries of the other visibility a class of their own with `-- nested-class:`, or put them on the type with `-- member-location: class`.
+The error is at the query that writes the second visibility, at its `-- visibility:` marker when it has one, else at its name.  Every file of the type with a query in that class produces no members and no models for the type until it is fixed, since neither visibility is more right than the other; two nested classes of one type, each of its own visibility, are fine.  Write one visibility for the class, or write it for one query and leave it to the others, or give the queries of the other visibility a class of their own with `-- nested-class:`, or put them on the type with `-- member-location: class`.
 
 See: [Name of the nested class](settings.md#setting-nested-class)
 
@@ -1230,7 +1230,7 @@ public partial class UserRepository
 /work/App/Queries/Users.sql(6,10): error SQLSRC125: The member of the query 'Get' cannot go on 'App.UserRepository', because the type declares a member, a nested type or a type parameter of that name.  Rename the query, or write -- member-location: on it.
 ```
 
-The error is at the query's name, and its file produces no members for the type until it is fixed.  Rename the query, or write `-- member-location: nested-class` on it; for a nested class of the type's queries you can also give that class another name with `-- nested-class:`.  A query named like the type itself is [SQLSRC009](#sqlsrc009), and a query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).
+The error is at the query's name, and its file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- member-location: nested-class` on it; for a nested class of the type's queries you can also give that class another name with `-- nested-class:`.  A query named like the type itself is [SQLSRC009](#sqlsrc009), and a query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).
 
 See: [Where the members go](generator.md#locations)
 
