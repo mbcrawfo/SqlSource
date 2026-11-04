@@ -2944,7 +2944,7 @@ See: [Type overrides](settings.md#setting-type-overrides), [column types](settin
 `sqlsource describe` looks for a `.env` file for the connections of a run, and the file it found cannot be read: the system would not open or read it.  The message names the file and ends with the reason the system gave.  The run goes on as if the file gave no connection at all, so the databases that needed a connection from it report [SQLSRC213](#sqlsrc213), unless another source gives one.
 
 ```console
-sqlsource describe /work/App
+$ dotnet sqlsource describe /work/App
 /work/.env : error SQLSRC285: '/work/.env' cannot be read: Access to the path '/work/.env' is denied.
 ```
 
@@ -2984,7 +2984,7 @@ See: [A `.env` file](tool.md#env-file)
 The usual cause is one of the two limits that Linux puts on watching files, of `inotify instances` and of `inotify watches`, which a machine with many projects, or with other tools that watch folders, such as editors, can reach.
 
 ```console
-sqlsource describe /work/App --watch
+$ dotnet sqlsource describe /work/App --watch
 /work/App : error SQLSRC287: watching '/work/App' for changes failed: The configured user limit (128) on the number of inotify instances has been reached, or the per-process limit on the number of open file descriptors has been reached.
     help: set DOTNET_USE_POLLING_FILE_WATCHER=true to poll for changes instead
 ```
