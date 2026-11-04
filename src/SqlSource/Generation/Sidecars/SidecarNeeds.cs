@@ -8,13 +8,13 @@ using SqlSource.Settings;
 namespace SqlSource.Generation.Sidecars;
 
 /// <summary>
-/// Which queries need an entry in their file's sidecar: one whose output, resolved for some type that claims its
-/// file, is not <see cref="OutputKind.Sql" />.
+/// Which queries need an entry in their file's sidecar: one whose output, resolved from its markers and its file's
+/// level, is not <see cref="OutputKind.Sql" />.  The output is the same for every type that claims the file.
 /// </summary>
 internal static class SidecarNeeds
 {
     /// <summary>
-    /// What <paramref name="type" /> needs of each of its files, with the output it resolves for each query.  A file
+    /// What <paramref name="type" /> needs of each of its files, with each query's output.  A file
     /// in which it needs nothing is left out.  A type with problems of its own counts as well: the <c>sqlsource</c>
     /// tool describes its files all the same, so their entries are not orphans.
     /// </summary>

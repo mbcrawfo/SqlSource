@@ -5,7 +5,8 @@ using SqlSource.Settings.TypeOverrides;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The settings in effect for one query, for one type that claims its file.
+/// The settings in effect for one query, from its markers and its file's level: the same for every type that claims
+/// its file.
 /// </summary>
 /// <param name="Parameters">The list of generator parameters.</param>
 /// <param name="Output">

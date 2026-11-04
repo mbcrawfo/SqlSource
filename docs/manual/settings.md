@@ -78,7 +78,7 @@ The rules:
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
 - **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file or of the attribute that is empty or white space.  `Source` is the exception: see [Source](#setting-source).
 - **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
-- **A file gives one value to every type that claims it.**  The places are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model.  A type that needs other settings needs a file of its own.
+- **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model.  Only what belongs to a type can differ: its [nested class](#setting-nested-class), where its members go, and the namespace of the models, which is the type's own unless the [model namespace](#setting-model-namespace) is set.  A type that needs other settings needs a file of its own.
 
 Four exceptions, stated plainly:
 

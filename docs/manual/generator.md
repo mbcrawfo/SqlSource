@@ -241,7 +241,8 @@ A query gets models when its [output](settings.md#setting-output) is `models` or
 
 - **Rows of no column**, which PostgreSQL gives for `SELECT FROM users`, get an output model with no properties.
 - **A query has no models while it has an error**: an entry that is missing or out of date ([SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244)), a column or a parameter with no C# type ([SQLSRC246](diagnostics.md#sqlsrc246), [SQLSRC249](diagnostics.md#sqlsrc249) to [SQLSRC252](diagnostics.md#sqlsrc252), [SQLSRC261](diagnostics.md#sqlsrc261), [SQLSRC269](diagnostics.md#sqlsrc269) and [SQLSRC270](diagnostics.md#sqlsrc270)), a name that gives no property ([property names](#property-names)), or a [`-- column:` marker](#column-marker) that names no column it can set ([SQLSRC260](diagnostics.md#sqlsrc260)).  Under the output `models` its constant or token method is still generated; under `codegen` it has no method either.
-- **A query whose output is `sql` gets none.**  When two types claim its file, a type with an error of its own asks for no models, and neither does a type for a file that it leaves out ([SQLSRC008](diagnostics.md#sqlsrc008), [SQLSRC009](diagnostics.md#sqlsrc009)); the other type still gets them.
+- **A query whose output is `sql` gets none.**
+- **A type with an error asks for no models.**  When two types claim one file, a type with an error of its own asks for no models of its queries, and neither does a type for a file that it leaves out ([SQLSRC008](diagnostics.md#sqlsrc008), [SQLSRC009](diagnostics.md#sqlsrc009)); the other type still gets them.
 - **`-- output-model:` on a query that returns no rows** is [SQLSRC259](diagnostics.md#sqlsrc259), and the query has no models until the marker is removed.  `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119).
 
 <a id="model-names"></a>
