@@ -7,6 +7,8 @@
   // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models
   // would need a sidecar beside its file.
   "output": "Sql",
+  // Their members are on the type itself, Queries, which Program.cs reads, in place of its nested class Sql.
+  "memberLocation": "class",
   // Token validation is off, so that a query without a list of its own does not check its arguments.
   "generatorParameters": ["sort-input", "no-token-validation"],
 }

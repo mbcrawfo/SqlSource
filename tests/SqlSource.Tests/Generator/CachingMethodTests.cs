@@ -33,6 +33,9 @@ public sealed class CachingMethodTests
     // The override that makes a datetime2 an Instant, which NodaTime's conversion of DateTime gives.
     private const string InstantOverride = "-- type-override: datetime2=NodaTime.Instant\n\n";
 
+    // The header that puts a file's methods on its type, public.
+    private const string OnTheType = "-- member-location: class\n-- visibility: public\n\n";
+
     private readonly CachingScene _scene = new();
 
     // Orders with its query renamed GetUser, as UserQueries' is, and a model of its own by its marker.
@@ -117,17 +120,18 @@ public sealed class CachingMethodTests
         MethodsOf(result, UserMethods).ShouldContain("GetFieldValue<string>(");
     }
 
-    // The methods of UserQueries move from its extension class onto the type, in the file of the same name.  The
-    // conflicts are found again, since the extension classes changed, and are none, as before, so OrderQueries' methods
-    // are not written again.
+    // The header of Users moves the methods of UserQueries from its extension class onto the type, in the file of the
+    // same name.  The conflicts are found again, since the extension classes changed, and are none, as before, so
+    // OrderQueries' methods are not written again.
     [Fact]
-    public void Run_MethodLocationEdit_ReEmitsThatTypesMethods()
+    public void Run_MemberLocationEdit_ReEmitsThatTypesMethods()
     {
         var compilation = MethodsCompilation(UserQueries());
-        var driver = _scene.FirstRunOfMethods(compilation);
+        var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
+        var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
         MethodsOf(driver.GetRunResult(), UserMethods).ShouldContain("class UserQueriesExtensions");
 
-        var result = Run(driver, WithUserQueries(compilation, UserQueries("MethodLocation = MethodLocation.Public")));
+        var result = Run(EditUsers(driver, usersSidecar, "GetUser", OnTheType + SqlTexts.GetUser), compilation);
 
         result.Diagnostics.ShouldBeEmpty();
         MethodReasons(result, TrackingNames.MethodOutput)
@@ -171,25 +175,27 @@ public sealed class CachingMethodTests
         MethodsOf(result, UserMethods).ShouldContain("global::App.GetUserRow");
     }
 
-    // UserQueries' methods go on itself, so the names of its members are among what it plans them from.  The new
-    // member takes no method's name, so the plan is equal, and nothing is written again.
+    // Users puts UserQueries' methods on itself, so the names of its members are among what it plans them from.  The
+    // member is read with UserQueries alone, so OrderQueries' input is taken from the previous run.  The new member
+    // takes no method's name, so the plan is equal, and nothing is written again.
     [Fact]
-    public void Run_MemberAddedToATypePlacedOnItself_ReachesNoOutput()
+    public void Run_MemberAddedToATypeWithItsMethodsOnIt_ReachesNoOutput()
     {
-        const string Arguments = "MethodLocation = MethodLocation.Public";
-        var compilation = MethodsCompilation(UserQueries(Arguments));
-        var driver = _scene.FirstRunOfMethods(compilation);
+        var compilation = MethodsCompilation(UserQueries());
+        var users = new InMemoryAdditionalText(_scene.Users.Path, OnTheType + SqlTexts.GetUser);
+        var driver = _scene.FirstRunOfMethodsWith(compilation, users);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        MethodsOf(driver.GetRunResult(), UserMethods).ShouldContain("partial class UserQueries");
 
         var result = Run(
             driver,
-            WithUserQueries(compilation, UserQueries(Arguments, "    public static int Count() => 0;\n"))
+            WithUserQueries(compilation, UserQueries(members: "    public static int Count() => 0;\n"))
         );
 
         result.Diagnostics.ShouldBeEmpty();
-        AllReasons(result, TrackingNames.TypeMemberNames).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.MethodsInput)
             .ShouldBe(
-                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged),
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
                 ignoreOrder: true
             );
         MethodReasons(result, TrackingNames.TypeMethods)

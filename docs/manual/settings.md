@@ -95,7 +95,6 @@ Four exceptions, stated plainly:
 |----|----|----|
 | A marker | [SQLSRC111](diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
 | A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of a list, unless one is `default` beside another, and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.  Of a key, or an entry, written twice, the first applies.  A file that is not a JSON object gives nothing |
-| A property of the attribute | [SQLSRC006](diagnostics.md#sqlsrc006) | The type produces no members until it is fixed |
 
 <a id="setting-output"></a>
 
@@ -731,7 +730,7 @@ public partial class UserRepository
 
 Under `SqlLocation.Nested`, this names the private class that holds the type's members, those of its queries whose output is `sql` or `models`.  `NestedClass` on the attribute names it for one type, and `nestedClass` in a settings file for each type that does not set it and whose C# file, the one that carries `[SqlSourceGenerate]`, is in the settings file's folder or a folder below it, the nearest such file winning.  Without either, the class is `Sql`.  The setting is read from the settings files of the type's C# file, not of its `.sql` files, and has no marker, since a type's queries can come from several files.
 
-The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute, and [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
+The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
 
 <a id="setting-method-location"></a>
 

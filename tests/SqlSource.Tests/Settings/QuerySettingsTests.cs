@@ -246,19 +246,6 @@ public sealed class QuerySettingsTests
             )
             .ShouldBe(expected);
 
-    [Theory]
-    [InlineData("Statements", "Queries", "Statements")]
-    [InlineData("Statements", null, "Statements")]
-    [InlineData(null, "Queries", "Queries")]
-    [InlineData(null, null, "Sql")]
-    public void ResolveNestedClass_TheAttribute_WinsOverTheChain(string? attribute, string? chain, string expected) =>
-        QuerySettings
-            .ResolveNestedClass(
-                new SettingsLevel { NestedClass = attribute },
-                new SettingsLevel { NestedClass = chain }
-            )
-            .ShouldBe(expected);
-
     [Fact]
     public void Over_NestedClass_ComesFromThisLevelWhenItHasOne()
     {

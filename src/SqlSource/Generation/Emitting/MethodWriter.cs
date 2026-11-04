@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Placement;
 using SqlSource.Parsing.Tokens;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation.Emitting;
 
@@ -30,13 +32,15 @@ internal static class MethodWriter
     /// <param name="name">The query's name, which is the method's.</param>
     /// <param name="segments">The query's SQL.  It holds at least one token.</param>
     /// <param name="validate">Whether the method checks that each argument has text.</param>
+    /// <param name="accessibility">The method's accessibility.</param>
     public static void Append(
         StringBuilder builder,
         string indent,
         string summaryXml,
         string name,
         EquatableArray<SqlSegment> segments,
-        bool validate
+        bool validate,
+        Visibility accessibility
     )
     {
         var parameters = GetTokens(segments);
@@ -53,7 +57,12 @@ internal static class MethodWriter
 
         XmlDocWriter.AppendReturns(builder, indent);
 
-        _ = builder.Append(indent).Append("public static string ").Append(name).Append('(');
+        _ = builder
+            .Append(indent)
+            .Append(PlacementChecks.KeywordOf(accessibility))
+            .Append(" static string ")
+            .Append(name)
+            .Append('(');
         AppendList(builder, parameters, "string ");
         _ = builder.Append(")\n").Append(indent).Append("{\n");
 

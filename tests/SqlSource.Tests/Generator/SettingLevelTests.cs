@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
-using System;
 using System.Linq;
 using Shouldly;
 using SqlSource.Testing.Generator;
@@ -18,8 +17,6 @@ namespace SqlSource.Tests.Generator;
 // MethodRuns, with an entry for the query.
 public sealed class SettingLevelTests
 {
-    private const string Sql = "-- name: Q\nSELECT 1;\n";
-
     // The query of the method runs, with its entry written for the file as each level's markers leave it.
     private static readonly SqlFile Users = new(
         GeneratorHarness.UsersPath,
@@ -28,9 +25,6 @@ public sealed class SettingLevelTests
 
     // Users with its header's output at sql.
     private static readonly SqlFile UsersAtSql = new(GeneratorHarness.UsersPath, "-- output: sql\n\n" + Users.Text);
-
-    // The one diagnostic of Sql under the defaults: SQLSRC209 at Q, on its first line.
-    private static readonly string[] Default = [NotDescribable("codegen", 1)];
 
     public static TheoryData<string, string, string[], string[]> MarkersWithoutAnEffect =>
         new()
@@ -58,11 +52,11 @@ public sealed class SettingLevelTests
             },
         };
 
-    public static TheoryData<SettingLevel, string, string> PlacementSettingsAtEachLevel
+    public static TheoryData<SettingLevel, string, string, string> PlacementSettingsAtEachLevel
     {
         get
         {
-            var rows = new TheoryData<SettingLevel, string, string>();
+            var rows = new TheoryData<SettingLevel, string, string, string>();
             foreach (
                 var level in new[]
                 {
@@ -73,9 +67,10 @@ public sealed class SettingLevelTests
                 }
             )
             {
-                rows.Add(level, "member-location", "nested-class");
-                rows.Add(level, "visibility", "private");
-                rows.Add(level, "nested-class", "Users");
+                rows.Add(level, "member-location", "nested-class", "    private static partial class Sql\n");
+                rows.Add(level, "visibility", "public", "public static partial class SampleExtensions\n");
+                // Away from a nested class the nested class is ignored, and the methods stay in the extension class.
+                rows.Add(level, "nested-class", "Users", "internal static partial class SampleExtensions\n");
             }
 
             return rows;
@@ -92,31 +87,6 @@ public sealed class SettingLevelTests
     // Every level of a setting.
     public static TheoryData<SettingLevel> Levels =>
         [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
-
-    [Theory]
-    [InlineData("MethodLocation = (MethodLocation)4", "4", "MethodLocation")]
-    public void Run_AttributePropertyThatIsNotValid_IsAnErrorAtTheAttribute(
-        string argument,
-        string value,
-        string property
-    )
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            GeneratorHarness.SampleSource(argument),
-            new SqlFile("/app/Repo/Q.sql", Sql)
-        );
-
-        // The type's files are still checked, under the default output.
-        run.Diagnostics.Count.ShouldBe(2);
-        run.Diagnostics.ShouldContain(Default[0]);
-        var diagnostic = run
-            .Diagnostics.Where(item => item.StartsWith("SQLSRC006", StringComparison.Ordinal))
-            .ShouldHaveSingleItem();
-        diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(5,2)-");
-        diagnostic.ShouldEndWith(": '" + value + "' is not a valid value of " + property);
-        run.Sources.Keys.ShouldNotContain(GeneratorHarness.SampleFile);
-    }
 
     // The markers that change no type's file without a dialect, in a preamble and in a query: the type's file is the
     // one of the same file without them.  A query's output marker of sql over the header's of models leaves the file
@@ -204,15 +174,16 @@ public sealed class SettingLevelTests
         ModelRuns.ModelFiles(run).ShouldBe([ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 
-    // The member location, the visibility and the nested class are read at every level, and until a later change gives
-    // them an effect they leave the generated files as they are.  A row gives the setting's marker, as the type of a
-    // setting is internal, and a value that is valid for it.
+    // The member location, the visibility and the nested class are read at every level, and each takes the query's
+    // method where it says.  A row gives the setting's marker, as the type of a setting is internal, a value that is
+    // valid for it, and what the file of methods then holds.  The query is a method, so the type's file stays as it is.
     [Theory]
     [MemberData(nameof(PlacementSettingsAtEachLevel))]
-    public void Run_PlacementSettingAtEachLevel_IsAcceptedAndChangesNothing(
+    public void Run_PlacementSettingAtEachLevel_PlacesTheMethod(
         SettingLevel level,
         string marker,
-        string value
+        string value,
+        string expected
     )
     {
         var entry = new[] { Setting.MemberLocation, Setting.Visibility, Setting.NestedClass }.Single(setting =>
@@ -223,7 +194,7 @@ public sealed class SettingLevelTests
         var run = RunPlacement(new LevelSettings().At(level, entry, LevelSettings.StringAt(level, value)));
 
         run.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
-        run.Sources[MethodRuns.MethodsFile].ShouldBe(plain.Sources[MethodRuns.MethodsFile]);
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(expected);
     }
 
     [Theory]
@@ -250,33 +221,42 @@ public sealed class SettingLevelTests
             );
     }
 
-    // The attribute is the setting's one place.  The default is the extension class.
+    // Each member location in the file's header, with each visibility on the type.  The default is the extension
+    // class, internal; a method in the nested class is public, in a class whose visibility is the file's.
     [Theory]
-    [InlineData(null, "    public static partial class SampleExtensions\n", "        public static async ")]
+    [InlineData("", "    internal static partial class SampleExtensions\n", "        internal static async ")]
     [InlineData(
-        "MethodLocation = MethodLocation.ExtensionClass",
-        "    public static partial class SampleExtensions\n",
+        "-- member-location: extension-class\n",
+        "    internal static partial class SampleExtensions\n",
+        "        internal static async "
+    )]
+    [InlineData(
+        "-- member-location: nested-class\n",
+        "        private static partial class Sql\n",
+        "            public static async "
+    )]
+    [InlineData(
+        "-- member-location: class\n-- visibility: public\n",
+        "    partial class Sample\n",
         "        public static async "
     )]
-    [InlineData("MethodLocation = MethodLocation.Public", "    partial class Sample\n", "        public static async ")]
     [InlineData(
-        "MethodLocation = MethodLocation.Internal",
+        "-- member-location: class\n-- visibility: internal\n",
         "    partial class Sample\n",
         "        internal static async "
     )]
     [InlineData(
-        "MethodLocation = MethodLocation.Private",
+        "-- member-location: class\n-- visibility: private\n",
         "    partial class Sample\n",
         "        private static async "
     )]
-    public void Run_MethodLocationOnTheAttribute_PlacesTheMethod(string? argument, string holder, string modifiers)
+    public void Run_MemberLocationInTheHeader_PlacesTheMethod(string header, string holder, string modifiers)
     {
-        var source = argument is null ? MethodRuns.Source : MethodRuns.SampleSource(argument);
+        var users = Users with { Text = header + "\n" + Users.Text };
 
         var run = MethodRuns.Run(
-            Users,
-            [ModelRuns.Entry(Users, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
-            source
+            users,
+            [ModelRuns.Entry(users, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])]
         );
 
         run.ShouldBeClean();

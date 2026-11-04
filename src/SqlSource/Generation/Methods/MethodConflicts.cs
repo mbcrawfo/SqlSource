@@ -30,7 +30,8 @@ internal sealed record MethodConflicts(
     /// The clashes of the methods of two types, and the extension classes that cannot be written.  A clash is two
     /// methods of one name in one extension class, from two types, or in two extension classes of one namespace with
     /// one parameter list, which a call could not tell apart; both are dropped.  An extension class cannot be written
-    /// when the project or a model has its full name, or when two types give it with two accessibilities; each type
+    /// when the project or a model has its full name, or when two types give it with two accessibilities, each its
+    /// widest method's, since widening it across types would make one type's output depend on another's; each type
     /// that gives it is blocked, and its methods clash with nothing.  The value does not depend on the order of
     /// <paramref name="signatures" />.
     /// </summary>
@@ -45,7 +46,8 @@ internal sealed record MethodConflicts(
         EquatableArray<string> modelNames
     )
     {
-        var extensions = signatures.Where(static signature => signature.ExtensionClass is not null).ToList();
+        // Only an extension method has a signature, and only it can clash with another type's.
+        var extensions = signatures.ToList();
         if (extensions.Count == 0)
         {
             return None;
@@ -108,7 +110,7 @@ internal sealed record MethodConflicts(
         var models = ModelNamesOf(modelNames);
         foreach (
             var extensionClass in extensions.GroupBy(
-                static signature => signature.ExtensionClassFullName!,
+                static signature => signature.ExtensionClassFullName,
                 StringComparer.Ordinal
             )
         )

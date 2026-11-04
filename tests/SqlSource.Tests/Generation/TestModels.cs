@@ -19,25 +19,27 @@ internal static class TestModels
 
     public static TargetType Type(
         string? source = null,
-        MemberPlacement placement = MemberPlacement.Nested,
         string filePath = SourceFile,
         string @namespace = "App",
         TypeDeclaration[]? types = null,
         DiagnosticInfo[]? diagnostics = null,
-        bool isPublic = true
+        bool isPublic = true,
+        bool isStatic = false,
+        bool isSealed = false,
+        string[]? takenNames = null
     ) =>
         new(
             @namespace,
             TestSidecars.Of(
                 types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]
             ),
-            placement,
-            MethodPlacement.ExtensionClass,
-            SettingsLevel.None,
             isPublic,
+            isStatic,
+            isSealed,
             source,
             filePath,
             AttributeLocation,
+            TestSidecars.Of(takenNames ?? [types?[^1].ValueName ?? "UserRepository"]),
             TestSidecars.Of(diagnostics ?? [])
         );
 

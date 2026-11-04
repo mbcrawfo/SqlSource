@@ -1,11 +1,14 @@
 -- The queries of the shapes of models, claimed by ShapeQueries, here and in tests/DatabaseTests/QueryMethodAllocation,
--- which links this file: its header gives both claims their models' shapes, suffixes and namespace.
+-- which links this file: its header gives both claims their models' shapes, suffixes and namespace, and puts their
+-- methods on the type, public.
 -- input-model-suffix: Filter
 -- output-model-suffix: View
 -- input-model-type: sealed-class
 -- output-model-type: record
 -- model-namespace: SqlSource.DatabaseTests.SqlServer.EndToEnd.Shapes
 -- collection-type: IReadOnlyList
+-- member-location: class
+-- visibility: public
 
 -- name: SearchAccounts -> many
 -- summary: The accounts with a name like a pattern, or with an id.

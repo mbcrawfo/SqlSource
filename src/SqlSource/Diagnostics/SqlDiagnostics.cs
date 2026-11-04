@@ -75,21 +75,12 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidAttributeValue = new(
-        id: "SQLSRC006",
-        title: "Attribute value is not valid",
-        messageFormat: "'{0}' is not a valid value of {1}",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLinkBase + "sqlsrc006",
-        customTags: WellKnownDiagnosticTags.NotConfigurable
-    );
-
+    // {0} is the type's name and {1} the nested class's.  Reported at the type's attribute, once for each name.
     public static readonly DiagnosticDescriptor NestedClassNameTaken = new(
         id: "SQLSRC007",
         title: "Type has a member named like its nested class",
-        messageFormat: "'{0}' already has a member named '{1}'.  Rename it, or use SqlLocation.Direct.",
+        messageFormat: "'{0}' already has a member named '{1}', which a file of it names as its nested class.  Rename "
+            + "the member, or set -- nested-class: or -- member-location: in the file.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -552,6 +543,65 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc121"
     );
 
+    // {0} is the query, {1} the place that wrote the location, as "the file header", and {2} the query's output.
+    // Reported at the query's own -- member-location: marker, else at its name.
+    public static readonly DiagnosticDescriptor MemberLocationNotFit = new(
+        id: "SQLSRC122",
+        title: "Member location does not fit the query",
+        messageFormat: "The query '{0}' cannot go in the extension class, which {1} sets, because its output is {2} "
+            + "and only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or "
+            + "-- member-location: on the query.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc122",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the query, {1} the visibility, {2} the place that wrote it, as "the file header", {3} the location, and
+    // {4} why the two do not fit, as "an extension method is public or internal".  Reported at the query's own
+    // -- visibility: marker, else at its -- member-location: marker, else at its name.
+    public static readonly DiagnosticDescriptor VisibilityNotFit = new(
+        id: "SQLSRC123",
+        title: "Visibility does not fit the member location",
+        messageFormat: "The query '{0}' cannot be {1}, which {2} sets, at the member location {3}, because {4}.  Write "
+            + "-- visibility: or -- member-location: on the query.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc123",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the nested class, {1} the type in full, {2} the query's visibility, {3} the place that wrote it, {4} the
+    // query, then {5} the place, {6} the visibility and {7} the query that gave the class its first.  Reported at the
+    // query's own -- visibility: marker, else at its name.
+    public static readonly DiagnosticDescriptor NestedClassVisibilities = new(
+        id: "SQLSRC124",
+        title: "Nested class has two visibilities",
+        messageFormat: "The nested class '{0}' of '{1}' cannot be {2}, which {3} sets for the query '{4}', since {5} "
+            + "sets it {6} for the query '{7}'.  Write one visibility for the queries of the class, or write "
+            + "-- nested-class: or -- member-location: on the query.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc124",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the query and {1} the type in full.  Reported at the query's name.
+    public static readonly DiagnosticDescriptor MemberNamedLikeNestedClass = new(
+        id: "SQLSRC125",
+        title: "Query's member is named like a nested class",
+        messageFormat: "The member of the query '{0}' cannot go on '{1}', because a nested class of the type's queries "
+            + "has that name.  Rename the query, or write -- nested-class: or -- member-location: on the query.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc125",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor SidecarMalformed = new(
         id: "SQLSRC237",
         title: "Sidecar cannot be read",
@@ -993,7 +1043,7 @@ internal static class SqlDiagnostics
         id: "SQLSRC276",
         title: "Extension class name is taken",
         messageFormat: "The query methods of '{0}' cannot go into the extension class '{1}', because {2}.  Rename the "
-            + "type or what has the name, or set the attribute's MethodLocation to put the methods on the type.",
+            + "type or what has the name, or set -- member-location: to put the methods on the type.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -1145,7 +1195,6 @@ internal static class SqlDiagnostics
             UnsupportedTargetFramework,
             SourceMatchesNothing,
             TypeHasNoSqlFile,
-            InvalidAttributeValue,
             NestedClassNameTaken,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
@@ -1185,6 +1234,10 @@ internal static class SqlDiagnostics
             InputModelWithoutParameters,
             TokenCrossesComment,
             ParameterInTwoSpellings,
+            MemberLocationNotFit,
+            VisibilityNotFit,
+            NestedClassVisibilities,
+            MemberNamedLikeNestedClass,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,

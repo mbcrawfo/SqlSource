@@ -1,6 +1,8 @@
 -- The queries of the collection types of the markers: IList by the file header, and Array and IImmutableList by a
--- marker of the query, which takes the place of the header's.
+-- marker of the query, which takes the place of the header's.  The header puts every method on the type, public.
 -- collection-type: IList
+-- member-location: class
+-- visibility: public
 
 -- name: ListAccountsByHeader
 -- summary: The id and name of every account, in the collection type of the file header.

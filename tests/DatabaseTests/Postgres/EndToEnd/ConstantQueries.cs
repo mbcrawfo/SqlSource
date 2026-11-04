@@ -1,5 +1,6 @@
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
-// The output sql by a file's header: a constant, no models, and no sidecar.
-[SqlSourceGenerate(Source = "Queries/Constants.sql", SqlLocation = SqlLocation.Direct)]
+// The output sql by a file's header: a constant, no models, and no sidecar.  The header's -- member-location: puts the
+// constant on the type.
+[SqlSourceGenerate(Source = "Queries/Constants.sql")]
 internal static partial class ConstantQueries;

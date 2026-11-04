@@ -88,19 +88,18 @@ internal static class GeneratorHarness
         ];
     }
 
-    // The source of the type App.Sample, whose attribute has SqlLocation.Direct and these arguments after it: null for
-    // none, or text such as NestedClass = "Queries".  Unless they set Source, it has Source = "." too, so that it
-    // gets every .sql file of its folder; the compiler rejects a second Source.
+    // The source of the type App.Sample, whose attribute has these arguments: null for Source = ".", so that it gets
+    // every .sql file of its folder, or text such as Source = "Users.sql".  Where its members go is the run's
+    // settings, as ProjectSettings writes them.
     public static string SampleSource(string? arguments) =>
         "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate("
-        + (
-            arguments is not null && arguments.Contains("Source =", StringComparison.Ordinal)
-                ? string.Empty
-                : "Source = \".\", "
-        )
-        + "SqlLocation = SqlLocation.Direct"
-        + (arguments is null ? string.Empty : ", " + arguments)
+        + (arguments ?? "Source = \".\"")
         + ")]\npublic partial class Sample;\n";
+
+    // The settings of a Sql or Models run whose members go in the nested class, the default, which the memberLocation
+    // of ProjectSettings would otherwise replace.
+    public const string InNestedClass = /*lang=json,strict*/
+        """{"memberLocation": "NestedClass"}""";
 
     // A settings file at the path, with this JSON.  The compiler gives one to the generator as an additional file, as
     // it gives a .sql file, so a test passes it among the .sql files.
@@ -177,11 +176,18 @@ internal static class GeneratorHarness
         };
     }
 
-    // The JSON of the project's settings file: the output, spelled as a user writes it, the dialect as given, the
-    // generator parameters as the array of their words, and then each entry of settings, a JSON object as a user
-    // writes the file, which replaces the key it names.  Null when all four are null.  The spelling is the tests' own,
-    // not taken from the generator, so that a change to the generator's spelling fails a test.  CachingScene writes
-    // the project's file of its drivers with it too.
+    // A run of the source and the files with InNestedClass for its settings, for a test of the nested class of a Sql
+    // or Models run.
+    public static GeneratorRun RunInNestedClass(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
+        Run(output, [new SourceFile(SourcePath, source)], sqlFiles, settings: InNestedClass);
+
+    // The JSON of the project's settings file: the output, spelled as a user writes it, and memberLocation class when
+    // the output is Sql or Models, so that a test reads the constants and token methods on the type, as Sample.Query;
+    // then the dialect as given, the generator parameters as the array of their words, and each entry of settings, a
+    // JSON object as a user writes the file, which replaces the key it names.  Null when all four are null.  A CodeGen
+    // run writes no memberLocation, so its methods go to the extension class, the default.  The spelling is the tests'
+    // own, not taken from the generator, so that a change to the generator's spelling fails a test.  CachingScene
+    // writes the project's file of its drivers with it too.
     public static string? ProjectSettings(
         OutputKind? output,
         string? dialect = null,
@@ -198,6 +204,10 @@ internal static class GeneratorHarness
         if (output is { } kind)
         {
             json["output"] = Spell(kind);
+            if (kind is OutputKind.Sql or OutputKind.Models)
+            {
+                json["memberLocation"] = "class";
+            }
         }
 
         if (dialect is not null)

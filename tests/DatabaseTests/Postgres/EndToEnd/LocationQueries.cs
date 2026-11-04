@@ -4,19 +4,15 @@ using System.Threading.Tasks;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
-// The method on the type as an internal static method, which any code of the project calls.
-[SqlSourceGenerate(Source = "Queries/Locations.sql", MethodLocation = MethodLocation.Internal)]
-internal static partial class InternalLocationQueries;
-
-// The method on the type as a private static method, which only the type's own code calls, as its wrapper does.
-[SqlSourceGenerate(Source = "Queries/Locations.sql", MethodLocation = MethodLocation.Private)]
-internal static partial class PrivateLocationQueries;
-
-internal static partial class PrivateLocationQueries
+// The one claim of Queries/Locations.sql, whose query and copies put their methods in each place by their markers: the
+// extension class, the type, internal and private, and the nested class Sql.  The wrapper calls the private method,
+// which only the type's own code can call.
+[SqlSourceGenerate(Source = "Queries/Locations.sql")]
+internal static partial class LocationQueries
 {
     internal static Task<GetLocatedNameDto> ReadLocatedName(
         DbConnection connection,
         GetLocatedNameArgs parameters,
         CancellationToken cancellationToken
-    ) => GetLocatedName(connection, parameters, cancellationToken: cancellationToken);
+    ) => GetLocatedNamePrivate(connection, parameters, cancellationToken: cancellationToken);
 }

@@ -1,44 +1,44 @@
-using SqlSource.Settings;
+using SqlSource.Generation.Placement;
 
 namespace SqlSource.Generation;
 
 /// <summary>
-/// The queries of the files a type can use, as <see cref="UsableQueries.Of" /> gives them.  It is walked with
-/// <c>foreach</c> and allocates nothing.
+/// The queries of the files a type can use, as <see cref="UsableQueries.Of" /> gives them, with the type's placement.
+/// It is walked with <c>foreach</c> and allocates nothing.
 /// </summary>
 internal readonly struct UsableQuerySequence
 {
     private readonly TypeQueries _type;
-    private readonly bool[] _usable;
 
-    internal UsableQuerySequence(TypeQueries type, bool[] usable)
+    internal UsableQuerySequence(TypeQueries type, TypePlacement placement)
     {
         _type = type;
-        _usable = usable;
+        Placement = placement;
     }
 
-    public Enumerator GetEnumerator() => new(_type, _usable);
+    /// <summary>Which files the type can use, its nested classes, and each query's settings and placement.</summary>
+    public TypePlacement Placement { get; }
+
+    public Enumerator GetEnumerator() => new(_type, Placement);
 
     /// <summary>Walks the usable files and their queries in order.</summary>
     internal struct Enumerator
     {
         private readonly TypeQueries _type;
-        private readonly bool[] _usable;
+        private readonly TypePlacement _placement;
         private int _fileIndex;
         private int _queryIndex;
 
-        // The queries and the level of the file being walked, looked up once for the file.
+        // The queries of the file being walked, looked up once for the file.
         private EquatableArray<SqlQuery> _queries;
-        private SettingsLevel _fileLevel;
 
-        internal Enumerator(TypeQueries type, bool[] usable)
+        internal Enumerator(TypeQueries type, TypePlacement placement)
         {
             _type = type;
-            _usable = usable;
+            _placement = placement;
             _fileIndex = -1;
             _queryIndex = 0;
             _queries = EquatableArray<SqlQuery>.Empty;
-            _fileLevel = SettingsLevel.None;
             Current = default;
         }
 
@@ -46,6 +46,7 @@ internal readonly struct UsableQuerySequence
 
         public bool MoveNext()
         {
+            var usable = _placement.Usable;
             _queryIndex++;
             while (_queryIndex >= _queries.Count)
             {
@@ -53,19 +54,24 @@ internal readonly struct UsableQuerySequence
                 do
                 {
                     _fileIndex++;
-                } while (_fileIndex < _usable.Length && !_usable[_fileIndex]);
-                if (_fileIndex >= _usable.Length)
+                } while (_fileIndex < usable.Length && !usable[_fileIndex]);
+                if (_fileIndex >= usable.Length)
                 {
                     return false;
                 }
 
                 _queries = _type.Files[_fileIndex].Queries;
-                _fileLevel = _type.FileSettings[_fileIndex];
                 _queryIndex = 0;
             }
 
-            var query = _queries[_queryIndex];
-            Current = new UsableQuery(_fileIndex, _queryIndex, query, QuerySettings.Resolve(query.Markers, _fileLevel));
+            var settings = _placement.SettingsOf(_fileIndex, _queryIndex);
+            Current = new UsableQuery(
+                _fileIndex,
+                _queryIndex,
+                _queries[_queryIndex],
+                settings,
+                _placement.PlacementOf(settings)
+            );
             return true;
         }
     }

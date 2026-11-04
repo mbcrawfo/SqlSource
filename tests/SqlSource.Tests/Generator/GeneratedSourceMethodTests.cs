@@ -21,7 +21,7 @@ public sealed class GeneratedSourceMethodTests
 
             namespace App;
 
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string List() => ListFrom("users", "1 = 1") + GetUser;
@@ -107,7 +107,7 @@ public sealed class GeneratedSourceMethodTests
     [Fact]
     public void Run_QueryWithTokensOnAGenericStructInNestedLocation_IsAMethodOfTheSqlClass()
     {
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             using SqlSource;
@@ -128,7 +128,7 @@ public sealed class GeneratedSourceMethodTests
         run.ShouldBeClean();
         run.Sources["App.Sample-1.g.cs"]
             .ShouldContain(
-                "        private static class Sql\n        {\n            /// <summary>\n"
+                "        private static partial class Sql\n        {\n            /// <summary>\n"
                     + "            /// The <c>ListFrom</c> query from <c>Users.sql</c>.\n"
             );
         run.Sources["App.Sample-1.g.cs"].ShouldContain("            public static string ListFrom(string table)\n");
@@ -137,7 +137,7 @@ public sealed class GeneratedSourceMethodTests
     [Fact]
     public void Run_QueryThatIsOnlyATokenOrHasEightOfThem_Compiles()
     {
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             using SqlSource;
@@ -205,7 +205,7 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("exception")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             using SqlSource;

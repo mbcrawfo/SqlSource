@@ -157,7 +157,7 @@ namespace App
     /// <summary>
     /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
     /// </summary>
-    public static partial class SampleExtensions
+    internal static partial class SampleExtensions
     {
         /// <summary>
         /// The <c>ListDocuments</c> query from <c>Users.sql</c>.
@@ -175,7 +175,7 @@ namespace App
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static async global::System.Threading.Tasks.Task<global::App.ListDocumentsDto[]> ListDocuments(
+        internal static async global::System.Threading.Tasks.Task<global::App.ListDocumentsDto[]> ListDocuments(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListDocumentsParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -280,7 +280,7 @@ namespace App
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static async global::System.Threading.Tasks.Task<global::App.GetDocumentDto> GetDocument(
+        internal static async global::System.Threading.Tasks.Task<global::App.GetDocumentDto> GetDocument(
             this global::System.Data.Common.DbConnection connection,
             global::App.GetDocumentParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -390,7 +390,7 @@ namespace App
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static async global::System.Threading.Tasks.Task<global::App.FindDocumentDto?> FindDocument(
+        internal static async global::System.Threading.Tasks.Task<global::App.FindDocumentDto?> FindDocument(
             this global::System.Data.Common.DbConnection connection,
             global::App.FindDocumentParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -503,7 +503,7 @@ namespace App
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamDocumentsDto> StreamDocuments(
+        internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamDocumentsDto> StreamDocuments(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamDocumentsParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -633,7 +633,7 @@ namespace App
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamDocumentClassesDto> StreamDocumentClasses(
+        internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamDocumentClassesDto> StreamDocumentClasses(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamDocumentClassesParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -764,7 +764,7 @@ namespace App
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static async global::System.Threading.Tasks.Task<global::App.GetEmbeddingDto> GetEmbedding(
+        internal static async global::System.Threading.Tasks.Task<global::App.GetEmbeddingDto> GetEmbedding(
             this global::System.Data.Common.DbConnection connection,
             global::App.GetEmbeddingParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -873,7 +873,7 @@ namespace App
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamEmbeddingsDto> StreamEmbeddings(
+        internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamEmbeddingsDto> StreamEmbeddings(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamEmbeddingsParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1005,7 +1005,7 @@ namespace App
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static async global::System.Threading.Tasks.Task<global::App.GetByValueDto> GetByValue(
+        internal static async global::System.Threading.Tasks.Task<global::App.GetByValueDto> GetByValue(
             this global::System.Data.Common.DbConnection connection,
             global::App.GetByValueParams parameters,
             string value,
@@ -1124,7 +1124,7 @@ namespace App
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
-        public static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamByValueDto> StreamByValue(
+        internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamByValueDto> StreamByValue(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamByValueParams parameters,
             string value,
@@ -1563,52 +1563,6 @@ namespace SqlSource
 namespace SqlSource
 {
     /// <summary>
-    /// Where the members generated for a type marked with <see cref="SqlSourceGenerateAttribute" /> go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum SqlLocation
-    {
-        /// <summary>
-        /// In a private static class nested in the type, named by
-        /// <see cref="SqlSourceGenerateAttribute.NestedClass" />.
-        /// </summary>
-        Nested = 0,
-
-        /// <summary>
-        /// On the type itself.
-        /// </summary>
-        Direct = 1,
-    }
-
-    /// <summary>
-    /// Where the methods that run the queries of a type go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum MethodLocation
-    {
-        /// <summary>
-        /// In a generated static class beside the type, named after it with <c>Extensions</c>, as extension
-        /// methods of <c>DbConnection</c>.
-        /// </summary>
-        ExtensionClass = 0,
-
-        /// <summary>
-        /// On the type, as public static methods.
-        /// </summary>
-        Public = 1,
-
-        /// <summary>
-        /// On the type, as internal static methods.
-        /// </summary>
-        Internal = 2,
-
-        /// <summary>
-        /// On the type, as private static methods.
-        /// </summary>
-        Private = 3,
-    }
-
-    /// <summary>
     /// Marks a static method of one argument as a conversion from its argument's type to its return type, which
     /// the generated query methods call to read a column into a property of the return type or to bind a
     /// parameter of that type from the argument's.  It is not conditional, unlike
@@ -1639,24 +1593,5 @@ namespace SqlSource
         /// that folder, <c>UserRepository.sql</c> for <c>UserRepository</c>.
         /// </summary>
         public string Source { get; set; }
-
-        /// <summary>
-        /// Where the generated members go.  The default is
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.
-        /// </summary>
-        public SqlLocation SqlLocation { get; set; }
-
-        /// <summary>
-        /// The name of the class that holds the generated members under
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the <c>nestedClass</c> of the
-        /// settings files of the folder of this type's file, else <c>Sql</c>.
-        /// </summary>
-        public string NestedClass { get; set; }
-
-        /// <summary>
-        /// Where the methods that run the queries go.  The default is
-        /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
-        /// </summary>
-        public MethodLocation MethodLocation { get; set; }
     }
 }

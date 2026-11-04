@@ -90,7 +90,7 @@ public sealed class ConverterMethodTests
             /// <summary>
             /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
             /// </summary>
-            public static partial class SampleExtensions
+            internal static partial class SampleExtensions
             {
                 /// <summary>
                 /// The <c>FindEmail</c> query from <c>Users.sql</c>.
@@ -107,7 +107,7 @@ public sealed class ConverterMethodTests
                 /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
                 /// <param name="cancellationToken">Cancels the query.</param>
                 /// <returns>The rows the query returned.</returns>
-                public static async global::System.Threading.Tasks.Task<global::App.FindEmailDto[]> FindEmail(
+                internal static async global::System.Threading.Tasks.Task<global::App.FindEmailDto[]> FindEmail(
                     this global::System.Data.Common.DbConnection connection,
                     global::App.FindEmailParams parameters,
                     global::System.Data.Common.DbTransaction? transaction = null,

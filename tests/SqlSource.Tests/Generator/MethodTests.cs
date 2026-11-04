@@ -40,7 +40,7 @@ public sealed class MethodTests
                         /// <summary>
                         /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
                         /// </summary>
-                        public static partial class SampleExtensions
+                        internal static partial class SampleExtensions
                         {
                             /// <summary>
                             /// The <c>GetUser</c> query from <c>Users.sql</c>.
@@ -58,7 +58,7 @@ public sealed class MethodTests
                         The command's timeout in seconds, or null for the driver's.</param>
                             /// <param name="cancellationToken">Cancels the query.</param>
                             /// <returns>The rows the query returned.</returns>
-                            public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(
+                            internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(
                                 this global::System.Data.Common.DbConnection connection,
                                 global::App.GetUserParams parameters,
                                 global::System.Data.Common.DbTransaction? transaction = null,
@@ -130,11 +130,8 @@ public sealed class MethodTests
     [InlineData("Private", "private static")]
     public void Run_EachTypePlacement_PutsTheMethodOnTheType(string placement, string modifiers)
     {
-        var run = MethodRuns.Run(
-            Users,
-            UsersEntries,
-            MethodRuns.SampleSource("MethodLocation = MethodLocation." + placement)
-        );
+        var users = UsersWith("-- member-location: class\n-- visibility: " + placement + "\n");
+        var run = MethodRuns.Run(users, EntriesOf(users));
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
@@ -150,13 +147,11 @@ public sealed class MethodTests
 
     // The method takes the place of the query's constant, so the two never clash on the type.
     [Fact]
-    public void Run_MethodOnTheTypeUnderDirect_TakesThePlaceOfTheConstant()
+    public void Run_MethodOnTheType_TakesThePlaceOfTheConstant()
     {
-        var run = MethodRuns.Run(
-            Users,
-            UsersEntries,
-            MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public")
-        );
+        var users = UsersWith("-- member-location: class\n-- visibility: public\n");
+
+        var run = MethodRuns.Run(users, EntriesOf(users));
 
         run.ShouldBeClean();
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
@@ -166,17 +161,16 @@ public sealed class MethodTests
             );
     }
 
-    // A nested class that only CodeGen queries would fill is not written, so a method may have its name.
+    // A nested class that no query of the type uses is not written, so a method on the type may have its name.
     [Fact]
-    public void Run_MethodNamedLikeTheNestedClassOfCodeGenQueriesAlone_Compiles()
+    public void Run_MethodNamedLikeTheNestedClassOfNoQuery_Compiles()
     {
-        var users = UsersWith("-- generator: async-method-suffix\n");
-
-        var run = MethodRuns.Run(
-            users,
-            EntriesOf(users),
-            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\"")
+        var users = UsersWith(
+            "-- generator: async-method-suffix\n-- member-location: class\n-- visibility: public\n"
+                + "-- nested-class: GetUserAsync\n"
         );
+
+        var run = MethodRuns.Run(users, EntriesOf(users));
 
         run.ShouldBeClean();
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("class GetUserAsync");
@@ -187,15 +181,13 @@ public sealed class MethodTests
     [Fact]
     public void Run_MethodNamedLikeTheNestedClassBesideAFileLeftOut_Compiles()
     {
-        var users = UsersWith("-- generator: async-method-suffix\n");
-        var other = new SqlFile("/app/Repo/Zed.sql", "-- name: GetUser\n-- output: sql\nSELECT 2;\n");
-
-        var run = MethodRuns.Run(
-            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\""),
-            users,
-            Sidecars.Of(users, EntriesOf(users)),
-            other
+        var users = UsersWith("-- generator: async-method-suffix\n-- member-location: class\n-- visibility: public\n");
+        var other = new SqlFile(
+            "/app/Repo/Zed.sql",
+            "-- nested-class: GetUserAsync\n\n-- name: GetUser\n-- output: sql\nSELECT 2;\n"
         );
+
+        var run = MethodRuns.Run(MethodRuns.Source, users, Sidecars.Of(users, EntriesOf(users)), other);
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 /app/Repo/Zed.sql(");
         run.CompilationErrors.ShouldBeEmpty();
@@ -225,7 +217,7 @@ public sealed class MethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("    public static partial class SampleExtensions\n");
+        methods.ShouldContain("    internal static partial class SampleExtensions\n");
         methods.ShouldContain("Task<global::App.SqlDto[]> Sql(\n");
         if (other.Contains("GetUser", StringComparison.Ordinal))
         {
@@ -239,23 +231,25 @@ public sealed class MethodTests
         }
     }
 
-    // Under SqlLocation.Direct a CodeGen query has no member on the type, so it may have the type's name when its
-    // method goes into the extension class.
+    // A CodeGen query whose method goes into the extension class has no member on the type, so it may have the
+    // type's name, beside a query at sql whose constant is on the type.
     [Fact]
-    public void Run_CodeGenQueryNamedLikeTheTypeUnderDirect_IsAMethodOfTheExtensionClass()
+    public void Run_CodeGenQueryNamedLikeTheTypeInTheExtensionClass_IsAMethodOfTheExtensionClass()
     {
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Sample\nSELECT id FROM users;\n");
-
-        var run = MethodRuns.Run(
-            file,
-            [Entry(file, "Sample", [], [Column("id")])],
-            MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct")
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: Sample\nSELECT id FROM users;\n"
+                + "-- name: GetName\n-- output: sql\n-- member-location: class\nSELECT name FROM users;\n"
         );
+
+        var run = MethodRuns.Run(file, [Entry(file, "Sample", [], [Column("id")])]);
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("    public static partial class SampleExtensions\n");
+        methods.ShouldContain("    internal static partial class SampleExtensions\n");
         methods.ShouldContain("Task<global::App.SampleDto[]> Sample(\n");
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain("        public const string GetName = \"SELECT name FROM users;\";\n");
     }
 
     // A query at sql still has a constant in the nested class, so it cannot have its name, and its file, the CodeGen
@@ -279,7 +273,8 @@ public sealed class MethodTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
-    // One file of a query at each output, by its marker, under SqlLocation.Direct and MethodLocation.Public.
+    // One file of a query at each output, by its marker, under the run's member location class, so the method and
+    // the constants are public members of the public type.
     [Fact]
     public void Run_MixedType_HasConstantsMethodsAndModels()
     {
@@ -292,12 +287,7 @@ public sealed class MethodTests
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [
-                new SourceFile(
-                    GeneratorHarness.SourcePath,
-                    MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public")
-                ),
-            ],
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
             [
                 file,
                 Sidecars.Of(
@@ -347,8 +337,7 @@ public sealed class MethodTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain("    internal static partial class SampleExtensions\n");
     }
 
-    // One top-level class for each type, named by the type's own name, internal unless the type and every type around
-    // it are public.
+    // One top-level class for each type, named by the type's own name, internal as its methods are by default.
     [Fact]
     public void Run_NestedAndGenericTypes_GiveOneTopLevelExtensionClassEach()
     {
@@ -394,7 +383,7 @@ public sealed class MethodTests
                 GeneratedFile.ModelHeader
                     + "\nnamespace App\n{\n    /// <summary>\n"
                     + "    /// The query methods of <c>App.Outer.Inner</c>, which extend the connection they run on.\n"
-                    + "    /// </summary>\n    public static partial class InnerExtensions\n    {\n"
+                    + "    /// </summary>\n    internal static partial class InnerExtensions\n    {\n"
             );
         run.Sources["App.Outer.Hidden-Methods.g.cs"]
             .ShouldContain("    internal static partial class HiddenExtensions\n");
@@ -402,7 +391,7 @@ public sealed class MethodTests
             .ShouldContain(
                 "    /// The query methods of <c>App.Repository&lt;T&gt;</c>, which extend the connection they run "
                     + "on.\n"
-                    + "    /// </summary>\n    public static partial class RepositoryExtensions\n"
+                    + "    /// </summary>\n    internal static partial class RepositoryExtensions\n"
             );
     }
 

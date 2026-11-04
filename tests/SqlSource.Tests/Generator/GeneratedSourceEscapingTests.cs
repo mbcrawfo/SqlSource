@@ -16,7 +16,7 @@ public sealed class GeneratedSourceEscapingTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
-            [SqlSource.SqlSourceGenerate(Source = ".", SqlLocation = SqlSource.SqlLocation.Direct)]
+            [SqlSource.SqlSourceGenerate(Source = ".")]
             public partial struct @class
             {
                 public static string Value => GetUser;
@@ -50,7 +50,7 @@ public sealed class GeneratedSourceEscapingTests
     [Fact]
     public void Run_NamespaceWithAnEscapedKeyword_KeepsTheEscapeInCode()
     {
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             using SqlSource;
@@ -88,7 +88,7 @@ public sealed class GeneratedSourceEscapingTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
             """,
             new SqlFile(GeneratorHarness.UsersPath, Sql + "\n")
@@ -149,7 +149,8 @@ public sealed class GeneratedSourceEscapingTests
                         + "public partial class Requêtes { public string V => Sql.Größe; }\n"
                 ),
             ],
-            [new SqlFile("/app/Dépôt/Größe.sql", "SELECT 'ñ 😀';\n")]
+            [new SqlFile("/app/Dépôt/Größe.sql", "SELECT 'ñ 😀';\n")],
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.ShouldBeClean();

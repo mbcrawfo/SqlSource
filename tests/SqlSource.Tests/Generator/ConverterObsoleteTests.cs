@@ -143,7 +143,7 @@ public sealed class ConverterObsoleteTests
     public void Run_ObsoleteMappedTypeWithMethodsOnTheType_DisablesItsWarning()
     {
         var source =
-            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public")
+            MethodRuns.Source
             + """
 
                 namespace App
@@ -154,7 +154,8 @@ public sealed class ConverterObsoleteTests
                 """;
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: public.email=App.Email\n-- name: GetEmail\nSELECT email FROM users;\n"
+            "-- type-override: public.email=App.Email\n-- member-location: class\n-- visibility: public\n"
+                + "-- name: GetEmail\nSELECT email FROM users;\n"
         );
 
         var run = MethodRuns.Run(file, [Entry(file, "GetEmail", [], [Column("email", Email, nullable: true)])], source);

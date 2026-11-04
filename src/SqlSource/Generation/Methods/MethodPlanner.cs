@@ -6,6 +6,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
+using SqlSource.Generation.Placement;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
 using SqlSource.Settings;
@@ -49,6 +50,7 @@ internal static class MethodPlanner
         // Made only when a first library is added, so that a type that uses none allocates nothing for them.
         SortedSet<SqlLibrary>? conversionLibraries = null;
         HashSet<LibraryUse>? usedLibraries = null;
+        IReadOnlyList<NestedClassPlacement> nestedClasses = [];
         if (typeQueries.Type.Diagnostics.Count == 0 && typeQueries.Files.Count > 0)
         {
             engines = Collect(
@@ -59,19 +61,22 @@ internal static class MethodPlanner
                 libraryUses,
                 warningIds,
                 ref conversionLibraries,
-                ref usedLibraries
+                ref usedLibraries,
+                out nestedClasses
             );
         }
 
+        var (extensionClassIsPublic, usedClasses, hasProtected) = HostsOf(methods, nestedClasses);
         return new TypeMethods(
             key,
             HintName.ForMethods(typeQueries.HintName),
-            MethodHost.Of(type.MethodPlacement),
             type.NamespaceValue,
             type.Namespace,
             type.Types,
             type.Name + ExtensionsSuffix,
-            type.IsPublic,
+            extensionClassIsPublic,
+            usedClasses,
+            type.IsSealed && hasProtected,
             type.AttributeLocation,
             new EquatableArray<QueryMethod>(methods.ToImmutable()),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()),
@@ -103,6 +108,34 @@ internal static class MethodPlanner
                 .ToImmutableArray()
         );
 
+    // What the planned methods' hosts give their file: whether the extension class is public, as its widest method is,
+    // the nested classes that hold a method, in the placement's order, and whether a method on the type or such a
+    // class is protected.
+    private static (
+        bool ExtensionClassIsPublic,
+        EquatableArray<NestedClassPlacement> NestedClasses,
+        bool HasProtected
+    ) HostsOf(ImmutableArray<QueryMethod>.Builder methods, IReadOnlyList<NestedClassPlacement> nestedClasses)
+    {
+        var hosts = methods.Select(static method => method.Host).ToList();
+        var isPublic = hosts.Exists(static host => host is { IsExtension: true, Accessibility: Visibility.Public });
+        var hasProtected = hosts.Exists(static host =>
+            host is { Location: MemberLocation.Class, Accessibility: Visibility.Protected }
+        );
+        var used = nestedClasses
+            .Where(nestedClass =>
+                hosts.Exists(host => string.Equals(host.NestedClass, nestedClass.Name, StringComparison.Ordinal))
+            )
+            .ToImmutableArray();
+        if (used.IsEmpty)
+        {
+            return (isPublic, EquatableArray<NestedClassPlacement>.Empty, hasProtected);
+        }
+
+        hasProtected |= used.Any(static nestedClass => nestedClass.Visibility == Visibility.Protected);
+        return (isPublic, new EquatableArray<NestedClassPlacement>(used), hasProtected);
+    }
+
     private static CodeGenEngines Collect(
         MethodsInput input,
         string key,
@@ -111,11 +144,14 @@ internal static class MethodPlanner
         ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses,
         SortedSet<string> warningIds,
         ref SortedSet<SqlLibrary>? conversionLibraries,
-        ref HashSet<LibraryUse>? usedLibraries
+        ref HashSet<LibraryUse>? usedLibraries,
+        out IReadOnlyList<NestedClassPlacement> nestedClasses
     )
     {
         var typeQueries = input.Type;
+        // The type's file reports the placement's problems; this runs it on the same input, so the two files agree.
         var queries = UsableQueries.Of(typeQueries, null);
+        nestedClasses = queries.Placement.NestedClasses;
         var written = WrittenNames(queries);
         var planned = new List<Planned>();
         var engines = CodeGenEngines.None;
@@ -139,7 +175,7 @@ internal static class MethodPlanner
             var context = new QueryContext(input, key, file, engine, usable);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
             var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
-            if (Plan(context, written, target, served.Of(target), ref usedLibraries) is { } plan)
+            if (Plan(context, written, nestedClasses, target, served.Of(target), ref usedLibraries) is { } plan)
             {
                 planned.Add(plan);
             }
@@ -150,20 +186,36 @@ internal static class MethodPlanner
     }
 
     // The names of the members the type's file writes for the queries whose output is not CodeGen: each one's constant
-    // or token method, in the type itself or in its nested class.
-    private static HashSet<string> WrittenNames(UsableQuerySequence queries)
+    // or token method, with the nested class that holds it, or null for one on the type itself.
+    private static HashSet<(string? NestedClass, string Name)> WrittenNames(UsableQuerySequence queries)
     {
-        var names = new HashSet<string>(StringComparer.Ordinal);
+        var names = new HashSet<(string? NestedClass, string Name)>();
         foreach (var usable in queries)
         {
             if (usable.Settings.Output != OutputKind.CodeGen)
             {
-                _ = names.Add(usable.Query.Name);
+                _ = names.Add((usable.Placement.NestedClass, usable.Query.Name));
             }
         }
 
         return names;
     }
+
+    // The host that the query's placement gives its method: in a nested class, a public method of it.
+    private static MethodHost HostOf(QueryPlacement placement) =>
+        placement.Location switch
+        {
+            MemberLocation.NestedClass => new MethodHost(
+                Visibility.Public,
+                MemberLocation.NestedClass,
+                placement.NestedClass
+            ),
+            MemberLocation.Class or MemberLocation.ExtensionClass => new MethodHost(
+                placement.Visibility,
+                placement.Location,
+                null
+            ),
+        };
 
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
     // problem of SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any one leaves
@@ -172,14 +224,15 @@ internal static class MethodPlanner
     // true once the library is updated.
     private static Planned? Plan(
         QueryContext context,
-        HashSet<string> written,
+        HashSet<(string? NestedClass, string Name)> written,
+        IReadOnlyList<NestedClassPlacement> nestedClasses,
         ConverterTargets target,
         EquatableArray<Converter> converters,
         ref HashSet<LibraryUse>? usedLibraries
     )
     {
         var (input, _, file, engine, usable) = context;
-        var (_, queryIndex, query, settings) = usable;
+        var (_, queryIndex, query, settings, placement) = usable;
         // A query without models has its own error already, reported by its file.
         if (input.Files[usable.FileIndex].Find(queryIndex, query.Name) is not { } models)
         {
@@ -202,7 +255,8 @@ internal static class MethodPlanner
 
         problems.AddRange(FindTokenProblems(query));
         var name = query.Name + ((settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0 ? AsyncSuffix : "");
-        var reason = FindTakenReason(input, name, written);
+        var host = HostOf(placement);
+        var reason = FindTakenReason(input, name, host, written, nestedClasses);
         if (reason is not null)
         {
             problems.Add(
@@ -247,7 +301,10 @@ internal static class MethodPlanner
             methodInput,
             methodOutput,
             query.NameLocation
-        );
+        )
+        {
+            Host = host,
+        };
         return new Planned(
             problems,
             query.Name,
@@ -438,7 +495,7 @@ internal static class MethodPlanner
     )
     {
         var (input, key, file, _, usable) = context;
-        var (_, queryIndex, query, _) = usable;
+        var (_, queryIndex, query, _, _) = usable;
         methodInput = null;
         if (models.Input is not { } properties)
         {
@@ -489,7 +546,7 @@ internal static class MethodPlanner
     )
     {
         var (input, key, file, _, usable) = context;
-        var (_, queryIndex, _, settings) = usable;
+        var (_, queryIndex, _, settings, _) = usable;
         methodOutput = null;
         if (models.Output is not { } properties)
         {
@@ -574,25 +631,52 @@ internal static class MethodPlanner
         return at >= 0 ? assignments[at] : null;
     }
 
-    // What takes the name of a method of the type, as SQLSRC274 says it, or null when nothing does.  Another method of
-    // the type is looked for once every query is planned.
-    private static string? FindTakenReason(MethodsInput input, string name, HashSet<string> written)
+    // What takes the name of a method of the type, as SQLSRC274 says it, or null when nothing does: by where the method
+    // goes.  Another method of the same class is looked for once every query is planned.
+    private static string? FindTakenReason(
+        MethodsInput input,
+        string name,
+        MethodHost host,
+        HashSet<(string? NestedClass, string Name)> written,
+        IReadOnlyList<NestedClassPlacement> nestedClasses
+    )
     {
         var type = input.Type.Type.Type;
-        if (MethodHost.Of(type.MethodPlacement).IsExtension)
+        return host.Location switch
         {
-            if (string.Equals(name, type.Name + ExtensionsSuffix, StringComparison.Ordinal))
-            {
-                return "the class that holds the method has that name";
-            }
+            MemberLocation.ExtensionClass => FindTakenInExtensionClass(type, name),
+            MemberLocation.Class => FindTakenOnType(type, name, written, nestedClasses),
+            // The nested class's own name is SQLSRC009, from the placement.  A member of the type is hidden there.
+            MemberLocation.NestedClass => written.Contains((host.NestedClass, name))
+                ? "the class of the queries '"
+                    + host.NestedClass
+                    + "' of '"
+                    + TypeModels.ClaimingTypeOf(type).Name
+                    + "' has a constant or method of that name"
+                : null,
+        };
+    }
 
-            return
-                SortedSearch.IndexOf(DbConnectionMembers.Names, name, static member => member, StringComparer.Ordinal)
-                >= 0
-                ? "DbConnection has a member of that name, which a call on a connection finds before the method"
-                : null;
+    private static string? FindTakenInExtensionClass(TargetType type, string name)
+    {
+        if (string.Equals(name, type.Name + ExtensionsSuffix, StringComparison.Ordinal))
+        {
+            return "the class that holds the method has that name";
         }
 
+        return
+            SortedSearch.IndexOf(DbConnectionMembers.Names, name, static member => member, StringComparer.Ordinal) >= 0
+            ? "DbConnection has a member of that name, which a call on a connection finds before the method"
+            : null;
+    }
+
+    private static string? FindTakenOnType(
+        TargetType type,
+        string name,
+        HashSet<(string? NestedClass, string Name)> written,
+        IReadOnlyList<NestedClassPlacement> nestedClasses
+    )
+    {
         // The type by its full name, so that two types of one name that claim one file each report their own.
         var typeName = TypeModels.ClaimingTypeOf(type).Name;
         if (string.Equals(name, type.Name, StringComparison.Ordinal))
@@ -605,20 +689,18 @@ internal static class MethodPlanner
             return "'" + typeName + "' has a type parameter of that name";
         }
 
-        if (SortedSearch.IndexOf(input.MemberNames, name, static member => member, StringComparer.Ordinal) >= 0)
+        if (SortedSearch.IndexOf(type.TakenNames, name, static member => member, StringComparer.Ordinal) >= 0)
         {
             return "'" + typeName + "' has a member of that name";
         }
 
-        if (type.Placement == MemberPlacement.Direct)
+        if (written.Contains((null, name)))
         {
-            return written.Contains(name)
-                ? "the query '" + name + "' of '" + typeName + "' has a constant or method of that name"
-                : null;
+            return "the query '" + name + "' of '" + typeName + "' has a constant or method of that name";
         }
 
-        return written.Count > 0 && string.Equals(name, type.NestedClass, StringComparison.Ordinal)
-            ? "the class of the queries of '" + typeName + "' has that name"
+        return nestedClasses.Any(nestedClass => string.Equals(nestedClass.Name, name, StringComparison.Ordinal))
+            ? "'" + typeName + "' has a nested class of that name"
             : null;
     }
 
@@ -641,17 +723,18 @@ internal static class MethodPlanner
         ref SortedSet<SqlLibrary>? conversionLibraries
     )
     {
-        var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        // By the class that holds each method and its name: two classes may each have a method of one name.
+        var byName = new Dictionary<(MemberLocation, string?, string), List<string>>();
         foreach (var plan in planned)
         {
             // An index, not a Select of the names, which would allocate for each query.
             for (var index = 0; index < plan.Methods.Length; index++)
             {
-                var name = plan.Methods[index].Name;
-                if (!byName.TryGetValue(name, out var queries))
+                var method = plan.Methods[index];
+                if (!byName.TryGetValue(KeyOf(method), out var queries))
                 {
                     queries = [];
-                    byName.Add(name, queries);
+                    byName.Add(KeyOf(method), queries);
                 }
 
                 queries.Add(plan.QueryName);
@@ -663,7 +746,7 @@ internal static class MethodPlanner
             diagnostics.AddRange(plan.Problems);
             foreach (var method in plan.Methods)
             {
-                if (byName[method.Name] is { Count: > 1 } queries)
+                if (byName[KeyOf(method)] is { Count: > 1 } queries)
                 {
                     var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
                     diagnostics.Add(
@@ -685,6 +768,10 @@ internal static class MethodPlanner
             }
         }
     }
+
+    // The class that holds the method, and its name.
+    private static (MemberLocation, string?, string) KeyOf(QueryMethod method) =>
+        (method.Host.Location, method.Host.NestedClass, method.Name);
 
     // The library of each conversion of the method that is a library's generated one, a column's read or a
     // parameter's write, into a set made only when the first is added.

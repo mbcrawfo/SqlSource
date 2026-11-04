@@ -453,16 +453,16 @@ public sealed class ModelShapeTests
         typeof(InvoiceQueries).GetFields(Members).ShouldBeEmpty();
         typeof(InvoiceQueries).GetNestedTypes(Members).ShouldBeEmpty();
         typeof(InvoiceQueriesExtensions)
-            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .GetMethods(Members)
             .Select(static method => method.Name)
             .Order(StringComparer.Ordinal)
             .ShouldBe(["GetInvoice", "ListInvoices"]);
     }
 
-    // A query at the output models, on a claim with a direct location, has its constant on the type, which the Dapper
-    // tests run.
+    // A query at the output models with -- member-location: class has its constant on the type, which the Dapper tests
+    // run.
     [Fact]
-    public void Build_ModelsCopiesWithADirectLocation_HaveTheConstantsOnTheType()
+    public void Build_ModelsCopiesOnTheClass_HaveTheConstantsOnTheType()
     {
         AllTypesQueries.ListAllTypesForDapper.ShouldBe("SELECT *\nFROM dbo.all_types\nORDER BY id;");
         WriteQueries.AddNoteForDapper.ShouldBe(

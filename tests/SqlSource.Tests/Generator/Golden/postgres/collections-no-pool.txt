@@ -315,7 +315,7 @@ namespace App
     /// <summary>
     /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
     /// </summary>
-    public static partial class SampleExtensions
+    internal static partial class SampleExtensions
     {
         /// <summary>
         /// The <c>ListAsArray</c> query from <c>Users.sql</c>.
@@ -331,7 +331,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::App.ListAsArrayDto[]> ListAsArray(
+        internal static async global::System.Threading.Tasks.Task<global::App.ListAsArrayDto[]> ListAsArray(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsArrayParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -398,7 +398,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IEnumerable<global::App.ListAsIEnumerableDto>> ListAsIEnumerable(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IEnumerable<global::App.ListAsIEnumerableDto>> ListAsIEnumerable(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsIEnumerableParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -465,7 +465,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.ICollection<global::App.ListAsICollectionDto>> ListAsICollection(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.ICollection<global::App.ListAsICollectionDto>> ListAsICollection(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsICollectionParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -532,7 +532,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IReadOnlyCollection<global::App.ListAsIReadOnlyCollectionDto>> ListAsIReadOnlyCollection(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IReadOnlyCollection<global::App.ListAsIReadOnlyCollectionDto>> ListAsIReadOnlyCollection(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsIReadOnlyCollectionParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -599,7 +599,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IList<global::App.ListAsIListDto>> ListAsIList(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IList<global::App.ListAsIListDto>> ListAsIList(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsIListParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -666,7 +666,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IReadOnlyList<global::App.ListAsIReadOnlyListDto>> ListAsIReadOnlyList(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.IReadOnlyList<global::App.ListAsIReadOnlyListDto>> ListAsIReadOnlyList(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsIReadOnlyListParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -733,7 +733,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<global::App.ListAsListDto>> ListAsList(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<global::App.ListAsListDto>> ListAsList(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsListParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -800,7 +800,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Immutable.ImmutableArray<global::App.ListAsImmutableArrayDto>> ListAsImmutableArray(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Immutable.ImmutableArray<global::App.ListAsImmutableArrayDto>> ListAsImmutableArray(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsImmutableArrayParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -867,7 +867,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Immutable.ImmutableList<global::App.ListAsImmutableListDto>> ListAsImmutableList(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Immutable.ImmutableList<global::App.ListAsImmutableListDto>> ListAsImmutableList(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsImmutableListParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -934,7 +934,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::System.Collections.Immutable.IImmutableList<global::App.ListAsIImmutableListDto>> ListAsIImmutableList(
+        internal static async global::System.Threading.Tasks.Task<global::System.Collections.Immutable.IImmutableList<global::App.ListAsIImmutableListDto>> ListAsIImmutableList(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsIImmutableListParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1001,7 +1001,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
-        public static global::System.Collections.Generic.IAsyncEnumerable<global::App.ListAsIAsyncEnumerableDto> ListAsIAsyncEnumerable(
+        internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.ListAsIAsyncEnumerableDto> ListAsIAsyncEnumerable(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAsIAsyncEnumerableParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -1075,7 +1075,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
-        public static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamAllDto> StreamAll(
+        internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamAllDto> StreamAll(
             this global::System.Data.Common.DbConnection connection,
             global::System.Data.Common.DbTransaction? transaction = null,
             int? commandTimeout = null,
@@ -1233,52 +1233,6 @@ namespace SqlSource
 namespace SqlSource
 {
     /// <summary>
-    /// Where the members generated for a type marked with <see cref="SqlSourceGenerateAttribute" /> go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum SqlLocation
-    {
-        /// <summary>
-        /// In a private static class nested in the type, named by
-        /// <see cref="SqlSourceGenerateAttribute.NestedClass" />.
-        /// </summary>
-        Nested = 0,
-
-        /// <summary>
-        /// On the type itself.
-        /// </summary>
-        Direct = 1,
-    }
-
-    /// <summary>
-    /// Where the methods that run the queries of a type go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum MethodLocation
-    {
-        /// <summary>
-        /// In a generated static class beside the type, named after it with <c>Extensions</c>, as extension
-        /// methods of <c>DbConnection</c>.
-        /// </summary>
-        ExtensionClass = 0,
-
-        /// <summary>
-        /// On the type, as public static methods.
-        /// </summary>
-        Public = 1,
-
-        /// <summary>
-        /// On the type, as internal static methods.
-        /// </summary>
-        Internal = 2,
-
-        /// <summary>
-        /// On the type, as private static methods.
-        /// </summary>
-        Private = 3,
-    }
-
-    /// <summary>
     /// Marks a static method of one argument as a conversion from its argument's type to its return type, which
     /// the generated query methods call to read a column into a property of the return type or to bind a
     /// parameter of that type from the argument's.  It is not conditional, unlike
@@ -1309,24 +1263,5 @@ namespace SqlSource
         /// that folder, <c>UserRepository.sql</c> for <c>UserRepository</c>.
         /// </summary>
         public string Source { get; set; }
-
-        /// <summary>
-        /// Where the generated members go.  The default is
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.
-        /// </summary>
-        public SqlLocation SqlLocation { get; set; }
-
-        /// <summary>
-        /// The name of the class that holds the generated members under
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the <c>nestedClass</c> of the
-        /// settings files of the folder of this type's file, else <c>Sql</c>.
-        /// </summary>
-        public string NestedClass { get; set; }
-
-        /// <summary>
-        /// Where the methods that run the queries go.  The default is
-        /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
-        /// </summary>
-        public MethodLocation MethodLocation { get; set; }
     }
 }

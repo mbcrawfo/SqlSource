@@ -7,7 +7,7 @@ SQLSRC274 /app/Repo/Users.sql(6,10)-(6,14): The method of the query 'Open' canno
 SQLSRC274 /app/Repo/Users.sql(8,10)-(8,26): The method of the query 'SampleExtensions' cannot be named 'SampleExtensions', because the class that holds the method has that name.  Rename the query.
 SQLSRC274 /app/Repo/A.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', because the method of the query 'Get' of 'App.Second.Queries' has that name too, in the class 'App.QueriesExtensions'.  Rename the query.
 SQLSRC274 /app/Repo/B.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', because the method of the query 'Get' of 'App.First.Queries' has that name too, in the class 'App.QueriesExtensions'.  Rename the query.
-SQLSRC276 /app/Repo/Sample.cs(23,6)-(23,47): The query methods of 'App.Blocked.Sample' cannot go into the extension class 'App.Blocked.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set the attribute's MethodLocation to put the methods on the type.
+SQLSRC276 /app/Repo/Sample.cs(23,6)-(23,47): The query methods of 'App.Blocked.Sample' cannot go into the extension class 'App.Blocked.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set -- member-location: to put the methods on the type.
 
 ==== Compilation errors
 (none)
@@ -63,7 +63,7 @@ namespace App
     /// <summary>
     /// The query methods of <c>App.First.Queries</c>, which extend the connection they run on.
     /// </summary>
-    public static partial class QueriesExtensions
+    internal static partial class QueriesExtensions
     {
         /// <summary>
         /// The <c>ListA</c> query from <c>A.sql</c>.
@@ -79,7 +79,7 @@ namespace App
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public static async global::System.Threading.Tasks.Task<global::App.ListADto[]> ListA(
+        internal static async global::System.Threading.Tasks.Task<global::App.ListADto[]> ListA(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -293,7 +293,7 @@ namespace App
     /// <summary>
     /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
     /// </summary>
-    public static partial class SampleExtensions
+    internal static partial class SampleExtensions
     {
         /// <summary>
         /// The <c>GetUser</c> query from <c>Users.sql</c>.
@@ -310,7 +310,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The row.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
-        public static async global::System.Threading.Tasks.Task<global::App.GetUserDto> GetUser(
+        internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto> GetUser(
             this global::System.Data.Common.DbConnection connection,
             global::App.GetUserParams parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
@@ -619,52 +619,6 @@ namespace SqlSource
 namespace SqlSource
 {
     /// <summary>
-    /// Where the members generated for a type marked with <see cref="SqlSourceGenerateAttribute" /> go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum SqlLocation
-    {
-        /// <summary>
-        /// In a private static class nested in the type, named by
-        /// <see cref="SqlSourceGenerateAttribute.NestedClass" />.
-        /// </summary>
-        Nested = 0,
-
-        /// <summary>
-        /// On the type itself.
-        /// </summary>
-        Direct = 1,
-    }
-
-    /// <summary>
-    /// Where the methods that run the queries of a type go.
-    /// </summary>
-    [global::Microsoft.CodeAnalysis.Embedded]
-    internal enum MethodLocation
-    {
-        /// <summary>
-        /// In a generated static class beside the type, named after it with <c>Extensions</c>, as extension
-        /// methods of <c>DbConnection</c>.
-        /// </summary>
-        ExtensionClass = 0,
-
-        /// <summary>
-        /// On the type, as public static methods.
-        /// </summary>
-        Public = 1,
-
-        /// <summary>
-        /// On the type, as internal static methods.
-        /// </summary>
-        Internal = 2,
-
-        /// <summary>
-        /// On the type, as private static methods.
-        /// </summary>
-        Private = 3,
-    }
-
-    /// <summary>
     /// Marks a static method of one argument as a conversion from its argument's type to its return type, which
     /// the generated query methods call to read a column into a property of the return type or to bind a
     /// parameter of that type from the argument's.  It is not conditional, unlike
@@ -695,24 +649,5 @@ namespace SqlSource
         /// that folder, <c>UserRepository.sql</c> for <c>UserRepository</c>.
         /// </summary>
         public string Source { get; set; }
-
-        /// <summary>
-        /// Where the generated members go.  The default is
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.
-        /// </summary>
-        public SqlLocation SqlLocation { get; set; }
-
-        /// <summary>
-        /// The name of the class that holds the generated members under
-        /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the <c>nestedClass</c> of the
-        /// settings files of the folder of this type's file, else <c>Sql</c>.
-        /// </summary>
-        public string NestedClass { get; set; }
-
-        /// <summary>
-        /// Where the methods that run the queries go.  The default is
-        /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
-        /// </summary>
-        public MethodLocation MethodLocation { get; set; }
     }
 }

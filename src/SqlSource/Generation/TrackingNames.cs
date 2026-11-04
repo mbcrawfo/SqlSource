@@ -15,8 +15,6 @@ internal static class TrackingNames
 
     public const string TargetTypes = nameof(TargetTypes);
 
-    public const string NestedClassCheck = nameof(NestedClassCheck);
-
     public const string SqlPaths = nameof(SqlPaths);
 
     public const string CompilePaths = nameof(CompilePaths);
@@ -126,8 +124,6 @@ internal static class TrackingNames
     public const string FileModelSlots = nameof(FileModelSlots);
 
     public const string ModelOutput = nameof(ModelOutput);
-
-    public const string TypeMemberNames = nameof(TypeMemberNames);
 
     public const string MethodDrivers = nameof(MethodDrivers);
 

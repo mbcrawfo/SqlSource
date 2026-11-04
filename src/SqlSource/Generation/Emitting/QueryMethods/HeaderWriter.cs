@@ -81,12 +81,13 @@ internal static class HeaderWriter
         context.Arguments.AppendDeclaration(builder, indent, context.Host);
     }
 
-    private static string ModifiersOf(MethodAccessibility accessibility) =>
+    private static string ModifiersOf(Visibility accessibility) =>
         accessibility switch
         {
-            MethodAccessibility.Public => "public static",
-            MethodAccessibility.Internal => "internal static",
-            MethodAccessibility.Private => "private static",
+            Visibility.Public => "public static",
+            Visibility.Internal => "internal static",
+            Visibility.Protected => "protected static",
+            Visibility.Private => "private static",
         };
 
     // The receiver and the input are refused when null, and under validate-tokens each token's text when it is null

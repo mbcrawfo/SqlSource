@@ -5,8 +5,8 @@ using SqlSource.Settings.TypeOverrides;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// What one source says about the settings: a settings file, or the chain of a folder's settings files, the attribute
-/// of a type, or the markers of a query over those of its file's preamble.
+/// What one source says about the settings: a settings file, or the chain of a folder's settings files, or the markers
+/// of a query over those of its file's preamble.
 /// </summary>
 /// <remarks>
 /// Every member is nullable, and null means the source does not say.  A source sets the members it has: not every
@@ -78,7 +78,7 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// The name of the class that holds a query's members in <see cref="MemberLocation.NestedClass" /> location.  A
-    /// marker, a settings file and, for now, the attribute of a type give it.
+    /// marker or a settings file gives it.
     /// </summary>
     public string? NestedClass { get; init; }
 

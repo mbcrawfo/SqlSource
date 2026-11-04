@@ -92,11 +92,11 @@ internal readonly record struct QuerySettings(
         );
 
     /// <summary>
-    /// The type override of a query on <paramref name="engine" />: the precedence of the type override, which has no
-    /// attribute level and merges per key, the markers over the file's level, each level's entries of that engine.
-    /// The file's level is the chain of its folder, whose files merge per key the same way.  Sorted by key, and empty
-    /// when no level sets one.  It keeps its entries of <c>default</c>, which <see cref="TypeOverrideMap.Find" />
-    /// weighs by their place against the entries of other keys that match a type, a nearer settings file's place above
+    /// The type override of a query on <paramref name="engine" />: the precedence of the type override, which merges
+    /// per key, the markers over the file's level, each level's entries of that engine.  The file's level is the chain
+    /// of its folder, whose files merge per key the same way.  Sorted by key, and empty when no level sets one.  It
+    /// keeps its entries of <c>default</c>, which <see cref="TypeOverrideMap.Find" /> weighs by their place against the
+    /// entries of other keys that match a type, a nearer settings file's place above
     /// a farther one's.  It is kept apart from <see cref="Resolve" />, which runs for each query and each type that
     /// claims its file, so that a caller that needs it computes it once for each distinct level of markers.
     /// </summary>
@@ -143,12 +143,4 @@ internal readonly record struct QuerySettings(
     /// </summary>
     public static string ResolveDatabase(SettingsLevel markers, SettingsLevel file, string dialectName) =>
         markers.Database ?? file.Database ?? dialectName;
-
-    /// <summary>
-    /// The name of a type's nested class: the attribute's, then the chain's, else the default.  The chain is that of
-    /// the folder of the type's C# file.  The class belongs to the type and not to a query, so it has no marker level,
-    /// and no <c>.sql</c> file's chain decides it; it is kept apart from <see cref="Resolve" />.
-    /// </summary>
-    public static string ResolveNestedClass(SettingsLevel attribute, SettingsLevel chain) =>
-        attribute.NestedClass ?? chain.NestedClass ?? DefaultNestedClass;
 }

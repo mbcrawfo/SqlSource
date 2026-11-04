@@ -8,10 +8,10 @@ using SqlSource.Settings.TypeOverrides;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// Reads a <see cref="SettingsLevel" /> from a source that is not a marker.  This is the one place that says which
-/// members such a level has, what makes a text, a list of generator parameters, a type override and a column type
-/// valid, in each form a source writes them, and that a text which is empty or white space is not set.  A choice is
-/// decoded by its source, which alone knows how one is written.
+/// Reads a <see cref="SettingsLevel" /> from a settings file, the one source that is not a marker.  This is the one
+/// place that says which members such a level has, what makes a text, a list of generator parameters, a type override
+/// and a column type valid, in each form a file writes them, and that a text which is empty or white space is not set.
+/// A choice is decoded by its source, which alone knows how one is written.
 /// </summary>
 internal static class SettingsLevelReader
 {
