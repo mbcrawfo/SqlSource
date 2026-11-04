@@ -379,11 +379,11 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_AllTypesSqlWithADirectLocation_HasTheConstantsOnTheType()
+    public void Build_ModelsCopiesWithADirectLocation_HaveTheConstantsOnTheType()
     {
-        AllTypesSql.ListAllTypes.ShouldBe("SELECT *\nFROM all_types\nORDER BY id;");
-        AllTypesSql.InsertAllTypes.ShouldStartWith("INSERT INTO all_types (\n    id,\n    bool_value,");
-        AllTypesSql.InsertAllTypes.ShouldEndWith("@dateArrayValue, @emailValue\n)\nRETURNING *;");
+        AllTypesQueries.ListAllTypesForDapper.ShouldBe("SELECT *\nFROM all_types\nORDER BY id;");
+        AllTypesQueries.InsertAllTypesForDapper.ShouldStartWith("INSERT INTO all_types (\n    id,\n    bool_value,");
+        AllTypesQueries.InsertAllTypesForDapper.ShouldEndWith("@dateArrayValue, @emailValue\n)\nRETURNING *;");
     }
 
     // A query whose output is codegen has its method and no constant: the type that claims it declares no field, and

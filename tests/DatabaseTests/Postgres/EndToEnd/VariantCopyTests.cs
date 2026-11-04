@@ -7,9 +7,10 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // A copy of a query in its file, such as GetAccountNameUnpooled of Queries/Accounts.sql, is the query again under one
 // setting, for a test that needs the two apart: the allocation tests of tests/DatabaseTests/QueryMethodAllocation send
-// both through one hand-written SQL.  A query's hash is of its SQL alone, and the project does not build while an
-// entry's hash is not its query's, so the committed entries of the two have one hash as long as the two queries have
-// one SQL.  No server is needed.
+// both through one hand-written SQL, and the Dapper tests run the constants of the ForDapper copies, such as
+// ListAllTypesForDapper, which are at the output models, since a codegen query has a method and no constant.  A
+// query's hash is of its SQL alone, and the project does not build while an entry's hash is not its query's, so the
+// committed entries of the two have one hash as long as the two queries have one SQL.  No server is needed.
 public sealed class VariantCopyTests
 {
     [Theory]
