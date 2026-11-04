@@ -165,8 +165,9 @@ internal sealed class LibraryRows
         return sets;
     }
 
-    // The rows of one library, for PostgreSQL's pg_catalog and for SQL Server.  PostGIS's rows match in any schema, and
-    // SQL Server's spatial rows only a CLR type of sys, so they are apart, in SpatialRows.
+    // The rows of one library for each engine's system types: PostgreSQL's of pg_catalog, SQL Server's by name.
+    // PostGIS's rows match in any schema, and SQL Server's spatial rows only a CLR type of sys, so they are apart, in
+    // SpatialRows.
     private static PerEngine<Dictionary<string, TypeMapping>> RowsOf(SqlLibrary library) =>
         PerEngine.Of(engine => RowsOf(library, engine));
 
