@@ -102,15 +102,48 @@ public sealed class SettingsFileSearchTests : IDisposable
             .ShouldContain("Widgets.sql(1,10): error SQLSRC241:", Case.Sensitive, output);
     }
 
+    // A known limit, which the owner accepted: a file the project lists by its full path through the link keeps the
+    // link's spelling in the compiler, while a settings file given by its relative path is made full where the link
+    // is resolved, so the two never meet and the query gets no settings, SQLSRC209 for the default output and the
+    // dialect ansi.  Before the settings files were given by relative paths, such a file got its settings and every
+    // file listed by a relative path lost them.
+    [Fact]
+    public async Task Build_FilesListedByFullPathsThroughALink_GetNoSettingsFiles()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), LinkSkipReason);
+        _ = _fixtures.Copy("Linked", "App/App.csproj");
+        _ = Directory.CreateSymbolicLink(_fixtures.PathOf("Link"), _fixtures.PathOf("Linked"));
+
+        var (exitCode, output) = await BuildLinkedAsync(
+            _fixtures.PathOf("Link/App/App.csproj"),
+            "-p:LinkedFullPaths=true"
+        );
+
+        exitCode.ShouldBe(1, output);
+        ErrorLines(output)
+            .ShouldHaveSingleItem(output)
+            .ShouldContain(
+                _fixtures.PathOf("Link/App/Widgets.sql") + "(1,10): error SQLSRC209:",
+                Case.Sensitive,
+                output
+            );
+    }
+
     // A link needs a privilege on Windows, whose working folder keeps the spelling of a link anyway.
     private const string LinkSkipReason = "Making a symbolic link needs a privilege on Windows.";
 
     // "dotnet build" of the copy, with the generator beside the tests.
-    private static Task<(int ExitCode, string Output)> BuildLinkedAsync(string project) =>
+    private static Task<(int ExitCode, string Output)> BuildLinkedAsync(string project, params string[] arguments) =>
         FixtureProjects.BuildAsync(
             project,
             new Dictionary<string, string>(),
-            FixtureProjects.PropertySwitch("LinkedGenerator", Path.Combine(AppContext.BaseDirectory, "SqlSource.dll"))
+            [
+                FixtureProjects.PropertySwitch(
+                    "LinkedGenerator",
+                    Path.Combine(AppContext.BaseDirectory, "SqlSource.dll")
+                ),
+                .. arguments,
+            ]
         );
 
     // The errors of a build, each once: the console logger repeats them in its summary.
