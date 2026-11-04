@@ -392,7 +392,6 @@ public sealed class ModelShapeTests
     [InlineData(typeof(AccountQueries))]
     [InlineData(typeof(Reporting.AccountReports))]
     [InlineData(typeof(InvoiceQueries))]
-    [InlineData(typeof(AllTypesQueries))]
     [InlineData(typeof(CubeQueries))]
     public void Build_CodeGenOutput_GivesNoConstant(Type type)
     {

@@ -12,6 +12,13 @@ SELECT *
 FROM accounts
 ORDER BY id;
 
+-- name: ListAccountsUnpooled
+-- summary: ListAccounts again, without the array pool.
+-- generator: no-array-pool
+SELECT *
+FROM accounts
+ORDER BY id;
+
 -- name: ListAccountsInTableOrder
 -- summary: Every account, by the whole list of columns in the table's order.
 SELECT id, name, email, status, created_at, closed_at, name_length
@@ -32,6 +39,15 @@ SELECT id, name
 FROM accounts
 WHERE id = @accountId;
 
+-- name: GetAccountNameUnpooled
+-- summary: GetAccountName again, without the array pool.
+-- output-model: AccountName
+-- generator: no-array-pool
+-- input-model: GetAccountNameArgs
+SELECT id, name
+FROM accounts
+WHERE id = @accountId;
+
 -- name: FindAccountName
 -- summary: The name of an account, by its email.
 -- output-model: AccountName
@@ -42,6 +58,17 @@ WHERE email = @email;
 -- name: ListClosedBefore
 -- summary: The accounts closed before a time, or every account when it is null.
 -- param: @closedBefore timestamptz null
+SELECT id, name, closed_at
+FROM accounts
+WHERE @closedBefore IS NULL OR closed_at < @closedBefore
+ORDER BY id;
+
+-- name: ListClosedBeforeUnpooled
+-- summary: ListClosedBefore again, without the array pool.
+-- param: @closedBefore timestamptz null
+-- generator: no-array-pool
+-- input-model: ListClosedBeforeArgs
+-- output-model: ListClosedBeforeDto
 SELECT id, name, closed_at
 FROM accounts
 WHERE @closedBefore IS NULL OR closed_at < @closedBefore
