@@ -7,8 +7,7 @@ namespace SqlSource.Generation.Methods;
 /// Whether the project references a driver that a query's method can be generated for, of each engine: one that
 /// <see cref="NpgsqlProbe" /> or <see cref="SqlClientProbe" /> finds and that is not below the floor.
 /// </summary>
-/// <param name="Postgres">Whether the methods of the <c>postgres</c> dialect can be generated.</param>
-/// <param name="SqlServer">Whether the methods of the <c>mssql</c> dialect can be generated.</param>
+/// <param name="Allowed">Whether the methods of each engine's queries can be generated.</param>
 /// <param name="PostgresAtLeast10">
 /// Whether the project references Npgsql 10 or later, which decides the target of a PostgreSQL query's converters,
 /// <see cref="Converters.ConverterTargets.Npgsql10" /> or <see cref="Converters.ConverterTargets.NpgsqlBefore10" />.
@@ -19,8 +18,7 @@ namespace SqlSource.Generation.Methods;
 /// path.
 /// </param>
 internal readonly record struct MethodDrivers(
-    bool Postgres,
-    bool SqlServer,
+    PerEngine<bool> Allowed,
     bool PostgresAtLeast10,
     bool SqlServerSpatial = false
 )
@@ -31,18 +29,13 @@ internal readonly record struct MethodDrivers(
     /// </summary>
     public static MethodDrivers Of(NpgsqlProbe npgsql, SqlClientProbe sqlClient, LibraryProbe libraries) =>
         new(
-            npgsql.Referenced && !npgsql.IsBelowTheFloor,
-            sqlClient.Referenced && !sqlClient.IsBelowTheFloor,
+            PerEngine.Of(engine =>
+                DriverProbes.Of(engine, npgsql, sqlClient) is { Referenced: true, IsBelowTheFloor: false }
+            ),
             npgsql.AtLeast10,
             libraries.NetTopologySuite && libraries.SqlServerBytes
         );
 
     /// <summary>Whether the methods of the engine's queries can be generated.</summary>
-    public bool Allows(DatabaseEngine engine) =>
-        engine switch
-        {
-            DatabaseEngine.PostgreSql => Postgres,
-            DatabaseEngine.SqlServer => SqlServer,
-            _ => throw UnexpectedEnumValueException.Of(engine),
-        };
+    public bool Allows(DatabaseEngine engine) => Allowed[engine];
 }

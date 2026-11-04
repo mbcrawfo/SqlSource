@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation.Types.Drivers;
 
@@ -15,12 +16,19 @@ namespace SqlSource.Generation.Types.Drivers;
 internal readonly record struct DriverFinding(DiagnosticDescriptor Descriptor, string Argument);
 
 /// <summary>
-/// What a driver's probe gives the step that reports it: the diagnostics of the project's reference to the driver.
-/// The step reports whatever the probe finds and decides nothing about the driver, so a probe that learns of another
-/// condition of its driver adds a flag and a finding, and <c>ReportDriver</c> is unchanged.
+/// What a driver's probe gives the steps that read it: the diagnostics of the project's reference to the driver, and
+/// whether the project references the driver, and one below the floor.  The step that reports it reports whatever the
+/// probe finds and decides nothing about the driver, so a probe that learns of another condition of its driver adds a
+/// flag and a finding, and <c>ReportDriver</c> is unchanged.
 /// </summary>
 internal interface IDriverProbe
 {
+    /// <summary>Whether the project references the driver.</summary>
+    bool Referenced { get; }
+
+    /// <summary>Whether the project references a version of the driver below the floor.</summary>
+    bool IsBelowTheFloor { get; }
+
     /// <summary>
     /// The diagnostics of the project's reference to the driver, each once, in the order they are reported: too old,
     /// then newer than known.  Empty when the project does not reference the driver or references one that the map
@@ -30,11 +38,23 @@ internal interface IDriverProbe
     IEnumerable<DriverFinding> Findings { get; }
 }
 
-/// <summary>What the probes share of reading a compilation.</summary>
+/// <summary>What the probes share of reading a compilation, and the choice of an engine's probe.</summary>
 internal static class DriverProbes
 {
     // What ends the version in an informational version: the commit's + and a description's space.
     private static readonly char[] VersionEnds = ['+', ' ', '\t'];
+
+    /// <summary>The probe of the driver of <paramref name="engine" />.</summary>
+    /// <param name="engine">The engine.</param>
+    /// <param name="npgsql">The probe of Npgsql, the driver of PostgreSQL.</param>
+    /// <param name="sqlClient">The probe of Microsoft.Data.SqlClient, the driver of SQL Server.</param>
+    public static IDriverProbe Of(DatabaseEngine engine, NpgsqlProbe npgsql, SqlClientProbe sqlClient) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => npgsql,
+            DatabaseEngine.SqlServer => sqlClient,
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
 
     /// <summary>Whether <paramref name="compilation" /> has a type named <paramref name="metadataName" />.</summary>
     public static bool Has(Compilation compilation, string metadataName) =>

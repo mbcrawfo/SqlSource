@@ -47,4 +47,16 @@ public sealed class SqlDescribableDialectsTests
                 );
         }
     }
+
+    [Fact]
+    public void DialectOf_EachEngine_IsTheDescribableDialectOfThatEngine()
+    {
+        foreach (var engine in DatabaseEngines.All)
+        {
+            var dialect = SqlDescribableDialects.DialectOf(engine);
+
+            SqlDescribableDialects.Contains(dialect).ShouldBeTrue(engine.ToString());
+            SqlDescribableDialects.EngineOf(dialect).ShouldBe(engine);
+        }
+    }
 }
