@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using Shouldly;
 
@@ -13,23 +12,12 @@ internal static class RealisticClaimChecks
         var found = corpus.ReadNamed(name);
         var claims = RealisticClaims.AllOf(corpus).Where(claim => claim.Case == name).ToList();
 
-        var atCodeGen = claims.Count(claim => claim.Output == RealisticClaims.CodeGenOutput);
-
         var expected = found.HasModels ? 1 : 0;
-        atCodeGen.ShouldBe(
-            expected,
-            RealisticClaims.ClaimedBy(corpus, found, RealisticClaims.CodeGenOutput, atCodeGen)
-        );
-        claims.Count.ShouldBe(expected, $"{found} is claimed at an output other than CodeGen");
+        claims.Count.ShouldBe(expected, RealisticClaims.ClaimedBy(corpus, found, claims.Count));
     }
 
     public static void ShouldBeItsClass(RealisticCorpus corpus, string name, string methodType) =>
-        RealisticClaims.Of(corpus, corpus.ReadNamed(name), RealisticClaims.CodeGenOutput).TypeName.ShouldBe(methodType);
-
-    public static void ShouldAllBeAtCodeGen(RealisticCorpus corpus) =>
-        RealisticClaims
-            .Parse(File.ReadAllText(corpus.Methods))
-            .ShouldAllBe(claim => claim.Output == RealisticClaims.CodeGenOutput);
+        RealisticClaims.Of(corpus, corpus.ReadNamed(name)).TypeName.ShouldBe(methodType);
 
     public static void ShouldNameOnlyCasesThatExist(RealisticCorpus corpus) =>
         RealisticClaims.AllOf(corpus).Select(static claim => claim.Case).ShouldBeSubsetOf(corpus.Names);

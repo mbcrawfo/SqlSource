@@ -103,7 +103,7 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
     // RealisticCalls checks.
     public MethodInfo MethodOf(RealisticCorpus corpus, RealisticCase found, SidecarEntry entry)
     {
-        var claim = RealisticClaims.Of(corpus, found, RealisticClaims.CodeGenOutput);
+        var claim = RealisticClaims.Of(corpus, found);
         var name = claim.TypeName + ExtensionsSuffix;
         var type =
             assembly.GetType($"{@namespace}.{name}")
