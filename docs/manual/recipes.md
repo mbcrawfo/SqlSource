@@ -420,7 +420,14 @@ Rules: [a class in a JSON column](settings.md#json-class), [the JSON opt-in](set
 
 ## Use the queries with Dapper or your own ADO.NET code
 
-Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under the default, `codegen`, it has a [method](generator.md#query-methods) in place of the constant, so a type whose queries you run yourself sets `Output`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
+Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under the default, `codegen`, it has a [method](generator.md#query-methods) in place of the constant, so a file whose queries you run yourself sets the output to `models`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
+
+```sql
+-- output: models
+
+-- name: GetUser
+SELECT id, name FROM users WHERE id = @id;
+```
 
 ```csharp
 using System.Data;
@@ -428,7 +435,7 @@ using System.Data.Common;
 using Dapper;
 using SqlSource;
 
-[SqlSourceGenerate(Output = GeneratorOutput.Models)]
+[SqlSourceGenerate]
 public partial class UserRepository(DbConnection connection)
 {
     // Dapper
@@ -457,7 +464,7 @@ public partial class UserRepository(DbConnection connection)
 }
 ```
 
-Here `GetUser` is `SELECT id, name FROM users WHERE id = @id;`, and `GetUserDto` is its generated [model](generator.md#models).  Under `models` SqlSource opens no connection and binds no value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
+`GetUserDto` is the generated [model](generator.md#models) of `GetUser`.  Under `models` SqlSource opens no connection and binds no value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
 Rules: [constants](generator.md#constants), [query parameters](parameters-and-tokens.md#query-parameters), [output](settings.md#setting-output).
 
@@ -466,6 +473,8 @@ Rules: [constants](generator.md#constants), [query parameters](parameters-and-to
 ## Run the models through Dapper
 
 ```sql postgres
+-- output: models
+
 -- name: GetOrder
 SELECT o.id, o.placed_at, c.name AS customer_name
 FROM orders o
@@ -478,7 +487,7 @@ using System.Data.Common;
 using Dapper;
 using SqlSource;
 
-[SqlSourceGenerate(Output = GeneratorOutput.Models)]
+[SqlSourceGenerate]
 public partial class OrderRepository(DbConnection connection)
 {
     public Task<GetOrderDto?> Get(long orderId) =>
