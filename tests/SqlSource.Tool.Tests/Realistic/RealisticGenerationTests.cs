@@ -111,6 +111,32 @@ public sealed class RealisticGenerationTests
         run.Sources.ShouldContainKey(RealisticGeneration.TypeFile);
     }
 
+    // A reference given to the run reaches its compilation: a SqlClient newer than SqlSource knows, of another identity
+    // than the process's copy, gives SQLSRC268.  Without it, the test above would pass with the reference dropped.
+    [Fact]
+    public void RunAtModels_SqlServerCaseWithANewerSqlClient_ReportsTheNewerDriver()
+    {
+        var found = RealisticCorpus.SqlServer.ReadNamed("customers-distinct-from");
+        var query = RealisticGeneration.QueryOf(found);
+
+        var run = RealisticGeneration.RunAtModels(
+            RealisticCorpus.SqlServer,
+            query,
+            RealisticGeneration.CommittedSidecarOf(found, query),
+            [
+                SqlClientReferences.Synthetic(
+                    "8.0.0.0",
+                    connection: true,
+                    vector: true,
+                    seven: true,
+                    informationalVersion: "8.0.1"
+                ),
+            ]
+        );
+
+        run.Diagnostics.ShouldContain(diagnostic => diagnostic.Contains("SQLSRC268", StringComparison.Ordinal));
+    }
+
     // A raise of VersionPrefix before the sidecars are described again: the generator gives SQLSRC240, a warning the
     // build keeps, and the SQL is still the query's.
     [Fact]
