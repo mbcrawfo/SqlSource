@@ -876,7 +876,7 @@ Turning the default off turns it off for sidecars too, so list them as well, as 
 | Value | The build runs the tool |
 |----|----|
 | `auto`, empty, or not set | When it finds a connection: the environment variable `SQLSOURCE_CONNECTION`, set and not blank, or a file named `.env` in the project's folder or any folder above it.  When the tool then finds no connection for any database with a query to describe, it says the build is offline, and the build goes on with the committed sidecars |
-| `true` | Always.  A database with a query to describe and no connection is then [SQLSRC213](diagnostics.md#sqlsrc213), and a tool that cannot be started [SQLSRC025](diagnostics.md#sqlsrc025) |
+| `true` | Whether it finds a connection or not.  A database with a query to describe and no connection is then [SQLSRC213](diagnostics.md#sqlsrc213), and a tool that cannot be started [SQLSRC025](diagnostics.md#sqlsrc025) |
 | `false` | Never |
 
 - **The value is matched ignoring case** and the white space around it, so ` True ` is `true`.  Any other value, such as `yes`, is [SQLSRC024](diagnostics.md#sqlsrc024), and the build stops.

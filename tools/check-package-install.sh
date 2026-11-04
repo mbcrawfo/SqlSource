@@ -4,13 +4,16 @@
 # Then removes a .sql file the project uses and checks that the next build, an incremental one, fails for it.
 # Then publishes a web project that references the package, and checks that no .sql file, no sidecar and no settings
 # file is copied.
-# Last, builds a project of two target frameworks that references the package, with a stand-in for the sqlsource tool,
+# Then builds a project of two target frameworks that references the package, with a stand-in for the sqlsource tool,
 # and checks that the outer build ran the tool once, for the first framework, before it dispatched the inner builds.
 # NuGet imports buildMultiTargeting/SqlSource.targets only for a package reference, so no other test reaches it.
+# Last, installs the packed tool of the same version into a project of one query, with a tool manifest, and builds it
+# under each value of SqlSourceOnline, with no database: the packed package starts the packed tool, and the build
+# shows what the tool printed, its summary, its offline line and its errors.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
-# own build applies to it, and it restores from the folder that holds the package and from nowhere else.
-# Usage: check-package-install.sh [directory]   The directory holds one SqlSource.<version>.nupkg, and may hold the
-# package of the tool beside it.  Without it, the package is packed into a temporary directory first.
+# own build applies to it, and it restores from the folder that holds the packages and from nowhere else.
+# Usage: check-package-install.sh [directory]   The directory holds one SqlSource.<version>.nupkg and one
+# SqlSource.Tool.<version>.nupkg of the same version.  Without it, both are packed into a temporary directory first.
 set -euo pipefail
 
 # MSBuild writes its own lines in the language of the user's interface, "0 Warnung(en)" in German, and the checks
@@ -18,12 +21,15 @@ set -euo pipefail
 export DOTNET_CLI_UI_LANGUAGE=en
 
 PACKAGE_ID='SqlSource'
+TOOL_PACKAGE_ID='SqlSource.Tool'
 FIXTURE='tools/package-install'
 PROJECT='Consumer.csproj'
 EXPECTED='expected-output.txt'
 # A .sql file of the project and the member that Program.cs uses from it.
 REMOVED='Queries/ByProject.sql'
 REMOVED_MEMBER='ByProject'
+# The query that the last project copies, with its sidecar beside it: GetUser, of the database postgres.
+ONLINE_QUERY='examples/PostgresExamples/Models/Users.sql'
 
 if [[ $# -gt 1 ]]; then
     echo 'Usage: check-package-install.sh [directory]' >&2
@@ -41,10 +47,13 @@ if [[ $# -eq 1 ]]; then
 else
     cd "$repo_root"
     directory="$work/feed"
-    dotnet pack src/SqlSource/SqlSource.csproj --output "$directory" --nologo --verbosity quiet
+    for project in src/SqlSource/SqlSource.csproj src/SqlSource.Tool/SqlSource.Tool.csproj; do
+        dotnet pack "$project" --output "$directory" --nologo --verbosity quiet
+    done
 fi
 
-# A version starts with a digit, and that is what keeps the pattern from matching SqlSource.Tool.<version>.nupkg.
+# A version starts with a digit, and that is what keeps the pattern of SqlSource from matching
+# SqlSource.Tool.<version>.nupkg.
 packages=()
 for package in "$directory/$PACKAGE_ID".[0-9]*.nupkg; do
     if [[ -f "$package" ]]; then
@@ -60,6 +69,13 @@ fi
 package="$(basename "${packages[0]}")"
 version="${package#"$PACKAGE_ID".}"
 version="${version%.nupkg}"
+
+# The tool of the same version, which the last project installs from the same folder.
+tool_package="$TOOL_PACKAGE_ID.$version.nupkg"
+if [[ ! -f "$directory/$tool_package" ]]; then
+    echo "check-package-install: expected $tool_package beside $package in $directory, and it is missing" >&2
+    exit 1
+fi
 
 consumer="$work/consumer"
 cp -R "$FIXTURE" "$consumer"
@@ -319,8 +335,123 @@ for framework in netstandard2.1 net10.0; do
     fi
 done
 
+# The packed tool, installed with a tool manifest of the project as a user installs it, run by the packed package's
+# target as the build starts it, with no database.  The query and its sidecar are the example's, which
+# tools/describe-end-to-end.sh keeps current for the tool of VersionPrefix, so its entry is current for this tool and no
+# database is needed to build it.  The variables that turn the online build off, or that hold a connection, were
+# cleared above.  Every check asserts a line that only the real tool writes, so that a build that never ran it fails.
+online="$work/online"
+mkdir -p "$online/Queries"
+cp global.json nuget.config "$online/"
+cat >"$online/Online.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="$PACKAGE_ID" Version="$version" PrivateAssets="all" />
+    </ItemGroup>
+</Project>
+EOF
+echo '{ "root": true, "dialect": "postgres" }' >"$online/sqlsource.json"
+cat >"$online/Queries.cs" <<'EOF'
+[SqlSource.SqlSourceGenerate(Source = "Queries", Output = SqlSource.GeneratorOutput.Models)]
+internal static partial class Queries;
+EOF
+
+online_fails() {
+    cat "$2" >&2
+    echo "check-package-install: the project that installs $tool_package $1" >&2
+    exit 1
+}
+
+for file in "$ONLINE_QUERY" "$ONLINE_QUERY.json"; do
+    cp "$repo_root/$file" "$online/Queries/" 2>"$work/online-copy.log" ||
+        online_fails "could not copy $file" "$work/online-copy.log"
+done
+
+cd "$online"
+# dotnet keeps a cache under DOTNET_CLI_HOME, the user's home by default, of where each local tool of a version is,
+# and runs the tool it finds there: a package packed again with the same version, or one installed into another
+# temporary folder, would run in place of this one.  Each run of this script has a cache of its own.
+export DOTNET_CLI_HOME="$work/dotnet-home"
+export DOTNET_NOLOGO=1
+dotnet new tool-manifest >"$work/online-manifest.log" 2>&1 ||
+    online_fails 'could not create its tool manifest' "$work/online-manifest.log"
+dotnet tool install "$TOOL_PACKAGE_ID" --version "$version" >"$work/online-install.log" 2>&1 ||
+    online_fails "could not install $TOOL_PACKAGE_ID $version" "$work/online-install.log"
+
+# The tool prints the package's version, alone or followed by "+" and the commit.
+dotnet sqlsource --version >"$work/online-version.log" 2>&1 ||
+    online_fails 'cannot run dotnet sqlsource --version' "$work/online-version.log"
+tool_version="$(cat "$work/online-version.log")"
+if [[ "$tool_version" != "$version" && "$tool_version" != "$version+"* ]]; then
+    online_fails "runs a tool that prints '$tool_version' for --version, and the package is $version" \
+        "$work/online-version.log"
+fi
+
+# A .env is a connection source, so auto runs the tool, and it holds no key the tool reads.  It is written before the
+# build with false, so that false is told apart from auto there: auto would start the tool, and false must not.
+echo 'APP_SETTING=1' >.env
+
+# false never starts the tool, whose command line a detailed log shows when it does.
+dotnet build Online.csproj --nologo -tl:off -v:d -p:SqlSourceOnline=false >"$work/online-false.log" 2>&1 ||
+    online_fails 'does not build with SqlSourceOnline false' "$work/online-false.log"
+if grep -q -F 'describe --manifest' "$work/online-false.log"; then
+    online_fails 'ran the tool with SqlSourceOnline false' "$work/online-false.log"
+fi
+
+# Under auto, with the .env, the tool runs.  The entry is current, so the database needs no connection and the tool's
+# summary says so.
+dotnet build Online.csproj --nologo -tl:off -v:d >"$work/online-auto.log" 2>&1 ||
+    online_fails 'does not build under auto with a .env and current sidecars' "$work/online-auto.log"
+if ! grep -q 'sqlsource: summary: ' "$work/online-auto.log"; then
+    online_fails 'did not show the summary of the tool under auto with a .env' "$work/online-auto.log"
+fi
+
+# A query whose SQL changed has a stale entry, which needs a connection to describe again.
+sed 's/^SELECT \*$/SELECT id, name/' "$repo_root/$ONLINE_QUERY" >Queries/Users.sql
+if cmp -s "$repo_root/$ONLINE_QUERY" Queries/Users.sql; then
+    online_fails "could not change the SQL of $ONLINE_QUERY, which no longer has a line SELECT *" Queries/Users.sql
+fi
+
+# The tool on its own, with no connection, reports the query's database as having none.
+code=0
+dotnet sqlsource describe >"$work/online-describe.log" 2>&1 || code=$?
+if [[ "$code" -ne 1 ]] || ! grep -q 'Users\.sql([0-9]*,[0-9]*): error SQLSRC213: ' "$work/online-describe.log"; then
+    online_fails "exited with $code from dotnet sqlsource describe, not with 1 and SQLSRC213" \
+        "$work/online-describe.log"
+fi
+
+# auto goes on offline with the committed sidecars, and the generator then reports the stale entry.
+if dotnet build Online.csproj --nologo -tl:off -v:d >"$work/online-stale.log" 2>&1; then
+    online_fails 'built under auto with a stale entry' "$work/online-stale.log"
+fi
+offline='sqlsource: offline: no connection for postgres; the build uses the committed sidecars'
+if ! grep -q -F "$offline" "$work/online-stale.log"; then
+    online_fails 'did not show the offline line of the tool under auto with a stale entry' "$work/online-stale.log"
+fi
+if ! grep -q 'Queries/Users\.sql([0-9]*,[0-9]*): error SQLSRC244: ' "$work/online-stale.log"; then
+    online_fails 'did not report the stale entry at its query under auto' "$work/online-stale.log"
+fi
+
+# true needs a connection for every database it describes, and the build shows the tool's error on one line, as a
+# compiler's, with nothing of Exec's.
+rm .env
+if dotnet build Online.csproj --nologo -tl:off -p:SqlSourceOnline=true >"$work/online-true.log" 2>&1; then
+    online_fails 'built with SqlSourceOnline true and no connection' "$work/online-true.log"
+fi
+if ! grep -q 'Users\.sql([0-9]*,[0-9]*): error SQLSRC213: .*; see: https://' "$work/online-true.log" ||
+    grep -q 'MSB3073' "$work/online-true.log"; then
+    online_fails 'did not show the error SQLSRC213 of the tool on one line under true' "$work/online-true.log"
+fi
+
 echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED,"
 echo "check-package-install: which has SqlSourceImported and writes its project manifest,"
 echo "check-package-install: and whose next build compiles again after a .sql file is removed,"
 echo "check-package-install: and into a web project, whose build and publish copy no .sql, sidecar or settings file,"
-echo "check-package-install: and into a project of two target frameworks, whose outer build runs the tool once"
+echo "check-package-install: and into a project of two target frameworks, whose outer build runs the tool once,"
+echo "check-package-install: and runs the packed tool through the build of a project," \
+    'under each value of SqlSourceOnline'

@@ -8,6 +8,7 @@ A small project that uses SqlSource with PostgreSQL: what you write, what you ge
 |----|----|
 | [`schema.sql`](schema.sql) | The database: users, their orders, the lines of each order and the delivery of an order, with a few rows |
 | [`docker-compose.yml`](docker-compose.yml) | Builds and starts PostgreSQL with that schema |
+| [`.env.example`](.env.example) | The connection to that database, which the tool reads once it is copied to `.env` |
 | [`Postgis/Dockerfile`](Postgis/Dockerfile) | The image that `docker-compose.yml` builds: PostgreSQL 18.6 with PostGIS, which the deliveries' `geography` needs, at an exact version |
 | [`Sql/`](Sql) | The output `sql`: `CountUsers` as a constant, and `CountRows` as a method that fills in a [token](../../docs/manual/parameters-and-tokens.md#tokens), in a nested class that the attribute [names](../../docs/manual/settings.md#setting-nested-class) `Counts`, from `CountQueries.sql`, the file named for [`CountQueries`](Sql/CountQueries.cs).  They are not described, so they have no sidecar and need no connection |
 | [`Models/`](Models) | The output `models`, for every `.sql` file of the folder, which [`StoreQueries`](Models/StoreQueries.cs) takes with [`Source = "."`](../../docs/manual/settings.md#setting-source): each query gets a model of its parameters and one of its rows.  `GetOrder` has a nullable column and a `timestamptz` read as a `DateTimeOffset` by the project's [type override](../../docs/manual/settings.md#setting-type-overrides); `ListOrderTotals` has a sum that the tool shows is never null, `CountShippedOrders` has a count that the tool shows is never null, and `ListUserDisplayNames` makes a column not null with a [`-- column:` marker](../../docs/manual/generator.md#column-marker); `GetOrderTags` has an array column, read into the default record; `GetUser` is `SELECT *`, so its rows are the [table's model](../../docs/manual/generator.md#table-models), `UsersDto` |
@@ -53,7 +54,7 @@ export SQLSOURCE_CONNECTION="Host=localhost;Port=55432;Database=examples;Usernam
 dotnet sqlsource describe
 ```
 
-The tool describes the queries that have no current entry in their sidecar.  `dotnet sqlsource describe --check` compares the sidecars with what the database says now, and `--force` describes every query again.  With the variable set, a build of a project of your own also runs the tool before it compiles, as [running in the build](../../docs/manual/tool.md#running-in-the-build) says; a build of this example does not, since this repository's `Directory.Build.props` sets `SqlSourceOnline` to `false`.
+The tool describes the queries that have no current entry in their sidecar.  `dotnet sqlsource describe --check` compares the sidecars with what the database says now, and `--force` describes every query again.
 
 This example's sidecars are committed and current.  They are written by `tools/describe-end-to-end.sh`, which starts a database of its own: see [the recording scripts](../../tools/README.md#recording-scripts).  To compare them with the Compose database, run the tool from its source, from the repository's root, with `SQLSOURCE_CONNECTION` set as above, since the repository pins no published tool and another version of it writes another version into every sidecar:
 
@@ -62,6 +63,24 @@ dotnet run --project src/SqlSource.Tool -- describe --check examples/PostgresExa
 ```
 
 See [the tool](../../docs/manual/tool.md) for the commands and the connections.
+
+## Describe as you save, and in the build
+
+In a project of your own, copy [`.env.example`](.env.example) to `.env`, and add `.env` to your `.gitignore`, since it holds your password; the tool reads the connection from it, as [the `.env` file](../../docs/manual/tool.md#env-file) says.  Then run:
+
+```bash
+dotnet sqlsource describe --watch
+```
+
+It describes again each time you save a query, as [describe on save](../../docs/manual/tool.md#describe-on-save) says, and your editor can start it for you: see [the recipe](../../docs/manual/recipes.md#start-the-watcher-with-your-editor).  A build of your project also describes before it compiles, as [running in the build](../../docs/manual/tool.md#running-in-the-build) says, so a query that the database rejects is an error of the build, and you need not run `describe` after a change.
+
+This example differs in two ways.  The watch runs from the source, as the commands above do, from the repository's root.  It reads the `.env` of this folder when it runs on the project, so the `export` above is not needed:
+
+```bash
+dotnet run --project src/SqlSource.Tool -- describe --watch examples/PostgresExamples/PostgresExamples.csproj
+```
+
+And its build stays offline, since this repository's `Directory.Build.props` sets `SqlSourceOnline` to `false`, so that it builds from the committed sidecars.  After you change a query here, run `tools/describe-end-to-end.sh`, which writes the sidecars the repository commits.
 
 ## Read a sidecar
 
