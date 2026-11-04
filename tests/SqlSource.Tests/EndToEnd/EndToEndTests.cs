@@ -130,6 +130,7 @@ public sealed class EndToEndTests
     public void ProjectWithParameters_FileWithAHeader_UsesTheListOfItsHeader() =>
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void ProjectWithParameters_TwoTypesClaimOneFile_EachUsesItsOwnAttribute()
     {
@@ -170,6 +171,7 @@ public sealed class EndToEndTests
     [InlineData(typeof(TokenQueries))]
     [InlineData(typeof(DialectQueries))]
     [InlineData(typeof(ParameterQueries))]
+    // Removed with the attribute level in Task 3.
     [InlineData(typeof(KeptQueries))]
     public void Attribute_OnAGeneratedType_IsNotInItsMetadata(Type type) =>
         type.GetCustomAttributesData()

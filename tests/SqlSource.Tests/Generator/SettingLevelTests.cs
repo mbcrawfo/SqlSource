@@ -67,18 +67,26 @@ public sealed class SettingLevelTests
     // out.
     // Every level below the project's file.
     public static TheoryData<SettingLevel> LevelsBelowTheProjectFile =>
-        [SettingLevel.FolderFile, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
+        [
+            SettingLevel.FolderFile,
+            // Removed with the attribute level in Task 3.
+            SettingLevel.Attribute,
+            SettingLevel.Header,
+            SettingLevel.Query,
+        ];
 
     // Every level of a setting that the attribute has too.
     public static TheoryData<SettingLevel> Levels =>
         [
             SettingLevel.ProjectFile,
             SettingLevel.FolderFile,
+            // Removed with the attribute level in Task 3.
             SettingLevel.Attribute,
             SettingLevel.Header,
             SettingLevel.Query,
         ];
 
+    // Removed with the attribute level in Task 3.
     [Theory]
     [InlineData("InputModelSuffix = \"Args\", OutputModelSuffix = \"Row\", ModelNamespace = \"App.Models\"")]
     [InlineData("InputModelType = GeneratorModelType.Class, OutputModelType = GeneratorModelType.SealedRecord")]
@@ -105,14 +113,22 @@ public sealed class SettingLevelTests
     }
 
     [Theory]
+    // Removed with the attribute level in Task 3.
     [InlineData("Output = (GeneratorOutput)7", "7", "Output")]
+    // Removed with the attribute level in Task 3.
     [InlineData("Output = (GeneratorOutput)(-1)", "-1", "Output")]
+    // Removed with the attribute level in Task 3.
     [InlineData("InputModelType = (GeneratorModelType)4", "4", "InputModelType")]
+    // Removed with the attribute level in Task 3.
     [InlineData("OutputModelType = (GeneratorModelType)9", "9", "OutputModelType")]
+    // Removed with the attribute level in Task 3.
     [InlineData("CollectionType = (GeneratorCollectionType)11", "11", "CollectionType")]
     [InlineData("MethodLocation = (MethodLocation)4", "4", "MethodLocation")]
+    // Removed with the attribute level in Task 3.
     [InlineData("InputModelSuffix = \"A B\"", "A B", "InputModelSuffix")]
+    // Removed with the attribute level in Task 3.
     [InlineData("OutputModelSuffix = \"A.B\"", "A.B", "OutputModelSuffix")]
+    // Removed with the attribute level in Task 3.
     [InlineData("ModelNamespace = \"App.\"", "App.", "ModelNamespace")]
     public void Run_AttributePropertyThatIsNotValid_IsAnErrorAtTheAttribute(
         string argument,

@@ -14,6 +14,8 @@ public enum SettingLevel
 {
     ProjectFile,
     FolderFile,
+
+    // Removed with the attribute level in Task 3.
     Attribute,
     Header,
     Query,
@@ -83,6 +85,7 @@ internal sealed class LevelSettings
 
     // The source with the attribute's arguments, Name = "value" or Name = Enum.Value joined by ", ", after the Source
     // of its [SqlSourceGenerate(Source = ".")], or the source unchanged when no setting is at the attribute's level.
+    // Removed with the attribute level in Task 3.
     public string Source(string source)
     {
         var arguments = AtLevel(SettingLevel.Attribute);

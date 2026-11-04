@@ -89,7 +89,7 @@ internal static class GeneratorHarness
     }
 
     // The source of the type App.Sample, whose attribute has SqlLocation.Direct and these arguments after it: null for
-    // none, or text such as Parameters = "keep-comments".  Unless they set Source, it has Source = "." too, so that it
+    // none, or text such as NestedClass = "Queries".  Unless they set Source, it has Source = "." too, so that it
     // gets every .sql file of its folder; the compiler rejects a second Source.
     public static string SampleSource(string? arguments) =>
         "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate("

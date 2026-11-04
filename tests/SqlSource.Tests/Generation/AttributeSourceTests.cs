@@ -26,8 +26,11 @@ public sealed partial class AttributeSourceTests
     // The generator's own forms are internal, so a public theory names them and the test looks them up.
     [Theory]
     [InlineData("SqlLocation", nameof(MemberPlacement))]
+    // Removed with the attribute level in Task 3.
     [InlineData("GeneratorOutput", nameof(OutputKind))]
+    // Removed with the attribute level in Task 3.
     [InlineData("GeneratorModelType", nameof(ModelKind))]
+    // Removed with the attribute level in Task 3.
     [InlineData("GeneratorCollectionType", nameof(CollectionKind))]
     [InlineData("MethodLocation", nameof(MethodPlacement))]
     public void EmittedEnum_ComparedWithTheGeneratorsOwnForm_HasTheSameMembersAndNumbers(string emitted, string ownName)

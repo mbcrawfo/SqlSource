@@ -29,6 +29,7 @@ public sealed class GeneratorParameterLevelTests
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
     // The type Plain, which turns comments off, and Kept, which keeps them as the settings files do.
+    // Removed with the attribute level in Task 3.
     private const string PlainAndKeptSource = """
         using SqlSource;
 
@@ -49,7 +50,9 @@ public sealed class GeneratorParameterLevelTests
     // project's file, folder's file, attribute, preamble, query
     [InlineData(On, null, null, null, null)]
     [InlineData(null, On, null, null, null)]
+    // Removed with the attribute level in Task 3.
     [InlineData(null, null, On, null, null)]
+    // Removed with the attribute level in Task 3.
     [InlineData(Default, Other, On, null, null)]
     [InlineData(null, null, null, On, null)]
     [InlineData(null, null, null, Default, On)]
@@ -75,9 +78,13 @@ public sealed class GeneratorParameterLevelTests
     [InlineData(null, null, null, null, null)]
     [InlineData(On, Default, null, null, null)]
     [InlineData(On, Other, null, null, null)]
+    // Removed with the attribute level in Task 3.
     [InlineData(Other, On, Default, null, null)]
+    // Removed with the attribute level in Task 3.
     [InlineData(On, On, On, Default, null)]
+    // Removed with the attribute level in Task 3.
     [InlineData(On, On, On, On, Default)]
+    // Removed with the attribute level in Task 3.
     [InlineData(On, On, On, On, Other)]
     public void Run_GeneratorParametersWhoseMostSpecificListLeavesCommentsOut_DropTheCommentAndCheckTheToken(
         string? projectFile,
@@ -95,6 +102,7 @@ public sealed class GeneratorParameterLevelTests
 
     // One type asks for comments and the other does not.  The token stands only in a comment, so one gets a method
     // and the other a constant, each from its own form of the same file.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_TwoTypesClaimOneFileAndOneKeepsComments_EachGetsItsOwnSql()
     {
@@ -131,6 +139,7 @@ public sealed class GeneratorParameterLevelTests
     // The project's settings file keeps comments and one type turns them off.  The keyword stands only in a comment,
     // so it is an error only for the type that keeps it, whose file then gives no members, and the other type uses the
     // file.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_ReservedTokenInACommentWhereTheProjectFileKeepsComments_IsReportedOnlyForATypeThatKeepsComments()
     {
@@ -145,6 +154,7 @@ public sealed class GeneratorParameterLevelTests
     }
 
     // The same, where the settings file of the file's folder keeps comments.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_ReservedTokenInACommentWhereTheFolderFileKeepsComments_IsReportedOnlyForATypeThatKeepsComments()
     {
@@ -166,6 +176,7 @@ public sealed class GeneratorParameterLevelTests
     // The token and the comment overlap, so with the comments kept the query reads other tokens: the comment opens a
     // default that the SQL closes, or stands in a token's head.  It is an error only for the type that keeps the
     // comments, whose file then gives no members, and the other type emits the query with its token.
+    // Removed with the attribute level in Task 3.
     [Theory]
     [InlineData(DefaultOpenedInAComment, "(2,10)-(2,30)", "note", "w")]
     [InlineData(CommentInATokensHead, "(2,18)-(2,25)", "t", "t")]
@@ -231,6 +242,7 @@ public sealed class GeneratorParameterLevelTests
         query.KeptErrors.ShouldBeEmpty();
     }
 
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_AttributeWithAWordThatIsNoParameter_IsAnErrorAtTheAttribute()
     {
@@ -240,6 +252,7 @@ public sealed class GeneratorParameterLevelTests
             .ShouldBe("SQLSRC006 /app/Repo/Sample.cs(5,2)-(5,102): 'nope' is not a valid value of Parameters");
     }
 
+    // Removed with the attribute level in Task 3.
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -251,10 +264,12 @@ public sealed class GeneratorParameterLevelTests
         run.Sources[GeneratorHarness.SampleFile].ShouldContain("-- kept");
     }
 
+    // Removed with the attribute level in Task 3.
     private static string Source(string? attribute) =>
         GeneratorHarness.SampleSource(attribute is null ? null : "Parameters = \"" + attribute + "\"");
 
     // The query ListFrom under the generator parameters of the project's settings file and of the attribute.
+    // Removed with the attribute level in Task 3.
     private static GeneratorRun Run(OutputKind? output, string? projectFile, string? attribute) =>
         GeneratorHarness.Run(
             output,
@@ -264,6 +279,7 @@ public sealed class GeneratorParameterLevelTests
         );
 
     // The reserved token is reported once, for Kept, whose file gives no members, and Plain uses the file.
+    // Removed with the attribute level in Task 3.
     private static void ShouldReportTheTokenForKeptAlone(GeneratorRun run)
     {
         run.Diagnostics.ShouldBe([

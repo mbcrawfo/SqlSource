@@ -40,6 +40,7 @@ public sealed class TableModelTests
         [
             SettingLevel.ProjectFile,
             SettingLevel.FolderFile,
+            // Removed with the attribute level in Task 3.
             SettingLevel.Attribute,
             SettingLevel.Header,
             SettingLevel.Query,

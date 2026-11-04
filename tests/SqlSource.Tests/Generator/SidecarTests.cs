@@ -563,6 +563,7 @@ public sealed class SidecarTests
 
     // The first type needs nothing, and the second every query: the file needs what the second needs, and is checked
     // once.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_TwoTypesClaimingOneFile_ReportOnceAndNeedTheUnion()
     {
@@ -588,6 +589,7 @@ public sealed class SidecarTests
     }
 
     // Both types need the entry: one error, which names the greater of the two outputs.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_TwoTypesThatNeedOneEntry_ReportItOnceWithTheGreatestOutput()
     {
@@ -761,6 +763,7 @@ public sealed class SidecarTests
 
     // Two types in one folder, which both claim its files, each with the arguments of its attribute.  The project is
     // at Sql, so the attributes decide.
+    // Removed with the attribute level in Task 3.
     private static GeneratorRun RunTwoTypes(string first, string second, params SqlFile[] files) =>
         GeneratorHarness.Run(
             OutputKind.Sql,

@@ -206,7 +206,13 @@ public sealed class ModelTests
 
     // The levels that give a setting of a model, from the least specific.
     public static TheoryData<SettingLevel> Levels =>
-        [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Attribute, SettingLevel.Header];
+        [
+            SettingLevel.ProjectFile,
+            SettingLevel.FolderFile,
+            // Removed with the attribute level in Task 3.
+            SettingLevel.Attribute,
+            SettingLevel.Header,
+        ];
 
     [Fact]
     public void Run_RowsAndParameters_EmitsBothModels()
@@ -680,6 +686,7 @@ public sealed class ModelTests
     }
 
     // The type that asks for the SQL alone gets no models, and the other type's are in its namespace.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_QueryClaimedAtSqlAndAtModels_GetsTheModelsTypesModels()
     {
@@ -805,6 +812,7 @@ public sealed class ModelTests
 
     // A keyword in braces in a comment is SQLSRC114 for First, which keeps the comments, and not for Second, which
     // does not.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_FileExcludedByAnErrorInAKeptComment_GetsNoModelsForThatType()
     {

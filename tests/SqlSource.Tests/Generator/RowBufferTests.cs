@@ -57,7 +57,7 @@ public sealed class RowBufferTests
     [InlineData("ImmutableArray", "ToImmutableArray")]
     public void Run_ManyMethodOfEachPooledType_ReadsItsRowsIntoTheBuffer(string collection, string result)
     {
-        var run = RunListUsers("CollectionType = GeneratorCollectionType." + collection);
+        var run = RunListUsers("-- collection-type: " + collection + "\n");
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
@@ -98,9 +98,7 @@ public sealed class RowBufferTests
         string result
     )
     {
-        var run = RunListUsers(
-            "CollectionType = GeneratorCollectionType." + collection + ", Parameters = \"no-array-pool\""
-        );
+        var run = RunListUsers("-- collection-type: " + collection + "\n-- generator: no-array-pool\n");
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
@@ -255,11 +253,9 @@ public sealed class RowBufferTests
     [Fact]
     public void Run_ArrayMethodUnderNoArrayPool_WritesTheMethodWithAListAndNoBuffer()
     {
-        var run = MethodRuns.Run(
-            ListUsers,
-            [Users(ListUsers, "ListUsers")],
-            MethodRuns.SampleSource("Parameters = \"no-array-pool\"")
-        );
+        var file = ListUsers with { Text = "-- generator: no-array-pool\n\n" + ListUsers.Text };
+
+        var run = MethodRuns.Run(file, [Users(file, "ListUsers")]);
 
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
@@ -464,9 +460,12 @@ public sealed class RowBufferTests
             """
         );
 
-    // ListUsers on App.Sample with the attribute's arguments.
-    private static GeneratorRun RunListUsers(string arguments) =>
-        MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")], MethodRuns.SampleSource(arguments));
+    // ListUsers on App.Sample, with these markers in its file header, before a blank line.
+    private static GeneratorRun RunListUsers(string header)
+    {
+        var file = ListUsers with { Text = header + "\n" + ListUsers.Text };
+        return MethodRuns.Run(file, [Users(file, "ListUsers")]);
+    }
 
     // The entry of a query of the rows id and name.
     private static SidecarEntry Users(SqlFile file, string name) =>

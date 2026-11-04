@@ -454,6 +454,7 @@ public sealed class TypeDiagnosticsTests
 
     // Each is reported where the attribute reader reads it: the location, the method location, then the settings in
     // the order of SettingId.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_AttributeWithSeveralValuesThatAreNotValid_ReportsThemInTheOrderTheyAreRead()
     {

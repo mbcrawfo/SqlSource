@@ -184,6 +184,7 @@ public sealed class SettingsFileTests
     }
 
     // The attribute's suffix wins, and the folder's file still gives the other.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_SuffixInTheAttributeAndTheFolder_IsTheAttributes()
     {

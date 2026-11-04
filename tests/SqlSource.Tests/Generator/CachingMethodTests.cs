@@ -9,6 +9,7 @@ using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -141,15 +142,19 @@ public sealed class CachingMethodTests
         methods.ShouldContain("partial class UserQueries");
     }
 
-    // The suffix renames the model of UserQueries, which its method reads.  The models' names are compared with the
-    // extension classes again, and clash with none.
+    // The suffix in Users' header renames the model of UserQueries, which its method reads.  The models' names are
+    // compared with the extension classes again, and clash with none.
     [Fact]
     public void Run_ModelSettingEdit_ReEmitsTheMethodsThatReadTheModel()
     {
         var compilation = MethodsCompilation(UserQueries());
-        var driver = _scene.FirstRunOfMethods(compilation);
+        var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
+        var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
 
-        var result = Run(driver, WithUserQueries(compilation, UserQueries("OutputModelSuffix = \"Row\"")));
+        var result = Run(
+            EditUsers(driver, usersSidecar, "GetUser", "-- output-model-suffix: Row\n\n" + SqlTexts.GetUser),
+            compilation
+        );
 
         result.Diagnostics.ShouldBeEmpty();
         MethodReasons(result, TrackingNames.MethodsInput)
@@ -506,16 +511,24 @@ public sealed class CachingMethodTests
             );
     }
 
-    // Both types are at Models by their attributes, so the project has no CodeGen query, and then UserQueries is at
-    // CodeGen again: its query's engine is now among those of the project's methods.
+    // The project's settings file puts both types at Models, so the project has no CodeGen query, and then the header
+    // of Users puts UserQueries at CodeGen: its query's engine is now among those of the project's methods.
     [Fact]
     public void Run_TypeTurnedToCodeGen_FindsTheEnginesAgain()
     {
-        const string AtModels = "Output = GeneratorOutput.Models";
-        var compilation = MethodsCompilation(UserQueries(AtModels), TypeSource("App", "OrderQueries", AtModels));
-        var driver = _scene.FirstRunOfMethods(compilation);
+        var compilation = MethodsCompilation(UserQueries());
+        var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
+        var driver = CreateDriver(
+                ProjectFile(OutputKind.Models, "postgres"),
+                [_scene.Users, _scene.Orders, usersSidecar, TypedSidecar(_scene.Orders, "GetOrder", "int4")]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
 
-        var result = Run(driver, WithUserQueries(compilation, UserQueries()));
+        var result = Run(
+            EditUsers(driver, usersSidecar, "GetUser", "-- output: codegen\n\n" + SqlTexts.GetUser),
+            compilation
+        );
 
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.CodeGenEngines).ShouldBe([IncrementalStepRunReason.Modified]);

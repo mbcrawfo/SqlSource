@@ -31,12 +31,17 @@ public sealed class ArrayPoolParameterTests
     [InlineData(On, Default, null, null, null, true)]
     [InlineData(On, Other, null, null, null, true)]
     [InlineData(null, On, null, null, null, false)]
+    // Removed with the attribute level in Task 3.
     [InlineData(Other, On, Default, null, null, true)]
+    // Removed with the attribute level in Task 3.
     [InlineData(null, null, On, null, null, false)]
+    // Removed with the attribute level in Task 3.
     [InlineData(Default, Other, On, null, null, false)]
+    // Removed with the attribute level in Task 3.
     [InlineData(On, On, On, Default, null, true)]
     [InlineData(null, null, null, On, null, false)]
     [InlineData(null, null, null, On, Other, true)]
+    // Removed with the attribute level in Task 3.
     [InlineData(On, On, On, On, Default, true)]
     [InlineData(null, null, null, Default, On, false)]
     public void Run_NoArrayPool_ComesWholeFromTheMostSpecificLevelThatGivesAList(
@@ -114,8 +119,10 @@ public sealed class ArrayPoolParameterTests
         var sql = hasRows ? "SELECT id, name FROM users;\n" : "UPDATE users SET name = name;\n";
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers -> " + shape + "\n" + sql);
 
+        var unpooledFile = file with { Text = "-- generator: no-array-pool\n\n" + file.Text };
+
         var pooled = Run([file], null, null, hasRows: hasRows);
-        var unpooled = Run([file], "no-array-pool", null, hasRows: hasRows);
+        var unpooled = Run([unpooledFile], null, null, hasRows: hasRows);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
@@ -123,6 +130,7 @@ public sealed class ArrayPoolParameterTests
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
     }
 
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_AttributeWithAMisspeltWordBesideNoArrayPool_IsAnErrorAtTheAttributeAndGivesNoMethods()
     {
@@ -139,11 +147,13 @@ public sealed class ArrayPoolParameterTests
     // ListUsers of the collection type, without and with no-array-pool, each clean.
     private static (GeneratorRun Pooled, GeneratorRun Unpooled) RunBoth(string collection)
     {
-        var collectionType = "CollectionType = GeneratorCollectionType." + collection;
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
+        var query = "\n-- name: ListUsers\nSELECT id, name FROM users;\n";
+        var collectionType = "-- collection-type: " + collection + "\n";
+        var file = new SqlFile(GeneratorHarness.UsersPath, collectionType + query);
+        var unpooledFile = file with { Text = collectionType + "-- generator: no-array-pool\n" + query };
 
-        var pooled = Run([file], collectionType, null, attributeArguments: true);
-        var unpooled = Run([file], collectionType + ", Parameters = \"no-array-pool\"", null, attributeArguments: true);
+        var pooled = Run([file], null, null);
+        var unpooled = Run([unpooledFile], null, null);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
@@ -157,19 +167,15 @@ public sealed class ArrayPoolParameterTests
         StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods).Methods.ShouldHaveSingleItem();
 
     // The first of the files, a .sql file, with its sidecar, and the others, at CodeGen under postgres on Npgsql 10, on
-    // App.Sample with the attribute's Parameters, or with the attribute's arguments as they are, and the generator
-    // parameters of the project's settings file.  The entry of ListUsers has the rows id and name, or none.
-    private static GeneratorRun Run(
-        SqlFile[] files,
-        string? attribute,
-        string? projectFile,
-        bool attributeArguments = false,
-        bool hasRows = true
-    )
+    // App.Sample with the attribute's Parameters, and the generator parameters of the project's settings file.  The
+    // entry of ListUsers has the rows id and name, or none.
+    private static GeneratorRun Run(SqlFile[] files, string? attribute, string? projectFile, bool hasRows = true)
     {
         var file = files[0];
-        var arguments = attributeArguments ? attribute : "Parameters = \"" + attribute + "\"";
-        var source = attribute is null ? MethodRuns.Source : MethodRuns.SampleSource(arguments!);
+        // Removed with the attribute level in Task 3.
+        var source = attribute is null
+            ? MethodRuns.Source
+            : MethodRuns.SampleSource("Parameters = \"" + attribute + "\"");
 
         return GeneratorHarness.Run(
             OutputKind.CodeGen,

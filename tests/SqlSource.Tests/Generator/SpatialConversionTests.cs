@@ -100,15 +100,6 @@ public sealed class SpatialConversionTests
     [Fact]
     public void Run_NoSpatialUse_EmitsNoClass()
     {
-        const string Models = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Sample;
-            }
-            """;
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListIds\nSELECT id FROM places;\n");
         var entry = MethodRuns.SqlServerEntry(
             file,
@@ -118,7 +109,7 @@ public sealed class SpatialConversionTests
         );
 
         var none = MethodRuns.RunSqlServer(file, [entry], references: WithSqlServerBytes, settings: NetTopologySuiteOn);
-        var models = RunPlaces(FindPlaces, WithSqlServerBytes, NetTopologySuiteOn, source: Models);
+        var models = RunPlaces("-- output: models\n" + FindPlaces, WithSqlServerBytes, NetTopologySuiteOn);
 
         none.ShouldBeClean();
         none.Sources.Keys.ShouldNotContain(ClassFile);
@@ -255,16 +246,21 @@ public sealed class SpatialConversionTests
             userType: new SqlServerUserType("sys", name, "Microsoft.SqlServer.Types, Version=11.0.0.0")
         );
 
-    // FindPlaces of the text at CodeGen under mssql, with these references, settings, other files and source.
+    // FindPlaces of the text at CodeGen under mssql, with these references, settings and other files.
     private static GeneratorRun RunPlaces(
         string text,
         MetadataReference[] references,
         string? settings = null,
-        SqlFile[]? otherFiles = null,
-        string source = MethodRuns.Source
+        SqlFile[]? otherFiles = null
     )
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, text);
-        return MethodRuns.RunSqlServer(file, [PlacesEntry(file)], source, references, settings, otherFiles);
+        return MethodRuns.RunSqlServer(
+            file,
+            [PlacesEntry(file)],
+            references: references,
+            settings: settings,
+            otherFiles: otherFiles
+        );
     }
 }

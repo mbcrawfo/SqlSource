@@ -145,6 +145,7 @@ public sealed class CachingOptionsTests
             .ShouldContain("SELECT 1; -- c");
     }
 
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_AttributeGainsKeepComments_ParsesOnlyTheFilesOfThatType()
     {
@@ -171,6 +172,7 @@ public sealed class CachingOptionsTests
             .ShouldBe(IncrementalStepRunReason.Cached);
     }
 
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_AttributeGainsAParameterThatIsNotKeepComments_ParsesNoFileAndEmitsOnlyItsType()
     {

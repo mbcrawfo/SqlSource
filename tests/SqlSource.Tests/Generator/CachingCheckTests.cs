@@ -161,7 +161,7 @@ public sealed class CachingCheckTests
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var driver = _scene.FirstRunWithSidecars(compilation);
 
-        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "ModelNamespace = \"App.Models\""));
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "MethodLocation = MethodLocation.Internal"));
 
         Reasons<TypeQueries>(result, TrackingNames.TypeQueries, type => type.HintName)["App.Users.UserQueries.g.cs"]
             .ShouldBe(IncrementalStepRunReason.Modified);

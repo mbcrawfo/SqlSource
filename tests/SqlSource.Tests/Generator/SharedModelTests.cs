@@ -49,26 +49,30 @@ public sealed class SharedModelTests
         "-- name: GetUser\nSELECT id FROM users;\n"
     );
 
-    private static readonly SqlFile EventsFile = new(
-        GeneratorHarness.UsersPath,
-        "-- name: ListEvents\nSELECT at FROM events;\n"
+    // ListEvents at CodeGen by its file's header, in A, and at the run's Models, in B.
+    private static readonly SqlFile CodeGenEvents = new(
+        APath,
+        "-- output: codegen\n\n-- name: ListEvents\nSELECT at FROM events;\n"
     );
 
-    // One file claimed by a type at CodeGen and a type at Models, in one namespace.
+    private static readonly SqlFile ModelsEvents = new(BPath, "-- name: ListEvents\nSELECT at FROM events;\n");
+
+    // A type that claims CodeGenEvents and a type that claims ModelsEvents, in one namespace.
     private const string TwoOutputsSource = """
         using SqlSource;
 
         namespace App
         {
-            [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
+            [SqlSourceGenerate(Source = "A.sql")]
             public partial class Repo;
 
-            [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
+            [SqlSourceGenerate(Source = "B.sql")]
             public partial class Dtos;
         }
         """;
 
-    private const string EventsName = $"{GeneratorHarness.UsersPath}(1,10)-(1,20)";
+    // The name of ListEvents in ModelsEvents.
+    private const string ModelsEventsName = "/app/Repo/B.sql(1,10)-(1,20)";
 
     // Npgsql, NodaTime and the plugin, which turn the library on by default.
     private static readonly MetadataReference[] WithThePlugin =
@@ -83,7 +87,14 @@ public sealed class SharedModelTests
         Name = "timestamp with time zone",
     };
 
-    private static SidecarEntry EventsEntry => EntryOf(EventsFile, "ListEvents");
+    // CodeGenEvents and ModelsEvents, each with its sidecar.
+    private static SqlFile[] TwoOutputsFiles =>
+        [
+            CodeGenEvents,
+            Sidecars.Of(CodeGenEvents, EntryOf(CodeGenEvents, "ListEvents")),
+            ModelsEvents,
+            Sidecars.Of(ModelsEvents, EntryOf(ModelsEvents, "ListEvents")),
+        ];
 
     // The query of the name, whose one column, at, is a timestamptz read from public.events.at.
     private static SidecarEntry EntryOf(SqlFile file, string name) =>
@@ -312,6 +323,7 @@ public sealed class SharedModelTests
     }
 
     // Repo comes before Repo<T> whatever the order of their declarations, so the same type's request is the first.
+    // Removed with the attribute level in Task 3.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -343,6 +355,7 @@ public sealed class SharedModelTests
     }
 
     // The earlier request is of a generic type, which the message names as it is declared.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_TwoGenericTypesOfOneName_NameTheEarlierWithItsTypeParameters()
     {
@@ -772,18 +785,17 @@ public sealed class SharedModelTests
         ModelsOf(run).Queries.ShouldHaveSingleItem().ColumnNames.ShouldBeNull();
     }
 
-    // The realistic corpora's pattern: one file claimed by a type at CodeGen and a type at Models, of one namespace.  A
-    // property that a library row types is the library's at CodeGen and the base map's at Models, so the two models of
-    // one name differ.
+    // A type at CodeGen and a type at Models, of one namespace, each with a query of one model name.  A property that a
+    // library row types is the library's at CodeGen and the base map's at Models, so the two models of one name differ.
     [Fact]
     public void SharedModel_CodeGenWithLibrary_AndModels_IsSQLSRC257()
     {
-        var run = Run(TwoOutputsSource, [EventsFile, Sidecars.Of(EventsFile, EventsEntry)], references: WithThePlugin);
+        var run = Run(TwoOutputsSource, TwoOutputsFiles, references: WithThePlugin);
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC257 {EventsName}: The output model 'App.ListEventsDto' of the query 'ListEvents' is not the same "
-                + "as the output model of that name of the query 'ListEvents' in Users.sql, for the type App.Dtos: the "
-                + "property 'At' is 'NodaTime.Instant' here and 'System.DateTime' there."
+            $"SQLSRC257 {ModelsEventsName}: The output model 'App.ListEventsDto' of the query 'ListEvents' is not the "
+                + "same as the output model of that name of the query 'ListEvents' in A.sql: the property 'At' is "
+                + "'System.DateTime' here and 'NodaTime.Instant' there."
                 + Help257,
         ]);
         run.CompilationErrors.ShouldBeEmpty();
@@ -797,7 +809,7 @@ public sealed class SharedModelTests
     {
         var run = Run(
             TwoOutputsSource,
-            [EventsFile, Sidecars.Of(EventsFile, EventsEntry)],
+            TwoOutputsFiles,
             settings: /*lang=json,strict*/
             """{"libraryTypes": {"nodaTime": "off"}}""",
             references: WithThePlugin
@@ -818,7 +830,7 @@ public sealed class SharedModelTests
 
             namespace App
             {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Repo;
             }
             """;
@@ -831,6 +843,8 @@ public sealed class SharedModelTests
         var run = Run(
             Source,
             [a, Sidecars.Of(a, EntryOf(a, "GetA")), b, Sidecars.Of(b, EntryOf(b, "GetB"))],
+            settings: /*lang=json,strict*/
+            """{"output": "CodeGen"}""",
             references: WithThePlugin
         );
 

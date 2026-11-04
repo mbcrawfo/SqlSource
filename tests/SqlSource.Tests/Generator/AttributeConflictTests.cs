@@ -58,7 +58,9 @@ public sealed class AttributeConflictTests
             "[global::SqlSource.SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }",
             "internal class Sample { object o = typeof(SqlSource.SqlLocation); }",
             "internal class Sample { object o = SqlSource.SqlLocation.Direct; }",
+            // Removed with the attribute level in Task 3.
             "internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }",
+            // Removed with the attribute level in Task 3.
             "internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }",
             "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
         ];
@@ -107,6 +109,7 @@ public sealed class AttributeConflictTests
         build.ShouldBeEmpty();
     }
 
+    // Removed with the attribute level in Task 3.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -128,6 +131,7 @@ public sealed class AttributeConflictTests
         build.ShouldBeEmpty();
     }
 
+    // Removed with the attribute level in Task 3.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

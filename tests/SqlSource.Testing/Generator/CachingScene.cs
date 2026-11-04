@@ -387,6 +387,7 @@ internal sealed class CachingScene
         );
 
     // The compilation with a list of generator parameters on the attribute of UserQueries.
+    // Removed with the attribute level in Task 3.
     public static Compilation WithParametersOnUserQueries(Compilation compilation, string parameters) =>
         WithArgumentsOnUserQueries(compilation, "Parameters = \"" + parameters + "\"");
 

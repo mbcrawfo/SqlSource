@@ -40,6 +40,10 @@ public sealed class LibraryTypeTests
 
     private const string ListShapes = "-- name: ListShapes\nSELECT shape FROM maps;\n";
 
+    // The project at Models, which the run would have at CodeGen.
+    private const string AtModels = /*lang=json,strict*/
+        """{"output": "Models"}""";
+
     // SQLSRC246 of ListShapes's column shape, PostGIS's geometry of public, whose help names the plugin.
     private const string ShapeHasNoCSharpType =
         $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'shape' has the type 'geometry', which "
@@ -367,25 +371,15 @@ public sealed class LibraryTypeTests
     [Fact]
     public void Run_SqlServerNodaTimeOn_ModelsClaimKeepsDateTime()
     {
-        const string Models = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Rows;
-            }
-            """;
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- library-types: nodatime=on\n\n-- name: ListDates\nSELECT d FROM dates;\n"
+            "-- output: models\n-- library-types: nodatime=on\n\n-- name: ListDates\nSELECT d FROM dates;\n"
         );
 
         var run = MethodRuns.RunSqlServer(
             file,
             [DatesEntry(file)],
-            Models,
-            [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+            references: [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
         );
 
         run.ShouldBeClean();
@@ -424,6 +418,7 @@ public sealed class LibraryTypeTests
 
     // The types of one file's queries are the same for every type that claims it, and the output of the claim picks: a
     // Models claim's model has the base map's, and a CodeGen claim's model and method have the library's.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void ModelsClaim_GetsTheBaseTypes_MethodsGetTheLibrarys()
     {
@@ -788,18 +783,9 @@ public sealed class LibraryTypeTests
     [Fact]
     public void Run_ModelsClaimOfALibraryOnlyColumn_Reports246AndNoModels()
     {
-        const string Models = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Rows;
-            }
-            """;
         var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
 
-        var run = MethodRuns.Run(file, [ShapesEntry(file)], Models, WithNetTopologySuite);
+        var run = MethodRuns.Run(file, [ShapesEntry(file)], references: WithNetTopologySuite, settings: AtModels);
 
         run.CompilationErrors.ShouldBeEmpty();
         run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
@@ -818,19 +804,19 @@ public sealed class LibraryTypeTests
 
             namespace First
             {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Rows;
             }
 
             namespace Second
             {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Rows;
             }
             """;
         var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
 
-        var run = MethodRuns.Run(file, [ShapesEntry(file)], TwoModels, WithNetTopologySuite);
+        var run = MethodRuns.Run(file, [ShapesEntry(file)], TwoModels, WithNetTopologySuite, settings: AtModels);
 
         run.CompilationErrors.ShouldBeEmpty();
         run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
@@ -839,6 +825,7 @@ public sealed class LibraryTypeTests
 
     // One query claimed by a type at CodeGen and by another at Models: the first's model and method have Geometry,
     // and the second gets SQLSRC246, once, and no models.
+    // Removed with the attribute level in Task 3.
     [Fact]
     public void Run_CodegenAndModelsClaims_EachGetsItsOwn()
     {
@@ -965,17 +952,16 @@ public sealed class LibraryTypeTests
     [Fact]
     public void Run_ModelsClaimOfSqlServerSpatial_Reports246()
     {
-        const string Models = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Rows;
-            }
-            """;
-
-        var run = RunPlaces(WithSqlServerBytes, NetTopologySuiteIs("on"), Models);
+        var run = RunPlaces(
+            WithSqlServerBytes,
+            GeneratorHarness.Json(
+                new JsonObject
+                {
+                    ["output"] = "Models",
+                    ["libraryTypes"] = new JsonObject { ["netTopologySuite"] = "on" },
+                }
+            )
+        );
 
         run.CompilationErrors.ShouldBeEmpty();
         run.Diagnostics.ShouldBe([PlaceHasNoCSharpType]);
@@ -1006,12 +992,8 @@ public sealed class LibraryTypeTests
         );
 
     // ListPlaces under mssql, whose columns are place, a nullable geography, and shape, a geometry, with these
-    // references, the project's settings and the source.
-    private static GeneratorRun RunPlaces(
-        MetadataReference[] references,
-        string? settings = null,
-        string source = MethodRuns.Source
-    )
+    // references and the project's settings.
+    private static GeneratorRun RunPlaces(MetadataReference[] references, string? settings = null)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListPlaces);
         var entry = MethodRuns.SqlServerEntry(
@@ -1023,7 +1005,7 @@ public sealed class LibraryTypeTests
                 TestSidecars.Column(1, "shape", SqlServerClr("geometry"), nullable: false),
             ]
         );
-        return MethodRuns.RunSqlServer(file, [entry], source, references, settings);
+        return MethodRuns.RunSqlServer(file, [entry], references: references, settings: settings);
     }
 
     // The settings of the library types that say this of NetTopologySuite.
