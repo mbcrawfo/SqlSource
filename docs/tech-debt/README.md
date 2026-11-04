@@ -43,7 +43,6 @@ Next id: `TD-0100`
 | [TD-0096](TD-0096-no-check-keeps-a-catch-all-out-of-an-enum-switch.md) | Open | 2026-11-02 | Low | No rule of the compiler or the analyzers keeps a `_ =>` arm out of a switch expression over an enum in `src/SqlSource`, where CS8524 and IDE0072 are off so that a new member is CS8509, and `src/SqlSource.Tool`'s switches over enums keep their discards; only an `AGENTS.md` rule stands against a catch-all that a new member would silently fall into |
 | [TD-0097](TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md) | Open | 2026-11-03 | Medium | What phase 9's design says Visual Studio and VS Code show of a sidecar another process wrote, their design-time builds, the VS Code task and the file events of their saves was checked in Rider on macOS alone |
 | [TD-0098](TD-0098-settings-file-through-a-symbolic-link-is-not-applied.md) | Open | 2026-11-03 | Low | A build started in a folder reached through a symbolic link applies no `sqlsource.json`, because the compiler is given the settings file through the link and the `.sql` files without it |
-| [TD-0099](TD-0099-sql-server-refusal-references-never-run.md) | Open | 2026-11-03 | Low | SQL Server's refusal of models gives the generator a downloaded Microsoft.Data.SqlClient beside the test process's own, a pairing that has never run because every SQL Server case skips the test |
 
 ## Columns
 

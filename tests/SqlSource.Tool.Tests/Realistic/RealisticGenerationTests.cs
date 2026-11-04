@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -83,6 +84,31 @@ public sealed class RealisticGenerationTests
         run.Diagnostics.ShouldBeEmpty();
         run.Sources.ShouldNotBeEmpty();
         run.Sources.Values.ShouldAllBe(source => !source.Contains(projectType, StringComparison.Ordinal));
+    }
+
+    // SQL Server's refusal of models gives the run the downloaded SqlClient 7 beside the copy this process loads, which
+    // the harness's runtime references hold too: the pairing gives the generator and the compiler nothing to report.
+    [Fact]
+    public void RunAtModels_SqlServerCaseWithTheRefusalsReferences_ReportsNothing()
+    {
+        AppContext
+            .GetData("TRUSTED_PLATFORM_ASSEMBLIES")
+            .ShouldBeOfType<string>()
+            .Split(Path.PathSeparator)
+            .ShouldContain(path => Path.GetFileName(path) == "Microsoft.Data.SqlClient.dll");
+        var found = RealisticCorpus.SqlServer.ReadNamed("customers-distinct-from");
+        var query = RealisticGeneration.QueryOf(found);
+
+        var run = RealisticGeneration.RunAtModels(
+            RealisticCorpus.SqlServer,
+            query,
+            RealisticGeneration.CommittedSidecarOf(found, query),
+            [SqlClientReferences.SqlClient7]
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources.ShouldContainKey(RealisticGeneration.TypeFile);
     }
 
     // A raise of VersionPrefix before the sidecars are described again: the generator gives SQLSRC240, a warning the
