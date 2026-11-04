@@ -95,7 +95,8 @@ public sealed class SettingsLevelReaderTests
 
         SettingsLevelReader
             .Read(ref source)
-            .TypeOverrides.ShouldNotBeNull()
+            .TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("int4", "long", SettingsFile),
                 new TypeOverride("timestamptz", null, SettingsFile),
@@ -118,9 +119,13 @@ public sealed class SettingsLevelReaderTests
 
         var level = SettingsLevelReader.Read(ref source);
 
-        level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
         level
-            .SqlServerTypeOverrides.ShouldNotBeNull()
+            .TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
+        level
+            .TypeOverrides[DatabaseEngine.SqlServer]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("int", "long", SettingsFile),
                 new TypeOverride("nvarchar", "string", SettingsFile),
@@ -142,8 +147,30 @@ public sealed class SettingsLevelReaderTests
 
         var level = SettingsLevelReader.Read(ref source);
 
-        level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
-        level.SqlServerTypeOverrides.ShouldBeNull();
+        level
+            .TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
+        level.TypeOverrides[DatabaseEngine.SqlServer].ShouldBeNull();
+    }
+
+    // The type override object has members, so the source is asked for them all, but no engine reads any of them.
+    [Fact]
+    public void Read_TypeOverridesWithNoValidEntry_IsTheSharedEmptyLevel()
+    {
+        var source = new FakeSource(
+            [],
+            SettingsFile,
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.TypeOverrides] = [new("bogus", "int"), new("also bogus", "long")],
+            }
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        ReferenceEquals(level, SettingsLevel.None).ShouldBeTrue();
+        source.InvalidParts.ShouldBe([(SettingId.TypeOverrides, 0), (SettingId.TypeOverrides, 1)]);
     }
 
     [Fact]
@@ -250,8 +277,14 @@ public sealed class SettingsLevelReaderTests
 
         var level = SettingsLevelReader.Read(ref source);
 
-        level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
-        level.SqlServerTypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("nvarchar", "string", SettingsFile)]);
+        level
+            .TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
+        level
+            .TypeOverrides[DatabaseEngine.SqlServer]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("nvarchar", "string", SettingsFile)]);
         source.InvalidParts.ShouldBe([(SettingId.TypeOverrides, 1)]);
         source.RepeatedKeys.ShouldBe([(SettingId.TypeOverrides, 2, 0)]);
     }

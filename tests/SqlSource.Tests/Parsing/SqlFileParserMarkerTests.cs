@@ -176,7 +176,8 @@ public sealed class SqlFileParserMarkerTests
     public void Parse_SameTypeOverrideTwiceInOneScope_IsNoConflict() =>
         Blocks("-- name: Q\n-- type-override: int4 = long\n-- type-override: int4=long\nSELECT 1\n")
             .ShouldHaveSingleItem()
-            .Markers.TypeOverrides.ShouldNotBeNull()
+            .Markers.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Query)]);
 
     // A query's entry replaces the header's for its key alone, and a default stays in the markers' level, so that it
@@ -194,14 +195,16 @@ public sealed class SqlFileParserMarkerTests
         var blocks = Blocks(Text);
 
         blocks[0]
-            .Markers.TypeOverrides.ShouldNotBeNull()
+            .Markers.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("int4", "long", SettingPlace.FileHeader),
                 new TypeOverride("text", null, SettingPlace.Query),
                 new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query),
             ]);
         blocks[1]
-            .Markers.TypeOverrides.ShouldNotBeNull()
+            .Markers.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("int4", "long", SettingPlace.FileHeader),
                 new TypeOverride("text", "string", SettingPlace.FileHeader),
@@ -214,7 +217,8 @@ public sealed class SqlFileParserMarkerTests
     public void Parse_TypeOverrideOfAFileWithNoName_IsAtTheQuery() =>
         Blocks("-- type-override: int4 = long\nSELECT 1\n")
             .ShouldHaveSingleItem()
-            .Markers.TypeOverrides.ShouldNotBeNull()
+            .Markers.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Query)]);
 
     // An mssql file's entries are read by SQL Server's rules, the file's dialect marker deciding as the project's does.
@@ -227,9 +231,10 @@ public sealed class SqlFileParserMarkerTests
             )
             .ShouldHaveSingleItem();
 
-        block.Markers.TypeOverrides.ShouldBeNull();
+        block.Markers.TypeOverrides[DatabaseEngine.PostgreSql].ShouldBeNull();
         block
-            .Markers.SqlServerTypeOverrides.ShouldNotBeNull()
+            .Markers.TypeOverrides[DatabaseEngine.SqlServer]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("nvarchar", "string", SettingPlace.Query),
                 new TypeOverride("timestamp", "byte[]", SettingPlace.FileHeader),

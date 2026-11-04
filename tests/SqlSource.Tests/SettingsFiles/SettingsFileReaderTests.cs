@@ -61,12 +61,14 @@ public sealed class SettingsFileReaderTests
         file.Root.ShouldBe(true);
         file.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.PostgreSql, SqlDialectOptions.None));
         file.Level.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.AsyncMethodSuffix);
-        file.Level.TypeOverrides.ShouldNotBeNull()
+        file.Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place),
                 new TypeOverride("timestamptz", "global::System.DateTimeOffset", Place),
             ]);
-        file.Level.SqlServerTypeOverrides.ShouldNotBeNull()
+        file.Level.TypeOverrides[DatabaseEngine.SqlServer]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place)]);
         file.Level.ColumnTypes.ShouldNotBeNull()
             .ShouldBe([
@@ -272,7 +274,10 @@ public sealed class SettingsFileReaderTests
                 null
             ),
         ]);
-        overrides.Level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", Place)]);
+        overrides
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", Place)]);
         overrides.Errors.ShouldBe([
             new SettingsFileError(SettingsFileErrorKind.WrongType, Span(Overrides, "{}"), "typeOverrides", null, null),
         ]);
@@ -399,7 +404,10 @@ public sealed class SettingsFileReaderTests
         var invalid = SettingsFileReader.Read(Invalid, Place);
         var repeated = SettingsFileReader.Read(Repeated, Place);
 
-        invalid.Level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int8", "long", Place)]);
+        invalid
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int8", "long", Place)]);
         invalid.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.InvalidValue,
@@ -409,7 +417,10 @@ public sealed class SettingsFileReaderTests
                 "int"
             ),
         ]);
-        repeated.Level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", Place)]);
+        repeated
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", Place)]);
         repeated.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.RepeatedKey,

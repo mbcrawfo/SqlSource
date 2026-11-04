@@ -83,17 +83,8 @@ internal readonly record struct QuerySettings(
         SettingsLevel file,
         DatabaseEngine engine
     ) =>
-        (
-            engine switch
-            {
-                DatabaseEngine.PostgreSql => TypeOverrideMap.Over(markers.TypeOverrides, file.TypeOverrides),
-                DatabaseEngine.SqlServer => TypeOverrideMap.Over(
-                    markers.SqlServerTypeOverrides,
-                    file.SqlServerTypeOverrides
-                ),
-                _ => throw UnexpectedEnumValueException.Of(engine),
-            }
-        ) ?? EquatableArray<TypeOverride>.Empty;
+        TypeOverrideMap.Over(markers.TypeOverrides[engine], file.TypeOverrides[engine])
+        ?? EquatableArray<TypeOverride>.Empty;
 
     /// <summary>
     /// The column types of a query: the markers' over the file's level's, merged per key as the type override is in

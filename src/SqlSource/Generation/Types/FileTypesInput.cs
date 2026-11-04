@@ -93,15 +93,11 @@ internal sealed record FileTypesInput(
     /// <see cref="SettingsLevel.None" /> when it has none of them.
     /// </summary>
     public static SettingsLevel TypeSettingsOf(SettingsLevel level) =>
-        level.TypeOverrides is null
-        && level.SqlServerTypeOverrides is null
-        && level.ColumnTypes is null
-        && level.LibraryTypes is null
+        level.TypeOverrides == default && level.ColumnTypes is null && level.LibraryTypes is null
             ? SettingsLevel.None
             : new SettingsLevel
             {
                 TypeOverrides = level.TypeOverrides,
-                SqlServerTypeOverrides = level.SqlServerTypeOverrides,
                 ColumnTypes = level.ColumnTypes,
                 LibraryTypes = level.LibraryTypes,
             };

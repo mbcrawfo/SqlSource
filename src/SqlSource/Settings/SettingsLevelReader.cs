@@ -37,8 +37,7 @@ internal static class SettingsLevelReader
             InputModelType = source.Choice<ModelKind>(SettingId.InputModelType),
             OutputModelType = source.Choice<ModelKind>(SettingId.OutputModelType),
             CollectionType = source.Choice<CollectionKind>(SettingId.CollectionType),
-            TypeOverrides = ReadTypeOverrides(ref source, out var sqlServerTypeOverrides),
-            SqlServerTypeOverrides = sqlServerTypeOverrides,
+            TypeOverrides = ReadTypeOverrides(ref source),
             ColumnTypes = ReadColumnTypes(ref source),
             LibraryTypes = ReadLibraryTypes(ref source),
             NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsTypeName),
@@ -64,28 +63,20 @@ internal static class SettingsLevelReader
         return parameters;
     }
 
-    // An entry that is not valid is recorded by its index, and the other entries apply.  The value serves both
-    // engines: PostgreSQL's entries are returned and SQL Server's given in sqlServer.  A list with no valid entry is
-    // not set.
-    private static EquatableArray<TypeOverride>? ReadTypeOverrides<TSource>(
-        ref TSource source,
-        out EquatableArray<TypeOverride>? sqlServer
-    )
+    // An entry that is not valid is recorded by its index, and the other entries apply.  The value serves every
+    // engine: each slot holds the entries whose key that engine reads.  A slot with no valid entry is not set.
+    private static PerEngine<EquatableArray<TypeOverride>?> ReadTypeOverrides<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
-        sqlServer = null;
         if (source.Members(SettingId.TypeOverrides) is not { } members)
         {
-            return null;
+            return default;
         }
 
         var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
         var overrides = TypeOverrideGrammar.ReadMembers(members, source.Place, indexes, repeated);
         ReportParts(ref source, SettingId.TypeOverrides, indexes, repeated);
-
-        // Until a level holds the container, its two arrays are set from the two slots.
-        sqlServer = overrides[DatabaseEngine.SqlServer] is { Count: > 0 } sqlServerEntries ? sqlServerEntries : null;
-        return overrides[DatabaseEngine.PostgreSql] is { Count: > 0 } postgreSqlEntries ? postgreSqlEntries : null;
+        return overrides.Select(static list => list.Count == 0 ? (EquatableArray<TypeOverride>?)null : list);
     }
 
     // An entry that is not valid is recorded by its index, and the other entries apply.  A list with no valid entry is

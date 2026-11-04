@@ -199,7 +199,8 @@ public sealed class QuerySettingsTests
 
         query
             .Over(preamble)
-            .TypeOverrides.ShouldNotBeNull()
+            .TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("int4", null, SettingPlace.Query),
                 new TypeOverride("int8", "decimal", SettingPlace.FileHeader),
@@ -212,15 +213,25 @@ public sealed class QuerySettingsTests
     {
         var file = new SettingsLevel
         {
-            TypeOverrides = TestSidecars.Of(new TypeOverride("int4", "long", SettingsFile)),
-            SqlServerTypeOverrides = TestSidecars.Of(
-                new TypeOverride("int", "short", SettingsFile),
-                new TypeOverride("nvarchar", "string", SettingsFile)
-            ),
+            TypeOverrides = PerEngine
+                .Only<EquatableArray<TypeOverride>?>(
+                    DatabaseEngine.PostgreSql,
+                    TestSidecars.Of(new TypeOverride("int4", "long", SettingsFile))
+                )
+                .With(
+                    DatabaseEngine.SqlServer,
+                    TestSidecars.Of(
+                        new TypeOverride("int", "short", SettingsFile),
+                        new TypeOverride("nvarchar", "string", SettingsFile)
+                    )
+                ),
         };
         var markers = new SettingsLevel
         {
-            SqlServerTypeOverrides = TestSidecars.Of(new TypeOverride("nvarchar", null, SettingPlace.Query)),
+            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                DatabaseEngine.SqlServer,
+                TestSidecars.Of(new TypeOverride("nvarchar", null, SettingPlace.Query))
+            ),
         };
 
         QuerySettings
@@ -239,25 +250,32 @@ public sealed class QuerySettingsTests
     {
         var query = new SettingsLevel
         {
-            SqlServerTypeOverrides = TestSidecars.Of(new TypeOverride("int", null, SettingPlace.Query)),
+            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                DatabaseEngine.SqlServer,
+                TestSidecars.Of(new TypeOverride("int", null, SettingPlace.Query))
+            ),
         };
         var preamble = new SettingsLevel
         {
-            SqlServerTypeOverrides = TestSidecars.Of(
-                new TypeOverride("bigint", "decimal", SettingPlace.FileHeader),
-                new TypeOverride("int", "long", SettingPlace.FileHeader)
+            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                DatabaseEngine.SqlServer,
+                TestSidecars.Of(
+                    new TypeOverride("bigint", "decimal", SettingPlace.FileHeader),
+                    new TypeOverride("int", "long", SettingPlace.FileHeader)
+                )
             ),
         };
 
         var merged = query.Over(preamble);
 
         merged
-            .SqlServerTypeOverrides.ShouldNotBeNull()
+            .TypeOverrides[DatabaseEngine.SqlServer]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("bigint", "decimal", SettingPlace.FileHeader),
                 new TypeOverride("int", null, SettingPlace.Query),
             ]);
-        merged.TypeOverrides.ShouldBeNull();
+        merged.TypeOverrides[DatabaseEngine.PostgreSql].ShouldBeNull();
     }
 
     // The column types merge per key as the type override does, one list for both engines.
@@ -357,7 +375,13 @@ public sealed class QuerySettingsTests
         };
 
     private static SettingsLevel Overrides(params TypeOverride[] entries) =>
-        new() { TypeOverrides = TestSidecars.Of(entries) };
+        new()
+        {
+            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                DatabaseEngine.PostgreSql,
+                TestSidecars.Of(entries)
+            ),
+        };
 
     private static SettingsLevel Columns(params ColumnType[] entries) =>
         new() { ColumnTypes = TestSidecars.Of(entries) };

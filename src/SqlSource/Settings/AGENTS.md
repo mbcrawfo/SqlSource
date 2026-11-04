@@ -27,9 +27,9 @@ See [the type override](../../../docs/architecture/generator.md#the-type-overrid
 - **Every array of entries holds each key once**, in the order of `TypeOverrideMap`: by the key's text ignoring case, then ordinally.  A key's text is its parts' text without quotes and with escapes decoded, compared ordinally.
 - **Keep a key a string in its written form, quotes included, and compare keys only through `TypeOverrideMap`.**
 - **`TypeOverrideGrammar` is its one reader**, of an object's members and of a marker alike; the attribute has no level for it.
-- **A level holds two arrays, one for each `DatabaseEngine`**: `TypeOverrides`, keyed by `TypeKeys.TryNormalizePostgres`, and `SqlServerTypeOverrides`, keyed by `TypeKeys.TryNormalizeSqlServer`.  An entry is absent from the array of an engine that does not read its key.
-- **An object of a settings file fills both arrays; a marker fills only its file's engine's**, by `SqlDescribableDialects.EngineOf`, and a key that engine does not read is `SQLSRC111`.
-- **Code that carries a level's entries carries both arrays**, as `SettingsLevel.Over`, `MappedTypeNames` and `FileTypesInput.TypeSettingsOf` do.
+- **A level's type override is a `PerEngine` of arrays, a slot for each `DatabaseEngine`**, keyed by that engine's rules through `TypeKeys.TryNormalizeEach`.  An entry is absent from the slot of an engine that does not read its key.
+- **An object of a settings file fills every slot; a marker fills only its file's engine's**, by `SqlDescribableDialects.EngineOf`, and a key that engine does not read is `SQLSRC111`.
+- **Code that carries a level's entries carries the whole container** and reads every slot through `DatabaseEngines.All`, as `MappedTypeNames` and `FileTypesInput.TypeSettingsOf` do.
 
 ## The library types
 
