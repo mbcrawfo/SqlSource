@@ -88,7 +88,7 @@ A value you pass when you run a query, written in the SQL as `@` and a name: `@i
 
 #### Generator parameter
 
-A word that changes what the generator does with a query, such as `keep-comments`.  A list of them is given in a `-- generator:` marker, on the attribute, or in a [settings file](#settings-file).  It has nothing to do with the parameters of the SQL.  See [generator parameters](settings.md#setting-generator-parameters).
+A word that changes what the generator does with a query, such as `keep-comments`.  A list of them is given in a `-- generator:` marker or in a [settings file](#settings-file).  It has nothing to do with the parameters of the SQL.  See [generator parameters](settings.md#setting-generator-parameters).
 
 <a id="token"></a>
 

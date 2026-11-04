@@ -1,7 +1,7 @@
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The shape of a generated model.  The generator's own form of <c>GeneratorModelType</c>, member for member.
+/// The shape of a generated model, as a marker or a settings file names it.
 /// </summary>
 internal enum ModelKind
 {

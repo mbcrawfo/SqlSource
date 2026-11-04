@@ -37,13 +37,13 @@ Each name links to its section, which gives its values and its rules.  **Written
 
 | Setting | Values | Written as | Status |
 |----|----|----|----|
-| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `output` in a settings file; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today |
+| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `output` in a settings file; `-- output:` in the file header and inside a query | Works today |
 | [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `database` in a settings file; `-- database:` in the file header and inside a query | Works today, for the tool alone |
 | [Dialect](#setting-dialect) | A dialect's name, with options for `mysql` and `mariadb`: see [the dialects page](dialects.md#choosing-a-dialect).  Default `ansi` | `dialect` in a settings file; `-- dialect:` in the file header | Works today |
-| [Generator parameters](#setting-generator-parameters) | Words separated by spaces, or an array of them in a settings file: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool`, `default`.  Default: none | `generatorParameters` in a settings file; `Parameters` on the attribute; `-- generator:` in the file header and inside a query | Works today |
-| [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `inputModelSuffix`, `outputModelSuffix` in a settings file; `InputModelSuffix`, `OutputModelSuffix` on the attribute; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header | Works today |
-| [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `modelNamespace` in a settings file; `ModelNamespace` on the attribute; `-- model-namespace:` in the file header | Works today |
-| [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `inputModelType`, `outputModelType` in a settings file; `InputModelType`, `OutputModelType` on the attribute; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query | Works today |
+| [Generator parameters](#setting-generator-parameters) | Words separated by spaces, or an array of them in a settings file: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool`, `default`.  Default: none | `generatorParameters` in a settings file; `-- generator:` in the file header and inside a query | Works today |
+| [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `inputModelSuffix`, `outputModelSuffix` in a settings file; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header | Works today |
+| [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `modelNamespace` in a settings file; `-- model-namespace:` in the file header | Works today |
+| [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `inputModelType`, `outputModelType` in a settings file; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query | Works today |
 | [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query | Works today |
 | [Type overrides](#setting-type-overrides) | Entries `"key": "type"`, each a database type and the C# type it gets, or `"key": "default"`.  Default: none | `typeOverrides` in a settings file; `-- type-override:` in the file header and inside a query | Works today |
 | [Column types](#setting-column-types) | Entries `"key": "type"`, each a column of a table or view, `table.column` or `schema.table.column`, and the C# type it gets, or `"key": "default"`, or `"key": { "type": "type", "json": true }` for a column that holds JSON, the [JSON opt-in](#json-opt-in).  Default: none | `columnTypes` in a settings file; `-- column:` in the file header, and inside a query for a column of the query's result | Works today |
@@ -51,11 +51,11 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
 | [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `NestedClass` on the attribute | Works today |
 | [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: the file named for the type in that folder | `Source` on the attribute | Works today |
-| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | Works today |
+| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `-- collection-type:` in the file header and inside a query | Works today |
 | [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | Works today |
 | [Running the tool in the build](#online-build) | `auto`, `true`, `false`.  Default `auto` | `SqlSourceOnline`, a property of the project | Works today |
 
-A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `Output = GeneratorOutput.Sql`.
+A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `SqlLocation = SqlLocation.Direct`.
 
 <a id="precedence"></a>
 
@@ -67,26 +67,25 @@ A setting written in several places has the value of the most specific place tha
 |----|----|----|
 | 1 | A marker inside the query | `-- output: sql` |
 | 2 | A marker in the file header | `-- output: models` |
-| 3 | The attribute of the type that claims the file | `[SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]` |
-| 4 | The nearest settings file that sets it | `"output": "models"` in `Reports/sqlsource.json` |
-| 5 | Each farther settings file, nearest first | `"output": "sql"` in the `sqlsource.json` of the project's folder |
-| 6 | The default | `codegen` |
+| 3 | The nearest settings file that sets it | `"output": "models"` in `Reports/sqlsource.json` |
+| 4 | Each farther settings file, nearest first | `"output": "sql"` in the `sqlsource.json` of the project's folder |
+| 5 | The default | `codegen` |
 
-A query with `-- output: sql` has the output `sql`, whatever the other five say.  A query without it takes the file header's `models`, and so on down the table.  The settings files of a `.sql` file are the `sqlsource.json` of its folder and those of the folders above it, nearest first, up to the first that says `"root": true`: see [settings files](#settings-files).  To give the files of one folder their own values, see [configure one folder differently](#configure-a-folder).
+A query with `-- output: sql` has the output `sql`, whatever the other four say.  A query without it takes the file header's `models`, and so on down the table.  The settings files of a `.sql` file are the `sqlsource.json` of its folder and those of the folders above it, nearest first, up to the first that says `"root": true`: see [settings files](#settings-files).  To give the files of one folder their own values, see [configure one folder differently](#configure-a-folder).
 
 The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
 - **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file or of the attribute that is empty or white space.  `Source` is the exception: see [Source](#setting-source).
 - **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
-- **The attribute belongs to one type.**  Two types that claim one file each use their own attribute, and each gets its own result.
+- **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model.  Only what belongs to a type can differ: its [nested class](#setting-nested-class), where its members go, and the namespace of the models, which is the type's own unless the [model namespace](#setting-model-namespace) is set.  A type that needs other settings needs a file of its own.
 
 Four exceptions, stated plainly:
 
 - **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
-- **A dialect value replaces the one below it whole**, options included.  The dialect has no attribute and no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
+- **A dialect value replaces the one below it whole**, options included.  The dialect has no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
 - **`SqlLocation`, `MethodLocation` and `Source` exist only on the attribute.**  They have nothing to choose between.  The nested class has two, the attribute over the settings files, which are those of the folder of the type's C# file.
-- **A type override, a column type, or a library of the library types, replaces only the keys it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column or a library, replaces the entry below it for that key, and `default` takes the key out.  None of them has an attribute level.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types) and [library types](#setting-library-types).
+- **A type override, a column type, or a library of the library types, replaces only the keys it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column or a library, replaces the entry below it for that key, and `default` takes the key out.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types) and [library types](#setting-library-types).
 
 <a id="a-value-that-is-wrong"></a>
 
@@ -121,9 +120,9 @@ TRUNCATE TABLE audit_log;
 | `models` | Its SQL, and its [models](generator.md#models): types for its parameters and for a row of its result |
 | `codegen` | Its models, and a [method](generator.md#query-methods) that runs the query, which holds its SQL in place of a constant |
 
-On the attribute: `[SqlSourceGenerate(Output = GeneratorOutput.Sql)]`.  As a marker it stands in the file header, for every query of the file, and inside a query.
+As a marker it stands in the file header, for every query of the file, and inside a query.  It can also be `output` in a settings file.
 
-**`Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`, and the build checks that each of them has a current entry in its file's [sidecar](concepts.md#sidecar): a query that has none is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  On the attribute, write the value out literally, as in `Output = GeneratorOutput.Models`, so that the tool can read it; a constant or an expression there is [SQLSRC208](diagnostics.md#sqlsrc208).  Details are under [the generator's known issues](generator.md#known-issues).  A file claimed by two types, or listed by two projects, is described when either needs it, and the build of a project checks the entries that any of its types needs, once for the file.
+**`Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`, and the build checks that each of them has a current entry in its file's [sidecar](concepts.md#sidecar): a query that has none is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  A file claimed by two types, or listed by two projects, is described once, and the build of a project checks its entries once for the file.
 
 The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  Set the dialect and describe the queries, or set the output to `sql` for queries that want only their SQL.
 
@@ -148,7 +147,7 @@ SELECT id, kind FROM events;
 
 - The value is one word of letters, digits, `-`, `_` and `.`.  The rule is narrow because the tool makes the name of an environment variable of it: `billing` is read from `SQLSOURCE_CONNECTION_BILLING`.  Names are compared ignoring case, so `Billing` and `billing` are one database, spelled as the tool first meets it.
 - Without a value, a query belongs to the database named after its file's dialect: `postgres` for a PostgreSQL file, `mssql` for a SQL Server file.
-- It can be a marker in the file header or inside a query, or `database` in a settings file.  It has no attribute property.
+- It can be a marker in the file header or inside a query, or `database` in a settings file.
 - One name is one database for a whole run, with one connection and one dialect.  Two files that give one name two dialects are [SQLSRC211](diagnostics.md#sqlsrc211).
 - Only the tool reads this setting.  The build does not, so a wrong `database` in a settings file is reported by the tool and not by the build.
 
@@ -203,7 +202,7 @@ SELECT /* the database logs this comment */ id FROM users;
 SELECT COUNT(*) FROM {{table:users}};
 ```
 
-A [generator parameter](concepts.md#generator-parameter) is a word that changes what SqlSource does with a query.  A list of them is written in a `-- generator:` line, in `Parameters` on the attribute, or in `generatorParameters` in a settings file.  Each parameter is a departure from a default, so a query with no list gets every default.
+A [generator parameter](concepts.md#generator-parameter) is a word that changes what SqlSource does with a query.  A list of them is written in a `-- generator:` line, or in `generatorParameters` in a settings file.  Each parameter is a departure from a default, so a query with no list gets every default.
 
 | Parameter | Effect |
 |----|----|
@@ -223,13 +222,12 @@ The list for a query is the first of these that gives one, whole:
 
 1. The `-- generator:` lines inside the query.
 2. The `-- generator:` lines in the file header.
-3. `Parameters` on the attribute of the type that claims the file.
-4. `generatorParameters` in the nearest settings file of the file's folder, or of a folder above it, that sets it.
-5. `generatorParameters` in each farther settings file, nearest first.
+3. `generatorParameters` in the nearest settings file of the file's folder, or of a folder above it, that sets it.
+4. `generatorParameters` in each farther settings file, nearest first.
 
 Several `-- generator:` lines in one place are one list: two lines in a query add up.  A list never adds to the list of another place.
 
-On the attribute the list is words separated by spaces or line breaks.  In a settings file it is an array of strings, one word in each: `"generatorParameters": ["keep-comments", "no-token-validation"]`.  `[]` is the empty list, every default, and so is `["default"]`; an element that is empty or white space is skipped.  `default` beside another word makes the whole value wrong: [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, whose list is then not set, so a farther one applies, and [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute.  A word that is not a generator parameter is reported the same way.  In a settings file the other words of the list still apply, and a list that has words, none of them a generator parameter, is not set, so a farther one applies; on the attribute the type gets no members until the value is fixed.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
+In a settings file the list is an array of strings, one word in each: `"generatorParameters": ["keep-comments", "no-token-validation"]`.  `[]` is the empty list, every default, and so is `["default"]`; an element that is empty or white space is skipped.  `default` beside another word makes the whole value wrong, [SQLSRC019](diagnostics.md#sqlsrc019), and the file's list is then not set, so a farther one applies.  A word that is not a generator parameter is reported the same way, and the other words of the list still apply; a list that has words, none of them a generator parameter, is not set, so a farther one applies.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
 
 <a id="setting-model-suffix"></a>
 
@@ -246,7 +244,7 @@ SELECT id, name FROM users WHERE id = @id;
 The suffix ends the name of the [model](generator.md#models) generated for a query's parameters (input) and for a row of its result (output).  The defaults are `Params` and `Dto`, so `GetUser` gets `GetUserParams` and `GetUserDto`; above, it gets `GetUserArgs` and `GetUserRow`.
 
 - The value is one or more characters that a C# identifier can contain, such as letters, digits and `_`.  A space or a period is not one.
-- It stands in the file header only, not inside a query.  It can also be `inputModelSuffix` or `outputModelSuffix` in a settings file, or a property of the attribute.
+- It stands in the file header only, not inside a query.  It can also be `inputModelSuffix` or `outputModelSuffix` in a settings file.
 - It ends a [table model's](generator.md#table-models) name too, `UsersRow`, and not a name that `-- input-model:` or `-- output-model:` gives.  Two equal suffixes give a query's two models one name, which is [SQLSRC257](diagnostics.md#sqlsrc257).
 
 The rules of the names are on [the generator page](generator.md#model-names).
@@ -265,7 +263,7 @@ SELECT id, name FROM users;
 The namespace the generated [models](generator.md#models) go in.  The default is the namespace of the type that claims the file.  Above, the models of `ListUsers` are in `App.Models`.
 
 - The value is C# identifiers joined by periods, none of them a reserved keyword.
-- It stands in the file header only.  It can also be `modelNamespace` in a settings file, or `ModelNamespace` on the attribute.
+- It stands in the file header only.  It can also be `modelNamespace` in a settings file.
 - A name with a period that `-- input-model:` or `-- output-model:` gives is a full name, and ignores this setting.
 - Two types in two namespaces that claim one file, or read one table, get a model each, one in each namespace, unless this setting gives them one.
 - A namespace that is, or starts with, the full name of a type of your project gives models whose names cannot be used: [SQLSRC258](diagnostics.md#sqlsrc258).
@@ -286,7 +284,7 @@ SELECT id, name FROM users WHERE id > @min;
 
 The shape of the [model](generator.md#models) generated for a query's parameters (input) and for a row of its result (output): `record`, `sealed record`, `class` or `sealed class`.  The default is `sealed record` for both.  A record is positional; a class has a property with `get` and `set` for each column or parameter.  Above, every output model of the file is a `sealed class`, and the input model of `ListUsers` a `record`.
 
-- It stands in the file header and inside a query, as two markers.  It can also be `inputModelType` or `outputModelType` in a settings file, or a property of the attribute: `InputModelType = GeneratorModelType.Class`.
+- It stands in the file header and inside a query, as two markers.  It can also be `inputModelType` or `outputModelType` in a settings file.
 - Two queries that share a model must give it one shape, or the later is [SQLSRC257](diagnostics.md#sqlsrc257).
 
 What each shape looks like is on [the generator page](generator.md#model-shape).  To read rows through Dapper into sorted models, make them classes: see [the recipe](recipes.md#models-through-dapper).
@@ -304,7 +302,7 @@ SELECT id, name FROM users WHERE id = @id;
 
 `-- input-model:` and `-- output-model:` name the [model](generator.md#models) of one query's parameters and of its result rows, whole, with no suffix.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword.  Above, `GetUser` gets `UserArgs`, in the namespace its models would have without the marker, and `UserRow` in the namespace `App.Models`, whatever the [model namespace](#setting-model-namespace) says.
 
-- It stands inside a query only.  It has no key in a settings file and no attribute property, since a name is for one query.
+- It stands inside a query only.  It has no key in a settings file, since a name is for one query.
 - `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119), and `-- output-model:` on a query whose statement returns no rows is [SQLSRC259](diagnostics.md#sqlsrc259).
 - `-- output-model:` wins over the name of a [table model](generator.md#table-models).
 - Two queries that give one name share one model when their models are the same, and are [SQLSRC257](diagnostics.md#sqlsrc257) otherwise: see [shared models](generator.md#shared-models).  A name that cannot be used, such as that of a type of your project, is [SQLSRC258](diagnostics.md#sqlsrc258).
@@ -337,7 +335,7 @@ The type that the [method](generator.md#query-methods) of a query whose result s
 
 `T` is the query's output model.  Every collection but `IAsyncEnumerable` is filled before the method's task completes, `IEnumerable` included, so reading it runs no query.
 
-- It stands in the file header and inside a query.  It can also be `collectionType` in a settings file, or `CollectionType = GeneratorCollectionType.IReadOnlyList` on the attribute.
+- It stands in the file header and inside a query.  It can also be `collectionType` in a settings file.
 - It changes nothing for a query whose shape is not `many`, and nothing under the output `sql` or `models`.
 
 <a id="streaming-rows"></a>
@@ -415,7 +413,7 @@ To give one column, or one parameter, a C# type of its own, where two columns of
 
 Each property of a generated [model](generator.md#models) has the C# type of its column or parameter, the type override's included.  A [query method](generator.md#query-methods) reads and sends a column or parameter as that type, through your [converters](#converters) when the type has them.
 
-**Every place, merged by type.**  The type override is `typeOverrides` in the settings files of a `.sql` file's folder and of the folders above it, and the `-- type-override:` marker in the file header and inside a query.  It has no attribute property.  For each query the entries add up from the farthest settings file to the nearest, then the file header, then the query, and an entry for a type replaces the entry of a place below for that type alone.  A settings file's entries reach only the `.sql` files of its folder and the folders below it.  An entry replaces the entry below for its key however that key is spelled, and its own spelling is the one kept: a query's `public."Status"=MyApp.Status` over `"public.Status": "MyApp.Status"` in the project's settings file leaves a type `status`, which the project's entry mapped too, to the type map, since the quoted key maps `Status` alone.  So a query that needs one type otherwise names that type, and keeps the rest of the project's entries.  This is the exception to the rule that the most specific place wins whole: see [which place wins](#precedence).  `default` takes the type out of the entries of every place below, and a key with no entry anywhere has the type map's C# type, or a library's in a query method.  Nothing removes every entry at once.
+**Every place, merged by type.**  The type override is `typeOverrides` in the settings files of a `.sql` file's folder and of the folders above it, and the `-- type-override:` marker in the file header and inside a query.  For each query the entries add up from the farthest settings file to the nearest, then the file header, then the query, and an entry for a type replaces the entry of a place below for that type alone.  A settings file's entries reach only the `.sql` files of its folder and the folders below it.  An entry replaces the entry below for its key however that key is spelled, and its own spelling is the one kept: a query's `public."Status"=MyApp.Status` over `"public.Status": "MyApp.Status"` in the project's settings file leaves a type `status`, which the project's entry mapped too, to the type map, since the quoted key maps `Status` alone.  So a query that needs one type otherwise names that type, and keeps the rest of the project's entries.  This is the exception to the rule that the most specific place wins whole: see [which place wins](#precedence).  `default` takes the type out of the entries of every place below, and a key with no entry anywhere has the type map's C# type, or a library's in a query method.  Nothing removes every entry at once.
 
 **The key** is a database type:
 
@@ -582,7 +580,7 @@ A column type gives one column of a table or view the C# type of your choice, in
 - **A part of a key is plain or in double quotes**, by the rules of a type override's key: a plain part holds letters, digits, `_` and `$` and is compared ignoring case, and a part in quotes holds any character, with a quote inside it doubled, is compared exactly, and may be written with escapes, `U&"..."`.  In a settings file each `"` of a key is written `\"`, as JSON requires: `"\"Users\".id"`.  So `users.id` matches `Users.ID` too, and `"Users".id` the table `Users` alone.
 - **A key serves both databases.**  A settings file's entry maps the columns of PostgreSQL's queries and SQL Server's alike, and a marker those of its file.
 
-**Every place, merged by key.**  The column types are `columnTypes` in the settings files of a `.sql` file's folder and of the folders above it, a `-- column:` marker in the file header, and a `-- column:` marker inside a query, which names a column of the query's result.  There is no attribute property.  For each column the query's marker wins, then the file header's entries, then those of the settings files, nearest first, and as for the type override, an entry for a key replaces the entries of a place below for that key alone, and `default` takes the column out of the entries of every place below.  Of the entries that match one column, the one of the most specific place wins; within one place, one with a schema wins over one without, and then one spelled exactly as the column's names over one that matches it only ignoring case.
+**Every place, merged by key.**  The column types are `columnTypes` in the settings files of a `.sql` file's folder and of the folders above it, a `-- column:` marker in the file header, and a `-- column:` marker inside a query, which names a column of the query's result.  For each column the query's marker wins, then the file header's entries, then those of the settings files, nearest first, and as for the type override, an entry for a key replaces the entries of a place below for that key alone, and `default` takes the column out of the entries of every place below.  Of the entries that match one column, the one of the most specific place wins; within one place, one with a schema wins over one without, and then one spelled exactly as the column's names over one that matches it only ignoring case.
 
 **Over the type override.**  A column's C# type is, in order: the column types, its query's `-- column: name -> type` first and then those of the other places by the column it is read from; then the type override, by its database type; then, in a query method, a library of the [library types](#setting-library-types) that is on; then the type map.  So a column type at any place wins over a type override at any place: naming a column is more specific than naming a type.  `-- column: name -> default` frees one column of a query for the type override.  A column type never reaches a parameter: a parameter's C# type is its [`-- param:` marker](parameters-and-tokens.md#param-marker)'s, then the type override's, then a library's, then the type map's.
 
@@ -675,7 +673,7 @@ The library types say whether the query methods read and send a library's types,
 - **PostgreSQL**: for NodaTime, `on` when the project references `Npgsql.NodaTime`, the plugin that lets Npgsql read and send NodaTime's types, directly or through another package such as Entity Framework Core's `Npgsql.EntityFrameworkCore.PostgreSQL.NodaTime`, and `off` otherwise.  A project that references `NodaTime` alone has it off.  For NetTopologySuite the same with `Npgsql.NetTopologySuite`, which Entity Framework Core's `Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite` brings.  `json` is `off`.
 - **SQL Server**: `off` for all three, whatever the project references.
 
-**Every place, merged by library.**  The library types are `libraryTypes` in the settings files of a `.sql` file's folder and of the folders above it, and the `-- library-types:` marker in the file header and inside a query.  There is no attribute property.  For each query the entries add up from the farthest settings file to the nearest, then the file header, then the query, and an entry for a library replaces the entry of a place below for that library alone, as the [type override](#setting-type-overrides)'s entries do.  One value serves both databases: a file's dialect decides which database's types apply.
+**Every place, merged by library.**  The library types are `libraryTypes` in the settings files of a `.sql` file's folder and of the folders above it, and the `-- library-types:` marker in the file header and inside a query.  For each query the entries add up from the farthest settings file to the nearest, then the file header, then the query, and an entry for a library replaces the entry of a place below for that library alone, as the [type override](#setting-type-overrides)'s entries do.  One value serves both databases: a file's dialect decides which database's types apply.
 
 **Only for query methods.**  A library's types reach only a query whose [output](#setting-output) is `codegen`, for each type that claims it.  A query whose output is `models` keeps the type map's types in its models, whatever the library types say: there they are read and checked, and do nothing else.  To give such a query a library's types, as for rows read through Dapper, name them with the type override or the column types.  A model that a `codegen` query, with the library on, and a `models` query share, or two `codegen` queries, one with the library on and one with it off, has two sets of types and is [SQLSRC257](diagnostics.md#sqlsrc257): name the models apart with [`-- output-model:`](#setting-model-name), or turn the library on or off alike for both.
 
@@ -696,7 +694,8 @@ The `sqlsource` tool does not read `libraryTypes`, and a `-- library-types:` mar
 ## Where the SQL goes
 
 ```csharp
-[SqlSourceGenerate(Output = GeneratorOutput.Models, SqlLocation = SqlLocation.Direct)]
+// UserQueries.sql has -- output: models in its file header
+[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
 public static partial class UserQueries;
 ```
 
@@ -722,7 +721,8 @@ With `Nested`, a type that already has a member with the nested class's name is 
 ```
 
 ```csharp
-[SqlSourceGenerate(Output = GeneratorOutput.Models, NestedClass = "Statements")]
+// UserRepository.sql has -- output: models in its file header
+[SqlSourceGenerate(NestedClass = "Statements")]
 public partial class UserRepository
 {
     public string Get() => Statements.GetUser;
@@ -813,7 +813,7 @@ Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the
 
 The file in `Legacy/` applies to the `.sql` files of its subfolders too, `Legacy/Reports/` among them, unless a settings file nearer to them sets the same setting.  It applies to a type, through the folder of the C# file that carries the type's attribute, only for the [nested class](#setting-nested-class): every other setting of a query comes from the settings files of its `.sql` file, whichever type claims it.
 
-Only the settings whose row in [the tables](#all-settings) lists a settings file can be given this way.  To change a setting for the files of one type, use the type's attribute.
+Only the settings whose row in [the tables](#all-settings) lists a settings file can be given this way.  To change a setting for one file, write its marker in the file header, which wins over every settings file.
 
 <a id="included-files"></a>
 
@@ -907,7 +907,7 @@ Turning the default off turns it off for sidecars too, so list them as well, as 
 }
 ```
 
-A settings file is a file named `sqlsource.json`, in any folder.  It sets the settings of the `.sql` files of its folder and of every folder below it.  The one above, in the project's folder, reads every `.sql` file of the project as PostgreSQL, gives each query its models and no method, keeps comments and sorts the output models' properties, and gives every `timestamptz` the C# type `System.DateTimeOffset` and every `users.id` column `MyApp.UserId`.  A setting it does not name keeps its default, and a marker or the attribute still wins over it, as [which place wins](#precedence) says.
+A settings file is a file named `sqlsource.json`, in any folder.  It sets the settings of the `.sql` files of its folder and of every folder below it.  The one above, in the project's folder, reads every `.sql` file of the project as PostgreSQL, gives each query its models and no method, keeps comments and sorts the output models' properties, and gives every `timestamptz` the C# type `System.DateTimeOffset` and every `users.id` column `MyApp.UserId`.  A setting it does not name keeps its default, and a marker still wins over it, as [which place wins](#precedence) says.
 
 **Its name** is `sqlsource.json`, in lower case.  A file named in another case, such as `SqlSource.json`, is not read when the project file lists it itself as an `AdditionalFiles` item.  When it is not listed, the build finds it and reads it on macOS and Windows, which compare names ignoring case, and does not find it on Linux, so a project built on both would read different settings.
 

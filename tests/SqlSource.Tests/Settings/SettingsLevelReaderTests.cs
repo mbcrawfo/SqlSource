@@ -72,7 +72,6 @@ public sealed class SettingsLevelReaderTests
     [InlineData("InputModelSuffix")]
     [InlineData("OutputModelSuffix")]
     [InlineData("ModelNamespace")]
-    [InlineData("Parameters")]
     [InlineData("NestedClass")]
     public void Read_TextThatIsWhiteSpace_IsNotSetAndNotRecorded(string setting)
     {
@@ -80,19 +79,6 @@ public sealed class SettingsLevelReaderTests
 
         SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
         source.Invalids.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Read_Parameters_AreParsedAndEachWordThatIsNoneIsRecorded()
-    {
-        var source = new FakeSource(
-            new Dictionary<SettingId, string> { [SettingId.Parameters] = " keep-comments nope sort-input other " }
-        );
-
-        SettingsLevelReader
-            .Read(ref source)
-            .Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.SortInput);
-        source.Invalids.ShouldBe([(SettingId.Parameters, "nope"), (SettingId.Parameters, "other")]);
     }
 
     [Fact]
@@ -206,18 +192,6 @@ public sealed class SettingsLevelReaderTests
                     CollectionType = CollectionKind.ImmutableArray,
                 }
             );
-    }
-
-    [Fact]
-    public void Read_ParametersAsElements_WinOverTheText()
-    {
-        var source = new FakeSource(
-            new Dictionary<SettingId, string> { [SettingId.Parameters] = "keep-comments" },
-            elements: new Dictionary<SettingId, string[]> { [SettingId.Parameters] = [" sort-input "] }
-        );
-
-        SettingsLevelReader.Read(ref source).Parameters.ShouldBe(GeneratorParameters.SortInput);
-        source.Asked.ShouldNotContain("Text(Parameters)");
     }
 
     // An array with no word is the empty list, which is set, as default is.
@@ -417,8 +391,8 @@ public sealed class SettingsLevelReaderTests
         invalid.InvalidParts.ShouldBe([(id, 0)]);
     }
 
-    // The parameters' array form is asked for before their text.  The type override, the column types and the library
-    // types are asked for as members alone.
+    // The parameters are asked for as elements alone, and the type override, the column types and the library types as
+    // members alone.
     [Fact]
     public void Read_EverySetting_IsAskedForInTheOrderOfTheEnum()
     {
@@ -428,7 +402,6 @@ public sealed class SettingsLevelReaderTests
 
         source.Asked.ShouldBe([
             "Elements(Parameters)",
-            "Text(Parameters)",
             "Choice(Output)",
             "Text(Database)",
             "Text(InputModelSuffix)",

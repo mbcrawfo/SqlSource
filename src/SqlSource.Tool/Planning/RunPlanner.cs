@@ -18,11 +18,12 @@ namespace SqlSource.Tool.Planning;
 /// needs.  It reports nothing: what is wrong is in the result, in the order it is to be reported.
 /// </summary>
 /// <remarks>
-/// The plan must agree with the generator on which type claims which file with which output, so every rule here is
-/// the generator's own code: <c>PathResolver</c>, <c>FileParseInput</c>, <c>SqlFileReader</c>, <c>FileLevel</c>,
-/// <c>QuerySettings</c> and <c>SqlQueryHash</c>.  The settings come from the settings files alone, which the
-/// generator's <c>ListedSettingsFile</c> and <c>SettingsFileSet</c> read, through <see cref="RunSettingsFiles" />, and
-/// the compile paths that reach one are <c>BuildFolders</c>'.  <c>GeneratorParityTests</c> holds the two together.
+/// The plan must agree with the generator on which type claims which file, and on which of its queries need an entry,
+/// so every rule here is the generator's own code: <c>PathResolver</c>, <c>FileParseInput</c>, <c>SqlFileReader</c>,
+/// <c>FileLevel</c>, <c>QuerySettings</c> and <c>SqlQueryHash</c>.  The settings come from the settings files alone,
+/// which the generator's <c>ListedSettingsFile</c> and <c>SettingsFileSet</c> read, through
+/// <see cref="RunSettingsFiles" />, and the compile paths that reach one are <c>BuildFolders</c>'.
+/// <c>GeneratorParityTests</c> holds the two together.
 /// </remarks>
 internal static class RunPlanner
 {
@@ -96,7 +97,7 @@ internal static class RunPlanner
         var claimed = new List<ClaimedFile>(claimsOf.Count);
         foreach (var path in listed.Paths)
         {
-            if (!claimsOf.TryGetValue(path, out var fileClaims))
+            if (!claimsOf.TryGetValue(path, out var types))
             {
                 continue;
             }
@@ -111,8 +112,7 @@ internal static class RunPlanner
                     text,
                     chain,
                     FileLevel.Resolve(path, chain)?.Level ?? SettingsLevel.None,
-                    fileClaims.Levels,
-                    fileClaims.Types
+                    types
                 )
             );
         }
@@ -127,23 +127,25 @@ internal static class RunPlanner
         return (claimed, listed.Paths.Count - claimed.Count);
     }
 
-    // The claims of each claimed file, by its path.  What a claim of a file says is its Output, and nothing else.
-    private static Dictionary<string, FileClaims> ClaimsByFile(ImmutableArray<TypeClaim> claims, ListedFiles listed)
+    // The claims of each claimed file, by its path, in the order they came.  A claim says nothing of what its files
+    // need: their markers and the settings files do.
+    private static Dictionary<string, List<TypeClaim>> ClaimsByFile(
+        ImmutableArray<TypeClaim> claims,
+        ListedFiles listed
+    )
     {
-        var byFile = new Dictionary<string, FileClaims>(SqlPath.Comparer);
+        var byFile = new Dictionary<string, List<TypeClaim>>(SqlPath.Comparer);
         foreach (var claim in claims)
         {
-            var level = claim.Output is { } output ? new SettingsLevel { Output = output } : SettingsLevel.None;
             foreach (var path in listed.ClaimedBy(claim))
             {
-                if (!byFile.TryGetValue(path, out var fileClaims))
+                if (!byFile.TryGetValue(path, out var types))
                 {
-                    fileClaims = new FileClaims();
-                    byFile.Add(path, fileClaims);
+                    types = [];
+                    byFile.Add(path, types);
                 }
 
-                fileClaims.Levels.Add(level);
-                fileClaims.Types.Add(claim);
+                types.Add(claim);
             }
         }
 
@@ -189,7 +191,7 @@ internal static class RunPlanner
     // wanted: the hash comes from the SQL without them.
     private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
     {
-        var input = FileParseInput.Resolve(owner.Text, owner.NormalizedPath, owner.Chain, EquatableArray<string>.Empty);
+        var input = FileParseInput.Resolve(owner.Text, owner.NormalizedPath, owner.Chain);
         return SqlFileReader.Read(
             owner.Text,
             owner.NormalizedPath,
@@ -296,20 +298,18 @@ internal static class RunPlanner
                 + $"-- token: {{{{{name}:default}}}}"
         );
 
-    // The output resolves for each type and query, and a file needs what any type that claims it needs: the
-    // greatest over every claim of every project, each with the chain of its own project.
+    // The output resolves for each query from its markers and its file's chain, which every type of one project
+    // shares, and a file needs what any project that claims it needs: the greatest over every project, each with the
+    // chain of its own settings files.
     private static OutputKind GreatestOutput(SqlQuery query, FileWork work)
     {
         var greatest = OutputKind.Sql;
         foreach (var claimant in work.Claimants)
         {
-            foreach (var claim in claimant.Claims)
+            var output = QuerySettings.Resolve(query.Markers, claimant.Level).Output;
+            if (output > greatest)
             {
-                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level).Output;
-                if (output > greatest)
-                {
-                    greatest = output;
-                }
+                greatest = output;
             }
         }
 
@@ -451,14 +451,6 @@ internal static class RunPlanner
     private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
         filters.Databases.IsEmpty || (query.Database is { } database && filters.NamesDatabase(database));
 
-    // The claims of one file in one project: what each says, and the type that says it, in the order they came.
-    private sealed class FileClaims
-    {
-        public List<SettingsLevel> Levels { get; } = [];
-
-        public List<TypeClaim> Types { get; } = [];
-    }
-
     // One claimed file as one project sees it.  Chain is that of the file's folder in the project's settings files, and
     // Level is the chain's, as the generator's FileLevel gives it.
     private sealed record ClaimedFile(
@@ -467,7 +459,6 @@ internal static class RunPlanner
         SqlFileText Text,
         SettingsChain Chain,
         SettingsLevel Level,
-        List<SettingsLevel> Claims,
         List<TypeClaim> Types
     );
 

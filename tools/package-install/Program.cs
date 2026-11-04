@@ -21,10 +21,8 @@ catch (ArgumentException exception)
     Console.WriteLine($"validation on: {exception.GetType().Name} for {exception.ParamName}");
 }
 
-// The header of Kept.sql says keep-comments, as the second word of its list, and so does the attribute of
-// KeptQueries, which claims Users.sql again.
+// The header of Kept.sql says keep-comments, as the second word of its list.
 Console.WriteLine($"comments kept by the file header: {Queries.Kept}");
-Console.WriteLine($"comments kept by the attribute: {KeptQueries.GetUser}");
 
 // The project's dialect is postgres, and the header of ByHeader.sql says mysql.
 Console.WriteLine($"dialect of the project: {Queries.ByProject}");

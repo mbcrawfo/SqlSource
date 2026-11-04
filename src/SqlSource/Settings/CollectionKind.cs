@@ -1,8 +1,8 @@
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The type a generated method returns many rows in.  The generator's own form of <c>GeneratorCollectionType</c>,
-/// member for member.
+/// The type a generated method returns many rows in, as the <c>collection-type</c> of a marker or a settings file names
+/// it.
 /// </summary>
 internal enum CollectionKind
 {

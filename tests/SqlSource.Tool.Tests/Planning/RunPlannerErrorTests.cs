@@ -294,25 +294,27 @@ public sealed class RunPlannerErrorTests : IDisposable
         Plans.Result(project).Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC209", "SQLSRC210"]);
     }
 
-    // Two types claim the file with two outputs: a message names the greater.
+    // Two projects claim the file with two outputs, each from its own chain: both list the farther settings file, and
+    // only the second the nearer one.  A message names the greater.
     [Theory]
-    [InlineData("Models", "CodeGen", "codegen")]
-    [InlineData("Models", "Sql", "models")]
+    [InlineData("models", "codegen", "codegen")]
+    [InlineData("models", "sql", "models")]
     public void Plan_TwoClaimsWithTwoOutputs_NameTheGreaterInAMessage(string first, string second, string named)
     {
-        var project = new TestProject(_folder);
-        project.Settings["dialect"] = "ansi";
-        _ = project.AddSource(
-            "A.cs",
-            Plans.TypeNamed("A", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
-        );
-        _ = project.AddSource(
-            "B.cs",
-            Plans.TypeNamed("B", $"Source = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
-        );
-        _ = project.AddSql("Q/Find.sql", "-- name: Find\nSELECT id FROM users {{where}};\n");
+        var farther = _folder.WriteFile("sqlsource.json", $$"""{"dialect": "ansi", "output": "{{first}}"}""");
+        var nearer = _folder.WriteFile("Shared/sqlsource.json", $$"""{"output": "{{second}}"}""");
+        var shared = _folder.WriteFile("Shared/Find.sql", "-- name: Find\nSELECT id FROM users {{where}};\n");
+        var a = new TestProject(_folder, "A");
+        a.ListSettings(farther);
+        _ = a.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
+        a.ListSql(shared);
+        var b = new TestProject(_folder, "B");
+        b.ListSettings(farther);
+        b.ListSettings(nearer);
+        _ = b.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"../Shared\""));
+        b.ListSql(shared);
 
-        var errors = Plans.Result(project).Errors;
+        var errors = Plans.Result(a, b).Errors;
 
         // SQLSRC209 and SQLSRC210, and each names the output.
         errors.Count.ShouldBe(2);

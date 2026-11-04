@@ -386,10 +386,6 @@ internal sealed class CachingScene
             )
         );
 
-    // The compilation with a list of generator parameters on the attribute of UserQueries.
-    public static Compilation WithParametersOnUserQueries(Compilation compilation, string parameters) =>
-        WithArgumentsOnUserQueries(compilation, "Parameters = \"" + parameters + "\"");
-
     // The arguments of an attribute, with Source = "." first unless they set Source, so that the type gets every .sql
     // file of its folder.
     private static string WithFolder(string? arguments)

@@ -25,7 +25,7 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_NoLevelSaysAnything_GivesTheDefaults()
     {
-        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None);
+        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
 
         settings.Parameters.ShouldBe(GeneratorParameters.None);
         settings.KeepComments.ShouldBeFalse();
@@ -36,22 +36,21 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_Parameters_ComeWholeFromTheMostSpecificLevelThatGivesAList()
     {
-        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, Keep).KeepComments.ShouldBeTrue();
-        QuerySettings.Resolve(SettingsLevel.None, Sort, Keep).Parameters.ShouldBe(GeneratorParameters.SortInput);
-        QuerySettings.Resolve(Keep, Sort, Sort).Parameters.ShouldBe(GeneratorParameters.KeepComments);
-        QuerySettings.Resolve(Empty, Keep, Keep).Parameters.ShouldBe(GeneratorParameters.None);
+        QuerySettings.Resolve(SettingsLevel.None, Keep).KeepComments.ShouldBeTrue();
+        QuerySettings.Resolve(Keep, Sort).Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        QuerySettings.Resolve(Empty, Keep).Parameters.ShouldBe(GeneratorParameters.None);
     }
 
     [Fact]
     public void Resolve_NoTokenValidation_TurnsValidationOff() =>
         QuerySettings
-            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }, Keep, Keep)
+            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }, Keep)
             .ValidateTokens.ShouldBeFalse();
 
     [Fact]
     public void Resolve_NoArrayPool_TurnsThePoolOff() =>
         QuerySettings
-            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoArrayPool }, Keep, Keep)
+            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoArrayPool }, Keep)
             .UseArrayPool.ShouldBeFalse();
 
     [Fact]
@@ -71,12 +70,9 @@ public sealed class QuerySettingsTests
         var sql = new SettingsLevel { Output = OutputKind.Sql };
         var models = new SettingsLevel { Output = OutputKind.Models };
 
-        QuerySettings
-            .Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None)
-            .Output.ShouldBe(OutputKind.CodeGen);
-        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, sql).Output.ShouldBe(OutputKind.Sql);
-        QuerySettings.Resolve(SettingsLevel.None, models, sql).Output.ShouldBe(OutputKind.Models);
-        QuerySettings.Resolve(models, sql, sql).Output.ShouldBe(OutputKind.Models);
+        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None).Output.ShouldBe(OutputKind.CodeGen);
+        QuerySettings.Resolve(SettingsLevel.None, sql).Output.ShouldBe(OutputKind.Sql);
+        QuerySettings.Resolve(models, sql).Output.ShouldBe(OutputKind.Models);
     }
 
     [Fact]
@@ -91,7 +87,7 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_ModelSettings_HaveTheirDefaults()
     {
-        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None);
+        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
 
         settings.InputModelSuffix.ShouldBe("Params");
         settings.OutputModelSuffix.ShouldBe("Dto");
@@ -113,10 +109,14 @@ public sealed class QuerySettingsTests
             OutputModelType = ModelKind.Class,
             CollectionType = CollectionKind.List,
         };
-        var attribute = new SettingsLevel { ModelNamespace = "A", InputModelType = ModelKind.Record };
-        var markers = new SettingsLevel { CollectionType = CollectionKind.IReadOnlyList };
+        var markers = new SettingsLevel
+        {
+            ModelNamespace = "A",
+            InputModelType = ModelKind.Record,
+            CollectionType = CollectionKind.IReadOnlyList,
+        };
 
-        var settings = QuerySettings.Resolve(markers, attribute, file);
+        var settings = QuerySettings.Resolve(markers, file);
 
         settings.InputModelSuffix.ShouldBe("In");
         settings.OutputModelSuffix.ShouldBe("Row");

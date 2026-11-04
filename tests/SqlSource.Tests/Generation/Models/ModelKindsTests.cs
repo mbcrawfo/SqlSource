@@ -7,7 +7,7 @@ namespace SqlSource.Tests.Generation.Models;
 
 public sealed class ModelKindsTests
 {
-    // ModelKind is internal, so a row names it by its number, which the attribute's enum keeps.
+    // ModelKind is internal, so a row names it by its number.
     [Theory]
     [InlineData(0, "record")]
     [InlineData(1, "sealed record")]

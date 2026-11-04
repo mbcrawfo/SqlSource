@@ -1,8 +1,7 @@
 namespace SqlSource.Settings;
 
 /// <summary>
-/// What SqlSource generates for a query.  The generator's own form of the <c>GeneratorOutput</c> enum that
-/// <c>AttributeSource</c> emits, member for member.
+/// What SqlSource generates for a query, as the <c>output</c> of a marker or a settings file names it.
 /// </summary>
 internal enum OutputKind
 {

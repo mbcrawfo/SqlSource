@@ -8,10 +8,10 @@ using SqlSource;
 
 namespace SqlServerExamples.Models;
 
-// The output models: each query gets the SQL and its models, read here through Dapper.  The input model is the
-// parameter object, and the output model the type of a row.  Source = "." gives the class every .sql file of this
-// folder, Orders.sql and Users.sql, in place of the one file named for it.
-[SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
+// The output models, which the folder's sqlsource.json sets: each query gets the SQL and its models, read here through
+// Dapper.  The input model is the parameter object, and the output model the type of a row.  Source = "." gives the
+// class every .sql file of this folder, Orders.sql and Users.sql, in place of the one file named for it.
+[SqlSourceGenerate(Source = ".")]
 public sealed partial class StoreQueries(DbConnection connection)
 {
     // A record of the query's columns.  ShippedOn is a DateOnly?, since the column is a date that can be null, and the

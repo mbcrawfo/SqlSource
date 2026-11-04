@@ -451,7 +451,7 @@ public sealed class TypeEmitterTests
     }
 
     [Fact]
-    public void Emit_ThreeLevels_ResolveForEachQuery()
+    public void Emit_TwoLevels_ResolveForEachQuery()
     {
         var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
         var none = new SettingsLevel { Parameters = GeneratorParameters.None };
@@ -460,22 +460,18 @@ public sealed class TypeEmitterTests
 
         var output = TypeEmitter.Emit(
             new TypeQueries(
-                new TypeFiles(
-                    TestModels.Type(settings: none),
-                    TestSidecars.Of<string>(),
-                    TestSidecars.Of<DiagnosticInfo>()
-                ),
+                new TypeFiles(TestModels.Type(), TestSidecars.Of<string>(), TestSidecars.Of<DiagnosticInfo>()),
                 TestSidecars.Of(
-                    File("Users.sql", Kept("FromTheAttribute", SettingsLevel.None), Kept("FromItsMarker", keep))
+                    File("Users.sql", Kept("FromTheFile", SettingsLevel.None), Kept("FromItsMarker", none))
                 ),
                 TestSidecars.Of(keep with { Output = OutputKind.Sql }),
                 "App.UserRepository.g.cs"
             )
         );
 
-        // The attribute's empty list beats the file's level; a query's own marker beats the attribute.
-        output.Source.ShouldNotBeNull().ShouldNotContain("-- FromTheAttribute");
-        output.Source.ShouldContain("-- FromItsMarker");
+        // A query without a list of its own takes the file's level; a query's own marker beats it.
+        output.Source.ShouldNotBeNull().ShouldContain("-- FromTheFile");
+        output.Source.ShouldNotContain("-- FromItsMarker");
     }
 
     [Fact]

@@ -24,7 +24,6 @@ internal readonly struct UsableQuerySequence
     {
         private readonly TypeQueries _type;
         private readonly bool[] _usable;
-        private readonly SettingsLevel _attribute;
         private int _fileIndex;
         private int _queryIndex;
 
@@ -36,7 +35,6 @@ internal readonly struct UsableQuerySequence
         {
             _type = type;
             _usable = usable;
-            _attribute = type.Type.Type.Settings;
             _fileIndex = -1;
             _queryIndex = 0;
             _queries = EquatableArray<SqlQuery>.Empty;
@@ -67,12 +65,7 @@ internal readonly struct UsableQuerySequence
             }
 
             var query = _queries[_queryIndex];
-            Current = new UsableQuery(
-                _fileIndex,
-                _queryIndex,
-                query,
-                QuerySettings.Resolve(query.Markers, _attribute, _fileLevel)
-            );
+            Current = new UsableQuery(_fileIndex, _queryIndex, query, QuerySettings.Resolve(query.Markers, _fileLevel));
             return true;
         }
     }
