@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
 using SqlSource.Snapshot;
 
@@ -20,35 +21,26 @@ internal sealed class LibraryRows
 
     private const string Geography = "geography";
 
-    // PostGIS's rows, by InternalName, which every set of libraries with NetTopologySuite shares.  Declared before
-    // Sets, which reads it when the type is initialized.
-    private static readonly Dictionary<string, TypeMapping> PostgisRows = BuildPostgisRows();
-
-    // SQL Server's spatial CLR types of sys, by name, which every set of libraries with NetTopologySuite shares.  Also
-    // declared before Sets.
-    private static readonly Dictionary<string, TypeMapping> SqlServerSpatialRows = BuildSqlServerSpatialRows();
+    // NetTopologySuite's rows that match by more than a type of pg_catalog or a system type, which every set of
+    // libraries with NetTopologySuite shares: PostGIS's, by InternalName, and SQL Server's spatial CLR types of sys, by
+    // name.  Declared before Sets, which reads it when the type is initialized.
+    private static readonly PerEngine<Dictionary<string, TypeMapping>?> SpatialRows = PerEngine.Of(SpatialRowsOf);
 
     // One instance for each set of libraries, found by the bit of each library, which is 1 << its number: built once,
     // when the type is initialized, so that a set found twice is the same instance.  Slot 0 is the empty set, which
     // has no instance.
     private static readonly LibraryRows?[] Sets = BuildSets();
 
-    private readonly Dictionary<string, TypeMapping> _rows;
-    private readonly Dictionary<string, TypeMapping>? _postgisRows;
-    private readonly Dictionary<string, TypeMapping> _sqlServerRows;
-    private readonly Dictionary<string, TypeMapping>? _sqlServerSpatialRows;
+    private readonly PerEngine<Dictionary<string, TypeMapping>> _rows;
+    private readonly PerEngine<Dictionary<string, TypeMapping>?> _spatialRows;
 
     private LibraryRows(
-        Dictionary<string, TypeMapping> rows,
-        Dictionary<string, TypeMapping>? postgisRows,
-        Dictionary<string, TypeMapping> sqlServerRows,
-        Dictionary<string, TypeMapping>? sqlServerSpatialRows
+        PerEngine<Dictionary<string, TypeMapping>> rows,
+        PerEngine<Dictionary<string, TypeMapping>?> spatialRows
     )
     {
         _rows = rows;
-        _postgisRows = postgisRows;
-        _sqlServerRows = sqlServerRows;
-        _sqlServerSpatialRows = sqlServerSpatialRows;
+        _spatialRows = spatialRows;
     }
 
     /// <summary>
@@ -98,13 +90,18 @@ internal sealed class LibraryRows
     /// </summary>
     public TypeMapping? Find(PostgresType type)
     {
-        if (PostgresTypeMap.IsSystemType(type) && _rows.TryGetValue(type.InternalName, out var row))
+        if (
+            PostgresTypeMap.IsSystemType(type)
+            && _rows[DatabaseEngine.PostgreSql].TryGetValue(type.InternalName, out var row)
+        )
         {
             return row;
         }
 
         return
-            _postgisRows is not null && IsPostgis(type) && _postgisRows.TryGetValue(type.InternalName, out var postgis)
+            _spatialRows[DatabaseEngine.PostgreSql] is { } postgisRows
+            && IsPostgis(type)
+            && postgisRows.TryGetValue(type.InternalName, out var postgis)
             ? postgis
             : null;
     }
@@ -120,17 +117,17 @@ internal sealed class LibraryRows
         if (type.UserType is { Name.Length: > 0 } userType)
         {
             return
-                _sqlServerSpatialRows is not null
+                _spatialRows[DatabaseEngine.SqlServer] is { } spatialRows
                 && !string.IsNullOrEmpty(userType.AssemblyQualifiedName)
                 && SystemSchemas.IsSqlServer(userType.Schema)
-                && _sqlServerSpatialRows.TryGetValue(userType.Name, out var spatial)
+                && spatialRows.TryGetValue(userType.Name, out var spatial)
                 ? spatial
                 : null;
         }
 
         return
             !string.IsNullOrEmpty(type.Name)
-            && _sqlServerRows.TryGetValue(SqlServerTypeMap.BaseName(type.Name), out var row)
+            && _rows[DatabaseEngine.SqlServer].TryGetValue(SqlServerTypeMap.BaseName(type.Name), out var row)
             ? row
             : null;
     }
@@ -143,8 +140,7 @@ internal sealed class LibraryRows
         var sets = new LibraryRows?[1 << libraries.Length];
         for (var mask = 1; mask < sets.Length; mask++)
         {
-            var rows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
-            var sqlServerRows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+            var rows = PerEngine.Of(static _ => new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase));
             foreach (var library in libraries)
             {
                 if ((mask & (1 << (int)library)) == 0)
@@ -152,46 +148,63 @@ internal sealed class LibraryRows
                     continue;
                 }
 
-                var (postgres, sqlServer) = RowsOf(library);
-                foreach (var row in postgres)
+                var rowsOfLibrary = RowsOf(library);
+                foreach (var engine in DatabaseEngines.All)
                 {
-                    rows[row.Key] = row.Value;
-                }
-
-                foreach (var row in sqlServer)
-                {
-                    sqlServerRows[row.Key] = row.Value;
+                    foreach (var row in rowsOfLibrary[engine])
+                    {
+                        rows[engine][row.Key] = row.Value;
+                    }
                 }
             }
 
             var hasNetTopologySuite = (mask & (1 << (int)SqlLibrary.NetTopologySuite)) != 0;
-            sets[mask] = new LibraryRows(
-                rows,
-                hasNetTopologySuite ? PostgisRows : null,
-                sqlServerRows,
-                hasNetTopologySuite ? SqlServerSpatialRows : null
-            );
+            sets[mask] = new LibraryRows(rows, hasNetTopologySuite ? SpatialRows : default);
         }
 
         return sets;
     }
 
     // The rows of one library, for PostgreSQL's pg_catalog and for SQL Server.  PostGIS's rows match in any schema, and
-    // SQL Server's spatial rows only a CLR type of sys, so they are apart, in PostgisRows and SqlServerSpatialRows.
-    private static (Dictionary<string, TypeMapping> Postgres, Dictionary<string, TypeMapping> SqlServer) RowsOf(
-        SqlLibrary library
-    ) =>
+    // SQL Server's spatial rows only a CLR type of sys, so they are apart, in SpatialRows.
+    private static PerEngine<Dictionary<string, TypeMapping>> RowsOf(SqlLibrary library) =>
+        PerEngine.Of(engine => RowsOf(library, engine));
+
+    private static Dictionary<string, TypeMapping> RowsOf(SqlLibrary library, DatabaseEngine engine) =>
         library switch
         {
-            SqlLibrary.NetTopologySuite => (Empty(), Empty()),
-            SqlLibrary.Json => (JsonRows(), JsonSqlServerRows()),
-            SqlLibrary.NodaTime => (NodaTimeRows(), NodaTimeSqlServerRows()),
+            SqlLibrary.NetTopologySuite => engine switch
+            {
+                DatabaseEngine.PostgreSql or DatabaseEngine.SqlServer => Empty(),
+                _ => throw UnexpectedEnumValueException.Of(engine),
+            },
+            SqlLibrary.Json => engine switch
+            {
+                DatabaseEngine.PostgreSql => JsonRows(),
+                DatabaseEngine.SqlServer => JsonSqlServerRows(),
+                _ => throw UnexpectedEnumValueException.Of(engine),
+            },
+            SqlLibrary.NodaTime => engine switch
+            {
+                DatabaseEngine.PostgreSql => NodaTimeRows(),
+                DatabaseEngine.SqlServer => NodaTimeSqlServerRows(),
+                _ => throw UnexpectedEnumValueException.Of(engine),
+            },
             _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     // No rows, which a set only reads to copy, so it needs no comparer: NetTopologySuite has none in pg_catalog, and no
     // row of a SQL Server system type that is not a CLR type.
     private static Dictionary<string, TypeMapping> Empty() => [];
+
+    // NetTopologySuite's rows of an engine that match by more than a system type.
+    private static Dictionary<string, TypeMapping>? SpatialRowsOf(DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => BuildPostgisRows(),
+            DatabaseEngine.SqlServer => BuildSqlServerSpatialRows(),
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
 
     // PostGIS's geometry and geography are both NetTopologySuite's Geometry, which the plugin reads and writes.  The
     // base map has no C# type for either.

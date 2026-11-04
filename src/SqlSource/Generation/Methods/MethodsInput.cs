@@ -52,13 +52,13 @@ internal sealed record MethodsInput(
     EquatableArray<LibraryUse> LibrariesBelowTheFloor
 )
 {
-    // Every library and engine, in the order of SqlLibrary and then of DatabaseEngine.
+    // Every library and engine, in the order of SqlLibrary and then of DatabaseEngine: a new member of either is in it.
+    // JSON is in it too, and is never below its floor.
     private static readonly LibraryUse[] AllUses =
     [
-        new(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql),
-        new(SqlLibrary.NodaTime, DatabaseEngine.SqlServer),
-        new(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql),
-        new(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer),
+        .. from library in (SqlLibrary[])Enum.GetValues(typeof(SqlLibrary))
+        from engine in DatabaseEngines.All
+        select new LibraryUse(library, engine),
     ];
 
     /// <summary>
