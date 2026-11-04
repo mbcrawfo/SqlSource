@@ -160,6 +160,7 @@ internal sealed class SqlDialectRules
             SqlDialect.Sqlite => Sqlite,
             SqlDialect.Oracle => Oracle,
             SqlDialect.CockroachDb => CockroachDb,
+            _ => throw UnexpectedEnumValueException.Of(choice.Dialect),
         };
 
     // MySQL and MariaDB read "..." as a string and take backslash escapes in both kinds of quote.  ANSI_QUOTES makes

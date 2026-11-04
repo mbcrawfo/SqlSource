@@ -96,6 +96,7 @@ internal static class SettingsFileDiagnostics
                 error.Other ?? string.Empty,
                 setting
             ),
+            _ => throw UnexpectedEnumValueException.Of(error.Kind),
         };
     }
 
@@ -109,6 +110,7 @@ internal static class SettingsFileDiagnostics
             SettingsFileValueType.ObjectOfStrings => "an object whose values are strings",
             SettingsFileValueType.ObjectOfColumnTypes =>
                 "an object whose values are strings, or objects of a \"type\" string and an optional \"json\" boolean",
+            _ => throw UnexpectedEnumValueException.Of(type),
         };
 
     // The end of SQLSRC019's message, after the setting: the names of the dialects, why default stands alone, the

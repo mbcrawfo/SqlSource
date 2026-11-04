@@ -87,6 +87,7 @@ internal static class PropertyNames
         {
             DatabaseEngine.PostgreSql => "public",
             DatabaseEngine.SqlServer => "dbo",
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
         if (string.Equals(schema, defaultSchema, StringComparison.Ordinal))
         {

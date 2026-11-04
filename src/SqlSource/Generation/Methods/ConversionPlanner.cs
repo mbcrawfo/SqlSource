@@ -299,6 +299,7 @@ internal static class ConversionPlanner
             {
                 DatabaseEngine.PostgreSql => false,
                 DatabaseEngine.SqlServer => true,
+                _ => throw UnexpectedEnumValueException.Of(context.Engine),
             }
         )
         && context.SqlServerSpatial
@@ -494,6 +495,7 @@ internal static class ConversionPlanner
             {
                 DatabaseEngine.PostgreSql => !PostgresTypeMap.Gives(type),
                 DatabaseEngine.SqlServer => !SqlServerTypeMap.Gives(type),
+                _ => throw UnexpectedEnumValueException.Of(context.Engine),
             };
 
         // 'int', 'int' and 'short', or 'a', 'b' and 'c'.

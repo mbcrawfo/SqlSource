@@ -182,6 +182,7 @@ internal static class TypeOverrideGrammar
         {
             DatabaseEngine.PostgreSql => TypeKeys.TryNormalizePostgres(key, out normalized),
             DatabaseEngine.SqlServer => TypeKeys.TryNormalizeSqlServer(key, out normalized),
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
 
     private static EquatableArray<TypeOverride> ToArray(List<TypeOverride>? entries) =>

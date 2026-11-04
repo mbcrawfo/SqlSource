@@ -57,6 +57,7 @@ internal static class ExecutionCapabilityRules
                         : ExecutionCapabilities.None
                 )
                 | (method.Streams ? ExecutionCapabilities.DrainsWhenLeftAtARow : ExecutionCapabilities.None),
+            _ => throw UnexpectedEnumValueException.Of(method.Engine),
         };
     }
 

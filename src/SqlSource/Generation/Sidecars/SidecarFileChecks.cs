@@ -82,5 +82,6 @@ internal static class SidecarFileChecks
             SidecarErrorKind.OrdinalMismatch => $"the ordinal {error.Argument} is not the position of its element",
             SidecarErrorKind.ColumnsWithoutRows => "it has columns for a query without rows",
             SidecarErrorKind.UnknownResultKind => $"'{error.Argument}' is not a result kind",
+            _ => throw UnexpectedEnumValueException.Of(error.Kind),
         };
 }

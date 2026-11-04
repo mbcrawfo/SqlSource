@@ -26,6 +26,7 @@ internal abstract class ParameterBinder
         {
             DatabaseEngine.PostgreSql => Postgres,
             DatabaseEngine.SqlServer => SqlServer,
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
 
     /// <summary>
@@ -150,6 +151,7 @@ internal abstract class ParameterBinder
         {
             ConversionKind.Converter or ConversionKind.Serializer => false,
             ConversionKind.Spatial => true,
+            _ => throw UnexpectedEnumValueException.Of(write.Kind),
         };
         if (writesBytes)
         {

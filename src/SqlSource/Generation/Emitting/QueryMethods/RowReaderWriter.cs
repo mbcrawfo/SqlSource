@@ -137,6 +137,7 @@ internal static class RowReaderWriter
             {
                 ConversionKind.Converter or ConversionKind.Serializer => false,
                 ConversionKind.Spatial => true,
+                _ => throw UnexpectedEnumValueException.Of(read.Kind),
             };
             if (readsBytes)
             {

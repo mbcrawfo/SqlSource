@@ -304,6 +304,7 @@ internal static class MethodPlanner
             SqlLibrary.NetTopologySuite => "NetTopologySuite",
             SqlLibrary.Json => "System.Text.Json",
             SqlLibrary.NodaTime => "NodaTime",
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     // The libraries that the query uses, each with its engine, added to the type's, which are made only when the first
@@ -716,6 +717,7 @@ internal static class MethodPlanner
             ResultShape.Many => "many",
             ResultShape.None => "none",
             ResultShape.RowCount => "rowcount",
+            _ => throw UnexpectedEnumValueException.Of(shape),
         };
 
     // The values that planning one query reads from its type and its file: the type's input and key, the query's file

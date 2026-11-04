@@ -158,6 +158,7 @@ internal sealed record MethodConflicts(
                 TakenReason.Namespace => "the project has a namespace of that name",
                 TakenReason.NamespacePartIsType => "'" + name.Part + "' is a type of the project",
                 TakenReason.Type => "the project has a type of that name",
+                _ => throw UnexpectedEnumValueException.Of(name.Reason),
             };
         }
 

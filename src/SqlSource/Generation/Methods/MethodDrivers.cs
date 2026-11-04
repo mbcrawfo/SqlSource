@@ -43,5 +43,6 @@ internal readonly record struct MethodDrivers(
         {
             DatabaseEngine.PostgreSql => Postgres,
             DatabaseEngine.SqlServer => SqlServer,
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
 }

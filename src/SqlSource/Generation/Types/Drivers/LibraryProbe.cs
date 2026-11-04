@@ -96,14 +96,17 @@ internal sealed record LibraryProbe(
             {
                 DatabaseEngine.PostgreSql => NodaTime && NpgsqlNodaTime,
                 DatabaseEngine.SqlServer => NodaTime,
+                _ => throw UnexpectedEnumValueException.Of(engine),
             },
             SqlLibrary.NetTopologySuite => NetTopologySuite
                 && engine switch
                 {
                     DatabaseEngine.PostgreSql => NpgsqlNetTopologySuite,
                     DatabaseEngine.SqlServer => SqlServerBytes,
+                    _ => throw UnexpectedEnumValueException.Of(engine),
                 },
             SqlLibrary.Json => Json,
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     /// <summary>
@@ -118,10 +121,12 @@ internal sealed record LibraryProbe(
             {
                 DatabaseEngine.PostgreSql => IsAvailable(library, engine),
                 DatabaseEngine.SqlServer => false,
+                _ => throw UnexpectedEnumValueException.Of(engine),
             }
                 ? LibraryState.On
                 : LibraryState.Off,
             SqlLibrary.Json => LibraryState.Off,
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     /// <summary>
@@ -137,13 +142,16 @@ internal sealed record LibraryProbe(
             {
                 DatabaseEngine.PostgreSql => "Npgsql.NodaTime",
                 DatabaseEngine.SqlServer => "NodaTime",
+                _ => throw UnexpectedEnumValueException.Of(engine),
             },
             SqlLibrary.NetTopologySuite => engine switch
             {
                 DatabaseEngine.PostgreSql => "Npgsql.NetTopologySuite",
                 DatabaseEngine.SqlServer => SqlServerSpatialPackages,
+                _ => throw UnexpectedEnumValueException.Of(engine),
             },
             SqlLibrary.Json => "System.Text.Json",
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     /// <summary>
@@ -156,6 +164,7 @@ internal sealed record LibraryProbe(
             SqlLibrary.NodaTime => IsNodaTimeBelowTheFloor,
             SqlLibrary.NetTopologySuite => IsNetTopologySuiteBelowTheFloor || SqlServerBytesBelowTheFloorOn(engine),
             SqlLibrary.Json => false,
+            _ => throw UnexpectedEnumValueException.Of(library),
         };
 
     /// <summary>
@@ -213,6 +222,7 @@ internal sealed record LibraryProbe(
         {
             DatabaseEngine.PostgreSql => false,
             DatabaseEngine.SqlServer => IsSqlServerBytesBelowTheFloor,
+            _ => throw UnexpectedEnumValueException.Of(engine),
         };
 
     /// <summary>

@@ -18,5 +18,6 @@ internal static class ModelKinds
             ModelKind.SealedRecord => "sealed record",
             ModelKind.Class => "class",
             ModelKind.SealedClass => "sealed class",
+            _ => throw UnexpectedEnumValueException.Of(kind),
         };
 }
