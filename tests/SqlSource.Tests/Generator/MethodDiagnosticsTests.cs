@@ -285,19 +285,19 @@ public sealed class MethodDiagnosticsTests
     public void Run_MethodNamedAsTheConstantOfAnotherQueryUnderDirect_IsSqlsrc274()
     {
         var source = MethodRuns.SampleSource(
-            "SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public, "
-                + "Parameters = \"async-method-suffix\""
+            "SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public"
         );
         var file = new SqlFile(
             Path,
-            "-- name: Get\nSELECT id FROM users;\n-- name: GetAsync\n-- output: sql\nSELECT 1;\n"
+            "-- generator: async-method-suffix\n\n"
+                + "-- name: Get\nSELECT id FROM users;\n-- name: GetAsync\n-- output: sql\nSELECT 1;\n"
         );
 
         var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], source);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
+                "SQLSRC274 /app/Repo/Users.sql(3,10)-(3,13): The method of the query 'Get' cannot be named 'GetAsync', "
                     + "because the query 'GetAsync' of 'App.Sample' has a constant or method of that name.  Rename the "
                     + "query.",
             ]);

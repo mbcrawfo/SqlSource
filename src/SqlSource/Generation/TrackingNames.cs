@@ -37,8 +37,6 @@ internal static class TrackingNames
 
     public const string ClaimedPaths = nameof(ClaimedPaths);
 
-    public const string CommentPaths = nameof(CommentPaths);
-
     public const string FileParseInput = nameof(FileParseInput);
 
     public const string FileClaim = nameof(FileClaim);

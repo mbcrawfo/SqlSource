@@ -44,7 +44,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var claims = ClaimFiles(context, settingsFiles);
         ReportSettingsFiles(context, settingsFiles, claims.SqlPaths);
         var fileLevels = ReadSettings(claims.SqlFiles, settingsFiles);
-        var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.CommentPaths, claims.ClaimedPaths);
+        var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.ClaimedPaths);
         var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, fileLevels);
         var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, parsedFiles, claims.RepeatedPaths);
         var typing = TypeFiles(context, sidecars.Checks, parsedFiles.Sorted, fileLevels);
@@ -197,16 +197,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (paths, _) => SqlPath.ToSortedSet(paths))
             .WithTrackingName(TrackingNames.ClaimedPaths);
 
-        // The files of the types whose attribute asks for comments.  Almost always none, so this value almost never
-        // changes.
-        var commentPaths = typeFiles
-            .SelectMany(
-                static (type, _) => type.Type.Settings.KeepsComments ? type.Files : EquatableArray<string>.Empty
-            )
-            .Collect()
-            .Select(static (paths, _) => SqlPath.ToSortedSet(paths))
-            .WithTrackingName(TrackingNames.CommentPaths);
-
         // The names that each type whose methods go on itself already has, which its methods cannot take.  Almost
         // always none, since the methods go into an extension class unless the attribute says otherwise.
         var typeMemberNames = declaredTypes
@@ -237,15 +227,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return new ClaimedFiles(
-            sqlFiles,
-            sqlPaths,
-            typeFiles,
-            claimedPaths,
-            commentPaths,
-            repeatedPaths,
-            typeMemberNames
-        );
+        return new ClaimedFiles(sqlFiles, sqlPaths, typeFiles, claimedPaths, repeatedPaths, typeMemberNames);
     }
 
     // The problems of each settings file that the chain of the folder of some .sql file or C# file reaches, whether or
@@ -319,15 +301,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<AdditionalText> sqlFiles,
         IncrementalValueProvider<SettingsFileSet> settingsFiles,
-        IncrementalValueProvider<EquatableArray<string>> commentPaths,
         IncrementalValueProvider<EquatableArray<string>> claimedPaths
     )
     {
-        // Stage one of the settings: each file with what its parse depends on, from the chain of its folder and the
-        // types whose attribute asks for comments.  It is resolved here, before the parse, so that a change to a
-        // settings file parses only the files whose input it changes.
+        // Stage one of the settings: each file with what its parse depends on, from the chain of its folder.  It is
+        // resolved here, before the parse, so that a change to a settings file parses only the files whose input it
+        // changes.
         var fileInputs = sqlFiles
-            .Combine(settingsFiles.Combine(commentPaths))
+            .Combine(settingsFiles)
             .Select(
                 static (input, _) =>
                 {
@@ -335,8 +316,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     return FileParseInput.Resolve(
                         input.Left,
                         path,
-                        path is null ? SettingsChain.None : input.Right.Left.ChainOf(path),
-                        input.Right.Right
+                        path is null ? SettingsChain.None : input.Right.ChainOf(path)
                     );
                 }
             )
@@ -1279,15 +1259,13 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // The project's .sql files and their paths, each type with the files it claims, every claimed path, those that
-    // keep comments, the paths the project lists more than once, and the member names that each type whose methods go
-    // on itself already has.
+    // The project's .sql files and their paths, each type with the files it claims, every claimed path, the paths the
+    // project lists more than once, and the member names that each type whose methods go on itself already has.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
         IncrementalValueProvider<EquatableArray<string>> SqlPaths,
         IncrementalValuesProvider<TypeFiles> ClaimingTypes,
         IncrementalValueProvider<EquatableArray<string>> ClaimedPaths,
-        IncrementalValueProvider<EquatableArray<string>> CommentPaths,
         IncrementalValueProvider<EquatableArray<string>> RepeatedPaths,
         IncrementalValueProvider<EquatableArray<TypeMemberNames>> TypeMemberNames
     );

@@ -5,7 +5,3 @@ namespace Consumer;
 // Every .sql file of the Queries folder, as members of the type itself.
 [SqlSourceGenerate(Source = "Queries", SqlLocation = SqlLocation.Direct)]
 internal static partial class Queries;
-
-// One of those files again, for a type whose attribute asks for comments.
-[SqlSourceGenerate(Source = "Queries/Users.sql", SqlLocation = SqlLocation.Direct, Parameters = "keep-comments")]
-internal static partial class KeptQueries;

@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
-using System;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
@@ -183,21 +182,22 @@ public sealed class SettingsFileTests
         run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = ");
     }
 
-    // The attribute's suffix wins, and the folder's file still gives the other.
+    // The file header's suffix wins, and the folder's file still gives the other.
     [Fact]
-    public void Run_SuffixInTheAttributeAndTheFolder_IsTheAttributes()
+    public void Run_SuffixInTheHeaderAndTheFolder_IsTheHeaders()
     {
-        var run = RunUsers(
-            Source.Replace(
-                "[SqlSourceGenerate(Source = \".\")]",
-                "[SqlSourceGenerate(Source = \".\", InputModelSuffix = \"Args\")]",
-                StringComparison.Ordinal
-            ),
-            null,
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"inputModelSuffix":"In","outputModelSuffix":"Row"}"""
-            )
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- input-model-suffix: Args\n\n" + GetUser);
+
+        var run = ModelRuns.Run(
+            Source,
+            [
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"inputModelSuffix":"In","outputModelSuffix":"Row"}"""
+                ),
+                file,
+                Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")])),
+            ]
         );
 
         run.ShouldBeClean();

@@ -7,9 +7,9 @@
 - **An alias.**  `using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]` is a claim for the generator and nothing for the tool, so the type's queries are never described, and its build reports their entries as missing, `SQLSRC241`.
 - **A type of the same name.**  A project's own `SqlSourceGenerateAttribute` in another namespace is a claim for the tool and nothing for the generator.  The tool describes queries that nothing uses.
 - **`#if` under another configuration.**  The tool reads the files with the constants of the manifest, which are those of the configuration that `dotnet msbuild` evaluates, `Debug` unless the environment says otherwise, and of the first target framework.  An attribute inside `#if RELEASE` is not seen.
-- **The attribute on two partial declarations of one type.**  The generator takes the first, and the tool takes each for a claim, so the type's files need what either attribute asks for.  The compiler rejects the second attribute, so only a project that does not build is read this way.
+- **The attribute on two partial declarations of one type.**  The generator takes the first, and the tool takes each for a claim, so it describes the files that either attribute's `Source` names.  The compiler rejects the second attribute, so only a project that does not build is read this way.
 
-A value that is not a literal is not among them: the tool reports it, `SQLSRC208`.
+A `Source` that is not a literal is not among them: the tool reports it, `SQLSRC208`.
 
 ## Why it exists
 

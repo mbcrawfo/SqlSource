@@ -1,14 +1,6 @@
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// The model shapes, a suffix and the model namespace by the attribute, with the methods on the type, each taking the
-// connection first; the file's collection type, IReadOnlyList, takes the place of the attribute's.
-[SqlSourceGenerate(
-    Source = "Queries/Shapes.sql",
-    OutputModelType = GeneratorModelType.Record,
-    OutputModelSuffix = "View",
-    InputModelType = GeneratorModelType.SealedClass,
-    ModelNamespace = "SqlSource.DatabaseTests.SqlServer.EndToEnd.Shapes",
-    MethodLocation = MethodLocation.Public,
-    CollectionType = GeneratorCollectionType.List
-)]
+// The methods on the type, each taking the connection first, by MethodLocation.  The model shapes, the suffixes, the
+// model namespace and the collection type, IReadOnlyList, are the file header's.
+[SqlSourceGenerate(Source = "Queries/Shapes.sql", MethodLocation = MethodLocation.Public)]
 internal static partial class ShapeQueries;

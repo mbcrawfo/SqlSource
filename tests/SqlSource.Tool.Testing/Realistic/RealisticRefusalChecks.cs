@@ -11,10 +11,9 @@ namespace SqlSource.Tool.Testing.Realistic;
 // Each case whose models the generator refuses is refused as its case.json says: its query is described against the
 // database "realistic" into a sidecar held in memory, never written, and the generator, run by RealisticGeneration
 // with the settings files of a build (the project's, which names the engine, and the corpus's own, which gives the
-// database realistic) at the output Models of that run, never the attribute's, gives exactly one error, of the id its
-// models names.  So a case the generator comes to accept, or to refuse otherwise, fails naming itself, and its models
-// member cannot go stale.  Both engines' RealisticModelRefusalTests run it, with the references the engine's
-// connection library needs.
+// database realistic) at the output Models of that run, gives exactly one error, of the id its models names.  So a
+// case the generator comes to accept, or to refuse otherwise, fails naming itself, and its models member cannot go
+// stale.  Both engines' RealisticModelRefusalTests run it, with the references the engine's connection library needs.
 internal sealed class RealisticRefusalChecks(
     RealisticDescribe describe,
     int major,

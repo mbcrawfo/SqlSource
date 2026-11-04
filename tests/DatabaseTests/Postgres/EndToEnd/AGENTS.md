@@ -13,7 +13,7 @@
 
 - **A query writes its parameters in camelCase, `@accountId`**, so that an input model binds through Dapper.
 - **A Dapper test runs the constant of a copy of its query in the same file, `<Query>ForDapper`, marked `-- output: models` and naming the original's models by `-- input-model:` and `-- output-model:` unless they are a table's**, on the file's one claim with `SqlLocation.Direct`, since a `codegen` query has a method and no constant.  `VariantCopyTests` holds each copy's SQL to its original's.
-- **A variant of a query, under another generator parameter, collection type or output, is a copy of it in its file, `<Query><Variant>`, never a second claim of the file**, since a file will give every claim the same settings.
+- **A variant of a query, under another generator parameter, collection type or output, is a copy of it in its file, `<Query><Variant>`, never a second claim of the file**, since a file gives every claim the same settings.
 - **A test of a method calls the method, never Dapper in its place**; one that reads asserts the values of at least one row, `NULL`s included.
 - **Every test takes its data source from `EndToEndSources`**, and a test that writes runs in a transaction that is rolled back.
 - **A test that must show that a commit succeeds commits only into a temporary table of its own connection**, as the transaction test of `EndToEnd/StreamingQueryTests.cs` does, since a rollback cannot show that the transaction was not aborted.

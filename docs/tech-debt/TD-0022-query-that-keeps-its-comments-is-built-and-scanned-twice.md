@@ -15,11 +15,11 @@ The same file without `keep-comments` went from 9.3 to 11.3 bytes and from 61 to
 
 ## Why it exists
 
-`keep-comments` can come from a level the parser cannot see: a settings file of the file's folder or of a folder above it, or the attribute of a type that claims the file, and two types that claim one file can ask for different things.  The parser therefore keeps both forms where both may be wanted, and the emitter picks one for each type and query.  The hash needs the form without comments in any case.  See "[The settings have two stages](../architecture/generator.md#the-settings-have-two-stages)" and "[A block has two forms of its SQL](../architecture/generator.md#a-block-has-two-forms-of-its-sql)" in [`docs/architecture/generator.md`](../architecture/generator.md).
+The tokens, the parameters and the hash come from the SQL without comments, whatever the query keeps, so a query that keeps its comments needs both forms, and the parser builds them in two passes.  The parser knows which queries keep their comments: a query's own list or its file header's, else the list of the settings files of the file's folder, which reaches the parser as `FileParseInput.CommentsWanted`.  See "[The settings have two stages](../architecture/generator.md#the-settings-have-two-stages)" and "[A block has two forms of its SQL](../architecture/generator.md#a-block-has-two-forms-of-its-sql)" in [`docs/architecture/generator.md`](../architecture/generator.md).
 
 ## Impact
 
-Low.  It is paid only by a query that keeps its comments, or by every query without a list of its own in a file for which a level outside it asks for comments.  A parse of such a file is still about a tenth of a millisecond for 19 KB.  The test holds a budget of its own for this path, so a further rise is seen.
+Low.  It is paid only by a query that keeps its comments, by its own list or its file's, or by the list of a settings file that reaches it.  A parse of such a file is still about a tenth of a millisecond for 19 KB.  The test holds a budget of its own for this path, so a further rise is seen.
 
 ## Proposed fix
 

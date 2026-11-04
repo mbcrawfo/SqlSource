@@ -48,31 +48,19 @@ internal static class SettingsLevelReader
         return level.Equals(SettingsLevel.None) ? SettingsLevel.None : level;
     }
 
-    // A word that is no generator parameter is recorded, and the other words apply.  The elements of an array win over
-    // a text; an array with no word is the empty list, which is set.
+    // The generator parameters are written as an array alone.  A word that is no generator parameter is recorded by
+    // its index, and the other words apply; an array with no word is the empty list, which is set.
     private static GeneratorParameters? ReadParameters<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
-        if (source.Elements(SettingId.Parameters) is { } elements)
-        {
-            var indexes = new List<int>();
-            var fromElements = GeneratorParameterList.ReadElements(elements, indexes);
-            ReportParts(ref source, SettingId.Parameters, indexes);
-            return fromElements;
-        }
-
-        if (source.Text(SettingId.Parameters) is not { } list || string.IsNullOrWhiteSpace(list))
+        if (source.Elements(SettingId.Parameters) is not { } elements)
         {
             return null;
         }
 
-        var words = new List<string>();
-        var parameters = GeneratorParameterList.Parse(list, words);
-        foreach (var word in words)
-        {
-            source.Invalid(SettingId.Parameters, word);
-        }
-
+        var indexes = new List<int>();
+        var parameters = GeneratorParameterList.ReadElements(elements, indexes);
+        ReportParts(ref source, SettingId.Parameters, indexes);
         return parameters;
     }
 

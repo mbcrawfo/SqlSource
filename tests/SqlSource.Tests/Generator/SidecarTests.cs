@@ -561,45 +561,27 @@ public sealed class SidecarTests
         UsableEntries(run).ShouldBe(["GetUser"]);
     }
 
-    // The first type needs nothing, and the second every query: the file needs what the second needs, and is checked
-    // once.
+    // Two types claim one file, whose query needs an entry: the error is reported once.
     [Fact]
-    public void Run_TwoTypesClaimingOneFile_ReportOnceAndNeedTheUnion()
+    public void Run_TwoTypesThatNeedOneEntry_ReportItOnce()
     {
-        var users = new SqlFile(
-            GeneratorHarness.UsersPath,
-            "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n"
-        );
-
-        var run = RunTwoTypes(
-            "Output = GeneratorOutput.Sql",
-            "Output = GeneratorOutput.Models",
-            users,
-            Sidecars.Of(users, CurrentEntry(users, "CountUsers"))
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(Source = \".\")]\n"
+                        + "public partial class First;\n\n"
+                        + "[SqlSourceGenerate(Source = \".\")]\npublic partial class Second;\n"
+                ),
+            ],
+            [GeneratorHarness.UsersFile],
+            dialect: "postgres"
         );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
                 + "'models' needs one.  Run 'sqlsource describe'.",
-        ]);
-        UsableEntries(run).ShouldBe(["CountUsers"]);
-        run.Sources.Keys.ShouldContain("App.First.g.cs");
-        run.Sources.Keys.ShouldContain("App.Second.g.cs");
-    }
-
-    // Both types need the entry: one error, which names the greater of the two outputs.
-    [Fact]
-    public void Run_TwoTypesThatNeedOneEntry_ReportItOnceWithTheGreatestOutput()
-    {
-        var run = RunTwoTypes(
-            "Output = GeneratorOutput.Models",
-            "Output = GeneratorOutput.CodeGen",
-            GeneratorHarness.UsersFile
-        );
-
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
-                + "'codegen' needs one.  Run 'sqlsource describe'.",
         ]);
     }
 
@@ -758,25 +740,6 @@ public sealed class SidecarTests
 
     private static GeneratorRun Run(OutputKind output, SqlFile[] files, string dialect) =>
         GeneratorHarness.Run(output, [new SourceFile(GeneratorHarness.SourcePath, Source)], files, dialect: dialect);
-
-    // Two types in one folder, which both claim its files, each with the arguments of its attribute.  The project is
-    // at Sql, so the attributes decide.
-    private static GeneratorRun RunTwoTypes(string first, string second, params SqlFile[] files) =>
-        GeneratorHarness.Run(
-            OutputKind.Sql,
-            [
-                new SourceFile(
-                    GeneratorHarness.SourcePath,
-                    $"using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(Source = \".\", {first})]\n"
-                        + "public partial class First;\n\n"
-                        + $"[SqlSourceGenerate(Source = \".\", {second})]\npublic partial class Second;\n"
-                ),
-            ],
-            files,
-            // A query whose output is CodeGen needs the driver for its method (SQLSRC273).
-            references: [NpgsqlReferences.Npgsql10],
-            dialect: "postgres"
-        );
 
     // The text of a sidecar whose hash is a number, which makes it malformed: every other key is as it was.
     private static string WithHashAsANumber(string text) =>

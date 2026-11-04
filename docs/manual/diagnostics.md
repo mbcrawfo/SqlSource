@@ -351,14 +351,14 @@ See: [Source](settings.md#setting-source)
 
 **Attribute value is not valid**
 
-A property of `[SqlSourceGenerate]` has a value it does not take.  The message names the property and the value: a number that is no member of the property's enum, or a word in `Parameters` that is not a generator parameter.
+A property of `[SqlSourceGenerate]` has a value it does not take.  The message names the property and the value: a number that is no member of the property's enum, or a name of the nested class that is not one.
 
 ```csharp
-[SqlSourceGenerate(SqlLocation = (SqlLocation)5, Parameters = "keep-coments")]
+[SqlSourceGenerate(SqlLocation = (SqlLocation)5, NestedClass = "My-Sql")]
 public partial class UserRepository { }
 ```
 
-Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  `InputModelType` and `OutputModelType` take `GeneratorModelType.Record`, `SealedRecord`, `Class` or `SealedClass`; `CollectionType` takes a member of `GeneratorCollectionType`; `MethodLocation` takes a member of `MethodLocation`.  `InputModelSuffix` and `OutputModelSuffix` take characters that can be part of an identifier, `ModelNamespace` takes a namespace such as `App.Models`, and `NestedClass` takes one identifier that is not a keyword; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
+Use a member of the enum: `SqlLocation` takes `SqlLocation.Nested` or `SqlLocation.Direct`, and `MethodLocation` takes a member of `MethodLocation`.  `NestedClass` takes one identifier that is not a keyword; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
 
 See: [All settings](settings.md#all-settings)
 
@@ -1257,7 +1257,7 @@ See: [Options](tool.md#options)
 
 **Attribute argument is not a literal**
 
-The `sqlsource` tool finds `[SqlSourceGenerate]` by reading the C# files of a project as text.  It does not compile them, so it cannot follow a name to its value.  `Source` and `Output` decide which queries are described, and the tool reads those two alone: `Source` must be a string literal, and `Output` a member of `GeneratorOutput` written out.
+The `sqlsource` tool finds `[SqlSourceGenerate]` by reading the C# files of a project as text.  It does not compile them, so it cannot follow a name to its value.  `Source` decides which `.sql` files belong to the type, and the tool reads it alone: it must be a string literal.
 
 ```csharp
 using SqlSource;
@@ -1270,7 +1270,7 @@ internal static partial class Queries;
 /work/App/Queries.cs(3,29): error SQLSRC208: 'Source' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here
 ```
 
-Write the value where the attribute is: `Source = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
+Write the value where the attribute is: `Source = "Queries"`.  A constant, `nameof`, a concatenation and an interpolated string are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
 
 See: [Known issues](generator.md#known-issues)
 
@@ -1294,7 +1294,7 @@ For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in t
 }
 ```
 
-For any other database, and for queries that only want their SQL, set the output to `sql`: `"output": "sql"` in a settings file, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; under the output `models` the file's constants and token methods are generated as before, and under `codegen` its queries get no method.
+For any other database, and for queries that only want their SQL, set the output to `sql`: `"output": "sql"` in a settings file, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; under the output `models` the file's constants and token methods are generated as before, and under `codegen` its queries get no method.
 
 See: [Database support](dialects.md#database-support)
 
@@ -2048,7 +2048,7 @@ The query's output is `models` or `codegen`, which needs a description of the qu
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'codegen' needs one.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](settings.md#settings-files) of the project's folder, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  When the sidecar exists and has the entry, the build does not see it: a project that sets `SqlSourceIncludeFiles` to `false`, or lists a `.sql` file from outside its folder, lists the sidecar as an `AdditionalFiles` item too, as [included files](settings.md#included-files) says.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](settings.md#settings-files) of the project's folder, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  When the sidecar exists and has the entry, the build does not see it: a project that sets `SqlSourceIncludeFiles` to `false`, or lists a `.sql` file from outside its folder, lists the sidecar as an `AdditionalFiles` item too, as [included files](settings.md#included-files) says.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
 See: [Output](settings.md#setting-output)
 
@@ -2100,7 +2100,7 @@ The sidecar has an entry for a query that does not need one: a query that was re
 
 Run `dotnet sqlsource describe` and commit the sidecar it writes, which has no such entry.  When no query of the file needs an entry any more, a run of `describe` over the whole project deletes the sidecar.
 
-A `.sql` file that two projects include is the exception.  A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.  A run over only the project that warns removes the entry, and the other project's build then reports [SQLSRC241](#sqlsrc241).  For such a file the warning clears when the query needs an entry in both projects or in neither, which is an output other than `sql` in both or `sql` in both, or when the project lists `SQLSRC245` in `NoWarn`.  See [known issues](sql-files.md#known-issues).
+A `.sql` file that two projects include is the exception when one of them misses a settings file of its folder that the other finds, such as one a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The query's output can then be `sql` in one project and not in the other.  A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.  A run over only the project that warns removes the entry, and the other project's build then reports [SQLSRC241](#sqlsrc241).  For such a file the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [known issues](sql-files.md#known-issues).
 
 This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`.
 

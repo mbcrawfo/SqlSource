@@ -110,7 +110,7 @@ cat >Sample.csproj <<'SAMPLE_EOF'
 </Project>
 SAMPLE_EOF
 cat >sqlsource.json <<'SAMPLE_EOF'
-{ "root": true, "dialect": "postgres" }
+{ "root": true, "dialect": "postgres", "output": "models" }
 SAMPLE_EOF
 cat >Directory.Build.targets <<'SAMPLE_EOF'
 <Project>
@@ -136,7 +136,7 @@ using SqlSource;
 
 namespace Sample;
 
-[SqlSourceGenerate(Source = "Queries", Output = GeneratorOutput.Models)]
+[SqlSourceGenerate(Source = "Queries")]
 internal static partial class Queries;
 SAMPLE_EOF
 cat >Program.cs <<'SAMPLE_EOF'

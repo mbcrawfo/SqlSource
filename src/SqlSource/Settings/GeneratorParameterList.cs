@@ -4,20 +4,18 @@ using System.Collections.Generic;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The names of the generator parameters, and a list of them as the attribute or a settings file writes it.  This is
-/// the only place the names are known.
+/// The names of the generator parameters, and a list of them as a settings file writes it.  This is the only place the
+/// names are known.
 /// </summary>
 /// <remarks>
 /// <para>
-/// A list is words separated by white space.  Each level that gives a list gives it whole: nothing is added to the
-/// list of a level below.  The word <c>default</c>, alone or repeated, is the empty list.
+/// A list is words.  Each level that gives a list gives it whole: nothing is added to the list of a level below.  The
+/// word <c>default</c>, alone or repeated, is the empty list.
 /// </para>
 /// <para>
-/// A <c>-- generator:</c> marker walks the same words, with <see cref="Words" />, and holds them to a rule of its
-/// own, in <c>SqlGeneratorParameterScope</c>.  The two rules differ on purpose.  A marker has a position for each
-/// word and adds up over several lines, so it reports the one word that conflicts, and a word with <c>=</c> as a
-/// value that is not valid.  An argument of the attribute has no position inside the value, so <c>default</c> beside
-/// another word makes the whole value the thing to quote.
+/// A <c>-- generator:</c> marker walks the words of its line, with <see cref="Words" />, and holds them to a rule of
+/// its own, in <c>SqlGeneratorParameterScope</c>: it adds up over several lines, so it reports the one word that
+/// conflicts, and a word with <c>=</c> as a value that is not valid.
 /// </para>
 /// </remarks>
 internal static class GeneratorParameterList
@@ -65,57 +63,6 @@ internal static class GeneratorParameterList
     /// is allocated.
     /// </summary>
     public static WordEnumerator Words(ReadOnlySpan<char> text) => new(text);
-
-    /// <summary>
-    /// Reads a list that is not in a marker.  Null when the value is empty, or holds no word that is a parameter or
-    /// <c>default</c>: the level then gives no list.  <c>default</c> alone or repeated is the empty list.  A word that
-    /// is no parameter is added to <paramref name="invalid" /> and the other words apply.  <c>default</c> beside a word
-    /// other than itself makes the whole value invalid.
-    /// </summary>
-    public static GeneratorParameters? Parse(string? value, List<string> invalid)
-    {
-        var whole = value.AsSpan().Trim();
-        if (whole.IsEmpty)
-        {
-            return null;
-        }
-
-        GeneratorParameters? parameters = null;
-        var hasDefault = false;
-        var hasOther = false;
-        foreach (var word in Words(whole))
-        {
-            if (IsDefault(word))
-            {
-                hasDefault = true;
-                continue;
-            }
-
-            hasOther = true;
-            if (TryFind(word, out var parameter))
-            {
-                parameters = (parameters ?? GeneratorParameters.None) | parameter;
-            }
-            else
-            {
-                invalid.Add(word.ToString());
-            }
-        }
-
-        if (!hasDefault)
-        {
-            return parameters;
-        }
-
-        if (!hasOther)
-        {
-            return GeneratorParameters.None;
-        }
-
-        invalid.Clear();
-        invalid.Add(whole.ToString());
-        return null;
-    }
 
     /// <summary>
     /// Reads a list written as an array, as a settings file writes it, each element one word.  An element is trimmed,

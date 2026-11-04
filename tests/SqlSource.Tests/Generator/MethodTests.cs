@@ -22,15 +22,7 @@ public sealed class MethodTests
         "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id;\n"
     );
 
-    private static readonly SidecarEntry[] UsersEntries =
-    [
-        Entry(
-            Users,
-            "GetUser",
-            [Parameter("id", Int4 with { BindName = "integer" })],
-            [Column("id"), Column("name", Text, nullable: true)]
-        ),
-    ];
+    private static readonly SidecarEntry[] UsersEntries = EntriesOf(Users);
 
     [Fact]
     public void Run_CodeGenQuery_IsAnExtensionMethodOfTheTypesExtensionClass()
@@ -178,13 +170,12 @@ public sealed class MethodTests
     [Fact]
     public void Run_MethodNamedLikeTheNestedClassOfCodeGenQueriesAlone_Compiles()
     {
+        var users = UsersWith("-- generator: async-method-suffix\n");
+
         var run = MethodRuns.Run(
-            Users,
-            UsersEntries,
-            MethodRuns.SampleSource(
-                "MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\", "
-                    + "Parameters = \"async-method-suffix\""
-            )
+            users,
+            EntriesOf(users),
+            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\"")
         );
 
         run.ShouldBeClean();
@@ -196,15 +187,13 @@ public sealed class MethodTests
     [Fact]
     public void Run_MethodNamedLikeTheNestedClassBesideAFileLeftOut_Compiles()
     {
+        var users = UsersWith("-- generator: async-method-suffix\n");
         var other = new SqlFile("/app/Repo/Zed.sql", "-- name: GetUser\n-- output: sql\nSELECT 2;\n");
 
         var run = MethodRuns.Run(
-            MethodRuns.SampleSource(
-                "MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\", "
-                    + "Parameters = \"async-method-suffix\""
-            ),
-            Users,
-            Sidecars.Of(Users, UsersEntries),
+            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\""),
+            users,
+            Sidecars.Of(users, EntriesOf(users)),
             other
         );
 
@@ -420,7 +409,9 @@ public sealed class MethodTests
     [Fact]
     public void Run_AsyncMethodSuffix_NamesTheMethodWithAsync()
     {
-        var run = MethodRuns.Run(Users, UsersEntries, MethodRuns.SampleSource("Parameters = \"async-method-suffix\""));
+        var users = UsersWith("-- generator: async-method-suffix\n");
+
+        var run = MethodRuns.Run(users, EntriesOf(users));
 
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
@@ -432,13 +423,12 @@ public sealed class MethodTests
     [Fact]
     public void Run_SortedRecordOutput_PassesEachColumnToItsProperty()
     {
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT zeta, alpha FROM users;\n");
-
-        var run = MethodRuns.Run(
-            file,
-            [Entry(file, "GetUser", [], [Column("zeta"), Column("alpha")])],
-            MethodRuns.SampleSource("Parameters = \"sort-output\"")
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: sort-output\n\n-- name: GetUser\nSELECT zeta, alpha FROM users;\n"
         );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetUser", [], [Column("zeta"), Column("alpha")])]);
 
         run.ShouldBeClean();
         run.Sources[GetUserDtoFile].ShouldContain("record GetUserDto(int Alpha, int Zeta);");
@@ -452,13 +442,13 @@ public sealed class MethodTests
     [Fact]
     public void Run_SortedClassOutput_SetsEachPropertyByItsName()
     {
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT zeta, alpha FROM users;\n");
-
-        var run = MethodRuns.Run(
-            file,
-            [Entry(file, "GetUser", [], [Column("zeta"), Column("alpha")])],
-            MethodRuns.SampleSource("Parameters = \"sort-output\", OutputModelType = GeneratorModelType.Class")
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: sort-output\n-- output-model-type: class\n\n"
+                + "-- name: GetUser\nSELECT zeta, alpha FROM users;\n"
         );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetUser", [], [Column("zeta"), Column("alpha")])]);
 
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
@@ -598,7 +588,9 @@ public sealed class MethodTests
     [Fact]
     public void Run_ModelsOutput_GivesNoMethod()
     {
-        var run = MethodRuns.Run(Users, UsersEntries, MethodRuns.SampleSource("Output = GeneratorOutput.Models"));
+        var users = UsersWith("-- output: models\n");
+
+        var run = MethodRuns.Run(users, EntriesOf(users));
 
         run.ShouldBeClean();
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
@@ -622,4 +614,18 @@ public sealed class MethodTests
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
+
+    // Users with these markers in its file header, before a blank line.
+    private static SqlFile UsersWith(string header) => Users with { Text = header + "\n" + Users.Text };
+
+    // The entry of GetUser of Users, or of Users with markers, written for that file's hash.
+    private static SidecarEntry[] EntriesOf(SqlFile file) =>
+        [
+            Entry(
+                file,
+                "GetUser",
+                [Parameter("id", Int4 with { BindName = "integer" })],
+                [Column("id"), Column("name", Text, nullable: true)]
+            ),
+        ];
 }

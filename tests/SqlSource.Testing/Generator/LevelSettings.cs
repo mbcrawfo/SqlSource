@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 namespace SqlSource.Testing.Generator;
 
 // The levels that give a setting of the generator, from the least specific: the project's settings file, the settings
-// file of the .sql file's folder, the type's attribute, a marker of the file header and a marker of a query.
+// file of the .sql file's folder, a marker of the file header and a marker of a query.
 //
 // It is public, though the library's types are internal, since a public test method takes it in its rows, and C#
 // refuses a public method whose parameter has a type less accessible than the method.
@@ -14,42 +14,30 @@ public enum SettingLevel
 {
     ProjectFile,
     FolderFile,
-    Attribute,
     Header,
     Query,
 }
 
-// A setting by its name at each level: the key of a settings file, the argument of the attribute, null for a setting
-// the attribute has not, and the marker.  The attribute takes the value of a setting with an enum as that enum's
-// member, so its value is the member's name, and as a string otherwise.
-internal sealed record Setting(string Key, string? AttributeArgument, string Marker, string? AttributeEnum = null)
+// A setting by its name at each level: the key of a settings file and the marker.
+internal sealed record Setting(string Key, string Marker)
 {
-    public static readonly Setting Output = new("output", "Output", "output", "GeneratorOutput");
+    public static readonly Setting Output = new("output", "output");
 
-    public static readonly Setting CollectionType = new(
-        "collectionType",
-        "CollectionType",
-        "collection-type",
-        "GeneratorCollectionType"
-    );
+    public static readonly Setting CollectionType = new("collectionType", "collection-type");
 
-    public static readonly Setting InputModelSuffix = new("inputModelSuffix", "InputModelSuffix", "input-model-suffix");
+    public static readonly Setting InputModelSuffix = new("inputModelSuffix", "input-model-suffix");
 
-    public static readonly Setting OutputModelSuffix = new(
-        "outputModelSuffix",
-        "OutputModelSuffix",
-        "output-model-suffix"
-    );
+    public static readonly Setting OutputModelSuffix = new("outputModelSuffix", "output-model-suffix");
 
-    public static readonly Setting ModelNamespace = new("modelNamespace", "ModelNamespace", "model-namespace");
+    public static readonly Setting ModelNamespace = new("modelNamespace", "model-namespace");
 
-    public static readonly Setting GeneratorParameters = new("generatorParameters", "Parameters", "generator");
+    public static readonly Setting GeneratorParameters = new("generatorParameters", "generator");
 
-    public static readonly Setting TypeOverrides = new("typeOverrides", null, "type-override");
+    public static readonly Setting TypeOverrides = new("typeOverrides", "type-override");
 }
 
-// Settings, each at its level, and what a run is given for them: the project's settings, the type's source, and the
-// .sql file with its folder's settings file.  A level without a setting leaves its part as it was.
+// Settings, each at its level, and what a run is given for them: the project's settings, and the .sql file with its
+// folder's settings file.  A level without a setting leaves its part as it was.
 internal sealed class LevelSettings
 {
     private const string SettingsFileName = "sqlsource.json";
@@ -73,40 +61,11 @@ internal sealed class LevelSettings
         IsFile(level) ? GeneratorHarness.Json(GeneratorHarness.Words(words)) : words;
 
     // The setting at the level, with the value as that level writes it: at a settings file's level a JSON value, such
-    // as "Sql", ["keep-comments"] or {"int4": "long"}, and otherwise the text of the attribute's argument or the
-    // marker.
+    // as "Sql", ["keep-comments"] or {"int4": "long"}, and otherwise the text of the marker.
     public LevelSettings At(SettingLevel level, Setting setting, string value)
     {
         _settings.Add((level, setting, value));
         return this;
-    }
-
-    // The source with the attribute's arguments, Name = "value" or Name = Enum.Value joined by ", ", after the Source
-    // of its [SqlSourceGenerate(Source = ".")], or the source unchanged when no setting is at the attribute's level.
-    public string Source(string source)
-    {
-        var arguments = AtLevel(SettingLevel.Attribute);
-        if (arguments.Length == 0)
-        {
-            return source;
-        }
-
-        var written = arguments.Select(argument =>
-            (
-                argument.Setting.AttributeArgument
-                ?? throw new InvalidOperationException($"The attribute has no argument for {argument.Setting.Key}.")
-            )
-            + (
-                argument.Setting.AttributeEnum is { } type
-                    ? " = " + type + "." + argument.Value
-                    : " = \"" + argument.Value + "\""
-            )
-        );
-        return source.Replace(
-            "[SqlSourceGenerate(Source = \".\")]",
-            "[SqlSourceGenerate(Source = \".\", " + string.Join(", ", written) + ")]",
-            StringComparison.Ordinal
-        );
     }
 
     // The file, with the file header's markers, each "-- <marker>: <value>" on its line and then a blank line, before

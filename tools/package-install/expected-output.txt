@@ -2,7 +2,6 @@ constant: SELECT id, name FROM users   WHERE id = @id;
 validation off: SELECT id, name FROM users ;
 validation on: ArgumentException for whereClause
 comments kept by the file header: SELECT 1 /* kept */ AS one;
-comments kept by the attribute: SELECT id, name FROM users /* by key */ WHERE id = @id;
 dialect of the project: SELECT E'it'
     '\'s -- not a comment' AS note;
 dialect of the file header: SELECT 'it\'s' AS note, 5--3 AS eight;

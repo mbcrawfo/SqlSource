@@ -1,6 +1,11 @@
 -- The queries of the shapes of models, claimed by ShapeQueries.  SearchAccounts has its collection type by its marker,
--- and the others by the attribute's.
+-- and the others by this header's.
 -- input-model-suffix: Filter
+-- output-model-suffix: View
+-- input-model-type: sealed-class
+-- output-model-type: record
+-- model-namespace: SqlSource.DatabaseTests.Postgres.EndToEnd.Shapes
+-- collection-type: List
 
 -- name: SearchAccounts -> many
 -- summary: The accounts with a name like a pattern, or with an id.

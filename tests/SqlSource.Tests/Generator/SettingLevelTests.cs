@@ -20,18 +20,14 @@ public sealed class SettingLevelTests
 {
     private const string Sql = "-- name: Q\nSELECT 1;\n";
 
-    // Sql with the query at sql by its marker, so that the type's file has its constant, whose text shows the marker's
-    // line stripped, and the run reports nothing.
-    private const string SqlAtSql = "-- name: Q\n-- output: sql\nSELECT 1;\n";
-
-    // The constant of SqlAtSql, which a comparison of two type files checks is there.
-    private const string Constant = "public const string Q = \"SELECT 1;\";\n";
-
     // The query of the method runs, with its entry written for the file as each level's markers leave it.
     private static readonly SqlFile Users = new(
         GeneratorHarness.UsersPath,
         "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
     );
+
+    // Users with its header's output at sql.
+    private static readonly SqlFile UsersAtSql = new(GeneratorHarness.UsersPath, "-- output: sql\n\n" + Users.Text);
 
     // The one diagnostic of Sql under the defaults: SQLSRC209 at Q, on its first line.
     private static readonly string[] Default = [NotDescribable("codegen", 1)];
@@ -67,53 +63,14 @@ public sealed class SettingLevelTests
     // out.
     // Every level below the project's file.
     public static TheoryData<SettingLevel> LevelsBelowTheProjectFile =>
-        [SettingLevel.FolderFile, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
+        [SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
 
-    // Every level of a setting that the attribute has too.
+    // Every level of a setting.
     public static TheoryData<SettingLevel> Levels =>
-        [
-            SettingLevel.ProjectFile,
-            SettingLevel.FolderFile,
-            SettingLevel.Attribute,
-            SettingLevel.Header,
-            SettingLevel.Query,
-        ];
+        [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
 
     [Theory]
-    [InlineData("InputModelSuffix = \"Args\", OutputModelSuffix = \"Row\", ModelNamespace = \"App.Models\"")]
-    [InlineData("InputModelType = GeneratorModelType.Class, OutputModelType = GeneratorModelType.SealedRecord")]
-    [InlineData("InputModelSuffix = \"\", ModelNamespace = \"  \"")]
-    public void Run_ValidAttributeProperty_ChangesNoGeneratedCode(string argument)
-    {
-        var plain = GeneratorHarness.Run(
-            null,
-            GeneratorHarness.SampleSource(null),
-            new SqlFile("/app/Repo/Q.sql", SqlAtSql)
-        );
-
-        var run = GeneratorHarness.Run(
-            null,
-            GeneratorHarness.SampleSource(argument),
-            new SqlFile("/app/Repo/Q.sql", SqlAtSql)
-        );
-
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        plain.Sources[GeneratorHarness.SampleFile].ShouldContain(Constant);
-        run.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
-    }
-
-    [Theory]
-    [InlineData("Output = (GeneratorOutput)7", "7", "Output")]
-    [InlineData("Output = (GeneratorOutput)(-1)", "-1", "Output")]
-    [InlineData("InputModelType = (GeneratorModelType)4", "4", "InputModelType")]
-    [InlineData("OutputModelType = (GeneratorModelType)9", "9", "OutputModelType")]
-    [InlineData("CollectionType = (GeneratorCollectionType)11", "11", "CollectionType")]
     [InlineData("MethodLocation = (MethodLocation)4", "4", "MethodLocation")]
-    [InlineData("InputModelSuffix = \"A B\"", "A B", "InputModelSuffix")]
-    [InlineData("OutputModelSuffix = \"A.B\"", "A.B", "OutputModelSuffix")]
-    [InlineData("ModelNamespace = \"App.\"", "App.", "ModelNamespace")]
     public void Run_AttributePropertyThatIsNotValid_IsAnErrorAtTheAttribute(
         string argument,
         string value,
@@ -234,7 +191,7 @@ public sealed class SettingLevelTests
         var run = MethodRuns.Run(
             file,
             [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
-            settings.Source(MethodRuns.Source),
+            MethodRuns.Source,
             settings: settings.ProjectSettings,
             otherFiles: files[1..]
         );
@@ -283,6 +240,55 @@ public sealed class SettingLevelTests
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
     }
 
+    // The file owns its output: two types that claim it, under a project's file of models, both take its header's sql,
+    // so each gets the constant, neither gets models, and the query needs no entry.
+    [Fact]
+    public void Run_TwoTypesClaimingOneFile_BothTakeItsHeaderOutput()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(Source = \".\")]\n"
+                        + "public partial class First;\n\n"
+                        + "[SqlSourceGenerate(Source = \".\")]\npublic partial class Second;\n"
+                ),
+            ],
+            [UsersAtSql],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources["App.First.g.cs"].ShouldContain(GetUserConstant);
+        run.Sources["App.Second.g.cs"].ShouldContain(GetUserConstant);
+        ModelRuns.ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // The header is more specific than the settings file of the file's folder.
+    [Fact]
+    public void Run_HeaderOutputOverSettingsFileOutput_Wins()
+    {
+        var run = GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
+            [
+                UsersAtSql,
+                GeneratorHarness.SettingsFile(
+                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
+                    "{\"output\": \"Models\"}"
+                ),
+            ],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain(GetUserConstant);
+        ModelRuns.ModelFiles(run).ShouldBeEmpty();
+    }
+
     // SQLSRC209 for the query Q at this line, under the default dialect.
     private static string NotDescribable(string output, int line) =>
         $"SQLSRC209 /app/Repo/Q.sql({line},10)-({line},11): The output '{output}' needs each query described by its "
@@ -318,7 +324,7 @@ public sealed class SettingLevelTests
         var run = MethodRuns.Run(
             file,
             withEntry ? [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])] : [],
-            settings.Source(MethodRuns.Source),
+            MethodRuns.Source,
             settings: settings.ProjectSettings,
             otherFiles: files[1..]
         );

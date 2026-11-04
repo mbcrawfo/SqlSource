@@ -115,17 +115,7 @@ public sealed class LibraryConversionTests
     [Fact]
     public void Run_NodaTimeOnAndOnlyAModelsQuery_EmitsNoClass()
     {
-        const string Models = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Sample;
-            }
-            """;
-
-        var run = RunDates(NodaTimeOn + FindDates, WithNodaTime, Models);
+        var run = RunDates("-- output: models\n" + NodaTimeOn + FindDates, WithNodaTime);
 
         run.ShouldBeClean();
         run.Sources.Keys.ShouldNotContain(ClassFile);
@@ -571,17 +561,7 @@ public sealed class LibraryConversionTests
     [Fact]
     public void Run_NoCodeGenUse_EmitsNoJsonConversions()
     {
-        const string Models = """
-            using SqlSource;
-
-            namespace App
-            {
-                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
-                public partial class Sample;
-            }
-            """;
-
-        var run = RunSqlServerDocs(JsonOn + FindDocs, SqlServerJson, Models);
+        var run = RunSqlServerDocs("-- output: models\n" + JsonOn + FindDocs, SqlServerJson);
 
         run.ShouldBeClean();
         run.Sources.Keys.ShouldNotContain(JsonClassFile);
