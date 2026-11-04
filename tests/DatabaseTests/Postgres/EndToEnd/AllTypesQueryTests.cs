@@ -14,10 +14,11 @@ using static SqlSource.DatabaseTests.TestHarness.EndToEnd.ModelReflection;
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // The type map through the generated methods and through Dapper.  The read side: both rows of all_types into
-// AllTypesDto, every column of each, by AllTypesQueries' method and by AllTypesSql's constant through Dapper.  The
-// write side of InsertAllTypes: a row inserted with InsertAllTypesArgs, built from the values of row 1, and read back
-// by RETURNING, for every type that Dapper can send, by its method and by its constant through Dapper.  Each insert
-// runs in a transaction that is rolled back.  EveryTypeTests writes every column through InsertEveryType's method.
+// AllTypesDto, every column of each, by AllTypesQueries' method and by the constant of its copy ListAllTypesForDapper
+// through Dapper.  The write side of InsertAllTypes: a row inserted with InsertAllTypesArgs, built from the values of
+// row 1, and read back by RETURNING, for every type that Dapper can send, by its method and by its constant through
+// Dapper.  Each insert runs in a transaction that is rolled back.  EveryTypeTests writes every column through
+// InsertEveryType's method.
 [Collection(UsesPostgres.Name)]
 public sealed class AllTypesQueryTests(PostgresDatabases postgres)
 {
@@ -133,7 +134,7 @@ public sealed class AllTypesQueryTests(PostgresDatabases postgres)
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes)).ToList();
+        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypesForDapper)).ToList();
 
         // Npgsql gives the type of an array column as System.Array, and Dapper looks for a constructor of that exact
         // type, so the positional constructor of the record never matches the row.  Dapper reads it through the
@@ -155,11 +156,14 @@ public sealed class AllTypesQueryTests(PostgresDatabases postgres)
         try
         {
             var full = (
-                await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes, transaction: transaction)
+                await connection.QueryAsync<AllTypesDto>(
+                    AllTypesQueries.ListAllTypesForDapper,
+                    transaction: transaction
+                )
             ).Single(static row => row.Id == AllTypesRows.FullRowId);
 
             var row = await connection.QuerySingleAsync<AllTypesDto>(
-                AllTypesSql.InsertAllTypes,
+                AllTypesQueries.InsertAllTypesForDapper,
                 AllTypesRows.ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
                 transaction
             );
@@ -186,8 +190,8 @@ public sealed class AllTypesQueryTests(PostgresDatabases postgres)
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(token);
-        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes)).Single(static row =>
-            row.Id == AllTypesRows.FullRowId
+        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypesForDapper)).Single(
+            static row => row.Id == AllTypesRows.FullRowId
         );
         var column = typeof(AllTypesDto).GetProperty(property).ShouldNotBeNull(property);
         var type = Nullable.GetUnderlyingType(column.PropertyType) ?? column.PropertyType;

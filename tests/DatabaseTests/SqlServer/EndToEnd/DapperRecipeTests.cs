@@ -20,8 +20,8 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // in DynamicParameters over the generated input model; a SqlVector<float>, which Dapper refuses, goes as a
 // TypedParameter; a string is written to json as it is; DateOnly, TimeOnly and an alias type mapped to a struct are
 // read through their handlers; a mark in an alias is matched neither by a record nor by a class; and a command on a
-// connection in a transaction is given the transaction.  The generated SQL it runs is that of the claims at the output
-// models, in DapperQueries.cs.  A test that writes rolls back.
+// connection in a transaction is given the transaction.  The SQL it runs is the constants of the ForDapper copies, at
+// the output models, of the queries of AllTypes.sql, Writes.sql and Notes.sql.  A test that writes rolls back.
 [Collection(UsesSqlServer.Name)]
 public sealed class DapperRecipeTests(SqlServerDatabases sqlServer)
 {
@@ -108,11 +108,11 @@ public sealed class DapperRecipeTests(SqlServerDatabases sqlServer)
             parameters.Add("writtenAt", args.WrittenAt, DbType.DateTime2);
 
             var exact = await connection.QuerySingleAsync<AddNoteDto>(
-                WriteDapperQueries.AddNote,
+                WriteQueries.AddNoteForDapper,
                 parameters,
                 transaction
             );
-            var alone = await connection.QuerySingleAsync<AddNoteDto>(WriteDapperQueries.AddNote, args, transaction);
+            var alone = await connection.QuerySingleAsync<AddNoteDto>(WriteQueries.AddNoteForDapper, args, transaction);
             const string Read = "SELECT written_at FROM dbo.notes WHERE id = @id";
             var writtenExact = await connection.ExecuteScalarAsync<DateTime>(Read, new { id = exact.Id }, transaction);
             var writtenAlone = await connection.ExecuteScalarAsync<DateTime>(Read, new { id = alone.Id }, transaction);
@@ -201,7 +201,7 @@ public sealed class DapperRecipeTests(SqlServerDatabases sqlServer)
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         var error = await Should.ThrowAsync<InvalidOperationException>(() =>
-            connection.QueryAsync<ListMarkedNamesDto>(NoteDapperQueries.ListMarkedNames)
+            connection.QueryAsync<ListMarkedNamesDto>(NoteQueries.ListMarkedNamesForDapper)
         );
 
         error.Message.ShouldContain("upper_name!");
@@ -215,7 +215,7 @@ public sealed class DapperRecipeTests(SqlServerDatabases sqlServer)
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var names = (await connection.QueryAsync<MarkedNames>(NoteDapperQueries.ListMarkedNames)).ToList();
+        var names = (await connection.QueryAsync<MarkedNames>(NoteQueries.ListMarkedNamesForDapper)).ToList();
 
         names.Count.ShouldBe(3);
         names.ShouldAllBe(static name => name.Id == MarkedNames.Unset && name.UpperName == nameof(MarkedNames.Unset));
@@ -272,7 +272,7 @@ public sealed class DapperRecipeTests(SqlServerDatabases sqlServer)
     {
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
-        return (await connection.QueryAsync<AllTypesDto>(AllTypesDapperQueries.ListAllTypes)).Single(static row =>
+        return (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypesForDapper)).Single(static row =>
             row.Id == SqlServerAllTypesRows.FullRowId
         );
     }

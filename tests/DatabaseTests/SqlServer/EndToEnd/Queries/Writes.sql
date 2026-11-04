@@ -7,6 +7,15 @@ INSERT INTO dbo.notes (account_id, kind, body, written_at)
 OUTPUT INSERTED.id, INSERTED.kind
 VALUES (@accountId, @kind, @body, @writtenAt);
 
+-- name: AddNoteForDapper
+-- summary: AddNote again, at the output models, whose constant the Dapper tests run.
+-- output: models
+-- input-model: AddNoteArgs
+-- output-model: AddNoteDto
+INSERT INTO dbo.notes (account_id, kind, body, written_at)
+OUTPUT INSERTED.id, INSERTED.kind
+VALUES (@accountId, @kind, @body, @writtenAt);
+
 -- name: RenameAccount
 -- summary: Renames an account, and returns its name before and after.
 UPDATE dbo.accounts

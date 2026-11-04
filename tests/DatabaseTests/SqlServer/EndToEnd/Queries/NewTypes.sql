@@ -9,6 +9,13 @@ SELECT *
 FROM dbo.new_types
 ORDER BY id;
 
+-- name: ListNewTypesForDapper
+-- summary: ListNewTypes again, at the output models, whose constant the Dapper tests run.
+-- output: models
+SELECT *
+FROM dbo.new_types
+ORDER BY id;
+
 -- name: WriteNewTypes -> one
 -- summary: Inserts a row of new_types, each column of which can be null, and returns it.
 -- param: @jsonValue null

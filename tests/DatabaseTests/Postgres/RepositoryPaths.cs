@@ -1,3 +1,4 @@
+using System.IO;
 using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Testing;
 
@@ -12,4 +13,7 @@ internal static class RepositoryPaths
 
     public static string EndToEndProject { get; } =
         RepositoryRoot.Path("tests", "DatabaseTests", "Postgres", "Postgres.csproj");
+
+    // The folder of the end-to-end queries and their sidecars.
+    public static string EndToEndQueries { get; } = Path.Combine(EndToEnd, "Queries");
 }
