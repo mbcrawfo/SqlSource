@@ -65,6 +65,10 @@ public sealed partial class BuildFileTests
     // The target that finds the settings files and gives them to the compiler.
     private const string SearchTarget = "SqlSourceFindSettingsFiles";
 
+    // The targets that the search depends on, which list the files and find the symbolic links above the project.
+    private const string ListSettingsTarget = "SqlSourceListSettingsFiles";
+    private const string LinksTarget = "SqlSourceFindProjectLinks";
+
     // The target that a target of a project hooks when it adds a .sql file, so that the file is searched above and is
     // in the manifest.
     private const string ListTarget = "SqlSourceListFiles";
@@ -152,6 +156,8 @@ public sealed partial class BuildFileTests
                     is not (
                         ManifestTarget
                         or ListTarget
+                        or ListSettingsTarget
+                        or LinksTarget
                         or DescribeOnlineTarget
                         or RunOnlineTarget
                         or ListSidecarsTarget
@@ -435,23 +441,34 @@ public sealed partial class BuildFileTests
     // the file exists.  The search is not under SqlSourceIncludeFiles, so a project that lists its own .sql files
     // still gets its settings.  It runs in a target, so that a .sql file a target adds is searched above too, and
     // after SqlSourceListFiles, the hook such a target is given.  A file the project lists itself is not given twice.
+    // The targets that list the files and find the links hook nothing, and run only as what the search depends on.
     [Fact]
     public void Targets_SettingsFileSearch_FindsEverySqlsourceJsonAboveTheSqlFilesAndTheCompileFiles()
     {
-        var target = Target(SearchTarget);
-
-        target
-            .Attributes()
-            .ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value)
+        AttributesOf(Target(SearchTarget))
             .ShouldBe(
                 new Dictionary<string, string>
                 {
                     ["Name"] = SearchTarget,
                     ["BeforeTargets"] = SearchHook,
-                    ["DependsOnTargets"] = ListTarget,
+                    ["DependsOnTargets"] = ListTarget + ";" + ListSettingsTarget + ";" + LinksTarget,
+                    ["Outputs"] = "%(SqlSourceSettingsFileNew.Identity)",
                 }
             );
-        var items = target.Elements("ItemGroup").ShouldHaveSingleItem().Elements().ToList();
+        AttributesOf(Target(ListSettingsTarget))
+            .ShouldBe(
+                new Dictionary<string, string> { ["Name"] = ListSettingsTarget, ["DependsOnTargets"] = ListTarget }
+            );
+        AttributesOf(Target(LinksTarget))
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Name"] = LinksTarget,
+                    ["DependsOnTargets"] = ListSettingsTarget,
+                    ["Outputs"] = "%(SqlSourceSettingsSearchProjectFolder.Identity)",
+                }
+            );
+        var items = Target(ListSettingsTarget).Elements("ItemGroup").ShouldHaveSingleItem().Elements().ToList();
         items
             .Select(item =>
                 (
@@ -475,12 +492,23 @@ public sealed partial class BuildFileTests
                         + "->Combine('sqlsource.json')->Exists())"
                 ),
                 (
-                    "AdditionalFiles",
-                    "Include=@(SqlSourceSettingsFileFound) Exclude=@(AdditionalFiles->'%(FullPath)') Visible=false"
+                    "SqlSourceSettingsFileNew",
+                    "Include=@(SqlSourceSettingsFileFound) Exclude=@(AdditionalFiles->'%(FullPath)')"
+                ),
+                ("SqlSourceSettingsSearchProject", "Include=$(MSBuildProjectFullPath)"),
+                (
+                    "SqlSourceSettingsSearchProjectFolder",
+                    "Include=@(SqlSourceSettingsSearchProject->GetPathsOfAllDirectoriesAbove())"
                 ),
             ]);
         items.ShouldAllBe(item => !item.HasElements);
+        Target(SearchTarget)
+            .Descendants("AdditionalFiles")
+            .ShouldAllBe(item => item.Attribute("Visible")!.Value == "false" && item.Attribute("Condition") != null);
     }
+
+    private static Dictionary<string, string> AttributesOf(XElement element) =>
+        element.Attributes().ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value);
 
     // The manifest lists the settings files the compiler is given, so that the tool reads the same ones: every
     // AdditionalFiles item named sqlsource.json, the search's and any the project lists, each once by its full path.

@@ -142,6 +142,19 @@
         with a relative path (msbuild issue 4392).  A file that the project lists itself is not added again, so that
         the compiler is given none twice; the comparison is of full paths, since the project may list it by another.
 
+        Each file is given by its path relative to the project's folder, as the project's own .sql and C# files are.
+        The compiler makes such a path full against its working folder, where a symbolic link on the way is resolved,
+        while MSBuild keeps the link in a full path, and the generator compares the paths as text: a file given by its
+        full path through a link would reach none of the project's files.  A file outside the deepest link among the
+        project's folder and the folders above it is given by its full path instead, since its relative path would
+        climb out of the folder the link leads to and name another file, which the compiler fails the build on.  A
+        link is a folder whose attributes hold ReparsePoint, and the deepest is the one link above no other.
+
+        The search is three targets.  SqlSourceListSettingsFiles lists the files and the project's folders,
+        SqlSourceFindProjectLinks finds the links among the folders, once for each, and SqlSourceFindSettingsFiles,
+        which a build hooks and the others depend on, adds the files, once for each.  A path goes through a property
+        on its way into a property function, since metadata would be text inside it, cut short by a quote.
+
         It runs in a target, and not where this file is imported, so that a .sql file that a target adds is searched
         above too.  In a build it runs just before CoreCompile, from SqlSource.AfterSdk.targets, after every target of
         the project that hooks CoreCompile; where that file is not imported, SqlSourceSettingsSearchHook hooks it to
@@ -151,23 +164,68 @@
         that a target adds, so Visible="false" is only for one that might; a settings file in the project's folder is
         listed anyway, as None or Content.
 
-        The chain of item functions is one attribute, and cannot be wrapped, so the check of the line length is off
-        for the target.
+        The chains of item functions and the conditions are one attribute each, and cannot be wrapped, so the check of
+        the line length is off for the targets.
     -->
     <!-- editorconfig-checker-disable -->
-    <Target
-        Name="SqlSourceFindSettingsFiles"
-        BeforeTargets="$(SqlSourceSettingsSearchHook)"
-        DependsOnTargets="SqlSourceListFiles"
-    >
+    <Target Name="SqlSourceListSettingsFiles" DependsOnTargets="SqlSourceListFiles">
         <ItemGroup>
             <SqlSourceSettingsSearchStart Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
             <SqlSourceSettingsSearchStart Include="@(Compile)" />
             <SqlSourceSettingsSearchFolder Include="@(SqlSourceSettingsSearchStart->GetPathsOfAllDirectoriesAbove())" />
             <SqlSourceSettingsFileFound Include="@(SqlSourceSettingsSearchFolder->'%(FullPath)'->Distinct()->Combine('sqlsource.json')->Exists())" />
-            <AdditionalFiles
+            <SqlSourceSettingsFileNew
                 Include="@(SqlSourceSettingsFileFound)"
                 Exclude="@(AdditionalFiles->'%(FullPath)')"
+            />
+            <SqlSourceSettingsSearchProject Include="$(MSBuildProjectFullPath)" />
+            <SqlSourceSettingsSearchProjectFolder Include="@(SqlSourceSettingsSearchProject->GetPathsOfAllDirectoriesAbove())" />
+        </ItemGroup>
+    </Target>
+    <Target
+        Name="SqlSourceFindProjectLinks"
+        DependsOnTargets="SqlSourceListSettingsFiles"
+        Outputs="%(SqlSourceSettingsSearchProjectFolder.Identity)"
+    >
+        <PropertyGroup>
+            <SqlSourceSettingsSearchPath>%(SqlSourceSettingsSearchProjectFolder.FullPath)</SqlSourceSettingsSearchPath>
+        </PropertyGroup>
+        <ItemGroup>
+            <SqlSourceSettingsSearchLink
+                Include="@(SqlSourceSettingsSearchProjectFolder)"
+                Condition="$([System.IO.File]::GetAttributes($(SqlSourceSettingsSearchPath)).ToString().Contains('ReparsePoint'))"
+            />
+        </ItemGroup>
+    </Target>
+    <Target
+        Name="SqlSourceFindSettingsFiles"
+        BeforeTargets="$(SqlSourceSettingsSearchHook)"
+        DependsOnTargets="SqlSourceListFiles;SqlSourceListSettingsFiles;SqlSourceFindProjectLinks"
+        Outputs="%(SqlSourceSettingsFileNew.Identity)"
+    >
+        <ItemGroup>
+            <SqlSourceSettingsSearchDeepestLink Remove="@(SqlSourceSettingsSearchDeepestLink)" />
+            <SqlSourceSettingsSearchDeepestLink
+                Include="@(SqlSourceSettingsSearchLink)"
+                Exclude="@(SqlSourceSettingsSearchLink->GetPathsOfAllDirectoriesAbove())"
+            />
+        </ItemGroup>
+        <PropertyGroup>
+            <SqlSourceSettingsSearchPath>%(SqlSourceSettingsFileNew.FullPath)</SqlSourceSettingsSearchPath>
+            <SqlSourceSettingsSearchUnder>@(SqlSourceSettingsSearchDeepestLink)</SqlSourceSettingsSearchUnder>
+            <SqlSourceSettingsSearchUnder Condition="'$(SqlSourceSettingsSearchUnder)' != ''"
+                >$([MSBuild]::EnsureTrailingSlash($(SqlSourceSettingsSearchUnder)))</SqlSourceSettingsSearchUnder>
+            <SqlSourceSettingsSearchInside>$(SqlSourceSettingsSearchPath.StartsWith($(SqlSourceSettingsSearchUnder)))</SqlSourceSettingsSearchInside>
+        </PropertyGroup>
+        <ItemGroup Condition="'$(SqlSourceSettingsSearchPath)' != ''">
+            <AdditionalFiles
+                Include="$([MSBuild]::MakeRelative($(MSBuildProjectDirectory), $(SqlSourceSettingsSearchPath)))"
+                Condition="$(SqlSourceSettingsSearchInside)"
+                Visible="false"
+            />
+            <AdditionalFiles
+                Include="@(SqlSourceSettingsFileNew)"
+                Condition="!$(SqlSourceSettingsSearchInside)"
                 Visible="false"
             />
         </ItemGroup>

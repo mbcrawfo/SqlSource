@@ -1,0 +1,6 @@
+{
+    // Above the project, in the folder that a test builds the copy through a symbolic link to.  "root" ends the chain
+    // at the copy, so that no settings file above the copy applies.
+    "root": true,
+    "dialect": "postgres",
+}
