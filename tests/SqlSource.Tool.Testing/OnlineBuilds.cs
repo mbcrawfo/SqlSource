@@ -155,9 +155,10 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     }
 
     // The path with every link among its folders replaced by what it links to.  The temporary folder of macOS is under
-    // /var, a link to /private/var, and a build of a project named through a link, from its folder, gives the compiler
-    // the .sql files under /private/var and the settings files under /var, so the generator applies none of them.  The
-    // project is named by its real path, as a build started in its folder with no project named would find it.
+    // /var, a link to /private/var, and a build of a project named through a link reports the tool's errors at the
+    // path as MSBuild names it, under /var, and the compiler's under /private/var, where the compiler resolves a path
+    // of the project's own.  The project is named by its real path, as a build started in its folder with no project
+    // named would find it, so that the errors of both name a file alike.
     private static string RealPath(string path)
     {
         var real = Path.GetPathRoot(path)!;

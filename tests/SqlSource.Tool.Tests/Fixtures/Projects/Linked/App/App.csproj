@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        A project that SettingsFileSearchTests builds through a symbolic link to the folder above it, with the
+        generator beside the tests, whose path the test gives as LinkedGenerator.  Its dialect is in the sqlsource.json
+        above it and its output in the one beside it.
+    -->
+    <Import Project="../../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(LinkedGenerator)' != ''">
+        <Analyzer Include="$(LinkedGenerator)" />
+    </ItemGroup>
+    <Import Project="../../build/SqlSource.targets" />
+</Project>
