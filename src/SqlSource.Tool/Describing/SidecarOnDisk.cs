@@ -32,7 +32,8 @@ internal sealed record SidecarOnDisk(
 {
     /// <summary>
     /// The sidecar, when this version of the tool wrote it in this version of the format.  Only such a one has
-    /// entries a run keeps: an entry from an older tool never stands beside a new one.
+    /// entries a run keeps: an entry from an older tool never stands beside a new one.  A git merge can still put
+    /// one there, since the version is the file's (TD-0100).
     /// </summary>
     public Sidecar? Usable => Sidecar is { } sidecar && sidecar.IsWrittenBy(PackageVersion.Prefix) ? sidecar : null;
 
