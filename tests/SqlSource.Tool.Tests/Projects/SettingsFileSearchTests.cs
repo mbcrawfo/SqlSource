@@ -77,12 +77,13 @@ public sealed class SettingsFileSearchTests : IDisposable
             .ShouldContain("Widgets.sql(1,10): error SQLSRC241:", Case.Sensitive, output);
     }
 
-    // A settings file above the folder that a link leads to, which the search finds through the link, is given by its
-    // full path: a path relative to the project would leave the link the other way, from the folder it leads to, and
-    // name a file that is not there, which the compiler fails the build on with CS2001.  The file is above the
-    // project's "root": true, so the queries are as in the build above.
+    // A settings file outside the deepest link above the project, which the search finds through the link, is given
+    // by its full path: a path relative to the project would leave the link the other way, from the folder it leads
+    // to, and name a file that is not there, which the compiler fails the build on with CS2001.  So is one beside a C#
+    // file listed by its full path in a folder whose name starts with the link's, LinkShared beside Link, which only
+    // a test of the folder's whole name tells apart.  The settings files inside the link are given by relative paths.
     [Fact]
-    public async Task Build_SettingsFileAboveWhereTheLinkLeads_IsGivenByItsFullPath()
+    public async Task Compile_DesignTimeBuildThroughALink_GivesTheFilesOutsideTheLinkByTheirFullPaths()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), LinkSkipReason);
         _ = _fixtures.Copy("Linked", "App/App.csproj");
@@ -92,23 +93,33 @@ public sealed class SettingsFileSearchTests : IDisposable
             /*lang=json,strict*/
             """{ "dialect": "mysql" }"""
         );
+        _ = _fixtures.WriteFile("Deep/LinkShared/sqlsource.json", "{}");
+        var shared = _fixtures.WriteFile("Deep/LinkShared/Shared.cs", "namespace Linked;");
         _ = Directory.CreateSymbolicLink(_fixtures.PathOf("Deep/Link"), _fixtures.PathOf("Linked"));
 
-        var (exitCode, output) = await BuildLinkedAsync(_fixtures.PathOf("Deep/Link/App/App.csproj"));
+        var files = await SettingsFilesAsGivenAsync(
+            _fixtures.PathOf("Deep/Link/App/App.csproj"),
+            FixtureProjects.PropertySwitch("LinkedCompile", shared)
+        );
 
-        exitCode.ShouldBe(1, output);
-        ErrorLines(output)
-            .ShouldHaveSingleItem(output)
-            .ShouldContain("Widgets.sql(1,10): error SQLSRC241:", Case.Sensitive, output);
+        files.ShouldBe(
+            [
+                "sqlsource.json",
+                "../sqlsource.json",
+                _fixtures.PathOf("Deep/sqlsource.json"),
+                _fixtures.PathOf("Deep/LinkShared/sqlsource.json"),
+            ],
+            ignoreOrder: true
+        );
     }
 
     // A known limit, which the owner accepted: a file the project lists by its full path through the link keeps the
-    // link's spelling in the compiler, while a settings file given by its relative path is made full where the link
-    // is resolved, so the two never meet and the query gets no settings, SQLSRC209 for the default output and the
-    // dialect ansi.  Before the settings files were given by relative paths, such a file got its settings and every
-    // file listed by a relative path lost them.
+    // link's spelling in the compiler, while a settings file inside the link, given by its relative path, is made full
+    // where the link is resolved, so the two never meet.  Both of Linked's settings files are inside the link, so the
+    // query gets no settings, SQLSRC209 for the default output and the dialect ansi.  Before the settings files were
+    // given by relative paths, such a file got its settings and every file listed by a relative path lost them.
     [Fact]
-    public async Task Build_FilesListedByFullPathsThroughALink_GetNoSettingsFiles()
+    public async Task Build_FilesListedByFullPathsThroughALink_GetNoSettingsFileInsideTheLink()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), LinkSkipReason);
         _ = _fixtures.Copy("Linked", "App/App.csproj");
@@ -164,7 +175,14 @@ public sealed class SettingsFileSearchTests : IDisposable
     {
         var project = _fixtures.Copy("SettingsFiles", "App/App.csproj");
         var folder = Path.GetDirectoryName(project)!;
+        var files = await SettingsFilesAsGivenAsync(project, properties);
+        return (Path.GetDirectoryName(folder)!, [.. files.Select(file => Path.GetFullPath(file, folder))]);
+    }
 
+    // The paths of the settings files a design-time build of a project gives the compiler, as it gives them, each as
+    // often as it is given.
+    private static async Task<List<string>> SettingsFilesAsGivenAsync(string project, params string[] properties)
+    {
         var (exitCode, output) = await FixtureProjects.RunMSBuildAsync(
             project,
             [
@@ -181,16 +199,17 @@ public sealed class SettingsFileSearchTests : IDisposable
 
         exitCode.ShouldBe(0, output);
         const string Switch = "/additionalfile:";
-        var files = JsonDocument
-            .Parse(output[output.IndexOf('{', StringComparison.Ordinal)..])
-            .RootElement.GetProperty("Items")
-            .GetProperty("CscCommandLineArgs")
-            .EnumerateArray()
-            .Select(item => item.GetProperty("Identity").GetString()!)
-            .Where(argument => argument.StartsWith(Switch, StringComparison.Ordinal))
-            .Select(argument => Path.GetFullPath(argument[Switch.Length..], folder))
-            .Where(path => Path.GetFileName(path) == "sqlsource.json")
-            .ToList();
-        return (Path.GetDirectoryName(folder)!, files);
+        return
+        [
+            .. JsonDocument
+                .Parse(output[output.IndexOf('{', StringComparison.Ordinal)..])
+                .RootElement.GetProperty("Items")
+                .GetProperty("CscCommandLineArgs")
+                .EnumerateArray()
+                .Select(item => item.GetProperty("Identity").GetString()!)
+                .Where(argument => argument.StartsWith(Switch, StringComparison.Ordinal))
+                .Select(argument => argument[Switch.Length..])
+                .Where(path => Path.GetFileName(path) == "sqlsource.json"),
+        ];
     }
 }
