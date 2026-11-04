@@ -325,14 +325,22 @@ public sealed class RowBufferTests
     [InlineData("Private", true)]
     public void Run_EachPlacement_CompilesWithTheBuffer(string placement, bool nested)
     {
-        var attribute = "[SqlSourceGenerate(Source = \".\", MethodLocation = MethodLocation." + placement + ")]";
+        const string Attribute = "[SqlSourceGenerate(Source = \".\")]";
         var source = nested
             ? "using SqlSource;\n\nnamespace App\n{\n    public partial class Outer<TKey>\n    {\n        "
-                + attribute
+                + Attribute
                 + "\n        public partial class Sample;\n    }\n}\n"
-            : "using SqlSource;\n\nnamespace App\n{\n    " + attribute + "\n    public partial class Sample;\n}\n";
+            : "using SqlSource;\n\nnamespace App\n{\n    " + Attribute + "\n    public partial class Sample;\n}\n";
 
-        var run = MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")], source);
+        // Every visibility but the extension class's puts the method on the type.
+        var file =
+            placement == "ExtensionClass"
+                ? ListUsers
+                : ListUsers with
+                {
+                    Text = "-- member-location: class\n-- visibility: " + placement + "\n\n" + ListUsers.Text,
+                };
+        var run = MethodRuns.Run(file, [Users(file, "ListUsers")], source);
 
         run.ShouldBeClean();
         MethodsOf(run).ShouldContain(NewBuffer);
@@ -348,12 +356,13 @@ public sealed class RowBufferTests
 
             namespace App
             {
-                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class SqlSourceRowBuffer<T>;
             }
             """;
+        var file = ListUsers with { Text = "-- member-location: class\n-- visibility: public\n\n" + ListUsers.Text };
 
-        var run = MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")], source);
+        var run = MethodRuns.Run(file, [Users(file, "ListUsers")], source);
 
         run.ShouldBeClean();
         MethodsOf(run).ShouldContain(NewBuffer);
@@ -389,7 +398,7 @@ public sealed class RowBufferTests
                 /// <summary>
                 /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
                 /// </summary>
-                public static partial class SampleExtensions
+                internal static partial class SampleExtensions
                 {
                     /// <summary>
                     /// The <c>ListUsers</c> query from <c>Users.sql</c>.
@@ -406,7 +415,7 @@ public sealed class RowBufferTests
                 The command's timeout in seconds, or null for the driver's.</param>
                     /// <param name="cancellationToken">Cancels the query.</param>
                     /// <returns>The rows the query returned.</returns>
-                    public static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ↩
+                    internal static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ↩
                 ListUsers(
                         this global::System.Data.Common.DbConnection connection,
                         global::System.Data.Common.DbTransaction? transaction = null,

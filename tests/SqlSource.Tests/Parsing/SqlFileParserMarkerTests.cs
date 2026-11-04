@@ -139,7 +139,7 @@ public sealed class SqlFileParserMarkerTests
             .ShouldBe([
                 SqlParseError.Create(
                     SqlParseErrorKind.InvalidMarkerValue,
-                    TextSpans.Of(text, value),
+                    TextSpans.Of(text, value, last: true),
                     word + ": " + value,
                     ""
                 ),
@@ -570,6 +570,73 @@ public sealed class SqlFileParserMarkerTests
                 ),
             ]);
     }
+
+    // The header's markers are in the level of every block, and each block's markers over them; the spans are the
+    // block's own marker, never the header's.
+    [Fact]
+    public void Parse_PlacementMarkers_AreInTheLevelAndTheSpansAreTheQuerysOwn()
+    {
+        const string Text =
+            "-- member-location: class\n-- visibility: private\n-- nested-class: Header\n\n"
+            + "-- name: A\nSELECT 1\n"
+            + "-- name: B\n-- member-location: nested-class\n-- visibility: internal\n-- nested-class: Own\nSELECT 2\n";
+
+        var blocks = Blocks(Text);
+
+        blocks[0]
+            .Markers.MemberLocation.ShouldBe(new Placed<MemberLocation>(MemberLocation.Class, SettingPlace.FileHeader));
+        blocks[0].Markers.Visibility.ShouldBe(new Placed<Visibility>(Visibility.Private, SettingPlace.FileHeader));
+        blocks[0].Markers.NestedClass.ShouldBe("Header");
+        blocks[0].MemberLocationMarker.ShouldBeNull();
+        blocks[0].VisibilityMarker.ShouldBeNull();
+
+        blocks[1]
+            .Markers.MemberLocation.ShouldBe(
+                new Placed<MemberLocation>(MemberLocation.NestedClass, SettingPlace.Query)
+            );
+        blocks[1].Markers.Visibility.ShouldBe(new Placed<Visibility>(Visibility.Internal, SettingPlace.Query));
+        blocks[1].Markers.NestedClass.ShouldBe("Own");
+        blocks[1].MemberLocationMarker.ShouldBe(TextSpans.Of(Text, "-- member-location: nested-class"));
+        blocks[1].VisibilityMarker.ShouldBe(TextSpans.Of(Text, "-- visibility: internal"));
+    }
+
+    // A file with no name marker is one query and its own header, so its markers are the query's own.
+    [Fact]
+    public void Parse_PlacementMarkersOfAFileOfOneQuery_AreTheQuerysOwn()
+    {
+        const string Text = "-- member-location: class\n-- visibility: private\nSELECT 1\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        block.Markers.MemberLocation.ShouldBe(new Placed<MemberLocation>(MemberLocation.Class, SettingPlace.Query));
+        block.Markers.Visibility.ShouldBe(new Placed<Visibility>(Visibility.Private, SettingPlace.Query));
+        block.MemberLocationMarker.ShouldBe(TextSpans.Of(Text, "-- member-location: class"));
+        block.VisibilityMarker.ShouldBe(TextSpans.Of(Text, "-- visibility: private"));
+    }
+
+    [Fact]
+    public void Parse_QueryWithoutPlacementMarkers_HasNoSpans()
+    {
+        var block = Blocks("-- visibility: private\n\n-- name: Q\nSELECT 1\n").ShouldHaveSingleItem();
+
+        block.MemberLocationMarker.ShouldBeNull();
+        block.VisibilityMarker.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("-- name: Q\n-- nested-class: class\nSELECT 1\n", "class", "nested-class: class")]
+    [InlineData("-- member-location: up\n\n-- name: Q\nSELECT 1\n", "up", "member-location: up")]
+    [InlineData("-- name: Q\n-- visibility: friend\nSELECT 1\n", "friend", "visibility: friend")]
+    public void Parse_PlacementMarkerThatIsNotValid_IsInvalidAtItsValue(string text, string value, string described) =>
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(text, value, last: true),
+                    described,
+                    ""
+                ),
+            ]);
 
     // A parameter that only a marker declares is a parameter.
     [Fact]

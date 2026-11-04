@@ -208,8 +208,32 @@
       }
     },
     "nestedClass": {
-      "description": "The name of the class that holds a type's queries: a C# identifier that is not a keyword. Default `Sql`.",
+      "description": "The name of the class that holds a query's members when the member location is a nested class: a C# identifier that is not a keyword. Default `Sql`.",
       "type": "string"
+    },
+    "memberLocation": {
+      "description": "Where a query's members go: `extension class`, `class` or `nested class`, matched ignoring case, hyphens and spaces. Default: `extension class` for the output `codegen`, else `nested class`.",
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": ["extension class", "class", "nested class"]
+        },
+        {
+          "pattern": "^\\s*(?:[- \\t]*(?:[eE][- \\t]*[xX][- \\t]*[tT][- \\t]*[eE][- \\t]*[nN][- \\t]*[sS][- \\t]*[iI][- \\t]*[oO][- \\t]*[nN][- \\t]*[cC][- \\t]*[lL][- \\t]*[aA][- \\t]*[sS][- \\t]*[sS][- \\t]*|[cC][- \\t]*[lL][- \\t]*[aA][- \\t]*[sS][- \\t]*[sS][- \\t]*|[nN][- \\t]*[eE][- \\t]*[sS][- \\t]*[tT][- \\t]*[eE][- \\t]*[dD][- \\t]*[cC][- \\t]*[lL][- \\t]*[aA][- \\t]*[sS][- \\t]*[sS][- \\t]*))?\\s*$"
+        }
+      ]
+    },
+    "visibility": {
+      "description": "The accessibility of a query's members: `public`, `internal`, `protected` or `private`, matched ignoring case. Default: follows the member location.",
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": ["public", "internal", "protected", "private"]
+        },
+        {
+          "pattern": "^\\s*(?:[- \\t]*(?:[pP][- \\t]*[uU][- \\t]*[bB][- \\t]*[lL][- \\t]*[iI][- \\t]*[cC][- \\t]*|[iI][- \\t]*[nN][- \\t]*[tT][- \\t]*[eE][- \\t]*[rR][- \\t]*[nN][- \\t]*[aA][- \\t]*[lL][- \\t]*|[pP][- \\t]*[rR][- \\t]*[oO][- \\t]*[tT][- \\t]*[eE][- \\t]*[cC][- \\t]*[tT][- \\t]*[eE][- \\t]*[dD][- \\t]*|[pP][- \\t]*[rR][- \\t]*[iI][- \\t]*[vV][- \\t]*[aA][- \\t]*[tT][- \\t]*[eE][- \\t]*))?\\s*$"
+        }
+      ]
     }
   }
 }

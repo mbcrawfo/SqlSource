@@ -58,7 +58,7 @@ public sealed class GeneratedSourceOrderTests
 
             namespace App;
 
-            [SqlSourceGenerate(Source = @"{{path}}", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = @"{{path}}")]
             public partial class Sample;
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: FromRepo\nSELECT 1;\n"),
@@ -88,7 +88,8 @@ public sealed class GeneratedSourceOrderTests
                         + "public partial class Sample { public string Value => Sql.GetUser; }\n"
                 ),
             ],
-            [new SqlFile(@"c:\App\repo\Users.sql", SqlTexts.GetUser)]
+            [new SqlFile(@"c:\App\repo\Users.sql", SqlTexts.GetUser)],
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.ShouldBeClean();
@@ -108,10 +109,10 @@ public sealed class GeneratedSourceOrderTests
             [SqlSourceGenerate(Source = ".")]
             public partial class First
             {
-                public static string Value => Sql.GetUser;
+                public static string Value => GetUser;
             }
 
-            [SqlSourceGenerate(Source = "Users.sql", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = "Users.sql")]
             public partial class Second
             {
                 public static string Value => GetUser;

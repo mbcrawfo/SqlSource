@@ -33,7 +33,8 @@ public sealed class MethodWriterTests
                 Token("table"),
                 TestModels.Literal(".id;")
             ),
-            validate: true
+            validate: true,
+            accessibility: Visibility.Public
         );
 
         builder
@@ -365,7 +366,8 @@ public sealed class MethodWriterTests
                         + "}} FROM {{second}};\n"
                 ),
             ],
-            languageVersion: LanguageVersion.Latest
+            languageVersion: LanguageVersion.Latest,
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.ShouldBeClean();
@@ -455,7 +457,7 @@ public sealed class MethodWriterTests
     private static string Write(bool validate, params SqlSegment[] segments)
     {
         var builder = new StringBuilder();
-        MethodWriter.Append(builder, string.Empty, "S", "Q", TestSidecars.Of(segments), validate);
+        MethodWriter.Append(builder, string.Empty, "S", "Q", TestSidecars.Of(segments), validate, Visibility.Public);
         return builder.ToString();
     }
 

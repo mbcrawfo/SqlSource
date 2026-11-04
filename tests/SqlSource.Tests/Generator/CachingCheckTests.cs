@@ -154,14 +154,15 @@ public sealed class CachingCheckTests
     public void Run_FileListedTwiceUnderTwoSpellings_ChecksItOnce() =>
         ShouldCheckUsersOnceWhenListedAgainAt("/app/Users/users.sql", ["SQLSRC013", "SQLSRC244"]);
 
-    // The attribute changes the type, so its needs are found again, and they are the same.
+    // The attribute names the type's one file by its name, which changes the type, so its needs are found again, and
+    // they are the same.
     [Fact]
     public void Run_AttributeEditedWithoutChangingTheOutput_ChecksNothing()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var driver = _scene.FirstRunWithSidecars(compilation);
 
-        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "MethodLocation = MethodLocation.Internal"));
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "Source = \"Users.sql\""));
 
         Reasons<TypeQueries>(result, TrackingNames.TypeQueries, type => type.HintName)["App.Users.UserQueries.g.cs"]
             .ShouldBe(IncrementalStepRunReason.Modified);

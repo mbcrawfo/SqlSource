@@ -58,7 +58,7 @@ public sealed class GeneratedFileNameTests
     {
         // The compiler compares the names of generated files ignoring case, and refuses the second of two that are
         // equal that way with an exception that costs every type its generated code.
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             using SqlSource;
@@ -97,7 +97,7 @@ public sealed class GeneratedFileNameTests
     [Fact]
     public void Run_TypeWhoseFileWouldBeNamedLikeTheAttributes_GetsAnotherName()
     {
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             [SqlSource.SqlSourceGenerate(Source = ".")]
@@ -119,7 +119,7 @@ public sealed class GeneratedFileNameTests
     public void Run_TypeNameWrittenWithAUnicodeEscape_GetsAFileNamedByTheCharacter()
     {
         // "\u0053ample" is the identifier Sample.  The escape is legal in code and not in the name of a file.
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             namespace App;

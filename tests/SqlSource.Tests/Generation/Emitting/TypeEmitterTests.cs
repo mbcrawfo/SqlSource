@@ -34,7 +34,7 @@ public sealed class TypeEmitterTests
             {
                 partial class UserRepository
                 {
-                    private static class Sql
+                    private static partial class Sql
                     {
                         /// <summary>
                         /// Loads one user by id.
@@ -68,11 +68,7 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_DirectPlacement_PutsTheConstantsOnTheType()
     {
-        var output = Emit(
-            OutputKind.Sql,
-            TestModels.Type(placement: MemberPlacement.Direct),
-            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))
-        );
+        var output = EmitOnType(OutputKind.Sql, File("Users.sql", TestModels.Query("GetUser", "SELECT 1;")));
 
         output.Source.ShouldBe(
             $$"""
@@ -122,7 +118,7 @@ public sealed class TypeEmitterTests
                 {
                     partial record Inner
                     {
-                        private static class Sql
+                        private static partial class Sql
                         {
                             /// <summary>
                             /// The <c>GetUser</c> query from <c>Users.sql</c>.
@@ -185,9 +181,8 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_SeveralFiles_KeepsTheOrderOfTheFilesAndOfTheQueriesInEach()
     {
-        var output = Emit(
+        var output = EmitOnType(
             OutputKind.Sql,
-            TestModels.Type(placement: MemberPlacement.Direct),
             File("B.sql", TestModels.Query("Zeta", "SELECT 1;"), TestModels.Query("Alpha", "SELECT 2;")),
             File("A.sql", TestModels.Query("Mid", "SELECT 3;"))
         );
@@ -266,7 +261,8 @@ public sealed class TypeEmitterTests
     {
         var output = Emit(
             OutputKind.Sql,
-            TestModels.Type(placement: Placement(direct)),
+            TestModels.Type(),
+            Placement(direct, 2),
             File("A.sql", TestModels.Query(name, "SELECT 1;"), TestModels.Query("Other", "SELECT 2;")),
             File("B.sql", TestModels.Query("Kept", "SELECT 3;"))
         );
@@ -294,7 +290,8 @@ public sealed class TypeEmitterTests
     {
         var output = Emit(
             OutputKind.CodeGen,
-            TestModels.Type(placement: Placement(direct)),
+            TestModels.Type(),
+            Placement(direct, 1),
             File(
                 "A.sql",
                 TestModels.Query(name, "SELECT 1;"),
@@ -316,7 +313,8 @@ public sealed class TypeEmitterTests
     {
         var output = Emit(
             OutputKind.Sql,
-            TestModels.Type(placement: Placement(direct)),
+            TestModels.Type(),
+            Placement(direct, 1),
             File("A.sql", TestModels.Query(name, "SELECT 1;"))
         );
 
@@ -346,7 +344,7 @@ public sealed class TypeEmitterTests
             {
                 partial class UserRepository
                 {
-                    private static class Sql
+                    private static partial class Sql
                     {
                         /// <summary>
                         /// The <c>GetUser</c> query from <c>Users.sql</c>.
@@ -405,11 +403,7 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_QueryWithATokenInDirectPlacement_IsAMethodOnTheType()
     {
-        var output = Emit(
-            OutputKind.Sql,
-            TestModels.Type(placement: MemberPlacement.Direct),
-            File("Users.sql", TokenQuery("ListFrom"))
-        );
+        var output = EmitOnType(OutputKind.Sql, File("Users.sql", TokenQuery("ListFrom")));
 
         var source = output.Source.ShouldNotBeNull();
         source.ShouldContain("    {\n        /// <summary>\n        /// The <c>ListFrom</c> query from");
@@ -517,7 +511,7 @@ public sealed class TypeEmitterTests
             {
                 partial class UserRepository
                 {
-                    private static class Sql
+                    private static partial class Sql
                     {
                     }
                 }
@@ -531,11 +525,7 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_CodeGenQuery_WritesNoConstant()
     {
-        var output = Emit(
-            OutputKind.CodeGen,
-            TestModels.Type(placement: MemberPlacement.Direct),
-            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))
-        );
+        var output = EmitOnType(OutputKind.CodeGen, File("Users.sql", TestModels.Query("GetUser", "SELECT 1;")));
 
         output.Diagnostics.ShouldBeEmpty();
         output.Source.ShouldBe(
@@ -555,11 +545,7 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_CodeGenTokenQuery_WritesNoTokenMethod()
     {
-        var output = Emit(
-            OutputKind.CodeGen,
-            TestModels.Type(placement: MemberPlacement.Direct),
-            File("Users.sql", TokenQuery("ListFrom"))
-        );
+        var output = EmitOnType(OutputKind.CodeGen, File("Users.sql", TokenQuery("ListFrom")));
 
         output.Diagnostics.ShouldBeEmpty();
         output.Source.ShouldBe(
@@ -624,7 +610,7 @@ public sealed class TypeEmitterTests
             {
                 partial class UserRepository
                 {
-                    private static class Sql
+                    private static partial class Sql
                     {
                         /// <summary>
                         /// The <c>AsSql</c> query from <c>Users.sql</c>.
@@ -719,8 +705,23 @@ public sealed class TypeEmitterTests
         Create().ShouldBe(Create());
     }
 
-    // A theory cannot take the internal enum as a parameter.
-    private static MemberPlacement Placement(bool direct) => direct ? MemberPlacement.Direct : MemberPlacement.Nested;
+    // A settings file's level that puts the members of every query on the type.
+    private static readonly SettingsLevel OnType = new()
+    {
+        MemberLocation = new Placed<MemberLocation>(
+            MemberLocation.Class,
+            SettingPlace.OfSettingsFile("/app/sqlsource.json", 1)
+        ),
+    };
+
+    // The levels of the files, which put the members on the type when direct, and leave them in the nested class
+    // otherwise: a theory cannot take the internal enum as a parameter.
+    private static SettingsLevel[] Placement(bool direct, int files) =>
+        Array.ConvertAll(new int[files], _ => direct ? OnType : SettingsLevel.None);
+
+    // The files under a level that puts the members of every query on the type.
+    private static TypeOutput EmitOnType(OutputKind output, params ParsedSqlFile[] files) =>
+        Emit(output, TestModels.Type(), Placement(direct: true, files.Length), files);
 
     // Each test states its output, which goes on each file's level.
     private static TypeOutput Emit(OutputKind? output, TargetType type, params ParsedSqlFile[] files) =>

@@ -41,7 +41,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         RegisterAttribute(context);
         RegisterExceptions(context);
         var settingsFiles = ReadSettingsFiles(context);
-        var claims = ClaimFiles(context, settingsFiles);
+        var claims = ClaimFiles(context);
         ReportSettingsFiles(context, settingsFiles, claims.SqlPaths);
         var fileLevels = ReadSettings(claims.SqlFiles, settingsFiles);
         var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.ClaimedPaths);
@@ -68,7 +68,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             models.AllFileModels,
             models.Models,
             models.ModelNames,
-            claims.TypeMemberNames,
             typing.NpgsqlProbe,
             typing.SqlClientProbe,
             typing.LibraryProbe,
@@ -124,13 +123,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (files, _) => SettingsFileSet.Of(files))
             .WithTrackingName(TrackingNames.SettingsFiles);
 
-    // The files each type claims, from the declarations that carry the attribute and the list of paths alone.
-    private static ClaimedFiles ClaimFiles(
-        IncrementalGeneratorInitializationContext context,
-        IncrementalValueProvider<SettingsFileSet> settingsFiles
-    )
+    // The files each type claims, from the declarations that carry the attribute and the list of paths alone.  Where
+    // each query's members go is known only once its file is parsed, so a type carries every name it already has, and
+    // an edit that adds a member to it runs its later steps again.
+    private static ClaimedFiles ClaimFiles(IncrementalGeneratorInitializationContext context)
     {
-        var declaredTypes = context
+        var targetTypes = context
             .SyntaxProvider.ForAttributeWithMetadataName(
                 AttributeSource.AttributeMetadataName,
                 static (node, _) => TargetTypeReader.IsCandidate(node),
@@ -138,15 +136,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             )
             .WhereNotNull()
             .WithTrackingName(TrackingNames.TargetTypes);
-
-        // The nested class named once the settings files are known, from the chain of the folder of the type's C# file.
-        // An edit that adds a member to a type changes its declaration and runs this again, and goes no further unless
-        // the member takes the name.  An edit to a settings file runs it for every type, and goes no further for a type
-        // whose name it leaves alone.
-        var targetTypes = declaredTypes
-            .Combine(settingsFiles)
-            .Select(static (input, _) => NestedClassCheck.Apply(input.Left, input.Right))
-            .WithTrackingName(TrackingNames.NestedClassCheck);
 
         var sqlFiles = context.AdditionalTextsProvider.Where(static file => SqlPath.IsSqlFile(file.Path));
 
@@ -197,20 +186,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (paths, _) => SqlPath.ToSortedSet(paths))
             .WithTrackingName(TrackingNames.ClaimedPaths);
 
-        // The names that each type whose methods go on itself already has, which its methods cannot take.  Almost
-        // always none, since the methods go into an extension class unless the attribute says otherwise.
-        var typeMemberNames = declaredTypes
-            .Where(static declared => !MethodHost.Of(declared.Type.MethodPlacement).IsExtension)
-            .Select(static (declared, _) => new TypeMemberNames(HintName.NameOf(declared.Type), declared.TakenNames))
-            .Collect()
-            .Select(
-                static (names, _) =>
-                    new EquatableArray<TypeMemberNames>(
-                        names.OrderBy(static names => names.TypeKey, StringComparer.Ordinal).ToImmutableArray()
-                    )
-            )
-            .WithTrackingName(TrackingNames.TypeMemberNames);
-
         // Reported for a file that a type claims only, as every other problem of a file is.
         context.RegisterSourceOutput(
             caseCollisions.Combine(claimedPaths),
@@ -227,7 +202,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return new ClaimedFiles(sqlFiles, sqlPaths, typeFiles, claimedPaths, repeatedPaths, typeMemberNames);
+        return new ClaimedFiles(sqlFiles, sqlPaths, typeFiles, claimedPaths, repeatedPaths);
     }
 
     // The problems of each settings file that the chain of the folder of some .sql file or C# file reaches, whether or
@@ -819,7 +794,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<FileModels>> allFileModels,
         IncrementalValueProvider<ModelSet> models,
         IncrementalValueProvider<EquatableArray<string>> modelNames,
-        IncrementalValueProvider<EquatableArray<TypeMemberNames>> typeMemberNames,
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
         IncrementalValueProvider<LibraryProbe> libraryProbe,
@@ -844,11 +818,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.LibrariesBelowTheFloor);
 
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
-        // queries, its files' models, the models its queries got, its names, the drivers, the converters of the types
-        // that its type overrides, column types and markers chose, or the libraries below their floor.
+        // queries and its names, its files' models, the models its queries got, the drivers, the converters of the
+        // types that its type overrides, column types and markers chose, or the libraries below their floor.
         var typeMethods = typeQueries
             .Combine(allFileModels.Combine(assignments))
-            .Combine(typeMemberNames.Combine(drivers.Combine(converters.Combine(librariesBelowTheFloor))))
+            .Combine(drivers.Combine(converters.Combine(librariesBelowTheFloor)))
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
@@ -857,8 +831,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                         input.Left.Right.Right,
                         input.Right.Left,
                         input.Right.Right.Left,
-                        input.Right.Right.Right.Left,
-                        input.Right.Right.Right.Right
+                        input.Right.Right.Right
                     )
             )
             .WithTrackingName(TrackingNames.MethodsInput)
@@ -1151,8 +1124,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private static EquatableArray<string> ExtensionClassNamesOf(EquatableArray<MethodSignature> signatures) =>
         new(
             signatures
-                .Where(static signature => signature.ExtensionClass is not null)
-                .Select(static signature => signature.ExtensionClassFullName!)
+                .Select(static signature => signature.ExtensionClassFullName)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(static name => name, StringComparer.Ordinal)
                 .ToImmutableArray()
@@ -1259,15 +1231,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // The project's .sql files and their paths, each type with the files it claims, every claimed path, the paths the
-    // project lists more than once, and the member names that each type whose methods go on itself already has.
+    // The project's .sql files and their paths, each type with the files it claims, every claimed path, and the paths
+    // the project lists more than once.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
         IncrementalValueProvider<EquatableArray<string>> SqlPaths,
         IncrementalValuesProvider<TypeFiles> ClaimingTypes,
         IncrementalValueProvider<EquatableArray<string>> ClaimedPaths,
-        IncrementalValueProvider<EquatableArray<string>> RepeatedPaths,
-        IncrementalValueProvider<EquatableArray<TypeMemberNames>> TypeMemberNames
+        IncrementalValueProvider<EquatableArray<string>> RepeatedPaths
     );
 
     // Each claimed file parsed, a node for each item of the project's list, and the files collected, one for each path

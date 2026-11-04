@@ -227,7 +227,7 @@ public sealed class LibraryDiagnosticsTests
 
         run.Problems().ShouldBe([AtTheProjectsMember + OnForPostgres]);
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("public static ");
+        methods.ShouldContain("internal static ");
         methods.ShouldContain(" ListEvents");
         methods.ShouldContain("reader.GetFieldValue<global::System.DateTime>(0)");
         methods.ShouldNotContain("NodaTime");

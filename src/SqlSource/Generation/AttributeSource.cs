@@ -1,7 +1,7 @@
 namespace SqlSource.Generation;
 
 /// <summary>
-/// The attribute and the enums that the generator adds to every project that uses it, and the definition of
+/// The attributes that the generator adds to every project that uses it, and the definition of
 /// <c>Microsoft.CodeAnalysis.EmbeddedAttribute</c> they are marked with.
 /// </summary>
 internal static class AttributeSource
@@ -28,23 +28,13 @@ internal static class AttributeSource
 
     public const string AttributeMetadataName = "SqlSource.SqlSourceGenerateAttribute";
 
-    public const string LocationMetadataName = "SqlSource.SqlLocation";
-
-    public const string MethodLocationMetadataName = "SqlSource.MethodLocation";
-
     public const string ConverterAttributeMetadataName = "SqlSource.SqlSourceConverterAttribute";
 
     public const string SourceProperty = "Source";
 
-    public const string LocationProperty = "SqlLocation";
-
-    public const string MethodLocationProperty = "MethodLocation";
-
-    public const string NestedClassProperty = "NestedClass";
-
-    // Only an attribute class can be [Conditional], so the enums stay in the consumer's assembly.  The attribute
-    // itself is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.  SqlSourceConverterAttribute
-    // is not [Conditional]: a library's converters are found in its metadata by the projects that reference it.
+    // SqlSourceGenerateAttribute is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.
+    // SqlSourceConverterAttribute is not [Conditional]: a library's converters are found in its metadata by the
+    // projects that reference it.
     //
     // This file goes into every project that references the package, including one that targets a framework older
     // than .NET 8 and so compiles as C# 7.3.  It therefore uses nothing newer: no "#nullable" and no "string?".  Such
@@ -58,52 +48,6 @@ internal static class AttributeSource
 
         namespace SqlSource
         {
-            /// <summary>
-            /// Where the members generated for a type marked with <see cref="SqlSourceGenerateAttribute" /> go.
-            /// </summary>
-            [global::Microsoft.CodeAnalysis.Embedded]
-            internal enum SqlLocation
-            {
-                /// <summary>
-                /// In a private static class nested in the type, named by
-                /// <see cref="SqlSourceGenerateAttribute.NestedClass" />.
-                /// </summary>
-                Nested = 0,
-
-                /// <summary>
-                /// On the type itself.
-                /// </summary>
-                Direct = 1,
-            }
-
-            /// <summary>
-            /// Where the methods that run the queries of a type go.
-            /// </summary>
-            [global::Microsoft.CodeAnalysis.Embedded]
-            internal enum MethodLocation
-            {
-                /// <summary>
-                /// In a generated static class beside the type, named after it with <c>Extensions</c>, as extension
-                /// methods of <c>DbConnection</c>.
-                /// </summary>
-                ExtensionClass = 0,
-
-                /// <summary>
-                /// On the type, as public static methods.
-                /// </summary>
-                Public = 1,
-
-                /// <summary>
-                /// On the type, as internal static methods.
-                /// </summary>
-                Internal = 2,
-
-                /// <summary>
-                /// On the type, as private static methods.
-                /// </summary>
-                Private = 3,
-            }
-
             /// <summary>
             /// Marks a static method of one argument as a conversion from its argument's type to its return type, which
             /// the generated query methods call to read a column into a property of the return type or to bind a
@@ -135,25 +79,6 @@ internal static class AttributeSource
                 /// that folder, <c>UserRepository.sql</c> for <c>UserRepository</c>.
                 /// </summary>
                 public string Source { get; set; }
-
-                /// <summary>
-                /// Where the generated members go.  The default is
-                /// <see cref="global::SqlSource.SqlLocation.Nested" />.
-                /// </summary>
-                public SqlLocation SqlLocation { get; set; }
-
-                /// <summary>
-                /// The name of the class that holds the generated members under
-                /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the <c>nestedClass</c> of the
-                /// settings files of the folder of this type's file, else <c>Sql</c>.
-                /// </summary>
-                public string NestedClass { get; set; }
-
-                /// <summary>
-                /// Where the methods that run the queries go.  The default is
-                /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
-                /// </summary>
-                public MethodLocation MethodLocation { get; set; }
             }
         }
 

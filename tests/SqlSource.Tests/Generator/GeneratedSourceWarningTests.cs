@@ -21,6 +21,8 @@ public sealed class GeneratedSourceWarningTests
     {
         // A consumer that treats CS1591, a public member without documentation, as an error must not be broken by
         // generated code.  Here the consumer's own members are documented, so any CS1591 comes from the generator.
+        // Sample's members are on it, Other's in a private nested class, and Public's in a public one.
+        const string Query = "-- name: GetUser\n-- summary: x < y & z\nSELECT 1 WHERE a < b;\n";
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
@@ -29,14 +31,20 @@ public sealed class GeneratedSourceWarningTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = "Users.sql")]
             public partial class Sample;
 
             /// <summary>More queries.</summary>
-            [SqlSourceGenerate(Source = ".")]
+            [SqlSourceGenerate(Source = "Other.sql")]
             public partial struct Other;
+
+            /// <summary>Public queries.</summary>
+            [SqlSourceGenerate(Source = "Public.sql")]
+            public partial class Public;
             """,
-            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- summary: x < y & z\nSELECT 1 WHERE a < b;\n")
+            new SqlFile(GeneratorHarness.UsersPath, Query),
+            new SqlFile("/app/Repo/Other.sql", "-- member-location: nested-class\n\n" + Query),
+            new SqlFile("/app/Repo/Public.sql", "-- member-location: nested-class\n-- visibility: public\n\n" + Query)
         );
 
         run.ShouldBeClean();
@@ -124,15 +132,15 @@ public sealed class GeneratedSourceWarningTests
     }
 
     [Theory]
-    [InlineData("Nested", "GetType")]
-    [InlineData("Nested", "ToString")]
-    [InlineData("Nested", "Equals")]
-    [InlineData("Nested", "GetHashCode")]
-    [InlineData("Nested", "MemberwiseClone")]
-    [InlineData("Nested", "ReferenceEquals")]
-    [InlineData("Direct", "GetType")]
-    [InlineData("Direct", "ToString")]
-    [InlineData("Direct", "Equals")]
+    [InlineData("nested-class", "GetType")]
+    [InlineData("nested-class", "ToString")]
+    [InlineData("nested-class", "Equals")]
+    [InlineData("nested-class", "GetHashCode")]
+    [InlineData("nested-class", "MemberwiseClone")]
+    [InlineData("nested-class", "ReferenceEquals")]
+    [InlineData("class", "GetType")]
+    [InlineData("class", "ToString")]
+    [InlineData("class", "Equals")]
     public void Run_QueryNamedLikeAMemberOfObject_GetsNoWarningInGeneratedCode(string location, string name)
     {
         // "GetType" is a likely name for a query on a table of types.  The constant hides the inherited method, which
@@ -144,10 +152,13 @@ public sealed class GeneratedSourceWarningTests
 
             namespace App;
 
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.{{location}})]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
             """,
-            new SqlFile(GeneratorHarness.UsersPath, "-- name: " + name + "\nSELECT 1;\n")
+            new SqlFile(
+                GeneratorHarness.UsersPath,
+                "-- member-location: " + location + "\n\n-- name: " + name + "\nSELECT 1;\n"
+            )
         );
 
         run.ShouldBeClean();
@@ -172,7 +183,7 @@ public sealed class GeneratedSourceWarningTests
                 public virtual string ListFrom(string table) => table;
             }
 
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample : Base;
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}};\n")
@@ -184,7 +195,7 @@ public sealed class GeneratedSourceWarningTests
     [Fact]
     public void Run_NestedLocationAndAnInheritedMemberNamedSql_GetsNoWarningInGeneratedCode()
     {
-        var run = GeneratorHarness.Run(
+        var run = GeneratorHarness.RunInNestedClass(
             OutputKind.Sql,
             """
             using SqlSource;

@@ -84,22 +84,41 @@ public sealed class GeneratorHarnessTests
         );
 
         run.ProjectSettings.ShouldBe(
-            "{\n  \"output\": \"Models\",\n  \"dialect\": \"a\\\"b\\nc\",\n  \"generatorParameters\": [\n"
-                + "    \"keep-comments\",\n    \"sort-output\"\n  ]\n}"
+            "{\n  \"output\": \"Models\",\n  \"memberLocation\": \"class\",\n  \"dialect\": \"a\\\"b\\nc\",\n"
+                + "  \"generatorParameters\": [\n    \"keep-comments\",\n    \"sort-output\"\n  ]\n}"
         );
     }
 
     // The spelling is the tests' own, so a change to the generator's spelling fails a test.  A test's data cannot be of
-    // the generator's internal type, so the member is found by its spelling.
+    // the generator's internal type, so the member is found by its spelling.  A Sql or Models run puts its members on
+    // the type, and a CodeGen run leaves its methods in the extension class.
     [Theory]
-    [InlineData("Sql")]
-    [InlineData("Models")]
-    [InlineData("CodeGen")]
-    public void Run_Output_IsSpelledAsAUserWritesIt(string spelled)
+    [InlineData("Sql", ",\n  \"memberLocation\": \"class\"")]
+    [InlineData("Models", ",\n  \"memberLocation\": \"class\"")]
+    [InlineData("CodeGen", "")]
+    public void Run_Output_IsSpelledAsAUserWritesIt(string spelled, string location)
     {
         var run = GeneratorHarness.Run(Enum.Parse<OutputKind>(spelled), GeneratorHarness.SampleSource(null));
 
-        run.ProjectSettings.ShouldBe("{\n  \"output\": \"" + spelled + "\"\n}");
+        run.ProjectSettings.ShouldBe("{\n  \"output\": \"" + spelled + "\"" + location + "\n}");
+    }
+
+    // The settings replace the member location that a Sql run writes, so a test can read the default nested class.
+    [Fact]
+    public void Run_SettingsMemberLocation_ReplacesTheRunsOwn()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.UsersFile],
+            settings: GeneratorHarness.InNestedClass
+        );
+
+        run.ShouldBeClean();
+        run.ProjectSettings.ShouldBe( /*lang=json,strict*/
+            "{\n  \"output\": \"Sql\",\n  \"memberLocation\": \"NestedClass\"\n}"
+        );
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static partial class Sql\n");
     }
 
     [Fact]

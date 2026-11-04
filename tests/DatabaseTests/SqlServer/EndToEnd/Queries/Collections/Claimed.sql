@@ -1,5 +1,8 @@
 -- The query of the collection types, claimed by CollectionQueries alone, which sets none, so that the query takes the
--- project's settings file's, and its copies, one for each collection type, which each set theirs by its marker.
+-- project's settings file's, and its copies, one for each collection type, which each set theirs by its marker.  The
+-- header puts every method on the type, public.
+-- member-location: class
+-- visibility: public
 
 -- name: ListCollectedAccounts
 -- summary: The id and name of every account, in the collection type of the project's settings file.

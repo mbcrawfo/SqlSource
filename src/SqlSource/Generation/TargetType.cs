@@ -1,6 +1,5 @@
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
-using SqlSource.Settings;
 
 namespace SqlSource.Generation;
 
@@ -9,36 +8,43 @@ namespace SqlSource.Generation;
 /// </summary>
 /// <param name="Namespace">The namespace as it is written in code.  Empty for the global namespace.</param>
 /// <param name="Types">The containing types from the outermost to the type itself.  Never empty.</param>
-/// <param name="Placement">Where the members go.</param>
-/// <param name="MethodPlacement">Where the methods of the type's queries go.</param>
-/// <param name="Settings">What the attribute says about the settings: the nested class alone.</param>
 /// <param name="IsPublic">
 /// Whether the type and every type it is nested in are declared <c>public</c>, which makes its models public.
+/// </param>
+/// <param name="IsReachableAsProtected">
+/// Whether code of another assembly can reach the type though it is not public: the type and every type it is nested
+/// in are declared <c>public</c>, <c>protected</c> or <c>protected internal</c>, and one of them is not public.  A
+/// public or protected member of it is then reachable as protected from a derived type there, and its internal models
+/// are less accessible than such a member (CS0051).
+/// </param>
+/// <param name="IsStatic">Whether the type is a static class, which cannot have protected members.</param>
+/// <param name="IsSealed">
+/// Whether the type is sealed, as the compiler says it: a sealed class or record, and every struct.  A static class is
+/// not.  A protected member of a sealed class gives the compiler's warning CS0628.
 /// </param>
 /// <param name="Source">The attribute's <c>Source</c>, or null when it is not set or is empty.</param>
 /// <param name="FilePath">The path of the source file that carries the attribute.</param>
 /// <param name="AttributeLocation">Where the attribute is.</param>
+/// <param name="TakenNames">
+/// The names that a nested class of the type, and a member that goes on the type, cannot have, sorted ordinally:
+/// those of the type, its members, its nested types and its type parameters.  Read for every type, since where a
+/// query's members go is known only once its file is parsed.
+/// </param>
 /// <param name="Diagnostics">The problems found in the declaration.</param>
 internal sealed record TargetType(
     string Namespace,
     EquatableArray<TypeDeclaration> Types,
-    MemberPlacement Placement,
-    MethodPlacement MethodPlacement,
-    SettingsLevel Settings,
     bool IsPublic,
+    bool IsReachableAsProtected,
+    bool IsStatic,
+    bool IsSealed,
     string? Source,
     string FilePath,
     LocationInfo AttributeLocation,
+    EquatableArray<string> TakenNames,
     EquatableArray<DiagnosticInfo> Diagnostics
 )
 {
-    /// <summary>
-    /// The name of the class that holds the members in <see cref="MemberPlacement.Nested" /> placement.  The reader
-    /// leaves the default, and <see cref="NestedClassCheck" /> sets it once the chain of the folder of the type's C#
-    /// file is known.
-    /// </summary>
-    public string NestedClass { get; init; } = QuerySettings.DefaultNestedClass;
-
     /// <summary>
     /// The name of the type itself, as a value: without the <c>@</c> of an escaped keyword.
     /// </summary>
@@ -48,4 +54,10 @@ internal sealed record TargetType(
     /// The namespace as a value: without the <c>@</c> of an escaped keyword.  Empty for the global namespace.
     /// </summary>
     public string NamespaceValue => Namespace.Replace("@", string.Empty);
+
+    /// <summary>
+    /// Whether the type is a struct or a record struct, which cannot have protected members.  It is computed, so it
+    /// takes no part in equality.
+    /// </summary>
+    public bool IsStruct => Types[Types.Count - 1].Keyword is "struct" or "record struct";
 }

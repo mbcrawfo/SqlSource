@@ -85,7 +85,7 @@ public sealed class QueryMethodWriterTests
     {
         var builder = new StringBuilder("before\n");
 
-        QueryMethodWriter.Append(builder, "    ", GetUser, MethodHost.Of(MethodPlacement.ExtensionClass));
+        QueryMethodWriter.Append(builder, "    ", GetUser);
 
         builder
             .ToString()
@@ -688,12 +688,13 @@ public sealed class QueryMethodWriterTests
     }
 
     [Theory]
-    [InlineData(nameof(MethodPlacement.Public), "public static")]
-    [InlineData(nameof(MethodPlacement.Internal), "internal static")]
-    [InlineData(nameof(MethodPlacement.Private), "private static")]
-    public void Append_TypePlacement_TakesTheConnectionWithoutThis(string placementName, string modifiers)
+    [InlineData(nameof(Visibility.Public), "public static")]
+    [InlineData(nameof(Visibility.Internal), "internal static")]
+    [InlineData(nameof(Visibility.Protected), "protected static")]
+    [InlineData(nameof(Visibility.Private), "private static")]
+    public void Append_TypePlacement_TakesTheConnectionWithoutThis(string visibilityName, string modifiers)
     {
-        var text = Write(GetUser, MethodHost.Of(Enum.Parse<MethodPlacement>(placementName)));
+        var text = Write(GetUser, OnType(visibilityName));
 
         text.ShouldContain(
             modifiers
@@ -1461,15 +1462,15 @@ public sealed class QueryMethodWriterTests
             );
 
     [Theory]
-    [InlineData(nameof(MethodPlacement.Public), "public static")]
-    [InlineData(nameof(MethodPlacement.Internal), "internal static")]
-    [InlineData(nameof(MethodPlacement.Private), "private static")]
+    [InlineData(nameof(Visibility.Public), "public static")]
+    [InlineData(nameof(Visibility.Internal), "internal static")]
+    [InlineData(nameof(Visibility.Private), "private static")]
     public void Append_IAsyncEnumerableTypePlacement_TakesTheConnectionWithoutThis(
-        string placementName,
+        string visibilityName,
         string modifiers
     )
     {
-        var text = Write(Stream, MethodHost.Of(Enum.Parse<MethodPlacement>(placementName)));
+        var text = Write(Stream, OnType(visibilityName));
 
         text.ShouldContain(
             "\n"
@@ -1552,9 +1553,12 @@ public sealed class QueryMethodWriterTests
                 {
                     foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
                     {
+                        // Every awkward method once by each placement and engine: the engine goes by ones, the
+                        // segments by twos and the placement by eights.
                         var method = GetUser with
                         {
                             Name = "Q" + index++,
+                            Host = index % 8 < 4 ? default : OnType(nameof(Visibility.Public)),
                             Shape = shape,
                             Collection = collection,
                             Engine = engine,
@@ -1562,14 +1566,7 @@ public sealed class QueryMethodWriterTests
                             Segments = index % 4 < 2 ? awkward : GetUser.Segments,
                             Input = index % 3 == 0 ? null : GetUser.Input,
                         };
-                        // Every awkward method once by each placement and engine: the engine goes by ones, the
-                        // segments by twos and the placement by eights.
-                        QueryMethodWriter.Append(
-                            builder,
-                            "        ",
-                            method,
-                            MethodHost.Of(index % 8 < 4 ? MethodPlacement.ExtensionClass : MethodPlacement.Public)
-                        );
+                        QueryMethodWriter.Append(builder, "        ", method);
                     }
                 }
             }
@@ -1699,25 +1696,23 @@ public sealed class QueryMethodWriterTests
     private static string WriteWith(QueryMethod method, ExecutionCapabilities capabilities)
     {
         var builder = new StringBuilder();
-        QueryMethodWriter.Append(
-            builder,
-            string.Empty,
-            method,
-            MethodHost.Of(MethodPlacement.ExtensionClass),
-            capabilities
-        );
+        QueryMethodWriter.Append(builder, string.Empty, method, capabilities);
         return builder.ToString();
     }
 
     private static void ShouldBalanceItsBraces(string text) =>
         text.Count(static character => character == '{').ShouldBe(text.Count(static character => character == '}'));
 
-    private static string Write(QueryMethod method) => Write(method, MethodHost.Of(MethodPlacement.ExtensionClass));
+    private static string Write(QueryMethod method) => Write(method, default);
 
     private static string Write(QueryMethod method, MethodHost host)
     {
         var builder = new StringBuilder();
-        QueryMethodWriter.Append(builder, string.Empty, method, host);
+        QueryMethodWriter.Append(builder, string.Empty, method with { Host = host });
         return builder.ToString();
     }
+
+    // A method on the type, of the visibility.
+    private static MethodHost OnType(string visibilityName) =>
+        new(Enum.Parse<Visibility>(visibilityName), MemberLocation.Class, null);
 }

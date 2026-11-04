@@ -270,6 +270,10 @@ internal static class SqlFileParser
                     ColumnMarkersOf(scope),
                     keptErrors
                 )
+                {
+                    MemberLocationMarker = scope?.MemberLocationMarker,
+                    VisibilityMarker = scope?.VisibilityMarker,
+                }
             );
         }
 

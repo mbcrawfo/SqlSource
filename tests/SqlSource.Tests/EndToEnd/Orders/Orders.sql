@@ -1,4 +1,5 @@
 -- generator: keep-comments
+-- member-location: class
 
 -- name: GetOrder
 SELECT id, total /* in cents */

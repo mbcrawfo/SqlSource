@@ -10,7 +10,6 @@ SQLSRC002 | SqlSource | Error | Type is file-local
 SQLSRC003 | SqlSource | Error | Target framework is not supported
 SQLSRC004 | SqlSource | Error | Source matches no SQL file
 SQLSRC005 | SqlSource | Error | Type has no SQL file
-SQLSRC006 | SqlSource | Error | Attribute value is not valid
 SQLSRC007 | SqlSource | Error | Type has a member named like its nested class
 SQLSRC008 | SqlSource | Error | Query name is used in two files
 SQLSRC009 | SqlSource | Error | Query is named like its containing type
@@ -50,6 +49,10 @@ SQLSRC118 | SqlSource | Error | Parameter is not declared
 SQLSRC119 | SqlSource | Error | Query has no parameters
 SQLSRC120 | SqlSource | Error | Token crosses a comment
 SQLSRC121 | SqlSource | Warning | Parameter is written in two spellings
+SQLSRC122 | SqlSource | Error | Member location does not fit the query
+SQLSRC123 | SqlSource | Error | Visibility does not fit the member location
+SQLSRC124 | SqlSource | Error | Nested class has two visibilities
+SQLSRC125 | SqlSource | Error | Query's member on the type has a name that is taken
 SQLSRC200 | SqlSource | Error | The tool failed unexpectedly
 SQLSRC201 | SqlSource | Error | No project or solution found
 SQLSRC202 | SqlSource | Error | More than one project or solution found

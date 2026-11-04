@@ -38,7 +38,7 @@ public sealed class EndToEndTests
         sql.GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(field => field.IsLiteral)
             .Select(field => field.Name)
-            .ShouldBe(["CountUsers", "GetUser", "ListUsers"]);
+            .ShouldBe(["GetUser", "ListUsers"]);
     }
 
     [Fact]
@@ -175,17 +175,11 @@ public sealed class EndToEndTests
             .ShouldNotContain("SqlSource.SqlSourceGenerateAttribute");
 
     [Fact]
-    public void AttributeAndEnum_OfTheConsumingAssembly_AreInternalTypes()
+    public void Attributes_OfTheConsumingAssembly_AreInternalTypes()
     {
         var assembly = typeof(EndToEndTests).Assembly;
 
-        string[] names =
-        [
-            AttributeSource.AttributeMetadataName,
-            AttributeSource.LocationMetadataName,
-            AttributeSource.MethodLocationMetadataName,
-            AttributeSource.ConverterAttributeMetadataName,
-        ];
+        string[] names = [AttributeSource.AttributeMetadataName, AttributeSource.ConverterAttributeMetadataName];
         foreach (var name in names)
         {
             assembly.GetType(name).ShouldNotBeNull().IsNotPublic.ShouldBeTrue();

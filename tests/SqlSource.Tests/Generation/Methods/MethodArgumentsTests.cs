@@ -71,13 +71,19 @@ public sealed class MethodArgumentsTests
     }
 
     [Theory]
-    [InlineData(nameof(MethodPlacement.ExtensionClass), "this ")]
-    [InlineData(nameof(MethodPlacement.Public), "")]
-    public void AppendDeclaration_TokenNamedAwait_IsVerbatim(string placementName, string receiverPrefix)
+    [InlineData(nameof(MemberLocation.ExtensionClass), "this ")]
+    [InlineData(nameof(MemberLocation.Class), "")]
+    [InlineData(nameof(MemberLocation.NestedClass), "")]
+    public void AppendDeclaration_TokenNamedAwait_IsVerbatim(string locationName, string receiverPrefix)
     {
         var builder = new StringBuilder();
 
-        Of().AppendDeclaration(builder, "    ", MethodHost.Of(Enum.Parse<MethodPlacement>(placementName)));
+        Of()
+            .AppendDeclaration(
+                builder,
+                "    ",
+                new MethodHost(Visibility.Public, Enum.Parse<MemberLocation>(locationName), null)
+            );
 
         builder
             .ToString()
@@ -187,7 +193,7 @@ public sealed class MethodArgumentsTests
         }
 
         _ = builder.Clear();
-        arguments.AppendDeclaration(builder, "    ", MethodHost.Of(MethodPlacement.ExtensionClass));
+        arguments.AppendDeclaration(builder, "    ", default);
         arguments.AppendIteratorDeclaration(builder, "    ");
         arguments.AppendCall(builder);
         return count;

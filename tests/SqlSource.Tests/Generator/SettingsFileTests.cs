@@ -382,9 +382,9 @@ public sealed class SettingsFileTests
         diagnostic.ShouldContain("in the typeOverrides of the settings file /app/Repo/sqlsource.json");
     }
 
-    // The class belongs to the type, so the folder of its C# file decides, and not that of the .sql file it claims.
+    // The class is a setting of the query, so the folder of the .sql file decides, and not that of the type's C# file.
     [Fact]
-    public void Run_NestedClassInTheTypesFolder_NamesTheClass()
+    public void Run_NestedClassInTheFilesFolder_NamesTheClass()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -394,10 +394,10 @@ public sealed class SettingsFileTests
                     """
                     using SqlSource;
                     namespace App;
-                    [SqlSourceGenerate(Source = "../Queries/Users.sql", SqlLocation = SqlLocation.Nested)]
+                    [SqlSourceGenerate(Source = "../Queries/Users.sql")]
                     public partial class Sample
                     {
-                        public static string Get() => Queries.GetUser;
+                        public static string Get() => Statements.GetUser;
                     }
                     """
                 ),
@@ -412,11 +412,12 @@ public sealed class SettingsFileTests
                     """{"nestedClass":"Statements"}"""
                 ),
                 new SqlFile("/app/Queries/Users.sql", SqlTexts.GetUser),
-            ]
+            ],
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.ShouldBeClean();
-        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static class Queries\n");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static partial class Statements\n");
     }
 
     // A file that a type links from outside its own folders takes the chain of the folder the file is in.

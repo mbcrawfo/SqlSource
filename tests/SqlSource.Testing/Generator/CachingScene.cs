@@ -39,7 +39,7 @@ internal sealed class CachingScene
     public static readonly string UsersSource = TypeSource(
         "App.Users",
         "UserQueries",
-        members: "    public static string Get() => Sql.GetUser;\n"
+        members: "    public static string Get() => GetUser;\n"
     );
 
     public static readonly SourceFile[] Sources =
@@ -379,7 +379,7 @@ internal sealed class CachingScene
         compilation.ReplaceSyntaxTree(
             compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath),
             CSharpSyntaxTree.ParseText(
-                UsersSource.Replace("=> Sql.GetUser;", "=> Sql.GetUser + \" \";", StringComparison.Ordinal),
+                UsersSource.Replace("=> GetUser;", "=> GetUser + \" \";", StringComparison.Ordinal),
                 GeneratorHarness.ParseOptions,
                 UsersSourcePath,
                 cancellationToken: TestContext.Current.CancellationToken

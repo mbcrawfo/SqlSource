@@ -88,7 +88,6 @@ public sealed class CachingParseTests
         [
             TrackingNames.SettingsFiles,
             TrackingNames.TargetTypes,
-            TrackingNames.NestedClassCheck,
             TrackingNames.SqlPaths,
             TrackingNames.ReachedSettingsFiles,
             TrackingNames.CaseCollisions,
@@ -146,10 +145,11 @@ public sealed class CachingParseTests
         OutputReasons(result).ShouldAllBeCached();
     }
 
-    // The declaration has a new member, so the names its nested class cannot take changed, and the check ran again.
-    // The member does not take the name, so the check gave an equal type and nothing after it ran.
+    // The declaration has a new member, so the names that a nested class of its queries cannot take changed.  The
+    // nested class is known only once the files are parsed, so the type's later steps run again, and the other type's
+    // do not.  The member takes no name of the type's, so its file comes out equal and no output is written again.
     [Fact]
-    public void Run_MemberAdded_ChecksTheNestedClassAndRunsNothingAfterIt()
+    public void Run_MemberAdded_RunsTheLaterStepsOfThatTypeAlone()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var driver = _scene.FirstRun(OutputKind.Sql, compilation);
@@ -167,7 +167,7 @@ public sealed class CachingParseTests
             )
         );
 
-        Reasons<DeclaredType>(result, TrackingNames.TargetTypes, declared => declared.Type.Name)
+        Reasons<TargetType>(result, TrackingNames.TargetTypes, type => type.Name)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
@@ -176,16 +176,24 @@ public sealed class CachingParseTests
                 },
                 ignoreOrder: true
             );
-        Reasons<TargetType>(result, TrackingNames.NestedClassCheck, type => type.Name)
+        Reasons<TypeFiles>(result, TrackingNames.TypeFiles, files => files.Type.Name)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
-                    ["UserQueries"] = IncrementalStepRunReason.Unchanged,
+                    ["UserQueries"] = IncrementalStepRunReason.Modified,
                     ["OrderQueries"] = IncrementalStepRunReason.Cached,
                 },
                 ignoreOrder: true
             );
-        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBeCached();
+        TypeReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
         OutputReasons(result).ShouldAllBeCached();
     }
 

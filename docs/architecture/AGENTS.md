@@ -14,6 +14,7 @@ Each page is in this folder.
 | `src/SqlSource/Generation/Emitting` | `generator.md` | `## Emitting` |
 | `src/SqlSource/Generation/Emitting/QueryMethods` | `generator.md` | `### Query methods` and `### Extending query methods`, under `## Emitting` |
 | `src/SqlSource/Generation/Methods` | `generator.md` | `### Query methods`, under `## Emitting` |
+| `src/SqlSource/Generation/Placement` | `generator.md` | `### Placement`, under `## Emitting` |
 | `src/SqlSource/Settings`, with `ClrTypes/`, `ColumnTypes/`, `Libraries/` and `TypeOverrides/` | `generator.md` | `## Settings` |
 | `src/SqlSource/SettingsFiles` | `generator.md` | `### Settings files`, under `## Settings` |
 | `src/SqlSource/Parsing`, with `Markers/`, `Quoting/` and `Tokens/` | `generator.md` | `## Parsing` |

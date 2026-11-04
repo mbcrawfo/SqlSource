@@ -58,6 +58,10 @@ internal static class SqlFileReader
                     ColumnMarkersOf(file.Path, text, block.ColumnMarkers),
                     DiagnosticsOf(file.Path, text, block.KeptErrors)
                 )
+                {
+                    MemberLocationMarker = MarkerLocationOf(file.Path, text, block.MemberLocationMarker),
+                    VisibilityMarker = MarkerLocationOf(file.Path, text, block.VisibilityMarker),
+                }
             );
         }
 
@@ -127,6 +131,10 @@ internal static class SqlFileReader
 
         return new EquatableArray<ColumnMarker>(columns.MoveToImmutable());
     }
+
+    // Made only for a query that has the marker: the parser's allocation budget holds.
+    private static LocationInfo? MarkerLocationOf(string path, SourceText text, TextSpan? span) =>
+        span is { } found ? LocationInfo.From(path, text, found) : null;
 
     private static ModelMarker? ModelMarkerOf(string path, SourceText text, SqlModelName? model) =>
         model is null ? null : new ModelMarker(model.Name, LocationInfo.From(path, text, model.Span));

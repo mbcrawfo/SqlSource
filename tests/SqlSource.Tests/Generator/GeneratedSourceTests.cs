@@ -31,33 +31,41 @@ public sealed class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            """
-            using SqlSource;
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    """
+                    using SqlSource;
 
-            namespace App;
+                    namespace App;
 
-            [SqlSourceGenerate(Source = ".")]
-            public partial class Sample
-            {
-                public static string First => Sql.GetUser;
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Sample
+                    {
+                        public static string First => Sql.GetUser;
 
-                public static string Second => Sql.ListUsers;
-            }
-            """,
-            new SqlFile(
-                GeneratorHarness.UsersPath,
-                """
-                -- Queries for users.
-                -- name: GetUser
-                -- summary: Loads one user by id.
-                SELECT id, name -- the columns
-                FROM users
-                WHERE id = @id;
+                        public static string Second => Sql.ListUsers;
+                    }
+                    """
+                ),
+            ],
+            [
+                new SqlFile(
+                    GeneratorHarness.UsersPath,
+                    """
+                    -- Queries for users.
+                    -- name: GetUser
+                    -- summary: Loads one user by id.
+                    SELECT id, name -- the columns
+                    FROM users
+                    WHERE id = @id;
 
-                -- name: ListUsers
-                SELECT id, name FROM users;
-                """
-            )
+                    -- name: ListUsers
+                    SELECT id, name FROM users;
+                    """
+                ),
+            ],
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.ShouldBeClean();
@@ -78,7 +86,7 @@ public sealed class GeneratedSourceTests
                 {
                     partial class Sample
                     {
-                        private static class Sql
+                        private static partial class Sql
                         {
                             /// <summary>
                             /// Loads one user by id.
@@ -109,8 +117,9 @@ public sealed class GeneratedSourceTests
             );
     }
 
+    // The run's settings put the members on the type, and the type is public, so they are public.
     [Fact]
-    public void Run_DirectLocation_PutsTheConstantsOnTheType()
+    public void Run_ClassLocation_PutsTheConstantsOnTheType()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -119,7 +128,7 @@ public sealed class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".")]
             public static partial class Sample;
 
             public static class Consumer
@@ -180,23 +189,31 @@ public sealed class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            $$"""
-            using SqlSource;
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    $$"""
+                    using SqlSource;
 
-            namespace App;
+                    namespace App;
 
-            [SqlSourceGenerate(Source = ".")]
-            {{declaration}}
-            {
-                public static string Value => Sql.GetUser;
-            }
-            """,
-            GeneratorHarness.UsersFile
+                    [SqlSourceGenerate(Source = ".")]
+                    {{declaration}}
+                    {
+                        public static string Value => Sql.GetUser;
+                    }
+                    """
+                ),
+            ],
+            [GeneratorHarness.UsersFile],
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.ShouldBeClean();
         run.Sources.Single(source => source.Key.StartsWith("App.Sample", StringComparison.Ordinal))
-            .Value.ShouldContain("namespace App\n{\n    " + expected + "\n    {\n        private static class Sql\n");
+            .Value.ShouldContain(
+                "namespace App\n{\n    " + expected + "\n    {\n        private static partial class Sql\n"
+            );
     }
 
     [Fact]
@@ -204,25 +221,31 @@ public sealed class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            """
-            using SqlSource;
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    """
+                    using SqlSource;
 
-            namespace App.Data
-            {
-                public static partial class Outer
-                {
-                    public partial interface IMiddle<TKey, TValue>
+                    namespace App.Data
                     {
-                        [SqlSourceGenerate(Source = ".")]
-                        private partial record Inner
+                        public static partial class Outer
                         {
-                            public static string Value => Sql.GetUser;
+                            public partial interface IMiddle<TKey, TValue>
+                            {
+                                [SqlSourceGenerate(Source = ".")]
+                                private partial record Inner
+                                {
+                                    public static string Value => Sql.GetUser;
+                                }
+                            }
                         }
                     }
-                }
-            }
-            """,
-            GeneratorHarness.UsersFile
+                    """
+                ),
+            ],
+            [GeneratorHarness.UsersFile],
+            settings: GeneratorHarness.InNestedClass
         );
 
         run.ShouldBeClean();
@@ -238,7 +261,7 @@ public sealed class GeneratedSourceTests
                         {
                             partial record Inner
                             {
-                                private static class Sql
+                                private static partial class Sql
                                 {
                                     /// <summary>
                                     /// The <c>GetUser</c> query from <c>Users.sql</c>.

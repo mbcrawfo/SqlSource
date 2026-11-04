@@ -10,6 +10,7 @@ VALUES (@accountId, @kind, @body, @writtenAt);
 -- name: AddNoteForDapper
 -- summary: AddNote again, at the output models, whose constant the Dapper tests run.
 -- output: models
+-- member-location: class
 -- input-model: AddNoteArgs
 -- output-model: AddNoteDto
 INSERT INTO dbo.notes (account_id, kind, body, written_at)

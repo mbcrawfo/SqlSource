@@ -5,5 +5,5 @@ namespace SqlSource.DatabaseTests.SqlServer.SqlClient61;
 // NetTopologySuiteQueriesExtensions, and their models in NetTopologySuite's geometries, read through the column's
 // stream and written as SqlBytes by the generated NetTopologySuiteConversions on SqlClient 6.1, NetTopologySuite 2.5.0
 // and NetTopologySuite.IO.SqlServerBytes 2.1.0.
-[SqlSourceGenerate(Source = "../SqlServer/EndToEnd/NetTopologySuite/Queries", SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Source = "../SqlServer/EndToEnd/NetTopologySuite/Queries")]
 internal static partial class NetTopologySuiteQueries;

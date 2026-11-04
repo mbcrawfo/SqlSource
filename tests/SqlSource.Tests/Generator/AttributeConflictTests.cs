@@ -16,7 +16,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // A project that sees the internals of another one that uses SqlSource, as a test project sees the project it tests.
-// Both hold the generated attribute and enums, but each marks them embedded, so neither sees the other's copy and the
+// Both hold the generated attributes, but each marks them embedded, so neither sees the other's copy and the
 // compiler has no conflict (CS0436) to warn about, with no analyzer loaded.  Each test of a generated type across the
 // boundary runs on an image, as a build references a project, and on a compilation, as an IDE does; the test of a type
 // the user declares in both projects needs only one.
@@ -56,8 +56,7 @@ public sealed class AttributeConflictTests
             "using SqlSource;\n[SqlSourceGenerateAttribute(Source = \".\")]\ninternal partial class Sample { }",
             "[SqlSource.SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }",
             "[global::SqlSource.SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }",
-            "internal class Sample { object o = typeof(SqlSource.SqlLocation); }",
-            "internal class Sample { object o = SqlSource.SqlLocation.Direct; }",
+            "internal class Sample { object o = typeof(SqlSource.SqlSourceGenerateAttribute); }",
             "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
         ];
         var uses = new TheoryData<string, bool>();
@@ -77,48 +76,6 @@ public sealed class AttributeConflictTests
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql, compilationReference)]
-        );
-
-        build.ShouldBeEmpty();
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Build_AttributeThatSetsTheLocation_HasNoConflictForEitherType(bool compilationReference)
-    {
-        const string Source = """
-            using SqlSource;
-            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
-            internal partial class Sample { }
-            """;
-
-        var build = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql, compilationReference)]
-        );
-
-        build.ShouldBeEmpty();
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Build_AttributeThatSetsTheMethods_HasNoConflictForTheEnum(bool compilationReference)
-    {
-        const string Source = """
-            using SqlSource;
-            [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Internal)]
-            internal partial class Sample { }
-            """;
-
-        var build = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
             [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql, compilationReference)]
         );
@@ -173,11 +130,11 @@ public sealed class AttributeConflictTests
     // A type that the project and the other one both declare by hand is a conflict that the user has to know about,
     // whatever its name.
     [Theory]
-    [InlineData("Mine", "SqlLocation")]
+    [InlineData("Mine", "SqlSourceConverterAttribute")]
     [InlineData("Mine", "SqlSourceGenerateAttribute")]
-    [InlineData("Mine", "MethodLocation")]
+    [InlineData("Mine", "SqlSourceRowBuffer")]
     [InlineData("SqlSource", "Shared")]
-    [InlineData("SqlSource.Inner", "SqlLocation")]
+    [InlineData("SqlSource.Inner", "SqlSourceConverterAttribute")]
     public async Task Build_UseOfATypeThatBothProjectsDeclare_IsStillAConflict(string @namespace, string name)
     {
         var declaration = $"namespace {@namespace} {{ internal class {name} {{ }} }}\n";
@@ -251,12 +208,12 @@ public sealed class AttributeConflictTests
     }
 
     // A project without SqlSource that sees the other's internals does not see the types SqlSource gave the other: the
-    // attribute's enums and a library's class of conversions are the other's alone.
+    // attribute and a library's class of conversions are the other's alone.
     [Theory]
     [InlineData("typeof(SqlSource.NodaTimeConversions)", "NodaTimeConversions", false)]
     [InlineData("typeof(SqlSource.NodaTimeConversions)", "NodaTimeConversions", true)]
-    [InlineData("SqlSource.SqlLocation.Direct", "SqlLocation", false)]
-    [InlineData("SqlSource.SqlLocation.Direct", "SqlLocation", true)]
+    [InlineData("typeof(SqlSource.SqlSourceGenerateAttribute)", "SqlSourceGenerateAttribute", false)]
+    [InlineData("typeof(SqlSource.SqlSourceGenerateAttribute)", "SqlSourceGenerateAttribute", true)]
     public async Task Build_FriendWithoutSqlSource_CannotNameTheOthersEmbeddedTypes(
         string expression,
         string name,
@@ -280,8 +237,7 @@ public sealed class AttributeConflictTests
     public async Task Build_ProjectWithAnotherGeneratorsEmbeddedAttribute_CompilesClean()
     {
         const string Source =
-            "using SqlSource;\n[SqlSourceGenerate(Source = \".\", SqlLocation = SqlLocation.Direct)]\n"
-            + "internal partial class Sample { }";
+            "using SqlSource;\n[SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }";
 
         var (diagnostics, sources) = await GeneratorHarness.BuildProjectAsync(
             OutputKind.Sql,

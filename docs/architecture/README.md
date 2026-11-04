@@ -87,7 +87,7 @@ The one solution or project that a `describe` run is on, a `RunUnit`.  `RunUnitF
 
 ### Settings level
 
-A `SettingsLevel`: what one source says about the settings, whether the markers of a query and its file, a settings file, or a type's attribute, which gives the nested class alone.  `QuerySettings.Resolve` puts a query's levels together, the most specific first.
+A `SettingsLevel`: what one source says about the settings, whether the markers of a query and its file, or a settings file.  `QuerySettings.Resolve` puts a query's levels together, the most specific first.
 
 ### Sidecar
 

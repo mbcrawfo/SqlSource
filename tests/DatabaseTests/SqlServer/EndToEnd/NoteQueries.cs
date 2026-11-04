@@ -5,5 +5,5 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // a query's that gives sys.time back to the map.  The column types of the header and the queries' markers give two
 // more record structs, read and sent through their converters.  Extension methods of the connection in
 // NoteQueriesExtensions.
-[SqlSourceGenerate(Source = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Source = "Queries/Notes.sql")]
 internal static partial class NoteQueries;

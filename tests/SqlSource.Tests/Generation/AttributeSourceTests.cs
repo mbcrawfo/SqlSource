@@ -1,51 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
-using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 using RoslynOutputKind = Microsoft.CodeAnalysis.OutputKind;
 
 namespace SqlSource.Tests.Generation;
 
-// The generator reads an enum argument of the attribute as a number and casts it to its own form of the enum.  The
-// two must agree member by member, or a value a user writes would mean another.
-public sealed partial class AttributeSourceTests
+public sealed class AttributeSourceTests
 {
     // The language of a project that targets a framework older than .NET 8, which gets the attribute's file too.
     private static readonly CSharpParseOptions CSharp73 = new(LanguageVersion.CSharp7_3);
 
-    // The generator's own forms are internal, so a public theory names them and the test looks them up.
-    [Theory]
-    [InlineData("SqlLocation", nameof(MemberPlacement))]
-    [InlineData("MethodLocation", nameof(MethodPlacement))]
-    public void EmittedEnum_ComparedWithTheGeneratorsOwnForm_HasTheSameMembersAndNumbers(string emitted, string ownName)
-    {
-        var own = new[] { typeof(MemberPlacement), typeof(MethodPlacement) }.Single(type => type.Name == ownName);
-        var body = Regex
-            .Match(AttributeSource.Text, @"internal enum " + emitted + @"\s*\{(?<body>[^}]*)\}")
-            .Groups["body"]
-            .Value;
-
-        var members = Member()
-            .Matches(body)
-            .Select(match => match.Groups["name"].Value + "=" + match.Groups["value"].Value);
-
-        members.ShouldBe(
-            Enum.GetValues(own)
-                .Cast<object>()
-                .Select(value => value + "=" + Convert.ToInt32(value, CultureInfo.InvariantCulture))
-        );
-    }
-
-    // The settings of output, generator parameters, models and collections are the files' alone.
+    // The settings of output, generator parameters, models, collections and placement are the files' alone.
     [Theory]
     [InlineData("GeneratorOutput")]
     [InlineData("GeneratorModelType")]
@@ -53,6 +25,11 @@ public sealed partial class AttributeSourceTests
     [InlineData("public string Parameters")]
     [InlineData("public GeneratorOutput Output")]
     [InlineData("public string ModelNamespace")]
+    [InlineData("enum SqlLocation")]
+    [InlineData("enum MethodLocation")]
+    [InlineData("public SqlLocation SqlLocation")]
+    [InlineData("public MethodLocation MethodLocation")]
+    [InlineData("public string NestedClass")]
     public void Text_RemovedSettings_AreNotDeclared(string declaration) =>
         AttributeSource.Text.ShouldNotContain(declaration);
 
@@ -68,7 +45,7 @@ public sealed partial class AttributeSourceTests
             .Where(type => type.ContainingNamespace.ToDisplayString() == "SqlSource")
             .ToList();
 
-        types.Count.ShouldBe(4);
+        types.Count.ShouldBe(2);
         types.ShouldAllBe(type =>
             type.GetAttributes()
                 .Any(attribute =>
@@ -144,7 +121,4 @@ public sealed partial class AttributeSourceTests
             References(),
             new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
         );
-
-    [GeneratedRegex(@"^\s*(?<name>\w+) = (?<value>\d+),", RegexOptions.Multiline)]
-    private static partial Regex Member();
 }

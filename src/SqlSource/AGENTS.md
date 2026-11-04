@@ -37,6 +37,6 @@ The generator runs inside its consumers' C# compiler, which limits what the proj
 - **The dialect is resolved for each file before the parse**, by `Generation/FileParseInput.cs` from the chain of the file's folder, as an input of the parse.  See [the dialect](../../docs/architecture/generator.md#how-the-dialect-reaches-the-parse).
 - **The build shows the compiler three properties, `SqlSourceBuildFolders`, `SqlSourceTransitivePackageAssemblies` and `SqlSourcePublicExceptions`, and no item metadata; a query's setting is never a property or metadata of the build.**
 - **Only stage one of the settings reaches the parse.**  A setting of stage two is never an input of `SqlFileReader.Read`, or a change to it would parse every file again.  See [the two stages](../../docs/architecture/generator.md#the-settings-have-two-stages).
-- **Stage two reads a file's settings from its `FileLevel`, the chain of its folder**, and a type's nested class from the chain of its C# file's folder, in `NestedClassCheck`, never from one settings file alone.
+- **Stage two reads a file's settings, its queries' placement too, from its `FileLevel`, the chain of its folder**, never from one settings file alone.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

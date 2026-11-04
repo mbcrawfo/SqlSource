@@ -15,6 +15,9 @@ public sealed class MethodDiagnosticsTests
 {
     private const string Path = GeneratorHarness.UsersPath;
 
+    // The header of a file whose methods go on the type, public.
+    private const string OnTheType = "-- member-location: class\n-- visibility: public\n\n";
+
     [Theory]
     [InlineData("one")]
     [InlineData("one-optional")]
@@ -163,67 +166,43 @@ public sealed class MethodDiagnosticsTests
     }
 
     [Fact]
-    public void Run_QueryNamedAsAMemberOfTheTypeUnderPublic_IsSqlsrc274()
+    public void Run_QueryNamedAsAMemberOfTheTypeUnderClass_IsSqlsrc274()
     {
         const string Source = """
             using SqlSource;
 
             namespace App
             {
-                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample
                 {
                     public static int Count => 0;
                 }
             }
             """;
-        var file = new SqlFile(Path, "-- name: Count\nSELECT id FROM users;\n");
+        var file = new SqlFile(Path, OnTheType + "-- name: Count\nSELECT id FROM users;\n");
 
         var run = MethodRuns.Run(file, [Entry(file, "Count", [], [Column("id")])], Source);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
+                "SQLSRC274 /app/Repo/Users.sql(4,10)-(4,15): The method of the query 'Count' cannot be named 'Count', "
                     + "because 'App.Sample' has a member of that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
+    // A CodeGen query on the type has no constant there, so its name is judged as its method's.
     [Fact]
-    public void Run_QueryNamedAsTheTypeUnderPublic_IsSqlsrc274()
+    public void Run_QueryNamedAsTheTypeUnderClass_IsSqlsrc274()
     {
-        var file = new SqlFile(Path, "-- name: Sample\nSELECT id FROM users;\n");
+        var file = new SqlFile(Path, OnTheType + "-- name: Sample\nSELECT id FROM users;\n");
 
-        var run = MethodRuns.Run(
-            file,
-            [Entry(file, "Sample", [], [Column("id")])],
-            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public")
-        );
+        var run = MethodRuns.Run(file, [Entry(file, "Sample", [], [Column("id")])]);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'Sample' cannot be named "
-                    + "'Sample', because it is the name of the type 'App.Sample' that holds the method.  Rename the "
-                    + "query.",
-            ]);
-        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
-    }
-
-    // Under SqlLocation.Direct a CodeGen query has no constant on the type, so its name is judged as its method's.
-    [Fact]
-    public void Run_QueryNamedAsTheTypeUnderDirectAndPublic_IsSqlsrc274()
-    {
-        var file = new SqlFile(Path, "-- name: Sample\nSELECT id FROM users;\n");
-
-        var run = MethodRuns.Run(
-            file,
-            [Entry(file, "Sample", [], [Column("id")])],
-            MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public")
-        );
-
-        run.Problems()
-            .ShouldBe([
-                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'Sample' cannot be named "
+                "SQLSRC274 /app/Repo/Users.sql(4,10)-(4,16): The method of the query 'Sample' cannot be named "
                     + "'Sample', because it is the name of the type 'App.Sample' that holds the method.  Rename the "
                     + "query.",
             ]);
@@ -231,73 +210,67 @@ public sealed class MethodDiagnosticsTests
     }
 
     [Fact]
-    public void Run_QueryNamedAsATypeParameterUnderPublic_IsSqlsrc274()
+    public void Run_QueryNamedAsATypeParameterUnderClass_IsSqlsrc274()
     {
         const string Source = """
             using SqlSource;
 
             namespace App
             {
-                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample<TRow>;
             }
             """;
-        var file = new SqlFile(Path, "-- name: TRow\nSELECT id FROM users;\n");
+        var file = new SqlFile(Path, OnTheType + "-- name: TRow\nSELECT id FROM users;\n");
 
         var run = MethodRuns.Run(file, [Entry(file, "TRow", [], [Column("id")])], Source);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,14): The method of the query 'TRow' cannot be named 'TRow', "
+                "SQLSRC274 /app/Repo/Users.sql(4,10)-(4,14): The method of the query 'TRow' cannot be named 'TRow', "
                     + "because 'App.Sample<TRow>' has a type parameter of that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain("App.Sample-1-Methods.g.cs");
     }
 
-    // Under SqlLocation.Nested the class that holds the constant of a query whose output is sql is a member of the
-    // type, and the method of Get under async-method-suffix would take its name.
+    // The nested class that holds the constant of a query whose output is sql is a member of the type, and the
+    // method of Get on the type under async-method-suffix would take its name.
     [Fact]
-    public void Run_MethodNamedAsTheNestedClassUnderPublic_IsSqlsrc274()
+    public void Run_MethodNamedAsTheNestedClassUnderClass_IsSqlsrc274()
     {
         var file = new SqlFile(
             Path,
-            "-- name: Get\n-- generator: async-method-suffix\nSELECT id FROM users;\n"
-                + "-- name: Other\n-- output: sql\nSELECT 1;\n"
+            "-- name: Get\n-- generator: async-method-suffix\n-- member-location: class\n-- visibility: public\n"
+                + "SELECT id FROM users;\n"
+                + "-- name: Other\n-- output: sql\n-- nested-class: GetAsync\nSELECT 1;\n"
         );
 
-        var run = MethodRuns.Run(
-            file,
-            [Entry(file, "Get", [], [Column("id")])],
-            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public, NestedClass = \"GetAsync\"")
-        );
+        var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])]);
 
         run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
-                    + "because the class of the queries of 'App.Sample' has that name.  Rename the query.",
+                    + "because 'App.Sample' has a nested class of that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
-    // Under SqlLocation.Direct the constant of a query whose output is sql is a member of the type, and the method of
-    // Get under async-method-suffix would take its name.
+    // Under the member location class the constant of a query whose output is sql is a member of the type, and the
+    // method of Get under async-method-suffix would take its name.
     [Fact]
-    public void Run_MethodNamedAsTheConstantOfAnotherQueryUnderDirect_IsSqlsrc274()
+    public void Run_MethodNamedAsTheConstantOfAnotherQueryUnderClass_IsSqlsrc274()
     {
-        var source = MethodRuns.SampleSource(
-            "SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public"
-        );
         var file = new SqlFile(
             Path,
-            "-- generator: async-method-suffix\n\n"
+            "-- generator: async-method-suffix\n-- member-location: class\n-- visibility: public\n\n"
                 + "-- name: Get\nSELECT id FROM users;\n-- name: GetAsync\n-- output: sql\nSELECT 1;\n"
         );
 
-        var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], source);
+        var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])]);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC274 /app/Repo/Users.sql(3,10)-(3,13): The method of the query 'Get' cannot be named 'GetAsync', "
+                "SQLSRC274 /app/Repo/Users.sql(5,10)-(5,13): The method of the query 'Get' cannot be named 'GetAsync', "
                     + "because the query 'GetAsync' of 'App.Sample' has a constant or method of that name.  Rename the "
                     + "query.",
             ]);
@@ -360,7 +333,7 @@ public sealed class MethodDiagnosticsTests
 
             namespace App.A
             {
-                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample
                 {
                     public static int Count => 0;
@@ -369,22 +342,22 @@ public sealed class MethodDiagnosticsTests
 
             namespace App.B
             {
-                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample
                 {
                     public static int Count => 0;
                 }
             }
             """;
-        var file = new SqlFile(Path, "-- name: Count\nSELECT id FROM users;\n");
+        var file = new SqlFile(Path, OnTheType + "-- name: Count\nSELECT id FROM users;\n");
 
         var run = MethodRuns.Run(file, [Entry(file, "Count", [], [Column("id")])], Source);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
+                "SQLSRC274 /app/Repo/Users.sql(4,10)-(4,15): The method of the query 'Count' cannot be named 'Count', "
                     + "because 'App.A.Sample' has a member of that name.  Rename the query.",
-                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
+                "SQLSRC274 /app/Repo/Users.sql(4,10)-(4,15): The method of the query 'Count' cannot be named 'Count', "
                     + "because 'App.B.Sample' has a member of that name.  Rename the query.",
             ]);
     }

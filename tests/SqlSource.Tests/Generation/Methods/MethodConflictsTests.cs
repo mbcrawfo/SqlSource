@@ -17,7 +17,6 @@ public sealed class MethodConflictsTests
         var conflicts = Find([
             Signature("App.First", "FirstExtensions", "Get"),
             Signature("App.Second", "SecondExtensions", "List"),
-            Signature("App.Third", null, "Get"),
         ]);
 
         conflicts.ShouldBe(
@@ -86,14 +85,13 @@ public sealed class MethodConflictsTests
         conflicts.Diagnostics.ShouldBeEmpty();
     }
 
-    // Two classes of two namespaces, and a method on its own type, never meet.
+    // Two classes of two namespaces never meet.
     [Fact]
-    public void Find_OneSignatureInTwoNamespacesOrOnTheType_DropsNothing()
+    public void Find_OneSignatureInTwoNamespaces_DropsNothing()
     {
         var conflicts = Find([
             Signature("App.A.Sample", "SampleExtensions", "Get", ns: "App.A"),
             Signature("App.B.Sample", "SampleExtensions", "Get", ns: "App.B"),
-            Signature("App.A.Other", null, "Get", ns: "App.A"),
         ]);
 
         conflicts.Dropped.ShouldBeEmpty();
@@ -123,7 +121,7 @@ public sealed class MethodConflictsTests
                 "SQLSRC276 Sample.cs: The query methods of 'App.Sample' cannot go into the extension class "
                     + "'App.SampleExtensions', because "
                     + because
-                    + ".  Rename the type or what has the name, or set the attribute's MethodLocation to put the "
+                    + ".  Rename the type or what has the name, or set -- member-location: to put the "
                     + "methods on the type.",
             ]);
     }
@@ -145,7 +143,7 @@ public sealed class MethodConflictsTests
                 "SQLSRC276 Sample.cs: The query methods of 'App.Sample' cannot go into the extension class "
                     + "'App.SampleExtensions', because "
                     + because
-                    + ".  Rename the type or what has the name, or set the attribute's MethodLocation to put the "
+                    + ".  Rename the type or what has the name, or set -- member-location: to put the "
                     + "methods on the type.",
             ]);
     }
@@ -164,11 +162,11 @@ public sealed class MethodConflictsTests
                 "SQLSRC276 First.cs: The query methods of 'App.First.Queries' cannot go into the extension class "
                     + "'App.QueriesExtensions', because 'App.Second.Queries' puts its methods there too, and the "
                     + "class would be public for one and internal for the other.  Rename the type or what has the "
-                    + "name, or set the attribute's MethodLocation to put the methods on the type.",
+                    + "name, or set -- member-location: to put the methods on the type.",
                 "SQLSRC276 Second.cs: The query methods of 'App.Second.Queries' cannot go into the extension class "
                     + "'App.QueriesExtensions', because 'App.First.Queries' puts its methods there too, and the "
                     + "class would be public for one and internal for the other.  Rename the type or what has the "
-                    + "name, or set the attribute's MethodLocation to put the methods on the type.",
+                    + "name, or set -- member-location: to put the methods on the type.",
             ]);
     }
 
@@ -276,10 +274,10 @@ public sealed class MethodConflictsTests
             .ShouldBe([
                 "SQLSRC276 First.cs: The query methods of 'App.First.Queries' cannot go into the extension class "
                     + "'App.QueriesExtensions', because the project has a type of that name.  Rename the type or what "
-                    + "has the name, or set the attribute's MethodLocation to put the methods on the type.",
+                    + "has the name, or set -- member-location: to put the methods on the type.",
                 "SQLSRC276 Second.cs: The query methods of 'App.Second.Queries' cannot go into the extension class "
                     + "'App.QueriesExtensions', because the project has a type of that name.  Rename the type or what "
-                    + "has the name, or set the attribute's MethodLocation to put the methods on the type.",
+                    + "has the name, or set -- member-location: to put the methods on the type.",
             ]);
     }
 
@@ -333,7 +331,7 @@ public sealed class MethodConflictsTests
     // The type's key is its full name, which no test gives a type parameter.
     private static MethodSignature Signature(
         string typeKey,
-        string? extensionClass,
+        string extensionClass,
         string name,
         string ns = "App",
         bool isPublic = true,

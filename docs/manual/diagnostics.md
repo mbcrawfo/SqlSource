@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.  In a build that [runs the tool](tool.md#running-in-the-build), each of its errors is one line, with its other lines after it, each after `; `.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed, and so does an error in where a query's members go, an id from 122 to 125, for the type it is reported for.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.  In a build that [runs the tool](tool.md#running-in-the-build), each of its errors is one line, with its other lines after it, each after `; `.
 
 **Project and attribute**
 
@@ -11,7 +11,6 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC003](#sqlsrc003) | Target framework is not supported |
 | [SQLSRC004](#sqlsrc004) | Source matches no SQL file |
 | [SQLSRC005](#sqlsrc005) | Type has no SQL file |
-| [SQLSRC006](#sqlsrc006) | Attribute value is not valid |
 | [SQLSRC007](#sqlsrc007) | Type has a member named like its nested class |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
@@ -76,6 +75,10 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
 | [SQLSRC120](#sqlsrc120) | Token crosses a comment |
 | [SQLSRC121](#sqlsrc121) | Parameter is written in two spellings |
+| [SQLSRC122](#sqlsrc122) | Member location does not fit the query |
+| [SQLSRC123](#sqlsrc123) | Visibility does not fit the member location |
+| [SQLSRC124](#sqlsrc124) | Nested class has two visibilities |
+| [SQLSRC125](#sqlsrc125) | Query's member on the type has a name that is taken |
 
 **The tool**
 
@@ -250,7 +253,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC286](#sqlsrc286) | Connection in .env cannot be read |
 | [SQLSRC287](#sqlsrc287) | The watcher failed |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 287 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 125 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 287 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), and [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -347,26 +350,11 @@ Add `UserRepository.sql` next to the source file, or rename the file you have.  
 
 See: [Source](settings.md#setting-source)
 
-## SQLSRC006
-
-**Attribute value is not valid**
-
-A property of `[SqlSourceGenerate]` has a value it does not take.  The message names the property and the value: a number that is no member of the property's enum, or a name of the nested class that is not one.
-
-```csharp
-[SqlSourceGenerate(SqlLocation = (SqlLocation)5, NestedClass = "My-Sql")]
-public partial class UserRepository { }
-```
-
-Use a member of the enum: `SqlLocation` takes `SqlLocation.Nested` or `SqlLocation.Direct`, and `MethodLocation` takes a member of `MethodLocation`.  `NestedClass` takes one identifier that is not a keyword; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
-
-See: [All settings](settings.md#all-settings)
-
 ## SQLSRC007
 
 **Type has a member named like its nested class**
 
-With `SqlLocation.Nested` the queries go in a nested class, named `Sql` unless [the nested class](settings.md#setting-nested-class) names it otherwise, and the type already has a member with that name.  The message names it.  The same error is reported when the type itself, or one of its type parameters, has the name: a nested class cannot share either name.
+A query whose [member location](generator.md#locations) is `nested-class` puts its members in a class nested in the type, named `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise, and the type already has a member with that name.  The message names it.  The same error is reported when the type itself, or one of its type parameters, has the name: a nested class cannot share either name.
 
 ```csharp
 [SqlSourceGenerate]
@@ -376,7 +364,13 @@ public partial class UserRepository
 }
 ```
 
-Rename the member, the type or the type parameter, give the nested class another name with `NestedClass` on the attribute or `nestedClass` in a settings file, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
+```console
+/work/App/Queries/UserRepository.cs(3,2): error SQLSRC007: 'UserRepository' already has a member named 'Sql', which a file of it names as its nested class.  Rename the member, or set -- nested-class: or -- member-location: in the file.
+```
+
+The error is reported at the type's `[SqlSourceGenerate]`, once for each name that is taken.  Each file of the type with a query whose members would go in a class of that name produces no members and no models for it, and the type's other files keep theirs.
+
+Rename the member, the type or the type parameter, give the nested class another name with `-- nested-class:` in the file or `nestedClass` in a settings file, or write `-- member-location: class` so that the queries become members of the type itself.
 
 See: [Where the members go](generator.md#locations)
 
@@ -384,7 +378,7 @@ See: [Where the members go](generator.md#locations)
 
 **Query name is used in two files**
 
-Two `.sql` files of one type each have a query with the same name, and a type cannot have two members with one name.  The error is at the second query, and the message names the file that holds the first.  The file that holds the second query produces no members for that type.
+Two `.sql` files of one type each have a query with the same name, and a type cannot have two members with one name.  The error is at the second query, and the message names the file that holds the first.  The file that holds the second query produces no members and no models for that type.
 
 Rename one of the queries.
 
@@ -394,7 +388,7 @@ See: [Which files belong to a type](generator.md#files-of-a-type)
 
 **Query is named like its containing type**
 
-A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type.  With `SqlLocation.Nested` that type is the generated class, so no such query can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise.  With `SqlLocation.Direct` it is the attributed type, so no such query can have that type's name.
+A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `codegen` whose method is in a nested class.  Under the [member location](generator.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise, and no query method there can have it either, with `Async` after the query's name under `async-method-suffix`.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
 
 ```sql
 -- name: Sql
@@ -402,7 +396,7 @@ A member cannot have the name of the type that contains it.  This applies to a q
 SELECT 1;
 ```
 
-Rename the query.  A query whose output is `codegen` has a method in place of the member, and may have either name when its method can: what its method cannot be named is [SQLSRC274](#sqlsrc274).
+The error is at the query's name, and the file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- nested-class:` or `-- member-location:` on it.  A query method on the type or in the extension class has no member of the class to clash with: what its name cannot be is [SQLSRC274](#sqlsrc274).
 
 See: [Where the members go](generator.md#locations)
 
@@ -476,7 +470,7 @@ A key of the top-level object of a settings file is not one of its keys.  Keys a
 }
 ```
 
-The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes` and `nestedClass`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
+The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes`, `nestedClass`, `memberLocation` and `visibility`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
 
 See: [Settings files](settings.md#settings-files)
 
@@ -551,7 +545,7 @@ Correct the value, or remove it.  While it is wrong the setting is not set by th
 
 `dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.  After `mysql` or `mariadb` the value may name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
 
-`output` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, and `nestedClass` takes one identifier that is not a keyword.  `database` takes one word of letters, digits, `-`, `_` and `.`.
+`output` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`, `memberLocation` takes `extension-class`, `class` or `nested-class`, and `visibility` takes `public`, `internal`, `protected` or `private`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name, and `nestedClass` takes one identifier that is none of those and not `var`.  `database` takes one word of letters, digits, `-`, `_` and `.`.
 
 `generatorParameters` takes one generator parameter in each element: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool` or `default`, in any case.  `[]` is the empty list, which gives every default, and so is `["default"]`; beside another word `default` is reported, and the message says to write `[]`.
 
@@ -850,8 +844,9 @@ A generator parameter has a value it does not take; what follows a name in a `--
 
 - `-- output:` takes `sql`, `models` or `codegen`.  `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
 - `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`.
-- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`.
-- `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  Neither is a reserved keyword, and no generic type is named.
+- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.
+- `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  No part of either is a reserved keyword or `file`, `required`, `scoped` or `extension`, and no generic type is named.
+- `-- nested-class:` takes one identifier that is none of those and not `var`, with which the query methods of the type would not compile: `Queries`, and not `class`, `file` or `App.Sql`.  `-- member-location:` takes `extension-class`, `class` or `nested-class`, and `-- visibility:` takes `public`, `internal`, `protected` or `private`, in any case and with or without hyphens and spaces.
 - `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
 - The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
 - A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
@@ -934,7 +929,7 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 SELECT * FROM {{class}};
 ```
 
-The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members for that type.
+The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members and no models for that type.
 
 Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
@@ -1095,7 +1090,7 @@ A comment stands inside a token's braces before its default: between `{{` and th
 SELECT id FROM {{table/* users or archive */}};
 ```
 
-The second and third are errors only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
+The second and third are errors only for a type that keeps the query's comments, and that type gets no members and no models from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
 
 See: [Defaults](parameters-and-tokens.md#token-defaults)
 
@@ -1132,6 +1127,121 @@ dotnet_diagnostic.SQLSRC121.severity = none
 ```
 
 See: [Parameters](parameters-and-tokens.md#query-parameters)
+
+## SQLSRC122
+
+**Member location does not fit the query**
+
+A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](generator.md#locations) is `extension-class`.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql` or `models`.  The message names the query, the type that claims the file and where the value was written; two types that claim one file each report the error.
+
+```sql
+-- member-location: extension-class
+
+-- name: CountUsers
+-- output: sql
+SELECT count(*) FROM users;
+```
+
+```console
+/work/App/Queries/Users.sql(3,10): error SQLSRC122: The query 'CountUsers' of 'App.UserRepository' cannot go in the extension class, which the file header sets, because its output is sql and only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.
+```
+
+The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members and no models for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `codegen`.
+
+See: [Where the members go](generator.md#locations)
+
+## SQLSRC123
+
+**Visibility does not fit the member location**
+
+A query's visibility and its [member location](generator.md#locations) together are something C# cannot write.  The message names the query, the type that claims the file, the visibility, where it was written, the member location and the reason, one of these:
+
+- the member location is `extension-class` and the visibility `private` or `protected`: the extension class is a class of the namespace, and its methods are public or internal;
+- the member location is `extension-class` and the visibility `public`, and the type is not public, or a type around it is not: the type's models, which such a method takes and returns, are internal then, and a public method cannot take them.  A query method with no parameters and no rows, which takes no models, is refused too: write `-- visibility: internal` on it;
+- the visibility is `protected`, and the member location `class` on a static class, or `class` or `nested-class` on a struct or a record struct, which cannot have protected members;
+- the query's output is `codegen`, the member location `class` or `nested-class` and the visibility `public` or `protected`, and the type, or a type around it, is `protected` or `protected internal`, and none of them is `internal`, `private` or `private protected`: a class derived from the type in another assembly could call the method, and the type's models, which such a method takes and returns, are internal.  A query method with no parameters and no rows, which takes no models, is refused too: write `-- visibility: internal` on it.  An `internal` or `private` method or nested class fits, and so does a constant or token method of any visibility, which takes no models.
+
+A header or a settings file's `visibility` reaches every query below it, whatever its member location.  A file of queries at `sql` and at `codegen` whose header says `-- visibility: private` puts the constants in a private nested class, and gets this error at each query at `codegen`, whose method goes in the extension class:
+
+```sql
+-- visibility: private
+
+-- name: GetUserName
+-- output: sql
+SELECT name FROM users WHERE id = @id;
+
+-- name: GetUser
+SELECT id, name FROM users WHERE id = @id;
+```
+
+```console
+/work/App/Queries/Users.sql(7,10): error SQLSRC123: The query 'GetUser' of 'App.UserRepository' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
+```
+
+The error is at the query's `-- visibility:` marker when it has one, else at its `-- member-location:` marker, else at its name, and the file produces no members and no models for the type until it is fixed.  Write `-- visibility:` on the query, as `-- visibility: internal` on `GetUser` above, or write `-- member-location: class` or `-- member-location: nested-class` on it, where a member can be private.  `protected` is allowed on a sealed class or record, and in a nested class of a static class.
+
+A query method that writes no visibility takes its nested class's, which another query of the type, in any of its files, may write.  When that visibility does not fit the method, the error is at the method's query, at its `-- member-location:` marker, else at its name, and names the query that wrote the visibility; only the method's file produces no members and no models for the type.  Here `Constants.sql` makes the class `Sql` of `App.Outer.Sample`, a `protected` class nested in a public one, public, which its constant can be and the method of `GetUser` cannot:
+
+```console
+/work/App/Queries/Users.sql(3,10): error SQLSRC123: The query 'GetUser' of 'App.Outer.Sample' cannot be public, which the file header for the query 'GetName' sets, at the member location nested-class, because 'App.Outer.Sample' is reachable as protected, so its models are internal, which a method reachable from another assembly cannot take or return.  Write -- visibility: or -- member-location: on the query.
+```
+
+Give the method a class of its own with `-- nested-class:`, or put it on the type or in the extension class with `-- member-location:`: `-- visibility: internal` on it would give the class two visibilities, [SQLSRC124](#sqlsrc124).
+
+See: [Where the methods go](generator.md#method-location)
+
+## SQLSRC124
+
+**Nested class has two visibilities**
+
+Queries of one type, in one file or in two, put their members in one nested class, and two of them write different visibilities for it, on the query, in a file's header or in a settings file.  A class has one accessibility.  A query whose visibility is only the default takes the visibility that another query writes for its class, without an error; two written visibilities that differ are this error.  The message names the class, both visibilities, where each was written and the query of each.
+
+```console
+/work/App/Queries/Orders.sql(3,10): error SQLSRC124: The nested class 'Sql' of 'App.UserRepository' cannot be internal, which the file header sets for the query 'GetOrder', since the file header sets it public for the query 'GetUser'.  Write one visibility for the queries of the class, or write -- nested-class: or -- member-location: on the query.
+```
+
+The error is at the query that writes the second visibility, at its `-- visibility:` marker when it has one, else at its name.  Every file of the type with a query in that class produces no members and no models for the type until it is fixed, since neither visibility is more right than the other; two nested classes of one type, each of its own visibility, are fine.  Write one visibility for the class, or write it for one query and leave it to the others, or give the queries of the other visibility a class of their own with `-- nested-class:`, or put them on the type with `-- member-location: class`.
+
+See: [Name of the nested class](settings.md#setting-nested-class)
+
+## SQLSRC125
+
+**Query's member on the type has a name that is taken**
+
+A query whose output is `sql` or `models` and whose [member location](generator.md#locations) is `class` has its constant or token method on the type, and its name is taken: the type declares a member, a nested type or a type parameter of that name, or another query of the type puts its members in a nested class of that name.  A type cannot have two members of one name, and a token method cannot overload a method of yours of the same name, even with other parameters.  The message names the query, the type and what has the name.
+
+```sql
+-- name: Sql
+-- output: sql
+-- member-location: class
+SELECT 1;
+
+-- name: Get
+-- output: sql
+-- member-location: class
+SELECT id, name FROM users WHERE id = {{id}};
+
+-- name: GetUser
+-- output: sql
+SELECT id, name FROM users;
+```
+
+```csharp
+[SqlSourceGenerate(Source = "Queries")]
+public partial class UserRepository
+{
+    public string Get() => Sql.GetUser;
+}
+```
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC125: The member of the query 'Sql' cannot go on 'App.UserRepository', because a nested class of the type's queries has that name.  Rename the query, or write -- member-location: on it.
+/work/App/Queries/Users.sql(6,10): error SQLSRC125: The member of the query 'Get' cannot go on 'App.UserRepository', because the type declares a member, a nested type or a type parameter of that name.  Rename the query, or write -- member-location: on it.
+```
+
+The error is at the query's name, and its file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- member-location: nested-class` on it; for a nested class of the type's queries you can also give that class another name with `-- nested-class:`.  A query named like the type itself is [SQLSRC009](#sqlsrc009), and a query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).
+
+See: [Where the members go](generator.md#locations)
 
 ## SQLSRC200
 
@@ -2735,10 +2845,11 @@ See: [Query methods](generator.md#query-methods)
 
 The method of a query whose output is `codegen` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  It is taken when it is:
 
-- under the default `MethodLocation.ExtensionClass`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
-- under `MethodLocation.Public`, `Internal` or `Private`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type under `SqlLocation.Direct`, or of the class that holds the type's queries under `SqlLocation.Nested`;
-- the name of the method of another query of the same type, which is reported at both queries;
-- under `MethodLocation.ExtensionClass`, the name of the method of a query of another type whose methods go into the same extension class, as two types of one name nested in two types do, or of a method of the same name and the same parameters in the extension class of another type of the same namespace, which a call on a connection could not tell apart from it.  Both queries get the error, and neither gets its method.  Two methods of one name in the classes of two types whose parameters differ, one with an input model and one without, say, are two overloads, and each is generated.
+- under the default [member location](generator.md#locations) `extension-class`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
+- under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
+- under `nested-class`, the name of the constant, token method or method of another query of the type in the same class, which may come from another file of the type;
+- the name of the method of another query of the same type in the same class, which is reported at both queries;
+- under `extension-class`, the name of the method of a query of another type whose methods go into the same extension class, as two types of one name nested in two types do, or of a method of the same name and the same parameters in the extension class of another type of the same namespace, which a call on a connection could not tell apart from it.  Both queries get the error, and neither gets its method.  Two methods of one name in the classes of two types whose parameters differ, one with an input model and one without, say, are two overloads, and each is generated.
 
 The message names the query, the method's name and what takes it.
 
@@ -2746,7 +2857,7 @@ The message names the query, the method's name and what takes it.
 /work/App/Queries/Users.sql(1,10): error SQLSRC274: The method of the query 'Open' cannot be named 'Open', because DbConnection has a member of that name, which a call on a connection finds before the method.  Rename the query.
 ```
 
-Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For a query `Get` under `async-method-suffix` beside a query `GetAsync` without it, rename one of them.  For the methods of two types, rename one of the queries, or set `MethodLocation` on one of the types to put its methods on the type itself.  The error is reported at the query's name, and the query's models are still generated.
+Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For a query `Get` under `async-method-suffix` beside a query `GetAsync` without it, rename one of them.  For the methods of two types, rename one of the queries, or write `-- member-location: class` in the files of one of the types to put its methods on the type itself.  The error is reported at the query's name, and the query's models are still generated.
 
 See: [Query methods](generator.md#query-methods)
 
@@ -2768,19 +2879,19 @@ See: [Query methods](generator.md#query-methods)
 
 **Extension class name is taken**
 
-Under the default `MethodLocation.ExtensionClass`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
+Under the default [member location](generator.md#locations) `extension-class`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
 
 - the project already has a type of the class's full name, or a namespace of it, such as a class `App.SampleExtensions` that you wrote;
 - SqlSource writes a model of that full name, named by `-- output-model:` or `-- input-model:`, or by a query's name and a suffix, or a model in a namespace of that name;
-- two types whose methods go into the one class, as two types `Queries` nested in two types of one namespace do, are of two accessibilities: the class is `public` when the type and every type around it are public, and `internal` otherwise, and one class cannot be both.
+- two types whose methods go into the one class, as two types `Queries` nested in two types of one namespace do, are of two accessibilities: the class is `public` when one of the type's methods is public, and `internal` otherwise, and one class cannot be both.
 
 Two types of one accessibility that give one class share it, each writing a part of it.  The message names the type, the class and what stops it.
 
 ```console
-/work/App/Sample.cs(5,6): error SQLSRC276: The query methods of 'App.Sample' cannot go into the extension class 'App.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set the attribute's MethodLocation to put the methods on the type.
+/work/App/Sample.cs(5,6): error SQLSRC276: The query methods of 'App.Sample' cannot go into the extension class 'App.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set -- member-location: to put the methods on the type.
 ```
 
-Rename the type, or the type, namespace or model that has the class's name, or make the two types of one accessibility.  Or set `MethodLocation` on the attribute to `Public`, `Internal` or `Private`, which puts the methods on the type itself and needs no extension class.  The error is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class, and the type's models are still generated.
+Rename the type, or the type, namespace or model that has the class's name, or give the methods of the two types one widest visibility.  Or write `-- member-location: class` in the type's files, which puts the methods on the type itself and needs no extension class.  The error is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class, and the type's models are still generated.
 
 See: [Query methods](generator.md#query-methods)
 

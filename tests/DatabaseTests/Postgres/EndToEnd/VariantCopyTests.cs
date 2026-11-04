@@ -21,6 +21,9 @@ public sealed class VariantCopyTests
     [InlineData("AllTypes.sql", "ListAllTypes", "ListAllTypesForDapper")]
     [InlineData("AllTypes.sql", "InsertAllTypes", "InsertAllTypesForDapper")]
     [InlineData("Notes.sql", "ListNoteKinds", "ListNoteKindsForDapper")]
+    [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNameInternal")]
+    [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNamePrivate")]
+    [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNameNested")]
     public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy)
     {
         var queries = JsonNode

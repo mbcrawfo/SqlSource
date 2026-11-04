@@ -55,6 +55,7 @@ ORDER BY a.id;
 -- name: ListMarkedNamesForDapper
 -- summary: ListMarkedNames again, at the output models, whose constant the Dapper tests run.
 -- output: models
+-- member-location: class
 -- output-model: ListMarkedNamesDto
 SELECT a.id AS [id?], UPPER(a.name) AS "upper_name!"
 FROM dbo.accounts AS a

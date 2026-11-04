@@ -563,14 +563,15 @@ public sealed class CachingModelTests
         ModelReasons(result).Count.ShouldBe(3);
     }
 
-    // An attribute argument that no model reads: the type is read again, and its requests come out equal.
+    // A Source that names the type's one file by its name, which no model reads: the type is read again, and its
+    // requests come out equal.
     [Fact]
     public void Run_AttributeEditedWithoutChangingAModel_EmitsNoModelAgain()
     {
         var compilation = ModelsCompilation();
         var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
 
-        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "MethodLocation = MethodLocation.Internal"));
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "Source = \"Users.sql\""));
 
         Reasons<TypeQueries>(result, TrackingNames.TypeQueries, type => type.HintName)["App.Users.UserQueries.g.cs"]
             .ShouldBe(IncrementalStepRunReason.Modified);

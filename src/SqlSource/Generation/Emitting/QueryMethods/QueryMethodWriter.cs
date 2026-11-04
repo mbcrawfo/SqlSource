@@ -31,13 +31,11 @@ internal static class QueryMethodWriter
     /// <param name="builder">The source being built.</param>
     /// <param name="indent">The whitespace that starts each line of the member.</param>
     /// <param name="method">
-    /// The query's method.  Its <see cref="QueryMethod.Output" /> is set when its shape reads rows.
+    /// The query's method.  Its <see cref="QueryMethod.Output" /> is set when its shape reads rows, and its
+    /// <see cref="QueryMethod.Host" /> gives its modifiers and whether it extends the connection.
     /// </param>
-    /// <param name="host">
-    /// Where the method goes and how visible it is, which gives its modifiers and whether it extends the connection.
-    /// </param>
-    public static void Append(StringBuilder builder, string indent, QueryMethod method, MethodHost host) =>
-        Append(builder, indent, method, host, ExecutionCapabilityRules.Of(method));
+    public static void Append(StringBuilder builder, string indent, QueryMethod method) =>
+        Append(builder, indent, method, ExecutionCapabilityRules.Of(method));
 
     /// <summary>
     /// Appends the documentation comment and the method with the capabilities given, which the tests choose to write
@@ -47,7 +45,6 @@ internal static class QueryMethodWriter
         StringBuilder builder,
         string indent,
         QueryMethod method,
-        MethodHost host,
         ExecutionCapabilities capabilities
     )
     {
@@ -64,7 +61,7 @@ internal static class QueryMethodWriter
         var context = new QueryMethodContext(
             builder,
             method,
-            host,
+            method.Host,
             tokens,
             MethodArguments.SpellTokens(tokens),
             arguments,

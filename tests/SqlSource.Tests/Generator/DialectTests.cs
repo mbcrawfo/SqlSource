@@ -186,7 +186,7 @@ public sealed class DialectTests
         new(
             "/app/" + name + "/" + name + ".cs",
             "using SqlSource;\n\nnamespace App;\n\n"
-                + "[SqlSourceGenerate(Source = \".\", SqlLocation = SqlLocation.Direct)]\n"
+                + "[SqlSourceGenerate(Source = \".\")]\n"
                 + "public partial class "
                 + name
                 + ";\n"

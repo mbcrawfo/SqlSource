@@ -64,6 +64,7 @@ ORDER BY n.id;
 -- name: ListNoteKindsForDapper
 -- summary: ListNoteKinds again, at the output models, whose constant the Dapper tests run.
 -- output: models
+-- member-location: class
 -- output-model: ListNoteKindsDto
 SELECT n.kind, a.email
 FROM notes AS n

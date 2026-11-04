@@ -1,5 +1,6 @@
 using System;
 using System.Data.SqlTypes;
+using System.Reflection;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -65,7 +66,10 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
                 );
 
                 typeof(MethodQueriesExtensions)
-                    .GetMethod(nameof(MethodQueriesExtensions.SetAccountStatus))!
+                    .GetMethod(
+                        nameof(MethodQueriesExtensions.SetAccountStatus),
+                        BindingFlags.NonPublic | BindingFlags.Static
+                    )!
                     .ReturnType.ShouldBe(typeof(Task));
                 var status = await connection.ExecuteScalarAsync<string>(
                     "SELECT status FROM dbo.accounts WHERE id = 2",
