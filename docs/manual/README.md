@@ -19,7 +19,8 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | See what the generator writes, and where it goes | [The generator](generator.md#locations) |
 | Know which models a query gets, what they are named, and what their properties are | [Models](generator.md#models) |
 | Run a query with its generated method, and know what it returns and throws | [Query methods](generator.md#query-methods) |
-| Choose what a query method returns its rows in, where the methods go, or give them `Async` names | [Collection type](settings.md#setting-collection-type), [where the methods go](settings.md#setting-method-location), [generator parameters](settings.md#setting-generator-parameters) |
+| Choose where a query's members go and how visible they are, for a file, a folder or one query | [Where the members go](settings.md#setting-member-location), [visibility](settings.md#setting-visibility), [the nested class](settings.md#setting-nested-class) |
+| Choose what a query method returns its rows in, or give the methods `Async` names | [Collection type](settings.md#setting-collection-type), [generator parameters](settings.md#setting-generator-parameters) |
 | Process each row as it is read, without holding them all | [Streaming rows](settings.md#streaming-rows) |
 | Run several queries in a transaction | [The recipe](recipes.md#queries-in-a-transaction) |
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
@@ -60,7 +61,8 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Settings files: `sqlsource.json` in a folder, for it and every folder below | Available | [Settings files](settings.md#settings-files) |
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
-| The settings for query methods: collection type, `MethodLocation`, and the generator parameters `async-method-suffix` and `no-array-pool` | Available | [All settings](settings.md#all-settings) |
+| The settings for query methods: collection type, and the generator parameters `async-method-suffix` and `no-array-pool` | Available | [All settings](settings.md#all-settings) |
+| Where each query's members go and how visible they are: member location, visibility and nested class, in markers and settings files | Available | [Where the members go](settings.md#setting-member-location) |
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |

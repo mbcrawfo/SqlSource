@@ -103,7 +103,7 @@ Your IDE shows the generated code among the project's dependencies, under its an
 dotnet build -p:EmitCompilerGeneratedFiles=true
 ```
 
-The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries whose output is `sql` or `models`, one with the methods of each class of `CodeGen/`, in the classes `UserQueriesExtensions`, `OrderLineQueriesExtensions` and `DeliveryQueriesExtensions`, and in `OrderQueries` and its nested class `Sql`, one for each model, and one with the attribute, its enums and the exception a method throws.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedOn` and `CustomerName`.  See [the generator](../../docs/manual/generator.md).
+The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries whose output is `sql` or `models`, one with the methods of each class of `CodeGen/`, in the classes `UserQueriesExtensions`, `OrderLineQueriesExtensions` and `DeliveryQueriesExtensions`, and in `OrderQueries` and its nested class `Sql`, one for each model, and one with the attributes, and one with the exceptions a method throws.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedOn` and `CustomerName`.  See [the generator](../../docs/manual/generator.md).
 
 ## Call the methods
 

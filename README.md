@@ -194,6 +194,10 @@ More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/setti
 
 Add the generator parameter `async-method-suffix`: `"generatorParameters": ["async-method-suffix"]` in the `sqlsource.json` beside your project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one type, folder, file or query.  A list of generator parameters replaces the one it would take from further out, so a file or query with a `-- generator:` line of its own writes `async-method-suffix` there too.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
 
+### I want my query methods to be public, or on the type
+
+By default a query method is an `internal` extension method of `DbConnection`, so a library's methods stay out of the code of the projects that use it.  Write `-- visibility: public` in a `.sql` file, or `"visibility": "public"` in a `sqlsource.json`, for public extension methods of a public type.  Write `-- member-location: class` for static methods of the type itself, called as `UserRepository.GetUser(connection, ...)`.  A setting for a whole file or folder reaches its `sql` and `models` queries too, where some values do not fit.  See [where the members go](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-member-location).
+
 ### I got an `InvalidCastException`; what does it mean and how do I fix it?
 
 A query method asked the driver to read a column, or send a parameter, as a C# type the driver does not read.  Most often a [type override](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides), a [column type](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-column-types) or a `-- param:` line names a type the driver was never taught: a C# enum for a PostgreSQL enum, or a type of your own, such as an id or an `Email`.  There are two fixes:
@@ -231,7 +235,7 @@ Hover over the member in your editor: its documentation holds the SQL as it was 
 
 ### My test project sees the internals of my main project
 
-Both projects can use SqlSource, and the attributes and enums that each gets do not conflict.  The test project uses the main project's `UnexpectedRowCountException` and `TransactionRolledBackException`, so it catches what a method of either project throws by its type.  When the main project uses the exceptions of a shared project, the shared project grants `InternalsVisibleTo` to the test project too.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#test-project-sees-internals), and [the other recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#share-the-exceptions) for an app that sees two data projects.
+Both projects can use SqlSource, and the attributes that each gets do not conflict.  The test project uses the main project's `UnexpectedRowCountException` and `TransactionRolledBackException`, so it catches what a method of either project throws by its type.  When the main project uses the exceptions of a shared project, the shared project grants `InternalsVisibleTo` to the test project too.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#test-project-sees-internals), and [the other recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#share-the-exceptions) for an app that sees two data projects.
 
 ## NodaTime and other libraries
 

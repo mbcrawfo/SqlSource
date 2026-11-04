@@ -37,10 +37,10 @@ With the output `models`, the same queries give `Sql.GetUser`, a [constant](#con
 
 ## The attribute
 
-`[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, its enums, the [`[SqlSourceConverter]`](settings.md#converters) attribute and the exceptions that a query method throws, [`UnexpectedRowCountException`](#unexpected-row-count) and [`TransactionRolledBackException`](#transaction-rolled-back), in your project, as internal types in the namespace `SqlSource`, so the code above needs `using SqlSource;` and nothing else.  The exceptions are left out when your project uses another project's, and are public when it sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions): see [projects that share internals](#projects-that-share-internals).  It also adds `Microsoft.CodeAnalysis.EmbeddedAttribute`, in the generated file `SqlSource-EmbeddedAttribute.g.cs`, an internal attribute that keeps every one of these types but the exceptions out of sight of other projects: see [known issues](#known-issues) if your project declares it too.
+`[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, the [`[SqlSourceConverter]`](settings.md#converters) attribute and the exceptions that a query method throws, [`UnexpectedRowCountException`](#unexpected-row-count) and [`TransactionRolledBackException`](#transaction-rolled-back), in your project, as internal types in the namespace `SqlSource`, so the code above needs `using SqlSource;` and nothing else.  The exceptions are left out when your project uses another project's, and are public when it sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions): see [projects that share internals](#projects-that-share-internals).  It also adds `Microsoft.CodeAnalysis.EmbeddedAttribute`, in the generated file `SqlSource-EmbeddedAttribute.g.cs`, an internal attribute that keeps every one of these types but the exceptions out of sight of other projects: see [known issues](#known-issues) if your project declares it too.
 
 ```csharp
-[SqlSourceGenerate(Source = "Queries", SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Source = "Queries")]
 internal static partial class Reports;
 ```
 
@@ -48,16 +48,13 @@ internal static partial class Reports;
 - **The type and every type that contains it must be `partial`** ([SQLSRC001](diagnostics.md#sqlsrc001)), and none may be `file` ([SQLSRC002](diagnostics.md#sqlsrc002)).  The generator adds its members in a second declaration of each.
 - **A type with an error gets no members**, and asks for no models.  The code that uses them then fails to compile too, so fix the first error the build reports.
 
-Every property of the attribute is a [setting](settings.md), documented there with the other places it can be written and the rule for which place wins:
+The attribute's one property is a [setting](settings.md), documented there:
 
 | Property | Sets |
 |----|----|
 | `Source` | Which `.sql` files belong to the type: [Source](settings.md#setting-source) |
-| `SqlLocation` | Where the generated members go: [Where the SQL goes](settings.md#setting-sql-location) |
-| `NestedClass` | The name of the class that holds the members under `SqlLocation.Nested`: [Name of the nested class](settings.md#setting-nested-class) |
-| `MethodLocation` | Where the methods that run the queries go: [Where the methods go](settings.md#setting-method-location) |
 
-`SqlLocation` and `NestedClass` place the constants and token methods of the queries whose output is `sql` or `models`, and `MethodLocation` places the [methods](#query-methods) of the queries whose output is `codegen`.  Every other setting of a query, its [output](settings.md#setting-output) among them, comes from its `.sql` file, through its markers and the [settings files](settings.md#settings-files) of its folder, and not from the type that claims it.
+Every other setting of a query, its [output](settings.md#setting-output) and [where its members go](#locations) among them, comes from its `.sql` file, through its markers and the [settings files](settings.md#settings-files) of its folder, and not from the type that claims it.
 
 <a id="files-of-a-type"></a>
 
@@ -75,7 +72,7 @@ Repository/
 A type gets the file named for it, beside its C# file, or the files that its [`Source`](settings.md#setting-source) names, `Source = "."` for every `.sql` file of that folder, by the rules and with the errors given there.  What follows is what the generator does with the files.
 
 - **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](diagnostics.md#sqlsrc008), and the file with the second one gets no members and no models for that type.
-- **Two types may claim one file**, and each gets its own members from it, though two types of one namespace can give one method twice: see [where the methods go](#method-location).  They take the same settings from it, since every setting of a query but where its members go comes from the file and its settings files: one output, one suffix and one shape of model for both.  Two types in one namespace share the models of the file's queries; two in two namespaces get a model each, unless the [namespace of the models](settings.md#setting-model-namespace) gives them one ([shared models](#shared-models)).  A type that needs other settings needs a file of its own.
+- **Two types may claim one file**, and each gets its own members from it, though two types of one namespace can give one method twice: see [where the methods go](#method-location).  They take the same settings from it, since every setting of a query comes from the file and its settings files: one output, one member location, one suffix and one shape of model for both.  Two types in one namespace share the models of the file's queries; two in two namespaces get a model each, unless the [namespace of the models](settings.md#setting-model-namespace) gives them one ([shared models](#shared-models)).  A type that needs other settings needs a file of its own.
 - **A `.sql` file that no type claims is ignored**: see [Source](settings.md#setting-source).
 - **A file with an error in how it is written produces no members** until it is fixed: see [`.sql` files](sql-files.md).  The other files of the type are unaffected.  An error about describing a query or about its sidecar, such as [SQLSRC241](diagnostics.md#sqlsrc241), leaves the query without models until it is fixed, and so without a [method](#which-methods) under `codegen`; under `models` it keeps its constant or token method.
 
@@ -83,36 +80,78 @@ A type gets the file named for it, beside its C# file, or the files that its [`S
 
 ## Where the members go
 
-```sql
--- The file header of UserRepository.sql, and of UserQueries.sql
--- output: models
-
--- name: GetUser
+```sql postgres
+-- name: GetUser -> one-optional
 SELECT id, name FROM users WHERE id = @id;
+
+-- name: CountUsers
+-- output: sql
+SELECT count(*) FROM users;
+
+-- name: ListUsers
+-- member-location: class
+-- visibility: public
+SELECT id, name FROM users ORDER BY name;
 ```
 
 ```csharp
-[SqlSourceGenerate]    // Nested, the default
-public partial class UserRepository
+[SqlSourceGenerate]
+public partial class UserRepository(DbConnection connection)
 {
-    public string Get() => Sql.GetUser;
+    public Task<GetUserDto?> Get(int id) => connection.GetUser(new GetUserParams(id));
+
+    public string CountText => Sql.CountUsers;
 }
 
-[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-public static partial class UserQueries;
-
 // elsewhere
-var sql = UserQueries.GetUser;
+ListUsersDto[] users = await UserRepository.ListUsers(connection);
 ```
 
-This section is about the constants and token methods of the queries whose output is `sql` or `models`.  A query whose output is `codegen` has a method in their place, which `SqlLocation` does not move: see [where the methods go](#method-location).
+Each query's members go where its [member location](settings.md#setting-member-location) says, with the accessibility its [visibility](settings.md#setting-visibility) gives, two settings of its `.sql` file.  Without them, as for `GetUser` and `CountUsers`, a query method is an `internal` extension method of `DbConnection`, in the class `UserRepositoryExtensions`, and a constant or token method is a public member of a private class `Sql` nested in the type, for the type's own code.  `ListUsers` is a public static method of the type, which takes the connection.  The settings' sections give their values and defaults; what follows is what to know of the code you get.
 
-[`SqlLocation`](settings.md#setting-sql-location) chooses between a private class `Sql` nested in the type (`Nested`, the default) and the type itself (`Direct`).  Its section says what each means.  [The nested class](settings.md#setting-nested-class) can have another name, in a settings file for the types of a folder, or on the attribute for one type.  What to know when you choose:
-
-- Use `Nested` for queries that one class runs, and `Direct` for a type whose job is to hold queries that other code uses.
-- With `Nested`, the type cannot have a member or a type parameter named like the nested class, and cannot have that name itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  Rename it, give the nested class another name, or use `Direct`.  The nested class holds the queries whose output is `sql` or `models`, and is not written when every query of the type's usable files is `codegen`.  A type with no queries at all keeps it, empty.
-- A query whose output is `sql` or `models` is not named like the class that holds the members: the nested class under `Nested`, `Sql` unless it is named otherwise, and the type's own name under `Direct` ([SQLSRC009](diagnostics.md#sqlsrc009)).  A query whose output is `codegen` has no member there, and may have that name when [its method](#method-location) can.
+- **The models follow the type, and the members follow `visibility`.**  A model is `public` or `internal` by the type that claims its query, as [accessibility](#model-accessibility) says, whatever the visibility of the query's members.  So a `private` method of a `public` type still has public models, and a `public` extension method of a type that is not `public` is [SQLSRC123](diagnostics.md#sqlsrc123), since the models it takes are internal.
+- **A nested class is `static partial`**, and is written for the members it holds alone: a class of query methods only is in the file of the type's methods, and a class of constants and methods has a part in each file.  Its members are `public`, and the class has the visibility.  A type none of whose queries can be used, such as one whose only file has an error, keeps an empty private class `Sql`, or the one that the `nestedClass` of its first file's settings files names, so that code that uses one of its members reports the member missing, and not the class.
+- **In a nested class**, the type cannot have a member, a nested type or a type parameter named like the class, nor that name itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  A query is not named like its class, with `Async` after a query method's name under `async-method-suffix` ([SQLSRC009](diagnostics.md#sqlsrc009)).
+- **On the type**, a constant or token method is not named like the type ([SQLSRC009](diagnostics.md#sqlsrc009)), nor like a nested class of the type's queries ([SQLSRC125](diagnostics.md#sqlsrc125)), and one named like a member that the type declares is the compiler's error: see [known issues](#known-issues).  A query method's name is checked where [the methods go](#method-location).
 - A query may share its name with a member that the type inherits, such as `ToString`.  The constant hides it, with no warning in the generated code.
+
+<a id="placement-for-a-file"></a>
+
+### A placement for a whole file or folder
+
+A member location or a visibility written in a file header or a settings file reaches every query below it, whatever its output, and a query where it does not fit is an error that leaves its file without members until it is fixed.  The message says where the value was written.  Two cases catch a project out:
+
+- **`"memberLocation": "ExtensionClass"` in a settings file** is [SQLSRC122](diagnostics.md#sqlsrc122) at every query whose output is `sql` or `models`, in its folder and the folders below it, since only a query method can go in the extension class.  Leave it out: a query method goes there by default.
+- **A visibility in the header of a file that mixes outputs** reaches its query methods too:
+
+```sql postgres
+-- visibility: private
+
+-- name: CountUsers
+-- output: sql
+SELECT count(*) FROM users;
+
+-- name: GetUser -> one-optional
+SELECT id, name FROM users WHERE id = @id;
+```
+
+```text
+error SQLSRC123: The query 'GetUser' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
+```
+
+`CountUsers` would be a constant of a private nested class, its default anyway, and `GetUser`, whose method goes to the extension class, cannot be private.  Write the visibility on the query that needs another, which wins over the header, or give it a member location where it fits:
+
+```sql postgres
+-- visibility: private
+
+-- name: CountUsers
+-- output: sql
+SELECT count(*) FROM users;
+
+-- name: GetUser -> one-optional
+-- visibility: internal
+SELECT id, name FROM users WHERE id = @id;
+```
 
 <a id="constants"></a>
 
@@ -122,7 +161,7 @@ This section is about the constants and token methods of the queries whose outpu
 public const string GetUser = "SELECT id, name\nFROM users\nWHERE id = @id;";
 ```
 
-A query without tokens whose output is `sql` or `models` is a `public const string` with the name of the query.  Its value is the SQL you wrote, with the markers and comments taken out and line endings made `\n`: [what reaches the generated SQL](sql-files.md#generated-sql) lists everything done to it.  A query parameter such as `@id` stays in it as written; you give the database its value when you run the query.
+A query without tokens whose output is `sql` or `models` is a `const string` with the name of the query, `public` in a nested class and of the query's [visibility](settings.md#setting-visibility) on the type: see [where the members go](#locations).  Its value is the SQL you wrote, with the markers and comments taken out and line endings made `\n`: [what reaches the generated SQL](sql-files.md#generated-sql) lists everything done to it.  A query parameter such as `@id` stays in it as written; you give the database its value when you run the query.
 
 Because it is a constant, it can be used wherever C# wants one, such as another `const` or an attribute argument:
 
@@ -142,7 +181,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
 ```
 
-A query with a token whose output is `sql` or `models` is a `public static string` method with the name of the query, `ListFrom(string table, string orderBy)`, in place of a constant.  Under `codegen` the query's [method](#query-methods) takes the tokens instead, and runs the query.  Its parameters, and what it returns, are under [tokens](parameters-and-tokens.md#tokens).
+A query with a token whose output is `sql` or `models` is a `static string` method with the name of the query, as visible as a constant would be, `ListFrom(string table, string orderBy)`, in place of a constant.  Under `codegen` the query's [method](#query-methods) takes the tokens instead, and runs the query.  Its parameters, and what it returns, are under [tokens](parameters-and-tokens.md#tokens).
 
 A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](concepts.md#query-parameter) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [parameters and tokens](parameters-and-tokens.md#tokens).
 
@@ -185,7 +224,7 @@ A token method adds a line for each token and one for the result, and shows its 
 public static string ListFrom(string table, string orderBy)
 ```
 
-A [query method](#query-methods) has the same summary and remarks, a line for each of its arguments and one for what it returns, and, for the shapes `one` and `one-optional`, a line for the [exception](#unexpected-row-count) it throws.  On SQL Server, every method also has a line for the `InvalidOperationException` it throws when it is given a transaction that has [completed](sqlserver.md#method-results), and a method of the shapes `one`, `one-optional` and `many` one for [`TransactionRolledBackException`](#transaction-rolled-back).  The extension class of the methods has a summary that names the type.
+A [query method](#query-methods) has the same summary and remarks, a line for each of its arguments and one for what it returns, and, for the shapes `one` and `one-optional`, a line for the [exception](#unexpected-row-count) it throws.  On SQL Server, every method also has a line for the `InvalidOperationException` it throws when it is given a transaction that has [completed](sqlserver.md#method-results), and a method of the shapes `one`, `one-optional` and `many` one for [`TransactionRolledBackException`](#transaction-rolled-back).  The extension class of the methods has a summary that names the type, and so does a nested class that is `public` or `protected`.
 
 Every generated member is documented, so a project that treats a missing comment on a public member (CS1591) as an error gets none from generated code.
 
@@ -275,6 +314,8 @@ Models are types of a namespace, not nested in the type that claims the query.  
 ### Accessibility
 
 A model is `public` when the type that claims its query is `public` and so is every type it is nested in, and `internal` otherwise: a `public` type nested in an `internal` one gives `internal` models.  A model that two types share is `public` when either of them would make it so.
+
+It does not follow the [visibility](settings.md#setting-visibility) of the query's members: see [where the members go](#locations).
 
 A `public` model cannot have a property whose type is not `public`, which a [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a `-- param:` marker can name.  That is [SQLSRC251](diagnostics.md#sqlsrc251), at each query of the model, and the model is not generated until the type is made `public`, or each type that claims the query `internal`.
 
@@ -494,9 +535,9 @@ WHERE id = @id;
 // Generated, shown without global::
 namespace App
 {
-    public static partial class UserRepositoryExtensions
+    internal static partial class UserRepositoryExtensions
     {
-        public static async Task<GetUserDto?> GetUser(
+        internal static async Task<GetUserDto?> GetUser(
             this DbConnection connection,
             GetUserParams parameters,
             DbTransaction? transaction = null,
@@ -519,7 +560,7 @@ A query gets its method from a type that claims its file when, for that type:
 
 - **its output is `codegen`**;
 - **it has what its models need**: a current entry in its sidecar, a C# type for each column and parameter, and every model it needs, an input model when it has parameters and an output model when it returns rows.  A query with neither needs no model;
-- **its method can be written**: a result shape that its rows allow ([SQLSRC272](diagnostics.md#sqlsrc272)), a name that nothing else takes ([SQLSRC274](diagnostics.md#sqlsrc274)), no token named as an argument a query method can have ([SQLSRC275](diagnostics.md#sqlsrc275)), and, under the default `MethodLocation`, a class to hold it ([SQLSRC276](diagnostics.md#sqlsrc276));
+- **its method can be written**: a result shape that its rows allow ([SQLSRC272](diagnostics.md#sqlsrc272)), a name that nothing else takes ([SQLSRC274](diagnostics.md#sqlsrc274)), no token named as an argument a query method can have ([SQLSRC275](diagnostics.md#sqlsrc275)), a visibility that fits its [member location](settings.md#setting-member-location) ([SQLSRC123](diagnostics.md#sqlsrc123)), and, in the extension class, a class to hold it ([SQLSRC276](diagnostics.md#sqlsrc276));
 - **its [converters](settings.md#converters) serve it**: a column or parameter whose type a type override, a column type or a `-- param:` marker chose, and whose type has converters, has one it can use: of the direction it needs ([SQLSRC280](diagnostics.md#sqlsrc280)), between it and the type the driver reads when it is a type of yours that the driver never reads ([SQLSRC279](diagnostics.md#sqlsrc279)), and the only one of that direction, with nothing wrong with it ([SQLSRC277](diagnostics.md#sqlsrc277), [SQLSRC278](diagnostics.md#sqlsrc278));
 - **the project references the driver of its dialect** ([SQLSRC273](diagnostics.md#sqlsrc273)), at Npgsql 8.0 or later ([SQLSRC247](diagnostics.md#sqlsrc247)) or Microsoft.Data.SqlClient 6.1 or later ([SQLSRC267](diagnostics.md#sqlsrc267)).
 
@@ -529,23 +570,25 @@ A query whose output is `codegen` that fails any of the others has an error, and
 
 ### Where the methods go
 
-Under the default [`MethodLocation`](settings.md#setting-method-location), `ExtensionClass`, the methods are extension methods of `DbConnection`, called on the connection as `connection.GetUser(...)`.  They are in a generated `static partial class` named after the type with `Extensions` after it, `UserRepositoryExtensions` for `UserRepository`.
+A query method goes where its query's [member location](settings.md#setting-member-location) says, with its [visibility](settings.md#setting-visibility).  Without either, it is an `internal` extension method of `DbConnection`, called on the connection as `connection.GetUser(...)`, in a generated `static partial class` named after the type with `Extensions` after it, `UserRepositoryExtensions` for `UserRepository`.
 
-- **The class is in the type's namespace**, not nested in the types around the type, and is named after the type's own name alone: `Outer.Queries<T>` gives `QueriesExtensions`.  Code in another namespace calls the methods with a `using` of that namespace.
-- **It is `public` when the type and every type around it are `public`**, and `internal` otherwise, as a [model](#model-accessibility) is.
-- **Two types whose classes have one name in one namespace share it**, as two types `Queries` nested in two types of one namespace do, when the class has one accessibility for both.  When it does not, or when a type of your project or a model has the class's full name, the type gets none of its methods: [SQLSRC276](diagnostics.md#sqlsrc276).
-- **A method is not named like a member of `DbConnection` or `object`**, such as `Open` or `ToString`, which a call on a connection would find instead, nor like the class itself ([SQLSRC274](diagnostics.md#sqlsrc274)).
+- **The extension class is in the type's namespace**, not nested in the types around the type, and is named after the type's own name alone: `Outer.Queries<T>` gives `QueriesExtensions`.  Code in another namespace calls the methods with a `using` of that namespace.
+- **It is `public` when one of the type's methods in it is**, as `-- visibility: public` asks and a type that is `public` with every type around it allows, and `internal` otherwise.  Each method keeps its own visibility in it.
+- **Two types whose classes have one name in one namespace share it**, as two types `Queries` nested in two types of one namespace do, when the class is `public` for both or `internal` for both.  When it is not, or when a type of your project or a model has the class's full name, the type gets none of its methods there: [SQLSRC276](diagnostics.md#sqlsrc276).
+- **A method there is not named like a member of `DbConnection` or `object`**, such as `Open` or `ToString`, which a call on a connection would find instead, nor like the class itself ([SQLSRC274](diagnostics.md#sqlsrc274)).
 
-Under `Public`, `Internal` or `Private`, the methods are static methods of the type itself, of that accessibility, which take the connection as their first argument: `UserRepository.GetUser(connection, ...)`.  A method is then not named like a member of the type, the type itself or one of its type parameters, nor like the constant, token method or nested class that the type's other queries get ([SQLSRC274](diagnostics.md#sqlsrc274)).
+Under `class`, the methods are static methods of the type itself, which take the connection as their first argument: `UserRepository.GetUser(connection, ...)`.  A method is then not named like a member of the type, the type itself or one of its type parameters, nor like a constant or token method that another query puts on the type, nor like a nested class of the type's queries ([SQLSRC274](diagnostics.md#sqlsrc274)).
 
-Two methods of one type with one name, as those of a query `Get` under `async-method-suffix` and a query `GetAsync` without it, are SQLSRC274, and so are two methods of one name and one list of arguments in two extension classes of one namespace, which a call could not tell apart.  [`SqlLocation`](settings.md#setting-sql-location) does not move a method: it places only the constants and token methods.  A type's methods are in a file of their own among the generated files, named after the type's full name, `App.UserRepository-Methods.g.cs`.
+Under `nested-class`, the methods are public static methods of the nested class, which take the connection as their first argument, since a nested class cannot hold extension methods: `Sql.GetUser(connection, ...)` in the type's code, and `UserRepository.Sql.GetUser(connection, ...)` outside it when the class is `public` or `internal`.  A method is then not named like a constant or token method that another query of the type, in any of its files, puts in that class ([SQLSRC274](diagnostics.md#sqlsrc274)), nor like the class ([SQLSRC009](diagnostics.md#sqlsrc009)).
+
+Two methods of one name in one class, as those of a query `Get` under `async-method-suffix` and a query `GetAsync` without it, are SQLSRC274, and so are two methods of one name and one list of arguments in two extension classes of one namespace, which a call could not tell apart.  A type's methods, wherever they go, are in a file of their own among the generated files, named after the type's full name, `App.UserRepository-Methods.g.cs`.
 
 <a id="method-signature"></a>
 
 ### The signature
 
 ```csharp
-public static async Task<ListFromDto[]> ListFrom(
+internal static async Task<ListFromDto[]> ListFrom(
     this DbConnection connection,
     string table,
     string orderBy,
@@ -558,7 +601,7 @@ The method has the name of the query, with `Async` after it under the [generator
 
 | Argument | What it is |
 |----|----|
-| `connection` | The connection to run on: see [the connection](#method-connection) |
+| `connection` | The connection to run on, after `this` for an extension method alone: see [the connection](#method-connection) |
 | `parameters` | The query's input model, when it has parameters.  It is not in the method of a query without parameters |
 | A `string` for each [token](parameters-and-tokens.md#tokens) | The text that replaces the token, named as the token, in the order the tokens first appear.  It is checked as a token method checks it: by default null, empty or blank text throws, and `no-token-validation` turns the check off |
 | `transaction` | The transaction to run the query in, or null |
@@ -688,7 +731,7 @@ catch (UnexpectedRowCountException exception)
 
 A test project usually sees the internals of the project it tests, through `InternalsVisibleTo`.  Both can use SqlSource.
 
-- **The attribute, its enums** (`SqlLocation` and `MethodLocation`) **and `SqlSourceConverterAttribute`** are each project's own, and the two copies do not conflict.  The same holds for `SqlSource.NodaTimeConversions`, `SqlSource.NetTopologySuiteConversions` and `SqlSource.JsonConversions`, the classes that the query methods of a project call to read and send [NodaTime's types on SQL Server](sqlserver.md#nodatime), [NetTopologySuite's](sqlserver.md#nettopologysuite), and System.Text.Json's types on [SQL Server](sqlserver.md#json) and on [Npgsql 8 and 9](postgresql.md#json), when the query methods of both projects call one.
+- **The attribute and `SqlSourceConverterAttribute`** are each project's own, and the two copies do not conflict.  The same holds for `SqlSource.NodaTimeConversions`, `SqlSource.NetTopologySuiteConversions` and `SqlSource.JsonConversions`, the classes that the query methods of a project call to read and send [NodaTime's types on SQL Server](sqlserver.md#nodatime), [NetTopologySuite's](sqlserver.md#nettopologysuite), and System.Text.Json's types on [SQL Server](sqlserver.md#json) and on [Npgsql 8 and 9](postgresql.md#json), when the query methods of both projects call one.
 - **`UnexpectedRowCountException` and `TransactionRolledBackException` are the other project's.**  A project that sees them in a project it references gets none of its own, and its query methods throw the other project's.  A project referenced only under an extern alias (`Aliases` on its reference, without `global`) does not count: the project gets its own.  So the test project catches what a method of either project throws by its type, and so does a project that sees the other's internals and does not use SqlSource.
 - **They are `internal`**, unless the project that has them sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions) to `true`, which makes them `public`, so that any project that references it catches them by type.  A project that uses another's exceptions gets none of its own, whatever it sets.
 - **A project that sees them in two projects it references** gets [SQLSRC022](diagnostics.md#sqlsrc022), as an app does that sees the internals of two data projects that both use SqlSource.  Put them in one shared project instead, which grants `InternalsVisibleTo` to every project that catches them or uses SqlSource and sees the others' internals, test projects among them: see [the recipe](recipes.md#share-the-exceptions).  A project that sees them in a project that uses another version of SqlSource gets [SQLSRC023](diagnostics.md#sqlsrc023).
@@ -701,7 +744,7 @@ The compiler gives no warning (CS0436) about the types that are each project's o
 
 - **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Source` must be written out where the attribute is, as a string: `Source = "Queries"`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](diagnostics.md#sqlsrc208) and describes nothing for the type.  The build then reports [SQLSRC241](diagnostics.md#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none, or, for the file, [SQLSRC209](diagnostics.md#sqlsrc209) under a dialect that has no database to ask, such as `ansi`.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described, and the build reports SQLSRC241 for them in the same way.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
 - **An input model binds through Dapper only when the query writes its parameters as the model's properties are named.**  Dapper sends a property of a parameter object only to a parameter that the SQL writes as `@` and the property's name, ignoring case but not `_`.  So the property `AccountId` binds to `@accountId`, and a query that writes `@account_id` gets no value from it.  Write the query's parameters in camelCase, or give Dapper the parameters yourself, as in `new { account_id = args.AccountId }`: see [the recipe](recipes.md#models-through-dapper).
-- **Under `Direct`, a query named like a member that the type declares is a compiler error.**  A query `Get` whose output is `sql` or `models`, in a type that declares a method `Get`, gives the compiler's CS0102, in the generated code, and no SQLSRC error.  Rename the query, or use `Nested`.  A query method on the type is checked instead, as [SQLSRC274](diagnostics.md#sqlsrc274).
+- **On the type, a query named like a member that the type declares is a compiler error.**  A query `Get` whose output is `sql` or `models` and whose [member location](settings.md#setting-member-location) is `class`, in a type that declares a method `Get`, gives the compiler's CS0102, in the generated code, and no SQLSRC error.  Rename the query, or put its member in a nested class.  A query method on the type is checked instead, as [SQLSRC274](diagnostics.md#sqlsrc274).
 - **`UnexpectedRowCountException` and `TransactionRolledBackException` are caught by their type only where they are seen.**  A project that sees another's exceptions, because the other grants it `InternalsVisibleTo` or sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions), catches them by type.  A project that uses SqlSource and sees them in two projects it references gets [SQLSRC022](diagnostics.md#sqlsrc022), which [one shared project](recipes.md#share-the-exceptions) fixes; a project that does not use SqlSource and sees two copies gets the compiler's error that the name is ambiguous where it names one, which the same shared project fixes.  Anywhere else, as in an assembly that calls a `public` method of a project whose exceptions are `internal`, catch `InvalidOperationException`, from which both derive.
 - **A `cref` to the exceptions can fail in a project that uses another project's.**  A project that uses the `UnexpectedRowCountException` and `TransactionRolledBackException` of a project it references, and also references another project or package that uses SqlSource and whose exceptions it cannot see, gets a compiler warning at a `cref` in its own documentation comments that names either exception or one of its members, when it builds a documentation file: CS0419 for the exception itself, such as `<exception cref="UnexpectedRowCountException"/>`, and CS1574 for a member, such as `<see cref="UnexpectedRowCountException.QueryName"/>`.  Under warnings as errors the build fails.  Write the reference as the documentation ID of what it names, which the compiler takes as it is: `T:` and the full name for an exception, as `cref="T:SqlSource.UnexpectedRowCountException"` or `cref="T:SqlSource.TransactionRolledBackException"`, and `P:` for a property or `M:` for a constructor, as `cref="P:SqlSource.UnexpectedRowCountException.QueryName"`.
 - **A query method with parameters works only on a connection whose commands take its driver's own parameters.**  It works on the connections of the drivers, such as `NpgsqlConnection`, the one an `NpgsqlDataSource` gives, and `SqlConnection`.  A `DbConnection` that wraps one of them, and whose commands create or accept only parameters of their own type, fails before the query is sent: on PostgreSQL with the wrapper's own exception, typically an `InvalidCastException`, and on SQL Server with `InvalidCastException`, "Unable to cast object of type '...' to type 'Microsoft.Data.SqlClient.SqlParameter'.".  Give the method the driver's connection that the wrapper holds, or give the query the output `models` and send its parameters through the wrapper yourself.
