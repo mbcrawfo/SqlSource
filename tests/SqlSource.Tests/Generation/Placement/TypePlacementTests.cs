@@ -501,13 +501,60 @@ public sealed class TypePlacementTests
 
         diagnostics.ShouldBe([
             DiagnosticInfo.Create(
-                SqlDiagnostics.MemberNamedLikeNestedClass,
+                SqlDiagnostics.MemberNameTaken,
                 At("Orders.sql", 0),
                 "Users",
-                "App.UserRepository"
+                "App.UserRepository",
+                "a nested class of the type's queries has that name"
             ),
         ]);
         placement.Usable.ShouldBe([true, false]);
+    }
+
+    // A constant or token method on the type cannot take a name the type declares, which TakenNames holds with the
+    // type's own name: its file is left out, and the other file kept.
+    [Fact]
+    public void Of_ConstantOnTheTypeNamedLikeWhatTheTypeDeclares_ReportsSqlsrc125AndDropsItsFile()
+    {
+        var files = Files(
+            File("Users.sql", Query("Get", output: OutputKind.Sql, location: MemberLocation.Class)),
+            File(
+                "Orders.sql",
+                Query("GetOrder", output: OutputKind.Sql, location: MemberLocation.Class, at: At("Orders.sql", 0))
+            )
+        );
+
+        var (placement, diagnostics) = Analyse(TestModels.Type(takenNames: ["Get", "UserRepository"]), files);
+
+        diagnostics.ShouldBe([
+            DiagnosticInfo.Create(
+                SqlDiagnostics.MemberNameTaken,
+                At("Users.sql", 0),
+                "Get",
+                "App.UserRepository",
+                "the type declares a member, a nested type or a type parameter of that name"
+            ),
+        ]);
+        placement.Usable.ShouldBe([false, true]);
+    }
+
+    // Only a member on the type is checked against what the type declares: a constant in a nested class is apart
+    // from it, and the method planner judges a method's name on the type.
+    // An internal enum cannot be the parameter of a public test method, so a row says which of the two it is.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Of_DeclaredNameOffTheTypeOrForAMethod_IsNoErrorHere(bool isMethod)
+    {
+        var query = isMethod
+            ? Query("Get", output: OutputKind.CodeGen, location: MemberLocation.Class)
+            : Query("Get", output: OutputKind.Sql, location: MemberLocation.NestedClass);
+        var files = Files(File("Users.sql", query));
+
+        var (placement, diagnostics) = Analyse(TestModels.Type(takenNames: ["Get", "UserRepository"]), files);
+
+        diagnostics.ShouldBeEmpty();
+        placement.Usable.ShouldBe([true]);
     }
 
     // A method on the type named like a nested class is the method planner's SQLSRC274.

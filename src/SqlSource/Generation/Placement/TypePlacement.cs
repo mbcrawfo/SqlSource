@@ -16,6 +16,11 @@ internal sealed class TypePlacement
 {
     private const string AsyncSuffix = "Async";
 
+    // What has the name of a member on the type, as SQLSRC125 says it.
+    private const string DeclaredReason = "the type declares a member, a nested type or a type parameter of that name";
+
+    private const string NestedClassReason = "a nested class of the type's queries has that name";
+
     private readonly TargetType _type;
 
     // The settings of each query, by its file's index and then its own.
@@ -81,11 +86,12 @@ internal sealed class TypePlacement
     /// The placement of the type's queries.  A file contributes all of its queries or none.  It is left out when one
     /// of its queries cannot be used here, with the diagnostics when <paramref name="diagnostics" /> is given, in this
     /// order: for each file and each query, <c>SQLSRC009</c> for a member named like the class that holds it, else
-    /// <c>SQLSRC008</c>, then the errors of its kept form (<see cref="SqlQuery.KeptErrors" />), then <c>SQLSRC122</c>,
-    /// else <c>SQLSRC123</c> for its own visibility; then, over the files left, <c>SQLSRC124</c> for a nested class
-    /// given two visibilities, <c>SQLSRC007</c> for a nested class named like a member of the type, and
-    /// <c>SQLSRC125</c> for a member on the type named like a nested class.  Each of the last three leaves out every
-    /// file it names.
+    /// <c>SQLSRC125</c> for a constant or token method on the type named like a member, a nested type or a type
+    /// parameter that the type declares, else <c>SQLSRC008</c>, then the errors of its kept form
+    /// (<see cref="SqlQuery.KeptErrors" />), then <c>SQLSRC122</c>, else <c>SQLSRC123</c> for its own visibility; then,
+    /// over the files left, <c>SQLSRC124</c> for a nested class given two visibilities, <c>SQLSRC007</c> for a nested
+    /// class named like a member of the type, and <c>SQLSRC125</c> for a member on the type named like a nested class.
+    /// Each of the last three leaves out every file it names.
     /// </summary>
     /// <param name="type">The type.</param>
     /// <param name="files">The type's files, in member order.</param>
@@ -147,8 +153,9 @@ internal sealed class TypePlacement
         // The type in full, as the diagnostics that name it give it, made only when one does.
         private string TypeName => field ??= PlacementChecks.NameOf(type);
 
-        // Each query's own checks, file by file: a query named like what holds its member, or like a query of an
-        // earlier usable file; the errors of its kept form; and a location or a visibility that does not fit it.
+        // Each query's own checks, file by file: a query named like what holds its member, like what the type declares
+        // when its member goes on the type, or like a query of an earlier usable file; the errors of its kept form;
+        // and a location or a visibility that does not fit it.
         public void CheckQueries()
         {
             var fileOfName = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -280,10 +287,11 @@ internal sealed class TypePlacement
 
                 diagnostics?.Add(
                     DiagnosticInfo.Create(
-                        SqlDiagnostics.MemberNamedLikeNestedClass,
+                        SqlDiagnostics.MemberNameTaken,
                         query.NameLocation,
                         query.Name,
-                        TypeName
+                        TypeName,
+                        NestedClassReason
                     )
                 );
                 leftOut.Add(fileIndex);
@@ -357,6 +365,19 @@ internal sealed class TypePlacement
                         query.NameLocation,
                         type.Name,
                         query.Name
+                    )
+                );
+                isUsable = false;
+            }
+            else if (IsDeclaredOnType(settings, location, query.Name))
+            {
+                diagnostics?.Add(
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.MemberNameTaken,
+                        query.NameLocation,
+                        query.Name,
+                        TypeName,
+                        DeclaredReason
                     )
                 );
                 isUsable = false;
@@ -436,6 +457,14 @@ internal sealed class TypePlacement
                 MemberLocation.Class => settings.Output == OutputKind.CodeGen ? null : type.Name,
                 MemberLocation.ExtensionClass => null,
             };
+
+        // Whether the constant or token method of the query goes on the type and takes a name the type declares, which
+        // it cannot have (CS0102), nor overload a method of the type with.  The type's own name is SQLSRC009, found
+        // first, and the method planner judges a method's name.
+        private bool IsDeclaredOnType(QuerySettings settings, MemberLocation location, string name) =>
+            location == MemberLocation.Class
+            && settings.Output != OutputKind.CodeGen
+            && SortedSearch.IndexOf(type.TakenNames, name, static taken => taken, StringComparer.Ordinal) >= 0;
 
         // What a query's method adds to its name: Async under async-method-suffix.  A constant adds nothing.
         private static string Suffix(QuerySettings settings) =>

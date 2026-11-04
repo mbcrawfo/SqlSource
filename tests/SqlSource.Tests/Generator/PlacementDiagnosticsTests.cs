@@ -236,12 +236,77 @@ public sealed class PlacementDiagnosticsTests
             .ShouldBe([
                 "SQLSRC125 /app/Repo/A.sql(1,10)-(1,15): The member of the query 'Users' cannot go on 'App.Sample', "
                     + "because a nested class of the type's queries has that name.  Rename the query, or write "
-                    + "-- nested-class: or -- member-location: on the query.",
+                    + "-- member-location: on it.",
             ]);
         var type = run.Sources[GeneratorHarness.SampleFile];
         type.ShouldNotContain("const string Users");
         type.ShouldContain("        private static partial class Users\n");
         type.ShouldContain("            public const string GetUser = \"SELECT 2;\";\n");
+    }
+
+    // A constant or a token method on the type cannot take a name the type declares: a method, which a token method
+    // would otherwise overload, a nested class or a type parameter.  The file gives the type no members, and the
+    // type's other file keeps its constant.  The last row gives the location in the settings file of the files'
+    // folder, over the project's nested class.
+    [Theory]
+    [InlineData("Get", "-- member-location: class\n", "(2,10)-(2,13)", false)]
+    [InlineData("Get", "-- member-location: class\n", "(2,10)-(2,13)", true)]
+    [InlineData("Inner", "-- member-location: class\n", "(2,10)-(2,15)", false)]
+    [InlineData("T", "-- member-location: class\n", "(2,10)-(2,11)", false)]
+    [InlineData("Get", "", "(1,10)-(1,13)", false)]
+    public void Run_MemberOnTheTypeNamedLikeWhatTheTypeDeclares_ReportsSqlsrc125(
+        string name,
+        string marker,
+        string span,
+        bool withToken
+    )
+    {
+        var text = marker + "-- name: " + name + "\nSELECT 1" + (withToken ? " {{t}}" : string.Empty) + ";\n";
+        SqlFile[] files =
+            marker.Length > 0
+                ? [new SqlFile("/app/Repo/A.sql", text), Kept]
+                :
+                [
+                    new SqlFile("/app/Repo/A.sql", text),
+                    Kept,
+                    GeneratorHarness.SettingsFile(
+                        "/app/Repo/sqlsource.json", /*lang=json,strict*/
+                        """{"memberLocation": "class"}"""
+                    ),
+                ];
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    """
+                    using SqlSource;
+                    namespace App;
+                    [SqlSourceGenerate(Source = ".")]
+                    public partial class Sample<T>
+                    {
+                        public static string Get() => "";
+
+                        public static class Inner { }
+                    }
+                    """
+                ),
+            ],
+            files,
+            settings: GeneratorHarness.InNestedClass
+        );
+
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC125 /app/Repo/A.sql{span}: The member of the query '{name}' cannot go on 'App.Sample<T>', "
+                    + "because the type declares a member, a nested type or a type parameter of that name.  Rename "
+                    + "the query, or write -- member-location: on it.",
+            ]);
+        var type = run.Sources["App.Sample-1.g.cs"];
+        type.ShouldNotContain(" " + name + " =");
+        type.ShouldNotContain(" " + name + "(");
+        type.ShouldContain(" const string Kept = \"SELECT 9;\";\n");
     }
 
     // A query method in a nested class cannot have the class's name, with Async after it under async-method-suffix,

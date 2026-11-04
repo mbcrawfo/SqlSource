@@ -78,7 +78,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC122](#sqlsrc122) | Member location does not fit the query |
 | [SQLSRC123](#sqlsrc123) | Visibility does not fit the member location |
 | [SQLSRC124](#sqlsrc124) | Nested class has two visibilities |
-| [SQLSRC125](#sqlsrc125) | Query's member is named like a nested class |
+| [SQLSRC125](#sqlsrc125) | Query's member on the type has a name that is taken |
 
 **The tool**
 
@@ -1197,9 +1197,9 @@ See: [Name of the nested class](settings.md#setting-nested-class)
 
 ## SQLSRC125
 
-**Query's member is named like a nested class**
+**Query's member on the type has a name that is taken**
 
-A query whose output is `sql` or `models` and whose [member location](generator.md#locations) is `class` has its constant or token method on the type, and another query of the type puts its members in a nested class of the same name.  A type cannot have two members of one name.  The message names the query and the type.
+A query whose output is `sql` or `models` and whose [member location](generator.md#locations) is `class` has its constant or token method on the type, and its name is taken: the type declares a member, a nested type or a type parameter of that name, or another query of the type puts its members in a nested class of that name.  A type cannot have two members of one name, and a token method cannot overload a method of yours of the same name, even with other parameters.  The message names the query, the type and what has the name.
 
 ```sql
 -- name: Sql
@@ -1207,16 +1207,30 @@ A query whose output is `sql` or `models` and whose [member location](generator.
 -- member-location: class
 SELECT 1;
 
+-- name: Get
+-- output: sql
+-- member-location: class
+SELECT id, name FROM users WHERE id = {{id}};
+
 -- name: GetUser
 -- output: sql
 SELECT id, name FROM users;
 ```
 
-```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC125: The member of the query 'Sql' cannot go on 'App.UserRepository', because a nested class of the type's queries has that name.  Rename the query, or write -- nested-class: or -- member-location: on the query.
+```csharp
+[SqlSourceGenerate(Source = "Queries")]
+public partial class UserRepository
+{
+    public string Get() => Sql.GetUser;
+}
 ```
 
-The error is at the query's name, and its file produces no members for the type until it is fixed.  Rename the query, give the nested class another name with `-- nested-class:`, or write `-- member-location:` on the query.  A query method on the type that would take a nested class's name is [SQLSRC274](#sqlsrc274).
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC125: The member of the query 'Sql' cannot go on 'App.UserRepository', because a nested class of the type's queries has that name.  Rename the query, or write -- member-location: on it.
+/work/App/Queries/Users.sql(6,10): error SQLSRC125: The member of the query 'Get' cannot go on 'App.UserRepository', because the type declares a member, a nested type or a type parameter of that name.  Rename the query, or write -- member-location: on it.
+```
+
+The error is at the query's name, and its file produces no members for the type until it is fixed.  Rename the query, or write `-- member-location: nested-class` on it; for a nested class of the type's queries you can also give that class another name with `-- nested-class:`.  A query named like the type itself is [SQLSRC009](#sqlsrc009), and a query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).
 
 See: [Where the members go](generator.md#locations)
 

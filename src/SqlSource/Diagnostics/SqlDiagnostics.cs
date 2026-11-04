@@ -590,12 +590,13 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the query and {1} the type in full.  Reported at the query's name.
-    public static readonly DiagnosticDescriptor MemberNamedLikeNestedClass = new(
+    // {0} is the query, {1} the type in full and {2} what has the name: a nested class of the type's queries, or a
+    // member, a nested type or a type parameter that the type declares.  Reported at the query's name.
+    public static readonly DiagnosticDescriptor MemberNameTaken = new(
         id: "SQLSRC125",
-        title: "Query's member is named like a nested class",
-        messageFormat: "The member of the query '{0}' cannot go on '{1}', because a nested class of the type's queries "
-            + "has that name.  Rename the query, or write -- nested-class: or -- member-location: on the query.",
+        title: "Query's member on the type has a name that is taken",
+        messageFormat: "The member of the query '{0}' cannot go on '{1}', because {2}.  Rename the query, or write "
+            + "-- member-location: on it.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -1238,7 +1239,7 @@ internal static class SqlDiagnostics
             MemberLocationNotFit,
             VisibilityNotFit,
             NestedClassVisibilities,
-            MemberNamedLikeNestedClass,
+            MemberNameTaken,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,
