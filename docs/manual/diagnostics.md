@@ -378,7 +378,7 @@ See: [Where the members go](generator.md#locations)
 
 **Query name is used in two files**
 
-Two `.sql` files of one type each have a query with the same name, and a type cannot have two members with one name.  The error is at the second query, and the message names the file that holds the first.  The file that holds the second query produces no members for that type.
+Two `.sql` files of one type each have a query with the same name, and a type cannot have two members with one name.  The error is at the second query, and the message names the file that holds the first.  The file that holds the second query produces no members and no models for that type.
 
 Rename one of the queries.
 
@@ -396,7 +396,7 @@ A member cannot have the name of the type that contains it.  This applies to a q
 SELECT 1;
 ```
 
-The error is at the query's name, and the file produces no members for the type until it is fixed.  Rename the query, or write `-- nested-class:` or `-- member-location:` on it.  A query method on the type or in the extension class has no member of the class to clash with: what its name cannot be is [SQLSRC274](#sqlsrc274).
+The error is at the query's name, and the file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- nested-class:` or `-- member-location:` on it.  A query method on the type or in the extension class has no member of the class to clash with: what its name cannot be is [SQLSRC274](#sqlsrc274).
 
 See: [Where the members go](generator.md#locations)
 
