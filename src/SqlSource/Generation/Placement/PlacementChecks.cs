@@ -44,14 +44,15 @@ internal static class PlacementChecks
     ) =>
         location switch
         {
-            // A top-level class is public or internal, and so is the extension class.  Its public method would take
-            // the type's internal models (CS0051).
+            // A top-level class is public or internal, and so is the extension class.  Its public method cannot take
+            // or return the type's internal models (CS0051).  A method with no models is refused too (TD-0101).
             MemberLocation.ExtensionClass => visibility switch
             {
                 Visibility.Private or Visibility.Protected => "an extension method is public or internal",
                 Visibility.Public when !type.IsPublic => "'"
                     + NameOf(type)
-                    + "' is not public, so the models a public extension method takes are internal",
+                    + "' is not public, so its models are internal, which a public extension method cannot take or "
+                    + "return",
                 Visibility.Public or Visibility.Internal => null,
             },
             // CS1057 and CS0666.
@@ -59,15 +60,16 @@ internal static class PlacementChecks
             MemberLocation.Class when visibility == Visibility.Protected && type.IsStruct => StructReason(type),
             // A protected class nested in a static class compiles; one nested in a struct is CS0666.
             MemberLocation.NestedClass when visibility == Visibility.Protected && type.IsStruct => StructReason(type),
-            // A derived type of another assembly reaches a public or protected method there, which would take the
-            // type's internal models (CS0051).
+            // A derived type of another assembly reaches a public or protected method there, which cannot take or
+            // return the type's internal models (CS0051).  A method with no models is refused too (TD-0101).
             MemberLocation.Class
             or MemberLocation.NestedClass
                 when output == OutputKind.CodeGen
                     && type.IsReachableAsProtected
                     && visibility is Visibility.Public or Visibility.Protected => "'"
                 + NameOf(type)
-                + "' is reachable as protected, so the internal models its method takes are less accessible",
+                + "' is reachable as protected, so its models are internal, which a method reachable from another "
+                + "assembly cannot take or return",
             MemberLocation.Class or MemberLocation.NestedClass => null,
         };
 

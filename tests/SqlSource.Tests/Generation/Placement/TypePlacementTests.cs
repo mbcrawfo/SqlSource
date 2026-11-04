@@ -315,7 +315,8 @@ public sealed class TypePlacementTests
                 "public",
                 "its own marker",
                 "extension-class",
-                "'App.UserRepository' is not public, so the models a public extension method takes are internal"
+                "'App.UserRepository' is not public, so its models are internal, which a public extension method "
+                    + "cannot take or return"
             ),
         ]);
     }
@@ -423,8 +424,8 @@ public sealed class TypePlacementTests
                 "public",
                 "the file header for the query 'GetName'",
                 "nested-class",
-                "'App.UserRepository' is reachable as protected, so the internal models its method takes are less "
-                    + "accessible"
+                "'App.UserRepository' is reachable as protected, so its models are internal, which a method reachable "
+                    + "from another assembly cannot take or return"
             ),
         ]);
         placement.Usable.ShouldBe([true, false]);
@@ -454,8 +455,8 @@ public sealed class TypePlacementTests
                 "protected",
                 "the file header for the query 'GetName'",
                 "nested-class",
-                "'App.UserRepository' is reachable as protected, so the internal models its method takes are less "
-                    + "accessible"
+                "'App.UserRepository' is reachable as protected, so its models are internal, which a method reachable "
+                    + "from another assembly cannot take or return"
             ),
         ]);
         placement.Usable.ShouldBe([false]);
@@ -495,8 +496,8 @@ public sealed class TypePlacementTests
         if (isRefused)
         {
             reason.ShouldBe(
-                "'App.UserRepository' is reachable as protected, so the internal models its method takes are less "
-                    + "accessible"
+                "'App.UserRepository' is reachable as protected, so its models are internal, which a method reachable "
+                    + "from another assembly cannot take or return"
             );
         }
         else

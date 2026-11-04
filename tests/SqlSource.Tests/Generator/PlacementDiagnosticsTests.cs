@@ -119,7 +119,7 @@ public sealed class PlacementDiagnosticsTests
         "public",
         "its own marker",
         "extension-class",
-        "'App.Sample' is not public, so the models a public extension method takes are internal"
+        "'App.Sample' is not public, so its models are internal, which a public extension method cannot take or return"
     )]
     [InlineData(
         "public partial class Sample;",
@@ -232,6 +232,27 @@ public sealed class PlacementDiagnosticsTests
         run.Problems().ShouldBe([Sqlsrc123AsProtected(span, middle, visibility, "its own marker", location)]);
         run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
         run.Sources.Values.ShouldContain(source => source.Contains(" const string Kept = \"SELECT 9;\";"));
+    }
+
+    // A query method with no parameters and no rows takes no models and would compile, but placement cannot see a
+    // query's models, so it is refused as one with models is (TD-0101).
+    [Fact]
+    public void Run_MethodWithNoModelsOfATypeReachableAsProtected_ReportsSqlsrc123()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- member-location: class\n-- visibility: public\nDELETE FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetUser", [], null)],
+            GeneratorHarness.NestedSampleSource("public", "", "protected"),
+            otherFiles: [Kept]
+        );
+
+        run.Problems().ShouldBe([Sqlsrc123AsProtected("(3,1)-(3,22)", "", "public", "its own marker", "class")]);
+        run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
     }
 
     // The header's visibility reaches the query, whose own member location is where the error is; with neither on
@@ -599,8 +620,8 @@ public sealed class PlacementDiagnosticsTests
         var type = middle.Length > 0 ? "App.Outer.Middle.Sample" : "App.Outer.Sample";
         return $"SQLSRC123 {GeneratorHarness.UsersPath}{span}: The query 'GetUser' of '{type}' cannot be {visibility}, "
             + $"which {place} sets, at the member location {location}, because '{type}' is reachable as protected, so "
-            + "the internal models its method takes are less accessible.  Write -- visibility: or -- member-location: "
-            + "on the query.";
+            + "its models are internal, which a method reachable from another assembly cannot take or return.  Write "
+            + "-- visibility: or -- member-location: on the query.";
     }
 
     // SQLSRC122 at a query at sql, set by the place.
