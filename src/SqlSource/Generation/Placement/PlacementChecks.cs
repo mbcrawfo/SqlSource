@@ -4,9 +4,9 @@ using SqlSource.Settings;
 namespace SqlSource.Generation.Placement;
 
 /// <summary>
-/// The rules of placement that need nothing but a query's location, its visibility and its type: the default
-/// visibility, the combinations that C# or the generated code cannot have, and how a marker and the code spell each
-/// value.
+/// The rules of placement that need nothing but a query's location, its visibility, its output and its type: the
+/// default visibility, the combinations that C# or the generated code cannot have, and how a marker and the code spell
+/// each value.
 /// </summary>
 internal static class PlacementChecks
 {
@@ -33,7 +33,15 @@ internal static class PlacementChecks
     /// <param name="type">The type, which a reason names in full.</param>
     /// <param name="location">Where the query's members go.</param>
     /// <param name="visibility">Their visibility, which is the nested class's under a nested class.</param>
-    public static string? VisibilityReason(TargetType type, MemberLocation location, Visibility visibility) =>
+    /// <param name="output">
+    /// The query's output: only a query method takes models, so only its visibility depends on theirs.
+    /// </param>
+    public static string? VisibilityReason(
+        TargetType type,
+        MemberLocation location,
+        Visibility visibility,
+        OutputKind output
+    ) =>
         location switch
         {
             // A top-level class is public or internal, and so is the extension class.  Its public method would take
@@ -50,9 +58,16 @@ internal static class PlacementChecks
             MemberLocation.Class when visibility == Visibility.Protected && type.IsStatic => StaticReason(type),
             MemberLocation.Class when visibility == Visibility.Protected && type.IsStruct => StructReason(type),
             // A protected class nested in a static class compiles; one nested in a struct is CS0666.
-            MemberLocation.NestedClass when visibility == Visibility.Protected => type.IsStruct
-                ? StructReason(type)
-                : null,
+            MemberLocation.NestedClass when visibility == Visibility.Protected && type.IsStruct => StructReason(type),
+            // A derived type of another assembly reaches a public or protected method there, which would take the
+            // type's internal models (CS0051).
+            MemberLocation.Class
+            or MemberLocation.NestedClass
+                when output == OutputKind.CodeGen
+                    && type.IsReachableAsProtected
+                    && visibility is Visibility.Public or Visibility.Protected => "'"
+                + NameOf(type)
+                + "' is reachable as protected, so the internal models its method takes are less accessible",
             MemberLocation.Class or MemberLocation.NestedClass => null,
         };
 

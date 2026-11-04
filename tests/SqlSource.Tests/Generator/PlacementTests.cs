@@ -549,6 +549,141 @@ public sealed class PlacementTests
             );
     }
 
+    // A method whose models are internal compiles where no derived type of another assembly reaches it: a method that
+    // is internal or private, in a class that is, or of a type that a level of internal, private or private protected
+    // keeps in its assembly, and one of a type that is public with every type around it, whose models are public.  The
+    // defaults always fit.
+    [Theory]
+    [InlineData("public", "", "protected", "-- member-location: class\n-- visibility: internal\n", "", "internal")]
+    [InlineData("public", "", "protected", "-- member-location: class\n-- visibility: private\n", "", "private")]
+    [InlineData("public", "", "protected", "-- member-location: class\n", "", "internal")]
+    [InlineData(
+        "public",
+        "",
+        "protected",
+        "-- member-location: nested-class\n-- visibility: internal\n",
+        "internal static partial class Sql\n",
+        "public"
+    )]
+    [InlineData(
+        "public",
+        "",
+        "protected",
+        "-- member-location: nested-class\n",
+        "private static partial class Sql\n",
+        "public"
+    )]
+    [InlineData("public", "", "protected", "", "internal static partial class SampleExtensions\n", "internal")]
+    [InlineData(
+        "public",
+        "",
+        "protected internal",
+        "-- member-location: class\n-- visibility: internal\n",
+        "",
+        "internal"
+    )]
+    [InlineData(
+        "public",
+        "",
+        "private protected",
+        "-- member-location: nested-class\n-- visibility: public\n",
+        "public static partial class Sql\n",
+        "public"
+    )]
+    [InlineData("public", "", "private protected", "-- member-location: class\n-- visibility: public\n", "", "public")]
+    [InlineData("public", "", "internal", "-- member-location: class\n-- visibility: protected\n", "", "protected")]
+    [InlineData(
+        "public",
+        "",
+        "public",
+        "-- member-location: nested-class\n-- visibility: public\n",
+        "public static partial class Sql\n",
+        "public"
+    )]
+    [InlineData("public", "", "public", "-- member-location: class\n-- visibility: protected\n", "", "protected")]
+    [InlineData("internal", "", "protected", "-- member-location: class\n-- visibility: public\n", "", "public")]
+    [InlineData(
+        "internal",
+        "",
+        "protected internal",
+        "-- member-location: nested-class\n-- visibility: public\n",
+        "public static partial class Sql\n",
+        "public"
+    )]
+    [InlineData("public", "internal", "protected", "-- member-location: class\n-- visibility: public\n", "", "public")]
+    [InlineData(
+        "public",
+        "private protected",
+        "protected",
+        "-- member-location: nested-class\n-- visibility: protected\n",
+        "protected static partial class Sql\n",
+        "public"
+    )]
+    public void Run_MethodOfANestedTypeNotReachableAsProtected_Compiles(
+        string outer,
+        string middle,
+        string accessibility,
+        string markers,
+        string host,
+        string modifier
+    )
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n" + markers + "SELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [UserEntry(file)],
+            GeneratorHarness.NestedSampleSource(outer, middle, accessibility)
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[
+            middle.Length > 0 ? "App.Outer.Middle.Sample-Methods.g.cs" : "App.Outer.Sample-Methods.g.cs"
+        ];
+        methods.ShouldContain(host.Length > 0 ? host : "partial class Sample\n");
+        methods.ShouldContain(
+            " " + modifier + " static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
+        );
+    }
+
+    // A constant or a token method takes no models, so it may be public or protected on a type that a derived type of
+    // another assembly reaches, on the type or in its nested class.
+    [Theory]
+    [InlineData("-- member-location: class\n-- visibility: public\n", "SELECT 1;", " public const string GetUser = ")]
+    [InlineData(
+        "-- member-location: class\n-- visibility: protected\n",
+        "SELECT {{t}};",
+        " protected static string GetUser("
+    )]
+    [InlineData(
+        "-- member-location: nested-class\n-- visibility: public\n",
+        "SELECT 1;",
+        " public static partial class Sql\n"
+    )]
+    [InlineData(
+        "-- member-location: nested-class\n-- visibility: protected\n",
+        "SELECT {{t}};",
+        " protected static partial class Sql\n"
+    )]
+    public void Run_ConstantOrTokenMethodOfATypeReachableAsProtected_IsAllowed(
+        string markers,
+        string sql,
+        string expected
+    )
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            GeneratorHarness.NestedSampleSource("public", "", "protected"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n" + markers + sql + "\n")
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.Outer.Sample.g.cs"].ShouldContain(expected);
+    }
+
     // The entry of GetUser, which takes an id and reads it, written for the file's hash.
     private static SidecarEntry UserEntry(SqlFile file) => Entry(file, "GetUser", [Parameter("id")], [Column("id")]);
 }

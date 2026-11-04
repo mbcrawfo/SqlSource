@@ -11,6 +11,12 @@ namespace SqlSource.Generation;
 /// <param name="IsPublic">
 /// Whether the type and every type it is nested in are declared <c>public</c>, which makes its models public.
 /// </param>
+/// <param name="IsReachableAsProtected">
+/// Whether code of another assembly can reach the type though it is not public: the type and every type it is nested
+/// in are declared <c>public</c>, <c>protected</c> or <c>protected internal</c>, and one of them is not public.  A
+/// public or protected member of it is then reachable as protected from a derived type there, and its internal models
+/// are less accessible than such a member (CS0051).
+/// </param>
 /// <param name="IsStatic">Whether the type is a static class, which cannot have protected members.</param>
 /// <param name="IsSealed">
 /// Whether the type is sealed, as the compiler says it: a sealed class or record, and every struct.  A static class is
@@ -29,6 +35,7 @@ internal sealed record TargetType(
     string Namespace,
     EquatableArray<TypeDeclaration> Types,
     bool IsPublic,
+    bool IsReachableAsProtected,
     bool IsStatic,
     bool IsSealed,
     string? Source,

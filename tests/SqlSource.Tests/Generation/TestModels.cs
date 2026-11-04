@@ -24,6 +24,7 @@ internal static class TestModels
         TypeDeclaration[]? types = null,
         DiagnosticInfo[]? diagnostics = null,
         bool isPublic = true,
+        bool isReachableAsProtected = false,
         bool isStatic = false,
         bool isSealed = false,
         string[]? takenNames = null
@@ -34,6 +35,7 @@ internal static class TestModels
                 types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]
             ),
             isPublic,
+            isReachableAsProtected,
             isStatic,
             isSealed,
             source,

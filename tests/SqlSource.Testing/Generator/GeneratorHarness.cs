@@ -96,6 +96,19 @@ internal static class GeneratorHarness
         + (arguments ?? "Source = \".\"")
         + ")]\npublic partial class Sample;\n";
 
+    // The source of a type Sample of the accessibility nested in a class Outer of its own, through a class Middle of
+    // the middle accessibility when it is not empty: App.Outer.Sample, else App.Outer.Middle.Sample.
+    public static string NestedSampleSource(string outer, string middle, string accessibility) =>
+        "using SqlSource;\n\nnamespace App\n{\n    "
+        + outer
+        + " partial class Outer\n    {\n"
+        + (middle.Length > 0 ? "        " + middle + " partial class Middle\n        {\n" : string.Empty)
+        + "        [SqlSourceGenerate(Source = \".\")]\n        "
+        + accessibility
+        + " partial class Sample;\n"
+        + (middle.Length > 0 ? "        }\n" : string.Empty)
+        + "    }\n}\n";
+
     // The settings of a Sql or Models run whose members go in the nested class, the default, which the memberLocation
     // of ProjectSettings would otherwise replace.
     public const string InNestedClass = /*lang=json,strict*/

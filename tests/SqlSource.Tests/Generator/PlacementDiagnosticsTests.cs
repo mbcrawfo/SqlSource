@@ -192,6 +192,120 @@ public sealed class PlacementDiagnosticsTests
         run.Sources.Values.ShouldContain(source => source.Contains(" const string Kept = \"SELECT 9;\";"));
     }
 
+    // A derived type of another assembly reaches a type nested as protected or protected internal, with no level
+    // around it internal, private or private protected, and so a public or protected method of it, which would take
+    // the type's internal models (CS0051).  The type's own visibility, a nested class's and one written in the header
+    // each give the error at the place that SQLSRC123 is reported at.
+    [Theory]
+    [InlineData("protected", "", "class", "public", "(3,1)-(3,22)")]
+    [InlineData("protected", "", "class", "protected", "(3,1)-(3,25)")]
+    [InlineData("protected", "", "nested-class", "public", "(3,1)-(3,22)")]
+    [InlineData("protected", "", "nested-class", "protected", "(3,1)-(3,25)")]
+    [InlineData("protected internal", "", "class", "public", "(3,1)-(3,22)")]
+    [InlineData("protected internal", "", "class", "protected", "(3,1)-(3,25)")]
+    [InlineData("protected internal", "", "nested-class", "public", "(3,1)-(3,22)")]
+    [InlineData("protected internal", "", "nested-class", "protected", "(3,1)-(3,25)")]
+    [InlineData("protected", "protected", "class", "public", "(3,1)-(3,22)")]
+    [InlineData("public", "protected", "nested-class", "public", "(3,1)-(3,22)")]
+    [InlineData("protected", "protected internal", "nested-class", "protected", "(3,1)-(3,25)")]
+    public void Run_MethodOfATypeReachableAsProtected_ReportsSqlsrc123(
+        string accessibility,
+        string middle,
+        string location,
+        string visibility,
+        string span
+    )
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            $"-- name: GetUser\n-- member-location: {location}\n-- visibility: {visibility}\n"
+                + "SELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [UserEntry(file)],
+            GeneratorHarness.NestedSampleSource("public", middle, accessibility),
+            otherFiles: [Kept]
+        );
+
+        run.Problems().ShouldBe([Sqlsrc123AsProtected(span, middle, visibility, "its own marker", location)]);
+        run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
+        run.Sources.Values.ShouldContain(source => source.Contains(" const string Kept = \"SELECT 9;\";"));
+    }
+
+    // The header's visibility reaches the query, whose own member location is where the error is; with neither on
+    // the query, the error is at its name.
+    [Theory]
+    [InlineData(
+        "-- visibility: public\n\n-- name: GetUser\n-- member-location: class\n",
+        "(4,1)-(4,26)",
+        "class",
+        "public"
+    )]
+    [InlineData(
+        "-- visibility: protected\n-- member-location: nested-class\n\n-- name: GetUser\n",
+        "(4,10)-(4,17)",
+        "nested-class",
+        "protected"
+    )]
+    public void Run_HeaderVisibilityOfATypeReachableAsProtected_ReportsSqlsrc123AtTheQuery(
+        string markers,
+        string span,
+        string location,
+        string visibility
+    )
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, markers + "SELECT id FROM users WHERE id = @id;\n");
+
+        var run = MethodRuns.Run(
+            file,
+            [UserEntry(file)],
+            GeneratorHarness.NestedSampleSource("public", "", "protected"),
+            otherFiles: [Kept]
+        );
+
+        run.Problems().ShouldBe([Sqlsrc123AsProtected(span, "", visibility, "the file header", location)]);
+        run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
+    }
+
+    // Another file's header makes the class Sql public, which its constant can be, and the method of the query that
+    // writes no visibility would be public in it too.  The error is at that query, whose file alone is left out, and
+    // names the query that wrote the visibility.
+    [Fact]
+    public void Run_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtected_ReportsSqlsrc123AtTheMethod()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: nested-class\n\n-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+        );
+        var constants = new SqlFile(
+            "/app/Repo/A.sql",
+            "-- visibility: public\n-- output: sql\n\n-- name: GetName\nSELECT 1;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [UserEntry(file)],
+            GeneratorHarness.NestedSampleSource("public", "", "protected"),
+            otherFiles: [constants]
+        );
+
+        run.Problems()
+            .ShouldBe([
+                Sqlsrc123AsProtected(
+                    "(3,10)-(3,17)",
+                    "",
+                    "public",
+                    "the file header for the query 'GetName'",
+                    "nested-class"
+                ),
+            ]);
+        run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
+        run.Sources["App.Outer.Sample.g.cs"].ShouldContain("            public static partial class Sql\n");
+        run.Sources["App.Outer.Sample.g.cs"].ShouldContain("                public const string GetName = ");
+    }
+
     // Both files write a visibility for the class Sql, and they differ, so neither file gives the type its members.
     // The class Other of a third file is not involved, and keeps its member.
     [Fact]
@@ -470,6 +584,23 @@ public sealed class PlacementDiagnosticsTests
                     + "which the file header sets, at the member location extension-class, because an extension method "
                     + "is public or internal.  Write -- visibility: or -- member-location: on the query.",
             ]);
+    }
+
+    // SQLSRC123 at GetUser of the type that GeneratorHarness.NestedSampleSource declares in a public Outer, whose
+    // method would be reachable as protected.
+    private static string Sqlsrc123AsProtected(
+        string span,
+        string middle,
+        string visibility,
+        string place,
+        string location
+    )
+    {
+        var type = middle.Length > 0 ? "App.Outer.Middle.Sample" : "App.Outer.Sample";
+        return $"SQLSRC123 {GeneratorHarness.UsersPath}{span}: The query 'GetUser' of '{type}' cannot be {visibility}, "
+            + $"which {place} sets, at the member location {location}, because '{type}' is reachable as protected, so "
+            + "the internal models its method takes are less accessible.  Write -- visibility: or -- member-location: "
+            + "on the query.";
     }
 
     // SQLSRC122 at a query at sql, set by the place.

@@ -400,6 +400,111 @@ public sealed class TypePlacementTests
         placement.Usable.ShouldBe([false]);
     }
 
+    // Another file's query writes the class Sql public, which its constant can be.  The method of the query that writes
+    // no visibility would be public in it too, which a type reachable as protected cannot have: the error is at that
+    // query, it names the query that wrote the visibility, and only the method's file is left out.  The class keeps
+    // the visibility written for it.
+    [Fact]
+    public void Of_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtected_ReportsSqlsrc123AtTheMethod()
+    {
+        var files = Files(
+            File("Users.sql", Query("GetName", output: OutputKind.Sql, visibility: Visibility.Public)),
+            File("Orders.sql", Query("GetOrder", location: MemberLocation.NestedClass, at: At("Orders.sql", 2)))
+        );
+
+        var (placement, diagnostics) = Analyse(ReachableAsProtected(), files);
+
+        diagnostics.ShouldBe([
+            DiagnosticInfo.Create(
+                SqlDiagnostics.VisibilityNotFit,
+                At("Orders.sql", 2),
+                "GetOrder",
+                "App.UserRepository",
+                "public",
+                "the file header for the query 'GetName'",
+                "nested-class",
+                "'App.UserRepository' is reachable as protected, so the internal models its method takes are less "
+                    + "accessible"
+            ),
+        ]);
+        placement.Usable.ShouldBe([true, false]);
+        placement.NestedClasses.ShouldBe([new NestedClassPlacement("Sql", Visibility.Public)]);
+    }
+
+    // The error is at the query's own member-location marker when it has no visibility marker.
+    [Fact]
+    public void Of_NestedClassMadePublicByAnotherQuery_ReportsSqlsrc123AtTheMemberLocationMarker()
+    {
+        var method = Query("GetOrder", location: MemberLocation.NestedClass, at: At("Users.sql", 2)) with
+        {
+            MemberLocationMarker = At("Users.sql", 3),
+        };
+        var files = Files(
+            File("Users.sql", Query("GetName", output: OutputKind.Sql, visibility: Visibility.Protected), method)
+        );
+
+        var (placement, diagnostics) = Analyse(ReachableAsProtected(), files);
+
+        diagnostics.ShouldBe([
+            DiagnosticInfo.Create(
+                SqlDiagnostics.VisibilityNotFit,
+                At("Users.sql", 3),
+                "GetOrder",
+                "App.UserRepository",
+                "protected",
+                "the file header for the query 'GetName'",
+                "nested-class",
+                "'App.UserRepository' is reachable as protected, so the internal models its method takes are less "
+                    + "accessible"
+            ),
+        ]);
+        placement.Usable.ShouldBe([false]);
+    }
+
+    // Only a public or protected query method of a type reachable as protected is refused for its models: not a
+    // constant, not an internal or private method, not one of a type that is not reachable so, and not one in the
+    // extension class, whose own reason refuses a public method of a type that is not public.
+    [Theory]
+    [InlineData("Class", "Public", "CodeGen", true, true)]
+    [InlineData("Class", "Protected", "CodeGen", true, true)]
+    [InlineData("NestedClass", "Public", "CodeGen", true, true)]
+    [InlineData("NestedClass", "Protected", "CodeGen", true, true)]
+    [InlineData("Class", "Internal", "CodeGen", true, false)]
+    [InlineData("NestedClass", "Private", "CodeGen", true, false)]
+    [InlineData("Class", "Public", "Sql", true, false)]
+    [InlineData("NestedClass", "Protected", "Models", true, false)]
+    [InlineData("Class", "Public", "CodeGen", false, false)]
+    [InlineData("NestedClass", "Protected", "CodeGen", false, false)]
+    public void VisibilityReason_OfATypeReachableAsProtected_RefusesOnlyAPublicOrProtectedMethod(
+        string locationName,
+        string visibilityName,
+        string outputName,
+        bool isReachableAsProtected,
+        bool isRefused
+    )
+    {
+        var type = TestModels.Type(isPublic: false, isReachableAsProtected: isReachableAsProtected);
+
+        var reason = PlacementChecks.VisibilityReason(
+            type,
+            System.Enum.Parse<MemberLocation>(locationName),
+            System.Enum.Parse<Visibility>(visibilityName),
+            System.Enum.Parse<OutputKind>(outputName)
+        );
+
+        if (isRefused)
+        {
+            reason.ShouldBe(
+                "'App.UserRepository' is reachable as protected, so the internal models its method takes are less "
+                    + "accessible"
+            );
+        }
+        else
+        {
+            reason.ShouldBeNull();
+        }
+    }
+
     // A written visibility beats a default: the class of the two files is public, whichever file comes first.
     [Theory]
     [InlineData(true)]
@@ -637,6 +742,9 @@ public sealed class TypePlacementTests
         PlaceText.Of(SettingPlace.FileHeader).ShouldBe("the file header");
         PlaceText.Of(SettingsFile).ShouldBe("the settings file '/app/sqlsource.json'");
     }
+
+    // A type nested as protected in a public type: not public, and reachable from a derived type of another assembly.
+    private static TargetType ReachableAsProtected() => TestModels.Type(isPublic: false, isReachableAsProtected: true);
 
     private static SettingPlace SettingsFile => SettingPlace.OfSettingsFile(SettingsPath, 1);
 

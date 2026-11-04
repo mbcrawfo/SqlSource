@@ -51,6 +51,7 @@ internal static class TargetTypeReader
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
             new EquatableArray<TypeDeclaration>(types),
             IsPublic(symbol),
+            IsReachableAsProtected(symbol),
             symbol.IsStatic,
             symbol.IsSealed,
             ReadSource(attribute),
@@ -74,6 +75,28 @@ internal static class TargetTypeReader
         }
 
         return true;
+    }
+
+    // A member's accessibility domain leaves the assembly unless the member or a type around it is internal, private or
+    // private protected, which keep it inside.  A protected or protected internal level lets in a derived type of
+    // another assembly, so a type whose levels are all public but for those is reached from there, as protected.
+    private static bool IsReachableAsProtected(INamedTypeSymbol symbol)
+    {
+        var isPublic = true;
+        for (var type = symbol; type is not null; type = type.ContainingType)
+        {
+            var accessibility = type.DeclaredAccessibility;
+            if (accessibility is Accessibility.Protected or Accessibility.ProtectedOrInternal)
+            {
+                isPublic = false;
+            }
+            else if (accessibility != Accessibility.Public)
+            {
+                return false;
+            }
+        }
+
+        return !isPublic;
     }
 
     // A nested class, or a member on the type, cannot share its name with a member of the type, with the type itself
