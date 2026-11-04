@@ -1984,7 +1984,7 @@ The sidecar of a `.sql` file, the `.sql.json` file beside it, is not a file that
 /work/App/Queries/Users.sql.json(7,1): error SQLSRC237: The sidecar cannot be read, because it is not one JSON object.  Run 'sqlsource describe' to write it again.
 ```
 
-Run `dotnet sqlsource describe`, which writes the whole file again, and commit it.  After a merge conflict, leave the conflict in the file: the tool cannot read it, so it describes every query of the file again.  If you have already taken one side, run `dotnet sqlsource describe --force` on the `.sql` file instead, since the side you took may hold entries written before a schema change.  While the sidecar cannot be read, no query of the file gets an error about its entry.
+Run `dotnet sqlsource describe`, which writes the whole file again, and commit it.  After a merge conflict, leave the conflict in the file: the tool cannot read it, so it describes every query of the file again.  If you have already taken one side, run `dotnet sqlsource describe --force` on the `.sql` file instead, since the side you took may hold entries written before a schema change.  Either way, first bring your database to the schema of the merged code, such as by applying the other branch's migrations: the tool writes what your database says.  While the sidecar cannot be read, no query of the file gets an error about its entry.
 
 See: [Sidecars in git](tool.md#sidecars-in-git)
 

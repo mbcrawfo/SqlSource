@@ -140,7 +140,7 @@ Last, the filters of `RunFilters` select queries, by `PlannedQuery.IsSelected`. 
 | `ToDescribe` | It is selected and has no current entry |
 | `LeftOut` | It is not selected and has no current entry |
 
-An entry is current when its hash and its database are the query's (`SidecarEntry.IsCurrentFor`) and its sidecar was written in this format by this version of the tool (`SidecarOnDisk.Usable`), so an entry from an older tool is never kept.  What a user sees of this is in the manual's [describing again](../manual/tool.md#describing-again).
+An entry is current when its hash and its database are the query's (`SidecarEntry.IsCurrentFor`) and its sidecar was written in this format by this version of the tool (`SidecarOnDisk.Usable`), so a run never keeps an entry from an older tool, though a git merge can put one under the new version (TD-0100).  What a user sees of this is in the manual's [describing again](../manual/tool.md#describing-again).
 
 `DescribeRun` writes an event for each query that it decided without a database.  A query to describe gets its event when it is described or fails.
 

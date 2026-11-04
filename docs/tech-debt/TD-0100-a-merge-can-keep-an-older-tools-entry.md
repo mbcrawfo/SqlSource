@@ -16,7 +16,7 @@ Medium.  When the newer tool describes the query differently, such as a nullabil
 
 ## Proposed fix
 
-Give each entry the version of the tool that wrote it, beside `hash` and `database`, in a new format version.  `IsCurrentFor` then also compares the entry's version with the tool's, so `describe` describes such an entry again, and the build's SQLSRC240 check looks at every entry's version, not the file's alone.  The file-level `toolVersion` can stay as the version of the last write.  Update `schemas/`, the architecture page, the manual's "Sidecars in git" and its known issue in `docs/manual/tool.md`, and resolve this item.
+Give each entry the version of the tool that wrote it, beside `hash` and `database`, in a new format version.  `IsCurrentFor` then also compares the entry's version with the tool's, so `describe` describes such an entry again, and the build's SQLSRC240 check looks at every entry's version, not the file's alone.  The file-level `toolVersion` can stay as the version of the last write.  Update `schemas/`; the statements of the rule that name this item in `docs/architecture/sidecar-format.md`, `docs/architecture/tool.md`, the comments of `SidecarOnDisk.Usable` and `Sidecar.IsWrittenBy`, and `src/SqlSource.Tool/Describing/AGENTS.md`; the manual's "Sidecars in git" and its known issue in `docs/manual/tool.md`; and resolve this item.
 
 ## Trigger
 

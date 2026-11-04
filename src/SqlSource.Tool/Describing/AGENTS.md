@@ -5,7 +5,7 @@
 - **`Describing/DescribeRun.cs` calls the steps in order, and they stay apart** ([a describe run](../../../docs/architecture/tool.md#a-describe-run)).  The step that decides never writes, the step that writes never decides, and the step that compares does neither.
 - **`--check` shares the run and replaces only the step that writes**, `SidecarStore`, with `Describing/SidecarCheck.cs`, which returns its differences as data.  What it says of a sidecar that would be deleted it takes from `FileOutcomes`.
 - **A sidecar is written whole or not at all, through `SidecarStore`**, whose remarks say which leftover temporary files a run removes.
-- **An entry from an older tool never stands beside a new one.**  A file's target holds an entry for every query that needs one, each described in this run or current (`SidecarEntry.IsCurrentFor` and `Sidecar.IsWrittenBy`); a file with a query that has neither is left as it was.
+- **A run never leaves an older tool's entry beside a new one** (a git merge can: TD-0100).  A file's target holds an entry for each query that needs one, described in this run or current (`SidecarEntry.IsCurrentFor`, `Sidecar.IsWrittenBy`); a file with a query that has neither is left as it was.
 
 ## Filters
 
