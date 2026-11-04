@@ -17,9 +17,9 @@ internal readonly record struct DriverFinding(DiagnosticDescriptor Descriptor, s
 
 /// <summary>
 /// What a driver's probe gives the steps that read it: the diagnostics of the project's reference to the driver, and
-/// whether the project references the driver, and one below the floor.  The step that reports it reports whatever the
-/// probe finds and decides nothing about the driver, so a probe that learns of another condition of its driver adds a
-/// flag and a finding, and <c>ReportDriver</c> is unchanged.
+/// whether the project references the driver and whether it is below the floor.  The step that reports it reports
+/// whatever the probe finds and decides nothing about the driver, so a probe that learns of another condition of its
+/// driver adds a flag and a finding, and <c>ReportDriver</c> is unchanged.
 /// </summary>
 internal interface IDriverProbe
 {
