@@ -14,8 +14,8 @@ namespace SqlSource.Tool.Testing.Realistic;
 
 // The models and the method the generator writes for a case with models, found as it names them from the case's
 // sidecar entry, in the assembly and the namespace of an engine's project that hold the classes of its
-// RealisticQueries.cs and RealisticMethods.cs, named for that engine.  The models are read from that assembly by
-// reflection, never from the sidecar: a check of them can fail where "describe --check" passes.
+// RealisticMethods.cs, named for that engine.  The models are read from that assembly by reflection, never from the
+// sidecar: a check of them can fail where "describe --check" passes.
 internal sealed class RealisticModels(Assembly assembly, string @namespace, DatabaseEngine engine)
 {
     // The suffix of an input model: the inputModelSuffix of the project's settings file,
@@ -97,19 +97,6 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
     // The input model of the entry, which a query without parameters has not.
     public Type? InputModelOf(SidecarEntry entry) =>
         entry.Parameters.Count == 0 ? null : ModelNamed(entry.Name, InputSuffix);
-
-    // The SQL of the case's query, the constant of its claiming class named as the query, which SqlLocation.Direct
-    // writes on the class itself.  The class is the corpus's claim of the case, in the namespace of the models.
-    public string SqlOf(RealisticCorpus corpus, RealisticCase found, SidecarEntry entry)
-    {
-        var claim = RealisticClaims.Of(corpus, found, RealisticClaims.ModelsOutput);
-        var type =
-            assembly.GetType($"{@namespace}.{claim.TypeName}")
-            ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} is not compiled");
-        return type.GetField(entry.Name, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
-                ?.GetValue(null) as string
-            ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} has no SQL {entry.Name}");
-    }
 
     // The method the generator writes for the case's query, on the extension class of the corpus's claim of the case at
     // CodeGen, in the namespace of the models.  It must have the generated signature for the entry's models, which

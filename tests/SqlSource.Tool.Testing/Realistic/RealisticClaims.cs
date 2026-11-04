@@ -11,18 +11,15 @@ using Xunit;
 
 namespace SqlSource.Tool.Testing.Realistic;
 
-// A class of a corpus's RealisticQueries.cs or RealisticMethods.cs, the case whose query.sql its attribute claims and
-// the member of GeneratorOutput the attribute names as its Output, null when it sets none.
+// A class of a corpus's RealisticMethods.cs, the case whose query.sql its attribute claims and the member of
+// GeneratorOutput the attribute names as its Output, null when it sets none.
 internal sealed record RealisticClaim(string TypeName, string Case, string? Output);
 
-// The claims of a corpus's RealisticQueries.cs and RealisticMethods.cs, read from their source with Roslyn and not by
-// reflection, so that a test of them names the case and the class and needs no generated type.
+// The claims of a corpus's RealisticMethods.cs, read from its source with Roslyn and not by reflection, so that a test
+// of them names the case and the class and needs no generated type.
 internal static partial class RealisticClaims
 {
-    // The output of a claim that the first file makes, which gives the case its models and the SQL of its query.
-    public const string ModelsOutput = "Models";
-
-    // The output of a claim that the second file makes, which gives the case its method.
+    // The output of every claim, which gives the case its models and its method.
     public const string CodeGenOutput = "CodeGen";
 
     // The attribute as the generator names it, without its namespace and the suffix Attribute, as the file writes it.
@@ -30,10 +27,9 @@ internal static partial class RealisticClaims
         .AttributeMetadataName[(AttributeSource.AttributeMetadataName.LastIndexOf('.') + 1)..]
         .Replace("Attribute", "", StringComparison.Ordinal);
 
-    // Every claim of the corpus's two files, those of Queries then those of Methods, each in its order, read afresh
-    // each time.
+    // Every claim of the corpus's file, in its order, read afresh each time.
     public static IReadOnlyList<RealisticClaim> AllOf(RealisticCorpus corpus) =>
-        [.. Parse(File.ReadAllText(corpus.Queries)), .. Parse(File.ReadAllText(corpus.Methods))];
+        Parse(File.ReadAllText(corpus.Methods));
 
     public static IReadOnlyList<RealisticClaim> Parse(string source) =>
         [
@@ -53,7 +49,7 @@ internal static partial class RealisticClaims
                 ),
         ];
 
-    // The one claim of the case at the output, which a case with models has at each of the two.
+    // The one claim of the case at the output, which a case with models has at CodeGen.
     public static RealisticClaim Of(RealisticCorpus corpus, RealisticCase found, string output)
     {
         var claims = AllOf(corpus).Where(claim => claim.Case == found.Name && claim.Output == output).ToList();
@@ -67,7 +63,7 @@ internal static partial class RealisticClaims
 
     // How a failure says that a case has a count of claims at an output it should not.
     public static string ClaimedBy(RealisticCorpus corpus, RealisticCase found, string output, int count) =>
-        $"{found} is claimed at {output} by {count} classes of {corpus.Queries} and {corpus.Methods}";
+        $"{found} is claimed at {output} by {count} classes of {corpus.Methods}";
 
     // The attribute's name without what qualifies it: SqlSource.SqlSourceGenerate and global::SqlSourceGenerate claim
     // as SqlSourceGenerate does.

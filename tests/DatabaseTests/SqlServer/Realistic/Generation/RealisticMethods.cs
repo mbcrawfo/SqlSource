@@ -1,9 +1,10 @@
 namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
 
-// Each realistic case with models is claimed a second time here, at CodeGen, so that a generated method runs its
-// query; RealisticQueries.cs claims it at Models.  The classes are in the same namespace as that file's, so the two
-// claims share the models.  A CodeGen query has no constant, so these classes set no SqlLocation.
-// RealisticClaimsTests fails on a case with models that either file lacks, or a class of a case without them.
+// Each realistic case with models is claimed here once, at CodeGen, which gives it its models and a generated method
+// that runs its query.  The models are those that the Dapper and method tests read, and the Dapper tests' SQL comes
+// from RealisticGeneration, an in-process run at Models.  A CodeGen query has no constant, so these classes set no
+// SqlLocation.  RealisticClaimsTests fails on a case with models that this file lacks, or a class of a case without
+// them.
 
 [SqlSourceGenerate(Source = "../Cases/activity-feed-union-all/query.sql", Output = GeneratorOutput.CodeGen)]
 internal static partial class ActivityFeedUnionAllMethod;
