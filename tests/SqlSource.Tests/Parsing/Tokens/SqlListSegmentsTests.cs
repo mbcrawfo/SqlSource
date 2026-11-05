@@ -32,6 +32,13 @@ public sealed class SqlListSegmentsTests
                 Literal(")"),
             ]);
 
+    // The test for NULL of a parameter that is no list stays in its literal, though the query has a list.
+    [Fact]
+    public void Split_NullTestOfAValueBesideAList_StaysInItsLiteral() =>
+        Blocks("-- name: Q\nWHERE (@name IS NULL OR name = @name) AND id IN @ids\n")
+            .ShouldHaveSingleItem()
+            .Segments.ShouldBe([Literal("WHERE (@name IS NULL OR name = @name) AND id IN "), List("@ids")]);
+
     // A use at either end of the SQL leaves no empty literal, and two uses side by side none between them.
     [Fact]
     public void Split_UseAtAnEdge_AddsNoEmptyLiteral() =>

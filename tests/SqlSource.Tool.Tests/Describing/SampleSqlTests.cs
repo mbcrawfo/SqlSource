@@ -47,6 +47,12 @@ public sealed class SampleSqlTests : IDisposable
         Sample("-- name: A\nSELECT 1 FROM t WHERE (@ids IS NULL OR id IN @ids);\n")
             .ShouldBe("SELECT 1 FROM t WHERE (NULL IS NULL OR id IN (@ids));");
 
+    // A parameter that is no list is described as written, its test for NULL too, beside a list.
+    [Fact]
+    public void Build_NullTestOfAValueBesideAList_IsAsWritten() =>
+        Sample("-- name: A\nSELECT 1 FROM t WHERE (@name IS NULL OR name = @name) AND id IN @ids;\n")
+            .ShouldBe("SELECT 1 FROM t WHERE (@name IS NULL OR name = @name) AND id IN (@ids);");
+
     // The plan gives such a query a problem and the run never builds its sample.
     [Fact]
     public void Build_TokenWithoutADefault_Throws() =>
