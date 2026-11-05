@@ -95,6 +95,12 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
         return made.Replacement;
     }
 
+    /// <summary>
+    /// Whether a spelling is kept as the engine's own, compared as the engine folds it, as <see cref="Keep" /> stored
+    /// it.  A spelling that has a replacement is not kept.
+    /// </summary>
+    public bool IsKept(string spelling, bool quoted) => _kept.ContainsKey(fold(spelling, quoted));
+
     /// <summary>Whether a text is a replacement this mapping gave.</summary>
     public bool IsReplacement(string text) => _replacements.Contains(text);
 

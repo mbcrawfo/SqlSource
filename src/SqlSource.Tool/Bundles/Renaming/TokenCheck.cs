@@ -9,8 +9,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 
 /// <summary>
 /// The check of every token of a renamed bundle that came from the user's database or query: each must be a
-/// replacement of the mapping, a word of the engine's, a number or one character of punctuation, and a literal must
-/// hold a replacement.  The first that is none is a refusal that names its place and the token.
+/// replacement of the mapping, a word of the engine's, a spelling the mapping kept as the engine's, a number or one
+/// character of punctuation, and a literal must hold a replacement.  The first that is none is a refusal that names its place and the token.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -22,7 +22,7 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// </para>
 /// <para>
 /// The check reads the renamed bundle alone, and trusts nothing of the renaming but the mapping: a word the renaming
-/// kept that is no word of the engine's is refused here.
+/// kept that is no word of the engine's, and that no row of the engine's held, is refused here.
 /// </para>
 /// </remarks>
 internal sealed partial class TokenCheck
@@ -213,8 +213,12 @@ internal sealed partial class TokenCheck
             || (_engine.CopyOf(name, _parameters) is var (parameter, _) && IsSafe(parameter, quoted: false));
     }
 
+    // A replacement, a word of the engine's, a spelling the mapping kept from a row of the engine's, or a number.
     private bool IsSafe(string token, bool quoted) =>
-        _mapping.IsReplacement(token) || _engine.IsEngineWord(token, quoted) || IsNumber(token);
+        _mapping.IsReplacement(token)
+        || _engine.IsEngineWord(token, quoted)
+        || _mapping.IsKept(token, quoted)
+        || IsNumber(token);
 
     private static bool IsPunctuation(string token) =>
         token.Length == 1 && SqlRenamer.Punctuation.Contains(token[0], StringComparison.Ordinal);

@@ -85,4 +85,50 @@ public sealed class TokenCheckTests
 
         refusal.ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "active"));
     }
+
+    // A name of a row the engine's part says is its own is kept by the mapping, and passes though no vocabulary
+    // holds it, in the row and wherever the SQL spells it as the engine folds it.
+    [Fact]
+    public void Check_SpellingKeptFromAnEngineRow_Passes()
+    {
+        var (engine, mapping) = Mapping();
+        var type = new JsonObject
+        {
+            ["name"] = "regdictionary",
+            ["kind"] = "base",
+            ["schema"] = "pg_catalog",
+            ["internalName"] = "regdictionary",
+        };
+        var column = new JsonObject
+        {
+            ["ordinal"] = 0,
+            ["name"] = "c_1",
+            ["type"] = type,
+        };
+        var answer = new JsonObject { ["description"] = new JsonObject { ["columns"] = new JsonArray(column) } };
+        var call = new RenamingCall(
+            0,
+            "describe",
+            [],
+            new JsonObject { ["request"] = new JsonObject(), ["answer"] = answer }
+        );
+        var run = RenamingRun.For(engine, mapping, "SELECT 1");
+        CaptureRenamer.Register(engine, [call], run);
+        column["name"] = mapping.Name("total", quoted: true, NameClass.Column);
+        var query = mapping.Name("GetTotals", quoted: false, NameClass.Query);
+        engine.IsEngineWord("regdictionary", quoted: true).ShouldBeFalse();
+
+        var refusal = TokenCheck.Check(
+            engine,
+            mapping,
+            [call],
+            $"-- name: {query}\nSELECT 1::RegDictionary",
+            expected: null
+        );
+
+        refusal.ShouldBeNull();
+        TokenCheck
+            .Check(engine, mapping, [], $"-- name: {query}\nSELECT 1::\"RegDictionary\"", expected: null)
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "RegDictionary"));
+    }
 }
