@@ -18,7 +18,11 @@ internal static class SqlServerVocabulary
     /// <summary>Whether the spelling is a word of the vocabulary, compared upper-invariant by character.</summary>
     public static bool Contains(string spelling) => Folded.Contains(Fold(spelling));
 
-    private static string Fold(string spelling) =>
+    /// <summary>
+    /// A spelling as SQL Server compares a name, ignoring case: upper-invariant by character, so that a fold never
+    /// changes a spelling's length.
+    /// </summary>
+    public static string Fold(string spelling) =>
         string.Create(
             spelling.Length,
             spelling,
