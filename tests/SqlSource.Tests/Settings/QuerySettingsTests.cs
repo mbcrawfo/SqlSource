@@ -245,8 +245,9 @@ public sealed class QuerySettingsTests
         fromFile.NestedClass.ShouldBe("FromFile");
     }
 
-    // The type override is one exception, the column types the other: each level replaces only the keys it names,
-    // and a default stays, so that the lookup of a type finds it in its place.
+    // The type override merges per key, as the column types and the library types do, and the generator parameters
+    // per parameter: each level replaces only the keys it names, and a default stays, so that the lookup of a type
+    // finds it in its place.
     [Fact]
     public void ResolveTypeOverrides_Levels_MergePerKeyAcrossTheLevels()
     {
