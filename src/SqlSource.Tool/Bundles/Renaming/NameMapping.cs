@@ -12,9 +12,10 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// A replacement is the class's prefix and the HMAC-SHA256 of the class word and the folded spelling, keyed by the
 /// run's key and cut to eight lower-case hex digits; a replacement that is already given lengthens by two digits
 /// until it is free.  A spelling that is kept maps to the spelling first kept, wins over a later <see cref="Name" />
-/// and carries no class; one that already has a replacement keeps it.
+/// and carries no class; one that already has a replacement keeps it.  The renaming starts at eight digits; a test
+/// gives a shorter <c>firstLength</c> to force a collision.
 /// </remarks>
-internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fold)
+internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fold, int firstLength)
 {
     private const int FirstLength = 8;
     private const string HexDigits = "0123456789abcdef";
@@ -24,6 +25,10 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
     private readonly Dictionary<string, MappedName> _literals = [with(StringComparer.Ordinal)];
     private readonly HashSet<string> _replacements = [with(StringComparer.Ordinal)];
     private readonly List<MappedName> _names = [];
+
+    /// <summary>A mapping whose replacements start at eight hex digits.</summary>
+    public NameMapping(RenamingKey key, Func<string, bool, string> fold)
+        : this(key, fold, FirstLength) { }
 
     /// <summary>The names made, in the order they were made; a kept name is left out.</summary>
     public IReadOnlyList<MappedName> Names => _names;
@@ -111,7 +116,7 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
     {
         var hex = HexOf(key.Hash(Encoding.UTF8.GetBytes(NameClasses.WordOf(cls) + ":" + folded)));
         var prefix = NameClasses.PrefixOf(cls);
-        for (var length = FirstLength; length <= hex.Length; length += 2)
+        for (var length = firstLength; length <= hex.Length; length += 2)
         {
             var candidate = prefix + Cut(hex, length);
             if (_replacements.Add(candidate))

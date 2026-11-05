@@ -67,6 +67,23 @@ public sealed class NameMappingTests
         mapping.IsReplacement("c_nothere").ShouldBeFalse();
     }
 
+    // Seventeen spellings of one class at one digit: sixteen digits cannot hold them, so at least one collides and is
+    // lengthened by two digits, and every spelling still has a replacement of its own, the same each time it is asked.
+    [Fact]
+    public void Name_ReplacementThatCollides_IsLengthened()
+    {
+        var mapping = new NameMapping(RenamingKey.Of(Zeros), Fold, firstLength: 1);
+        var spellings = Enumerable.Range(0, 17).Select(i => $"n{i}").ToList();
+
+        var replacements = spellings.Select(spelling => mapping.Name(spelling, false, NameClass.Column)).ToList();
+
+        replacements.Distinct().Count().ShouldBe(spellings.Count);
+        replacements.ShouldAllBe(r => mapping.IsReplacement(r));
+        replacements.ShouldAllBe(r => r.Length == "c_".Length + 1 || r.Length == "c_".Length + 3);
+        replacements.ShouldContain(r => r.Length == "c_".Length + 3);
+        spellings.Select(spelling => mapping.Name(spelling, false, NameClass.Column)).ShouldBe(replacements);
+    }
+
     [Fact]
     public void Cut_ALongerLength_KeepsTheLeadingDigits()
     {
