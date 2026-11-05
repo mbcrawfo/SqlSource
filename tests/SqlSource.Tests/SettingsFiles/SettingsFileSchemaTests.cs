@@ -354,7 +354,7 @@ public sealed class SettingsFileSchemaTests
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"\"]")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"default\"]")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \" Keep-Comments=OFF \", \"sort-input=Default\"]")]
-    [InlineData(SettingsFileKeys.GeneratorParameters, "[\"Sort-Input\", \"\", \" DEFAULT \", \"no-array-pool=on\"]")]
+    [InlineData(SettingsFileKeys.GeneratorParameters, "[\"Sort-Input\", \"\", \" DEFAULT \", \"array-pool=off\"]")]
     [InlineData(
         SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
         "{\"nodaTime\": \"on\"}"

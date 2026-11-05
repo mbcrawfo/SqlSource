@@ -16,7 +16,7 @@ A theory is clearest when its rows share one arrangement and one set of assertio
   - `SqlSource.Tests/Snapshot/SidecarWriterTests.cs`, `Write_PostgresType_WritesTheNestedTypeItsKindNames`;
   - `SqlSource.Tool.Tests/Describing/FileOutcomesTests.cs`, `Decide_FileThatNeedsNoEntry_LosesItsSidecarOnlyInARunThatMayDeleteAndWhenThereIsOne`.
 - An `if` that sets an optional input only when the row gives one, which may be acceptable as it stands:
-  - `SqlSource.Tests/Generator/ArrayPoolParameterTests.cs`, `Run_NoArrayPool_ComesWholeFromTheMostSpecificLevelThatGivesAList` (`folderFile`);
+  - `SqlSource.Tests/Generator/ArrayPoolParameterTests.cs`, `Run_ArrayPoolOff_ComesWholeFromTheMostSpecificLevelThatGivesAList` (`folderFile`);
   - `SqlSource.Tool.Tests/Commands/SecretTests.cs`, three tests over `debug`, and `SqlSource.Tool.Tests/Describing/DatabaseRunsFaultTests.cs`, `Run_DescriberThatThrows_IsAFaultWithoutTheConnection`;
   - `SqlSource.Tool.Tests/Logging/RunLogDestinationTests.cs`, `Run_NoLogOptionAndNoVariable_WritesNoFile`;
   - `SqlSource.Tool.Tests/Planning/RunPlannerTests.cs`, `Plan_OutputOfTheChain_DecidesWhetherAQueryNeedsAnEntry`;

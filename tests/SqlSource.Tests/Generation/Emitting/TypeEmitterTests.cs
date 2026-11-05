@@ -727,7 +727,7 @@ public sealed class TypeEmitterTests
     private static TypeOutput Emit(OutputKind? output, TargetType type, params ParsedSqlFile[] files) =>
         Emit(output, type, validateTokens: true, files);
 
-    // The files under one level, of no-token-validation unless the tokens are validated.
+    // The files under one level, with token-validation=off unless the tokens are validated.
     private static TypeOutput Emit(
         OutputKind? output,
         TargetType type,
@@ -735,9 +735,7 @@ public sealed class TypeEmitterTests
         params ParsedSqlFile[] files
     )
     {
-        var level = validateTokens
-            ? SettingsLevel.None
-            : TestModels.ParametersOn(GeneratorParameters.NoTokenValidation);
+        var level = validateTokens ? SettingsLevel.None : TestModels.ParametersOff(GeneratorParameters.TokenValidation);
         return Emit(output, type, Array.ConvertAll(files, _ => level), files);
     }
 
@@ -784,7 +782,7 @@ public sealed class TypeEmitterTests
             EquatableArray<SqlQueryParameter>.Empty,
             tokenValidation switch
             {
-                false => TestModels.ParametersOn(GeneratorParameters.NoTokenValidation),
+                false => TestModels.ParametersOff(GeneratorParameters.TokenValidation),
                 true => new SettingsLevel { Parameters = GeneratorParameterChoices.Reset },
                 null => SettingsLevel.None,
             },

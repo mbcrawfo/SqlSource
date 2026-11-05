@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // the row buffer's sizes: none, one, its first buffer of 16 and one more, the largest buffer it rents, of 1,024, and
 // one more, and 3,000, which grows past it into plain arrays.  Each of the eight types that read through the buffer,
 // the array, the three read-only interfaces, the List and IList and ICollection and the ImmutableArray, returns the
-// numbers from 1 to the count, in order, and its twin under no-array-pool, which reads without the pool, returns the
+// numbers from 1 to the count, in order, and its twin under array-pool=off, which reads without the pool, returns the
 // same rows.  The array and the three read-only interfaces return an array, List and the two interfaces over it a List,
 // and ImmutableArray one that is never the default, ImmutableArray.Empty when there are no rows.  A pooled list is the
 // caller's alone: its capacity is the count, and clearing it changes no later call.  An even count runs on an open

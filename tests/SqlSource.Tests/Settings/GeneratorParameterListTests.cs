@@ -61,11 +61,11 @@ public sealed class GeneratorParameterListTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         GeneratorParameterList
-            .ReadElements([" keep-comments ", "SORT-INPUT=off", "", "no-array-pool=Default"], invalid, repeated)
+            .ReadElements([" keep-comments ", "SORT-INPUT=off", "", "array-pool=Default"], invalid, repeated)
             .ShouldBe(
                 KeepCommentsOn
                     .With(GeneratorParameters.SortInput, GeneratorParameterState.Off)
-                    .With(GeneratorParameters.NoArrayPool, GeneratorParameterState.Default)
+                    .With(GeneratorParameters.ArrayPool, GeneratorParameterState.Default)
             );
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
@@ -81,6 +81,30 @@ public sealed class GeneratorParameterListTests
             .ShouldBe(KeepCommentsOn);
         invalid.ShouldBe([1, 2]);
         repeated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadElements_OldNegativeWord_IsItsIndexAndTheOthersApply()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList
+            .ReadElements(["no-array-pool", "keep-comments"], invalid, repeated)
+            .ShouldBe(KeepCommentsOn);
+        invalid.ShouldBe([0]);
+        repeated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void All_IsTheUnionOfTheNamedParameters()
+    {
+        var union = GeneratorParameters.None;
+        foreach (var (_, parameter) in GeneratorParameterList.Names)
+        {
+            union |= parameter;
+        }
+
+        GeneratorParameterList.All.ShouldBe(union);
     }
 
     // An element is one word: two words in one element are no parameter.

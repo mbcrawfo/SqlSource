@@ -75,7 +75,7 @@ public sealed class EndToEndTests
     public void NestedLocation_QueryWithEightTokens_ReplacesEachInItsPlace() =>
         TokenQueries.Eight("1", "2", "3", "4", "5", "6", "7", "8").ShouldBe("SELECT 12, 3, 4, 5, 6, 7, 8, 1;");
 
-    // The sqlsource.json of this folder lists sort-input and no-token-validation as the generator parameters, and
+    // The sqlsource.json of this folder lists sort-input and token-validation=off as the generator parameters, and
     // Search names no generator parameter of its own.  That its method checks nothing shows the settings file reaching
     // the generator.
     [Theory]
@@ -125,7 +125,7 @@ public sealed class EndToEndTests
     public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
         DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
-    // The header of Kept.sql gives every generator parameter its default, then turns no-token-validation and
+    // The header of Kept.sql gives every generator parameter its default, then turns token-validation off and
     // keep-comments on.  The settings file does not keep comments, so that the comment is there shows the header
     // reaching the generator and turning keep-comments on over the settings file.
     [Fact]
@@ -133,7 +133,7 @@ public sealed class EndToEndTests
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
     // Plain.sql has no header, so the settings file's generator parameters apply.  Without keep-comments it leaves the
-    // comment out, and with no-token-validation the method takes the blank text of its token, which it would throw on
+    // comment out, and with token-validation=off the method takes the blank text of its token, which it would throw on
     // otherwise.
     [Fact]
     public void ProjectWithParameters_FileWithoutAHeader_UsesTheParametersOfTheSettingsFile() =>

@@ -64,10 +64,10 @@ internal readonly record struct QuerySettings(
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
 
     /// <summary>Whether the query's token method and query method check that each token's argument has text.</summary>
-    public bool ValidateTokens => (Parameters & GeneratorParameters.NoTokenValidation) == 0;
+    public bool ValidateTokens => (Parameters & GeneratorParameters.TokenValidation) != 0;
 
     /// <summary>Whether the query's method may read its rows into buffers from the shared array pool.</summary>
-    public bool UseArrayPool => (Parameters & GeneratorParameters.NoArrayPool) == 0;
+    public bool UseArrayPool => (Parameters & GeneratorParameters.ArrayPool) != 0;
 
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then

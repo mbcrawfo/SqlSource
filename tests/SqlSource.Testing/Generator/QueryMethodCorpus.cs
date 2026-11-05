@@ -19,15 +19,15 @@ namespace SqlSource.Testing.Generator;
 internal static partial class QueryMethodCorpus
 {
     // The settings of collections-no-pool, over the project's settings file: no row buffer.
-    private const string NoArrayPool = /*lang=json,strict*/
-        """{"generatorParameters": ["no-array-pool"]}""";
+    private const string ArrayPoolOff = /*lang=json,strict*/
+        """{"generatorParameters": ["array-pool=off"]}""";
 
     // The scenarios that every engine runs.  Cases reads it, so both stay in this part, where their order is kept.
     public static IReadOnlyList<CorpusScenario> Shared { get; } =
     [
         new("shapes", engine => Shapes(engine, properties: null)),
         new("collections", engine => Collections(engine, settings: null)),
-        new("collections-no-pool", engine => Collections(engine, NoArrayPool)),
+        new("collections-no-pool", engine => Collections(engine, ArrayPoolOff)),
         new("tokens", Tokens),
         new("placement", Placement),
         new("converters", Converters),

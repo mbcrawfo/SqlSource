@@ -20,19 +20,20 @@ public sealed class SqlFileParserMarkerTests
     [Fact]
     public void Parse_PreambleGeneratorParameters_ApplyToEveryBlock()
     {
-        const string Text = "-- generator: no-token-validation\n" + "-- name: A\nSELECT 1\n" + "-- name: B\nSELECT 2\n";
+        const string Text =
+            "-- generator: token-validation=off\n" + "-- name: A\nSELECT 1\n" + "-- name: B\nSELECT 2\n";
 
         var blocks = Blocks(Text);
 
-        blocks[0].Markers.Parameters.ShouldBe(TestModels.TurnedOn(GeneratorParameters.NoTokenValidation));
-        blocks[1].Markers.Parameters.ShouldBe(TestModels.TurnedOn(GeneratorParameters.NoTokenValidation));
+        blocks[0].Markers.Parameters.ShouldBe(TestModels.TurnedOff(GeneratorParameters.TokenValidation));
+        blocks[1].Markers.Parameters.ShouldBe(TestModels.TurnedOff(GeneratorParameters.TokenValidation));
     }
 
     [Fact]
     public void Parse_QueryWithoutMarkers_SharesTheEmptyLevel() =>
         Blocks("-- name: Q\nSELECT 1\n").ShouldHaveSingleItem().Markers.ShouldBeSameAs(SettingsLevel.None);
 
-    // A row gives the parameters that are on, as a number.
+    // A row gives the parameters that are on beyond the defaults, as a number.
     [Theory]
     [InlineData("-- generator: keep-comments\n-- name: Q\nSELECT 1\n", 1)]
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: sort-input\nSELECT 1\n", 5)]
@@ -40,13 +41,15 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1\n", 0)]
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default sort-input\nSELECT 1\n", 4)]
     public void Parse_Markers_MergeTheQuerysOverThePreamblesPerParameter(string text, int expected) =>
-        ((int)Blocks(text).ShouldHaveSingleItem().Markers.Parameters.Resolve()).ShouldBe(expected);
+        (
+            (int)(Blocks(text).ShouldHaveSingleItem().Markers.Parameters.Resolve() & ~GeneratorParameterList.Defaults)
+        ).ShouldBe(expected);
 
     [Fact]
     public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()
     {
         const string Text =
-            "-- name: A\n-- generator: keep-comments no-token-validation\n-- token-ignore: x\nSELECT {{x}} -- c\n"
+            "-- name: A\n-- generator: keep-comments token-validation=off\n-- token-ignore: x\nSELECT {{x}} -- c\n"
             + "-- name: B\nSELECT {{x}} -- c\n";
 
         var blocks = Blocks(Text);
@@ -61,9 +64,9 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-- generator:", nameof(SqlParseErrorKind.EmptyGeneratorLine), "-- generator:")]
     [InlineData("-- generator: keep-comments=", nameof(SqlParseErrorKind.InvalidMarkerValue), "keep-comments=")]
     [InlineData(
-        "-- generator: no-token-validation no-token-validation=off",
+        "-- generator: token-validation=off token-validation",
         nameof(SqlParseErrorKind.ConflictingSettings),
-        "no-token-validation=off"
+        "token-validation"
     )]
     public void Parse_GeneratorParameterProblem_IsReportedAtItsPlaceInTheFile(string line, string kind, string place)
     {
@@ -72,7 +75,7 @@ public sealed class SqlFileParserMarkerTests
         var error = Errors(text).ShouldHaveSingleItem();
 
         error.Kind.ToString().ShouldBe(kind);
-        error.Span.ShouldBe(TextSpans.Of(text, place));
+        error.Span.ShouldBe(TextSpans.Of(text, place, last: true));
     }
 
     // A comment that has the form of a marker is one, whatever its author meant by it.

@@ -6,7 +6,7 @@ using Consumer;
 // A constant: the generator was loaded, and the package handed the .sql files to the compiler.
 Console.WriteLine($"constant: {Queries.GetUser}");
 
-// sqlsource.json sets the project's generator parameters, to a list whose second word is no-token-validation.
+// sqlsource.json sets the project's generator parameters, to a list whose second word is token-validation=off.
 // Without it, the empty argument throws.
 Console.WriteLine($"validation off: {Queries.ListUsers("users", "")}");
 

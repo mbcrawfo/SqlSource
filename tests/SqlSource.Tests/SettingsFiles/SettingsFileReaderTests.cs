@@ -63,7 +63,11 @@ public sealed class SettingsFileReaderTests
         file.Root.ShouldBe(true);
         file.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.PostgreSql, SqlDialectOptions.None));
         file.Level.Parameters.Resolve()
-            .ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.AsyncMethodSuffix);
+            .ShouldBe(
+                GeneratorParameterList.Defaults
+                    | GeneratorParameters.KeepComments
+                    | GeneratorParameters.AsyncMethodSuffix
+            );
         file.Level.TypeOverrides[DatabaseEngine.PostgreSql]
             .ShouldNotBeNull()
             .ShouldBe([
@@ -271,7 +275,9 @@ public sealed class SettingsFileReaderTests
         var parameters = SettingsFileReader.Read(Parameters, Place);
         var overrides = SettingsFileReader.Read(Overrides, Place);
 
-        parameters.Level.Parameters.Resolve().ShouldBe(GeneratorParameters.KeepComments);
+        parameters
+            .Level.Parameters.Resolve()
+            .ShouldBe(GeneratorParameterList.Defaults | GeneratorParameters.KeepComments);
         parameters.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.WrongType,
@@ -354,7 +360,7 @@ public sealed class SettingsFileReaderTests
 
         empty.Errors.ShouldBeEmpty();
         empty.Level.ShouldBeSameAs(SettingsLevel.None);
-        misspelt.Level.Parameters.Resolve().ShouldBe(GeneratorParameters.SortInput);
+        misspelt.Level.Parameters.Resolve().ShouldBe(GeneratorParameterList.Defaults | GeneratorParameters.SortInput);
         misspelt.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.InvalidValue,

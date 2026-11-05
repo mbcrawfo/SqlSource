@@ -25,12 +25,12 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // they are read.  It reads them into what the
 // generated method does, so there are two pairs: SearchAccounts, which reads its rows into the pooled buffer, against a
 // hand-written method that reads them into RowBufferByHand of this project, the same buffer by hand; and
-// SearchAccountsUnpooled, a copy of the query under no-array-pool, which reads them into a List, against a hand-written
+// SearchAccountsUnpooled, a copy of the query with array-pool=off, which reads them into a List, against a hand-written
 // method that does the same.  The copy is a query of its own because a query has one set of generator parameters, and
 // VariantCopyTests holds its SQL to SearchAccounts'.  The
 // numbers queries of RowBufferQueries have a pair of each kind for the List, IList, ICollection and ImmutableArray, at
 // 3 rows: the pooled method against rows read into RowBufferByHand and copied by ToList or ToImmutableArray, and its
-// twin under no-array-pool against a List that is returned as it is or an ImmutableArray builder that is drained, since
+// twin with array-pool=off against a List that is returned as it is or an ImmutableArray builder that is drained, since
 // those are what the generated method returns.  Three more tests hold the pooled NumbersAsArray, NumbersAsList and
 // NumbersAsImmutableArray, at 300 rows, to allocating less than a List copied to an array, a List grown by doubling and
 // an ImmutableArray builder that is drained, each by at least a given number of bytes, since a pooled buffer exists to
@@ -66,7 +66,7 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     // The bytes a call of the generated method may allocate over the hand-written one's, by the commonest difference of
     // a pair, the same for every pair.  It was 0 for all ten pairs, SearchAccounts and SearchAccountsUnpooled and the
     // eight of the numbers queries, NumbersAsList, IList, ICollection and ImmutableArray through the pool and under
-    // no-array-pool, on both connections, on every one of six runs when this was set, three on SQL Server 2025 and
+    // array-pool=off, on both connections, on every one of six runs when this was set, three on SQL Server 2025 and
     // three on 2017.  (The numbers pairs were 8 while their hand-written methods took the count and not the input model
     // that the generated methods take; given the model, they fell to 0.)  It does not move with the driver's share of
     // a call or with another thread's work.  The streaming StreamAccounts allocated about 5.0 KB a call on an open
@@ -196,7 +196,7 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     [Theory]
     [InlineData(ConnectionState.Closed)]
     [InlineData(ConnectionState.Open)]
-    public async Task SearchAccountsUnpooled_UnderNoArrayPool_AllocatesNoMoreThanByHand(ConnectionState state)
+    public async Task SearchAccountsUnpooled_UnderArrayPoolOff_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(sqlServer.ConnectionString);
@@ -955,7 +955,7 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         }
     }
 
-    // NumbersNoPoolAsList of Queries/RowBuffers.sql under no-array-pool, by hand, the rows into a List that is
+    // NumbersNoPoolAsList of Queries/RowBuffers.sql under array-pool=off, by hand, the rows into a List that is
     // returned, as NumbersNoPoolAsIList and NumbersNoPoolAsICollection read them too.
     private static async Task<List<CountedNumber>> NumbersAsListUnpooledByHandAsync(
         DbConnection connection,
@@ -1041,7 +1041,7 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         }
     }
 
-    // NumbersNoPoolAsImmutableArray of Queries/RowBuffers.sql under no-array-pool, by hand, the rows into a builder
+    // NumbersNoPoolAsImmutableArray of Queries/RowBuffers.sql under array-pool=off, by hand, the rows into a builder
     // that is drained.
     private static async Task<ImmutableArray<CountedNumber>> NumbersAsImmutableArrayUnpooledByHandAsync(
         DbConnection connection,

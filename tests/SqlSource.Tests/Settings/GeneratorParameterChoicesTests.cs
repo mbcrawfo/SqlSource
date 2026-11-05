@@ -36,6 +36,28 @@ public sealed class GeneratorParameterChoicesTests
             .ShouldBe((GeneratorParameterList.Defaults & GeneratorParameters.KeepComments) != 0);
 
     [Fact]
+    public void With_Default_OfAnOnByDefaultParameter_TurnsItOn() =>
+        GeneratorParameterChoices
+            .None.With(GeneratorParameters.ArrayPool, GeneratorParameterState.Default)
+            .StateOf(GeneratorParameters.ArrayPool)
+            .ShouldBe(true);
+
+    [Fact]
+    public void Reset_Resolves_ToTheDefaults() =>
+        GeneratorParameterChoices
+            .Reset.Resolve()
+            .ShouldBe(
+                GeneratorParameters.TokenValidation | GeneratorParameters.TableModels | GeneratorParameters.ArrayPool
+            );
+
+    [Fact]
+    public void Reset_Over_AnOffBelow_TurnsItBackOn() =>
+        GeneratorParameterChoices
+            .Reset.Over(GeneratorParameterChoices.None.With(GeneratorParameters.ArrayPool, GeneratorParameterState.Off))
+            .StateOf(GeneratorParameters.ArrayPool)
+            .ShouldBe(true);
+
+    [Fact]
     public void StateOf_NotNamed_IsNull() =>
         GeneratorParameterChoices.None.StateOf(GeneratorParameters.KeepComments).ShouldBeNull();
 

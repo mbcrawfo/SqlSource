@@ -12,12 +12,12 @@ namespace SqlSource.Tests.Generator;
 // the project's settings file through the settings file of the file's folder and the file header to the query's
 // markers, turns the options it names on or off, or gives them their default, over the levels before it, and default
 // alone gives every option its default at its level.  Two parameters change a query's generated code, keep-comments
-// its SQL and no-token-validation its method's checks, and each row shows both.
+// its SQL and token-validation=off its method's checks, and each row shows both.
 public sealed class GeneratorParameterLevelTests
 {
-    private const string On = "keep-comments no-token-validation";
+    private const string On = "keep-comments token-validation=off";
 
-    private const string Off = "keep-comments=off no-token-validation=off";
+    private const string Off = "keep-comments=off token-validation";
 
     private const string Other = "sort-input";
 

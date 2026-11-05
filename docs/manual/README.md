@@ -61,8 +61,8 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Settings, and an error for a value that is wrong | Available | [Settings](settings.md#all-settings) |
 | Settings files: `sqlsource.json` in a folder, for it and every folder below | Available | [Settings files](settings.md#settings-files) |
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
-| The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
-| The settings for query methods: collection type, and the generator parameters `async-method-suffix` and `no-array-pool` | Available | [All settings](settings.md#all-settings) |
+| The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `table-models` | Available | [All settings](settings.md#all-settings) |
+| The settings for query methods: collection type, and the generator parameters `async-method-suffix` and `array-pool` | Available | [All settings](settings.md#all-settings) |
 | Where each query's members go and how visible they are: member location, visibility and nested class, in markers and settings files | Available | [Where the members go](settings.md#setting-member-location) |
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |

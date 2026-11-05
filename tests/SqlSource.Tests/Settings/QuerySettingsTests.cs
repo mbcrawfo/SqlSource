@@ -25,7 +25,9 @@ public sealed class QuerySettingsTests
     {
         var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
 
-        settings.Parameters.ShouldBe(GeneratorParameters.None);
+        settings.Parameters.ShouldBe(
+            GeneratorParameters.TokenValidation | GeneratorParameters.TableModels | GeneratorParameters.ArrayPool
+        );
         settings.KeepComments.ShouldBeFalse();
         settings.ValidateTokens.ShouldBeTrue();
         settings.UseArrayPool.ShouldBeTrue();
@@ -37,7 +39,9 @@ public sealed class QuerySettingsTests
         QuerySettings.Resolve(SettingsLevel.None, Keep).KeepComments.ShouldBeTrue();
         QuerySettings
             .Resolve(Sort, Keep)
-            .Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.SortInput);
+            .Parameters.ShouldBe(
+                GeneratorParameterList.Defaults | GeneratorParameters.KeepComments | GeneratorParameters.SortInput
+            );
     }
 
     [Fact]
@@ -49,7 +53,7 @@ public sealed class QuerySettingsTests
         var settings = QuerySettings.Resolve(off, file);
 
         settings.KeepComments.ShouldBeFalse();
-        settings.Parameters.ShouldBe(GeneratorParameters.SortInput);
+        settings.Parameters.ShouldBe(GeneratorParameterList.Defaults | GeneratorParameters.SortInput);
     }
 
     [Fact]
@@ -59,15 +63,15 @@ public sealed class QuerySettingsTests
             .Parameters.ShouldBe(GeneratorParameterList.Defaults);
 
     [Fact]
-    public void Resolve_NoTokenValidation_TurnsValidationOff() =>
+    public void Resolve_TokenValidationOff_TurnsValidationOff() =>
         QuerySettings
-            .Resolve(Turn(GeneratorParameters.NoTokenValidation, GeneratorParameterState.On), Keep)
+            .Resolve(Turn(GeneratorParameters.TokenValidation, GeneratorParameterState.Off), Keep)
             .ValidateTokens.ShouldBeFalse();
 
     [Fact]
-    public void Resolve_NoArrayPool_TurnsThePoolOff() =>
+    public void Resolve_ArrayPoolOff_TurnsThePoolOff() =>
         QuerySettings
-            .Resolve(Turn(GeneratorParameters.NoArrayPool, GeneratorParameterState.On), Keep)
+            .Resolve(Turn(GeneratorParameters.ArrayPool, GeneratorParameterState.Off), Keep)
             .UseArrayPool.ShouldBeFalse();
 
     [Fact]

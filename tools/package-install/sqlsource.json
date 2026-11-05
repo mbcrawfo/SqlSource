@@ -10,5 +10,5 @@
   // Their members are on the type itself, Queries, which Program.cs reads, in place of its nested class Sql.
   "memberLocation": "class",
   // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.
-  "generatorParameters": ["sort-input", "no-token-validation"],
+  "generatorParameters": ["sort-input", "token-validation=off"],
 }

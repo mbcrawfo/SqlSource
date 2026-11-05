@@ -271,12 +271,12 @@ public sealed class SettingsFileTests
         ModelFiles(run).ShouldBe(["App.GetUserParams-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
     }
 
-    // The nearer file names no-token-validation alone, so the farther file's keep-comments still reaches the query.
+    // The nearer file names token-validation=off alone, so the farther file's keep-comments still reaches the query.
     [Fact]
     public void Run_GeneratorParametersOfANearerFile_MergeOverTheFartherPerParameter()
     {
         var type = RunUnderFarther( /*lang=json,strict*/
-            """{"generatorParameters":["no-token-validation"]}"""
+            """{"generatorParameters":["token-validation=off"]}"""
         );
 
         type.ShouldContain(KeptConstant);
@@ -296,15 +296,15 @@ public sealed class SettingsFileTests
         type.ShouldNotContain("ThrowIfNullOrWhiteSpace");
     }
 
-    // The query Kept and the query ListFrom with a token, under a farther file that turns keep-comments and
-    // no-token-validation on, and a nearer one of this text.
+    // The query Kept and the query ListFrom with a token, under a farther file that turns keep-comments on and
+    // token-validation off, and a nearer one of this text.
     private static string RunUnderFarther(string nearer)
     {
         var run = Run(
             null,
             GeneratorHarness.SettingsFile(
                 FartherSettingsPath, /*lang=json,strict*/
-                """{"generatorParameters":["keep-comments", "no-token-validation"]}"""
+                """{"generatorParameters":["keep-comments", "token-validation=off"]}"""
             ),
             GeneratorHarness.SettingsFile(SettingsPath, nearer),
             new SqlFile(QueryPath, Kept + "\n-- name: ListFrom\nSELECT * FROM {{table}};\n")

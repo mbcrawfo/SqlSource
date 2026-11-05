@@ -147,14 +147,14 @@ public sealed class SqlFileReaderTests
     public void Read_ValidationGeneratorParameters_GiveEachQueryTheFilesOrItsOwnDefault()
     {
         const string Text =
-            "-- generator: no-token-validation\n-- name: FromFile\nSELECT {{a}};\n"
+            "-- generator: token-validation=off\n-- name: FromFile\nSELECT {{a}};\n"
             + "-- name: Own\n-- generator: default\nSELECT {{b}};\n";
 
         var file = Read(Text);
 
         file.Errors.ShouldBeEmpty();
         file.Queries.Select(query => query.Markers.Parameters)
-            .ShouldBe([TestModels.TurnedOn(GeneratorParameters.NoTokenValidation), GeneratorParameterChoices.Reset]);
+            .ShouldBe([TestModels.TurnedOff(GeneratorParameters.TokenValidation), GeneratorParameterChoices.Reset]);
         Read("SELECT {{a}};\n").Queries.ShouldHaveSingleItem().Markers.ShouldBeSameAs(SettingsLevel.None);
     }
 

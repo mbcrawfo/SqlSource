@@ -31,15 +31,16 @@ internal static class GeneratorParameterList
     /// <summary>Every parameter.</summary>
     public const GeneratorParameters All =
         GeneratorParameters.KeepComments
-        | GeneratorParameters.NoTokenValidation
+        | GeneratorParameters.TokenValidation
         | GeneratorParameters.SortInput
         | GeneratorParameters.SortOutput
-        | GeneratorParameters.NoTableModels
+        | GeneratorParameters.TableModels
         | GeneratorParameters.AsyncMethodSuffix
-        | GeneratorParameters.NoArrayPool;
+        | GeneratorParameters.ArrayPool;
 
-    /// <summary>The parameters that are on when no level says otherwise.  Every parameter is off for now.</summary>
-    public const GeneratorParameters Defaults = GeneratorParameters.None;
+    /// <summary>The parameters that are on when no level says otherwise.</summary>
+    public const GeneratorParameters Defaults =
+        GeneratorParameters.TokenValidation | GeneratorParameters.TableModels | GeneratorParameters.ArrayPool;
 
     /// <summary>
     /// Each name of a parameter, with the parameter.  The schema of a settings file repeats them in its list and its
@@ -48,12 +49,12 @@ internal static class GeneratorParameterList
     internal static readonly (string Name, GeneratorParameters Parameter)[] Names =
     [
         ("keep-comments", GeneratorParameters.KeepComments),
-        ("no-token-validation", GeneratorParameters.NoTokenValidation),
+        ("token-validation", GeneratorParameters.TokenValidation),
         ("sort-input", GeneratorParameters.SortInput),
         ("sort-output", GeneratorParameters.SortOutput),
-        ("no-table-models", GeneratorParameters.NoTableModels),
+        ("table-models", GeneratorParameters.TableModels),
         ("async-method-suffix", GeneratorParameters.AsyncMethodSuffix),
-        ("no-array-pool", GeneratorParameters.NoArrayPool),
+        ("array-pool", GeneratorParameters.ArrayPool),
     ];
 
     private static readonly GeneratorParameterState[] States =

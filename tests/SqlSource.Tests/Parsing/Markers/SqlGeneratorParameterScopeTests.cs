@@ -25,9 +25,11 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData("-- generator: KEEP-COMMENTS=Off", 1, 0)]
     [InlineData("-- generator: keep-comments=ON", 1, 1)]
     [InlineData("-- generator: keep-comments=default", 1, 0)]
-    [InlineData("-- generator: no-array-pool=off", 64, 0)]
-    [InlineData("-- generator: KEEP-COMMENTS No-Token-Validation", 3, 3)]
-    [InlineData("-- generator: sort-input sort-output no-table-models async-method-suffix", 60, 60)]
+    [InlineData("-- generator: token-validation=off", 2, 0)]
+    [InlineData("-- generator: array-pool=OFF table-models=off", 80, 0)]
+    [InlineData("-- generator: array-pool", 64, 64)]
+    [InlineData("-- generator: KEEP-COMMENTS TOKEN-VALIDATION", 3, 3)]
+    [InlineData("-- generator: sort-input sort-output table-models async-method-suffix", 60, 60)]
     [InlineData("-- generator: keep-comments=off sort-input", 5, 4)]
     public void Read_Words_NameTheirStates(string line, int named, int on)
     {
@@ -101,8 +103,11 @@ public sealed class SqlGeneratorParameterScopeTests
     [Theory]
     [InlineData("keep-comment")]
     [InlineData("no-arraypool")]
-    // The word was a generator parameter once: omitting no-token-validation says it now.
-    [InlineData("token-validation")]
+    // The words that turned the three options off before they were named for what they do.
+    [InlineData("no-token-validation")]
+    [InlineData("no-table-models")]
+    [InlineData("no-array-pool")]
+    [InlineData("NO-ARRAY-POOL")]
     [InlineData("preserve-comments")]
     [InlineData("strip-comments")]
     [InlineData("foo=bar")]
