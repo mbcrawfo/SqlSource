@@ -526,7 +526,7 @@ The input model is the parameter object, and the output model is the type of a r
   WHERE c.id = @customerId;
   ```
 
-- **A [list parameter](parameters-and-tokens.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  Dapper sends one parameter for each value of a list on SQL Server, but it rewrites every `@ids` of the query, so `@ids IS NULL` breaks, and it does not expand a null list at all.  On PostgreSQL it sends a list as one array: write `id = ANY(@ids)` there, an [array parameter](postgresql.md#array-parameters).
+- **A [list parameter](parameters-and-tokens.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  Dapper sends one parameter for each value of a list on SQL Server, and a null list as an empty one, but it rewrites every `@ids` of the query: `@ids IS NULL` is an error from two values up, and true for an empty list as for a null one.  On PostgreSQL it sends a list as one array: write `id = ANY(@ids)` there, an [array parameter](postgresql.md#array-parameters).
 
 Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).
 
