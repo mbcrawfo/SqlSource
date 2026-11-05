@@ -23,6 +23,19 @@ internal static class GeneratorParameterList
     /// <summary>The word that stands for the empty list.</summary>
     public const string Default = "default";
 
+    /// <summary>Every parameter.</summary>
+    public const GeneratorParameters All =
+        GeneratorParameters.KeepComments
+        | GeneratorParameters.NoTokenValidation
+        | GeneratorParameters.SortInput
+        | GeneratorParameters.SortOutput
+        | GeneratorParameters.NoTableModels
+        | GeneratorParameters.AsyncMethodSuffix
+        | GeneratorParameters.NoArrayPool;
+
+    /// <summary>The parameters that are on when no level says otherwise.  Every parameter is off for now.</summary>
+    public const GeneratorParameters Defaults = GeneratorParameters.None;
+
     /// <summary>
     /// Each name of a parameter, with the parameter.  The schema of a settings file repeats them in its list and its
     /// patterns, and a test compares the two.
