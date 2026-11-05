@@ -246,8 +246,6 @@ internal static class CorpusUserWords
         "databases",
         // The column job_id of msdb.dbo.sysjobs.
         "job_id",
-        // The system procedure sys.sp_executesql.
-        "sp_executesql",
         // The table msdb.dbo.sysjobs.
         "sysjobs",
     ];

@@ -1125,6 +1125,13 @@ internal static class SqlServerVocabulary
     public static IReadOnlyList<string> SystemDatabases { get; } =
     ["master", "model", "msdb", "mssqlsystemresource", "tempdb"];
 
+    // Written by hand on 2026-11-05.
+    /// <summary>
+    /// The system procedure of dynamic SQL, which a query calls by name.  Any other system procedure is renamed,
+    /// which is safe.
+    /// </summary>
+    public static IReadOnlyList<string> SystemProcedures { get; } = ["sp_executesql"];
+
     // Built last, since the static fields initialize in the order of the file.
     private static readonly FrozenSet<string> Folded = Reserved
         .Concat(Odbc)
@@ -1136,6 +1143,7 @@ internal static class SqlServerVocabulary
         .Concat(Types)
         .Concat(Schemas)
         .Concat(SystemDatabases)
+        .Concat(SystemProcedures)
         .Append(HiddenRow)
         .Select(Fold)
         .ToFrozenSet(StringComparer.Ordinal);
