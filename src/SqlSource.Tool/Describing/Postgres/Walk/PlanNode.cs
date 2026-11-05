@@ -61,8 +61,11 @@ internal sealed record PlanNode(
     IReadOnlyList<PlanNode> Plans
 )
 {
-    // Each node is two levels of the text, and the reader's own limit of 64 would refuse a plan of thirty.
-    private const int MaxDepth = 512;
+    /// <summary>
+    /// The depth of JSON a plan's text is read to.  Each node is two levels of the text, and the reader's own limit of
+    /// 64 would refuse a plan of thirty.
+    /// </summary>
+    public const int MaxDepth = 512;
 
     /// <summary>
     /// The root of the plan a <c>Subquery Scan</c> scans, its one child whose <c>Parent Relationship</c> is

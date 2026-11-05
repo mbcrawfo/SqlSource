@@ -5,36 +5,50 @@ using SqlSource.Tool.Bundles.Renaming;
 namespace SqlSource.Tool.Tests;
 
 /// <summary>
-/// A scope of the renaming for testing an engine's part alone: a name is its class's prefix and its spelling, a
-/// literal <c>l_</c> and its content, a parameter <c>p_</c> and its name, and a refusal is recorded.
+/// A scope of the renaming for testing an engine's part alone: a name is the prefix of the class it is first named in
+/// and its spelling, a literal <c>l_</c> and its content, a parameter <c>p_</c> and its name, and a refusal is
+/// recorded.
 /// </summary>
 /// <remarks>
 /// A spelling kept through <see cref="Keep" />, or one that <c>isEngineWord</c> says is the engine's, is its own.
-/// Spellings are compared as given, without the engine's fold.
+/// Spellings are compared as given, each with its quoting, or as <c>fold</c> folds them when it is given, and a name
+/// is then the prefix and the folded spelling.
 /// </remarks>
-internal sealed class FakeRenamingScope(Func<string, bool, bool>? isEngineWord = null) : IRenamingScope
+internal sealed class FakeRenamingScope(
+    Func<string, bool, bool>? isEngineWord = null,
+    Func<string, bool, string>? fold = null
+) : IRenamingScope
 {
     private readonly HashSet<(string Spelling, bool Quoted)> _kept = [];
-    private readonly HashSet<(string Spelling, bool Quoted)> _named = [];
+    private readonly Dictionary<(string Spelling, bool Quoted), string> _named = [];
 
     /// <summary>The refusals made, in order.</summary>
     public List<RenamingRefusal> Refusals { get; } = [];
 
     public string Name(string spelling, bool quoted, NameClass cls)
     {
-        if (_kept.Contains((spelling, quoted)) || (isEngineWord?.Invoke(spelling, quoted) ?? false))
+        var key = KeyOf(spelling, quoted);
+        if (_kept.Contains(key) || (isEngineWord?.Invoke(spelling, quoted) ?? false))
         {
             return spelling;
         }
 
-        _ = _named.Add((spelling, quoted));
-        return NameClasses.PrefixOf(cls) + spelling;
+        if (!_named.TryGetValue(key, out var replacement))
+        {
+            replacement = NameClasses.PrefixOf(cls) + key.Spelling;
+            _named.Add(key, replacement);
+        }
+
+        return replacement;
     }
 
-    public void Keep(string spelling, bool quoted) => _ = _kept.Add((spelling, quoted));
+    public void Keep(string spelling, bool quoted) => _ = _kept.Add(KeyOf(spelling, quoted));
 
-    public bool IsMapped(string spelling, bool quoted) =>
-        _kept.Contains((spelling, quoted)) || _named.Contains((spelling, quoted));
+    public bool IsMapped(string spelling, bool quoted)
+    {
+        var key = KeyOf(spelling, quoted);
+        return _kept.Contains(key) || _named.ContainsKey(key);
+    }
 
     public string Literal(string content) => NameClasses.PrefixOf(NameClass.Literal) + content;
 
@@ -44,4 +58,8 @@ internal sealed class FakeRenamingScope(Func<string, bool, bool>? isEngineWord =
     public string Parameter(string name) => NameClasses.PrefixOf(NameClass.Parameter) + name;
 
     public void Refuse(RenamingRefusal refusal) => Refusals.Add(refusal);
+
+    // A folded spelling is one name whatever its quoting, as the engine compares it.
+    private (string Spelling, bool Quoted) KeyOf(string spelling, bool quoted) =>
+        fold is null ? (spelling, quoted) : (fold(spelling, quoted), true);
 }
