@@ -16,9 +16,9 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // The type map through the generated methods and through Dapper.  The read side: both rows of all_types into
 // AllTypesDto, every column of each, by AllTypesQueries' method and by the constant of its copy ListAllTypesForDapper
 // through Dapper.  The write side of InsertAllTypes: a row inserted with InsertAllTypesArgs, built from the values of
-// row 1, and read back by RETURNING, for every type that Dapper can send, by its method and by its constant through
-// Dapper.  Each insert runs in a transaction that is rolled back.  EveryTypeTests writes every column through
-// InsertEveryType's method.
+// row 1, and read back by RETURNING, for every type that Dapper can send, by its method, and with
+// InsertAllTypesForDapperArgs, whose arrays are arrays, by the constant of its copy through Dapper.  Each insert runs
+// in a transaction that is rolled back.  EveryTypeTests writes every column through InsertEveryType's method.
 [Collection(UsesPostgres.Name)]
 public sealed class AllTypesQueryTests(PostgresDatabases postgres)
 {
@@ -164,7 +164,7 @@ public sealed class AllTypesQueryTests(PostgresDatabases postgres)
 
             var row = await connection.QuerySingleAsync<AllTypesDto>(
                 AllTypesQueries.InsertAllTypesForDapper,
-                AllTypesRows.ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
+                AllTypesRows.ArgsFrom<InsertAllTypesForDapperArgs>(full, InsertedId),
                 transaction
             );
 

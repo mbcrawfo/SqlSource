@@ -545,10 +545,11 @@ public sealed class MethodTests
     }
 
     // A PostgreSQL parameter is a parameter of Npgsql of the type of the value bound, by the canonical name of the type
-    // the entry describes it by: the database's type for a converted one.
+    // the entry describes it by: the database's type for a converted one, and an IList of its element for an array,
+    // which its property holds as any sequence.
     [Theory]
     [InlineData("base", "int", "pg_catalog.int4")]
-    [InlineData("array", "int[]", "pg_catalog._int4")]
+    [InlineData("array", "global::System.Collections.Generic.IList<int>", "pg_catalog._int4")]
     [InlineData("enum", "string", "public.mood")]
     [InlineData("domain", "string", "public.email")]
     [InlineData("range", "global::NpgsqlTypes.NpgsqlRange<int>", "pg_catalog.int4range")]

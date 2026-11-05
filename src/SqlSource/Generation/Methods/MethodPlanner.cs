@@ -526,7 +526,8 @@ internal static class MethodPlanner
                     property.Type.IsValueType,
                     property.IsNullable,
                     write,
-                    models.ParameterTypes?[index]
+                    models.ParameterTypes?[index],
+                    property.Sequence
                 )
             );
         }

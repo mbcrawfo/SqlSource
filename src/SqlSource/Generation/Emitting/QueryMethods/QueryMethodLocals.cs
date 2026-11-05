@@ -34,7 +34,7 @@ internal sealed class QueryMethodLocals
         Parameter = names.Take("parameter");
         var byElement = HasByElement(input, output);
         ConversionNames = new ConversionNames(
-            HasWrite(input) ? names.Take("value") : string.Empty,
+            MatchesAValue(input) ? names.Take("value") : string.Empty,
             byElement ? names.Take("element") : string.Empty,
             byElement ? names.Take("item") : string.Empty
         );
@@ -115,8 +115,11 @@ internal sealed class QueryMethodLocals
     // The exception that the catch of a method that checks for a rollback takes.
     public string Exception { get; }
 
-    private static bool HasWrite(MethodInput? input) =>
-        input is not null && input.Parameters.Any(static parameter => parameter.Write is not null);
+    // Whether a parameter's binding matches its value as one that can be null: one bound through a converter, or an
+    // array that its property holds as any sequence.
+    private static bool MatchesAValue(MethodInput? input) =>
+        input is not null
+        && input.Parameters.Any(static parameter => parameter.Write is not null || parameter.IsArraySequence);
 
     private static bool HasByElement(MethodInput? input, MethodOutput? output) =>
         (input is not null && input.Parameters.Any(static parameter => parameter.Write is { IsByElement: true }))

@@ -857,6 +857,38 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBe(["App.Event-Model.g.cs"]);
     }
 
+    // A type at CodeGen and a type at Models, each with a query whose @ids is an integer[], of one input model name.
+    // The array is an IEnumerable<int> at CodeGen and an int[] at Models, so the two models of one name differ.
+    [Fact]
+    public void SharedInputModel_CodeGenAndModelsWithAnArrayParameter_IsSqlsrc257()
+    {
+        var ids = ArrayOf(Int4, "_int4");
+        var a = new SqlFile(
+            APath,
+            "-- output: codegen\n\n-- name: FindA\n-- input-model: IdFilter\nSELECT 1 WHERE 1 = ANY (@ids);\n"
+        );
+        var b = new SqlFile(BPath, "-- name: FindB\n-- input-model: IdFilter\nSELECT 1 WHERE 1 = ANY (@ids);\n");
+
+        var run = Run(
+            TwoOutputsSource,
+            [
+                a,
+                Sidecars.Of(a, Entry(a, "FindA", [Parameter("ids", ids, false)], null)),
+                b,
+                Sidecars.Of(b, Entry(b, "FindB", [Parameter("ids", ids, false)], null)),
+            ]
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC257 /app/Repo/B.sql(2,1)-(2,25): The input model 'App.IdFilter' of the query 'FindB' is not the "
+                + "same as the input model of that name of the query 'FindA' in A.sql: the property 'Ids' is 'int[]' "
+                + $"here and 'System.Collections.Generic.IEnumerable<int>' there.{Help257}",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBe(["App.IdFilter-Model.g.cs"]);
+    }
+
     // GetA in A and GetB in B, each with the -- output-model: marker of the name, then the markers given.
     private static (SqlFile A, SqlFile B) OfOneName(string aMarkers, string bMarkers, string name = "UserRow") =>
         (

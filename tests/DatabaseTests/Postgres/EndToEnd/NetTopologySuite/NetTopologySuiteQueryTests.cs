@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NetTopologySuite.Geometries;
@@ -209,7 +210,17 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
         ];
 
         ModelReflection.TypedPropertiesOf(typeof(SpatialValuesDto)).ShouldBe(properties);
-        ModelReflection.TypedPropertiesOf(typeof(InsertSpatialValuesArgs)).ShouldBe(properties);
+
+        // The input model holds an array as any sequence.
+        ModelReflection
+            .TypedPropertiesOf(typeof(InsertSpatialValuesArgs))
+            .ShouldBe(
+                properties.Select(static property =>
+                    property.Type == typeof(Geometry[])
+                        ? (property.Name, typeof(IEnumerable<Geometry>), true)
+                        : property
+                )
+            );
         ModelReflection.TypedPropertiesOf(typeof(GetPointValueDto)).ShouldBe([("PointValue", typeof(Point), true)]);
         ModelReflection
             .TypedPropertiesOf(typeof(GetPolygonValueDto))
@@ -217,7 +228,8 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
     }
 
     // The SRID of each geometry of a row or of its arguments, by the name of its property and the index of an array's
-    // element, -1 for a value of its own, since Equals does not compare it.  A NULL element has none.
+    // element, or of any sequence's that the arguments hold, -1 for a value of its own, since Equals does not compare
+    // it.  A NULL element has none.
     private static (string Property, int Index, int? Srid)[] SridsOf(object model) =>
         [
             .. ModelReflection
@@ -226,7 +238,9 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
                     property.GetValue(model) switch
                     {
                         Geometry geometry => [(property.Name, -1, geometry.SRID)],
-                        Geometry[] array => array.Select((element, index) => (property.Name, index, element?.SRID)),
+                        IEnumerable<Geometry?> elements => elements.Select(
+                            (element, index) => (property.Name, index, element?.SRID)
+                        ),
                         _ => [],
                     }
                 ),

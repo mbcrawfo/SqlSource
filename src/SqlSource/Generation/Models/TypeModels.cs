@@ -194,7 +194,7 @@ internal static class TypeModels
         var isSorted = (settings.Parameters & parameter) != 0;
         if (settings.Output != OutputKind.CodeGen)
         {
-            properties = WithoutLibrary(properties);
+            properties = ForOtherOutputs(properties);
         }
 
         return new ModelRequest(
@@ -223,15 +223,23 @@ internal static class TypeModels
 
     // Typing runs once for a file, whatever the output of the types that claim it, and a column or parameter that a
     // library's row types has the type it has without the library beside it.  Only CodeGen reads and writes the
-    // library's type, through the driver's plugin, so a model of any other output has the base map's.  Nothing is
-    // allocated when no property has a library's type.
-    private static EquatableArray<ModelProperty> WithoutLibrary(EquatableArray<ModelProperty> properties)
+    // library's type, through the driver's plugin, so a model of any other output has the base map's.  Only CodeGen's
+    // method sends an array parameter from any sequence too, so at any other output, where a library such as Dapper
+    // hands the value to Npgsql as it is, the property is the array.  A list parameter is a sequence at every output.
+    // Nothing is allocated when no property changes.
+    private static EquatableArray<ModelProperty> ForOtherOutputs(EquatableArray<ModelProperty> properties)
     {
         ImmutableArray<ModelProperty>.Builder? picked = null;
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            if (property.Type.WithoutLibrary is not { } baseType)
+            var isArray = property.Sequence switch
+            {
+                ParameterSequence.Array => true,
+                ParameterSequence.None or ParameterSequence.List => false,
+                _ => throw UnexpectedEnumValueException.Of(property.Sequence),
+            };
+            if (property.Type.WithoutLibrary is null && !isArray)
             {
                 picked?.Add(property);
                 continue;
@@ -246,7 +254,13 @@ internal static class TypeModels
                 }
             }
 
-            picked.Add(property with { Type = baseType });
+            picked.Add(
+                property with
+                {
+                    Type = property.Type.WithoutLibrary ?? property.Type,
+                    Sequence = isArray ? ParameterSequence.None : property.Sequence,
+                }
+            );
         }
 
         return picked is null ? properties : new EquatableArray<ModelProperty>(picked.MoveToImmutable());

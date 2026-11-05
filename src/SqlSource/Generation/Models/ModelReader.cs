@@ -6,6 +6,7 @@ using System.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Types;
+using SqlSource.Parsing;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
@@ -264,7 +265,8 @@ internal static class ModelReader
                     parameter.Nullable == true,
                     ParameterDocumentation(parameter, reading.Text),
                     MessageSubject.Of(MessageSubject.Parameter, parameter.Name),
-                    false
+                    false,
+                    IsArraySequence(parameter, types[index], query) ? ParameterSequence.Array : ParameterSequence.None
                 )
             );
         }
@@ -317,6 +319,20 @@ internal static class ModelReader
 
         return new EquatableArray<ModelProperty>(properties.ToImmutable());
     }
+
+    // Whether a CodeGen method sends the parameter from any sequence: a PostgreSQL array, or a domain over one, whose
+    // C# type is an array of one rank, E[], that the type map, a library or the type override gave.  A C# type that the
+    // parameter's -- param: marker names after -> is taken as written, the marker found as the typing finds it, by
+    // its name ignoring case.  bytea is no array of the database's, and a multirange is an array of the C# alone.
+    private static bool IsArraySequence(SidecarParameter parameter, PropertyType type, SqlQuery query) =>
+        parameter.Type is { } described
+        && IsArrayType(described)
+        && type.Text.EndsWith("[]", StringComparison.Ordinal)
+        && type.Text.IndexOf("[,", StringComparison.Ordinal) < 0
+        && !(
+            SqlParameterName.IndexOf(query.Parameters, parameter.Name.AsSpan()) is >= 0 and var declared
+            && query.Parameters[declared].ClrType is not null
+        );
 
     // Whether Npgsql reads the type as an array, which is also how it reads a domain whose base type is one.
     private static bool IsArrayType(SidecarType type) =>

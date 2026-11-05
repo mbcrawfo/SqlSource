@@ -117,7 +117,7 @@ The queries are in `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/`, `EndToEnd/
 | `Shapes.sql` | `ShapeQueries` | The shapes, the suffixes and the model namespace by the file header and by markers, `sort-input` and `sort-output`, a model of another namespace, the methods on the type, public, by the file header's `-- member-location: class` and `-- visibility: public`, and the collection type `List` by the file header and `IReadOnlyList` by a query's marker |
 | `Streaming.sql` | `StreamingQueries` | The collection type `IAsyncEnumerable` by the file header, so that each `many` query is a method that returns a stream: one with no parameter, one with parameters, one with a token, a `NOT NULL` column that holds a `NULL` at its third row, many rows for a break and a cancellation partway through, and a million sorted numbers whose row of 500,000 divides by zero, with the division above the subquery that sorts them, since PostgreSQL computes the columns of a query before its own sort, and `StreamThenRaise`, the accounts and then a division by zero after them, as `Methods.sql`'s `ListThenRaise` |
 
-Every query writes its parameters in camelCase, `@accountId`, so that an input model binds through Dapper as the manual's recipe says, as `InsertAllTypesArgs` does in the Dapper test of `InsertAllTypes`; the methods bind a parameter of any name.
+Every query writes its parameters in camelCase, `@accountId`, so that an input model binds through Dapper as the manual's recipe says, as `InsertAllTypesForDapperArgs` does in the Dapper test of `InsertAllTypes`; the methods bind a parameter of any name.
 
 ### The tests
 
