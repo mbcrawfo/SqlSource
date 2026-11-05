@@ -49,8 +49,9 @@ internal interface IEngineRenaming
     /// <summary>
     /// The rule of a string member of a call, by the call's method (<c>open</c>, <c>prepare</c>, ...) and the member's
     /// path from the call (<c>request.sql</c>, <c>answer.rows[].name</c>, <c>answer.error.message</c>), or of a member
-    /// of the entry, by the method <see cref="BundleFiles.Expected" /> and its path from the entry's type record
-    /// (<c>columns[].type.name</c>).  An element of an array is <c>[]</c> in the path.
+    /// of a type record of the entry, by the method <see cref="BundleFiles.Expected" /> and its path from the entry
+    /// (<c>columns[].type.name</c>, <c>parameters[].type.element.name</c>): the entry's other members are the
+    /// renaming's.  An element of an array is <c>[]</c> in the path.
     /// </summary>
     /// <returns>
     /// The rule, or null when the member has none: the renaming refuses a string with none, so every member the

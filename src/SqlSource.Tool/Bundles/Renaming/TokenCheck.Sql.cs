@@ -1,0 +1,206 @@
+using System;
+using SqlSource.Parsing;
+using SqlSource.Parsing.Markers;
+
+namespace SqlSource.Tool.Bundles.Renaming;
+
+internal sealed partial class TokenCheck
+{
+    // SQL, lexeme by lexeme and word by word as the SQL renamer reads it.  In query.sql a marker's value is checked by
+    // its kind.
+    private void Sql(string text, string place, bool queryFile)
+    {
+        var lexed = SqlLexer.Lex(text, _rules);
+        if (lexed.Error is { } error)
+        {
+            Refuse(place, text.Substring(error.Span.Start, error.Span.Length));
+            return;
+        }
+
+        var lexemes = lexed.Lexemes;
+        for (var index = 0; index < lexemes.Count; index++)
+        {
+            var lexeme = lexemes[index];
+            var (start, end) = (lexeme.Span.Start, lexeme.Span.End);
+            switch (lexeme.Kind)
+            {
+                case SqlLexemeKind.Text:
+                    var quoteFollows = index + 1 < lexemes.Count && lexemes[index + 1].Kind == SqlLexemeKind.Quoted;
+                    Words(text, start, end, quoteFollows, place);
+                    break;
+                case SqlLexemeKind.Quoted:
+                    Quoted(text, start, end, place);
+                    break;
+                case SqlLexemeKind.Parameter:
+                    var name = text.Substring(lexeme.ParameterName.Start, lexeme.ParameterName.Length);
+                    Whole(IsParameter(name), place, name);
+                    break;
+                case SqlLexemeKind.LineComment:
+                    if (queryFile && SqlMarkerReader.Read(text, lexeme) is { } marker)
+                    {
+                        Marker(text, marker, place);
+                    }
+                    else
+                    {
+                        Words(text, start + (text[start] == '-' ? 2 : 1), end, quoteFollows: false, place);
+                    }
+
+                    break;
+                case SqlLexemeKind.BlockComment:
+                    Words(text, start + 2, end - 2, quoteFollows: false, place);
+                    break;
+                case SqlLexemeKind.Hint:
+                    var isLine = text[start] == '-';
+                    var opener = !isLine && text[start + 2] == 'M' ? 4 : 3;
+                    Words(text, start + opener, end - (isLine ? 0 : 2), quoteFollows: false, place);
+                    break;
+                default:
+                    throw UnexpectedEnumValueException.Of(lexeme.Kind);
+            }
+        }
+    }
+
+    // A marker's value, by its kind; the rest of its line as plain text.
+    private void Marker(string text, SqlMarker marker, string place)
+    {
+        var value = text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
+        switch (marker.Kind)
+        {
+            case SqlMarkerKind.Name:
+                // The result's shape after the arrow is a closed word, which the renaming kept only when it read.
+                var arrow = value.IndexOf("->", StringComparison.Ordinal);
+                var name = arrow < 0 ? value : value[..arrow].TrimEnd();
+                Whole(IsSafe(name, quoted: false), place, name);
+                break;
+            case SqlMarkerKind.Dialect:
+                // A dialect's name, which the renaming kept only when it read.
+                break;
+            case SqlMarkerKind.Database:
+                Name(value, NameClass.Database, place);
+                break;
+            case SqlMarkerKind.Param:
+            case SqlMarkerKind.Token:
+            case SqlMarkerKind.TokenIgnore:
+                Sql(value, place, queryFile: false);
+                break;
+            case SqlMarkerKind.Summary:
+            case SqlMarkerKind.GeneratorParameters:
+            case SqlMarkerKind.Output:
+            case SqlMarkerKind.InputModelSuffix:
+            case SqlMarkerKind.OutputModelSuffix:
+            case SqlMarkerKind.ModelNamespace:
+            case SqlMarkerKind.InputModelType:
+            case SqlMarkerKind.OutputModelType:
+            case SqlMarkerKind.InputModel:
+            case SqlMarkerKind.OutputModel:
+            case SqlMarkerKind.CollectionType:
+            case SqlMarkerKind.TypeOverride:
+            case SqlMarkerKind.Column:
+            case SqlMarkerKind.LibraryTypes:
+            case SqlMarkerKind.MemberLocation:
+            case SqlMarkerKind.Visibility:
+            case SqlMarkerKind.NestedClass:
+                Refuse(place, "-- " + SqlMarkerReader.WordOf(marker.Kind) + ":");
+                break;
+            default:
+                throw UnexpectedEnumValueException.Of(marker.Kind);
+        }
+
+        Words(text, marker.ValueSpan.End, marker.Span.End, quoteFollows: false, place);
+    }
+
+    // Plain text: numbers, white space and punctuation pass, and each word must be safe.
+    private void Words(string text, int start, int end, bool quoteFollows, string place)
+    {
+        var at = start;
+        while (at < end)
+        {
+            var character = text[at];
+            if (char.IsAsciiDigit(character))
+            {
+                at++;
+                while (at < end && (_engine.IsWordPart(text[at]) || text[at] == '.'))
+                {
+                    at++;
+                }
+            }
+            else if (_engine.IsWordStart(character))
+            {
+                var wordStart = at;
+                at++;
+                while (at < end && _engine.IsWordPart(text[at]))
+                {
+                    at++;
+                }
+
+                Word(text, wordStart, at, end, quoteFollows, place);
+            }
+            else if (
+                char.IsWhiteSpace(character) || SqlRenamer.Punctuation.Contains(character, StringComparison.Ordinal)
+            )
+            {
+                at++;
+            }
+            else
+            {
+                var length = char.IsSurrogatePair(text, at) ? 2 : 1;
+                Refuse(place, text.Substring(at, length));
+                at += length;
+            }
+        }
+    }
+
+    // A word: a literal's one-letter prefix passes, and SQL Server's @ and # before a name are punctuation.
+    private void Word(string text, int start, int end, int textEnd, bool quoteFollows, string place)
+    {
+        var rest = textEnd - end;
+        if (
+            quoteFollows
+            && end - start == 1
+            && SqlRenamer.LiteralPrefixes.Contains(text[start], StringComparison.Ordinal)
+            && (rest == 0 || (rest == 1 && text[end] == '&'))
+        )
+        {
+            return;
+        }
+
+        var word = text[start..end];
+        var name = word.TrimStart('@', '#');
+        Whole(name.Length == 0 || IsSafe(word, quoted: false) || IsSafe(name, quoted: false), place, word);
+    }
+
+    // A quoted region: a literal holds a replacement, and a quoted name is a replacement or the engine's.
+    private void Quoted(string text, int start, int end, string place)
+    {
+        switch (text[start])
+        {
+            case '\'':
+                var content = text[(start + 1)..(end - 1)].Replace("''", "'", StringComparison.Ordinal);
+                Whole(_mapping.IsReplacement(content), place, content);
+                break;
+            case '$':
+                var tag = text[start..(text.IndexOf('$', start + 1) + 1)];
+                var inner = text[(start + tag.Length)..(end - tag.Length)];
+                Whole(_mapping.IsReplacement(inner), place, inner);
+                break;
+            case '"':
+                QuotedName(text[(start + 1)..(end - 1)].Replace("\"\"", "\"", StringComparison.Ordinal), place);
+                break;
+            case '[':
+                QuotedName(text[(start + 1)..(end - 1)].Replace("]]", "]", StringComparison.Ordinal), place);
+                break;
+            default:
+                Refuse(place, text[start].ToString());
+                break;
+        }
+    }
+
+    private void QuotedName(string name, string place) =>
+        Whole(
+            name == SqlRenamer.UnnamedColumn
+                || _engine.IsEngineWord(name, quoted: true)
+                || IsSafe(RenamingRun.MarkOf(name).Stem, quoted: true),
+            place,
+            name
+        );
+}

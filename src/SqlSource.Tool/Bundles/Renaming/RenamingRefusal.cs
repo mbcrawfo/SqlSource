@@ -19,7 +19,9 @@ internal enum RefusalStep
 /// <summary>Why a bundle cannot be renamed safely, and where.</summary>
 /// <param name="Step">The step that refused it.</param>
 /// <param name="Place">
-/// Where: a file of the bundle, <c>query.sql</c>, or a member of a call, <c>capture.json call &lt;n&gt; '&lt;method&gt;'
+/// Where: a file of the bundle, <c>query.sql</c>; a call, <c>capture.json call &lt;n&gt; '&lt;method&gt;'</c>, and a
+/// member of it, <c>capture.json call &lt;n&gt; '&lt;method&gt;' &lt;path&gt;</c>; a call the replay asked and the
+/// capture lacks, <c>capture.json call '&lt;method&gt;'</c>; or a member of the entry, <c>expected.json
 /// &lt;path&gt;</c>.
 /// </param>
 /// <param name="Token">The text refused, which is the user's own, or null when the step names none.</param>

@@ -7,8 +7,9 @@ namespace SqlSource.Tool.Bundles.Renaming;
 internal interface IRenamingScope
 {
     /// <summary>
-    /// The replacement of a name, made in the class given if the spelling has none yet; a spelling kept is its own.
-    /// One spelling, as the engine folds it, has one replacement throughout the bundle.
+    /// The replacement of a name, made in the class given if the spelling has none yet; a spelling kept, or one that
+    /// <see cref="IEngineRenaming.IsEngineWord" /> keeps, is its own.  One spelling, as the engine folds it, has one
+    /// replacement throughout the bundle.
     /// </summary>
     string Name(string spelling, bool quoted, NameClass cls);
 

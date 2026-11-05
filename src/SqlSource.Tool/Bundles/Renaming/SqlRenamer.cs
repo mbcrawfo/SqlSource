@@ -22,14 +22,21 @@ internal sealed partial class SqlRenamer(
     IReadOnlySet<string> queryParameters
 )
 {
-    // ASCII operators and delimiters, the only characters kept that are no word, number or white space.
-    private const string Punctuation = "!%&()*+,-./:;<=>?@[]^`{|}~\\$#'\"";
+    /// <summary>
+    /// The ASCII operators and delimiters, the only characters kept that are no word, number or white space.
+    /// </summary>
+    internal const string Punctuation = "!%&()*+,-./:;<=>?@[]^`{|}~\\$#'\"";
 
-    // The letters that, right before a quoted region, are a literal's prefix: E'', N'', B'', X'' and U&''.
-    private const string LiteralPrefixes = "EeNnBbXxUu";
+    /// <summary>
+    /// The letters that, right before a quoted region, are a literal's prefix: <c>E''</c>, <c>N''</c>, <c>B''</c>,
+    /// <c>X''</c> and <c>U&amp;''</c>.
+    /// </summary>
+    internal const string LiteralPrefixes = "EeNnBbXxUu";
 
-    // PostgreSQL's name of a column it names itself, which is kept whole and holds no nullability mark.
-    private const string UnnamedColumn = "?column?";
+    /// <summary>
+    /// PostgreSQL's name of a column it names itself, which is kept whole and holds no nullability mark.
+    /// </summary>
+    internal const string UnnamedColumn = "?column?";
 
     private readonly IEngineRenaming _engine = engine;
     private readonly NameMapping _mapping = mapping;
@@ -57,12 +64,15 @@ internal sealed partial class SqlRenamer(
     public RenamedText RenameQueryFile(string text, Action<RenamingRefusal> refuse) =>
         new Pass(this, text, BundleFiles.Query, refuse, queryFile: true).Run(NameClass.Alias);
 
-    // A name, kept when it is the engine's word.
-    private string NameOf(string spelling, bool quoted, NameClass cls) =>
+    /// <summary>A name, kept when it is the engine's word, else the mapping's replacement of it.</summary>
+    internal string NameOf(string spelling, bool quoted, NameClass cls) =>
         _engine.IsEngineWord(spelling, quoted) ? spelling : _mapping.Name(spelling, quoted, cls);
 
-    // A parameter's name: a copy of one of the query's through its parameter, else a name of its own.
-    private string ParameterName(string name)
+    /// <summary>
+    /// A parameter's name, without its prefix: a copy of one of the query's through its parameter, else a name of its
+    /// own, kept when it is the engine's word.
+    /// </summary>
+    internal string ParameterName(string name)
     {
         if (!queryParameters.Contains(name) && _engine.CopyOf(name, queryParameters) is var (parameter, suffix))
         {
