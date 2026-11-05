@@ -96,6 +96,29 @@ public sealed class ToolHostTests
     }
 
     [Fact]
+    public void Create_OpenReadFile_IsTheRealOpen() =>
+        ToolHost.Create().OpenReadFile.ShouldBe(new Func<string, Stream?>(ToolHost.OpenRead));
+
+    [Fact]
+    public void Create_RealHost_OpenReadFile_GivesAStreamAndNullForNoFileOrAFolder()
+    {
+        using var folder = new TempFolder();
+        var path = folder.WriteFile("report.zip", "x");
+        var host = ToolHost.Create();
+
+        using (var stream = host.OpenReadFile(path).ShouldNotBeNull())
+        {
+            stream.CanRead.ShouldBeTrue();
+            stream.CanWrite.ShouldBeFalse();
+            stream.ReadByte().ShouldBe('x');
+        }
+
+        host.OpenReadFile(folder.PathOf("missing/report.zip")).ShouldBeNull();
+        host.OpenReadFile(folder.PathOf("nothing.zip")).ShouldBeNull();
+        host.OpenReadFile(folder.CreateFolder("a-folder")).ShouldBeNull();
+    }
+
+    [Fact]
     public void Hosts_ReadTextFile_ReadsOnlyUnderTheTemporaryFolder()
     {
         using var folder = new TempFolder();

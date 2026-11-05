@@ -71,7 +71,7 @@ internal sealed partial class PostgresSession : DescriberSession
     /// <param name="request">The database, its connection, the exchange and the clock.</param>
     /// <param name="log">Where the session's events go.</param>
     /// <param name="explainSettings">
-    /// The settings of the planner that every <c>explain</c> carries: none, but in a test.
+    /// The settings of the planner that every <c>explain</c> carries: none, but in a test and under <c>replay</c>.
     /// </param>
     /// <param name="cancellationToken">Ends the call.</param>
     public static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(

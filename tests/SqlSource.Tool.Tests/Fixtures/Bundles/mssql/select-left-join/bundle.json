@@ -1,0 +1,14 @@
+{
+  "bundleVersion": 1,
+  "renamed": false,
+  "toolVersion": "fixture",
+  "formatVersion": 1,
+  "engine": "mssql",
+  "serverVersion": "17.0.5015.4",
+  "driverVersion": "7.1.1",
+  "runtime": "fixture",
+  "operatingSystem": "fixture",
+  "outcome": {
+    "kind": "entry"
+  }
+}

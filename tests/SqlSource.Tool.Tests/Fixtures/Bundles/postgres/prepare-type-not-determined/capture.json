@@ -1,0 +1,50 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.6",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "UPDATE users SET name = $1 WHERE id = $2",
+        "types": [
+          "unknown",
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": null,
+        "error": {
+          "sqlState": "42P18",
+          "message": "could not determine data type of parameter $1",
+          "detail": null,
+          "hint": null,
+          "position": null
+        }
+      }
+    }
+  ]
+}

@@ -22,6 +22,9 @@ tests/SqlSource.Tests/Generator/Golden/** text eol=lf
 # A describer's fixture is compared byte for byte, and its SQL is in a request that keys a recorded answer
 tests/SqlSource.Tool.Tests/Fixtures/Describers/** text eol=lf
 
+# A bundle fixture is replayed from its files, which are compared byte for byte, as a describer's are
+tests/SqlSource.Tool.Tests/Fixtures/Bundles/** text eol=lf
+
 # A realistic case's query is described from its file at LF, as its committed sidecar was
 tests/DatabaseTests/Postgres/Realistic/Cases/** text eol=lf
 

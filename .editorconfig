@@ -50,6 +50,11 @@ end_of_line = lf
 max_line_length = off
 end_of_line = lf
 
+# The fixtures of the bundles, which are a describer's capture and sidecar beside a query and a bundle.json.
+[tests/SqlSource.Tool.Tests/Fixtures/Bundles/**]
+max_line_length = off
+end_of_line = lf
+
 # The golden corpus: generated code, compared byte for byte with what the generator writes, whose lines are as long
 # as the generator makes them.
 [tests/SqlSource.Tests/Generator/Golden/**]
