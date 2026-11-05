@@ -21,45 +21,52 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
 
 // The errors and refusals of SQL Server's part, which no recorded fixture holds: each case is a fixture's raw bundle
 // with one answer edited by hand, its outcome made by replaying it raw, then renamed.
-public sealed class SqlServerErrorRenamingTests
+public sealed partial class SqlServerErrorRenamingTests
 {
     private const string Engine = "mssql";
 
     private const string Columns = "columns";
+
+    // The members of a request that hold SQL or declarations.
+    private static readonly string[] RequestTexts = ["sql", "params"];
 
     private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer).ShouldNotBeNull();
 
     [Fact]
     public async Task RenameAsync_UndeclaredParameterError_NamesTheRenamedParameter()
     {
-        string? copy = null;
-        var raw = await EditedAsync(
-            "update-copies-agree",
-            capture =>
-            {
-                var parameters = CallOf(capture, "parameters");
-                copy = FirstCopyIn(parameters["request"]!["sql"]!.GetValue<string>(), "before");
-                parameters["answer"] = Answer(
-                    ("rows", null),
-                    (
-                        "error",
-                        ServerError(
-                            11502,
-                            16,
-                            1,
-                            $"The undeclared parameter '@{copy}' is used more than once in the batch being analyzed."
-                        )
-                    )
-                );
-            }
-        );
+        const string Parameter = "cutoff";
+        var (raw, copy) = await UndeclaredParameterErrorAsync(Parameter);
+        copy.ShouldBe(Parameter + "_1");
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Failure("SQLSRC226", "describe parameters"));
 
         var renamed = await RenamedAsync(raw);
 
-        // The parameter "before" is a word of SQL Server's, kept as it is; its copy is written as the parameter.
-        copy.ShouldNotBeNull().ShouldStartWith("before_");
-        MessagesOf(renamed.Bundle, "parameters", "error.errors").ShouldBe(["@" + ParameterOf(renamed.Bundle)]);
+        var replacement = renamed
+            .Mapping.Single(static name => name.Class == NameClass.Parameter && name.Original == Parameter)
+            .Replacement;
+        var message = MessagesOf(renamed.Bundle, "parameters", "error.errors").ShouldHaveSingleItem();
+        message.ShouldBe("@" + replacement);
+        message.ShouldStartWith("@p_");
+        message.ShouldNotContain(Parameter, Case.Insensitive);
+        renamed.Bundle.Info.ShouldNotBeNull().Outcome.ShouldBe(raw.Info.Outcome);
+        renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
+        renamed.Bundle.Expected.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task RenameAsync_UndeclaredParameterErrorOfAKeyword_NamesTheKeptParameter()
+    {
+        const string Parameter = "before";
+        var (raw, copy) = await UndeclaredParameterErrorAsync(Parameter);
+        copy.ShouldBe(Parameter + "_1");
+        raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Failure("SQLSRC226", "describe parameters"));
+
+        var renamed = await RenamedAsync(raw);
+
+        // "before" is a word of SQL Server's, kept as it is, and its copy is written as the parameter.
+        ParameterOf(renamed.Bundle).ShouldBe(Parameter);
+        MessagesOf(renamed.Bundle, "parameters", "error.errors").ShouldBe(["@" + Parameter]);
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
         renamed.Bundle.Expected.ShouldBeNull();
     }
@@ -191,6 +198,50 @@ public sealed class SqlServerErrorRenamingTests
         refusal.Place.ShouldBe("expected.json");
         refusal.Token.ShouldNotBeNull().ShouldStartWith("matchesTable: null -> ");
     }
+
+    // update-copies-agree with its reused parameter "before" written as the one given, in query.sql and in every
+    // string of the capture that names it or a copy of it, and the answer of "parameters" the error 11502 that names
+    // its first copy; and that copy.
+    private static async Task<(Bundle Raw, string Copy)> UndeclaredParameterErrorAsync(string parameter)
+    {
+        string? copy = null;
+        var raw = await EditedAsync(
+            "update-copies-agree",
+            capture =>
+            {
+                foreach (var call in capture["calls"]!.AsArray().Select(static call => call!.AsObject()))
+                {
+                    foreach (var member in RequestTexts)
+                    {
+                        if (call["request"]![member] is { } text)
+                        {
+                            call["request"]![member] = WithParameter(text.GetValue<string>(), parameter);
+                        }
+                    }
+                }
+
+                var parameters = CallOf(capture, "parameters");
+                copy = FirstCopyIn(parameters["request"]!["sql"]!.GetValue<string>(), parameter);
+                parameters["answer"] = Answer(
+                    ("rows", null),
+                    (
+                        "error",
+                        ServerError(
+                            11502,
+                            16,
+                            1,
+                            $"The undeclared parameter '@{copy}' is used more than once in the batch being analyzed."
+                        )
+                    )
+                );
+            },
+            query => WithParameter(query, parameter)
+        );
+        return (raw, copy.ShouldNotBeNull());
+    }
+
+    // The text with the parameter "@before", and each copy of it, written as the parameter given.
+    private static string WithParameter(string text, string parameter) => MyRegex().Replace(text, "@" + parameter);
 
     // The fixture's raw bundle with its capture edited and, when given, its query.sql, whose outcome is what replaying
     // the edited bundle raw gives: an entry, with its expected.json, or a refusal's id and step, with none.
@@ -343,4 +394,7 @@ public sealed class SqlServerErrorRenamingTests
 
     private static string? TableMatchOf(Bundle bundle) =>
         SidecarReader.Read(bundle.Expected.ShouldNotBeNull()).Sidecar.ShouldNotBeNull().Queries.Single().TableMatch;
+
+    [GeneratedRegex("@before(?=_|[^A-Za-z0-9]|$)")]
+    private static partial Regex MyRegex();
 }
