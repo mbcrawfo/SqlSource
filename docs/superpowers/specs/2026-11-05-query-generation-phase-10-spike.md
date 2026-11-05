@@ -54,7 +54,7 @@ Every member is kept but `deallocate.answer.error`, `partitions.answer.error` an
 
 ### SQL Server
 
-Every member is kept but `declared.answer.rows[].columnOrdinal`, and an error row's `class` and `state`, which on the replay's path only the failure's printed line `Msg <n>, Level <class>, State <state>` reads; the live exchange reads `class` before anything is captured.  `error` is `SqlServerServerError`, `errors[].{number, class, state, message}`, and a row error of `columns`, `declared`, `operands` and `table` is `SqlServerDescribeError`, `{number, type, message}`; both are code only for every call.
+Every member is kept but `declared.answer.rows[].columnOrdinal`.  An error row's `class` and `state` are kept, though on the replay's path only the failure's printed line `Msg <n>, Level <class>, State <state>` reads them: they are numbers of the server's, hold nothing of the user's, and are not nullable.  `error` is `SqlServerServerError`, `errors[].{number, class, state, message}`, and a row error of `columns`, `declared`, `operands` and `table` is `SqlServerDescribeError`, `{number, type, message}`; both are code only for every call.
 
 | Call | Request (key) | Answer: read | Answer: read, never moved `*` or code only `†` | Not read |
 |----|----|----|----|----|
@@ -243,7 +243,7 @@ Each test writes its tables to `$SPIKE10_OUT/spike10/results/`.
 **Amended in the design**, each marked there "(10.0, 2026-11-05)":
 
 - **The constraint on messages**: `Position` added, read for `prepare` alone; the four constants are PostgreSQL's; SQL Server's `NamedIn` reads only four numbers' rows.  Its "Verify first" is answered.
-- **Step 1**: the list is [finding 1](#1-the-fields-the-pipeline-reads); a member is kept when a decision reads it, and dropped when only the log or a failure's printed lines read it, as an error's detail and hint are; 28 plan keys are dropped; a member that is not nullable is kept even when its value is never read.
+- **Step 1**: the list is [finding 1](#1-the-fields-the-pipeline-reads); a member is kept when a decision reads it, and dropped when only the log or a failure's printed lines read it, as an error's detail and hint are, unless it is not nullable; 28 plan keys are dropped; a member that is not nullable is kept even when its value is never read.
 - **Step 2**: the vocabulary is a committed list per engine, as [finding 3](#3-the-vocabulary) chose; the names the planner makes, and the engine's words found by the renaming; a row of a system database is the engine's; a word is folded before it is compared.
 - **Step 3**: the logical database that no marker or setting names stays; the class of a name the lexer finds first is its guess.
 - **Step 5**: a nullability mark stays.
