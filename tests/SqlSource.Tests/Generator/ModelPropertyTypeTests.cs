@@ -60,6 +60,21 @@ public sealed class ModelPropertyTypeTests
         run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "int?> Ids);");
     }
 
+    // A type override that gives the array a type that is no array is taken as written.
+    [Fact]
+    public void InputModel_ArrayWithListOverride_IsTakenAsWritten()
+    {
+        var run = RunIds(
+            OutputKind.CodeGen,
+            "-- type-override: int4[]=System.Collections.Generic.List<int>\n",
+            nullable: false
+        );
+
+        run.ShouldBeClean();
+        run.Sources[ParamsModel].ShouldContain("(global::System.Collections.Generic.List<int> Ids);");
+        run.Sources[ParamsModel].ShouldNotContain("IEnumerable");
+    }
+
     // A C# type the marker names after -> is taken as written.
     [Fact]
     public void InputModel_ArrayParameterWithMarkerClrType_IsTakenAsWritten()

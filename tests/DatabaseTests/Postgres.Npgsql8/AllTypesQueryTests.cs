@@ -155,12 +155,12 @@ public sealed class AllTypesQueryTests(AppContainer app)
         };
 
     [Theory]
-    [InlineData("Array")]
-    [InlineData("List")]
-    [InlineData("ImmutableArray")]
-    [InlineData("HashSet")]
-    [InlineData("Lazy")]
-    public async Task Int4Array_EachKindOfSequence_RoundTrips(string kind)
+    [InlineData("Array", true)]
+    [InlineData("List", true)]
+    [InlineData("ImmutableArray", true)]
+    [InlineData("HashSet", false)]
+    [InlineData("Lazy", true)]
+    public async Task Int4Array_EachKindOfSequence_RoundTrips(string kind, bool ordered)
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NpgsqlDataSource.Create(app.ConnectionString);
@@ -177,7 +177,7 @@ public sealed class AllTypesQueryTests(AppContainer app)
 
         // The set's order is the set's, so the elements are compared without it.
         row.Int4ArrayValue.ShouldNotBeNull().OrderBy(static x => x).ShouldBe([1, 2, 3]);
-        if (kind != "HashSet")
+        if (ordered)
         {
             row.Int4ArrayValue.ShouldBe([1, 2, 3]);
         }
