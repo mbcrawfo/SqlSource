@@ -360,6 +360,38 @@ public sealed class GeneratedSourceMethodTests
             );
     }
 
+    // The kept form's list use is split at the kept form's places, and its token method keeps the comment before it in
+    // the literal around it.
+    [Fact]
+    public void TokenMethod_QueryWithAListThatKeepsComments_KeepsTheCommentAndTheList()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListByIds\n-- output: models\n-- generator: keep-comments\n"
+                + "SELECT id FROM users WHERE id IN /* c */ @ids ORDER BY {{order:id}}\n"
+        );
+        var run = ModelRuns.Run(
+            file,
+            ModelRuns.Entry(file, "ListByIds", [ModelRuns.Parameter("ids")], [ModelRuns.Column("id")])
+        );
+
+        run.ShouldBeClean();
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain(
+                """
+                                checked(55 + order.Length),
+                                order,
+                                static (span, state) =>
+                                {
+                                    "SELECT id FROM users WHERE id IN /* c */ @ids ORDER BY ".CopyTo(span);
+                                    span = span.Slice(55);
+                                    state.CopyTo(span);
+                                }
+
+                """
+            );
+    }
+
     [Fact]
     public void Run_TokenWithADefault_GeneratesTheMethodItGeneratesWithout()
     {
