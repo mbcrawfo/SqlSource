@@ -50,8 +50,11 @@ internal static class BundleLeaks
             foreach (var (text, kind) in UsersOf(source, engine))
             {
                 var quoted = kind == Kind.QuotedName;
+
+                // A text with no token, as the literal ', ', is punctuation and white space alone: it holds nothing of
+                // the user's, and as a phrase it would be found in every list of the SQL's own.
                 if (
-                    text.Length == 0
+                    !TokensOf(text, engine).Any()
                     || SqlRenamer.IsNumber(text)
                     || engine.IsEngineWord(text, quoted)
                     || kept.Contains(engine.Fold(text, quoted))

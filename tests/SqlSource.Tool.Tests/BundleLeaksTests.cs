@@ -86,6 +86,16 @@ public sealed class BundleLeaksTests
     }
 
     [Fact]
+    public void Find_LiteralWithNoToken_IsNoLeak()
+    {
+        var raw = RawOf("select-left-join") with { Query = "-- name: q_1\nSELECT a, b, 'ab, cd' AS c;\n" };
+
+        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), "SELECT ', ', 'ab, cd';");
+
+        found.ShouldBe(["'ab, cd' in query.sql"]);
+    }
+
+    [Fact]
     public void EngineRowNames_OfAnotherDatabasesTables_AreTheEnginesNames()
     {
         var raw = RawOf("select-other-database");
