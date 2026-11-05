@@ -46,6 +46,29 @@ public sealed class SqlFileParserParameterTests
         ParseOf.Sql(block).ShouldBe(Sql);
     }
 
+    // A query's method sends no parameter by a declared name, so the block carries each, as written, of its own query.
+    [Fact]
+    public void Parse_VariablesThatSqlServerSqlDeclares_AreTheBlocksDeclaredVariables()
+    {
+        var blocks = Blocks(
+            "-- name: A\nDECLARE @n int = @start, @M int;\nSELECT @n + @m\n-- name: B\nSELECT @n\n",
+            dialect: SqlDialect.SqlServer
+        );
+
+        blocks
+            .Select(static block => block.DeclaredVariables.ToArray())
+            .ShouldBe([
+                ["n", "M"],
+                [],
+            ]);
+    }
+
+    [Fact]
+    public void Parse_DeclareUnderADialectWithoutDeclaredVariables_DeclaresNone() =>
+        Blocks("-- name: Q\nDECLARE @n int = @start;\nSELECT @n\n", dialect: SqlDialect.PostgreSql)
+            .ShouldHaveSingleItem()
+            .DeclaredVariables.ShouldBeEmpty();
+
     // A query is one batch.
     [Fact]
     public void Parse_VariableThatAnotherQueryOfTheFileDeclares_IsAParameter()

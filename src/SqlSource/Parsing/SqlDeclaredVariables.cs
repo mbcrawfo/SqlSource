@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Quoting;
 
@@ -140,6 +141,18 @@ internal sealed class SqlDeclaredVariables
         }
 
         return names is null ? null : new SqlDeclaredVariables(text, names);
+    }
+
+    /// <summary>Each declared name as written, without its prefix, in order.  A name may be here twice.</summary>
+    public EquatableArray<string> ToNames()
+    {
+        var names = ImmutableArray.CreateBuilder<string>(_names.Count);
+        foreach (var name in _names)
+        {
+            names.Add(_text.Substring(name.Start, name.Length));
+        }
+
+        return new EquatableArray<string>(names.MoveToImmutable());
     }
 
     /// <summary>Whether <paramref name="name" />, written without its prefix, is one of the variables.</summary>

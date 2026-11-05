@@ -522,7 +522,9 @@ internal static class MethodPlanner
             var parameter = query.Parameters[index];
             var write = reading.ConversionOf(property, false, ref isBlocked);
             // A list's property is of its element, so its conversion is the element's.
-            var prefix = parameter.IsList ? ListNames.PrefixOf(parameter, lists++, query.Parameters, engine) : null;
+            var prefix = parameter.IsList
+                ? ListNames.PrefixOf(parameter, lists++, query.Parameters, query.DeclaredVariables, engine)
+                : null;
             parameters.Add(
                 new MethodParameter(
                     parameter.Name,

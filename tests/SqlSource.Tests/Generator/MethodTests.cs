@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -39,6 +40,33 @@ public sealed class MethodTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" FindIds(\n");
         run.Sources[MethodRuns.MethodsFile].ShouldContain("parameter.ParameterName = \"ids_\" + index.ToString(");
         run.Sources["App.FindIdsParams-Model.g.cs"].ShouldContain("IEnumerable<int> Ids");
+    }
+
+    // A variable the query declares is no parameter, but SQL Server refuses a parameter of its name, so a list's
+    // values are never sent by it.
+    [Fact]
+    public void RunSqlServer_ListBesideADeclaredVariableOfItsFirstValuesName_TakesAnotherPrefix()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: FindIds\nDECLARE @ids_0 int = 5;\nSELECT id FROM dbo.users WHERE id IN @ids OR id = @ids_0;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "FindIds",
+                    [TestSidecars.Parameter(0, "ids", TestSidecars.SqlServer(), false)],
+                    [TestSidecars.Column(0, "id", TestSidecars.SqlServer())]
+                ),
+            ]
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("parameter.ParameterName = \"ids__\" + index.ToString(");
+        run.Sources[MethodRuns.MethodsFile].ShouldNotContain("\"ids_\" + index");
     }
 
     [Fact]

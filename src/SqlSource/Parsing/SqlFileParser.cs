@@ -273,6 +273,7 @@ internal static class SqlFileParser
                 {
                     MemberLocationMarker = scope?.MemberLocationMarker,
                     VisibilityMarker = scope?.VisibilityMarker,
+                    DeclaredVariables = query.DeclaredVariables,
                 }
             );
         }
@@ -362,7 +363,15 @@ internal static class SqlFileParser
             );
 
             var segments = SqlListSegments.Split(scanned.Segments, scanned.Occurrences, sql, uses, parameters);
-            return new BuiltQuery(sql, segments, scanned.Occurrences, tokens, parameters, uses);
+            return new BuiltQuery(
+                sql,
+                segments,
+                scanned.Occurrences,
+                tokens,
+                parameters,
+                uses,
+                variables?.ToNames() ?? EquatableArray<string>.Empty
+            );
         }
 
         // A comment is gone from the SQL that the tokens are found in, and so is any "}}" it holds: in a default, that
@@ -667,7 +676,8 @@ internal static class SqlFileParser
             EquatableArray<SqlTokenOccurrence> Occurrences,
             EquatableArray<SqlToken> Tokens,
             EquatableArray<SqlQueryParameter> Parameters,
-            ImmutableArray<SqlParameterUse> Uses
+            ImmutableArray<SqlParameterUse> Uses,
+            EquatableArray<string> DeclaredVariables
         );
     }
 }

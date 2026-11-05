@@ -16,23 +16,31 @@ internal static class ListNames
     private const int SqlServerLongestPrefix = 127 - 4;
 
     /// <summary>
-    /// The prefix of the names a list sends, which no other parameter of the query can take: the list's name and an
-    /// underscore, <c>ids_</c>, with another underscore for as long as another parameter is named as the prefix and one
-    /// or more digits, <c>ids_0</c>, or an earlier list has the prefix.  On SQL Server a prefix too long for a name and
-    /// its index is <c>list</c>, the list's ordinal and an underscore, with underscores added the same way.  Names are
-    /// compared as <see cref="SqlParameterName.Comparer" /> compares them.
+    /// The prefix of the names a list sends, which no other parameter of the query, and no variable it declares, can
+    /// take: the list's name and an underscore, <c>ids_</c>, with another underscore for as long as another parameter
+    /// or a declared variable is named as the prefix and one or more digits, <c>ids_0</c>, or an earlier list has the
+    /// prefix.  On SQL Server a prefix too long for a name and its index is <c>list</c>, the list's ordinal and an
+    /// underscore, with underscores added the same way.  Names are compared as <see cref="SqlParameterName.Comparer" />
+    /// compares them.
     /// </summary>
     /// <param name="list">The list, a parameter of <paramref name="all" />.</param>
     /// <param name="ordinal">The list's place among the lists of <paramref name="all" />, from 0.</param>
     /// <param name="all">The query's parameters.</param>
+    /// <param name="declared">
+    /// The names the query declares as local variables, which are none of <paramref name="all" />, but which SQL Server
+    /// refuses as the name of a parameter it is sent.
+    /// </param>
     /// <param name="engine">The engine of the query's file.</param>
     public static string PrefixOf(
         SqlQueryParameter list,
         int ordinal,
         EquatableArray<SqlQueryParameter> all,
+        EquatableArray<string> declared,
         DatabaseEngine engine
     )
     {
+        var taken = new Taken(all, declared);
+
         // Each earlier list's prefix is found first, so that no two lists share one.
         var earlier = new string[ordinal];
         var found = 0;
@@ -45,26 +53,26 @@ internal static class ListNames
 
             if (parameter.IsList)
             {
-                earlier[found] = PrefixFor(parameter, found, all, engine, earlier, found);
+                earlier[found] = PrefixFor(parameter, found, taken, engine, earlier, found);
                 found++;
             }
         }
 
-        return PrefixFor(list, found, all, engine, earlier, found);
+        return PrefixFor(list, found, taken, engine, earlier, found);
     }
 
     private static string PrefixFor(
         SqlQueryParameter list,
         int ordinal,
-        EquatableArray<SqlQueryParameter> all,
+        Taken taken,
         DatabaseEngine engine,
         string[] earlier,
         int earlierCount
     )
     {
-        var prefix = Free(list.Name + "_", all, earlier, earlierCount);
+        var prefix = Free(list.Name + "_", taken, earlier, earlierCount);
         return IsTooLong(prefix, engine)
-            ? Free("list" + ordinal.ToString(CultureInfo.InvariantCulture) + "_", all, earlier, earlierCount)
+            ? Free("list" + ordinal.ToString(CultureInfo.InvariantCulture) + "_", taken, earlier, earlierCount)
             : prefix;
     }
 
@@ -76,16 +84,11 @@ internal static class ListNames
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
 
-    // The candidate with underscores added until no parameter is named as it and digits, and no earlier list has it.
-    // The list's own name is shorter than its candidate, so it never matches.
-    private static string Free(
-        string candidate,
-        EquatableArray<SqlQueryParameter> all,
-        string[] earlier,
-        int earlierCount
-    )
+    // The candidate with underscores added until no parameter or declared variable is named as it and digits, and no
+    // earlier list has it.  The list's own name is shorter than its candidate, so it never matches.
+    private static string Free(string candidate, Taken taken, string[] earlier, int earlierCount)
     {
-        if (!IsTaken(candidate, all, earlier, earlierCount))
+        if (!IsTaken(candidate, taken, earlier, earlierCount))
         {
             return candidate;
         }
@@ -94,17 +97,12 @@ internal static class ListNames
         do
         {
             _ = longer.Append('_');
-        } while (IsTaken(longer.ToString(), all, earlier, earlierCount));
+        } while (IsTaken(longer.ToString(), taken, earlier, earlierCount));
 
         return longer.ToString();
     }
 
-    private static bool IsTaken(
-        string candidate,
-        EquatableArray<SqlQueryParameter> all,
-        string[] earlier,
-        int earlierCount
-    )
+    private static bool IsTaken(string candidate, Taken taken, string[] earlier, int earlierCount)
     {
         for (var index = 0; index < earlierCount; index++)
         {
@@ -114,9 +112,17 @@ internal static class ListNames
             }
         }
 
-        for (var index = 0; index < all.Count; index++)
+        for (var index = 0; index < taken.All.Count; index++)
         {
-            if (IsPrefixAndDigits(all[index].Name, candidate))
+            if (IsPrefixAndDigits(taken.All[index].Name, candidate))
+            {
+                return true;
+            }
+        }
+
+        for (var index = 0; index < taken.Declared.Count; index++)
+        {
+            if (IsPrefixAndDigits(taken.Declared[index], candidate))
             {
                 return true;
             }
@@ -143,4 +149,7 @@ internal static class ListNames
 
         return true;
     }
+
+    // The names of the query that a list's values may not be sent by: its parameters and the variables it declares.
+    private readonly record struct Taken(EquatableArray<SqlQueryParameter> All, EquatableArray<string> Declared);
 }
