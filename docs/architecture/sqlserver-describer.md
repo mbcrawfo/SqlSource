@@ -93,6 +93,8 @@ A `probe` answers `binds` true when the procedure raises nothing, and false when
 
 An `error` is a `SqlServerServerError`, the list of the exception's errors, each a `SqlServerErrorRow` of number, class, state and message.  A small integer of a row is read as an `int`, whatever the column's own type.  `database` of `open` is the one member that came after a capture: an older capture's null gives no column an origin.  `sourceType` came with the call it is a row of, so no capture has a `columns` without it.  `persistedNotNull` came after captures, and an older capture's null proves no column.
 
+A capture is also what a bug-report bundle holds, and the renaming keeps every member of these records as long as the pipeline reads it ([renaming for SQL Server](bundles.md#renaming-for-sql-server)).  Each string member has its rule in [`SqlServerFields`](../../src/SqlSource.Tool/Bundles/Renaming/SqlServer/SqlServerFields.cs), and one with no rule is refused in every bundle that holds it, so a member added to a record, or one newly read, gets its rule there in the same change.  `SqlServerFieldsTests` holds the rule of each member, and fails for a string of a committed fixture's capture that has no rule, so recording the fixtures again after such a change finds a missed member that a fixture holds as a string.
+
 ## One describe, step by step
 
 `SqlServerSession.DescribeAsync` runs these steps in order, the columns through `ResultAsync`, their proofs through `ProvedAsync` and the table match through `MatchAsync`, and the first failure ends the describe:

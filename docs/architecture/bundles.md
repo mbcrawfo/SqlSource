@@ -75,7 +75,7 @@ Every error goes through the reporter, and the action returns `0`, so `Cli.ExitC
 
 ## Renaming
 
-[`BundleRenamer.RenameAsync`](../../src/SqlSource.Tool/Bundles/Renaming/BundleRenamer.cs) takes a raw bundle, the engine's part of the renaming, the bundle's describer as `BundleDescribers.For` makes it, and a [`RenamingKey`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingKey.cs), and gives a [`RenamedBundle`](../../src/SqlSource.Tool/Bundles/Renaming/RenamedBundle.cs), the bundle and its mapping, or the [`RenamingRefusal`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingRefusal.cs) that says why it cannot be renamed safely.  It reads no file: the caller reads the raw bundle and writes what it gives, `MappingFile.Write` writing the mapping.  It throws `ArgumentException` for a bundle with no `bundle.json`, one renamed already, one whose capture does not read or is of another engine than the part's, and one whose `expected.json` is no sidecar of one entry, which a caller has replayed first.  No command calls it; its tests do, with [`FakeEngineRenaming`](../../tests/SqlSource.Tool.Tests/FakeEngineRenaming.cs) and the raw bundle of [`RenamingBundles`](../../tests/SqlSource.Tool.Tests/RenamingBundles.cs).
+[`BundleRenamer.RenameAsync`](../../src/SqlSource.Tool/Bundles/Renaming/BundleRenamer.cs) takes a raw bundle, the engine's part of the renaming, the bundle's describer as `BundleDescribers.For` makes it, and a [`RenamingKey`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingKey.cs), and gives a [`RenamedBundle`](../../src/SqlSource.Tool/Bundles/Renaming/RenamedBundle.cs), the bundle and its mapping, or the [`RenamingRefusal`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingRefusal.cs) that says why it cannot be renamed safely.  It reads no file: the caller reads the raw bundle and writes what it gives, `MappingFile.Write` writing the mapping.  It throws `ArgumentException` for a bundle with no `bundle.json`, one renamed already, one whose capture does not read or is of another engine than the part's, and one whose `expected.json` is no sidecar of one entry, which a caller has replayed first.  No command calls it; its tests do: those of the neutral steps with [`FakeEngineRenaming`](../../tests/SqlSource.Tool.Tests/FakeEngineRenaming.cs) and the raw bundle of [`RenamingBundles`](../../tests/SqlSource.Tool.Tests/RenamingBundles.cs), and those of SQL Server's part with the raw bundles of [`RawBundles`](../../tests/SqlSource.Tool.Testing/Bundles/RawBundles.cs) and the search of [`BundleLeaks`](../../tests/SqlSource.Tool.Testing/Bundles/BundleLeaks.cs), as [SQL Server's tests](#sql-servers-tests) say.
 
 Everything an engine decides is behind [`IEngineRenaming`](../../src/SqlSource.Tool/Bundles/Renaming/IEngineRenaming.cs), which [`EngineRenamings.For`](../../src/SqlSource.Tool/Bundles/Renaming/EngineRenamings.cs) gives for a `DatabaseEngine`.  The neutral part never names an engine.
 
@@ -172,14 +172,80 @@ The design asks that the SQL of each request made from the renamed query equal t
 
 ### `EngineRenamings.For`
 
-`EngineRenamings.For` is a switch over `DatabaseEngine`, each arm on a line of its own, and the one place that names an engine's part.  Both arms give null, the arm of `PostgreSql` marked `// Built by 10.2.` and that of `SqlServer` `// Built by 10.3.`, and null means a bundle of that engine cannot be renamed.
+`EngineRenamings.For` is a switch over `DatabaseEngine`, each arm on a line of its own, and the one place that names an engine's part.  The arm of `SqlServer` gives `SqlServerRenaming.Instance`, [SQL Server's part](#renaming-for-sql-server).  The arm of `PostgreSql` gives null, marked `// Built by 10.2.`, and null means a bundle of that engine cannot be renamed.
+
+### Renaming for SQL Server
+
+[`SqlServerRenaming`](../../src/SqlSource.Tool/Bundles/Renaming/SqlServer/SqlServerRenaming.cs) is SQL Server's part, one instance that holds nothing.  Beside it, [`SqlServerFields`](../../src/SqlSource.Tool/Bundles/Renaming/SqlServer/SqlServerFields.cs) is the table of rules, [`SqlServerVocabulary`](../../src/SqlSource.Tool/Bundles/Renaming/SqlServer/SqlServerVocabulary.cs) the engine's words, and [`SqlServerMessages`](../../src/SqlSource.Tool/Bundles/Renaming/SqlServer/SqlServerMessages.cs) the renaming of a message.
+
+| Member | SQL Server's answer |
+|----|----|
+| `Dialect` | `SqlDialect.SqlServer` |
+| `IsWordStart`, `IsWordPart` | Both `QuoteReader.IsNameCharacterOfSqlServer`, the describer's rule: a letter or a digit of any script, `_`, `@`, `#` or `$` |
+| `Fold` | `SqlServerVocabulary.Fold`, each character upper-cased by the invariant culture, so that a fold never changes a spelling's length, quoted or not ([the fold](#sql-servers-fold)) |
+| `IsEngineWord` | A word of the vocabulary; ASCII digits alone, the alias of the tool's `SELECT @p AS [1]` of `declared` and of each `AS [n]` of `operands`; or the assembly-qualified name of a system CLR type, `geometry`, `geography` or `hierarchyid`, of any version, compared folded.  Quoting does not change the answer: `[1]` is the tool's, and `[1a]` and `[2 x]` are the user's |
+| `RuleOf` | `SqlServerFields.RuleOf` ([the fields](#sql-servers-fields)) |
+| `IsEngineRow` | A row at `answer.rows[]` of `columns`, `operands` or `table` whose `sourceSchema` folds to `SYS` or `INFORMATION_SCHEMA`, or whose `sourceDatabase` is a system database, such as `msdb` of `msdb.dbo.sysjobs`; and the request of `table` whose `schema` is one of the two.  Any other row, every row of `parameters` among them, is the user's |
+| `CopyOf` | The parameter and `_` with the copy's number ([the copies](#the-copies-of-a-reused-parameter)) |
+| `Register`, `Derive` | Nothing.  SQL Server has no plan, and the describer asks no list in name order, so no name is found only by the engine and nothing is sorted again; the tool's `AS [n]` is kept by `IsEngineWord`, a copy comes through `CopyOf`, and no answer holds a position |
+| `RenameOwn` | `SqlServerMessages.Rename`, for every `Own` member, which is always a message ([the messages](#sql-servers-messages)) |
+| `WordsOf` | `SqlServerMessages.WordsOf`: the `@` and the name of each piece of the renamed message, and a piece with no `@`, which the renaming never writes, whole, so that the check sees it |
+
+#### SQL Server's fields
+
+`SqlServerFields` gives a rule to every string member of the records of [`SqlServerCalls.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerCalls.cs), by the call's method and the member's path, and to every string member of the entry's SQL Server type, under `parameters[].type.` and `columns[].type.`.  It gives no `Drop`: the pipeline reads every member of SQL Server's calls ([the spike's finding 1](../superpowers/specs/2026-11-05-query-generation-phase-10-spike.md#1-the-fields-the-pipeline-reads)).  The kinds it gives:
+
+- **`Fixed`**: the versions and the settings, each name and value, of `open`.
+- **`Sql`** and **`TypeSpelling`**: the `sql` of the requests of `parameters`, `probe`, `declared`, `columns` and `operands` is SQL, and their `params`, each row's `systemTypeName` or `suggestedSystemTypeName`, and the entry's type `name` and `bindName` are type spellings.
+- **`Name`**: `open`'s `database`, and a row's `sourceServer` and `sourceDatabase`, are `Database` names; a row's `name` and `sourceColumn` are `Column` names, its `sourceSchema` a `Schema` and its `sourceTable` a `Table`; `table`'s request is a `Schema` and a `Table`, and a user type's schema and name a `Schema` and a `Type`.
+- **`Parameter`**: the `name` of a row of `parameters`.
+- **`WholeName`**: each assembly-qualified name of a CLR type, a type's whole name, kept when it is a system type's.
+- **`Closed`**: the tool's `sourceType`.
+- **`Own`**: every message, of an `error` of any call and of the error rows of `declared`, `columns`, `operands` and `table`.
+
+A number or a boolean is kept, an error's number, class and state among them.  A member with no rule is refused at its place, so a member added to a record, or newly read, is given its rule in the change that adds it; `SqlServerFieldsTests` fails when a string of a committed fixture's capture has no rule, and [the describer's page](sqlserver-describer.md#the-calls-and-their-records) says so.
+
+#### SQL Server's vocabulary
+
+`SqlServerVocabulary` holds each list in its natural spelling, sorted, and looks a spelling up folded in one ordinal set of them all.  It is the union of what the floor image, `mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04`, and the default image, `DefaultImages.SqlServer`, know, and each list's comment says where and when it was taken:
+
+- the reserved, ODBC and future keywords of Microsoft's list, 185, 235 and 273 with `REGR_R2`, which a fetch of the page lost;
+- the words that are not reserved and that a statement reads, such as `APPLY`, `INSERTED` and `OPENJSON`;
+- the pseudo-columns with their `$`, such as `$action`, and the global variables with their `@@`, such as `@@ROWCOUNT`;
+- the documented functions either image knows, and the system types of either image's `sys.types`;
+- the schemas `dbo`, `sys` and `INFORMATION_SCHEMA`, and the system databases;
+- `sp_executesql`, the one system procedure kept ([what building it found](#what-building-sql-servers-part-found));
+- `ROWSTAT\u0000`, the name of browse mode 2's hidden row with its NUL, which `columns` and `table` capture with the rest ([browse mode 2](sqlserver-describer.md#browse-mode-2)).  `ROWSTAT` without it is not the engine's, so a user's column of that name is renamed.
+
+The proof cannot find a word the vocabulary lacks, since a renamed engine word still replays when the capture is renamed alike: a function the list lacks is renamed in the bundle, and a user's word the list held would be kept.  So three tests hold it.  `SqlServerVocabularyTests` holds the keyword lists' counts and that no list holds a word twice.  `VocabularyTests` of `tests/DatabaseTests/SqlServer/Renaming/` asks the server for every system type of `sys.types` and every documented function of `DocumentedFunctions` it knows, and fails for each the vocabulary lacks.  SQL Server has no catalog of its intrinsic functions, so a name is known when `SELECT F()` under `sys.dm_exec_describe_first_result_set` gives no error `195`, or `SELECT * FROM F()` no `208`.  `CorpusWordsTests` beside it needs no server: every word of the queries of the describer's fixtures and of the realistic cases must be the engine's or be listed in `CorpusUserWords`, as the user's or as the name of a system object a query uses, and no word of the user's may be the engine's.  How to answer their failures is in [the images of the SQL Server tests](../../tests/DatabaseTests/SqlServer/README.md#the-images).
+
+#### SQL Server's fold
+
+The fold ignores case whatever the database's collation: `Fold` is given no bundle, so it cannot read the `collation` that `open`'s settings hold.  The pipeline compares parameters' names ignoring case (`SqlParameterName.Comparer`), so `@Id` and `@id` are one parameter and fold to one.  It compares a column's name with the name the server gives its origin, or the query's with the server's, by ordinal, in [`SqlServerTableMatcher`](../../src/SqlSource.Tool/Describing/SqlServer/Columns/SqlServerTableMatcher.cs) and `ColumnProofs.AreTheColumns`, and every replacement is lower case.  So a query that spells a column as `EMAIL` where the catalog holds `email` has a table match of `names-differ` raw and `matched` renamed, and the proof refuses it at `expected.json`, which `RenameAsync_ANameThatDiffersFromTheCatalogsByCaseAlone_IsRefusedByTheProof` of `SqlServerErrorRenamingTests` holds.  A database whose collation is case-sensitive folds the same way, so two names it keeps apart become one.  This is [TD-0102](../tech-debt/TD-0102-sql-server-renaming-folds-ignoring-case.md).
+
+#### The copies of a reused parameter
+
+[`ParameterCopies`](../../src/SqlSource.Tool/Describing/SqlServer/Statements/ParameterCopies.cs) makes a copy of a reused parameter as its name, one or more `_` and the use's number, with as many `_` as keep it apart from the names the text holds ([the copies and the probe](sqlserver-describer.md#the-copies-and-the-probe)).  `CopyOf` reads a name back so: trailing ASCII digits, one or more `_` before them, and before those a parameter of the query, found as the set given finds it, ignoring case.  It tries the shortest first, with every `_` taken off, so `before___3` is a copy of `before_` when the query has no `before`.  The suffix it gives is always `_` and the number, since that is what the pipeline makes from the renamed query: a replacement is its class's prefix and hex digits, so no name of the renamed query is spelled as a copy of another, and one `_` keeps every copy apart.  A wrong choice, of `before` for a copy of `before_` when the query holds both, or a copy whose parameter's part `ParameterCopies` cut to fit 127 characters, gives a request the renamed capture does not answer, which the proof refuses as `RequestSql`.
+
+#### SQL Server's messages
+
+No decision of the pipeline compares a message's text: [`SqlServerErrors`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerErrors.cs) chooses an id by the error's number, or by a row's `error_type`, and reads a message only for the parameter that `SQLSRC226` names, through `NamedIn`, which takes each `@name` as a whole word and a copy back to its parameter.  So `SqlServerMessages.Rename` replaces a message with the `@name`s it holds, read as `NamedIn` reads them, each written as `@` and its name renamed through `IRenamingScope.Parameter`, joined by one space.  A name the mapping does not hold and that is no engine word, but whose stem before `_` and a number is, is a copy, and is written as its parameter.  A global variable, `@@ROWCOUNT`, and an `@` that no name follows are left out.  A message that names no parameter becomes empty, as a fixed text of [`ConnectionErrors`](../../src/SqlSource.Tool/Describing/SqlServer/ConnectionErrors.cs) does.  `SqlServerMessagesTests` holds each case, and `SqlServerErrorRenamingTests` the errors no fixture holds: an `11502` that names a copy, whose renamed bundle's `SQLSRC226` names the renamed parameter, error rows and an error of `open` that keep their numbers and lose their text.
+
+#### What building SQL Server's part found
+
+- **A money literal is a word.**  `$12` is a literal of `money` to the server, but `$` starts a word by SQL Server's word rule, so the SQL renamer reads `$12` as a name and renames it.  The capture's requests are renamed alike, so the proof passes, and the bundle holds a name where the query held the amount.
+- **`sp_executesql` is kept.**  A query calls it by name, as the realistic case `report-dynamic-exec` does, so it is in the vocabulary's `SystemProcedures`.  Any other system procedure a query names is renamed, which is safe.
+- **A parameter spelled as an engine word is kept, and so are its copies.**  The fixture `update-copies-agree`'s `@before` is a keyword, so its copies are `@before_1` and `@before_2` in the renamed bundle too, and a message that names `@before_1` is renamed to `@before`.
+- **A temporary table's name is renamed after its `#` or `##`, and `$action` is kept** as the vocabulary's pseudo-column.
+
+#### SQL Server's tests
+
+- In `tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/`, with no server: `SqlServerRenamingTests`, `SqlServerVocabularyTests`, `SqlServerFieldsTests` and `SqlServerMessagesTests` hold each member.  [`SqlServerFixtureRenamingTests`](../../tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerFixtureRenamingTests.cs) renames each of the describer's fixtures as a raw bundle of `RawBundles.OfFixture`: the proof replays it to its renamed entry, the entry keeps the original's provenance, `BundleLeaks.Find` finds no name or literal of `schema.sql` and the query in it, and two keys give other names and the same provenance.  [`SqlServerErrorRenamingTests`](../../tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerErrorRenamingTests.cs) edits one answer of a fixture's raw bundle by hand, replays it raw for its outcome and renames it, for the errors and refusals no fixture holds.
+- In `tests/DatabaseTests/SqlServer/Renaming/`: [`RealisticRenamingTests`](../../tests/DatabaseTests/SqlServer/Renaming/RealisticRenamingTests.cs) captures each realistic case on the server through `RawBundles.CaptureAsync`, as a bundle captures one, and renames it: the proof replays it, a described case keeps its provenance and a refused one its id and step, and `BundleLeaks.Find` finds nothing of the corpus's `schema.sql`, its `seed.sql` or the case's query.  `VocabularyTests` and `CorpusWordsTests` hold [the vocabulary](#sql-servers-vocabulary).
+- `RawBundles` and `BundleLeaks`, in `tests/SqlSource.Tool.Testing/Bundles/`, name no engine.  `BundleLeaks.Find` lexes the user's SQL by the engine's word rule and searches every string of the renamed bundle that the renaming renames, with nothing of the renaming's own, and `BundleLeaksTests` runs it on raw bundles, so that a search that finds nothing is known to look.
 
 ## Not built yet
 
 ### Renaming for PostgreSQL
 
 > **Not built yet.**  How PostgreSQL's part of the renaming answers each member of `IEngineRenaming`.  Delivered by sub-phase 10.2 of phase 10 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
-
-### Renaming for SQL Server
-
-> **Not built yet.**  How SQL Server's part of the renaming answers each member of `IEngineRenaming`.  Delivered by sub-phase 10.3 of phase 10 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
