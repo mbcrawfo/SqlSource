@@ -24,7 +24,10 @@ internal abstract record ReplayOutcome
     internal sealed record Refused(string Id, string? Step) : ReplayOutcome;
 
     /// <summary>The describer asked what the capture holds no answer to.</summary>
-    /// <param name="Method">The call that has no answer, such as <c>explain</c>.</param>
+    /// <param name="Method">
+    /// The call that has no answer, such as <c>explain</c>, or <c>BundleReplay.UnknownQuestion</c> for a miss that names
+    /// none.
+    /// </param>
     /// <param name="Reason">The miss's message, which says what was asked or why the answer cannot be read.</param>
     internal sealed record Missed(string Method, string Reason) : ReplayOutcome;
 }

@@ -8,9 +8,9 @@ namespace SqlSource.Tool.Describing.Capture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// It is a bug or a stale capture, never something a server or a user can cause.  Under a run of the tool it ends
-/// the run with <c>SQLSRC200</c>, as any exception of a describer does; under a test it fails the test with the
-/// question in its message, so that a change to a describer's calls is a visible update of its fixtures.
+/// It is a bug or a stale capture, never something a server or a user can cause.  Under <c>replay</c> it is
+/// <c>SQLSRC290</c>, a bundle that does not answer what this version of the tool asks; under a test it fails the test
+/// with the question in its message, so that a change to a describer's calls is a visible update of its fixtures.
 /// </para>
 /// <para>
 /// It derives from <see cref="InvalidOperationException" /> and has the standard constructors for the reasons

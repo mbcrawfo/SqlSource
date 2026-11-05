@@ -18,10 +18,12 @@ public sealed class UsageCheckTests
         var force = new Option<bool>("--force") { Arity = ArgumentArity.Zero };
         var verbose = new Option<bool>("--verbose") { Arity = ArgumentArity.Zero, Recursive = true };
         var path = new Argument<string?>("path") { Arity = ArgumentArity.ZeroOrOne };
+        var bundle = new Argument<string>("bundle") { Arity = ArgumentArity.ExactlyOne };
         return new Command("sqlsource")
         {
             verbose,
             new Command("describe") { connection, project, force, path },
+            new Command("replay") { bundle },
         };
     }
 
@@ -254,6 +256,7 @@ public sealed class UsageCheckTests
         string[] vocabulary =
         [
             "describe",
+            "replay",
             "--connection",
             "--connection=",
             "--connection=V",
@@ -349,6 +352,7 @@ public sealed class UsageCheckTests
         string[] vocabulary =
         [
             "describe",
+            "replay",
             "--project",
             "--project=P",
             "--database",
@@ -385,7 +389,12 @@ public sealed class UsageCheckTests
         {
             var usage = UsageCheck.Check(root, args);
             var parsed = root.Parse(args, Cli.Parser);
-            if (usage.Messages.Count > 0 || DescribeCommand.CheckUsage(usage).Count > 0 || parsed.Errors.Count > 0)
+            if (
+                usage.Messages.Count > 0
+                || DescribeCommand.CheckUsage(usage).Count > 0
+                || ReplayCommand.CheckUsage(usage).Count > 0
+                || parsed.Errors.Count > 0
+            )
             {
                 continue;
             }
@@ -393,7 +402,11 @@ public sealed class UsageCheckTests
             // The command reads the values of its options from what UsageCheck read, and System.CommandLine gives the
             // log's path, so the two must give --project, --database, --connection, --log, --manifest and --online the
             // same values too.
-            if (!usage.IsReadTheSameBy(parsed) || !DescribeCommand.ReadsValuesAs(usage, parsed))
+            if (
+                !usage.IsReadTheSameBy(parsed)
+                || !DescribeCommand.ReadsValuesAs(usage, parsed)
+                || !ReplayCommand.ReadsValuesAs(usage, parsed)
+            )
             {
                 disagreements.Add(string.Join(' ', args));
             }
@@ -603,4 +616,59 @@ public sealed class UsageCheckTests
         DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--manifest", "m"])).ShouldBeFalse();
         DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--online", "auto"])).ShouldBeFalse();
     }
+
+    [Fact]
+    public void ReadsValuesAs_ReplayLogReadAsAnotherValue_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        var usage = UsageCheck.Check(root, ["replay", "report.zip", "--log", "run.log"]);
+
+        ReplayCommand.ReadsValuesAs(usage, root.Parse(["replay", "report.zip", "--log", "run.log"])).ShouldBeTrue();
+        ReplayCommand.ReadsValuesAs(usage, root.Parse(["replay", "report.zip", "--log", "other.log"])).ShouldBeFalse();
+        ReplayCommand.ReadsValuesAs(usage, root.Parse(["replay", "report.zip"])).ShouldBeFalse();
+        ReplayCommand.ReadsValuesAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"])).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("replay", "report.zip")]
+    [InlineData("replay", "report.zip", "--verbose", "--log", "run.log")]
+    [InlineData("replay", "--log=run.log", "a folder")]
+    [InlineData("replay", "--help")]
+    public void CheckUsage_ReplayWithABundle_GivesNoLine(params string[] args)
+    {
+        var usage = UsageCheck.Check(Cli.BuildCommands(), args);
+
+        usage.Messages.ShouldBeEmpty();
+        ReplayCommand.CheckUsage(usage).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void CheckUsage_ReplayWithoutABundle_SaysItNeedsOne() =>
+        ReplayCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["replay", "--verbose"]))
+            .ShouldBe(["sqlsource: command 'replay' needs the path of a bundle"]);
+
+    [Theory]
+    [InlineData(4, "replay", "report.zip", "--log", "a=" + Secrets.Word + ".log")]
+    [InlineData(2, "replay", "--log=a;" + Secrets.Word + ".log", "report.zip")]
+    public void CheckUsage_ReplayLogPathWithAnEqualsSignOrASemicolon_IsNamedByItsPosition(
+        int position,
+        params string[] args
+    ) =>
+        ReplayCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([
+                $"sqlsource: the value of option '--log' at position {position} holds '=' or ';', which a log's path "
+                    + "may not",
+            ]);
+
+    [Fact]
+    public void CheckUsage_ReplayLogThatIsNoPath_IsReportedByItsPosition() =>
+        ReplayCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["replay", "report.zip", "--log", " "]))
+            .ShouldBe(["sqlsource: the value of option '--log' at position 4 is not a path"]);
+
+    [Fact]
+    public void CheckUsage_ReplayOfAnotherCommand_GivesNoLine() =>
+        ReplayCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["describe", "--log", "a=b"])).ShouldBeEmpty();
 }

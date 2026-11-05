@@ -1,10 +1,16 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Parsing;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Describing.Capture;
+using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -105,6 +111,35 @@ public sealed class BundleReplayTests
         );
     }
 
+    // A miss made without a method is one still, and never an exception of the run.
+    [Fact]
+    public async Task RunAsync_MissWithoutAMethod_IsMissedAsAnUnknownQuestion()
+    {
+        var replayed = await BundleReplays.ReplayAsync(
+            BundleReplays.OfCase("postgres", "select-plain"),
+            Path,
+            new DescriberRegistry([new MissingDescriber()])
+        );
+
+        replayed.ShouldBe(new ReplayOutcome.Missed("an unknown question", "No answer."));
+    }
+
+    // A describer whose open throws a miss made without a method, before it asks its exchange anything.
+    private sealed class MissingDescriber : IQueryDescriber
+    {
+        public SqlDialect Dialect => SqlDialect.PostgreSql;
+
+        public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) => [];
+
+        public string? RewriteOf(string connection) => null;
+
+        public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
+            OpenRequest request,
+            IRunLog log,
+            CancellationToken cancellationToken
+        ) => throw new CaptureMissException("No answer.");
+    }
+
     [Fact]
     public async Task RunAsync_PrepareAnsweredWith42P18_IsRefusedWithIdAndStep()
     {
@@ -121,7 +156,7 @@ public sealed class BundleReplayTests
         _ = await BundleReplays.ReplayAsync(BundleReplays.OfCase("postgres", "select-left-join"), Path, log: log);
 
         log.Events.Select(static written => written.Name).ShouldContain("postgres.walk.node");
-        log.Events.ShouldAllBe(static written => written.Name.StartsWith("postgres.", System.StringComparison.Ordinal));
+        log.Events.ShouldAllBe(static written => written.Name.StartsWith("postgres.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -220,7 +255,7 @@ public sealed class BundleReplayTests
             Capture = bundle.Capture.Replace(
                 "\"captureVersion\": 1",
                 "\"captureVersion\": 2",
-                System.StringComparison.Ordinal
+                StringComparison.Ordinal
             ),
         };
 

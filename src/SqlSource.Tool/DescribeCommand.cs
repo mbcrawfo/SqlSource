@@ -294,22 +294,12 @@ internal static class DescribeCommand
                         + "database name"
                 );
             }
-            else if (value.Option.Name == LogOption && string.IsNullOrWhiteSpace(value.Text))
+            else if (value.Option.Name == LogOption)
             {
-                // What --log "$UNSET" gives.
-                messages.Add(
-                    $"sqlsource: the value of option '{LogOption}' at position {value.Position} is not a path"
-                );
-            }
-            else if (value.Option.Name == LogOption && !isOnline && !value.MayBePrintedAsPath)
-            {
-                // "=" and ";" are what a connection string is made of: the value may be one typed after --log.  The
-                // build's paths may hold them, as a project's name may, and a message names such a path by its
-                // position.
-                messages.Add(
-                    $"sqlsource: the value of option '{LogOption}' at position {value.Position} holds '=' or ';', "
-                        + "which a log's path may not"
-                );
+                if (ProblemOfLogPath(value, isOnline) is { } problem)
+                {
+                    messages.Add(problem);
+                }
             }
             else if (value.Option.Name == ConnectionOption)
             {
@@ -386,6 +376,28 @@ internal static class DescribeCommand
             ? OnlineModeOf(online.Text)
                 ?? throw new InvalidOperationException("An --online that is no mode was let through.")
             : OnlineMode.Off;
+
+    /// <summary>
+    /// What is wrong with a value of <c>--log</c> as a path, as a whole line, or null: it is no path, or, without
+    /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.  <c>replay</c> holds its <c>--log</c> to the same rule.
+    /// </summary>
+    /// <param name="log">The value of <c>--log</c>.</param>
+    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
+    internal static string? ProblemOfLogPath(UsageValue log, bool isOnline)
+    {
+        // What --log "$UNSET" gives.
+        if (string.IsNullOrWhiteSpace(log.Text))
+        {
+            return $"sqlsource: the value of option '{LogOption}' at position {log.Position} is not a path";
+        }
+
+        // "=" and ";" are what a connection string is made of: the value may be one typed after --log.  The build's
+        // paths may hold them, as a project's name may, and a message names such a path by its position.
+        return !isOnline && !log.MayBePrintedAsPath
+            ? $"sqlsource: the value of option '{LogOption}' at position {log.Position} holds '=' or ';', which a "
+                + "log's path may not"
+            : null;
+    }
 
     // What is wrong with the value of --manifest as a path, as a whole line, or null.  Without --online a path that
     // holds "=" or ";" is refused, as one of --log is: it may be a connection string typed after the option.

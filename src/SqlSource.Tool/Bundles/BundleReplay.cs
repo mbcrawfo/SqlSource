@@ -41,6 +41,9 @@ internal static class BundleReplay
     /// <summary>The connection of a replayed session.  Nothing opens, and the describer needs a value.</summary>
     public const string Connection = "replay";
 
+    /// <summary>The method of a miss that names none, as <c>SQLSRC290</c> quotes it.</summary>
+    public const string UnknownQuestion = "an unknown question";
+
     private const string VersionKey = "captureVersion";
     private const string EngineKey = "engine";
 
@@ -170,7 +173,8 @@ internal static class BundleReplay
     /// <remarks>
     /// The describer writes to <paramref name="log" /> with the engine before each event's name, as a run's log has
     /// them.  A <see cref="CaptureMissException" /> of opening, describing or closing the session is
-    /// <see cref="ReplayOutcome.Missed" />; any other exception is a bug, and is let through.
+    /// <see cref="ReplayOutcome.Missed" />, of <see cref="UnknownQuestion" /> when it names no method; any other
+    /// exception is a bug, and is let through.
     /// </remarks>
     /// <param name="query">The query as <see cref="Plan" /> gives it.</param>
     /// <param name="dialect">Its dialect as <see cref="Plan" /> gives it.</param>
@@ -214,9 +218,9 @@ internal static class BundleReplay
                 )
                 : RefusedBy(described.Failure);
         }
-        catch (CaptureMissException miss) when (miss.Method is { } method)
+        catch (CaptureMissException miss)
         {
-            return new ReplayOutcome.Missed(method, miss.Message);
+            return new ReplayOutcome.Missed(miss.Method ?? UnknownQuestion, miss.Message);
         }
     }
 
