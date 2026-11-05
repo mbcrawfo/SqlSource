@@ -27,8 +27,8 @@ The tool's tests, and where each kind goes, are in [`tests/README.md`](../../tes
 
 - **A result that may fail has one shape where files meet.**  A method that another file calls and that gives one value or one reason returns an `Outcome<TValue, TFailure>` and reports nothing: its caller does, as `DescribeCommand.FindUnit` reports what `Projects/RunUnitFinder.cs` found.  `Outcome.cs` says what is no `Outcome`, and how one of a value that must be disposed is made.
 - **Every error goes through `Reporting/Reporter.cs` with a descriptor of `ToolDiagnostics`**, or of `SqlDiagnostics` where the generator reports the same condition.  The descriptors are in the generator's project; `src/SqlSource/Diagnostics/AGENTS.md` lists the four places a new one touches.  A wrong command line is the one exception, below.
-- **The exit code is `0`, `1` or `2`**, as the manual's [exit codes](../../docs/manual/tool.md#exit-codes) say.  `Cli.ExitCodeOf` takes it from the reporter, so a command reports, goes on, and never returns `1` itself.  `2` is for `SQLSRC219` alone, and a query that could not be described is "could not check" and never `SQLSRC219`.
-- **Every text the tool prints and did not write itself goes through `Reporting/OneLine.cs`**, which writes a line break as a space: an argument of a message, a path, a label, the name of an unknown option.
+- **The exit code is `0`, `1` or `2`**, as the manual's [exit codes](../../docs/manual/tool.md#exit-codes) say.  `Cli.ExitCodeOf` takes it from the reporter, so a command reports, goes on, and never returns `1`.  `2` is for `SQLSRC219` and for `replay`'s answer that is not the bundle's; a query that cannot be described is "could not check", never `SQLSRC219`.
+- **Every text the tool prints and did not write goes through `Reporting/OneLine.cs`**, which writes a line break as a space: an argument of a message, a path, a label, the name of an unknown option.
 - **A path in a message is a full path**, or `The path at position <n>` when its token holds `=` or `;` (`UsageValue.NamedAsPath`).
 - **No error carries a hint to a log.**  A failed `describe` with no log ends with `Cli.RunAgainLine` instead, but not under `--online` or `--watch`.
 - **An exception is `SQLSRC200`**, caught in `Cli.RunCommandAsync`, in each pass of `Watching/WatchSession.cs`, in `Cli.Run` when the host cannot be made, and in `Describing/DatabaseRuns.cs`, which rethrows a describer's as a `DescriberFaultException` without the connection's value ([describing](../../docs/architecture/tool.md#describing)).
@@ -43,9 +43,9 @@ The tool's tests, and where each kind goes, are in [`tests/README.md`](../../tes
 
 ## What a run says
 
-- **A step that reports nothing writes no event either**: its caller writes it from what the step returned, as for the planner, `RunDecisions`, `FileOutcomes` and `SidecarCheck`.  `Logging/RunEvents.cs` builds every event but `run.start`, `run.end` and `diagnostic`, and says each line of `--verbose` through `RunTrace.Say`, the one writer of those lines.
+- **A step that reports nothing writes no event either**: its caller writes it from what the step returned, as for the planner, `RunDecisions`, `FileOutcomes` and `SidecarCheck`.  `Logging/RunEvents.cs` builds every event but `run.start`, `run.end` and `diagnostic`, and says each line of `describe --verbose` through `RunTrace.Say`, their one writer.
 - **Under `--online` a run always prints a line of the tool's own**, an error or a `sqlsource:` line: `SqlSourceRunOnline` reads silence as a tool that could not start, a bare exit code of 1 as `SQLSRC027` ([why](../../docs/architecture/tool.md#build-integration-options)).  A plan error the compiler reports too goes through `Reporter.ReportWithoutWriting`.
-- **An event's name and its members are read by people and by phase 10's bundle.**  A member is added and never renamed, and a value is one of `Logging/LogValue.cs`'s closed set ([the log](../../docs/architecture/tool.md#the-log)).
+- **An event's name and its members are read by people and by `replay`'s lines.**  A member is added and never renamed, and a value is one of `Logging/LogValue.cs`'s closed set ([the log](../../docs/architecture/tool.md#the-log)).
 
 ## The command line
 

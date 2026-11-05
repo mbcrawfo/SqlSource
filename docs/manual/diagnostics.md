@@ -3131,6 +3131,8 @@ $ dotnet sqlsource replay /work/report.zip
 
 Check the path first, and that the zip file was not cut short by the download or the mail that carried it.  If the path is right, ask the person who made the bundle for it again; a bundle that was edited by hand, or unzipped and zipped again with a file left out, is read the same way as a damaged one.
 
+See: [Checking a bundle with `replay`](tool.md#replay)
+
 ## SQLSRC289
 
 **Bundle is of a newer version**
@@ -3143,6 +3145,8 @@ $ dotnet sqlsource replay /work/report.zip
 ```
 
 Update the `sqlsource` tool to the latest version, and replay the bundle again.
+
+See: [Checking a bundle with `replay`](tool.md#replay)
 
 ## SQLSRC290
 
@@ -3157,6 +3161,8 @@ $ dotnet sqlsource replay /work/report.zip
 
 Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and replay the bundle again.  When the message says `another version of sqlsource`, ask the person who made the bundle which version it was.
 
+See: [Checking a bundle with `replay`](tool.md#replay)
+
 ## SQLSRC291
 
 **Bundle's engine is not supported**
@@ -3169,3 +3175,5 @@ $ dotnet sqlsource replay /work/report.zip
 ```
 
 Update the `sqlsource` tool to the latest version, and replay the bundle again.
+
+See: [Checking a bundle with `replay`](tool.md#replay)

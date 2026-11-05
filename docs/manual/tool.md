@@ -11,7 +11,7 @@ The generator writes a constant or a token method for every query whose output i
 
 The generator builds the [models](generator.md#models) of each described query from the sidecars that the tool writes, and the [method](generator.md#query-methods) that runs a query whose output is `codegen`.
 
-This page has two parts: [the workflow](#install-the-tool), from installing the tool and running it in the build to checking the sidecars in CI, and [the command reference](#command-reference).
+This page has two parts: [the workflow](#install-the-tool), from installing the tool and running it in the build to checking the sidecars in CI, and [the command reference](#command-reference).  The tool's `replay` command checks a bug-report bundle that someone gave you, with no database: see [checking a bundle with `replay`](#replay).
 
 <a id="install-the-tool"></a>
 
@@ -373,9 +373,10 @@ dotnet sqlsource describe [<path>...] [--project <path>]... [--database <name>].
                           [--connection <name>=<connection string>]...
                           [--force | --check] [--verbose] [--log <path>]
                           [--watch]
+dotnet sqlsource replay <bundle> [--verbose] [--log <path>]
 ```
 
-`dotnet sqlsource --help` and `dotnet sqlsource describe --help` print the options, and `dotnet sqlsource --version` the version of the tool.
+`dotnet sqlsource --help`, `dotnet sqlsource describe --help` and `dotnet sqlsource replay --help` print the options, and `dotnet sqlsource --version` the version of the tool.  The arguments and options below are those of `describe`; `replay` is in [checking a bundle with `replay`](#replay).
 
 <a id="arguments"></a>
 
@@ -434,7 +435,7 @@ A connection or log variable that is empty or holds only white space is not set.
 |----|----|
 | `0` | The run reported no error; or a `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP`, whatever its passes reported |
 | `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; or a run without `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
-| `2` | `--check` found a sidecar out of date, and nothing else went wrong |
+| `2` | `--check` found a sidecar out of date, and nothing else went wrong; or `replay` gave another answer than the bundle's |
 
 A run that is stopped writes no further sidecar.  A second Ctrl+C ends the process at once.
 
@@ -468,7 +469,7 @@ $ dotnet sqlsource describe --log sqlsource.log
 
 - **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).  It refuses a `--log` path that holds `=` or `;` too, which is more likely a connection string typed in the wrong place than a path; a path from `SQLSOURCE_LOG` is not held to that.
 - **A `--watch` writes one file from its start until it is stopped**, with every pass in it and where each begins and ends.
-- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it, nor does a `--watch`, nor the run of a build, which is given no `--log`: see [running in the build](#running-in-the-build) for its logs.
+- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it, nor does a `--watch`, nor `replay`, nor the run of a build, which is given no `--log`: see [running in the build](#running-in-the-build) for its logs.
 
 **Read a log before you share it.**  The tool writes each connection value as `***` wherever it finds it whole: the value of each `--connection` on the command line, and the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message, as written, with the spaces at its ends trimmed, or as the driver writes it again.  It writes each password of a connection string as `***` too, where it stands apart from other letters, digits and underscores and is at least four characters long, and so the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file when the connection string gives none.  In the record of your command line, every value of `--database` and `--connection` is written `***`.  A value typed where a path goes (the path of `describe`, a `.sql` path or a `--project` value) is written `***` too when it holds `=` or `;`, as a connection string does.  A value typed there or after `--log` with neither, such as a password typed alone, can appear as written, and so can a password shorter than four characters, and one that is the name of its logical database or of its dialect, such as `postgres` ([known issues](#known-issues)): search the log for your password before you share it.  The log also holds:
 
@@ -486,6 +487,40 @@ $ dotnet sqlsource describe --log sqlsource.log
 - **Restored projects.**  The tool does not restore: run `dotnet restore` first ([SQLSRC220](diagnostics.md#sqlsrc220)).
 - **The same version as the `SqlSource` package** of your projects ([SQLSRC206](diagnostics.md#sqlsrc206)).
 - **A database the tool can reach**, of a version it supports, for each logical database with a query to describe.  See [PostgreSQL](postgresql.md#connecting) and [SQL Server](sqlserver.md#connecting).
+
+<a id="replay"></a>
+
+### Checking a bundle with `replay`
+
+```console
+$ dotnet sqlsource replay report.zip
+sqlsource: mssql.table-match: query="UsersWithOrders" tableMatch="several-tables" table=null
+sqlsource: reproduced: the pipeline gives this answer
+```
+
+A bug-report bundle holds one query, what its database answered when the query was described, and what SqlSource made of it.  `replay` runs the query through SqlSource again from the bundle alone, and says whether it gives the same answer.  Give it the zip file, or the folder you unzipped it into.  It needs no database, no connection, no project and no `.env` file, and none of the [requirements](#requirements) above but .NET 8 or later, so you can check a bundle that someone gave you on any machine with the tool.
+
+Before its outcome, it prints a line for each decision it made about the query's columns and the table its rows match, each starting with `sqlsource:` and the name of the bundle's database engine.  With `--verbose` it prints a line for everything else it did too.  `--log <path>`, or `SQLSOURCE_LOG`, writes a record of the replay to a file, with the same rules as for `describe` ([logs](#logs)).  These are its only options.
+
+It ends with one of three outcomes:
+
+- **`sqlsource: reproduced: the pipeline gives this answer`.**  This version gives the answer the bundle holds, the same columns, types, nullability and everything else a sidecar records for the query.  If that answer is wrong, the bundle shows SqlSource giving it with no database.  The exit code is `0`.
+- **`sqlsource: not reproduced`**, then a line for each difference, the bundle's value first, then a line that names the version of `sqlsource` that made the bundle beside yours.  A newer version may decide otherwise; to see the bundle's answer, install the version that made it.  The exit code is `2`.
+
+  ```console
+  $ dotnet sqlsource replay report.zip
+  sqlsource: not reproduced
+  sqlsource:   columns[2].nullable: true -> false
+  sqlsource: the bundle was made by sqlsource 1.4.0, sidecar format 1; this is sqlsource 1.6.0, sidecar format 1
+  ```
+
+- **`sqlsource: replayed:` and an answer**, for a bundle that holds no answer of its own to compare with: the query's entry as a sidecar holds it, on one line, or the error that refused the query, as `sqlsource: replayed: SQLSRC226 at describe parameters`.  The exit code is `0`.
+
+A bundle of a query that SqlSource refused holds the error and the step it was reported at.  `reproduced` then means that this version refuses the query with the same error at the same step, and a difference reads `expected SQLSRC231, replayed SQLSRC226 at describe parameters`.  Columns are counted from 0, so `columns[2]` is the third.
+
+A bundle that holds its maker's own names and SQL, as one sent to you privately does, says so first, with `sqlsource: this bundle is not renamed, and must not be posted`.  Keep it to yourself: never attach it to an issue or post it anywhere.
+
+A bundle that cannot be read or replayed is an error, from [SQLSRC288](diagnostics.md#sqlsrc288) to [SQLSRC291](diagnostics.md#sqlsrc291), at its full path, and the exit code is `1`.  A path that holds `=` or `;` is named as `The path at position <n>` instead, on a line labelled `bundle`, as a value of the command line that may be a secret is.
 
 <a id="known-issues"></a>
 
