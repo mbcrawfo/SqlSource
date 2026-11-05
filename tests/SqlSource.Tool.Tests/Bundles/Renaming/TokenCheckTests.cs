@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Shouldly;
@@ -269,5 +270,280 @@ public sealed class TokenCheckTests
         TokenCheck
             .Check(engine, mapping, [], $"-- name: {query}\nSELECT 1::\"integer\"", expected: null)
             .ShouldBeNull();
+    }
+
+    // Each branch of the check that reads plain SQL or a marker of query.sql refuses a token that is the user's.
+    [Theory]
+    [InlineData("postgres", "SELECT 'open", "'")]
+    [InlineData("postgres", "SELECT 1 FROM \"secret\"", "secret")]
+    [InlineData("postgres", "SELECT $q$secret$q$", "secret")]
+    [InlineData("postgres", "SELECT 1 WHERE 2 = @secret", "secret")]
+    [InlineData("postgres", "SELECT 1 -- secret", "secret")]
+    [InlineData("postgres", "SELECT /* secret */ 1", "secret")]
+    [InlineData("postgres", "SELECT /*+ secret */ 1", "secret")]
+    [InlineData("postgres", "SELECT 1 AS E", "E")]
+    [InlineData("postgres", "-- database: secret\nSELECT 1", "secret")]
+    [InlineData("postgres", "-- param: @secret\nSELECT 1", "secret")]
+    [InlineData("postgres", "-- token: {{secret:1}}\nSELECT 1", "secret")]
+    [InlineData("postgres", "-- token-ignore: secret\nSELECT 1", "secret")]
+    [InlineData("postgres", "-- summary: Gets the users\nSELECT 1", "-- summary:")]
+    [InlineData("postgres", "-- column: total not null\nSELECT 1", "-- column:")]
+    [InlineData("mssql", "SELECT [secret]", "secret")]
+    [InlineData("mssql", "SELECT 1 FROM #secret", "#secret")]
+    [InlineData("mssql", "SELECT 1 ≠ 2", "≠")]
+    public void Check_QueryFileTokenOfTheUser_IsRefused(string dialect, string sql, string token) =>
+        CheckQuery(sql, DialectOf(dialect)).ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", token));
+
+    [Fact]
+    public void Check_NameMarkerThatIsNoReplacement_IsRefused()
+    {
+        var (engine, mapping) = Mapping();
+
+        TokenCheck
+            .Check(engine, mapping, [], "-- name: secret\nSELECT 1", expected: null)
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "secret"));
+    }
+
+    // A one-letter literal prefix passes only right before its quote, or before U&'s ampersand.
+    [Fact]
+    public void Check_LiteralPrefix_PassesOnlyBeforeItsQuote()
+    {
+        var (engine, mapping) = Mapping();
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+        var literal = mapping.Literal("active");
+
+        TokenCheck
+            .Check(engine, mapping, [], $"-- name: {query}\nSELECT E'{literal}', U&'{literal}'", expected: null)
+            .ShouldBeNull();
+        TokenCheck
+            .Check(engine, mapping, [], $"-- name: {query}\nSELECT N '{literal}'", expected: null)
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "N"));
+    }
+
+    // SQL Server's # and @ before a name are punctuation, and the name after them is checked.
+    [Fact]
+    public void Check_NameAfterSqlServersPrefix_PassesAsTheName()
+    {
+        var (engine, mapping) = Mapping(SqlDialect.SqlServer);
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+        var table = mapping.Name("orders", quoted: false, NameClass.Table);
+
+        TokenCheck
+            .Check(engine, mapping, [], $"-- name: {query}\nSELECT 1 FROM #{table} JOIN ##{table} ON 1 = 1", null)
+            .ShouldBeNull();
+    }
+
+    // A comment of a call's SQL is checked as query.sql's is.
+    [Fact]
+    public void Check_CommentOfACallsSql_IsRefused() =>
+        Check(Describe(new JsonObject { ["sql"] = "SELECT 1 -- secret" }))
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, "capture.json call 0 'describe' request.sql", "secret"));
+
+    [Fact]
+    public void Check_MemberWithNoRule_IsRefused() =>
+        Check(Describe(new JsonObject { ["secret"] = "GetUsers" }))
+            .ShouldBe(
+                new RenamingRefusal(RefusalStep.Token, "capture.json call 0 'describe' request.secret", "GetUsers")
+            );
+
+    // A dropped member is in no renamed bundle, so one that is there is refused whatever it holds.
+    [Fact]
+    public void Check_DroppedMemberStillPresent_IsRefused()
+    {
+        var server = new JsonObject { ["driver"] = "Npgsql 9.0.3" };
+        var call = new RenamingCall(
+            0,
+            "open",
+            [],
+            new JsonObject
+            {
+                ["request"] = new JsonObject(),
+                ["answer"] = new JsonObject { ["server"] = server },
+            }
+        );
+
+        Check(call)
+            .ShouldBe(
+                new RenamingRefusal(
+                    RefusalStep.Token,
+                    "capture.json call 0 'open' answer.server.driver",
+                    "Npgsql 9.0.3"
+                )
+            );
+    }
+
+    [Fact]
+    public void Check_LabelThatIsNoReplacement_IsRefused()
+    {
+        var (engine, mapping) = Mapping();
+        var type = new JsonObject { ["labels"] = new JsonArray(mapping.Literal("active"), "secret") };
+        var column = new JsonObject { ["type"] = type };
+        var call = new RenamingCall(
+            0,
+            "describe",
+            [],
+            new JsonObject
+            {
+                ["request"] = new JsonObject(),
+                ["answer"] = new JsonObject
+                {
+                    ["description"] = new JsonObject { ["columns"] = new JsonArray(column) },
+                },
+            }
+        );
+
+        TokenCheck
+            .Check(engine, mapping, [call], "SELECT 1", expected: null)
+            .ShouldBe(
+                new RenamingRefusal(
+                    RefusalStep.Token,
+                    "capture.json call 0 'describe' answer.description.columns[].type.labels[]",
+                    "secret"
+                )
+            );
+    }
+
+    // A parameter passes as a replacement, or as a copy of the query's whose parameter is one, after its prefix.
+    [Theory]
+    [InlineData("secret")]
+    [InlineData("@secret")]
+    [InlineData("secret_1")]
+    public void Check_ParameterThatIsNoReplacement_IsRefused(string name)
+    {
+        var (engine, mapping) = Mapping();
+        var id = mapping.Name("id", quoted: false, NameClass.Parameter);
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+        static RenamingCall Parameter(string value) =>
+            Describe(new JsonObject { ["parameters"] = new JsonArray(new JsonObject { ["name"] = value }) });
+        var file = $"-- name: {query}\nSELECT @{id}";
+
+        TokenCheck.Check(engine, mapping, [Parameter($"@{id}"), Parameter($"{id}_2")], file, null).ShouldBeNull();
+        TokenCheck
+            .Check(engine, mapping, [Parameter(name)], file, expected: null)
+            .ShouldBe(
+                new RenamingRefusal(RefusalStep.Token, "capture.json call 0 'describe' request.parameters[].name", name)
+            );
+    }
+
+    // A copy of a query's parameter passes only through a parameter that passes: the capture is checked before
+    // query.sql, so the copy is refused first.
+    [Fact]
+    public void Check_CopyOfAParameterThatIsNoReplacement_IsRefused()
+    {
+        var (engine, mapping) = Mapping();
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+        var call = Describe(
+            new JsonObject { ["parameters"] = new JsonArray(new JsonObject { ["name"] = "secret_1" }) }
+        );
+
+        TokenCheck
+            .Check(engine, mapping, [call], $"-- name: {query}\nSELECT @secret", expected: null)
+            .ShouldBe(
+                new RenamingRefusal(
+                    RefusalStep.Token,
+                    "capture.json call 0 'describe' request.parameters[].name",
+                    "secret_1"
+                )
+            );
+    }
+
+    [Fact]
+    public void Check_WholeNameThatIsNoReplacement_IsRefused()
+    {
+        var engine = new FakeEngineRenaming(
+            rules: new Dictionary<string, FieldRule?>
+            {
+                ["describe request.clrType"] = FieldRule.WholeName(NameClass.Type),
+            }
+        );
+        var mapping = new NameMapping(RenamingBundles.Key(1), engine.Fold);
+        var type = mapping.Name("MyApp.Money, MyApp", quoted: true, NameClass.Type);
+
+        TokenCheck
+            .Check(engine, mapping, [Describe(new JsonObject { ["clrType"] = type })], "SELECT 1", null)
+            .ShouldBeNull();
+        TokenCheck
+            .Check(engine, mapping, [Describe(new JsonObject { ["clrType"] = "MyApp.Money, MyApp" })], "SELECT 1", null)
+            .ShouldBe(
+                new RenamingRefusal(
+                    RefusalStep.Token,
+                    "capture.json call 0 'describe' request.clrType",
+                    "MyApp.Money, MyApp"
+                )
+            );
+    }
+
+    // An engine's own string is checked word by word: a literal and a quoted name by their content, and one character
+    // of punctuation passes.
+    [Theory]
+    [InlineData("secret", "secret")]
+    [InlineData("'secret'", "secret")]
+    [InlineData("\"secret\"", "secret")]
+    [InlineData(";;", ";;")]
+    public void Check_OwnWordOfTheUser_IsRefused(string word, string token)
+    {
+        var (engine, mapping) = Mapping();
+
+        TokenCheck
+            .Check(engine, mapping, [Open($"public, ; {word}")], "SELECT 1", expected: null)
+            .ShouldBe(
+                new RenamingRefusal(
+                    RefusalStep.Token,
+                    "capture.json call 0 'open' answer.server.settings[].value",
+                    token
+                )
+            );
+    }
+
+    // The entry is checked after query.sql: its key, a member by the sidecar's table, and a member with no rule.
+    [Theory]
+    [InlineData("secret", "{}", "expected.json", "secret")]
+    [InlineData(
+        null, /*lang=json,strict*/
+        """{"columns": [{"name": "secret"}]}""",
+        "expected.json columns[].name",
+        "secret"
+    )]
+    [InlineData(
+        null, /*lang=json,strict*/
+        """{"database": "secret"}""",
+        "expected.json database",
+        "secret"
+    )]
+    [InlineData(
+        null, /*lang=json,strict*/
+        """{"secret": "x"}""",
+        "expected.json secret",
+        "x"
+    )]
+    public void Check_EntryTokenOfTheUser_IsRefused(string? key, string entry, string place, string token)
+    {
+        var (engine, mapping) = Mapping();
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+        static string Sidecar(string name, string body) =>
+            new JsonObject { ["queries"] = new JsonObject { [name] = JsonNode.Parse(body) } }.ToJsonString();
+
+        TokenCheck
+            .Check(
+                engine,
+                mapping,
+                [],
+                $"-- name: {query}\nSELECT 1",
+                Sidecar(
+                    query, /*lang=json,strict*/
+                    """{"database": "postgres"}"""
+                )
+            )
+            .ShouldBeNull();
+        TokenCheck
+            .Check(engine, mapping, [], $"-- name: {query}\nSELECT 1", Sidecar(key ?? query, entry))
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, place, token));
+    }
+
+    // The check of the calls given, with an empty query.sql.
+    private static RenamingRefusal? Check(params RenamingCall[] calls)
+    {
+        var (engine, mapping) = Mapping();
+        return TokenCheck.Check(engine, mapping, calls, "SELECT 1", expected: null);
     }
 }
