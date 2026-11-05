@@ -69,6 +69,24 @@ public sealed class BundleJsonTests
         read.Failure.Arguments.ToArray().ShouldBe(["bundleVersion", "2", "1"]);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Read_BundleVersionBelowOne_IsSqlsrc288(int version)
+    {
+        var text = BundleJson
+            .Write(Info)
+            .Replace("\"bundleVersion\": 1,", $"\"bundleVersion\": {version},", System.StringComparison.Ordinal);
+
+        var read = BundleJson.Read(text, Path);
+
+        read.Succeeded.ShouldBeFalse();
+        read.Failure.Descriptor.Id.ShouldBe("SQLSRC288");
+        read.Failure.Path.ShouldBe(Path);
+        read.Failure.Arguments.Single()
+            .ShouldBe($"the bundleVersion of bundle.json is {version}, which no sqlsource writes");
+    }
+
     [Fact]
     public void Read_NoEngine_IsSqlsrc288NamingEngine()
     {
