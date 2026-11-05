@@ -24,7 +24,7 @@ SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/Databa
 
 Every database image the tests run is pinned to a major and a minor, such as `postgres:18.6`, and never to a bare major such as `postgres:18`.  The recorded fixtures carry the version of the server they were recorded against, and a bare major moves to each new minor without a word, so the tests would run a server the recordings never saw.  This holds for the default image, for the image CI runs on the oldest supported version, for the images of the nightly run, and for the image of any engine added later.  `PostgresDatabasesTests` fails, on `EngineImage.Postgres.Image`, on an image whose tag is not a major and a minor, or whose server reports another version, and `FixtureVersionTests` fails on a fixture case recorded against any version but the default image's.
 
-Moving to a new minor is a change of its own: bump the tag, here and in `examples/PostgresExamples/Postgis/Dockerfile`, record the fixtures again on the new image, as in [the describer's fixtures](#the-describers-fixtures), write the sidecars of the end-to-end project, of the realistic cases and of the examples again, as in [writing the sidecars](#writing-the-sidecars), since each entry holds the server's version, and read the diff, all in the same pull request.  Nothing is recorded on `postgres:14.24`: moving it bumps its tag here, in `CONTRIBUTING.md`, in `.github/workflows/build.yml` and in the root `AGENTS.md`, and runs the tests on it.  The nightly run, `.github/workflows/nightly.yml`, runs the tests on every supported major between the floor and the default, on `postgres:15.19`, `postgres:16.15` and `postgres:17.11`.  Nothing is recorded on them either: moving one bumps its tag here, in `.github/workflows/nightly.yml` and in the root `AGENTS.md`, and runs the tests on it.
+Moving to a new minor is a change of its own: bump the tag, here and in `examples/PostgresExamples/Postgis/Dockerfile`, record the fixtures again on the new image, as in [the describer's fixtures](#the-describers-fixtures), write the sidecars of the end-to-end project, of the realistic cases and of the examples again, as in [writing the sidecars](#writing-the-sidecars), since each entry holds the server's version, add the new image's words to [the renaming's vocabulary](#the-renamings-vocabulary), and read the diff, all in the same pull request.  Nothing is recorded on `postgres:14.24` but its words in the renaming's vocabulary: moving it adds the new image's words, bumps its tag here, in `CONTRIBUTING.md`, in `.github/workflows/build.yml` and in the root `AGENTS.md`, and runs the tests on it.  The nightly run, `.github/workflows/nightly.yml`, runs the tests on every supported major between the floor and the default, on `postgres:15.19`, `postgres:16.15` and `postgres:17.11`.  Nothing is recorded on them either: moving one bumps its tag here, in `.github/workflows/nightly.yml` and in the root `AGENTS.md`, and runs the tests on it.
 
 ### The PostGIS image
 
@@ -48,6 +48,17 @@ A case of the walk is named `walk-` and its shape, and `tests/SqlSource.Tool.Tes
 4. Run the script.
 
 `FixtureCasesTests` describes such a case with its settings, and `DescribeCommandTests` leaves it out, since a run of the command cannot turn a join method off.
+
+## The renaming's vocabulary
+
+The words that the renaming of a bug-report bundle keeps verbatim are a committed list, `src/SqlSource.Tool/Bundles/Renaming/Postgres/postgres-vocabulary.txt`, embedded in the tool: the words of `pg_get_keywords()`, the names of `pg_catalog`'s functions, operators and types, `information_schema`'s types and the system columns of `pg_class`, each folded, one a line and sorted by ordinal, after a header whose lines start with `# `.  It is the union of the words of `postgres:14.24` and of the default image, since a word that only a newer server knows is still the engine's word in a bundle from it.  `Renaming/VocabularyTests.cs` reads them from the container: `Vocabulary_OfThisImage_IsInTheCommittedList` fails when the run's image has a word the list lacks, and skips on any image but those two.  Its explicit test, `Record_TheImagesWords_MergesThemIntoTheList`, adds the run's image's words to the list.  The list is never edited by hand; it is made again, and its diff read, when either image moves:
+
+```bash
+SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/DatabaseTests/Postgres -- --filter-class "SqlSource.DatabaseTests.Postgres.Renaming.VocabularyTests" --explicit only
+dotnet test --project tests/DatabaseTests/Postgres -- --filter-class "SqlSource.DatabaseTests.Postgres.Renaming.VocabularyTests" --explicit only
+```
+
+A word that only an image no longer used holds stays in the list; to drop one, empty the list but its header and run both commands.
 
 ## The realistic corpus
 
