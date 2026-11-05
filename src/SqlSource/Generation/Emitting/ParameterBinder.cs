@@ -128,14 +128,8 @@ internal abstract class ParameterBinder
             return;
         }
 
-        _ = builder
-            .Append(context.Parameters)
-            .Append('.')
-            .Append(bound.Property)
-            .Append(" is { } ")
-            .Append(context.Names.Value)
-            .Append(" ? ")
-            .Append(cast);
+        AppendMatch(context, bound);
+        _ = builder.Append(cast);
         var value = ArrayOf(bound, context.Names.Value);
         if (write.IsByElement)
         {
@@ -147,6 +141,21 @@ internal abstract class ParameterBinder
         }
 
         _ = builder.Append(" : ").Append(nullText);
+    }
+
+    /// <summary>
+    /// Appends the match of the property's value that is not null, <c>parameters.X is { } value ? </c>, before the
+    /// arm that reads <c>value</c>, the pattern variable of <see cref="ConversionNames.Value" />.
+    /// </summary>
+    protected static void AppendMatch(in BindingContext context, MethodParameter bound)
+    {
+        _ = context
+            .Builder.Append(context.Parameters)
+            .Append('.')
+            .Append(bound.Property)
+            .Append(" is { } ")
+            .Append(context.Names.Value)
+            .Append(" ? ");
     }
 
     // The value, the pattern variable of the property's value that is not null, as an array: as it is, unless the

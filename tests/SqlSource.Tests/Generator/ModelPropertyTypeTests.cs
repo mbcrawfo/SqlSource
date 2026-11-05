@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
+using System;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -67,6 +68,59 @@ public sealed class ModelPropertyTypeTests
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("(int[] Ids);");
+    }
+
+    // The marker is found by the parameter's name ignoring case, as the typing finds it: in the SQL's spelling, which
+    // the tool writes, and in another, which only a person who edited the sidecar writes.
+    [Theory]
+    [InlineData("Ids", false)]
+    [InlineData("ids", true)]
+    public void InputModel_MarkerClrTypeOfANameInAnotherCase_IsTakenAsWritten(string entryName, bool handEdited)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: FindIds\n-- param: @ids -> int[]\nSELECT 1 WHERE 1 = ANY (@Ids);\n"
+        );
+        var entry = Entry(file, "FindIds", [Parameter(entryName, IntArray, false)], null);
+
+        var run = GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [file, handEdited ? Sidecars.HandEdited(file, entry) : Sidecars.Of(file, entry)],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.ShouldBeClean();
+        run.Sources[ParamsModel].ShouldContain("(int[] Ids);");
+    }
+
+    // An array of a library's type is an IEnumerable of it at CodeGen, and at Models, which has the base map's type
+    // without the library, the base map's array, so both of the other outputs' changes apply to the one property.
+    [Theory]
+    [InlineData(nameof(OutputKind.CodeGen), Enumerable + "global::NodaTime.Instant> Ids")]
+    [InlineData(nameof(OutputKind.Models), "global::System.DateTime[] Ids")]
+    public void InputModel_ArrayParameterOfALibrarysType_IsItsOutputsType(string output, string expected)
+    {
+        var file = IdsFile("");
+        var instants = ArrayOf(Catalog("timestamptz") with { Name = "timestamp with time zone" }, "_timestamptz");
+
+        var run = GeneratorHarness.Run(
+            Enum.Parse<OutputKind>(output),
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [file, Sidecars.Of(file, Entry(file, "FindIds", [Parameter("ids", instants, false)], null))],
+            references:
+            [
+                NpgsqlReferences.Npgsql10,
+                LibraryReferences.NodaTime("3.3.7"),
+                LibraryReferences.NpgsqlNodaTime("10.0.3"),
+            ],
+            dialect: "postgres"
+        );
+
+        run.ShouldBeClean();
+        var model = run.Sources[ParamsModel];
+        model.ShouldContain("(" + expected + ");");
     }
 
     // bytea is no array of the database's, and a multirange is an array of the C# alone.

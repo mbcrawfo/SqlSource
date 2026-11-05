@@ -155,13 +155,8 @@ internal sealed class PostgresParameterBinder : ParameterBinder
         else if (bound.IsArraySequence)
         {
             var value = context.Names.Value;
+            AppendMatch(context, bound);
             _ = builder
-                .Append(context.Parameters)
-                .Append('.')
-                .Append(bound.Property)
-                .Append(" is { } ")
-                .Append(value)
-                .Append(" ? ")
                 .Append(value)
                 .Append(" as ")
                 .Append(IList)

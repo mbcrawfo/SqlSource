@@ -102,13 +102,7 @@ internal sealed record MethodParameter(
     /// is matched, as a value that can be null, and copied into an array where it must be one.  A list's elements are
     /// each bound as a value of the element's type.  It is computed, so it takes no part in equality.
     /// </summary>
-    public bool IsArraySequence =>
-        Sequence switch
-        {
-            ParameterSequence.Array => true,
-            ParameterSequence.None or ParameterSequence.List => false,
-            _ => throw UnexpectedEnumValueException.Of(Sequence),
-        };
+    public bool IsArraySequence => ParameterSequences.IsArray(Sequence);
 }
 
 /// <summary>

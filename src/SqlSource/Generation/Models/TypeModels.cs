@@ -233,12 +233,7 @@ internal static class TypeModels
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            var isArray = property.Sequence switch
-            {
-                ParameterSequence.Array => true,
-                ParameterSequence.None or ParameterSequence.List => false,
-                _ => throw UnexpectedEnumValueException.Of(property.Sequence),
-            };
+            var isArray = ParameterSequences.IsArray(property.Sequence);
             if (property.Type.WithoutLibrary is null && !isArray)
             {
                 picked?.Add(property);

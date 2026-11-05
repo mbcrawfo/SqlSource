@@ -1,3 +1,4 @@
+using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types;
 
 namespace SqlSource.Generation.Models;
@@ -43,7 +44,7 @@ internal sealed record ModelProperty(
         Sequence switch
         {
             ParameterSequence.None => Type.Text,
-            ParameterSequence.Array => Enumerable + Type.Text.Substring(0, Type.Text.Length - 2) + ">",
+            ParameterSequence.Array => Enumerable + (ConversionPlanner.ElementOf(Type.Text) ?? Type.Text) + ">",
             ParameterSequence.List => Enumerable + Type.Text + ">",
             _ => throw UnexpectedEnumValueException.Of(Sequence),
         };
