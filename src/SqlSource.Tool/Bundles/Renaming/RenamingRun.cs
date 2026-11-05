@@ -104,7 +104,7 @@ internal sealed class RenamingRun
         var (stem, _) = MarkOf(value);
         if (engineRow)
         {
-            Mapping.Keep(stem, IsQuoted(cls));
+            Mapping.KeepFromEngineRow(stem, IsQuoted(cls));
         }
         else
         {

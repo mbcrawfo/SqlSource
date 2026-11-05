@@ -63,8 +63,8 @@ internal interface IEngineRenaming
     /// <summary>
     /// Whether a row of an answer is the engine's own, whose names are kept: a type or relation of
     /// <c>pg_catalog</c> or <c>information_schema</c>, a row of <c>sys</c> or of a system database.  The renaming asks
-    /// before it renames the row's names, and keeps every name of a row this says is the engine's.  It decides by the
-    /// row alone and changes nothing.
+    /// before it renames the row's names, and keeps every name of a row this says is the engine's, which the token
+    /// check then trusts wherever it is spelled.  It decides by the row alone and changes nothing.
     /// </summary>
     /// <param name="method">The call's method.</param>
     /// <param name="path">The path of the row from the call, such as <c>answer.rows[]</c>.</param>
@@ -87,7 +87,10 @@ internal interface IEngineRenaming
     /// <summary>
     /// Registers the names that only the engine finds, before the query's SQL is renamed and after the catalog fields
     /// of every call: a plan's name keys, through <see cref="IRenamingScope.Name" /> or
-    /// <see cref="IRenamingScope.Keep" />.  Called once for each call, in order.  It writes nothing into the call.
+    /// <see cref="IRenamingScope.Keep" />.  A spelling it keeps passes the token check only where
+    /// <see cref="IsEngineWord" /> keeps it, since the check trusts no kept spelling but those of a row that
+    /// <see cref="IsEngineRow" /> said is the engine's.  Called once for each call, in order.  It writes nothing into
+    /// the call.
     /// </summary>
     void Register(RenamingCall call, IRenamingScope scope);
 

@@ -17,7 +17,7 @@ How a bundle, `replay` and the renaming work: [`bundles.md`](../../../docs/archi
 - **A renaming refuses what it cannot rename safely, and never guesses or blanks a value**: it returns a `RenamingRefusal` at the place, with the token found.
 - **A member with no `FieldRule` is a refusal**, at its place.  A member the pipeline reads gets a rule, and any other `FieldRule.Drop`.
 - **Every replacement comes from the run's `NameMapping`**, through `IRenamingScope`; an engine's part writes no name of its own making.
-- **The token check trusts nothing the renaming kept** but the mapping's replacements and kept spellings and the engine's words, so a fix that makes it pass by trusting the renamer defeats it.
+- **The token check trusts nothing the renaming kept** but the mapping's replacements, the spellings it kept from an engine's row and the engine's words, so a fix that makes it pass by trusting the renamer, or a spelling kept through `IRenamingScope.Keep`, defeats it.
 - **The run's `RenamingKey` is never written, logged or printed**, and its `ToString` names only its type.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

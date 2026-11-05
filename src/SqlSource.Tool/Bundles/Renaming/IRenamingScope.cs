@@ -13,7 +13,12 @@ internal interface IRenamingScope
     /// </summary>
     string Name(string spelling, bool quoted, NameClass cls);
 
-    /// <summary>Keeps a spelling verbatim from here on: a name of the engine's, which then maps to itself.</summary>
+    /// <summary>
+    /// Keeps a spelling verbatim from here on: a name of the engine's, which then maps to itself.  The token check
+    /// does not trust a spelling kept here: it passes only where <see cref="IEngineRenaming.IsEngineWord" /> keeps
+    /// it, unlike a name the renaming kept from a row that <see cref="IEngineRenaming.IsEngineRow" /> said is the
+    /// engine's.
+    /// </summary>
     void Keep(string spelling, bool quoted);
 
     /// <summary>Whether a spelling already has a replacement or is kept.</summary>

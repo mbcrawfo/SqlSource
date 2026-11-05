@@ -104,6 +104,35 @@ public sealed class NameMappingTests
         mapping.Names.ShouldBeEmpty();
     }
 
+    // Only a spelling kept from an engine's row is kept for the token check; one kept otherwise maps to itself alone.
+    [Fact]
+    public void IsKeptFromEngineRow_OnlyASpellingKeptFromARow_IsTrue()
+    {
+        var mapping = Mapping();
+
+        mapping.Keep("users", false);
+        mapping.KeepFromEngineRow("regdictionary", false);
+
+        mapping.IsKeptFromEngineRow("users", false).ShouldBeFalse();
+        mapping.TryGet("users", false, out var kept).ShouldBeTrue();
+        kept.ShouldBe("users");
+        mapping.IsKeptFromEngineRow("REGDICTIONARY", false).ShouldBeTrue();
+        mapping.Name("regdictionary", false, NameClass.Type).ShouldBe("regdictionary");
+        mapping.Names.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void KeepFromEngineRow_AfterName_KeepsTheReplacementAndIsNotKept()
+    {
+        var mapping = Mapping();
+        var replacement = mapping.Name("users", false, NameClass.Table);
+
+        mapping.KeepFromEngineRow("users", false);
+
+        mapping.Name("users", false, NameClass.Table).ShouldBe(replacement);
+        mapping.IsKeptFromEngineRow("users", false).ShouldBeFalse();
+    }
+
     [Fact]
     public void Keep_AfterName_KeepsTheReplacement()
     {

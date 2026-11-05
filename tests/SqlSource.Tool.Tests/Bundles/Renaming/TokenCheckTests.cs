@@ -250,4 +250,24 @@ public sealed class TokenCheckTests
             .Check(engine, mapping, [], $"-- dialect: postgres\n-- name: {query} -> Many\nSELECT 1", expected: null)
             .ShouldBeNull();
     }
+
+    // A spelling an engine's part keeps through the scope maps to itself, but the check trusts it no more than any
+    // other word: it passes only as a word of the engine's.
+    [Fact]
+    public void Check_SpellingKeptThroughTheScope_IsRefusedUnlessAnEngineWord()
+    {
+        var (engine, mapping) = Mapping();
+        var scope = RenamingRun.For(engine, mapping, "SELECT 1").At("capture.json call 0 'describe'");
+        scope.Keep("users", quoted: true);
+        scope.Keep("integer", quoted: true);
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+
+        scope.Name("users", quoted: true, NameClass.Table).ShouldBe("users");
+        TokenCheck
+            .Check(engine, mapping, [], $"-- name: {query}\nSELECT 1 FROM \"users\"", expected: null)
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "users"));
+        TokenCheck
+            .Check(engine, mapping, [], $"-- name: {query}\nSELECT 1::\"integer\"", expected: null)
+            .ShouldBeNull();
+    }
 }
