@@ -40,7 +40,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `output` in a settings file; `-- output:` in the file header and inside a query | Works today |
 | [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `database` in a settings file; `-- database:` in the file header and inside a query | Works today, for the tool alone |
 | [Dialect](#setting-dialect) | A dialect's name, with options for `mysql` and `mariadb`: see [the dialects page](dialects.md#choosing-a-dialect).  Default `ansi` | `dialect` in a settings file; `-- dialect:` in the file header | Works today |
-| [Generator parameters](#setting-generator-parameters) | Words separated by spaces, or an array of them in a settings file: `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `default`.  Default: `token-validation`, `table-models` and `array-pool` on, the others off | `generatorParameters` in a settings file; `-- generator:` in the file header and inside a query | Works today |
+| [Generator parameters](#setting-generator-parameters) | Words separated by spaces, or an array of them in a settings file, each a parameter alone or with `=on`, `=off` or `=default`, or `default` alone.  The parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix` and `array-pool`, and each place turns on or off only those it names.  Default: `token-validation`, `table-models` and `array-pool` on, the others off | `generatorParameters` in a settings file; `-- generator:` in the file header and inside a query | Works today |
 | [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `inputModelSuffix`, `outputModelSuffix` in a settings file; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header | Works today |
 | [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `modelNamespace` in a settings file; `-- model-namespace:` in the file header | Works today |
 | [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `inputModelType`, `outputModelType` in a settings file; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query | Works today |
@@ -80,12 +80,11 @@ The rules:
 - **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](#setting-member-location).  Only what follows from the type itself can differ: the namespace of the models, which is the type's own unless the [model namespace](#setting-model-namespace) is set, and the default [visibility](#setting-visibility) of members on the type, which follows the type's own accessibility.  A type that needs other settings needs a file of its own.
 
-Four exceptions, stated plainly:
+Three exceptions, stated plainly:
 
-- **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
 - **`Source` exists only on the attribute.**  It has nothing to choose between.
-- **A type override, a column type, or a library of the library types, replaces only the keys it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column or a library, replaces the entry below it for that key, and `default` takes the key out.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types) and [library types](#setting-library-types).
+- **A type override, a column type, a library of the library types, or a generator parameter, replaces only what it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column, a library or a generator parameter, replaces the entry below it for that key, and `default` takes the key out.  The generator parameters also take `default` alone, which takes every parameter out, back to its default.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types), [library types](#setting-library-types) and [generator parameters](#setting-generator-parameters).
 
 <a id="a-value-that-is-wrong"></a>
 
@@ -94,7 +93,7 @@ Four exceptions, stated plainly:
 | Written as | Reported as | What happens |
 |----|----|----|
 | A marker | [SQLSRC111](diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
-| A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of a list, unless one is `default` beside another, and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.  Of a key, or an entry, written twice, the first applies.  A file that is not a JSON object gives nothing |
+| A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of `generatorParameters` and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.  Of a key, or an entry, written twice, the first applies, and so does the first of two states of one generator parameter.  A file that is not a JSON object gives nothing |
 
 <a id="setting-output"></a>
 
@@ -199,34 +198,52 @@ SELECT /* the database logs this comment */ id FROM users;
 -- name: Total
 -- generator: token-validation=off
 SELECT COUNT(*) FROM {{table:users}};
+
+-- name: Plain
+-- generator: default
+SELECT /* the database never sees this comment */ id FROM users;
 ```
 
-A [generator parameter](concepts.md#generator-parameter) is a word that changes what SqlSource does with a query.  A list of them is written in a `-- generator:` line, or in `generatorParameters` in a settings file.  A query with no list gets every default: `token-validation`, `table-models` and `array-pool` are on, and the others are off.
+A [generator parameter](concepts.md#generator-parameter) is an option that changes what SqlSource does with a query.  Each is on or off, and a word in a `-- generator:` line, or in `generatorParameters` in a settings file, turns it on or off.  A query that no word reaches gets every default: `token-validation`, `table-models` and `array-pool` are on, and the others are off.
 
-| Parameter | Effect |
-|----|----|
-| `keep-comments` | Comments and blank lines stay in the generated SQL: see [what reaches the generated SQL](sql-files.md#generated-sql) |
-| `token-validation` | On by default.  The method of a query with tokens checks its arguments, and `token-validation=off` turns the check off: see [validation](parameters-and-tokens.md#token-validation) |
-| `sort-input`, `sort-output` | The properties of the query's input model, or of its output model, are sorted by name: see [the order of the properties](generator.md#property-order) |
-| `table-models` | On by default.  A query that reads a whole table gets a row model named after the table, and with `table-models=off` it gets one named after the query: see [table models](generator.md#table-models) |
-| `async-method-suffix` | The name of a query's [method](generator.md#method-signature) ends with `Async`: `GetUserAsync` for `GetUser` |
-| `array-pool` | On by default.  A [`many`](generator.md#method-shapes) method that returns a collection reads its rows into buffers borrowed from .NET's shared array pool, unless it returns an `ImmutableList<T>` or an `IImmutableList<T>`.  Once the pool holds buffers of the sizes it needs, a method that reads through the pool allocates no collection for a result of up to about 1,000 rows but the one it returns.  With `array-pool=off`, every such method reads its rows into a collection that it allocates and grows, as hand-written code usually does, and as a method that returns one of the two immutable lists always does.  Turn it off to keep the pool out of a project, or to compare the two.  A method that [streams its rows](#streaming-rows) holds no collection, so it is the same with `array-pool` on or off |
-| `default` | The empty list: every default.  `default` must be the only word in its list, though it may be repeated |
+| Parameter | Default | Effect |
+|----|----|----|
+| `keep-comments` | off | Comments and blank lines stay in the generated SQL: see [what reaches the generated SQL](sql-files.md#generated-sql) |
+| `token-validation` | on | The method of a query with tokens checks its arguments, and `token-validation=off` turns the check off: see [validation](parameters-and-tokens.md#token-validation) |
+| `sort-input`, `sort-output` | off | The properties of the query's input model, or of its output model, are sorted by name: see [the order of the properties](generator.md#property-order) |
+| `table-models` | on | A query that reads a whole table gets a row model named after the table, and with `table-models=off` it gets one named after the query: see [table models](generator.md#table-models) |
+| `async-method-suffix` | off | The name of a query's [method](generator.md#method-signature) ends with `Async`: `GetUserAsync` for `GetUser` |
+| `array-pool` | on | A [`many`](generator.md#method-shapes) method that returns a collection reads its rows into buffers borrowed from .NET's shared array pool, unless it returns an `ImmutableList<T>` or an `IImmutableList<T>`.  Once the pool holds buffers of the sizes it needs, a method that reads through the pool allocates no collection for a result of up to about 1,000 rows but the one it returns.  With `array-pool=off`, every such method reads its rows into a collection that it allocates and grows, as hand-written code usually does, and as a method that returns one of the two immutable lists always does.  Turn it off to keep the pool out of a project, or to compare the two.  A method that [streams its rows](#streaming-rows) holds no collection, so it is the same with `array-pool` on or off |
+| `default` | | No parameter of its own: every parameter takes its default at the place that says it, and the place's other words apply over it |
 
-Words are matched ignoring case.
+**A word** is `name`, `name=on`, `name=off` or `name=default`, with no space around its `=`, since a `-- generator:` line separates its words by white space.  `name` alone is `name=on`.  `name=default` gives the parameter its default, whatever the places below say.  Names and states are matched ignoring case: `Keep-Comments=OFF` is `keep-comments=off`.
 
-**A list replaces; it never adds.**  In the example, `Total` has the list `token-validation=off` and nothing else: it does not keep its comments, though the file header says `keep-comments`.  A query that wants both writes both, `-- generator: keep-comments token-validation=off`.  `-- generator: default` gives a query every default, whatever its file says.
+**`default` alone gives every parameter its default**, and the other words of its place apply over it, wherever it stands among them.  `-- generator: default keep-comments` is every default with `keep-comments` on, and so is `-- generator: keep-comments default`.  It may be repeated.
 
-The list for a query is the first of these that gives one, whole:
+**Each place turns parameters on or off over the places below it.**  A place changes only the parameters it names, and every other parameter keeps the state the places below give it.  In the example, the file header turns `keep-comments` on for every query of the file.  `Report` keeps its comments.  `Total` turns `token-validation` off and says nothing of `keep-comments`, so it skips the token check and keeps its comments too.  `Plain` gives every parameter its default, whatever its file says, so it does not keep its comments.
 
-1. The `-- generator:` lines inside the query.
+The places, from the farthest to the nearest:
+
+1. `generatorParameters` in each settings file of the file's folder and of the folders above it, up to the first that says `"root": true`, from the farthest to the nearest.
 2. The `-- generator:` lines in the file header.
-3. `generatorParameters` in the nearest settings file of the file's folder, or of a folder above it, that sets it.
-4. `generatorParameters` in each farther settings file, nearest first.
+3. The `-- generator:` lines inside the query.
 
-Several `-- generator:` lines in one place are one list: two lines in a query add up.  A list never adds to the list of another place.
+A parameter has the state of the nearest place that names it, and its default when none does.  `default` names every parameter, so nothing below the place that says it matters.
 
-In a settings file the list is an array of strings, one word in each: `"generatorParameters": ["keep-comments", "token-validation=off"]`.  `[]` is the empty list, every default, and so is `["default"]`; an element that is empty or white space is skipped.  `default` beside another word makes the whole value wrong, [SQLSRC019](diagnostics.md#sqlsrc019), and the file's list is then not set, so a farther one applies.  A word that is not a generator parameter is reported the same way, and the other words of the list still apply; a list that has words, none of them a generator parameter, is not set, so a farther one applies.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
+**The lines of one place add up.**  Several `-- generator:` lines in the file header are one place, and so are several inside one query.  A file with no `-- name:` line is one query and one place, so all of its `-- generator:` lines add up, wherever they stand: `keep-comments` at its top and `keep-comments=off` lower down contradict each other, and the second does not override the first.
+
+**In a settings file** the value is an array of strings, one word in each: `"generatorParameters": ["sort-output", "token-validation=off"]`.  `[]` names no parameter, so it changes nothing, and `["default"]` gives every parameter its default, whatever the folders above say.  An element that is empty or white space is skipped.
+
+**A mistake** is reported where it is written:
+
+| Mistake | In a `-- generator:` line | In a settings file |
+|----|----|----|
+| A word that is not a generator parameter, such as `keep-coments` | [SQLSRC109](diagnostics.md#sqlsrc109) | [SQLSRC019](diagnostics.md#sqlsrc019) at the element, and the other elements apply |
+| A state that is not `on`, `off` or `default`, such as `keep-comments=yes`, or `default` with a state | [SQLSRC111](diagnostics.md#sqlsrc111) | [SQLSRC019](diagnostics.md#sqlsrc019) at the element, and the other elements apply |
+| A line with nothing after the colon | [SQLSRC110](diagnostics.md#sqlsrc110) | |
+| One parameter given two different states in one place, such as `keep-comments` and `keep-comments=off`.  `keep-comments=default` beside either is one too, even where the default is the same | [SQLSRC112](diagnostics.md#sqlsrc112), at the later word | [SQLSRC020](diagnostics.md#sqlsrc020), at the later element, and the first applies |
+
+A mistake in a `-- generator:` line leaves its file without members until it is fixed, as [a value that is wrong](#a-value-that-is-wrong) says.  The same state given twice is no mistake, and nor is `default` beside other words.
 
 <a id="setting-model-suffix"></a>
 
@@ -839,15 +856,15 @@ A project reads its `.sql` files as PostgreSQL and keeps the comments of its que
 // Legacy/sqlsource.json
 {
     "dialect": "mysql",
-    "generatorParameters": ["keep-comments", "token-validation=off"],
+    "generatorParameters": ["token-validation=off"],
 }
 ```
 
 Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the token check.  Every other file is untouched: it is read as `postgres`, keeps its comments, and checks its tokens.  Three things to notice:
 
-- The folder's list says `keep-comments` again.  A list replaces the project's whole, so a folder that wants what the project asks for repeats it.  Without it, the files of `Legacy/` would lose their comments.
-- The dialect is a value of its own too.  Had the project's file set `"mysql,ansi-quotes"` as its dialect, this folder would still be read as plain `mysql`.
-- A file's own marker still wins: a `-- generator: default` or a `-- dialect: mariadb` in one of the files overrides both settings files.  See [which place wins](#precedence).
+- The folder's list names only `token-validation=off`.  It adds to the project's list, so the files of `Legacy/` keep their comments without saying so.  A folder that wants none of the project's list starts its own with `default`: `["default", "token-validation=off"]` would give `Legacy/` every default but the token check.
+- The dialect takes the nearest value whole.  Had the project's file set `"mysql,ansi-quotes"` as its dialect, this folder would still be read as plain `mysql`.
+- A file's own markers still win.  A `-- generator:` line in one of the files adds its words to the list of both settings files, and `-- generator: default` drops that list, and a `-- dialect: mariadb` overrides both settings files.  See [which place wins](#precedence).
 
 The file in `Legacy/` applies to the `.sql` files of its subfolders too, `Legacy/Reports/` among them, unless a settings file nearer to them sets the same setting.  Every setting of a query comes from the settings files of its `.sql` file, whichever type claims it, and never from those of a type's C# file.
 
@@ -956,7 +973,7 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 - **A string is read as JSON writes it.**  The white space around it is ignored, and every character inside it is kept, a `;` or a `#` among them; there is no escape but JSON's own.  A string that is empty or white space sets nothing, and is no error.  To leave a setting to the files above, or to its default, leave its key out.
 - **`$schema`** is for your editor, which then checks the keys and values as you write them and offers them as you type: `https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json`.  SqlSource reads nothing of it.
 
-**The settings files of a `.sql` file** are the `sqlsource.json` of its folder and those of each folder above it, to the top of the drive, nearest first.  For each setting the nearest that sets it wins, so a file in a folder sets only what differs from the folders above it; the entries of `typeOverrides`, `columnTypes` and `libraryTypes` add up instead, key by key, as [type overrides](#setting-type-overrides) says.  A file that says `"root": true` is the last: no `sqlsource.json` in a folder above it applies to the files below it.  Put one in the project's folder, or at the top of the repository, so that a settings file above it, elsewhere on the machine, never changes your build.  `"root": false`, or no `root`, lets the search go on.  A file whose text is not JSON ([SQLSRC015](diagnostics.md#sqlsrc015)) gives nothing, its `root` included, so the search goes past it to the folders above.
+**The settings files of a `.sql` file** are the `sqlsource.json` of its folder and those of each folder above it, to the top of the drive, nearest first.  For each setting the nearest that sets it wins, so a file in a folder sets only what differs from the folders above it; the entries of `typeOverrides`, `columnTypes` and `libraryTypes` add up instead, key by key, as [type overrides](#setting-type-overrides) says, and the words of `generatorParameters` parameter by parameter, as [generator parameters](#setting-generator-parameters) says.  A file that says `"root": true` is the last: no `sqlsource.json` in a folder above it applies to the files below it.  Put one in the project's folder, or at the top of the repository, so that a settings file above it, elsewhere on the machine, never changes your build.  `"root": false`, or no `root`, lets the search go on.  A file whose text is not JSON ([SQLSRC015](diagnostics.md#sqlsrc015)) gives nothing, its `root` included, so the search goes past it to the folders above.
 
 - **A `.sql` file that the project lists from another folder**, outside the project's folder, takes the settings files of its own folder and the folders above it, not those of the project's folder.
 - **A settings file in a folder that holds no `.sql` file and no C# file of the project**, in it or in a folder below it, is not read, and applies to nothing.
