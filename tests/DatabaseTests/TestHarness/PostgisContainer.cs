@@ -30,7 +30,10 @@ public abstract class PostgisContainer(DbProviderFactory factory, string postgre
     // first's layers.
     protected override async Task PrepareImageAsync(CancellationToken token)
     {
-        await using var buildLock = await LockBuildsAsync(token);
+        await using var buildLock = await LockBuildsAsync(
+            Path.Combine(Path.GetTempPath(), "sqlsource-postgis-build.lock"),
+            BuildPatience
+        );
         var image = new ImageFromDockerfileBuilder()
             .WithDockerfileDirectory(RepositoryRoot.Path("tests", "DatabaseTests", "TestHarness", "Postgis"))
             .WithDockerfile("Dockerfile")
@@ -43,21 +46,38 @@ public abstract class PostgisContainer(DbProviderFactory factory, string postgre
         await image.CreateAsync(token);
     }
 
+    // How long a build waits for another test process's build of the image to let go of the lock.  A build on a cold
+    // cache pulls the postgres image and PostGIS's packages, a few minutes on CI's runner, so fifteen minutes, as long
+    // as a CI job that runs the tests may take, outlasts any build that is still going and ends one that hangs.
+    private static readonly TimeSpan BuildPatience = TimeSpan.FromMinutes(15);
+
     // FileShare.None locks the file against every other process, and every other handle of this one, until it is
     // disposed.  The file is left in place, since deleting it would let a waiting build lock a new file beside it.
-    private static async Task<FileStream> LockBuildsAsync(CancellationToken token)
+    internal static async Task<FileStream> LockBuildsAsync(string path, TimeSpan patience)
     {
-        var path = Path.Combine(Path.GetTempPath(), "sqlsource-postgis-build.lock");
-        while (true)
+        FileStream? held = null;
+        await Eventually.TrueAsync(
+            () =>
+            {
+                held = TryLock(path);
+                return Task.FromResult(held is not null);
+            },
+            $"Another build of the PostGIS image held {path} for longer than {patience}.",
+            patience
+        );
+        return held ?? throw new InvalidOperationException("The wait for the lock ended without it.");
+    }
+
+    // The lock, or null when another handle holds it.
+    private static FileStream? TryLock(string path)
+    {
+        try
         {
-            try
-            {
-                return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            }
-            catch (IOException exception) when (IsHeldByAnother(exception))
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(250), token);
-            }
+            return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        catch (IOException exception) when (IsHeldByAnother(exception))
+        {
+            return null;
         }
     }
 

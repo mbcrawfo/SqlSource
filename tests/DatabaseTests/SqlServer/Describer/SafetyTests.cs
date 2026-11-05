@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing;
 using Xunit;

@@ -9,6 +9,7 @@ using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Parsing;
+using SqlSource.Testing;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;

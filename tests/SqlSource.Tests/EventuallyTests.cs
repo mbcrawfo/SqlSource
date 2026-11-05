@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Tool.Testing;
+using SqlSource.Testing;
 using Xunit;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tests;
 
 // Eventually is how every wait of the tests waits, and Patience its one limit.
 public sealed class EventuallyTests

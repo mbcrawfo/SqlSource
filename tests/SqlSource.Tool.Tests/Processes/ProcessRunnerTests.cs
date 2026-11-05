@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Processes;
 using SqlSource.Tool.Testing;
 using Xunit;

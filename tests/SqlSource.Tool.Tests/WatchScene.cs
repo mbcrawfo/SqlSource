@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;

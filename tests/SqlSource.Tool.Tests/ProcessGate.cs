@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using SqlSource.Testing;
 using SqlSource.Tool.Processes;
-using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;

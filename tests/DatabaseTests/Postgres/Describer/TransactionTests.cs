@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
