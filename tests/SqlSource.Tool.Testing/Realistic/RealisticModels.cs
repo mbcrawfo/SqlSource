@@ -87,7 +87,7 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
 
     // The output model of the entry: the table's model when the result is a table's columns and the table gives a
     // name, the query's otherwise, as the generator names them.  The corpus has no output-model marker and leaves
-    // no-table-models unset, so the table's or the query's name is the model's.
+    // table-models on, so the table's or the query's name is the model's.
     public Type OutputModelOf(SidecarEntry entry) =>
         ModelNamed(
             (entry.MatchesTable is { } table ? PropertyNames.FromTable(table, engine) : null) ?? entry.Name,

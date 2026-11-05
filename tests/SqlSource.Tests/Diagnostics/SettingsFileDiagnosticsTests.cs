@@ -8,6 +8,7 @@ using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.SettingsFiles;
 using SqlSource.Snapshot.Reading;
+using SqlSource.Tests.Parsing;
 using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;
@@ -75,18 +76,30 @@ public sealed class SettingsFileDiagnosticsTests
             .ShouldBe("'model' is not a valid value of output");
 
     [Fact]
-    public void Create_DefaultBesideAnotherParameter_SaysItStandsAlone()
+    public void Create_GeneratorParameterInTwoStates_IsARepeatAtTheSecondElement()
     {
         const string Text = /*lang=json,strict*/
-            """{ "generatorParameters": ["keep-comments", "Default"] }""";
+            """{ "generatorParameters": ["keep-comments", "keep-comments=off"] }""";
         var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
 
-        Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
+        var diagnostic = SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text));
+
+        diagnostic.Descriptor.Id.ShouldBe("SQLSRC020");
+        diagnostic.Location.Span.ShouldBe(TextSpans.Of(Text, "\"keep-comments=off\""));
+        Message(diagnostic)
             .ShouldBe(
-                "'Default' is not a valid value of generatorParameters.  'default' is the empty list and stands "
-                    + "alone: write [] for it."
+                "'keep-comments=off' is the same key as 'keep-comments' in generatorParameters, and the first applies"
             );
     }
+
+    [Fact]
+    public void Create_DefaultBesideAnotherParameter_IsNoError() =>
+        SettingsFileReader
+            .Read( /*lang=json,strict*/
+                """{ "generatorParameters": ["keep-comments", "Default"] }""",
+                SettingsFile
+            )
+            .Errors.ShouldBeEmpty();
 
     [Fact]
     public void Create_UnknownGeneratorParameter_HasNoHelp() =>

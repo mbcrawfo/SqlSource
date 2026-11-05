@@ -20,7 +20,7 @@ ORDER BY id;
 
 -- name: ListAccountsUntabled
 -- summary: Every account, in a model named after the query.
--- generator: no-table-models
+-- generator: table-models=off
 SELECT *
 FROM dbo.accounts
 ORDER BY id;

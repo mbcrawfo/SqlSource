@@ -1,4 +1,4 @@
--- generator: keep-comments
+-- generator: default keep-comments
 -- member-location: class
 
 -- name: GetOrder

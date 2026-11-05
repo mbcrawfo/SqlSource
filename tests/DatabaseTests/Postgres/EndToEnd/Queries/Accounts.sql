@@ -14,7 +14,7 @@ ORDER BY id;
 
 -- name: ListAccountsUnpooled
 -- summary: ListAccounts again, without the array pool.
--- generator: no-array-pool
+-- generator: array-pool=off
 SELECT *
 FROM accounts
 ORDER BY id;
@@ -27,7 +27,7 @@ ORDER BY id;
 
 -- name: ListAccountsUntabled
 -- summary: Every account, in a model named after the query.
--- generator: no-table-models
+-- generator: table-models=off
 SELECT *
 FROM accounts
 ORDER BY id;
@@ -42,7 +42,7 @@ WHERE id = @accountId;
 -- name: GetAccountNameUnpooled
 -- summary: GetAccountName again, without the array pool.
 -- output-model: AccountName
--- generator: no-array-pool
+-- generator: array-pool=off
 -- input-model: GetAccountNameArgs
 SELECT id, name
 FROM accounts
@@ -66,7 +66,7 @@ ORDER BY id;
 -- name: ListClosedBeforeUnpooled
 -- summary: ListClosedBefore again, without the array pool.
 -- param: @closedBefore timestamptz null
--- generator: no-array-pool
+-- generator: array-pool=off
 -- input-model: ListClosedBeforeArgs
 -- output-model: ListClosedBeforeDto
 SELECT id, name, closed_at

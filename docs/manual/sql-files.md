@@ -187,7 +187,7 @@ SELECT 2;
 
 The summary was meant for `ListUsers`.  Move it under that query's `-- name:` line.
 
-Writing a marker twice in one place is fine when the value is the same, and the generator parameters of several `-- generator:` lines add up.
+Writing a marker twice in one place is fine when the value is the same.  The words of several `-- generator:` lines in one place add up, and a query's add to its file header's: see [generator parameters](settings.md#setting-generator-parameters).
 
 A comment of yours that happens to start with one of the words and a colon, such as `-- summary: see the ticket`, is read as a marker.  Reword it.
 

@@ -12,13 +12,15 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// The generator parameter no-array-pool: read at every level a list is, the nearest list replacing the farther ones
-// whole, and carried to the query's method as QueryMethod.UseArrayPool.  A many method that returns an array, a list,
-// an immutable array or one of their interfaces reads its rows into a pooled buffer without it and into a list or a
-// builder with it; every other method is written the same with it and without it.
+// The generator parameter array-pool: read at every level that gives generator parameters, the nearest level that
+// names it deciding, and carried to the query's method as QueryMethod.UseArrayPool.  A many method that returns an
+// array, a list, an immutable array or one of their interfaces reads its rows into a pooled buffer when it is on and
+// into a list or a builder when it is off; every other method is written the same on and off.
 public sealed class ArrayPoolParameterTests
 {
-    private const string On = "no-array-pool";
+    private const string Unpooled = "array-pool=off";
+
+    private const string Pooled = "array-pool";
 
     private const string Other = "sort-input";
 
@@ -27,17 +29,19 @@ public sealed class ArrayPoolParameterTests
     [Theory]
     // project's file, folder's file, preamble, query
     [InlineData(null, null, null, null, true)]
-    [InlineData(On, null, null, null, false)]
-    [InlineData(On, Default, null, null, true)]
-    [InlineData(On, Other, null, null, true)]
-    [InlineData(null, On, null, null, false)]
-    [InlineData(null, null, On, null, false)]
-    [InlineData(Default, Other, On, null, false)]
-    [InlineData(On, On, Default, null, true)]
-    [InlineData(null, null, On, Other, true)]
-    [InlineData(On, On, On, Default, true)]
-    [InlineData(null, null, Default, On, false)]
-    public void Run_NoArrayPool_ComesWholeFromTheMostSpecificLevelThatGivesAList(
+    [InlineData(Unpooled, null, null, null, false)]
+    [InlineData(Unpooled, Default, null, null, true)]
+    [InlineData(Unpooled, Other, null, null, false)]
+    [InlineData(null, Unpooled, null, null, false)]
+    [InlineData(null, null, Unpooled, null, false)]
+    [InlineData(Default, Other, Unpooled, null, false)]
+    [InlineData(Unpooled, Unpooled, Default, null, true)]
+    [InlineData(null, null, Unpooled, Other, false)]
+    [InlineData(Unpooled, Unpooled, Unpooled, Default, true)]
+    [InlineData(null, null, Default, Unpooled, false)]
+    [InlineData(Unpooled, null, null, Pooled, true)]
+    [InlineData(Pooled, null, null, Unpooled, false)]
+    public void Run_ArrayPool_ComesFromTheMostSpecificLevelThatNamesIt(
         string? projectFile,
         string? folderFile,
         string? preamble,
@@ -70,7 +74,7 @@ public sealed class ArrayPoolParameterTests
     [Theory]
     [InlineData("ImmutableList")]
     [InlineData("IImmutableList")]
-    public void Run_NoArrayPool_LeavesTheGeneratedTextAsItIs(string collection)
+    public void Run_ArrayPoolOff_LeavesTheGeneratedTextAsItIs(string collection)
     {
         var (pooled, unpooled) = RunBoth(collection);
 
@@ -88,7 +92,7 @@ public sealed class ArrayPoolParameterTests
     [InlineData("IList", "new global::System.Collections.Generic.List<")]
     [InlineData("ICollection", "new global::System.Collections.Generic.List<")]
     [InlineData("ImmutableArray", "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<")]
-    public void Run_NoArrayPool_GivesTheTextOfBeforeThePoolForThePooledTypes(string collection, string buffer)
+    public void Run_ArrayPoolOff_GivesTheTextOfBeforeThePoolForThePooledTypes(string collection, string buffer)
     {
         var (pooled, unpooled) = RunBoth(collection);
 
@@ -106,12 +110,12 @@ public sealed class ArrayPoolParameterTests
     [InlineData("one-optional", true)]
     [InlineData("rowcount", false)]
     [InlineData("none", false)]
-    public void Run_NoArrayPool_LeavesTheMethodOfEveryOtherShapeAsItIs(string shape, bool hasRows)
+    public void Run_ArrayPoolOff_LeavesTheMethodOfEveryOtherShapeAsItIs(string shape, bool hasRows)
     {
         var sql = hasRows ? "SELECT id, name FROM users;\n" : "UPDATE users SET name = name;\n";
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers -> " + shape + "\n" + sql);
 
-        var unpooledFile = file with { Text = "-- generator: no-array-pool\n\n" + file.Text };
+        var unpooledFile = file with { Text = "-- generator: array-pool=off\n\n" + file.Text };
 
         var pooled = Run([file], null, hasRows: hasRows);
         var unpooled = Run([unpooledFile], null, hasRows: hasRows);
@@ -122,13 +126,13 @@ public sealed class ArrayPoolParameterTests
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
     }
 
-    // ListUsers of the collection type, without and with no-array-pool, each clean.
+    // ListUsers of the collection type, without and with array-pool=off, each clean.
     private static (GeneratorRun Pooled, GeneratorRun Unpooled) RunBoth(string collection)
     {
         var query = "\n-- name: ListUsers\nSELECT id, name FROM users;\n";
         var collectionType = "-- collection-type: " + collection + "\n";
         var file = new SqlFile(GeneratorHarness.UsersPath, collectionType + query);
-        var unpooledFile = file with { Text = collectionType + "-- generator: no-array-pool\n" + query };
+        var unpooledFile = file with { Text = collectionType + "-- generator: array-pool=off\n" + query };
 
         var pooled = Run([file], null);
         var unpooled = Run([unpooledFile], null);

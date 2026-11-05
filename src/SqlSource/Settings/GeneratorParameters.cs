@@ -3,23 +3,24 @@ using System;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The switches a list of generator parameters can hold.  Each is a departure from a default, so the empty list is
-/// every default.
+/// The generator parameters: the switches a level can name, each on or off.  Most are off by default;
+/// <see cref="TokenValidation" />, <see cref="TableModels" /> and <see cref="ArrayPool" /> are on, and
+/// <see cref="GeneratorParameterList.Defaults" /> names them.
 /// </summary>
 [Flags]
 internal enum GeneratorParameters
 {
-    /// <summary>The empty list.</summary>
+    /// <summary>No parameter.</summary>
     None = 0,
 
     /// <summary><c>keep-comments</c>: comments and blank lines stay in the SQL.</summary>
     KeepComments = 1,
 
     /// <summary>
-    /// <c>no-token-validation</c>: a query's token method and query method do not check that each token's argument has
-    /// text.
+    /// <c>token-validation</c>: a query's token method and query method check that each token's argument has text.
+    /// On by default.
     /// </summary>
-    NoTokenValidation = 2,
+    TokenValidation = 2,
 
     /// <summary><c>sort-input</c>: an input model's properties are sorted by name.</summary>
     SortInput = 4,
@@ -27,12 +28,16 @@ internal enum GeneratorParameters
     /// <summary><c>sort-output</c>: an output model's properties are sorted by name.</summary>
     SortOutput = 8,
 
-    /// <summary><c>no-table-models</c>: a query whose result is a table gets a model of its own.</summary>
-    NoTableModels = 16,
+    /// <summary>
+    /// <c>table-models</c>: a query whose result is a table gets a model named after the table.  On by default.
+    /// </summary>
+    TableModels = 16,
 
     /// <summary><c>async-method-suffix</c>: a generated method's name ends in <c>Async</c>.</summary>
     AsyncMethodSuffix = 32,
 
-    /// <summary><c>no-array-pool</c>: a query's method reads its rows without the shared array pool.</summary>
-    NoArrayPool = 64,
+    /// <summary>
+    /// <c>array-pool</c>: a query's method reads its rows through the shared array pool.  On by default.
+    /// </summary>
+    ArrayPool = 64,
 }

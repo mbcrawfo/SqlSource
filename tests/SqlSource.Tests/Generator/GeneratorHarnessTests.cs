@@ -67,7 +67,10 @@ public sealed class GeneratorHarnessTests
         var file = StepOutputs.Single<ListedSettingsFile>(run, TrackingNames.SettingsFile);
         file.Path.ShouldBe(GeneratorHarness.ProjectSettingsPath);
         file.File.Errors.ShouldBeEmpty();
-        file.File.Level.Parameters.ShouldBe(GeneratorParameters.SortOutput | GeneratorParameters.KeepComments);
+        file.File.Level.Parameters.Resolve()
+            .ShouldBe(
+                GeneratorParameterList.Defaults | GeneratorParameters.SortOutput | GeneratorParameters.KeepComments
+            );
     }
 
     // A value is escaped as JSON escapes it, here a quote and a line break, and the words are an array.  The dialect

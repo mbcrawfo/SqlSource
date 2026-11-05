@@ -283,7 +283,7 @@ internal sealed class SqlMarkerScope(
     private SettingsLevel BuildLevel()
     {
         if (
-            Generator.Parameters is null
+            Generator.Parameters.IsEmpty
             && _output is null
             && _database is null
             && _inputModelSuffix is null

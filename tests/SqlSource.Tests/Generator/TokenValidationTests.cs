@@ -7,9 +7,10 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// Whether a generated method checks its arguments: a list of generator parameters decides whole, the query's before
-// the file's, and the generatorParameters of the project's settings file decide for a query that has neither.
-// Without any of them it checks.  GeneratorParameterLevelTests has the levels between the file and the project.
+// Whether a generated method checks its arguments: the generator parameters merge per parameter, so the nearest level
+// that names token-validation decides, the query's before the file's and the file's before the generatorParameters
+// of the project's settings file.  When none names it the method checks.  GeneratorParameterLevelTests has the levels
+// between the file and the project.
 public sealed class TokenValidationTests
 {
     private const string Source = """
@@ -26,44 +27,48 @@ public sealed class TokenValidationTests
 
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
-    // The query's list replaces the file's, the file's beats the project's file, and the project's file alone decides
-    // last: the token is validated.
+    // The generator parameters merge per parameter: the query's state of token-validation beats the file's, the
+    // file's beats the project's file, and a level that does not name it leaves it to the one below.  Here the nearest
+    // level that names it leaves validation on, or none does: the token is validated.
     [Theory]
     // Nothing set.
     [InlineData(null, null, null)]
     // The project's file alone.
     [InlineData(null, null, "default")]
     [InlineData(null, null, "")]
-    // The file's list beats the project's file, with or without the switch.
-    [InlineData(null, "default", "no-token-validation")]
-    [InlineData(null, "keep-comments", "no-token-validation")]
-    // The query's list replaces the file's.
-    [InlineData("default", null, "no-token-validation")]
-    [InlineData("default", "no-token-validation", "no-token-validation")]
-    public void Run_MethodWhoseNearestListValidates_ChecksTheToken(
+    // The file's state beats the project's file.
+    [InlineData(null, "default", "token-validation=off")]
+    [InlineData(null, "token-validation", "token-validation=off")]
+    // The query's state beats the file's.
+    [InlineData("default", null, "token-validation=off")]
+    [InlineData("default", "token-validation=off", "token-validation=off")]
+    [InlineData("token-validation=default", "token-validation=off", null)]
+    public void Run_MethodWhoseNearestStateValidates_ChecksTheToken(
         string? queryGeneratorParameter,
         string? fileGeneratorParameter,
         string? projectFile
     ) => ListFromAt(queryGeneratorParameter, fileGeneratorParameter, projectFile).ShouldContain(Check);
 
-    // The same, where the nearest list that says anything turns validation off: the token is not checked.
+    // The same, where the nearest level that names token-validation turns it off: the token is not checked.
     [Theory]
     // The project's file alone.
-    [InlineData(null, null, "no-token-validation")]
-    [InlineData(null, null, " No-Token-Validation ")]
-    // The file's list.
-    [InlineData(null, "no-token-validation", null)]
-    // The query's list replaces the file's.
-    [InlineData("no-token-validation", null, null)]
-    [InlineData("no-token-validation", "default", null)]
-    public void Run_MethodWhoseNearestListTurnsValidationOff_ChecksNothing(
+    [InlineData(null, null, "token-validation=off")]
+    [InlineData(null, null, " Token-Validation=Off ")]
+    // The file's state, or the project's file's under a file that does not name it.
+    [InlineData(null, "token-validation=off", null)]
+    [InlineData(null, "keep-comments", "token-validation=off")]
+    // The query's state beats the file's, or the file's reaches a query that does not name it.
+    [InlineData("token-validation=off", null, null)]
+    [InlineData("token-validation=off", "default", null)]
+    [InlineData("sort-input", "token-validation=off", null)]
+    public void Run_MethodWhoseNearestStateTurnsValidationOff_ChecksNothing(
         string? queryGeneratorParameter,
         string? fileGeneratorParameter,
         string? projectFile
     ) => ListFromAt(queryGeneratorParameter, fileGeneratorParameter, projectFile).ShouldNotContain("Throw");
 
     [Fact]
-    public void Run_ProjectsFileOff_ChangesOnlyTheQueriesWithoutAGeneratorParameter()
+    public void Run_ProjectsFileOff_ChangesOnlyTheQueriesThatDoNotResetIt()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -74,7 +79,7 @@ public sealed class TokenValidationTests
                     "-- name: Plain\nSELECT {{a}};\n-- name: Checked\n-- generator: default\nSELECT {{b}};\n"
                 ),
             ],
-            generatorParameters: "no-token-validation"
+            generatorParameters: "token-validation=off"
         );
 
         run.CompilationErrors.ShouldBeEmpty();

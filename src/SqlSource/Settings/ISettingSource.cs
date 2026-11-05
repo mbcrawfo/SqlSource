@@ -66,8 +66,9 @@ internal interface ISettingSource
     void InvalidPart(SettingId setting, int index);
 
     /// <summary>
-    /// Records that the member at <paramref name="index" /> has the key of the member at <paramref name="first" />, by
-    /// the identity of the setting's map.  It is left out, and the first applies.
+    /// Records that the element or member at <paramref name="index" /> has the key of the one at
+    /// <paramref name="first" />: by the identity of the setting's map for a member, and for an element of the
+    /// generator parameters, the same parameter in another state.  It is left out, and the first applies.
     /// </summary>
     void RepeatedKey(SettingId setting, int index, int first);
 }

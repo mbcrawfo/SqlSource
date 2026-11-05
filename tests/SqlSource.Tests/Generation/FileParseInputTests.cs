@@ -38,15 +38,17 @@ public sealed class FileParseInputTests
             .Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
 
     [Theory]
-    // The chain's list decides.
+    // The chain's state of keep-comments decides.
     [InlineData("keep-comments", true)]
     [InlineData("sort-input keep-comments", true)]
+    [InlineData("keep-comments=on default", true)]
+    [InlineData("keep-comments=off", false)]
     [InlineData("sort-input", false)]
-    // The empty list is a list, which asks for nothing.
+    // Every default, which leaves comments out.
     [InlineData("default", false)]
-    // No list, no comments.
+    // No word, no comments.
     [InlineData(null, false)]
-    public void Resolve_CommentsWanted_IsWhatTheChainsListAsksFor(string? chainParameters, bool expected) =>
+    public void Resolve_CommentsWanted_IsTheChainsStateOfKeepComments(string? chainParameters, bool expected) =>
         Resolve(new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""), ChainOf(null, chainParameters))
             .CommentsWanted.ShouldBe(expected);
 
@@ -76,7 +78,7 @@ public sealed class FileParseInputTests
         return new SettingsChain(
             parameters is null
                 ? SettingsLevel.None
-                : new SettingsLevel { Parameters = GeneratorParameterList.ReadElements(parameters.Split(' '), []) },
+                : new SettingsLevel { Parameters = GeneratorParameterList.ReadElements(parameters.Split(' '), [], []) },
             choice
         );
     }
