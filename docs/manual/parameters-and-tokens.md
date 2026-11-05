@@ -68,7 +68,7 @@ A change to the type or the nullability of a `-- param:` marker, like a change t
 
 ## List parameters
 
-A parameter written directly after `IN` or `NOT IN`, without parentheses, as in `WHERE category IN @categories`, is a list of values rather than one value.  A list can stand only after `IN` or `NOT IN`, or before `IS NULL` or `IS NOT NULL`, and any other use of it, a use in a token's default among them, is [SQLSRC126](diagnostics.md#sqlsrc126).
+> **Coming in a later release.**  A parameter written directly after `IN`, as in `WHERE category IN @categories`, will expand to one parameter per value of the list.  See [what works today](README.md#what-works-today).
 
 <a id="declared-variables"></a>
 

@@ -1,4 +1,6 @@
+using System;
 using System.Data.Common;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
@@ -22,9 +24,13 @@ public abstract class PostgisContainer(DbProviderFactory factory, string postgre
         $"sqlsource-postgis:{EngineImage.TagOf(postgresImage)}-{Package.Split('+')[0]}";
 
     // Builds the image through Docker, which reuses its cached layers.  It is never removed: WithCleanUp(false) keeps
-    // Testcontainers' reaper from it, and the image is not disposed, which would delete it.
+    // Testcontainers' reaper from it, and the image is not disposed, which would delete it.  Testcontainers writes the
+    // build's context to a tar in the temp folder named after the image, so two test projects that build one image at
+    // once write and delete the same file; a lock file held for the build makes the second wait, and then reuse the
+    // first's layers.
     protected override async Task PrepareImageAsync(CancellationToken token)
     {
+        await using var buildLock = await LockBuildsAsync(token);
         var image = new ImageFromDockerfileBuilder()
             .WithDockerfileDirectory(RepositoryRoot.Path("tests", "DatabaseTests", "TestHarness", "Postgis"))
             .WithDockerfile("Dockerfile")
@@ -35,5 +41,23 @@ public abstract class PostgisContainer(DbProviderFactory factory, string postgre
             .WithCleanUp(false)
             .Build();
         await image.CreateAsync(token);
+    }
+
+    // FileShare.None locks the file against every other process, and every other handle of this one, until it is
+    // disposed.  The file is left in place, since deleting it would let a waiting build lock a new file beside it.
+    private static async Task<FileStream> LockBuildsAsync(CancellationToken token)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "sqlsource-postgis-build.lock");
+        while (true)
+        {
+            try
+            {
+                return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), token);
+            }
+        }
     }
 }
