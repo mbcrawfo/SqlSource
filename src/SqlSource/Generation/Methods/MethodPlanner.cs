@@ -284,7 +284,9 @@ internal static class MethodPlanner
         // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
         var isBelowTheFloor = AddUsedLibraries(input, engine, models, methodInput, methodOutput, ref usedLibraries);
         // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
-        if (problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor)
+        // A method binds each parameter as one value, so a query with a list has none until the method expands lists.
+        // This guard is removed by the task that expands lists in query methods.
+        if (HasList(methodInput) || problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor)
         {
             return new Planned(problems, query.Name, query.NameLocation, [], false, []);
         }
@@ -486,6 +488,10 @@ internal static class MethodPlanner
                     )
                 ),
         ];
+
+    // Whether any parameter of the input is a list.
+    private static bool HasList(MethodInput? input) =>
+        input is not null && input.Parameters.Any(static parameter => parameter.Sequence == ParameterSequence.List);
 
     // The input model, or null when the query has no parameters.  False when it needs one and has none, when its
     // properties do not match its parameters, which is never thrown on, or when a parameter's converter blocks it.

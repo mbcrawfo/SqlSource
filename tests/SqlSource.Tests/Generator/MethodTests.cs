@@ -24,6 +24,23 @@ public sealed class MethodTests
 
     private static readonly SidecarEntry[] UsersEntries = EntriesOf(Users);
 
+    // Until a query method expands a list, a query with one gets no method, and no diagnostic; its models are written.
+    // The task that expands lists in query methods deletes this test.
+    [Fact]
+    public void Method_QueryWithAList_IsNotGeneratedYet()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: FindIds\nSELECT id FROM users WHERE id IN @ids;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "FindIds", [Parameter("ids")], [Column("id")])]);
+
+        run.ShouldBeClean();
+        run.Sources.ContainsKey(MethodRuns.MethodsFile).ShouldBeFalse();
+        run.Sources["App.FindIdsParams-Model.g.cs"].ShouldContain("IEnumerable<int> Ids");
+    }
+
     [Fact]
     public void Run_CodeGenQuery_IsAnExtensionMethodOfTheTypesExtensionClass()
     {

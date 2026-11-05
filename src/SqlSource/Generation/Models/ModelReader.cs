@@ -258,15 +258,18 @@ internal static class ModelReader
                 continue;
             }
 
+            // The parse's parameter, found as the typing finds it, by its name ignoring case.
+            var declared = SqlParameterName.IndexOf(query.Parameters, parameter.Name.AsSpan());
+            var list = declared >= 0 && query.Parameters[declared].IsList;
             properties.Add(
                 new ModelProperty(
                     name,
                     types[index],
-                    parameter.Nullable == true,
+                    parameter.Nullable == true || (list && query.Parameters[declared].HasNullTest),
                     ParameterDocumentation(parameter, reading.Text),
                     MessageSubject.Of(MessageSubject.Parameter, parameter.Name),
                     false,
-                    IsArraySequence(parameter, types[index], query) ? ParameterSequence.Array : ParameterSequence.None
+                    list ? ParameterSequence.List : ArrayOrNone(parameter, types[index], query)
                 )
             );
         }
@@ -319,6 +322,9 @@ internal static class ModelReader
 
         return new EquatableArray<ModelProperty>(properties.ToImmutable());
     }
+
+    private static ParameterSequence ArrayOrNone(SidecarParameter parameter, PropertyType type, SqlQuery query) =>
+        IsArraySequence(parameter, type, query) ? ParameterSequence.Array : ParameterSequence.None;
 
     // Whether a CodeGen method sends the parameter from any sequence: a PostgreSQL array, or a domain over one, whose
     // C# type is an array of one rank, E[], that the type map, a library or the type override gave.  A C# type that the

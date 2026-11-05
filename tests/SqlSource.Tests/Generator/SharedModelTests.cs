@@ -889,6 +889,32 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBe(["App.IdFilter-Model.g.cs"]);
     }
 
+    // A list is an IEnumerable of its element at CodeGen and at Models alike, so a model of one name shared by a type
+    // at each is one model.
+    [Fact]
+    public void SharedInputModel_ListInBothOutputs_IsOneModel()
+    {
+        var a = new SqlFile(
+            APath,
+            "-- output: codegen\n\n-- name: FindA\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id IN @ids;\n"
+        );
+        var b = new SqlFile(BPath, "-- name: FindB\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id IN @ids;\n");
+
+        var run = Run(
+            TwoOutputsSource,
+            [
+                a,
+                Sidecars.Of(a, Entry(a, "FindA", [Parameter("ids")], null)),
+                b,
+                Sidecars.Of(b, Entry(b, "FindB", [Parameter("ids")], null)),
+            ]
+        );
+
+        run.ShouldBeClean();
+        ModelFiles(run).ShouldBe(["App.IdFilter-Model.g.cs"]);
+        run.Sources["App.IdFilter-Model.g.cs"].ShouldContain("IEnumerable<int> Ids");
+    }
+
     // GetA in A and GetB in B, each with the -- output-model: marker of the name, then the markers given.
     private static (SqlFile A, SqlFile B) OfOneName(string aMarkers, string bMarkers, string name = "UserRow") =>
         (

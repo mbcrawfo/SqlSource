@@ -20,6 +20,8 @@ public sealed class ModelPropertyTypeTests
 {
     private const string ParamsModel = "App.FindIdsParams-Model.g.cs";
 
+    private const string ListModel = ParamsModel;
+
     private const string Enumerable = "global::System.Collections.Generic.IEnumerable<";
 
     private static readonly PostgresType IntArray = ArrayOf(Int4, "_int4");
@@ -207,6 +209,113 @@ public sealed class ModelPropertyTypeTests
         var model = run.Sources["App.GetIdsDto-Model.g.cs"];
         model.ShouldContain("public sealed record GetIdsDto(int[] Ids)");
         model.ShouldNotContain("IEnumerable");
+    }
+
+    // A list parameter is an IEnumerable of its element at every output, whose type is the one an ordinary parameter of
+    // the described type has.
+    [Theory]
+    [InlineData(nameof(OutputKind.CodeGen))]
+    [InlineData(nameof(OutputKind.Models))]
+    public void InputModel_ListParameter_IsIEnumerableOfTheElement(string output)
+    {
+        var run = RunList(Enum.Parse<OutputKind>(output), "id IN @ids", "", nullable: null);
+
+        run.ShouldBeClean();
+        run.Sources[ListModel].ShouldContain("public sealed record FindIdsParams(" + Enumerable + "int> Ids);");
+    }
+
+    [Fact]
+    public void InputModel_ListWithNullTest_IsNullable()
+    {
+        var run = RunList(OutputKind.CodeGen, "(@ids IS NULL OR id IN @ids)", "", nullable: null);
+
+        run.ShouldBeClean();
+        run.Sources[ListModel].ShouldContain("(" + Enumerable + "int>? Ids);");
+    }
+
+    // The tool writes the marker's null into the sidecar, as nullable.
+    [Theory]
+    [InlineData(nameof(OutputKind.CodeGen))]
+    [InlineData(nameof(OutputKind.Models))]
+    public void InputModel_ListWithNullMarker_IsNullable(string output)
+    {
+        var run = RunList(Enum.Parse<OutputKind>(output), "id IN @ids", "-- param: @ids null\n", nullable: true);
+
+        run.ShouldBeClean();
+        run.Sources[ListModel].ShouldContain("(" + Enumerable + "int>? Ids);");
+    }
+
+    [Fact]
+    public void InputModel_ListWithMarkerClrType_IsIEnumerableOfThatType()
+    {
+        var run = RunList(
+            OutputKind.CodeGen,
+            "id IN @ids",
+            "-- param: @ids -> AccountId\n",
+            nullable: null,
+            source: Source + "\nnamespace App { public readonly record struct AccountId(int Value); }\n"
+        );
+
+        run.ShouldBeClean();
+        run.Sources[ListModel].ShouldContain("(" + Enumerable + "global::App.AccountId> Ids);");
+    }
+
+    [Fact]
+    public void InputModel_ListWithTypeOverride_IsIEnumerableOfTheOverride()
+    {
+        var run = RunList(OutputKind.CodeGen, "id IN @ids", "-- type-override: int4=long\n", nullable: null);
+
+        run.ShouldBeClean();
+        run.Sources[ListModel].ShouldContain("(" + Enumerable + "long> Ids);");
+    }
+
+    // A list of a library's type is an IEnumerable of the library's type at CodeGen and of the base map's without it.
+    [Theory]
+    [InlineData(nameof(OutputKind.CodeGen), Enumerable + "global::NodaTime.Instant> Ids")]
+    [InlineData(nameof(OutputKind.Models), Enumerable + "global::System.DateTime> Ids")]
+    public void InputModel_ListOfNodaTimeInCodeGen_TakesTheLibrarysElement(string output, string expected)
+    {
+        var file = ListFile("at IN @ids", "");
+        var instant = Catalog("timestamptz") with { Name = "timestamp with time zone" };
+
+        var run = GeneratorHarness.Run(
+            Enum.Parse<OutputKind>(output),
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [file, Sidecars.Of(file, Entry(file, "FindIds", [Parameter("ids", instant)], null))],
+            references:
+            [
+                NpgsqlReferences.Npgsql10,
+                LibraryReferences.NodaTime("3.3.7"),
+                LibraryReferences.NpgsqlNodaTime("10.0.3"),
+            ],
+            dialect: "postgres"
+        );
+
+        run.ShouldBeClean();
+        run.Sources[ListModel].ShouldContain("(" + expected + ");");
+    }
+
+    // FindIds, whose @ids is a list of integers, the predicate and the markers given, with the parameter's
+    // nullability as the sidecar says it.
+    private static SqlFile ListFile(string predicate, string markers) =>
+        new(GeneratorHarness.UsersPath, "-- name: FindIds\n" + markers + "SELECT 1 FROM t WHERE " + predicate + ";\n");
+
+    private static GeneratorRun RunList(
+        OutputKind output,
+        string predicate,
+        string markers,
+        bool? nullable,
+        string source = Source
+    )
+    {
+        var file = ListFile(predicate, markers);
+        return GeneratorHarness.Run(
+            output,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [file, Sidecars.Of(file, Entry(file, "FindIds", [Parameter("ids", Int4, nullable)], null))],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
     }
 
     // FindIds, whose @ids is an integer[], with the markers given.
