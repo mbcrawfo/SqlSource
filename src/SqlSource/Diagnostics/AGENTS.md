@@ -9,7 +9,7 @@ The generator's are in `Diagnostics/SqlDiagnostics.cs`, and the errors of the `s
 - **`Diagnostics/SettingsFileDiagnostics.cs` is the one place a `SettingsFileError` becomes a diagnostic**, `SQLSRC015` to `SQLSRC020`, at the line and column of its span, for the build and the tool alike.
 - **An id below 100 is about the type or the project, one from 101 about a `.sql` file, and one from 200 about the snapshot or the tool** (`tests/SqlSource.Tests/Diagnostics/ToolDiagnosticsTests.cs` holds the tool's).
 - **`SQLSRC200` to `SQLSRC287` are taken.**
-- **Add a new `SqlParseErrorKind` at the end**: the parser ids follow its order.
+- **Add a new `SqlParseErrorKind` at the end**: the parser ids follow its order, from `SQLSRC126` after the first twenty-one, since `SQLSRC122` to `SQLSRC125` are placement errors.
 
 ## Diagnostics with no position
 

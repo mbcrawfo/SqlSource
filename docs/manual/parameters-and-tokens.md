@@ -64,6 +64,12 @@ The marker goes inside a query, under its `-- name:` line.  In the file header i
 
 A change to the type or the nullability of a `-- param:` marker, like a change to the SQL, makes the query's sidecar out of date, and so does adding or removing `not null`, since it is recorded apart from saying nothing.  Run `dotnet sqlsource describe` again: see [sidecar files](tool.md#sidecar-files).  The C# type after `->`, with or without `json`, changes nothing that is described, so adding, changing or removing it leaves the sidecar current, and so does adding or removing a marker that gives neither a type nor a nullability, such as `-- param: @team -> TeamId` or `-- param: @team`.  A query with such a marker whose entry an earlier version of the tool wrote is out of date once: describe it again.
 
+<a id="list-parameters"></a>
+
+## List parameters
+
+A parameter written directly after `IN` or `NOT IN`, without parentheses, as in `WHERE category IN @categories`, is a list of values rather than one value.  A list can stand only after `IN` or `NOT IN`, or before `IS NULL` or `IS NOT NULL`, and any other use of it, a use in a token's default among them, is [SQLSRC126](diagnostics.md#sqlsrc126).
+
 <a id="declared-variables"></a>
 
 ## Variables declared with `DECLARE`

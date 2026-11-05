@@ -21,11 +21,21 @@ namespace SqlSource.Parsing;
 /// Whether the marker writes the word <c>json</c> before the C# type, the JSON opt-in, which says that the parameter
 /// holds JSON.  It describes nothing to the database either, so the hash leaves it out.
 /// </param>
+/// <param name="IsList">
+/// Whether the SQL writes the parameter directly after <c>IN</c>, outside every token, which makes it a list of values.
+/// The marker's types are then those of each element.  It follows from the SQL, which the hash reads already.
+/// </param>
+/// <param name="HasNullTest">
+/// Whether a list is also written before <c>IS NULL</c> or <c>IS NOT NULL</c>.  Never true of a parameter that is no
+/// list.  It follows from the SQL too.
+/// </param>
 internal sealed record SqlQueryParameter(
     string Name,
     string? Type,
     bool? Nullable,
     bool IsDeclared,
     string? ClrType = null,
-    bool IsJson = false
+    bool IsJson = false,
+    bool IsList = false,
+    bool HasNullTest = false
 );

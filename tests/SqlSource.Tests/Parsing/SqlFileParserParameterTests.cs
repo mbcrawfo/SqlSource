@@ -620,4 +620,170 @@ public sealed class SqlFileParserParameterTests
                 ),
             ]);
     }
+
+    private const string AsOneValue = "is used here as one value";
+
+    private const string InATokensDefault = "stands here in a token's default, which the method cannot expand";
+
+    private const string WithJson = "has a -- param: marker that says json, which a list cannot hold";
+
+    private static SqlParseError ListMisused(TextSpan span, string parameter, string reason) =>
+        SqlParseError.Create(SqlParseErrorKind.ListParameterMisused, span, parameter, reason);
+
+    [Theory]
+    [InlineData("SELECT id FROM t WHERE a = @a AND id IN @ids")]
+    [InlineData("SELECT id FROM t WHERE a = @a AND id NOT IN @ids")]
+    [InlineData("SELECT id FROM t WHERE a = @a AND (id in @ids OR parent_id IN /* any */ @ids)")]
+    public void Parse_ParameterAfterIn_IsAList(string sql) =>
+        Blocks("-- name: Q\n" + sql + "\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBe([
+                new SqlQueryParameter("a", null, null, false),
+                new SqlQueryParameter("ids", null, null, false, IsList: true),
+            ]);
+
+    [Theory]
+    [InlineData("SELECT id FROM t WHERE (@ids IS NULL OR id IN @ids)")]
+    [InlineData("SELECT id FROM t WHERE @ids IS NOT NULL AND id NOT IN @ids")]
+    [InlineData("SELECT id FROM t WHERE id IN @ids OR @ids is null")]
+    public void Parse_ListWithANullTest_HasNullTest(string sql) =>
+        Blocks("-- name: Q\n" + sql + "\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBe([new SqlQueryParameter("ids", null, null, false, IsList: true, HasNullTest: true)]);
+
+    // A null test matters only of a list, so a parameter that has only null tests is one value.
+    [Theory]
+    [InlineData("SELECT id FROM t WHERE @a IS NULL")]
+    [InlineData("SELECT id FROM t WHERE @a IS NOT NULL AND id IN @ids")]
+    public void Parse_ParameterWithOnlyANullTest_IsNotAList(string sql) =>
+        Blocks("-- name: Q\n" + sql + "\n")
+            .ShouldHaveSingleItem()
+            .Parameters[0]
+            .ShouldBe(new SqlQueryParameter("a", null, null, false));
+
+    // Each use as a value is reported where it is written, wherever it stands in the SQL.
+    [Theory]
+    [InlineData("SELECT @ids FROM t WHERE id IN @ids", false)]
+    [InlineData("SELECT id FROM t WHERE id IN @ids OR parent_id = @ids", true)]
+    [InlineData("SELECT id FROM t WHERE id IN @ids OR parent_id IN (@ids)", true)]
+    public void Parse_ListUsedAsAValue_IsSqlsrc126(string sql, bool last)
+    {
+        var text = "-- name: Q\n" + sql + "\n";
+
+        Errors(text).ShouldBe([ListMisused(TextSpans.Of(text, "@ids", last), "@ids", AsOneValue)]);
+    }
+
+    [Fact]
+    public void Parse_ListUsedAsAValueTwice_IsReportedAtEachUse()
+    {
+        const string Text = "-- name: Q\nSELECT @ids, @ids + 1 FROM t WHERE id IN @ids\n";
+        var first = Text.IndexOf("@ids", StringComparison.Ordinal);
+        var second = Text.IndexOf("@ids", first + 1, StringComparison.Ordinal);
+
+        Errors(Text)
+            .ShouldBe([
+                ListMisused(new TextSpan(first, 4), "@ids", AsOneValue),
+                ListMisused(new TextSpan(second, 4), "@ids", AsOneValue),
+            ]);
+    }
+
+    // The error names the parameter as it is written where it is used.
+    [Fact]
+    public void Parse_ListUsedAsAValueInAnotherSpelling_NamesThatSpelling()
+    {
+        const string Text = "-- name: Q\nSELECT id FROM t WHERE id IN @IDS OR parent_id = @ids\n";
+
+        Errors(Text).ShouldBe([ListMisused(TextSpans.Of(Text, "@ids"), "@ids", AsOneValue)]);
+    }
+
+    // A token's default is the caller's text at run time, so any use of a list there is reported, at that use.
+    [Theory]
+    [InlineData("-- name: Q\nSELECT id FROM t WHERE id IN @ids {{f:AND parent_id IN @ids}}\n", true)]
+    [InlineData("-- name: Q\nSELECT id FROM t WHERE id IN @ids {{f:AND parent_id = @ids}}\n", true)]
+    [InlineData("-- name: Q\nSELECT id FROM t WHERE id IN @ids {{f:OR @ids IS NULL}}\n", true)]
+    [InlineData("-- name: Q\n-- token: {{f:AND parent_id = @ids}}\nSELECT id FROM t WHERE id IN @ids {{f}}\n", false)]
+    [InlineData("-- name: Q\n-- token: {{f:AND parent_id IN @ids}}\nSELECT id FROM t WHERE id IN @ids {{f}}\n", false)]
+    [InlineData("-- name: Q\n-- token: {{f:OR @ids IS NOT NULL}}\nSELECT id FROM t WHERE id IN @ids {{f}}\n", false)]
+    public void Parse_ListInATokenDefault_IsSqlsrc126(string text, bool last) =>
+        Errors(text).ShouldBe([ListMisused(TextSpans.Of(text, "@ids", last), "@ids", InATokensDefault)]);
+
+    // Even when the parameter is no list outside the default, the method cannot expand one in it.
+    [Theory]
+    [InlineData("-- name: Q\n-- param: @x int\nSELECT id FROM t {{f:WHERE id IN @x}}\n")]
+    [InlineData("-- name: Q\n-- param: @x int\n-- token: {{f:WHERE id IN @x}}\nSELECT id FROM t {{f}}\n")]
+    [InlineData("-- name: Q\nSELECT id FROM t WHERE a = @x {{f:AND id IN @x}}\n")]
+    public void Parse_BareInInATokenDefault_IsSqlsrc126(string text) =>
+        Errors(text).ShouldBe([ListMisused(TextSpans.Of(text, "@x", last: true), "@x", InATokensDefault)]);
+
+    // Declaring the parameter would not make the default one that the method can expand, nor would rewriting the IN
+    // declare it, so both are reported.
+    [Fact]
+    public void Parse_BareInInATokenDefaultOfAnUndeclaredParameter_IsBothErrors()
+    {
+        const string Text = "-- name: Q\nSELECT id FROM t {{f:WHERE id IN @x}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, TextSpans.Of(Text, "@x"), "@x"),
+                ListMisused(TextSpans.Of(Text, "@x"), "@x", InATokensDefault),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("@ids -> json Tag")]
+    [InlineData("@ids jsonb null -> json App.Tag")]
+    public void Parse_ListWithJsonMarker_IsSqlsrc126(string value)
+    {
+        var text = "-- name: Q\n-- param: " + value + "\nSELECT id FROM t WHERE id IN @ids\n";
+
+        Errors(text).ShouldBe([ListMisused(TextSpans.Of(text, value), "@ids", WithJson)]);
+    }
+
+    // A json opt-in on a parameter that is no list is the JSON opt-in, as before.
+    [Fact]
+    public void Parse_JsonMarkerOnAParameterInParentheses_IsNotAList() =>
+        Blocks("-- name: Q\n-- param: @a -> json Tag\nSELECT id FROM t WHERE id IN (@a)\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBe([new SqlQueryParameter("a", null, null, true, "Tag", IsJson: true)]);
+
+    // The marker describes each element, and its null says the list itself may be null.
+    [Theory]
+    [InlineData("SELECT id FROM t WHERE category IN @ids", false)]
+    [InlineData("SELECT id FROM t WHERE @ids IS NULL OR category NOT IN @ids", true)]
+    public void Parse_ListMarker_GivesTheElementsTypeAndTheListsNullability(string sql, bool hasNullTest) =>
+        Blocks("-- name: Q\n-- param: @ids text null -> Category\n" + sql + "\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBe([
+                new SqlQueryParameter("ids", "text", true, true, "Category", IsList: true, HasNullTest: hasNullTest),
+            ]);
+
+    [Fact]
+    public void Parse_ListSpelledTwoWays_IsOneList()
+    {
+        const string Text = "-- name: Q\nSELECT id FROM t WHERE (@ids IS NULL OR id IN @IDS)\n";
+
+        var result = SqlFileParser.Parse(Text, "Query.sql", SqlDialect.PostgreSql);
+
+        result.Errors.ShouldBeEmpty();
+        result.Warnings.ShouldBeEmpty();
+        result
+            .Blocks.ShouldHaveSingleItem()
+            .Parameters.ShouldBe([new SqlQueryParameter("ids", null, null, false, IsList: true, HasNullTest: true)]);
+    }
+
+    // SQL Server may compare names by case, so the second spelling is still warned of.
+    [Fact]
+    public void Parse_SqlServerListSpelledTwoWays_IsOneListAndAWarning()
+    {
+        const string Text = "-- name: Q\nSELECT id FROM t WHERE (@ids IS NULL OR id IN @IDS)\n";
+
+        var result = SqlFileParser.Parse(Text, "Query.sql", SqlDialect.SqlServer);
+
+        result.Warnings.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.ParameterInTwoSpellings, TextSpans.Of(Text, "@IDS"), "@IDS", "@ids"),
+        ]);
+        result
+            .Blocks.ShouldHaveSingleItem()
+            .Parameters.ShouldBe([new SqlQueryParameter("ids", null, null, false, IsList: true, HasNullTest: true)]);
+    }
 }

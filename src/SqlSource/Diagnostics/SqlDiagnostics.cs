@@ -604,6 +604,20 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the parameter, with its prefix, as written where it is reported, and {1} the reason: where it stands, or
+    // what its marker says.  Reported at the use, or at the marker's value for the JSON opt-in.
+    public static readonly DiagnosticDescriptor ListParameterMisused = new(
+        id: "SQLSRC126",
+        title: "List parameter is used outside IN",
+        messageFormat: "The parameter '{0}' is a list, written after IN, and {1}.  A list can stand after IN or NOT "
+            + "IN, or before IS NULL or IS NOT NULL.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc126",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor SidecarMalformed = new(
         id: "SQLSRC237",
         title: "Sidecar cannot be read",
@@ -1240,6 +1254,7 @@ internal static class SqlDiagnostics
             VisibilityNotFit,
             NestedClassVisibilities,
             MemberNameTaken,
+            ListParameterMisused,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,
@@ -1311,6 +1326,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
             SqlParseErrorKind.TokenCrossesComment => TokenCrossesComment,
             SqlParseErrorKind.ParameterInTwoSpellings => ParameterInTwoSpellings,
+            SqlParseErrorKind.ListParameterMisused => ListParameterMisused,
             _ => throw UnexpectedEnumValueException.Of(kind),
         };
 }

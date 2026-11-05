@@ -53,6 +53,7 @@ SQLSRC122 | SqlSource | Error | Member location does not fit the query
 SQLSRC123 | SqlSource | Error | Visibility does not fit the member location
 SQLSRC124 | SqlSource | Error | Nested class has two visibilities
 SQLSRC125 | SqlSource | Error | Query's member on the type has a name that is taken
+SQLSRC126 | SqlSource | Error | List parameter is used outside IN
 SQLSRC200 | SqlSource | Error | The tool failed unexpectedly
 SQLSRC201 | SqlSource | Error | No project or solution found
 SQLSRC202 | SqlSource | Error | More than one project or solution found
