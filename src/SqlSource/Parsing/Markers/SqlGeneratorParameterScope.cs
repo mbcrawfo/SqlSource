@@ -9,16 +9,30 @@ namespace SqlSource.Parsing.Markers;
 /// The generator parameters given by the <c>-- generator:</c> markers of one scope: a block, or a file's preamble.
 /// </summary>
 /// <remarks>
-/// The markers of one scope add up to the scope's list.  A list is never added to another scope's: a query that has
-/// one uses it whole.
+/// The markers of one scope add up to one level, which names only the parameters its words give a state, and merges
+/// per parameter over the levels below it.  <c>default</c> gives every parameter its default at the scope's level, and
+/// the scope's other words apply over it, wherever it stands.  A word that gives a parameter another state than an
+/// earlier word of the scope gave it is a contradiction, reported and not applied.
 /// </remarks>
 internal sealed class SqlGeneratorParameterScope
 {
-    // Whether the scope's list is the word "default".
-    private bool _isDefault;
+    // Whether a word of the scope is "default".
+    private bool _reset;
 
-    /// <summary>The scope's list, or null when no marker of the scope gave a parameter.</summary>
-    public GeneratorParameters? Parameters { get; private set; }
+    // The parameters the scope's words have turned on, turned off and given their default.  Each parameter is in one
+    // of them at most: a word that would put it in another is a contradiction.
+    private GeneratorParameters _on;
+
+    private GeneratorParameters _off;
+
+    private GeneratorParameters _default;
+
+    /// <summary>What the scope's words say about the generator parameters: empty when they name none.</summary>
+    public GeneratorParameterChoices Parameters =>
+        (_reset ? GeneratorParameterChoices.Reset : GeneratorParameterChoices.None)
+            .With(_on, GeneratorParameterState.On)
+            .With(_off, GeneratorParameterState.Off)
+            .With(_default, GeneratorParameterState.Default);
 
     /// <summary>
     /// Applies the generator parameters of one <c>-- generator:</c> marker to this scope, adding any problems to
@@ -53,46 +67,45 @@ internal sealed class SqlGeneratorParameterScope
 
     private SqlParseErrorKind? Apply(ReadOnlySpan<char> word)
     {
-        var separator = word.IndexOf('=');
-        var name = separator < 0 ? word : word.Slice(0, separator);
-        if (GeneratorParameterList.IsDefault(name))
+        var kind = GeneratorParameterList.ReadWord(word, out var parameter, out var state);
+        switch (kind)
         {
-            return ApplyDefault(separator >= 0);
+            case GeneratorWordKind.Default:
+                _reset = true;
+                return null;
+            case GeneratorWordKind.UnknownName:
+                return SqlParseErrorKind.UnknownGeneratorParameter;
+            case GeneratorWordKind.InvalidState:
+                return SqlParseErrorKind.InvalidMarkerValue;
+            case GeneratorWordKind.Parameter:
+                break;
+            default:
+                throw UnexpectedEnumValueException.Of(kind);
         }
 
-        if (!GeneratorParameterList.TryFind(name, out var parameter))
-        {
-            return SqlParseErrorKind.UnknownGeneratorParameter;
-        }
-
-        if (separator >= 0)
-        {
-            return SqlParseErrorKind.InvalidMarkerValue;
-        }
-
-        if (_isDefault)
+        // The same state again is no contradiction.
+        ref var states = ref StatesOf(state);
+        if (((_on | _off | _default) & ~states & parameter) != GeneratorParameters.None)
         {
             return SqlParseErrorKind.ConflictingSettings;
         }
 
-        Parameters = (Parameters ?? GeneratorParameters.None) | parameter;
+        states |= parameter;
         return null;
     }
 
-    private SqlParseErrorKind? ApplyDefault(bool hasValue)
+    private ref GeneratorParameters StatesOf(GeneratorParameterState state)
     {
-        if (hasValue)
+        switch (state)
         {
-            return SqlParseErrorKind.InvalidMarkerValue;
+            case GeneratorParameterState.On:
+                return ref _on;
+            case GeneratorParameterState.Off:
+                return ref _off;
+            case GeneratorParameterState.Default:
+                return ref _default;
+            default:
+                throw UnexpectedEnumValueException.Of(state);
         }
-
-        if (Parameters is not null && !_isDefault)
-        {
-            return SqlParseErrorKind.ConflictingSettings;
-        }
-
-        _isDefault = true;
-        Parameters = GeneratorParameters.None;
-        return null;
     }
 }

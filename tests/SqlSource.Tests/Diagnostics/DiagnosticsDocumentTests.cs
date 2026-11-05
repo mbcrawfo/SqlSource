@@ -65,12 +65,12 @@ public sealed class DiagnosticsDocumentTests
         string[] parameters =
         [
             "keep-comments",
-            "no-token-validation",
+            "token-validation",
             "sort-input",
             "sort-output",
-            "no-table-models",
+            "table-models",
             "async-method-suffix",
-            "no-array-pool",
+            "array-pool",
             "default",
         ];
         var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);

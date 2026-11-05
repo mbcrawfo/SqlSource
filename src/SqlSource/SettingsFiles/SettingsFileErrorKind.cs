@@ -46,9 +46,10 @@ internal enum SettingsFileErrorKind
     InvalidValue,
 
     /// <summary>
-    /// A member has the key of an earlier member of its object, by the identity of its setting's map; the first
-    /// applies.  Span: the repeated member's key, quotes included.  Setting: the key of the top level.  Argument: that
-    /// key trimmed.  Other: the first member's key trimmed.
+    /// A member has the key of an earlier member of its object, by the identity of its setting's map, or an element of
+    /// the generator parameters gives a parameter another state than an earlier element; the first applies.  Span: the
+    /// repeated member's key, or the repeated element's string, quotes included.  Setting: the key of the top level.
+    /// Argument: that key or element trimmed.  Other: the first member's key, or the first element, trimmed.
     /// </summary>
     RepeatedKey,
 }

@@ -510,7 +510,7 @@ A value of a settings file is not of the JSON type its key takes.  `root` takes 
 }
 ```
 
-Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, while `[]` is the empty list.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
+Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, and so does `[]`.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
 
 See: [Settings files](settings.md#settings-files)
 
@@ -526,7 +526,7 @@ A member of `columnTypes` written as an object takes a `"type"` string, its C# t
 {
     "dialect": "pgsql",
     "output": "model",
-    "generatorParameters": ["keep-comments", "keep-coments"],
+    "generatorParameters": ["keep-comments", "keep-coments", "array-pool=no"],
     "typeOverrides": {
         "[dbo].[Email]": "MyApp.Email",
         "int4": "int?",
@@ -541,13 +541,13 @@ A member of `columnTypes` written as an object takes a `"type"` string, its C# t
 }
 ```
 
-Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides`, `columnTypes` and `libraryTypes` each element or member that is not valid is reported on its own, and the others still apply, with one exception: `default` beside another generator parameter makes the whole list not set, and each `default` is reported.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides`, `columnTypes` or `libraryTypes` whose key or value is empty or white space is reported.
+Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides`, `columnTypes` and `libraryTypes` each element or member that is not valid is reported on its own, and the others still apply.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides`, `columnTypes` or `libraryTypes` whose key or value is empty or white space is reported.
 
 `dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.  After `mysql` or `mariadb` the value may name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
 
 `output` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`, `memberLocation` takes `extension-class`, `class` or `nested-class`, and `visibility` takes `public`, `internal`, `protected` or `private`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name, and `nestedClass` takes one identifier that is none of those and not `var`.  `database` takes one word of letters, digits, `-`, `_` and `.`.
 
-`generatorParameters` takes one generator parameter in each element: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool` or `default`, in any case.  `[]` is the empty list, which gives every default, and so is `["default"]`; beside another word `default` is reported, and the message says to write `[]`.
+`generatorParameters` takes one word in each element: a generator parameter, `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix` or `array-pool`, alone or followed by `=on`, `=off` or `=default`, or `default` alone, in any case.  A name that is not one is reported, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them, and so is a state that is not `on`, `off` or `default`, and `default` followed by `=`.  `[]` names no parameter and changes nothing, and `["default"]` gives every parameter its default.  The rules are in [generator parameters](settings.md#setting-generator-parameters).
 
 `typeOverrides` takes members `"key": "type"`, and the key and the type of each are trimmed:
 
@@ -567,7 +567,9 @@ See: [Settings files](settings.md#settings-files)
 
 **Settings file entry repeats a key**
 
-Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, have one key.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, `nodaTime` and `NodaTime` one library, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
+Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, have one key, or two elements of `generatorParameters` give one generator parameter two different states.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, `nodaTime` and `NodaTime` one library, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
+
+In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states of one parameter, and so are `keep-comments=default` and either of them, even where the default is the same.  The first applies, and the second is reported at its element.  The same state twice is no error.
 
 ```jsonc
 {
@@ -579,10 +581,11 @@ Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, 
         "users.id": "MyApp.UserId",
         "\"users\".id": "UserId",
     },
+    "generatorParameters": ["keep-comments", "keep-comments=off"],
 }
 ```
 
-Remove one of the two members, and keep the C# type you want.
+Remove one of the two, and keep the C# type or the state you want.
 
 See: [Settings files](settings.md#settings-files)
 
@@ -806,7 +809,7 @@ See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
 
 **Generator parameter is not known**
 
-A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool` and `default`.  If you used `token-validation` or `token-ignore` as generator parameters in an earlier preview: leave out the first, since validation is the default, and write the second as a marker inside the query, `-- token-ignore: name`.
+A `-- generator:` marker holds a word whose name is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix` and `array-pool`, each alone or followed by `=on`, `=off` or `=default`, and `default` alone.  The name is what stands before an `=`, so `keep-coments=off` is this error too.  The words `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews are not generator parameters: write `token-validation=off`, `table-models=off` and `array-pool=off`.  If you used `token-ignore` as a generator parameter in an earlier preview, write it as a marker inside the query, `-- token-ignore: name`.
 
 ```sql error
 -- generator: keep-comment
@@ -830,9 +833,9 @@ See: [Generator parameters](settings.md#setting-generator-parameters)
 
 **Marker value is not valid**
 
-A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+A generator parameter has a state it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
 
-- No generator parameter takes a value: `keep-comments=1` is this error.
+- A generator parameter's state is `on`, `off` or `default`: `keep-comments=true` is this error, and so is `default` followed by `=`, as in `default=on`.  See [generator parameters](settings.md#setting-generator-parameters).
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of a settings file's `dialect`, in [SQLSRC019](#sqlsrc019).  The value is the rest of the line, so nothing else may follow it.
 
@@ -882,7 +885,7 @@ See: [Marker index](sql-files.md#marker-index)
 
 Two settings contradict each other.  The error is at the second.
 
-- `default` beside another generator parameter in the file header, or inside one query: `default` is the empty list, and a list that holds something is not empty.
+- Two words of `-- generator:` markers that give one generator parameter two different states, in the file header or inside one query, on one line or two: `keep-comments` and `keep-comments=off`.  `keep-comments=default` beside either is one too, even where the default is the same.  The later word is not applied.  In a file with no `-- name:` line every `-- generator:` line is in one place.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
 - Two `-- column:` markers inside one query for one column, its name compared ignoring case, of which one says `null` and the other `not null`, or which give it two C# types, `default` among them.  One may give the nullability and the other the type.
@@ -900,7 +903,7 @@ Two settings contradict each other.  The error is at the second.
 SELECT id, name FROM users;
 ```
 
-Remove one of the two.  A query's `-- generator:` list replaces the file header's list, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A query's `-- generator:` word for a generator parameter replaces the file header's for that parameter, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either, nor is `default` beside other words of `-- generator:`.
 
 See: [A value that is wrong](settings.md#a-value-that-is-wrong)
 

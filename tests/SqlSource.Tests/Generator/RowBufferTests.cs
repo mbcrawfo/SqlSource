@@ -92,13 +92,13 @@ public sealed class RowBufferTests
         "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<global::App.ListUsersDto>()",
         "rows.DrainToImmutable()"
     )]
-    public void Run_ManyMethodOfEachPooledTypeUnderNoArrayPool_ReadsItsRowsAsBeforeThePool(
+    public void Run_ManyMethodOfEachPooledTypeUnderArrayPoolOff_ReadsItsRowsAsBeforeThePool(
         string collection,
         string buffer,
         string result
     )
     {
-        var run = RunListUsers("-- collection-type: " + collection + "\n-- generator: no-array-pool\n");
+        var run = RunListUsers("-- collection-type: " + collection + "\n-- generator: array-pool=off\n");
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
@@ -233,11 +233,11 @@ public sealed class RowBufferTests
     }
 
     [Fact]
-    public void Run_FileMixingPooledAndNoArrayPoolMethods_PoolsOnlyThePooled()
+    public void Run_FileMixingPooledAndArrayPoolOffMethods_PoolsOnlyThePooled()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: ListUsers\n" + Select + "\n-- name: ListOthers\n-- generator: no-array-pool\n" + Select
+            "-- name: ListUsers\n" + Select + "\n-- name: ListOthers\n-- generator: array-pool=off\n" + Select
         );
 
         var run = MethodRuns.Run(file, [Users(file, "ListUsers"), Users(file, "ListOthers")]);
@@ -249,11 +249,11 @@ public sealed class RowBufferTests
         Count(methods, "var rows = new global::System.Collections.Generic.List<").ShouldBe(1);
     }
 
-    // Under no-array-pool the method reads its rows into a list, as before the buffer, and the project has no buffer.
+    // Under array-pool=off the method reads its rows into a list, as before the buffer, and the project has no buffer.
     [Fact]
-    public void Run_ArrayMethodUnderNoArrayPool_WritesTheMethodWithAListAndNoBuffer()
+    public void Run_ArrayMethodUnderArrayPoolOff_WritesTheMethodWithAListAndNoBuffer()
     {
-        var file = ListUsers with { Text = "-- generator: no-array-pool\n\n" + ListUsers.Text };
+        var file = ListUsers with { Text = "-- generator: array-pool=off\n\n" + ListUsers.Text };
 
         var run = MethodRuns.Run(file, [Users(file, "ListUsers")]);
 

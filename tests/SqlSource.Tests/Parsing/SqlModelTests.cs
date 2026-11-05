@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Tests.Generation;
 using Xunit;
 
 namespace SqlSource.Tests.Parsing;
@@ -82,14 +83,10 @@ public sealed class SqlModelTests
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", shape: ResultShape.One));
         Create("SELECT 1 FROM ", keptSql: "SELECT 1 -- c").ShouldBe(Create("SELECT 1 FROM ", keptSql: "SELECT 1 -- c"));
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", keptSql: "SELECT 1 -- c"));
-        Create("SELECT 1 FROM ", markers: new SettingsLevel { Parameters = GeneratorParameters.SortInput })
-            .ShouldBe(
-                Create("SELECT 1 FROM ", markers: new SettingsLevel { Parameters = GeneratorParameters.SortInput })
-            );
+        Create("SELECT 1 FROM ", markers: TestModels.ParametersOn(GeneratorParameters.SortInput))
+            .ShouldBe(Create("SELECT 1 FROM ", markers: TestModels.ParametersOn(GeneratorParameters.SortInput)));
         Create("SELECT 1 FROM ")
-            .ShouldNotBe(
-                Create("SELECT 1 FROM ", markers: new SettingsLevel { Parameters = GeneratorParameters.SortInput })
-            );
+            .ShouldNotBe(Create("SELECT 1 FROM ", markers: TestModels.ParametersOn(GeneratorParameters.SortInput)));
         Create("SELECT 1 FROM ", columnIsNullable: true).ShouldBe(Create("SELECT 1 FROM ", columnIsNullable: true));
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", columnIsNullable: true));
         Create("SELECT 1 FROM ", columnIsNullable: true).ShouldNotBe(Create("SELECT 1 FROM ", columnIsNullable: false));

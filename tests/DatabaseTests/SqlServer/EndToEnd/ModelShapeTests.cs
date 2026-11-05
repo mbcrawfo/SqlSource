@@ -65,7 +65,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Build_NoTableModels_NamesTheModelAfterTheQuery() =>
+    public void Build_TableModelsOff_NamesTheModelAfterTheQuery() =>
         ShouldBeModel(
             typeof(ListAccountsUntabledDto),
             $"{Namespace}.ListAccountsUntabledDto",

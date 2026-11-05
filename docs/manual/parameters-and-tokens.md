@@ -183,13 +183,13 @@ SELECT 'Hello, {{name}}' AS greeting;
 
 ```sql
 -- name: ListFiltered
--- generator: no-token-validation
+-- generator: token-validation=off
 SELECT id, name FROM users {{whereClause}};
 ```
 
 By default the method, a token method or a query method, checks each argument with `ArgumentException.ThrowIfNullOrWhiteSpace`: null throws `ArgumentNullException`, and an empty or blank string throws `ArgumentException`.  The check is that a value is present, not that it is safe.
 
-An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `no-token-validation` generator parameter.  Where a generator parameter can be written, and which place wins, is on [the settings page](settings.md#setting-generator-parameters).
+An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `token-validation=off` generator parameter.  Where a generator parameter can be written, and which place wins, is on [the settings page](settings.md#setting-generator-parameters).
 
 With validation off the method checks nothing.  An empty argument leaves nothing where its token was, and a null argument throws `NullReferenceException`.
 

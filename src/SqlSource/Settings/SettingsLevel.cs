@@ -9,7 +9,8 @@ namespace SqlSource.Settings;
 /// of a query over those of its file's preamble.
 /// </summary>
 /// <remarks>
-/// Every member is nullable, and null means the source does not say.  A source sets the members it has: not every
+/// Every member but the generator parameters is nullable, and null means the source does not say; the generator
+/// parameters say nothing when they are empty.  A source sets the members it has: not every
 /// setting has every source.  <see cref="QuerySettings.Resolve" /> is the one rule that puts the levels together.
 /// </remarks>
 internal sealed record SettingsLevel
@@ -19,8 +20,11 @@ internal sealed record SettingsLevel
     /// </summary>
     public static SettingsLevel None { get; } = new();
 
-    /// <summary>The list of generator parameters, whole, or null when the level gives no list.</summary>
-    public GeneratorParameters? Parameters { get; init; }
+    /// <summary>
+    /// What the level says about the generator parameters: the ones it names, each on or off.  Merged per parameter,
+    /// not taken whole, and empty when the level names none.
+    /// </summary>
+    public GeneratorParameterChoices Parameters { get; init; }
 
     /// <summary>What is generated for a query.</summary>
     public OutputKind? Output { get; init; }
@@ -86,13 +90,15 @@ internal sealed record SettingsLevel
     /// </summary>
     public Placed<Visibility>? Visibility { get; init; }
 
-    /// <summary>Whether the level gives a list that has <c>keep-comments</c>.</summary>
-    public bool KeepsComments => Parameters is { } list && (list & GeneratorParameters.KeepComments) != 0;
+    /// <summary>
+    /// Whether <c>keep-comments</c> is on in this level, over the defaults of the parameters it does not name.
+    /// </summary>
+    public bool KeepsComments => (Parameters.Resolve() & GeneratorParameters.KeepComments) != 0;
 
     /// <summary>
     /// This level over <paramref name="other" />: each member from this level when it has one, and from
-    /// <paramref name="other" /> when it has not.  The type override of each engine, the column types and the library
-    /// types are merged per key, this level's entry winning.
+    /// <paramref name="other" /> when it has not.  The generator parameters are merged per parameter, and the type
+    /// override of each engine, the column types and the library types per key, this level's entry winning.
     /// </summary>
     public SettingsLevel Over(SettingsLevel other)
     {
@@ -108,7 +114,7 @@ internal sealed record SettingsLevel
 
         return new SettingsLevel
         {
-            Parameters = Parameters ?? other.Parameters,
+            Parameters = Parameters.Over(other.Parameters),
             Output = Output ?? other.Output,
             Database = Database ?? other.Database,
             InputModelSuffix = InputModelSuffix ?? other.InputModelSuffix,

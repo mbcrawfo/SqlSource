@@ -8,59 +8,140 @@ namespace SqlSource.Tests.Settings;
 
 public sealed class GeneratorParameterListTests
 {
-    [Theory]
-    // An internal enum cannot be the parameter of a public test method, so a row gives the flags as a number.
-    [InlineData(new string[] { }, 0)]
-    [InlineData(new[] { "", "  " }, 0)]
-    [InlineData(new[] { "DEFAULT" }, 0)]
-    [InlineData(new[] { " default", "default " }, 0)]
-    [InlineData(new[] { " keep-comments ", "sort-input" }, 5)]
-    [InlineData(new[] { "keep-comments", "", "keep-comments" }, 1)]
-    public void ReadElements_ValidElements_AreTheirParameters(string[] elements, int expected)
-    {
-        var invalid = new List<int>();
+    private static readonly GeneratorParameterChoices KeepCommentsOn = GeneratorParameterChoices.None.With(
+        GeneratorParameters.KeepComments,
+        GeneratorParameterState.On
+    );
 
-        ((int?)GeneratorParameterList.ReadElements(elements, invalid)).ShouldBe(expected);
+    [Theory]
+    [InlineData([new string[] { }])]
+    [InlineData([new[] { "  " }])]
+    [InlineData([new[] { "", " \t" }])]
+    public void ReadElements_NoElement_NamesNothing(string[] elements)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList.ReadElements(elements, invalid, repeated).IsEmpty.ShouldBeTrue();
         invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData([new[] { "default" }])]
+    [InlineData([new[] { "default", "DEFAULT" }])]
+    [InlineData([new[] { " default", "default " }])]
+    public void ReadElements_Default_IsTheReset(string[] elements)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList.ReadElements(elements, invalid, repeated).ShouldBe(GeneratorParameterChoices.Reset);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData([new[] { "keep-comments", "default" }])]
+    [InlineData([new[] { "default", " Keep-Comments=ON " }])]
+    public void ReadElements_DefaultBesideOtherWords_ResetsThenAppliesThem(string[] elements)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList
+            .ReadElements(elements, invalid, repeated)
+            .ShouldBe(
+                GeneratorParameterChoices.Reset.With(GeneratorParameters.KeepComments, GeneratorParameterState.On)
+            );
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
     }
 
     [Fact]
-    public void ReadElements_UnknownWord_IsItsIndexAndTheOthersApply()
+    public void ReadElements_Words_NameTheirStates()
     {
-        var invalid = new List<int>();
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         GeneratorParameterList
-            .ReadElements(["keep-comments", "bogus"], invalid)
-            .ShouldBe(GeneratorParameters.KeepComments);
-        invalid.ShouldBe([1]);
+            .ReadElements([" keep-comments ", "SORT-INPUT=off", "", "array-pool=Default"], invalid, repeated)
+            .ShouldBe(
+                KeepCommentsOn
+                    .With(GeneratorParameters.SortInput, GeneratorParameterState.Off)
+                    .With(GeneratorParameters.ArrayPool, GeneratorParameterState.Default)
+            );
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadElements_UnknownWordOrState_IsItsIndexAndTheOthersApply()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList
+            .ReadElements(["keep-comments", "bogus", "sort-input=maybe"], invalid, repeated)
+            .ShouldBe(KeepCommentsOn);
+        invalid.ShouldBe([1, 2]);
+        repeated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadElements_OldNegativeWord_IsItsIndexAndTheOthersApply()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList
+            .ReadElements(["no-array-pool", "keep-comments"], invalid, repeated)
+            .ShouldBe(KeepCommentsOn);
+        invalid.ShouldBe([0]);
+        repeated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void All_IsTheUnionOfTheNamedParameters()
+    {
+        var union = GeneratorParameters.None;
+        foreach (var (_, parameter) in GeneratorParameterList.Names)
+        {
+            union |= parameter;
+        }
+
+        GeneratorParameterList.All.ShouldBe(union);
     }
 
     // An element is one word: two words in one element are no parameter.
     [Theory]
     [InlineData(new[] { "bogus" }, new[] { 0 })]
     [InlineData(new[] { "keep-comments sort-input" }, new[] { 0 })]
-    [InlineData(new[] { "", "bogus", "nope" }, new[] { 1, 2 })]
-    public void ReadElements_OnlyUnknownWords_GivesNoList(string[] elements, int[] expected)
+    [InlineData(new[] { "", "bogus", "default=off" }, new[] { 1, 2 })]
+    public void ReadElements_OnlyUnknownWords_NameNothing(string[] elements, int[] expected)
     {
-        var invalid = new List<int>();
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
-        GeneratorParameterList.ReadElements(elements, invalid).ShouldBeNull();
+        GeneratorParameterList.ReadElements(elements, invalid, repeated).IsEmpty.ShouldBeTrue();
         invalid.ShouldBe(expected);
     }
 
-    [Theory]
-    [InlineData(new[] { "default", "keep-comments" }, new[] { 0 })]
-    [InlineData(new[] { "keep-comments", " DEFAULT " }, new[] { 1 })]
-    [InlineData(new[] { "bogus", "default", "default" }, new[] { 0, 1, 2 })]
-    public void ReadElements_DefaultBesideAnotherWord_GivesNoListAndNamesEachDefaultAndUnknownWord(
-        string[] elements,
-        int[] expected
-    )
+    [Fact]
+    public void ReadElements_OneOptionInTwoStates_IsARepeatAndTheFirstApplies()
     {
-        var invalid = new List<int>();
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
-        GeneratorParameterList.ReadElements(elements, invalid).ShouldBeNull();
-        invalid.ShouldBe(expected);
+        GeneratorParameterList
+            .ReadElements(["keep-comments", "keep-comments=off"], invalid, repeated)
+            .ShouldBe(KeepCommentsOn);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBe([(1, 0)]);
+    }
+
+    [Fact]
+    public void ReadElements_OneOptionInOneStateTwice_IsNoRepeat()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList
+            .ReadElements(["keep-comments", "KEEP-COMMENTS=on"], invalid, repeated)
+            .ShouldBe(KeepCommentsOn);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
     }
 
     [Theory]

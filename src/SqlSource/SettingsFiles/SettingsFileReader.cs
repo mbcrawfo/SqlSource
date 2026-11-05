@@ -198,7 +198,7 @@ internal static class SettingsFileReader
         }
 
         // An element that is not a string is reported and left out.  An array whose every element is left out is not
-        // the empty list but sets nothing, since a wrong JSON type never sets a setting; [] stays the empty list.
+        // given to the level reader, since a wrong JSON type never sets a setting; [] is, and names no parameter there.
         private SettingsFileValue? ReadArray(string key)
         {
             var (elements, spans) = (new List<string>(), new List<TextSpan>());

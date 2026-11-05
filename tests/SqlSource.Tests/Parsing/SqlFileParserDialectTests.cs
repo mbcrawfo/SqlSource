@@ -147,7 +147,7 @@ public sealed class SqlFileParserDialectTests
 
         Sql(block).ShouldBe("SELECT q'[it's]' --+ h");
         block.Summary.ShouldBe("S");
-        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        block.Markers.Parameters.StateOf(GeneratorParameters.KeepComments).ShouldBe(true);
     }
 
     // The header is read under the dialect of the project, and the rest of the file under the marker's.
