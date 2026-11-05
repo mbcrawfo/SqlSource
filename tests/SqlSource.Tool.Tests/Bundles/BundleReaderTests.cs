@@ -188,7 +188,8 @@ public sealed class BundleReaderTests : IDisposable
         );
 
         read.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC288");
-        read.Failure.Arguments.Single().ShouldContain("The disk is gone.");
+        // The system's reason is kept on its line, its line break written as its escape.
+        read.Failure.Arguments.Single().ShouldContain("The disk\\u000Ais gone.");
     }
 
     private string WriteZip(Bundle bundle)

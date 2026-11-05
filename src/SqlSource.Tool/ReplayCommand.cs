@@ -34,6 +34,12 @@ namespace SqlSource.Tool;
 /// file, a line under it names the path by its position, and every text of the path in its message, as a reason of
 /// the system quotes it, is replaced by that position.
 /// </para>
+/// <para>
+/// A bundle may come from anyone, so every text it prints from one is written through <see cref="BundleText" />: the
+/// version of <c>bundle.json</c>, each difference, whose path and refusal may come from the bundle, and, through
+/// <see cref="BundleErrors" />, an error's.  A line of an event and the entry that <c>replayed:</c> prints are written
+/// by a JSON writer, which leaves no control character to escape.
+/// </para>
 /// </remarks>
 internal static class ReplayCommand
 {
@@ -282,14 +288,14 @@ internal static class ReplayCommand
         await output.WriteLineAsync(Prefix + "not reproduced");
         foreach (var difference in differences)
         {
-            await output.WriteLineAsync(Prefix + "  " + OneLine.Of(difference));
+            await output.WriteLineAsync(Prefix + "  " + BundleText.Of(difference));
         }
 
         if (info is not null)
         {
             await output.WriteLineAsync(
                 Prefix
-                    + $"the bundle was made by sqlsource {OneLine.Of(info.ToolVersion)}, sidecar format "
+                    + $"the bundle was made by sqlsource {BundleText.Of(info.ToolVersion)}, sidecar format "
                     + $"{info.FormatVersion}; this is sqlsource {OneLine.Of(Cli.Version)}, sidecar format "
                     + $"{SidecarFormat.Version}"
             );
@@ -338,7 +344,8 @@ internal static class ReplayCommand
     }
 
     // An error at the bundle as it is printed: at its full path, or, for a token that holds "=" or ";", at no file,
-    // with the path named by its position, in its text too.
+    // with the path named by its position, in its text too, where a reason quotes it as written or as BundleErrors
+    // writes it.
     private static ToolDiagnostic AsNamed(ToolDiagnostic error, UsageValue argument, string path)
     {
         if (argument.MayBePrintedAsPath)
@@ -351,7 +358,7 @@ internal static class ReplayCommand
         [
             .. error.Arguments.Select(text =>
                 text.Replace(path, named, StringComparison.Ordinal)
-                    .Replace(OneLine.Of(path), named, StringComparison.Ordinal)
+                    .Replace(BundleText.Of(path), named, StringComparison.Ordinal)
             ),
         ];
         return ToolDiagnostic.Create(error.Descriptor, arguments).WithLines(new ContinuationLine("bundle", named));

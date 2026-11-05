@@ -6,7 +6,9 @@ namespace SqlSource.Tool.Bundles;
 
 /// <summary>
 /// The errors of reading and replaying a bundle, each at the bundle's path, so that the command and the tests share
-/// their texts.  A text the tool did not write, a reason of the system or a name from the bundle, is kept on its line.
+/// their texts.  A text the tool did not write, a reason of the system or a name from the bundle, is written through
+/// <see cref="BundleText" />, so that a control character of the bundle is printed as its escape, and a line break
+/// too, which keeps the text on its line.
 /// </summary>
 internal static class BundleErrors
 {
@@ -16,7 +18,7 @@ internal static class BundleErrors
     /// Why, in words that start in lower case, such as <c>there is no query.sql at the root of the zip</c>.
     /// </param>
     public static ToolDiagnostic CannotBeRead(string path, string reason) =>
-        ToolDiagnostic.AtFile(ToolDiagnostics.BundleCannotBeRead, path, OneLine.Of(reason));
+        ToolDiagnostic.AtFile(ToolDiagnostics.BundleCannotBeRead, path, BundleText.Of(reason));
 
     /// <summary><c>SQLSRC289</c>: a version of the bundle's form is newer than this tool reads.</summary>
     /// <param name="path">The bundle's full path.</param>
@@ -40,8 +42,8 @@ internal static class BundleErrors
         ToolDiagnostic.AtFile(
             ToolDiagnostics.BundleCallMissing,
             path,
-            OneLine.Of(method),
-            OneLine.Of(madeBy),
+            BundleText.Of(method),
+            BundleText.Of(madeBy),
             OneLine.Of(Cli.Version)
         );
 
@@ -59,5 +61,5 @@ internal static class BundleErrors
     /// <param name="path">The bundle's full path.</param>
     /// <param name="engine">The engine the bundle names.</param>
     public static ToolDiagnostic NoDescriber(string path, string engine) =>
-        ToolDiagnostic.AtFile(ToolDiagnostics.NoDescriberForBundle, path, OneLine.Of(engine));
+        ToolDiagnostic.AtFile(ToolDiagnostics.NoDescriberForBundle, path, BundleText.Of(engine));
 }

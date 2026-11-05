@@ -67,10 +67,7 @@ internal static class BundleDescribers
             }
             catch (ArgumentException)
             {
-                return Failed(
-                    path,
-                    $"the line '{OneLine.Of(setting)}' of {BundleFiles.ExplainSettings} is no planner setting"
-                );
+                return Failed(path, $"the line '{setting}' of {BundleFiles.ExplainSettings} is no planner setting");
             }
         }
 

@@ -75,6 +75,14 @@ public sealed class BundleDescribersTests
     }
 
     [Fact]
+    public void For_SettingLineWithAnEscapeSequence_IsSqlsrc288WithItsEscape() =>
+        BundleDescribers
+            .For(SqlDialect.PostgreSql, Registry, ["work_mem\u001b[2J\t=1GB"], "postgres", Path)
+            .Failure.ShouldNotBeNull()
+            .Arguments.ToArray()
+            .ShouldBe(["the line 'work_mem\\u001B[2J\t=1GB' of explain-settings.txt is no planner setting"]);
+
+    [Fact]
     public void For_SqlServerWithSettings_IsSqlsrc288()
     {
         var described = BundleDescribers.For(SqlDialect.SqlServer, Registry, ["enable_hashjoin=off"], "mssql", Path);

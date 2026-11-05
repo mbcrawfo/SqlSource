@@ -176,6 +176,102 @@ public sealed class ReplayTests : IDisposable
             );
     }
 
+    // A control character of each kind that a crafted bundle may hold, and how it is printed: C0's escape and bell, a
+    // character of C1, and DEL.
+    public static TheoryData<string, string> Controls =>
+        new()
+        {
+            { "\u001b", "\\u001B" },
+            { "\u0007", "\\u0007" },
+            { "\u009b", "\\u009B" },
+            { "\u007f", "\\u007F" },
+        };
+
+    [Theory]
+    [MemberData(nameof(Controls))]
+    public async Task Replay_ToolVersionWithAControlCharacter_PrintsItsEscape(string control, string escape)
+    {
+        var bundle = BundleReplays.OfCase("postgres", "select-plain");
+        var expected = JsonNode.Parse(bundle.Expected.ShouldNotBeNull()).ShouldNotBeNull();
+        var entry = expected["queries"].ShouldNotBeNull().AsObject().Single().Value.ShouldNotBeNull();
+        entry["serverVersion"] = "0.1";
+        var info = InfoOf("postgres", renamed: true) with { ToolVersion = $"1.0{control}[3A\t{control}[0J" };
+        _ = WriteFolder(bundle with { Info = info, Expected = expected.ToJsonString() });
+
+        var result = await _run.RunAsync("replay", "case");
+
+        result.ExitCode.ShouldBe(2);
+        result.Out.ShouldNotContain(control);
+        result
+            .Out.TrimEnd('\n')
+            .Split('\n')[^1]
+            .ShouldStartWith(
+                $"sqlsource: the bundle was made by sqlsource 1.0{escape}[3A\t{escape}[0J, sidecar format "
+            );
+    }
+
+    [Theory]
+    [MemberData(nameof(Controls))]
+    public async Task Replay_FailureWithAControlCharacter_PrintsItsEscape(string control, string escape)
+    {
+        _ = WriteFolder(
+            BundleReplays.PrepareTypeNotDetermined() with
+            {
+                Info = InfoOf("postgres") with
+                {
+                    Renamed = true,
+                    Outcome = BundleOutcome.Failure($"SQLSRC231{control}[2J", $"parse\t{control}"),
+                },
+            }
+        );
+
+        var result = await _run.RunAsync("replay", "case");
+
+        result.ExitCode.ShouldBe(2);
+        result.Out.ShouldNotContain(control);
+        result
+            .Out.Split('\n')
+            .ShouldContain(
+                $"sqlsource:   expected SQLSRC231{escape}[2J at parse\t{escape}, "
+                    + "replayed SQLSRC226 at describe parameters"
+            );
+    }
+
+    [Fact]
+    public async Task Replay_EngineWithEscapeSequences_IsSqlsrc291WithTheirEscapes()
+    {
+        var folder = CopyCase("postgres", "select-plain");
+        var path = Path.Combine(folder, BundleFiles.Capture);
+        var capture = JsonNode.Parse(ReadText(path)).ShouldNotBeNull();
+        capture["engine"] = "x\u001b]0;pwned\u0007";
+        WriteText(path, capture.ToJsonString());
+
+        var result = await _run.RunAsync("replay", "case");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(
+            $"{folder} : error SQLSRC291: The bundle is of the engine 'x\\u001B]0;pwned\\u0007', which this version of "
+                + "sqlsource does not describe\n"
+        );
+    }
+
+    [Fact]
+    public async Task Replay_OutcomeKindWithAnEscapeSequence_IsSqlsrc288WithItsEscape()
+    {
+        var folder = CopyCase("postgres", "select-plain");
+        var info = JsonNode.Parse(BundleJson.Write(InfoOf("postgres", renamed: true))).ShouldNotBeNull();
+        info["outcome"].ShouldNotBeNull()["kind"] = "x\u001b[2Jy";
+        WriteText(Path.Combine(folder, BundleFiles.Info), info.ToJsonString());
+
+        var result = await _run.RunAsync("replay", "case");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(
+            $"{folder} : error SQLSRC288: The bundle cannot be read: the kind of the outcome of bundle.json is "
+                + "'x\\u001B[2Jy', which is neither 'entry' nor 'failure'\n"
+        );
+    }
+
     [Fact]
     public async Task Replay_CaptureWithACallRemoved_IsSqlsrc290()
     {
@@ -555,6 +651,20 @@ public sealed class ReplayTests : IDisposable
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC288: The bundle cannot be read: Could not read 'The path at position 2"
         );
+    }
+
+    // The reason quotes the path with its control character escaped, and the message still names it by its position.
+    [Fact]
+    public async Task Replay_PathWithASemicolonAndAnEscapeThatCannotBeRead_HasNoPartOfItInTheReason()
+    {
+        _run.ReadTextFile = static path => throw new IOException($"Could not read '{path}'.");
+
+        var result = await _run.RunAsync("replay", "a;\u001b" + Secrets.Word);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldNotContain(Secrets.Word);
+        result.Error.ShouldStartWith("sqlsource : error SQLSRC288: The bundle cannot be read: ");
+        result.Error.ShouldContain("'The path at position 2");
     }
 
     [Fact]

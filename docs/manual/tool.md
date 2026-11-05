@@ -520,6 +520,8 @@ A bundle of a query that SqlSource refused holds the error and the step it was r
 
 A bundle that holds its maker's own names and SQL, as one sent to you privately does, says so first, with `sqlsource: this bundle is not renamed, and must not be posted`.  Keep it to yourself: never attach it to an issue or post it anywhere.
 
+A control character in a text that `replay` prints from a bundle, such as the escape that starts a sequence a terminal would act on, or a line break, is printed as its code, `\u001B` for the escape, so that a bundle from someone else cannot change what your terminal shows.  A tab is printed as it is.
+
 A bundle that cannot be read or replayed is an error, from [SQLSRC288](diagnostics.md#sqlsrc288) to [SQLSRC291](diagnostics.md#sqlsrc291), at its full path, and the exit code is `1`.  A path that holds `=` or `;` is named as `The path at position <n>` instead, on a line labelled `bundle`, as a value of the command line that may be a secret is.
 
 <a id="known-issues"></a>

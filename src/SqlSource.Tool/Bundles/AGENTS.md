@@ -8,6 +8,7 @@ How a bundle, `replay` and the renaming work: [`bundles.md`](../../../docs/archi
 - **A question the capture does not answer is `ReplayOutcome.Missed`, never an exception that reaches `Cli`**: it is a bundle of another version, `SQLSRC290`, and no bug.
 - **A bundle reads no log and holds none.**  `replay`'s lines are built from the describer's events by `ReplayLines.cs`, so no describer writes a line for `replay`.
 - **Every error of reading or replaying a bundle is built by `BundleErrors.cs`**, at the bundle's path, so the command and the tests share its texts.
+- **Every text `replay` prints from a bundle goes through `BundleText.cs`**, an error's through `BundleErrors.cs`, unless a JSON writer wrote it: a bundle may come from anyone, and a control character in it would reach the terminal ([why](../../../docs/architecture/bundles.md#what-it-prints)).
 - **A line of `explain-settings.txt` is checked against `PlannerSettings` before a describer is made**, in `BundleDescribers.cs`, so a bad line is `SQLSRC288` and never the describer's exception.
 
 ## The renaming
