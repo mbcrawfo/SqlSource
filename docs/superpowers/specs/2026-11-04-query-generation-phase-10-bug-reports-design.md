@@ -56,7 +56,7 @@ The seam that makes it possible is built: every call a describer makes goes thro
 - **A PostgreSQL error's position counts characters of the SQL that was sent**, and renaming changes lengths.  A position is mapped through the renaming.
 - **Settings no longer come from the attribute.**  A query's dialect and database may come from a settings file, so a bundle's `query.sql` states both as markers of its own.
 - **The closed sets.**  What differs by engine, the fields kept, the names kept verbatim, the renamer itself, is a `PerEngine<T>` or behind a switch over `DatabaseEngine` that names each engine ([closed sets](2026-11-04-closed-sets-design.md)).
-- **The tool writes nothing into a project but its sidecars.**  A bundle and its mapping go where the user says, by default the current folder, never a project's folder unasked.
+- **The tool writes nothing into a project but its sidecars.**  A bundle and its mapping go where the user says with `--out`, which `diagnose` requires: there is no default folder, since the folder a run starts in is usually a project's, whose SDK may copy a `.json` file such as the mapping into its output.  Decided by the owner on 2026-11-04 (review finding R3-F2).
 - **A connection's value goes nowhere but the describer.**  A bundle that `diagnose` describes is written through `CaptureJson.Write(DescribeCapture, ConnectionSecret)`, which refuses a capture that holds the secret, raw bundles included.  `--scrub` has no connection, and writes through `CaptureJson.Write(DescribeCapture)`: the raw bundle it reads passed the secret's check when it was written.
 - The repository's rules apply in full: validate before each commit, `--full` before each push, branch-review, a describer's floor image after a change to it, and docs in the same pull request as the code they describe.
 
@@ -81,7 +81,7 @@ Decided by the owner on 2026-11-04: approach A.
 
 ### The bundle
 
-A zip file, by default `sqlsource-<query>.zip` in the current folder, `<query>` being the query's renamed name, or its own in a raw bundle.  Designer's call for the name and folder.  It holds:
+A zip file, at the path `--out` gives.  It holds:
 
 | File | What it is |
 |----|----|
@@ -126,14 +126,14 @@ A refusal of step 8, 9, 12 or 13 writes nothing and says to make a raw bundle wi
 ```text
 dotnet sqlsource diagnose --query <file>:<name> [<path>] [--project <path>]
                           [--connection <name>=<connection string>]...
-                          [--out <path>] [--no-obfuscate] [--verbose] [--log <path>]
-dotnet sqlsource diagnose --scrub <bundle> [--out <path>]
+                          --out <path> [--no-obfuscate] [--verbose] [--log <path>]
+dotnet sqlsource diagnose --scrub <bundle> --out <path>
 ```
 
 - **The run** plans the unit as `describe` does, with the `.sql` path as its filter, and describes the one query whatever its hash, as `--force` would, through a `CapturingExchange` over the live one.  It writes no sidecar and deletes none.  Its connections, `.env`, `--verbose` and `--log` are `describe`'s; the log stays the user's private file.
 - **`--query <file>:<name>`** names the file as a `.sql` path of `describe` and the query by its `-- name:`.  The colon is the last one, so a Windows path reads.  A name that is no query of the file is an error.  Designer's call for the syntax; the epic gave it.
 - **A refused query** still makes a bundle: a report of a refusal is a report too, and `bundle.json` holds the failure.  Designer's call: the refusal is a line of the outcome, `sqlsource: the query was refused: SQLSRC<n>`, not an error of the run, so the run exits `0` with no `RunAgainLine`; the user saw the error itself when `describe` ran.
-- **`--out <path>`** is the zip's path.  A path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx` is refused, as `--log`'s is, and so is one that holds `=` or `;`.  The mapping goes beside it.
+- **`--out <path>`** is the zip's path, and is required, with `--scrub` too: a run without it is a wrong command line.  Decided by the owner on 2026-11-04.  A path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx` is refused, as `--log`'s is, and so is one that holds `=` or `;`.  The mapping goes beside it.
 - **`--no-obfuscate`** writes the bundle with nothing renamed and no mapping, after the same `CaptureJson.Write` with the secret, and says on standard output that it must not be posted, and to open an issue without it, the private route above.
 - **`--scrub <bundle>`** reads a raw bundle, renames it by the steps above, and writes the renamed bundle and its mapping, with no database and no project.  It refuses a bundle that is renamed already.
 - **What it prints**: the paths it wrote, and a line that says the mapping is private.  Under `--online` it does not run: `--online` is `describe`'s.
@@ -237,7 +237,7 @@ In this design's pull request:
 - A refusal prints the token it found.
 - A refused query is a line of `diagnose`'s outcome, exit `0`.
 - `Cli.RunAgainLine` unchanged.
-- The bundle's default name, `sqlsource-<query>.zip` by the renamed name, in the current folder; the query's own name renamed, class `q_`.
+- The query's own name renamed, class `q_`.
 - A fixture made from a bundle in `Fixtures/Bundles/`, never described against a container or recorded again, its refusal compared by id and step.
 - The renaming's engine-neutral part built in 10.1, so that 10.2 and 10.3 stay side by side.
 - `--scrub` as an option of `diagnose`, with no database.
