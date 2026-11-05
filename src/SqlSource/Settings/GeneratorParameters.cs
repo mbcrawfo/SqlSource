@@ -3,9 +3,9 @@ using System;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The switches a list of generator parameters can hold.  Most are off by default; <see cref="TokenValidation" />,
-/// <see cref="TableModels" /> and <see cref="ArrayPool" /> are on, and <see cref="GeneratorParameterList.Defaults" />
-/// names them.
+/// The generator parameters: the switches a level can name, each on or off.  Most are off by default;
+/// <see cref="TokenValidation" />, <see cref="TableModels" /> and <see cref="ArrayPool" /> are on, and
+/// <see cref="GeneratorParameterList.Defaults" /> names them.
 /// </summary>
 [Flags]
 internal enum GeneratorParameters
