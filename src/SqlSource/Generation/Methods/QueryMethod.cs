@@ -23,6 +23,10 @@ namespace SqlSource.Generation.Methods;
 /// under <c>no-array-pool</c>.  It is the resolved setting, true for a method of any shape without the parameter, so a
 /// reader checks the shape and the collection type as well, as <see cref="Emitting.RowBuffer.IsUsedBy" /> does.
 /// </param>
+/// <param name="PadsLists">
+/// Whether the method pads each list query parameter to a fixed size: false under <c>no-list-padding</c>.  It is the
+/// resolved setting, true for a method without a list.
+/// </param>
 /// <param name="Input">The input model, or null when the query has no parameters.</param>
 /// <param name="Output">The output model, or null when the query's entry has no rows.</param>
 /// <param name="NameLocation">Where the query's name is, for a diagnostic about the method.</param>
@@ -36,6 +40,7 @@ internal sealed record QueryMethod(
     EquatableArray<SqlSegment> Segments,
     bool ValidateTokens,
     bool UseArrayPool,
+    bool PadsLists,
     MethodInput? Input,
     MethodOutput? Output,
     LocationInfo NameLocation

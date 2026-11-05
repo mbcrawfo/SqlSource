@@ -20,6 +20,8 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData("-- generator: sort-input sort-output no-table-models async-method-suffix", 60)]
     [InlineData("-- generator: no-array-pool", 64)]
     [InlineData("-- generator: NO-ARRAY-POOL", 64)]
+    [InlineData("-- generator: no-list-padding", 128)]
+    [InlineData("-- generator: NO-LIST-PADDING", 128)]
     [InlineData("-- generator: default", 0)]
     [InlineData("-- generator: DEFAULT", 0)]
     public void Read_KnownParameters_SetTheList(string line, int expected)
@@ -42,6 +44,7 @@ public sealed class SqlGeneratorParameterScopeTests
     [Theory]
     [InlineData("keep-comment")]
     [InlineData("no-arraypool")]
+    [InlineData("no-listpadding")]
     // The word was a generator parameter once: omitting no-token-validation says it now.
     [InlineData("token-validation")]
     [InlineData("preserve-comments")]
@@ -100,6 +103,7 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData(new[] { "-- generator: default", "-- generator: sort-input" }, "sort-input")]
     [InlineData(new[] { "-- generator: sort-input", "-- generator: default" }, "default")]
     [InlineData(new[] { "-- generator: default no-array-pool" }, "no-array-pool")]
+    [InlineData(new[] { "-- generator: default no-list-padding" }, "no-list-padding")]
     public void Read_DefaultBesideAnotherParameter_ConflictsAtTheSecond(string[] lines, string second)
     {
         var (_, errors) = Read(lines);

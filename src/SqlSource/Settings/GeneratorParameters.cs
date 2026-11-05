@@ -35,4 +35,9 @@ internal enum GeneratorParameters
 
     /// <summary><c>no-array-pool</c>: a query's method reads its rows without the shared array pool.</summary>
     NoArrayPool = 64,
+
+    /// <summary>
+    /// <c>no-list-padding</c>: a list query parameter's values are sent without padding the list to a fixed size.
+    /// </summary>
+    NoListPadding = 128,
 }

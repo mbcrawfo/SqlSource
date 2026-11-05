@@ -31,6 +31,7 @@ public sealed class QuerySettingsTests
         settings.KeepComments.ShouldBeFalse();
         settings.ValidateTokens.ShouldBeTrue();
         settings.UseArrayPool.ShouldBeTrue();
+        settings.PadsLists.ShouldBeTrue();
     }
 
     [Fact]
@@ -52,6 +53,16 @@ public sealed class QuerySettingsTests
         QuerySettings
             .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoArrayPool }, Keep)
             .UseArrayPool.ShouldBeFalse();
+
+    [Fact]
+    public void PadsLists_WithoutTheParameter_IsTrue() =>
+        QuerySettings.Resolve(new SettingsLevel(), Keep).PadsLists.ShouldBeTrue();
+
+    [Fact]
+    public void PadsLists_WithTheParameter_IsFalse() =>
+        QuerySettings
+            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoListPadding }, Keep)
+            .PadsLists.ShouldBeFalse();
 
     [Fact]
     public void Over_EachMember_ComesFromThisLevelWhenItHasOne()

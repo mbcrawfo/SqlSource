@@ -301,6 +301,7 @@ internal static class MethodPlanner
             settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments,
             settings.ValidateTokens,
             settings.UseArrayPool,
+            settings.PadsLists,
             methodInput,
             methodOutput,
             query.NameLocation

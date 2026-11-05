@@ -69,6 +69,9 @@ internal readonly record struct QuerySettings(
     /// <summary>Whether the query's method may read its rows into buffers from the shared array pool.</summary>
     public bool UseArrayPool => (Parameters & GeneratorParameters.NoArrayPool) == 0;
 
+    /// <summary>Whether the query's method pads each list query parameter to a fixed size.</summary>
+    public bool PadsLists => (Parameters & GeneratorParameters.NoListPadding) == 0;
+
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file

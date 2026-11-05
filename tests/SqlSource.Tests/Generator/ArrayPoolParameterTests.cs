@@ -68,6 +68,21 @@ public sealed class ArrayPoolParameterTests
     }
 
     [Theory]
+    [InlineData(null, true)]
+    [InlineData("no-list-padding", false)]
+    public void Run_NoListPadding_ReachesTheMethodAsPadsLists(string? parameter, bool expected)
+    {
+        var sql =
+            (parameter is null ? string.Empty : "-- generator: " + parameter + "\n")
+            + "-- name: ListUsers\nSELECT id, name FROM users;\n";
+
+        var run = Run([new SqlFile(GeneratorHarness.UsersPath, sql)], null);
+
+        run.ShouldBeClean();
+        Method(run).PadsLists.ShouldBe(expected);
+    }
+
+    [Theory]
     [InlineData("ImmutableList")]
     [InlineData("IImmutableList")]
     public void Run_NoArrayPool_LeavesTheGeneratedTextAsItIs(string collection)

@@ -43,6 +43,7 @@ public sealed class QueryMethodWriterTests
         TestSidecars.Of(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
         true,
         true,
+        true,
         new MethodInput(
             "global::App.GetUserParams",
             TestSidecars.Of(new MethodParameter("id", "Id", "int", true, false, Described: Integer))
