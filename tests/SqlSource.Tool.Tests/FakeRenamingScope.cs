@@ -12,7 +12,8 @@ namespace SqlSource.Tool.Tests;
 /// <remarks>
 /// A spelling kept through <see cref="Keep" />, or one that <c>isEngineWord</c> says is the engine's, is its own.
 /// Spellings are compared as given, each with its quoting, or as <c>fold</c> folds them when it is given, and a name
-/// is then the prefix and the folded spelling.
+/// is then the prefix and the folded spelling.  SQL is renamed word by word through <see cref="Name" />, unquoted and
+/// in the class given: a word is a letter or an underscore and the letters, digits and underscores after it.
 /// </remarks>
 internal sealed class FakeRenamingScope(
     Func<string, bool, bool>? isEngineWord = null,
@@ -52,8 +53,31 @@ internal sealed class FakeRenamingScope(
 
     public string Literal(string content) => NameClasses.PrefixOf(NameClass.Literal) + content;
 
-    public RenamedText Sql(string sql, NameClass newWords) =>
-        throw new NotSupportedException("The fake scope renames no SQL.");
+    public RenamedText Sql(string sql, NameClass newWords)
+    {
+        var builder = new RenamedTextBuilder(sql);
+        var index = 0;
+        while (index < sql.Length)
+        {
+            if (!(char.IsLetter(sql[index]) || sql[index] == '_'))
+            {
+                index++;
+                continue;
+            }
+
+            var end = index + 1;
+            while (end < sql.Length && (char.IsLetterOrDigit(sql[end]) || sql[end] == '_'))
+            {
+                end++;
+            }
+
+            builder.CopyTo(index);
+            builder.ReplaceTo(end, Name(sql[index..end], quoted: false, newWords));
+            index = end;
+        }
+
+        return builder.Build();
+    }
 
     public string Parameter(string name) => NameClasses.PrefixOf(NameClass.Parameter) + name;
 
