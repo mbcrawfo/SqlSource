@@ -903,7 +903,7 @@ Two settings contradict each other.  The error is at the second.
 SELECT id, name FROM users;
 ```
 
-Remove one of the two.  A query's `-- generator:` word for a generator parameter replaces the file header's for that parameter, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either, nor is `default` beside other generator parameters.
+Remove one of the two.  A query's `-- generator:` word for a generator parameter replaces the file header's for that parameter, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either, nor is `default` beside other words of `-- generator:`.
 
 See: [A value that is wrong](settings.md#a-value-that-is-wrong)
 

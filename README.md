@@ -192,7 +192,7 @@ More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/setti
 
 ### I want my query methods to have `Async` names
 
-Add the generator parameter `async-method-suffix`: `"generatorParameters": ["async-method-suffix"]` in the `sqlsource.json` beside your project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one type, folder, file or query.  A file or query's own `-- generator:` line adds to it, so the suffix stays unless that line says `async-method-suffix=off` or `default`.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
+Add the generator parameter `async-method-suffix`: `"generatorParameters": ["async-method-suffix"]` in the `sqlsource.json` beside your project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one folder, file or query.  A file's or a query's own `-- generator:` line adds to the project's list, so the suffix stays unless that line says `async-method-suffix=off` or `default`.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
 
 ### I want my query methods to be public, or on the type
 
