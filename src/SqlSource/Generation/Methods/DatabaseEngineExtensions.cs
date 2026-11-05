@@ -21,4 +21,15 @@ internal static class DatabaseEngineExtensions
             DatabaseEngine.SqlServer => "SQL Server",
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
+
+    /// <summary>
+    /// The package of the engine's driver as a diagnostic names it: <c>Npgsql</c> or <c>Microsoft.Data.SqlClient</c>.
+    /// </summary>
+    public static string DriverName(this DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => "Npgsql",
+            DatabaseEngine.SqlServer => "Microsoft.Data.SqlClient",
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
 }

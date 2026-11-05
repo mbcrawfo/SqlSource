@@ -659,23 +659,47 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // Whether a query of the project needs an entry of an engine, whose types the driver decides.  Without one, the
         // driver is not reported on.
         var filesWithNeeds = fileNeeds.Combine(parsedFiles);
-        var usesPostgresEntries = filesWithNeeds
-            .Select(static (input, _) => UsesEntriesOf(input.Left, input.Right, SqlDialect.PostgreSql))
-            .WithTrackingName(TrackingNames.UsesPostgresEntries);
-        var usesSqlServerEntries = filesWithNeeds
-            .Select(static (input, _) => UsesEntriesOf(input.Left, input.Right, SqlDialect.SqlServer))
-            .WithTrackingName(TrackingNames.UsesSqlServerEntries);
+        foreach (var engine in DatabaseEngines.All)
+        {
+            var dialect = SqlDescribableDialects.DialectOf(engine);
+            var usesEntries = filesWithNeeds
+                .Select((input, _) => UsesEntriesOf(input.Left, input.Right, dialect))
+                .WithTrackingName(UsesEntriesName(engine));
 
-        // Not located, and once for the project, however many of its queries need the driver.
-        context.RegisterSourceOutput(
-            npgsqlProbe.Combine(usesPostgresEntries),
-            static (output, input) => ReportDriver(output, input.Right, input.Left)
-        );
-        context.RegisterSourceOutput(
-            sqlClientProbe.Combine(usesSqlServerEntries),
-            static (output, input) => ReportDriver(output, input.Right, input.Left)
-        );
+            switch (engine)
+            {
+                case DatabaseEngine.PostgreSql:
+                    RegisterDriverReport(context, npgsqlProbe, usesEntries);
+                    break;
+                case DatabaseEngine.SqlServer:
+                    RegisterDriverReport(context, sqlClientProbe, usesEntries);
+                    break;
+                default:
+                    throw UnexpectedEnumValueException.Of(engine);
+            }
+        }
     }
+
+    // The tracking name of the node that says whether a query of the project needs an entry of the engine.
+    private static string UsesEntriesName(DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => TrackingNames.UsesPostgresEntries,
+            DatabaseEngine.SqlServer => TrackingNames.UsesSqlServerEntries,
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
+
+    // Not located, and once for the project, however many of its queries need the driver.
+    private static void RegisterDriverReport<TProbe>(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValueProvider<TProbe> probe,
+        IncrementalValueProvider<bool> usesEntries
+    )
+        where TProbe : IDriverProbe =>
+        context.RegisterSourceOutput(
+            probe.Combine(usesEntries),
+            static (output, input) => ReportDriver(output, input.Right, input.Left)
+        );
 
     // The diagnostics of one driver, if a query needs an entry of its engine: whatever its probe finds.
     private static void ReportDriver(SourceProductionContext output, bool usesEntries, IDriverProbe probe)
@@ -1069,23 +1093,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         (CodeGenEngines Engines, (NpgsqlProbe Npgsql, SqlClientProbe SqlClient) Probes) input
     )
     {
-        if ((input.Engines & CodeGenEngines.Postgres) != 0 && !input.Probes.Npgsql.Referenced)
+        foreach (var engine in DatabaseEngines.All)
         {
-            output.ReportDiagnostic(
-                Diagnostic.Create(SqlDiagnostics.DriverNotReferenced, Location.None, "PostgreSQL", "Npgsql")
-            );
-        }
-
-        if ((input.Engines & CodeGenEngines.SqlServer) != 0 && !input.Probes.SqlClient.Referenced)
-        {
-            output.ReportDiagnostic(
-                Diagnostic.Create(
-                    SqlDiagnostics.DriverNotReferenced,
-                    Location.None,
-                    "SQL Server",
-                    "Microsoft.Data.SqlClient"
-                )
-            );
+            if (
+                (input.Engines & engine.ToCodeGenEngines()) != 0
+                && !DriverProbes.Of(engine, input.Probes.Npgsql, input.Probes.SqlClient).Referenced
+            )
+            {
+                output.ReportDiagnostic(
+                    Diagnostic.Create(
+                        SqlDiagnostics.DriverNotReferenced,
+                        Location.None,
+                        engine.DatabaseName(),
+                        engine.DriverName()
+                    )
+                );
+            }
         }
     }
 

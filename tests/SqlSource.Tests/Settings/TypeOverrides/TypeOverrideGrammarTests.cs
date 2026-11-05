@@ -230,12 +230,13 @@ public sealed class TypeOverrideGrammarTests
             repeated
         );
 
-        lists.PostgreSql.ShouldBe([
-            new TypeOverride("int4", "long", Place),
-            new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place),
-            new TypeOverride("timestamptz", null, Place),
-        ]);
-        lists.SqlServer.ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place)]);
+        lists[DatabaseEngine.PostgreSql]
+            .ShouldBe([
+                new TypeOverride("int4", "long", Place),
+                new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place),
+                new TypeOverride("timestamptz", null, Place),
+            ]);
+        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }
@@ -260,8 +261,8 @@ public sealed class TypeOverrideGrammarTests
                 Place,
                 invalid,
                 repeated
-            )
-            .PostgreSql.Select(static entry => entry.Key)
+            )[DatabaseEngine.PostgreSql]
+            .Select(static entry => entry.Key)
             .ShouldBe(["bool", "Public.alpha", "public.Status", "public.status", "public.Zeta", "text", "timestamptz"]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
@@ -279,8 +280,8 @@ public sealed class TypeOverrideGrammarTests
                 Place,
                 invalid,
                 repeated
-            )
-            .PostgreSql.ShouldBe([
+            )[DatabaseEngine.PostgreSql]
+            .ShouldBe([
                 new TypeOverride("int4", "long", Place),
                 new TypeOverride("\"my schema\".\"order status\"", "global::MyApp.A", Place),
             ]);
@@ -295,8 +296,8 @@ public sealed class TypeOverrideGrammarTests
 
         var lists = TypeOverrideGrammar.ReadMembers([new("nvarchar", "string")], Place, invalid, repeated);
 
-        lists.PostgreSql.ShouldBeEmpty();
-        lists.SqlServer.ShouldBe([new TypeOverride("nvarchar", "string", Place)]);
+        lists[DatabaseEngine.PostgreSql].ShouldBeEmpty();
+        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("nvarchar", "string", Place)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }
@@ -310,8 +311,8 @@ public sealed class TypeOverrideGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         TypeOverrideGrammar
-            .ReadMembers([new(key, type)], Place, invalid, repeated)
-            .PostgreSql.ShouldBe([new TypeOverride("int4", expected, Place)]);
+            .ReadMembers([new(key, type)], Place, invalid, repeated)[DatabaseEngine.PostgreSql]
+            .ShouldBe([new TypeOverride("int4", expected, Place)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }
@@ -330,8 +331,8 @@ public sealed class TypeOverrideGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         TypeOverrideGrammar
-            .ReadMembers([new("int8", "long"), new(key, type)], Place, invalid, repeated)
-            .PostgreSql.ShouldBe([new TypeOverride("int8", "long", Place)]);
+            .ReadMembers([new("int8", "long"), new(key, type)], Place, invalid, repeated)[DatabaseEngine.PostgreSql]
+            .ShouldBe([new TypeOverride("int8", "long", Place)]);
         invalid.ShouldBe([1]);
         repeated.ShouldBeEmpty();
     }
@@ -353,8 +354,8 @@ public sealed class TypeOverrideGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         TypeOverrideGrammar
-            .ReadMembers([new(first, "long"), new(second, "int")], Place, invalid, repeated)
-            .PostgreSql.ShouldBe([new TypeOverride(key, "long", Place)]);
+            .ReadMembers([new(first, "long"), new(second, "int")], Place, invalid, repeated)[DatabaseEngine.PostgreSql]
+            .ShouldBe([new TypeOverride(key, "long", Place)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBe([(1, 0)]);
     }
@@ -373,8 +374,8 @@ public sealed class TypeOverrideGrammarTests
             repeated
         );
 
-        lists.PostgreSql.ShouldBe([new TypeOverride("int4", "long", Place)]);
-        lists.SqlServer.ShouldBeEmpty();
+        lists[DatabaseEngine.PostgreSql].ShouldBe([new TypeOverride("int4", "long", Place)]);
+        lists[DatabaseEngine.SqlServer].ShouldBeEmpty();
         repeated.ShouldBe([(1, 0)]);
     }
 
@@ -391,8 +392,8 @@ public sealed class TypeOverrideGrammarTests
             repeated
         );
 
-        lists.PostgreSql.ShouldBeEmpty();
-        lists.SqlServer.ShouldBe([new TypeOverride("timestamp", "byte[]", Place)]);
+        lists[DatabaseEngine.PostgreSql].ShouldBeEmpty();
+        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("timestamp", "byte[]", Place)]);
         repeated.ShouldBe([(1, 0)]);
     }
 
@@ -419,8 +420,8 @@ public sealed class TypeOverrideGrammarTests
 
         var lists = TypeOverrideGrammar.ReadMembers([], Place, invalid, repeated);
 
-        lists.PostgreSql.ShouldBeEmpty();
-        lists.SqlServer.ShouldBeEmpty();
+        lists[DatabaseEngine.PostgreSql].ShouldBeEmpty();
+        lists[DatabaseEngine.SqlServer].ShouldBeEmpty();
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }

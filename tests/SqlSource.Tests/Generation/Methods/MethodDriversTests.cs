@@ -18,7 +18,12 @@ public sealed class MethodDriversTests
     [InlineData(true, true, (int)DatabaseEngine.PostgreSql, true)]
     [InlineData(true, true, (int)DatabaseEngine.SqlServer, true)]
     public void Allows_EachEngine_IsItsDriversFlag(bool postgres, bool sqlServer, int engine, bool expected) =>
-        new MethodDrivers(postgres, sqlServer, false).Allows((DatabaseEngine)engine).ShouldBe(expected);
+        new MethodDrivers(
+            PerEngine.Only(DatabaseEngine.PostgreSql, postgres).With(DatabaseEngine.SqlServer, sqlServer),
+            false
+        )
+            .Allows((DatabaseEngine)engine)
+            .ShouldBe(expected);
 
     // Npgsql 10 is a target of its own for a library's converters.
     [Theory]

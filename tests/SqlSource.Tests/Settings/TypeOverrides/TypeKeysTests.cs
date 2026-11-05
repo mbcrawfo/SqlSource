@@ -1,5 +1,6 @@
 using System;
 using Shouldly;
+using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
@@ -261,10 +262,10 @@ public sealed class TypeKeysTests
     [InlineData("_int4", "int4[]", null)]
     public void TryNormalizeEach_Key_IsWhatEachEnginesReadingGives(string key, string? postgreSql, string? sqlServer)
     {
-        TypeKeys.TryNormalizeEach(key.AsSpan(), out var first, out var second).ShouldBeTrue();
+        TypeKeys.TryNormalizeEach(key.AsSpan(), out var keys).ShouldBeTrue();
 
-        first.ShouldBe(postgreSql);
-        second.ShouldBe(sqlServer);
+        keys[DatabaseEngine.PostgreSql].ShouldBe(postgreSql);
+        keys[DatabaseEngine.SqlServer].ShouldBe(sqlServer);
         (TypeKeys.TryNormalizePostgres(key.AsSpan(), out var alone) ? alone : null).ShouldBe(postgreSql);
         (TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var sqlServerAlone) ? sqlServerAlone : null).ShouldBe(
             sqlServer
@@ -277,10 +278,30 @@ public sealed class TypeKeysTests
     [InlineData("")]
     public void TryNormalizeEach_KeyThatNeitherEngineReads_IsFalse(string key)
     {
-        TypeKeys.TryNormalizeEach(key.AsSpan(), out var postgreSql, out var sqlServer).ShouldBeFalse();
+        TypeKeys.TryNormalizeEach(key.AsSpan(), out var keys).ShouldBeFalse();
 
-        postgreSql.ShouldBeNull();
-        sqlServer.ShouldBeNull();
+        keys[DatabaseEngine.PostgreSql].ShouldBeNull();
+        keys[DatabaseEngine.SqlServer].ShouldBeNull();
+    }
+
+    // An array is PostgreSQL's alone in a user's schema too, since SQL Server has none.
+    [Fact]
+    public void TryNormalizeEach_ArrayOfAUsersSchema_IsPostgreSqlsAlone()
+    {
+        TypeKeys.TryNormalizeEach("public.tag[]".AsSpan(), out var keys).ShouldBeTrue();
+
+        keys[DatabaseEngine.PostgreSql].ShouldBe("public.tag[]");
+        keys[DatabaseEngine.SqlServer].ShouldBeNull();
+    }
+
+    // An escaped part is written in its quoted form for each engine.
+    [Fact]
+    public void TryNormalizeEach_EscapedKeyOfAUsersSchema_IsRewrittenForEachEngine()
+    {
+        TypeKeys.TryNormalizeEach("public.U&\"st\\0061tus\"".AsSpan(), out var keys).ShouldBeTrue();
+
+        keys[DatabaseEngine.PostgreSql].ShouldBe("public.\"status\"");
+        keys[DatabaseEngine.SqlServer].ShouldBe("public.\"status\"");
     }
 
     private static void ShouldNormalizeSqlServer(string key, string expected)

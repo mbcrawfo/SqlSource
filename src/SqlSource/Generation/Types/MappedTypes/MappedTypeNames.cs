@@ -63,11 +63,14 @@ internal static class MappedTypeNames
         return names.Count == 0 ? EquatableArray<string>.Empty : new EquatableArray<string>(names.ToImmutableArray());
     }
 
-    // The types of both engines' entries: an entry of a settings file is in each, and names its type once in the set.
+    // The types of each engine's entries: an entry of a settings file is in each, and names its type once in the set.
     private static void Add(SortedSet<string> names, SettingsLevel level)
     {
-        Add(names, level.TypeOverrides);
-        Add(names, level.SqlServerTypeOverrides);
+        foreach (var engine in DatabaseEngines.All)
+        {
+            Add(names, level.TypeOverrides[engine]);
+        }
+
         if (level.ColumnTypes is not { } columnTypes)
         {
             return;

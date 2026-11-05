@@ -16,6 +16,17 @@ internal static class SqlDescribableDialects
     public static bool Contains(SqlDialect dialect) => All.Contains(dialect);
 
     /// <summary>
+    /// The describable dialect of the engine, the inverse of <see cref="EngineOf" /> on <see cref="All" />.
+    /// </summary>
+    public static SqlDialect DialectOf(DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => SqlDialect.PostgreSql,
+            DatabaseEngine.SqlServer => SqlDialect.SqlServer,
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
+
+    /// <summary>
     /// The engine whose rules read a file's type override: SQL Server for <see cref="SqlDialect.SqlServer" />, and
     /// PostgreSQL for every other dialect.
     /// </summary>

@@ -85,38 +85,44 @@ internal static class TypeKeys
 
     /// <summary>
     /// Reads a key by each engine's rules, as <see cref="TryNormalizePostgres" /> and
-    /// <see cref="TryNormalizeSqlServer" /> do, with null for an engine that does not read it.  The key is split once,
-    /// and a key of a user's schema, which both engines read alike, is read once.  Returns whether either engine reads
-    /// it.
+    /// <see cref="TryNormalizeSqlServer" /> do, with null for an engine that does not read it.  The key is split once.
+    /// Returns whether any engine reads it.
     /// </summary>
-    public static bool TryNormalizeEach(ReadOnlySpan<char> key, out string? postgreSql, out string? sqlServer)
+    public static bool TryNormalizeEach(ReadOnlySpan<char> key, out PerEngine<string?> keys)
     {
-        postgreSql = null;
-        sqlServer = null;
+        keys = default;
         if (!TypeKeyText.TrySplit(key, out var schema, out var name, out var isArray))
         {
             return false;
         }
 
-        if (!schema.IsEmpty && !IsSchema(schema, SystemSchemas.Postgres) && !IsSchema(schema, SystemSchemas.SqlServer))
+        // A loop rather than PerEngine.Of, since a lambda cannot capture the spans.
+        foreach (var engine in DatabaseEngines.All)
         {
-            postgreSql = UsersKey(key, schema, name, isArray);
-            sqlServer = isArray ? null : postgreSql;
-            return true;
+            if (TryNormalizeParts(engine, key, schema, name, isArray, out var normalized))
+            {
+                keys = keys.With(engine, normalized);
+            }
         }
 
-        if (TryNormalizePostgresParts(key, schema, name, isArray, out var postgreSqlKey))
-        {
-            postgreSql = postgreSqlKey;
-        }
-
-        if (TryNormalizeSqlServerParts(key, schema, name, isArray, out var sqlServerKey))
-        {
-            sqlServer = sqlServerKey;
-        }
-
-        return postgreSql is not null || sqlServer is not null;
+        return keys != default;
     }
+
+    // An engine's reading of a key that TrySplit split.
+    private static bool TryNormalizeParts(
+        DatabaseEngine engine,
+        ReadOnlySpan<char> key,
+        ReadOnlySpan<char> schema,
+        ReadOnlySpan<char> name,
+        bool isArray,
+        out string normalized
+    ) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => TryNormalizePostgresParts(key, schema, name, isArray, out normalized),
+            DatabaseEngine.SqlServer => TryNormalizeSqlServerParts(key, schema, name, isArray, out normalized),
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
 
     // PostgreSQL's reading of a key that TrySplit split.
     private static bool TryNormalizePostgresParts(

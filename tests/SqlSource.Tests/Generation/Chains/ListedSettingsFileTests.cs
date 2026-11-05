@@ -88,7 +88,8 @@ public sealed class ListedSettingsFileTests
             .ShouldNotBeNull();
 
         listed
-            .File.Level.TypeOverrides.ShouldNotBeNull()
+            .File.Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.OfSettingsFile(QueriesPath, 2))]);
     }
 

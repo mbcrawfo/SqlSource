@@ -88,7 +88,8 @@ public sealed class SqlMarkerScopeTests
 
         errors.ShouldBeEmpty();
         scope
-            .Level.TypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("int4", "long", place),
                 new TypeOverride("public.user_status", "global::App.Status", place),
@@ -240,7 +241,8 @@ public sealed class SqlMarkerScopeTests
 
         errors.ShouldBeEmpty();
         scope
-            .Level.TypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "global::System.Int32", SettingPlace.Query)]);
     }
 
@@ -255,7 +257,8 @@ public sealed class SqlMarkerScopeTests
 
         errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
         scope
-            .Level.TypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "global::System.Int32", SettingPlace.FileHeader)]);
     }
 
@@ -287,7 +290,8 @@ public sealed class SqlMarkerScopeTests
 
         errors.ShouldBeEmpty();
         scope
-            .Level.TypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([
                 new TypeOverride("public.Status", "global::App.A", SettingPlace.Query),
                 new TypeOverride("public.status", "global::App.B", SettingPlace.Query),
@@ -302,7 +306,8 @@ public sealed class SqlMarkerScopeTests
 
         errors.ShouldBeEmpty();
         scope
-            .Level.TypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("\"my schema\".\"order status\"", "global::App.A", SettingPlace.Query)]);
     }
 
@@ -318,7 +323,8 @@ public sealed class SqlMarkerScopeTests
 
         errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
         scope
-            .Level.TypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("public.status", "global::App.A", SettingPlace.Query)]);
     }
 
@@ -333,7 +339,10 @@ public sealed class SqlMarkerScopeTests
         );
 
         errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
-        scope.Level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4[]", "long", SettingPlace.Query)]);
+        scope
+            .Level.TypeOverrides[DatabaseEngine.PostgreSql]
+            .ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4[]", "long", SettingPlace.Query)]);
     }
 
     [Theory]
@@ -360,9 +369,10 @@ public sealed class SqlMarkerScopeTests
         );
 
         errors.ShouldBeEmpty();
-        scope.Level.TypeOverrides.ShouldBeNull();
+        scope.Level.TypeOverrides[DatabaseEngine.PostgreSql].ShouldBeNull();
         scope
-            .Level.SqlServerTypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.SqlServer]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("nvarchar", "string", SettingPlace.Query)]);
     }
 
@@ -379,7 +389,8 @@ public sealed class SqlMarkerScopeTests
 
         errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
         scope
-            .Level.SqlServerTypeOverrides.ShouldNotBeNull()
+            .Level.TypeOverrides[DatabaseEngine.SqlServer]
+            .ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int", "long", SettingPlace.Query)]);
     }
 

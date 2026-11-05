@@ -303,14 +303,6 @@ internal sealed class SqlMarkerScope(
             return SettingsLevel.None;
         }
 
-        // The entries are the file's engine's alone.
-        var typeOverrides = BuildTypeOverrides();
-        var isSqlServer = Engine switch
-        {
-            DatabaseEngine.PostgreSql => false,
-            DatabaseEngine.SqlServer => true,
-            _ => throw UnexpectedEnumValueException.Of(Engine),
-        };
         return new SettingsLevel
         {
             Parameters = Generator.Parameters,
@@ -322,8 +314,8 @@ internal sealed class SqlMarkerScope(
             InputModelType = _inputModelType,
             OutputModelType = _outputModelType,
             CollectionType = _collectionType,
-            TypeOverrides = isSqlServer ? null : typeOverrides,
-            SqlServerTypeOverrides = isSqlServer ? typeOverrides : null,
+            // The entries are the file's engine's alone.
+            TypeOverrides = PerEngine.Only(Engine, BuildTypeOverrides()),
             ColumnTypes = _columnTypes is null ? null : new EquatableArray<ColumnType>(_columnTypes.ToImmutableArray()),
             LibraryTypes = _libraryTypes is null
                 ? null

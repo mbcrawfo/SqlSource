@@ -50,17 +50,11 @@ internal sealed record SettingsLevel
     public CollectionKind? CollectionType { get; init; }
 
     /// <summary>
-    /// The entries of the type override whose keys PostgreSQL reads, keyed by its rules, sorted by key as
+    /// The entries of the type override, a slot for each engine, keyed by that engine's rules, sorted by key as
     /// <see cref="TypeOverrideMap" /> keeps them, entries of <c>default</c> included.  Merged per key, not taken whole.
+    /// An object of a settings file fills every slot, and a marker the slot of its file's engine.
     /// </summary>
-    public EquatableArray<TypeOverride>? TypeOverrides { get; init; }
-
-    /// <summary>
-    /// The entries of the type override whose keys SQL Server reads, keyed by its rules, kept as
-    /// <see cref="TypeOverrides" /> is.  An object of a settings file fills both, and a marker the one of its file's
-    /// engine.
-    /// </summary>
-    public EquatableArray<TypeOverride>? SqlServerTypeOverrides { get; init; }
+    public PerEngine<EquatableArray<TypeOverride>?> TypeOverrides { get; init; }
 
     /// <summary>
     /// The column types: the C# types of columns by their source, sorted by key as <see cref="ColumnTypeMap" /> keeps
@@ -123,8 +117,7 @@ internal sealed record SettingsLevel
             InputModelType = InputModelType ?? other.InputModelType,
             OutputModelType = OutputModelType ?? other.OutputModelType,
             CollectionType = CollectionType ?? other.CollectionType,
-            TypeOverrides = TypeOverrideMap.Over(TypeOverrides, other.TypeOverrides),
-            SqlServerTypeOverrides = TypeOverrideMap.Over(SqlServerTypeOverrides, other.SqlServerTypeOverrides),
+            TypeOverrides = TypeOverrides.Zip(other.TypeOverrides, TypeOverrideMap.Over),
             ColumnTypes = ColumnTypeMap.Over(ColumnTypes, other.ColumnTypes),
             LibraryTypes = LibrarySettings.Over(LibraryTypes, other.LibraryTypes),
             NestedClass = NestedClass ?? other.NestedClass,

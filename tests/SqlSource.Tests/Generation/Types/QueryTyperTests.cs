@@ -59,11 +59,14 @@ public sealed class QueryTyperTests
                 Entry(SidecarValues.Engine.Postgres, columns: [array]),
                 new SettingsLevel
                 {
-                    TypeOverrides = TestSidecars.Of(
-                        new TypeOverride(
-                            "public._user_status",
-                            Guid,
-                            SettingPlace.OfSettingsFile("/app/sqlsource.json", 1)
+                    TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                        DatabaseEngine.PostgreSql,
+                        TestSidecars.Of(
+                            new TypeOverride(
+                                "public._user_status",
+                                Guid,
+                                SettingPlace.OfSettingsFile("/app/sqlsource.json", 1)
+                            )
                         )
                     ),
                 }
@@ -314,8 +317,11 @@ public sealed class QueryTyperTests
         var entry = Entry(SidecarValues.Engine.Postgres, columns: [TestSidecars.Postgres()]);
         var level = new SettingsLevel
         {
-            TypeOverrides = TestSidecars.Of(
-                new TypeOverride("int4", "MyApp.Missing", SettingPlace.OfSettingsFile("/app/sqlsource.json", 1))
+            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                DatabaseEngine.PostgreSql,
+                TestSidecars.Of(
+                    new TypeOverride("int4", "MyApp.Missing", SettingPlace.OfSettingsFile("/app/sqlsource.json", 1))
+                )
             ),
         };
 
@@ -387,7 +393,7 @@ public sealed class QueryTyperTests
             []
         );
         invalid.ShouldBeEmpty();
-        return new SettingsLevel { TypeOverrides = lists.PostgreSql, SqlServerTypeOverrides = lists.SqlServer };
+        return new SettingsLevel { TypeOverrides = lists.Select(list => (EquatableArray<TypeOverride>?)list) };
     }
 
     // The entry GetUser, with a parameter p<n> and a column c<n> of each type.

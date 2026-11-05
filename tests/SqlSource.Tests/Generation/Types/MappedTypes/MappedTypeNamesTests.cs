@@ -65,7 +65,10 @@ public sealed class MappedTypeNamesTests
                 "app/Other.sql",
                 new SettingsLevel
                 {
-                    TypeOverrides = TestSidecars.Of(new TypeOverride("int4", "long", Farther)),
+                    TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                        DatabaseEngine.PostgreSql,
+                        TestSidecars.Of(new TypeOverride("int4", "long", Farther))
+                    ),
                     ColumnTypes = TestSidecars.Of(
                         new ColumnType("posts.id", null, Farther),
                         new ColumnType("users.id", "UserId", Farther)
@@ -91,7 +94,13 @@ public sealed class MappedTypeNamesTests
     [Fact]
     public void Collect_FilesOfOneChain_GiveItsTypesOnce()
     {
-        var chain = new SettingsLevel { TypeOverrides = TestSidecars.Of(new TypeOverride("int4", "long", Farther)) };
+        var chain = new SettingsLevel
+        {
+            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                DatabaseEngine.PostgreSql,
+                TestSidecars.Of(new TypeOverride("int4", "long", Farther))
+            ),
+        };
         var files = TestSidecars.Of(
             new FileLevel("app/Repo/A.sql", chain),
             new FileLevel("app/Repo/B.sql", Level(new TypeOverride("text", "global::MyApp.Name", Nearer)).Over(chain)),
@@ -121,7 +130,13 @@ public sealed class MappedTypeNamesTests
     }
 
     private static SettingsLevel Level(params TypeOverride[] entries) =>
-        new() { TypeOverrides = TestSidecars.Of(entries) };
+        new()
+        {
+            TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
+                DatabaseEngine.PostgreSql,
+                TestSidecars.Of(entries)
+            ),
+        };
 
     private static ParsedSqlFile Read(string text) =>
         SqlFileReader.Read(
