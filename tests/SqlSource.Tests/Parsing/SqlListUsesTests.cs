@@ -32,6 +32,12 @@ public sealed class SqlListUsesTests
     // "#" is a name character of T-SQL, so "x#IN" is one word.
     [InlineData("mssql", "x#IN @y", new[] { "Value" })]
     [InlineData("postgres", "id IN @ids AND @other = 1", new[] { "List", "Value" })]
+    // A ")" that closes nothing is passed over.
+    [InlineData("postgres", "f(a)) AND id IN @ids", new[] { "List" })]
+    // Only an IN directly inside the parentheses of position is that of the call.
+    [InlineData("postgres", "position(a IN (SELECT x FROM t WHERE id IN @x))", new[] { "List" })]
+    [InlineData("postgres", "id IN @ids OR @ids IS /* c */ NOT NULL", new[] { "List", "NullTest" })]
+    [InlineData("postgres", "id IN {{t}} @ids", new[] { "Value" })]
     public void Find_Use_IsClassified(string dialect, string sql, string[] expected)
     {
         SqlDialectName.TryParse(dialect, out var choice).ShouldBeTrue();
@@ -58,6 +64,39 @@ public sealed class SqlListUsesTests
         SqlListUses.Find(Sql, lexemes, 0, 2, rules).ShouldBe([SqlParameterUse.List]);
         SqlListUses.Find(Sql, lexemes, 2, 6, rules).ShouldBe([SqlParameterUse.NullTest, SqlParameterUse.List]);
         SqlListUses.Find(Sql, lexemes, 2, 2, rules).ShouldBeEmpty();
+    }
+
+    // A range starts where the lexemes of the query before it end, and an IN there is not the range's.  One that
+    // starts the range is.
+    [Fact]
+    public void Find_RangeNextToAnIn_ReadsTheWordWithinTheRangeOnly()
+    {
+        const string Before = "id IN /* the query before ends here */ @x";
+        var rules = SqlDialectRules.PostgreSql;
+        var before = SqlLexer.Lex(Before, rules).Lexemes;
+        before.Count.ShouldBe(4);
+
+        SqlListUses.Find(Before, before, 0, 4, rules).ShouldBe([SqlParameterUse.List]);
+        SqlListUses.Find(Before, before, 1, 4, rules).ShouldBeEmpty();
+
+        const string Starts = "@a = 'x'IN @b";
+        var starts = SqlLexer.Lex(Starts, rules).Lexemes;
+        starts.Count.ShouldBe(5);
+
+        SqlListUses.Find(Starts, starts, 3, 5, rules).ShouldBe([SqlParameterUse.List]);
+        SqlListUses.Find(Starts, starts, 0, 3, rules).ShouldBeEmpty();
+    }
+
+    // A null test matters only of a list, so a query that holds IN but no list use gives no uses.
+    [Theory]
+    [InlineData("id IN (@ids) OR @ids IS NULL")]
+    [InlineData("position('@' IN @email) > 0")]
+    public void Find_InWithoutAListUse_IsEmpty(string sql)
+    {
+        var rules = SqlDialectRules.PostgreSql;
+        var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
+
+        SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules).ShouldBeEmpty();
     }
 
     // Most queries hold no word IN, and a search says so: the walk, and its result, are never made.  The IN of JOIN,

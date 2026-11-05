@@ -28,7 +28,7 @@ internal static class SqlListUses
 
     private const string Null = "NULL";
 
-    // What the reader of a query's lexemes meets next.
+    // What the cursor over a query's lexemes meets next.
     private enum Item
     {
         // The end of the query.
@@ -52,8 +52,8 @@ internal static class SqlListUses
 
     /// <summary>
     /// The use of each parameter lexeme from <paramref name="start" /> up to <paramref name="end" />, in order, or an
-    /// empty array when the text of the lexemes does not hold the word <c>IN</c>, in any case, and so every use is a
-    /// value.
+    /// empty array when no use is a list.  An empty array means that every use is read as a value: a null test matters
+    /// only of a list.  A query whose text does not hold the word <c>IN</c>, in any case, is not walked.
     /// </summary>
     /// <param name="text">The text of the file.</param>
     /// <param name="lexemes">The lexemes of the file.</param>
@@ -93,15 +93,16 @@ internal static class SqlListUses
 
         // Whether each open parenthesis is that of a call to position, innermost last.  Created at the first "(".
         List<bool>? calls = null;
+        var hasList = false;
         var afterIn = false;
         var afterPosition = false;
-        var reader = new Reader(text, lexemes, start, end, rules);
-        for (var item = reader.Next(); item != Item.End; item = reader.Next())
+        var cursor = new Cursor(text, lexemes, start, end, rules);
+        for (var item = cursor.Next(); item != Item.End; item = cursor.Next())
         {
             if (item == Item.Word)
             {
-                afterIn = reader.IsWord(In);
-                afterPosition = reader.IsWord(Position);
+                afterIn = cursor.IsWord(In);
+                afterPosition = cursor.IsWord(Position);
                 continue;
             }
 
@@ -115,14 +116,16 @@ internal static class SqlListUses
             }
             else if (item == Item.Parameter)
             {
-                uses.Add(Classify(afterIn && !(calls is { Count: > 0 } && calls[calls.Count - 1]), reader));
+                var use = Classify(afterIn && !(calls is { Count: > 0 } && calls[calls.Count - 1]), cursor);
+                hasList |= use == SqlParameterUse.List;
+                uses.Add(use);
             }
 
             afterIn = false;
             afterPosition = false;
         }
 
-        return uses.MoveToImmutable();
+        return hasList ? uses.MoveToImmutable() : ImmutableArray<SqlParameterUse>.Empty;
     }
 
     // Whether the text from one offset up to another holds IN as a whole word, so that JOIN, INSERT and INTO, which
@@ -150,32 +153,32 @@ internal static class SqlListUses
     }
 
     // A use after IN is a list, unless the IN is that of a call to position.  Any other use is a null test or a value.
-    private static SqlParameterUse Classify(bool isList, Reader reader)
+    private static SqlParameterUse Classify(bool isList, Cursor cursor)
     {
         if (isList)
         {
             return SqlParameterUse.List;
         }
 
-        return IsNullTest(reader) ? SqlParameterUse.NullTest : SqlParameterUse.Value;
+        return IsNullTest(cursor) ? SqlParameterUse.NullTest : SqlParameterUse.Value;
     }
 
-    // Whether the words that the reader meets next are IS NULL or IS NOT NULL.  The reader is a copy, so the walk
+    // Whether the words that the cursor meets next are IS NULL or IS NOT NULL.  The cursor is a copy, so the walk
     // goes on from the parameter.
-    private static bool IsNullTest(Reader reader) =>
-        reader.Next() == Item.Word
-        && reader.IsWord(Is)
-        && reader.Next() == Item.Word
-        && (reader.IsWord(Null) || (reader.IsWord(Not) && reader.Next() == Item.Word && reader.IsWord(Null)));
+    private static bool IsNullTest(Cursor cursor) =>
+        cursor.Next() == Item.Word
+        && cursor.IsWord(Is)
+        && cursor.Next() == Item.Word
+        && (cursor.IsWord(Null) || (cursor.IsWord(Not) && cursor.Next() == Item.Word && cursor.IsWord(Null)));
 
     // Reads a query's lexemes one item at a time.  A struct, so that a copy can look ahead without moving the walk.
-    private struct Reader(string text, EquatableArray<SqlLexeme> lexemes, int start, int end, SqlDialectRules rules)
+    private struct Cursor(string text, EquatableArray<SqlLexeme> lexemes, int start, int end, SqlDialectRules rules)
     {
         private int _lexeme = start;
         private int _offset = lexemes[start].Span.Start;
         private TextSpan _word;
 
-        // Whether the word the reader last met is the given one, ignoring case.
+        // Whether the word the cursor last met is the given one, ignoring case.
         public readonly bool IsWord(string word) =>
             text.AsSpan(_word.Start, _word.Length).Equals(word.AsSpan(), StringComparison.OrdinalIgnoreCase);
 

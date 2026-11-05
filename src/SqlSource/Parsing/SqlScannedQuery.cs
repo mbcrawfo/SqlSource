@@ -15,8 +15,8 @@ namespace SqlSource.Parsing;
 /// declares none.
 /// </param>
 /// <param name="Uses">
-/// What each parameter of the SQL is used as, in the order of <see cref="SqlBlockText.Parameters" />, or empty when
-/// every use is a value.
+/// What each parameter of the SQL is used as, in the order of <see cref="SqlBlockText.Parameters" />, or empty when no
+/// use is a list, and every use is then read as a value.
 /// </param>
 internal readonly record struct SqlScannedQuery(
     SqlBlockText Sql,

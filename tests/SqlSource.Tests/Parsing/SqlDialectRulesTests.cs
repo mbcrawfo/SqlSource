@@ -140,8 +140,8 @@ public sealed class SqlDialectRulesTests
     public void StringContinuation_OfEachDialect_IsTheRowOfTheTable(string dialect, string expected) =>
         SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect)).StringContinuation.ToString().ShouldBe(expected);
 
-    // T-SQL takes "@", "#" and "$" in a name and refuses a currency sign; the others read every character above
-    // U+007F as a letter, and take only "$" of the three.
+    // T-SQL takes "@", "#" and "$" in a name and refuses other currency signs, such as "€"; the others read every
+    // character above U+007F as a letter, and take only "$" of the three.
     [Theory]
     [InlineData("Ansi", false)]
     [InlineData("SqlServer", true)]
