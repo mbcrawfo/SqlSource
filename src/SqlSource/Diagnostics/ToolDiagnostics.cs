@@ -560,7 +560,7 @@ internal static class ToolDiagnostics
 
     public static readonly DiagnosticDescriptor NoDescriberForBundle = new(
         id: "SQLSRC291",
-        title: "No describer for the bundle's engine",
+        title: "Bundle's engine is not supported",
         messageFormat: "The bundle is of the engine '{0}', which this version of sqlsource does not describe",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,

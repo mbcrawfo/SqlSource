@@ -144,4 +144,4 @@ SQLSRC287 | SqlSource | Error | The watcher failed
 SQLSRC288 | SqlSource | Error | Bundle cannot be read
 SQLSRC289 | SqlSource | Error | Bundle is of a newer version
 SQLSRC290 | SqlSource | Error | Bundle does not answer a question of the query
-SQLSRC291 | SqlSource | Error | No describer for the bundle's engine
+SQLSRC291 | SqlSource | Error | Bundle's engine is not supported

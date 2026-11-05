@@ -260,7 +260,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC288](#sqlsrc288) | Bundle cannot be read |
 | [SQLSRC289](#sqlsrc289) | Bundle is of a newer version |
 | [SQLSRC290](#sqlsrc290) | Bundle does not answer a question of the query |
-| [SQLSRC291](#sqlsrc291) | No describer for the bundle's engine |
+| [SQLSRC291](#sqlsrc291) | Bundle's engine is not supported |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 125 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 291 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), and [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
@@ -3126,7 +3126,7 @@ A bundle is a zip file, or an unzipped folder, that someone made of one query fo
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
-/work/report.zip : error SQLSRC288: The bundle cannot be read: the file 'bundle.json' is missing
+/work/report.zip : error SQLSRC288: The bundle cannot be read: there is no query.sql at the root of the zip
 ```
 
 Check the path first, and that the zip file was not cut short by the download or the mail that carried it.  If the path is right, ask the person who made the bundle for it again; a bundle that was edited by hand, or unzipped and zipped again with a file left out, is read the same way as a damaged one.
@@ -3135,11 +3135,11 @@ Check the path first, and that the zip file was not cut short by the download or
 
 **Bundle is of a newer version**
 
-The bundle was made by a newer version of `sqlsource` than the one you run, in a form that this version does not know.  The message names what is newer, the number the bundle has and the number this version reads.
+The bundle was made by a newer version of `sqlsource` than the one you run, in a form that this version does not know.  The message names the member that is newer, `bundleVersion` or `captureVersion`, the number the bundle has and the number this version reads.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
-/work/report.zip : error SQLSRC289: The bundle's format is 3, and this version of sqlsource reads 2
+/work/report.zip : error SQLSRC289: The bundle's bundleVersion is 2, and this version of sqlsource reads 1
 ```
 
 Update the `sqlsource` tool to the latest version, and replay the bundle again.
@@ -3148,18 +3148,18 @@ Update the `sqlsource` tool to the latest version, and replay the bundle again.
 
 **Bundle does not answer a question of the query**
 
-`sqlsource replay` runs the query from what the bundle holds, and the bundle has no answer to something that the query asks.  The message names the question, the version of `sqlsource` that made the bundle, and the version you run.  This happens when you run a version other than the one that made the bundle, since a different version can ask something the other never did.  A bundle made from a folder says `another version of sqlsource` when it does not tell which version made it.
+`sqlsource replay` runs the query from what the bundle holds, and the bundle has no answer to something that the query asks.  The message names the question, the version of `sqlsource` that made the bundle, and the version you run.  This happens when you run a version other than the one that made the bundle, since a different version can ask something the other never did.  An unzipped folder without the bundle's own description file, `bundle.json`, says `another version of sqlsource`, since it does not tell which version made it.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
-/work/report.zip : error SQLSRC290: The bundle has no answer to 'column types of the table "orders"' that the query asks: it was made by sqlsource 1.4.0, and this is sqlsource 1.6.0
+/work/report.zip : error SQLSRC290: The bundle has no answer to 'columns' that the query asks: it was made by sqlsource 1.4.0, and this is sqlsource 1.6.0
 ```
 
 Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and replay the bundle again.  When the message says `another version of sqlsource`, ask the person who made the bundle which version it was.
 
 ## SQLSRC291
 
-**No describer for the bundle's engine**
+**Bundle's engine is not supported**
 
 The bundle is of a query for a database engine that this version of `sqlsource` cannot run a query of without a database.  The message names the engine.  It happens when the bundle was made by a newer version that supports an engine this one does not.
 
