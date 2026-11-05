@@ -1,0 +1,237 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using SqlSource.Parsing;
+using SqlSource.Snapshot;
+using SqlSource.Tool.Bundles;
+
+namespace SqlSource.Tool.Testing.Bundles;
+
+// What of a schema's and a query's text a renamed bundle still holds, found without asking the renaming: every name
+// and literal of the sources, lexed as PostgreSQL, but the engine's words, sought in each file of the bundle.  A name
+// is sought as a whole word, case-insensitively, and a literal of four characters or more as a substring.  After the
+// leak search of phase 10's spike (f51ac107).
+internal static class BundleLeaks
+{
+    // A shorter literal is too common a substring to be sought.
+    private const int ShortestLiteral = 4;
+
+    private const string NameMarker = "-- name:";
+    private const string ParamMarker = "-- param:";
+
+    // The leaks found, each as "name <name> in <file>" or "literal '<literal>' in <file>"; empty when none.
+    public static IReadOnlyList<string> Of(Bundle renamed, IEnumerable<string> sources, Func<string, bool> isEngineWord)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var literals = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in sources)
+        {
+            Originals(source, names, literals);
+        }
+
+        _ = names.RemoveWhere(name => isEngineWord(name));
+        _ = literals.RemoveWhere(literal => literal.Length < ShortestLiteral || isEngineWord(literal));
+
+        var texts = TextsOf(renamed).ToList();
+        var words = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (file, text) in texts)
+        {
+            foreach (var word in WordsOf(text))
+            {
+                _ = words.TryAdd(word, file);
+            }
+        }
+
+        var leaks = new List<string>();
+        foreach (var name in names.Order(StringComparer.Ordinal))
+        {
+            var found = IsOneWord(name)
+                ? words.GetValueOrDefault(name)
+                : texts.FirstOrDefault(text => text.Text.Contains(name, StringComparison.OrdinalIgnoreCase)).File;
+            if (found is not null)
+            {
+                leaks.Add($"name {name} in {found}");
+            }
+        }
+
+        foreach (var literal in literals.Order(StringComparer.Ordinal))
+        {
+            if (texts.FirstOrDefault(text => text.Text.Contains(literal, StringComparison.Ordinal)).File is { } found)
+            {
+                leaks.Add($"literal '{literal}' in {found}");
+            }
+        }
+
+        return leaks;
+    }
+
+    // The names and literals of a text: the words of plain text but a string's prefix, quoted names without the
+    // nullability mark that the renaming keeps, parameters, the value of -- name: and what -- param: declares, and the
+    // contents of string literals.  Comments hold nothing
+    // that the renaming keeps, since it empties them.
+    private static void Originals(string text, HashSet<string> names, HashSet<string> literals)
+    {
+        var lexed = SqlLexer.Lex(text, SqlDialectRules.PostgreSql);
+        if (lexed.Error is { } error)
+        {
+            throw new ArgumentException($"A source does not lex: {error.Kind} at {error.Span}.", nameof(text));
+        }
+
+        var lexemes = lexed.Lexemes;
+        for (var index = 0; index < lexemes.Count; index++)
+        {
+            var span = lexemes[index].Span;
+            var part = text[span.Start..span.End];
+            switch (lexemes[index].Kind)
+            {
+                case SqlLexemeKind.Text:
+                    var words = WordsOf(part).Where(static word => char.IsLetter(word[0]) || word[0] == '_').ToList();
+                    var prefixed =
+                        index + 1 < lexemes.Count
+                        && lexemes[index + 1].Kind == SqlLexemeKind.Quoted
+                        && words.Count > 0
+                        && words[^1].Length == 1
+                        && part.TrimEnd('&').EndsWith(words[^1], StringComparison.Ordinal);
+                    names.UnionWith(prefixed ? words.Take(words.Count - 1) : words);
+                    break;
+                case SqlLexemeKind.Quoted when part[0] == '"':
+                    var quoted = part[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal);
+                    _ = names.Add(quoted.Length > 1 && quoted[^1] is '!' or '?' ? quoted[..^1] : quoted);
+                    break;
+                case SqlLexemeKind.Quoted when part[0] == '$':
+                    var tag = part[..(part.IndexOf('$', 1) + 1)];
+                    _ = literals.Add(part[tag.Length..^tag.Length]);
+                    break;
+                case SqlLexemeKind.Quoted:
+                    _ = literals.Add(part[1..^1].Replace("''", "'", StringComparison.Ordinal));
+                    break;
+                case SqlLexemeKind.Parameter:
+                    _ = names.Add(part[1..]);
+                    break;
+                case SqlLexemeKind.LineComment when part.StartsWith(NameMarker, StringComparison.Ordinal):
+                    _ = names.Add(part[NameMarker.Length..].Trim());
+                    break;
+                case SqlLexemeKind.LineComment when part.StartsWith(ParamMarker, StringComparison.Ordinal):
+                    Originals(part[ParamMarker.Length..], names, literals);
+                    break;
+                case SqlLexemeKind.LineComment:
+                case SqlLexemeKind.BlockComment:
+                case SqlLexemeKind.Hint:
+                default:
+                    break;
+            }
+        }
+    }
+
+    // Where a name could be left, by file: query.sql and explain-settings.txt whole, and every string of the JSON
+    // files, a string that is JSON itself, a plan, read the same way, with the names of the sidecar's entries.  Not
+    // sought: the members' names, which are the formats'; the sidecar's header, which is the tool's text; and a string
+    // of one character outside a plan, a closed code such as a relkind that a one-letter alias would match.
+    private static IEnumerable<(string File, string Text)> TextsOf(Bundle bundle)
+    {
+        yield return (BundleFiles.Query, bundle.Query);
+        yield return (BundleFiles.ExplainSettings, string.Join('\n', bundle.ExplainSettings));
+        if (bundle.Info is { } info)
+        {
+            foreach (var text in StringsOf(JsonNode.Parse(BundleJson.Write(info)), embedded: false))
+            {
+                yield return (BundleFiles.Info, text);
+            }
+        }
+
+        foreach (var text in StringsOf(JsonNode.Parse(bundle.Capture), embedded: false))
+        {
+            yield return (BundleFiles.Capture, text);
+        }
+
+        if (bundle.Expected is { } expected && JsonNode.Parse(expected) is JsonObject sidecar)
+        {
+            foreach (var (member, value) in sidecar)
+            {
+                if (member is SidecarKeys.Warning or SidecarKeys.SchemaUrl)
+                {
+                    continue;
+                }
+
+                if (member == SidecarKeys.Queries && value is JsonObject entries)
+                {
+                    foreach (var (name, _) in entries)
+                    {
+                        yield return (BundleFiles.Expected, name);
+                    }
+                }
+
+                foreach (var text in StringsOf(value, embedded: false))
+                {
+                    yield return (BundleFiles.Expected, text);
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<string> StringsOf(JsonNode? node, bool embedded)
+    {
+        switch (node)
+        {
+            case JsonObject members:
+                return members.SelectMany(member => StringsOf(member.Value, embedded));
+            case JsonArray items:
+                return items.SelectMany(item => StringsOf(item, embedded));
+            case JsonValue value when value.GetValueKind() == JsonValueKind.String:
+                var text = value.GetValue<string>();
+                if (Embedded(text) is { } document)
+                {
+                    return StringsOf(document, embedded: true);
+                }
+
+                return text.Length == 1 && !embedded ? [] : [text];
+            default:
+                return [];
+        }
+    }
+
+    // A string that is a JSON array or object, as explain's plan is.
+    private static JsonNode? Embedded(string text)
+    {
+        if (text.Length == 0 || text.TrimStart() is not ['[' or '{', ..])
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonNode.Parse(text);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsOneWord(string name) => WordsOf(name).FirstOrDefault() == name;
+
+    // The runs of letters, digits, _ and $ that start with a letter, a digit or _.
+    private static IEnumerable<string> WordsOf(string text)
+    {
+        var at = 0;
+        while (at < text.Length)
+        {
+            if (char.IsLetterOrDigit(text[at]) || text[at] == '_')
+            {
+                var start = at;
+                while (at < text.Length && (char.IsLetterOrDigit(text[at]) || text[at] is '_' or '$'))
+                {
+                    at++;
+                }
+
+                yield return text[start..at];
+            }
+            else
+            {
+                at++;
+            }
+        }
+    }
+}

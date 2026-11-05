@@ -172,7 +172,7 @@ The design asks that the SQL of each request made from the renamed query equal t
 
 ### `EngineRenamings.For`
 
-`EngineRenamings.For` is a switch over `DatabaseEngine`, each arm on a line of its own, and the one place that names an engine's part.  Both arms give null, the arm of `PostgreSql` marked `// Built by 10.2.` and that of `SqlServer` `// Built by 10.3.`, and null means a bundle of that engine cannot be renamed.
+`EngineRenamings.For` is a switch over `DatabaseEngine`, each arm on a line of its own, and the one place that names an engine's part.  The arm of `PostgreSql` gives `PostgresRenaming.Instance`, and that of `SqlServer` gives null, marked `// Built by 10.3.`: null means a bundle of that engine cannot be renamed.
 
 ## Not built yet
 
