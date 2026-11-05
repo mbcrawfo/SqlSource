@@ -24,10 +24,9 @@ public sealed class MethodTests
 
     private static readonly SidecarEntry[] UsersEntries = EntriesOf(Users);
 
-    // Until a query method expands a list, a query with one gets no method, and no diagnostic; its models are written.
-    // The task that expands lists in query methods deletes this test.
+    // A list's method sends a parameter for each value, named after the list; the golden corpus holds the whole method.
     [Fact]
-    public void Method_QueryWithAList_IsNotGeneratedYet()
+    public void Run_QueryWithAList_GetsAMethodThatSendsEachValue()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -37,7 +36,8 @@ public sealed class MethodTests
         var run = MethodRuns.Run(file, [Entry(file, "FindIds", [Parameter("ids")], [Column("id")])]);
 
         run.ShouldBeClean();
-        run.Sources.ContainsKey(MethodRuns.MethodsFile).ShouldBeFalse();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" FindIds(\n");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("parameter.ParameterName = \"ids_\" + index.ToString(");
         run.Sources["App.FindIdsParams-Model.g.cs"].ShouldContain("IEnumerable<int> Ids");
     }
 

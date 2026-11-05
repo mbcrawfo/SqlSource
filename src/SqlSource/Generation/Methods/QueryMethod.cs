@@ -89,7 +89,18 @@ internal sealed record MethodInput(string TypeText, EquatableArray<MethodParamet
 /// <param name="Sequence">
 /// Whether the property is a sequence, the property's <c>ModelProperty.Sequence</c>: for
 /// <see cref="ParameterSequence.Array" />, <paramref name="TypeText" /> is the array <c>E[]</c> and the property an
-/// <c>IEnumerable&lt;E&gt;</c>, which the PostgreSQL binding sends as an <c>IList&lt;E&gt;</c>.
+/// <c>IEnumerable&lt;E&gt;</c>, which the PostgreSQL binding sends as an <c>IList&lt;E&gt;</c>; for
+/// <see cref="ParameterSequence.List" />, <paramref name="TypeText" />, <paramref name="IsValueType" />,
+/// <paramref name="Write" /> and <paramref name="Described" /> are the element's, and <paramref name="IsNullable" />
+/// says whether the list can be null.
+/// </param>
+/// <param name="HasNullTest">
+/// Whether the SQL tests the list with <c>IS NULL</c> or <c>IS NOT NULL</c>, for which the method sends a parameter of
+/// the list's own name that says whether it is null.
+/// </param>
+/// <param name="ExpansionPrefix">
+/// For a list, the prefix of the names its values are sent by, before each value's index: <c>ids_</c>, as
+/// <see cref="ListNames.PrefixOf" /> gives it.  Null for any other parameter.
 /// </param>
 internal sealed record MethodParameter(
     string Name,
@@ -99,7 +110,9 @@ internal sealed record MethodParameter(
     bool IsNullable,
     Conversion? Write = null,
     SidecarType? Described = null,
-    ParameterSequence Sequence = ParameterSequence.None
+    ParameterSequence Sequence = ParameterSequence.None,
+    bool HasNullTest = false,
+    string? ExpansionPrefix = null
 )
 {
     /// <summary>
@@ -108,6 +121,12 @@ internal sealed record MethodParameter(
     /// each bound as a value of the element's type.  It is computed, so it takes no part in equality.
     /// </summary>
     public bool IsArraySequence => ParameterSequences.IsArray(Sequence);
+
+    /// <summary>
+    /// Whether the parameter is a list, <see cref="ParameterSequence.List" />, whose values the method sends one by
+    /// one.  It is computed, so it takes no part in equality.
+    /// </summary>
+    public bool IsList => Sequence == ParameterSequence.List;
 }
 
 /// <summary>

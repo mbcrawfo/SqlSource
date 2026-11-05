@@ -11,9 +11,12 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// </summary>
 internal static class CommandWriter
 {
-    // The lines around the assignment of a command's SQL when its tokens build it.
+    // The lines around the assignment of a command's SQL when its tokens or its lists build it.
     private const string SqlFromTokensStart =
         "#pragma warning disable CA2100 // The text of a token is the caller's own choice.\n";
+
+    private const string SqlFromListsStart =
+        "#pragma warning disable CA2100 // The text is the query's own, with a parameter for each value of a list.\n";
 
     private const string SqlFromTokensEnd = "#pragma warning restore CA2100\n";
 
@@ -63,13 +66,13 @@ internal static class CommandWriter
     }
 
     // The SQL the constant would have held, or, with tokens, the string the token method would have returned, built
-    // by the same code.
+    // by the same code, which with lists writes each use of a list as the list's values.
     private static void AppendSql(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var segments = context.Method.Segments;
         var locals = context.Locals;
-        if (context.Tokens.Count == 0)
+        if (context.Tokens.Count == 0 && locals.Lists is null)
         {
             _ = builder
                 .Append(indent)
@@ -91,18 +94,20 @@ internal static class CommandWriter
             context.SpelledTokens,
             locals.Span,
             locals.State,
-            expandsLists: false
+            locals.Lists
         );
         _ = builder.Append(";\n");
     }
 
-    // A command whose SQL is built at run time, from the text of its tokens, is what CA2100 flags, and its tokens are
-    // text that the caller chooses, so the assignment turns the rule off around itself and nothing else.
+    // A command whose SQL is built at run time, from the text of its tokens or for the values of its lists, is what
+    // CA2100 flags, and its tokens are text that the caller chooses, and its lists' uses the query's own text, so the
+    // assignment turns the rule off around itself and nothing else.
     private static void AppendCommand(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var locals = context.Locals;
-        var builtAtRunTime = context.Tokens.Count > 0;
+        var builtAtRunTime = context.Tokens.Count > 0 || locals.Lists is not null;
+        var start = context.Tokens.Count > 0 ? SqlFromTokensStart : SqlFromListsStart;
         _ = builder
             .Append(indent)
             .Append("var ")
@@ -112,7 +117,7 @@ internal static class CommandWriter
             .Append(".CreateCommand();\n");
         _ = AsyncSpelling.AppendUsing(builder, indent, locals.CommandScope, locals.Command);
         _ = builder
-            .Append(builtAtRunTime ? indent + SqlFromTokensStart : string.Empty)
+            .Append(builtAtRunTime ? indent + start : string.Empty)
             .Append(indent)
             .Append(locals.Command)
             .Append(".CommandText = ")
@@ -136,7 +141,8 @@ internal static class CommandWriter
         _ = builder.Append('\n');
     }
 
-    // Each parameter of the input, in a block of its own, bound by the binder of the method's engine.
+    // Each parameter of the input, in a block of its own, bound by the binder of the method's engine.  A list binds
+    // each of its values, and its null test.
     private static void AppendBindings(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
@@ -152,11 +158,26 @@ internal static class CommandWriter
                 MethodArguments.Parameters,
                 locals.ConversionNames
             );
+            var list = 0;
             foreach (var parameter in input.Parameters)
             {
-                _ = builder.Append(indent).Append("{\n");
-                binder.Append(bindingContext, parameter);
-                QueryMethodWriter.AppendEnd(builder, indent);
+                if (parameter.IsList)
+                {
+                    ListBindingWriter.AppendBindings(
+                        in context,
+                        binder,
+                        bindingContext,
+                        locals.Lists!.Each[list++],
+                        indent
+                    );
+                }
+                else
+                {
+                    _ = builder.Append(indent).Append("{\n");
+                    binder.Append(bindingContext, parameter);
+                    QueryMethodWriter.AppendEnd(builder, indent);
+                }
+
                 _ = builder.Append('\n');
             }
         }

@@ -203,6 +203,24 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("item")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("list0")]
+    [InlineData("count0")]
+    [InlineData("size0")]
+    [InlineData("padded0")]
+    [InlineData("total")]
+    [InlineData("index")]
+    [InlineData("end")]
+    [InlineData("written")]
+    [InlineData("CountOf")]
+    [InlineData("PaddedSize")]
+    [InlineData("DigitsUpTo")]
+    [InlineData("TElement")]
+    [InlineData("values")]
+    [InlineData("collection")]
+    [InlineData("array")]
+    [InlineData("size")]
+    [InlineData("digits")]
+    [InlineData("power")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.RunInNestedClass(
@@ -282,6 +300,24 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("yield")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("list0")]
+    [InlineData("count0")]
+    [InlineData("size0")]
+    [InlineData("padded0")]
+    [InlineData("total")]
+    [InlineData("index")]
+    [InlineData("end")]
+    [InlineData("written")]
+    [InlineData("CountOf")]
+    [InlineData("PaddedSize")]
+    [InlineData("DigitsUpTo")]
+    [InlineData("TElement")]
+    [InlineData("values")]
+    [InlineData("collection")]
+    [InlineData("array")]
+    [InlineData("size")]
+    [InlineData("digits")]
+    [InlineData("power")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
@@ -299,6 +335,9 @@ public sealed class GeneratedSourceMethodTests
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
         methods.ShouldNotContain("static " + name + " =>");
         methods.ShouldNotContain("is { } " + name + " ?");
+        // A list's local takes the name list0 unless a token has it, and then list01.
+        methods.ShouldContain(name == "list0" ? "var list01 = parameters.Members;" : "var list0 = parameters.Members;");
+        methods.ShouldContain(".ParameterName = \"members_\" + ");
 
         var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.CSharp12);
 

@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
@@ -40,6 +39,18 @@ internal abstract class ParameterBinder
     public abstract void Append(in BindingContext context, MethodParameter bound);
 
     /// <summary>
+    /// Appends the binding of a list's null test: a parameter of the list's own name, a boolean of the database's that
+    /// is null when the list is null and true otherwise, which the SQL's <c>IS NULL</c> or <c>IS NOT NULL</c> reads in
+    /// place of the list.
+    /// </summary>
+    /// <param name="context">
+    /// What every parameter of the method is bound with, whose <see cref="BindingContext.ValueExpression" /> is the
+    /// list's value.
+    /// </param>
+    /// <param name="list">The list.</param>
+    public abstract void AppendNullTest(in BindingContext context, MethodParameter list);
+
+    /// <summary>
     /// Appends the binding by value alone: the name, without the <c>@</c>, and the value, with nothing else set.  A
     /// nullable property, and any property of a reference type, which a caller can set to null all the same, sends
     /// <c>DBNull.Value</c> for null.  A property with a converter sends the converter's result, and the converter
@@ -58,7 +69,7 @@ internal abstract class ParameterBinder
             .Append(context.Indent)
             .Append(context.Parameter)
             .Append(".ParameterName = ")
-            .Append(SymbolDisplay.FormatLiteral(bound.Name, quote: true))
+            .Append(context.NameOf(bound))
             .Append(";\n")
             .Append(context.Indent)
             .Append(context.Parameter)
@@ -86,17 +97,11 @@ internal abstract class ParameterBinder
         }
         else if (bound.IsNullable || !bound.IsValueType)
         {
-            _ = builder
-                .Append("(object?)")
-                .Append(context.Parameters)
-                .Append('.')
-                .Append(bound.Property)
-                .Append(" ?? ")
-                .Append(nullText);
+            _ = builder.Append("(object?)").Append(context.ValueOf(bound)).Append(" ?? ").Append(nullText);
         }
         else
         {
-            _ = builder.Append(context.Parameters).Append('.').Append(bound.Property);
+            _ = builder.Append(context.ValueOf(bound));
         }
     }
 
@@ -124,7 +129,7 @@ internal abstract class ParameterBinder
         var builder = context.Builder;
         if (!bound.IsNullable && bound.IsValueType)
         {
-            AppendCall(builder, write, context.Parameters + "." + bound.Property);
+            AppendCall(builder, write, context.ValueOf(bound));
             return;
         }
 
@@ -144,19 +149,12 @@ internal abstract class ParameterBinder
     }
 
     /// <summary>
-    /// Appends the match of the property's value that is not null, <c>parameters.X is { } value ? </c>, before the
-    /// arm that reads <c>value</c>, the pattern variable of <see cref="ConversionNames.Value" />.
+    /// Appends the match of the property's value that is not null, <c>parameters.X is { } value ? </c>, or of the
+    /// binding's value expression, before the arm that reads <c>value</c>, the pattern variable of
+    /// <see cref="ConversionNames.Value" />.
     /// </summary>
-    protected static void AppendMatch(in BindingContext context, MethodParameter bound)
-    {
-        _ = context
-            .Builder.Append(context.Parameters)
-            .Append('.')
-            .Append(bound.Property)
-            .Append(" is { } ")
-            .Append(context.Names.Value)
-            .Append(" ? ");
-    }
+    protected static void AppendMatch(in BindingContext context, MethodParameter bound) =>
+        _ = context.Builder.Append(context.ValueOf(bound)).Append(" is { } ").Append(context.Names.Value).Append(" ? ");
 
     // The value, the pattern variable of the property's value that is not null, as an array: as it is, unless the
     // property holds the array as any sequence, which is then copied into an array when it is not one.

@@ -7,6 +7,7 @@ using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Methods;
+using SqlSource.Generation.Models;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
@@ -1230,6 +1231,43 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain(" await.Length");
         text.ShouldNotContain("(await, b)");
         text.ShouldNotContain(" await,");
+    }
+
+    // The values of a list are counted, and their number checked, when the method is called, so the limit throws
+    // there and not when the loop asks for the first row.
+    [Fact]
+    public void Append_StreamWithLists_ChecksTheLimitBeforeTheIterator()
+    {
+        var streamIds = Stream with
+        {
+            Segments = TestSidecars.Of(
+                TestModels.Literal("SELECT id FROM accounts WHERE id IN "),
+                new SqlSegment(SqlSegmentKind.List, "@ids")
+            ),
+            Input = new MethodInput(
+                "global::App.StreamIdsParams",
+                TestSidecars.Of(
+                    new MethodParameter(
+                        "ids",
+                        "Ids",
+                        "int",
+                        true,
+                        false,
+                        Described: Integer,
+                        Sequence: ParameterSequence.List,
+                        ExpansionPrefix: "ids_"
+                    )
+                )
+            ),
+        };
+
+        var text = Write(streamIds);
+
+        var check = text.IndexOf("throw new global::System.ArgumentException(", StringComparison.Ordinal);
+        var iterator = text.IndexOf("ReadRows(", StringComparison.Ordinal);
+        check.ShouldBeGreaterThan(0);
+        iterator.ShouldBeGreaterThan(check);
+        ShouldBalanceItsBraces(text);
     }
 
     // After the last row the iterator reads the later results inside its try, so that the move that ends the loop

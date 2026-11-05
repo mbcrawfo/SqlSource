@@ -1,4 +1,6 @@
 using System.Text;
+using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Methods;
 
 namespace SqlSource.Generation.Emitting;
 
@@ -14,11 +16,29 @@ namespace SqlSource.Generation.Emitting;
 /// <param name="Names">
 /// The names of what a converted parameter's binding declares, which no argument and no local of the method has.
 /// </param>
+/// <param name="ValueExpression">
+/// The expression of the value bound, or null for the property's, <c>parameters.X</c>: a list binds each of its values
+/// from its loop's element.
+/// </param>
+/// <param name="NameExpression">
+/// The expression of the parameter's name, or null for the literal of the parameter's own: a list names each of its
+/// values by its prefix and the value's index.
+/// </param>
 internal readonly record struct BindingContext(
     StringBuilder Builder,
     string Indent,
     string Command,
     string Parameter,
     string Parameters,
-    ConversionNames Names
-);
+    ConversionNames Names,
+    string? ValueExpression = null,
+    string? NameExpression = null
+)
+{
+    /// <summary>The value bound: <see cref="ValueExpression" />, or the property's, <c>parameters.X</c>.</summary>
+    public string ValueOf(MethodParameter bound) => ValueExpression ?? (Parameters + "." + bound.Property);
+
+    /// <summary>The name bound: <see cref="NameExpression" />, or the literal of the parameter's own name.</summary>
+    public string NameOf(MethodParameter bound) =>
+        NameExpression ?? SymbolDisplay.FormatLiteral(bound.Name, quote: true);
+}

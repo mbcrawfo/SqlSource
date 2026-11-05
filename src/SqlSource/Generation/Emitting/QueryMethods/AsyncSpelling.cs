@@ -10,9 +10,10 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 internal static class AsyncSpelling
 {
     /// <summary>
-    /// The modifiers of the local iterator of a streaming method.
+    /// The modifiers of the local iterator of a streaming method: <c>static async</c>, or <c>async</c> for one that
+    /// captures the locals the method counts its lists into before it returns the iterator.
     /// </summary>
-    internal const string IteratorModifiers = "static async ";
+    internal static string IteratorModifiersOf(bool captures) => captures ? "async " : "static async ";
 
     // DbCommand and DbDataReader are IAsyncDisposable, whose ConfigureAwait is an extension method.  The generated file
     // imports no namespace, so it is called by its class.

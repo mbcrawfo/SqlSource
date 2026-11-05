@@ -8,7 +8,7 @@ See [query methods](../../../../../docs/architecture/generator.md#query-methods)
 
 ## Engines in a query method
 
-- **A phase file asks a flag of `ExecutionCapabilities`, never the engine, which `CommandWriter.cs` names only for `ParameterBinder.For`.**  The flags come from the one switch in `ExecutionCapabilityRules.cs`, run in the output step and never cached, and the statements and `<exception>` documentation they turn on are in `ExecutionCapabilityWriter.cs`.  See [query methods](../../../../../docs/architecture/generator.md#query-methods).
+- **A phase file asks a flag of `ExecutionCapabilities`, never the engine, which `CommandWriter.cs` names only for `ParameterBinder.For`, and `ListWriter.cs` only for the limit of parameters, `LimitOf`.**  The flags come from the one switch in `ExecutionCapabilityRules.cs`, run in the output step and never cached, and the statements and `<exception>` documentation they turn on are in `ExecutionCapabilityWriter.cs`.  See [query methods](../../../../../docs/architecture/generator.md#query-methods).
 
 ## Locals
 

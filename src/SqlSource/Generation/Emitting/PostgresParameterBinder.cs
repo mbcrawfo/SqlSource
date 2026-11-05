@@ -48,7 +48,7 @@ internal sealed class PostgresParameterBinder : ParameterBinder
             .Append(context.Indent)
             .Append(context.Parameter)
             .Append(".ParameterName = ")
-            .Append(SymbolDisplay.FormatLiteral(bound.Name, quote: true))
+            .Append(context.NameOf(bound))
             .Append(";\n");
         if (DataTypeNameOf(bound.Described) is { } dataTypeName)
         {
@@ -70,6 +70,32 @@ internal sealed class PostgresParameterBinder : ParameterBinder
             .Append(context.Parameter)
             .Append(");\n");
     }
+
+    /// <inheritdoc />
+    public override void AppendNullTest(in BindingContext context, MethodParameter list) =>
+        _ = context
+            .Builder.Append(context.Indent)
+            .Append("var ")
+            .Append(context.Parameter)
+            .Append(" = new global::Npgsql.NpgsqlParameter<bool?>();\n")
+            .Append(context.Indent)
+            .Append(context.Parameter)
+            .Append(".ParameterName = ")
+            .Append(context.NameOf(list))
+            .Append(";\n")
+            .Append(context.Indent)
+            .Append(context.Parameter)
+            .Append(".DataTypeName = \"pg_catalog.bool\";\n")
+            .Append(context.Indent)
+            .Append(context.Parameter)
+            .Append(".TypedValue = ")
+            .Append(context.ValueOf(list))
+            .Append(" is null ? null : true;\n")
+            .Append(context.Indent)
+            .Append(context.Command)
+            .Append(".Parameters.Add(")
+            .Append(context.Parameter)
+            .Append(");\n");
 
     /// <summary>
     /// The name the parameter of a type is bound by: null when the type has no <c>bindName</c>, and otherwise the
@@ -168,7 +194,7 @@ internal sealed class PostgresParameterBinder : ParameterBinder
         }
         else
         {
-            _ = builder.Append(context.Parameters).Append('.').Append(bound.Property);
+            _ = builder.Append(context.ValueOf(bound));
         }
     }
 }
