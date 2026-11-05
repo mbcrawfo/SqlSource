@@ -221,7 +221,7 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 
 | Kind | C# type |
 |----|----|
-| An array | Its element's C# type with `[]`: `int[]` for `int4[]`, `string[]` for `text[]`, `string[]` for an array of an enum |
+| An array | Its element's C# type with `[]`: `int[]` for `int4[]`, `string[]` for `text[]`, `string[]` for an array of an enum.  A parameter in a query method is an `IEnumerable<T>` of that element: see [array parameters](#array-parameters) |
 | A domain | Its base type's C# type: a domain over `text` is a `string` |
 | An enum | `string`.  Npgsql reads an enum as its label.  To read it as a C# enum, map it with the type override, `public.user_status=MyApp.UserStatus`, and call `MapEnum<MyApp.UserStatus>()` on the application's data source builder |
 | A range or a multirange that the table does not name, a range of your own over `int4` included | None: SQLSRC246.  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project without Npgsql references it first, since that type is Npgsql's |
@@ -396,6 +396,7 @@ A described PostgreSQL query gets the [models](generator.md#models) that every d
 - **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or [NodaTime's](#nodatime) or [NetTopologySuite's](#nettopologysuite) for a query whose output is `codegen` in a project that references `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, or [System.Text.Json's](#json) for one where the library types turn `json` on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A column's alias can say otherwise with `!` or `?`, and so can a [`-- column:` marker](generator.md#column-marker).
 - **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since PostgreSQL does not say whether a parameter can be null.
+- **An array parameter's property is an `IEnumerable<T>`** in the input model of a query whose output is `codegen`, and a `T[]` in that of a query whose output is `models`: see [array parameters](#array-parameters).  A column's property is a `T[]` in both.
 - **A column with no name**, which PostgreSQL calls `?column?`, as an expression or a literal without an alias, is [SQLSRC253](diagnostics.md#sqlsrc253), and the query gets no models until it is fixed.  Give it an alias.
 - **A query whose rows are a whole table** gets a model named after the table, with the table's schema before its name unless the schema is `public`: `users` gives `UsersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](generator.md#table-models).
 - **Updating Npgsql from 9 to 10** changes the types of the properties for `date`, `time`, `cidr`, `daterange` and `datemultirange`, as [which version of Npgsql](#which-npgsql) says, and so the models.
@@ -429,7 +430,32 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 - **A parameter declared as a domain is sent as the domain's base type**, so the domain's `CHECK` is not applied to it.  Compared with a column of the domain, a value that the domain refuses finds no row, and the server checks it only when it is written to such a column.
 - **A `string` longer than the `varchar(n)` column it is written to is refused by the server**, with `22001`, and never cut to fit.
 - **A parameter that has a [converter](settings.md#converters)** is converted to the type of [the table](#type-table), a domain's base type for a domain, and sent as its database type too.
+- **An array parameter** takes any sequence of its element type: see [array parameters](#array-parameters).
 - **A parameter of a [JSON](#json) type, or a class of yours in one,** is sent as its `json` or `jsonb`: a `JsonElement`, a `JsonDocument`, and on Npgsql 10 a `JsonNode`, a `JsonObject` or a `JsonArray`, by Npgsql, and on Npgsql 8 and 9 those three, and a class on every version, as their JSON's text.  A class by [the JSON opt-in](settings.md#json-opt-in) is sent as its JSON's text, as the parameter's own type: a `text` parameter as a `text`.
+
+<a id="array-parameters"></a>
+
+### Array parameters
+
+```sql postgres
+-- name: FindUsersByIds
+SELECT id, name FROM users WHERE id = ANY(@ids);
+```
+
+```csharp
+HashSet<int> ids = [3, 1, 2];
+FindUsersByIdsDto[] users = await connection.FindUsersByIds(new FindUsersByIdsParams(ids));
+```
+
+In a query method, an array parameter takes any `IEnumerable<T>` of its element type: an array, a `List<T>`, a `HashSet<T>`, an `ImmutableArray<T>` or the result of a LINQ query.  Above, `FindUsersByIdsParams.Ids` is an `IEnumerable<int>`.  The same holds for an array of a library's type, such as NodaTime's or NetTopologySuite's, and for a parameter that can be null, an `IEnumerable<T>?`, which is sent as `NULL`.
+
+- **A sequence is read once.**  An array, a `List<T>`, an `ImmutableArray<T>`, a `ReadOnlyCollection<T>` and any other `IList<T>` are sent as they are.  A `HashSet<T>`, a type that is only an `ICollection<T>` or an `IReadOnlyList<T>`, and a lazy sequence are copied into an array once, as the method sends them, so a lazy sequence is enumerated once and never twice.  The order of a `HashSet<T>` is the set's own, and so is the order of the array it gives.
+- **A null element** is sent as a `NULL` element, so the element type must be one that can be null: see [what to know about some types](#type-notes).
+- **The `models` output keeps `T[]`.**  An input model of a query whose output is `models` holds an array as an array, since a library such as Dapper hands the value to Npgsql as it is, and Npgsql refuses a set or a lazy sequence.  A model of one name shared by a query whose output is `codegen` and one whose output is `models` therefore differs, and is [SQLSRC257](diagnostics.md#sqlsrc257), which names both property types.  Name the models apart with [`-- output-model:`](settings.md#setting-model-name) or `-- input-model:`.
+- **A type that you give is taken as written.**  `-- param: @ids -> int[]` makes the property an `int[]`, and so does a type that is not an array of one dimension, such as `int4[]=System.Collections.Generic.List<int>` in the [type override](settings.md#setting-type-overrides).
+- **These are not sequences, and stay as they are:** `bytea`, a `byte[]`; a multidimensional array such as `int[,]`; `int2vector` and `oidvector`; and the multiranges, which are sent as one value.
+- **A caller that reads the array back from an input model** of a `codegen` query, `ids.Length` for instance, sees an `IEnumerable<T>` now, though constructing the model with an array still compiles.  Copy the sequence into an array, `ids.ToArray()`, where you need one.
+- **`= ANY(@ids)` is the way to filter by a sequence on PostgreSQL**; `IN (@ids)` would compare to one array.
 
 <a id="method-results"></a>
 

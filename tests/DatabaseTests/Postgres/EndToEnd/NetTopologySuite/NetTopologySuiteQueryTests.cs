@@ -195,6 +195,37 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
         polygon.PolygonValue.ShouldBeNull();
     }
 
+    // A sequence that is no IList, from LINQ, as the array parameter: it is copied once on its way to the server, and
+    // the elements come back as they were, a NULL one and its SRID included.
+    [Fact]
+    public async Task GeometryArray_LazySequence_RoundTrips()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.GisWithNetTopologySuite(postgis);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var row = Nulls(103) with
+        {
+            GeometryArrayValue = Enumerable
+                .Range(1, 2)
+                .Select(static x => x == 1 ? Wgs84.CreatePoint(new Coordinate(x, x)) : null!)
+                .Where(static _ => true),
+        };
+
+        _ = await connection.InsertSpatialValues(row, transaction, cancellationToken: token);
+        var read = await connection.GetSpatialValues(
+            new GetSpatialValuesArgs(103),
+            transaction,
+            cancellationToken: token
+        );
+        await transaction.RollbackAsync(token);
+
+        read.GeometryArrayValue.ShouldNotBeNull()
+            .Cast<object?>()
+            .ShouldBe([Wgs84.CreatePoint(new Coordinate(1, 1)), null]);
+        SridsOf(read).ShouldBe([("GeometryArrayValue", 0, 4326), ("GeometryArrayValue", 1, null)]);
+    }
+
     [Fact]
     public void MethodTypes_AreGeometries()
     {
