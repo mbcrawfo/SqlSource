@@ -144,7 +144,7 @@ internal static class SqlParameterList
     {
         foreach (var use in uses)
         {
-            if (use.Use == SqlParameterUse.List && !parameters[use.Parameter].IsList)
+            if ((use.Use is SqlParameterUse.List or SqlParameterUse.NegatedList) && !parameters[use.Parameter].IsList)
             {
                 parameters[use.Parameter] = parameters[use.Parameter] with { IsList = true };
             }
@@ -161,6 +161,13 @@ internal static class SqlParameterList
             switch (use.Use)
             {
                 case SqlParameterUse.List:
+                    break;
+                case SqlParameterUse.NegatedList:
+                    if (!parameter.HasNegatedUse)
+                    {
+                        parameters[use.Parameter] = parameter with { HasNegatedUse = true };
+                    }
+
                     break;
                 case SqlParameterUse.NullTest:
                     if (!parameter.HasNullTest)
@@ -306,7 +313,10 @@ internal static class SqlParameterList
                 WarnOfSpelling(ref warned, warnings, rules, name, parameters[index], span);
             }
 
-            if (parameter.Use == SqlParameterUse.List || (index >= 0 && parameters[index].IsList))
+            if (
+                parameter.Use is SqlParameterUse.List or SqlParameterUse.NegatedList
+                || (index >= 0 && parameters[index].IsList)
+            )
             {
                 errors.Add(
                     SqlParseError.Create(

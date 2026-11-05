@@ -145,6 +145,7 @@ internal static class SqlListSegments
             case SqlParameterUse.Value:
                 return null;
             case SqlParameterUse.List:
+            case SqlParameterUse.NegatedList:
                 kind = SqlSegmentKind.List;
                 break;
             case SqlParameterUse.NullTest:

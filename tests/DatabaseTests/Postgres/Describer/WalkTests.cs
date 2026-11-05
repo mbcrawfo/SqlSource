@@ -47,6 +47,56 @@ public sealed class WalkTests(PostgresDatabases postgres)
             )
         ).ShouldBe([NotNullCatalog, NotNullCatalog, NotNullCatalog, NotNullCatalog]);
 
+    // A list is described as one value, o.id NOT IN (@ids), which the planner reads as the strict o.id <> $1 and so
+    // makes the join inner; but an empty list keeps the rows whose o.id is NULL.  So in a query that negates a list
+    // every join may null-extend, and both of its sides are nullable.
+    [Fact]
+    public async Task DescribeAsync_LeftJoinThatANegatedListMakesInner_IsNullableThroughout()
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE o.id NOT IN @ids"
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NullableOuterJoin, NullableOuterJoin]);
+    }
+
+    // A query without a word of the gate has no outer join for a negated list to undo, and keeps the catalog's answer.
+    [Fact]
+    public async Task DescribeAsync_InnerJoinWithANegatedList_KeepsTheCatalogsAnswer()
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id, o.total FROM users u JOIN orders o ON o.user_id = u.id WHERE o.id NOT IN @ids"
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NotNullCatalog]);
+    }
+
+    // A list that is not negated keeps what it proved: an empty list matches no row, as NULL does.
+    [Fact]
+    public async Task DescribeAsync_LeftJoinThatAListMakesInner_IsNotNullThroughout()
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE o.id IN @ids"
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NotNullCatalog]);
+    }
+
     // A column with no origin is answered from the plan, so a query without a word of the gate is planned for it,
     // and its column of a table keeps the catalog's answer.
     [Fact]

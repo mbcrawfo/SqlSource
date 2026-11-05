@@ -10,10 +10,15 @@ namespace SqlSource.Parsing;
 /// </summary>
 /// <remarks>
 /// A use is a list when the word before it is <c>IN</c>, and a null test when the words after it are <c>IS NULL</c> or
-/// <c>IS NOT NULL</c>.  Words are runs of the dialect's name characters, so <c>JOIN</c> and T-SQL's <c>x#IN</c> are
-/// not <c>IN</c>, and a quoted region is never a word.  A comment or a hint between two words is passed over as white
-/// space.  <c>position(a IN b)</c> puts a single value after <c>IN</c>, so an <c>IN</c> directly inside the
-/// parentheses of a call to <c>position</c> makes no list.  The uses are read from the lexemes of the file, so
+/// <c>IS NOT NULL</c>.  A list is negated when a <c>NOT</c> is open where it stands: one opens at the word <c>NOT</c>,
+/// but for the <c>NOT</c> of <c>IS NOT</c>, and stays open at its depth of parentheses, and in every parenthesis
+/// opened inside it, until an <c>AND</c>, an <c>OR</c> or a comma at that depth, or the parenthesis that closes the
+/// depth.  So <c>id NOT IN @ids</c>, <c>NOT id IN @ids</c> and <c>NOT (a AND id IN @ids)</c> negate the list, and
+/// <c>NOT a AND id IN @ids</c> does not.  A list that only a test of its truth negates, <c>(id IN @ids) IS FALSE</c>,
+/// is not read as negated (TD-0102).  Words are runs of the dialect's name characters, so <c>JOIN</c> and T-SQL's
+/// <c>x#IN</c> are not <c>IN</c>, and a quoted region is never a word.  A comment or a hint between two words is passed
+/// over as white space.  <c>position(a IN b)</c> puts a single value after <c>IN</c>, so an <c>IN</c> directly inside
+/// the parentheses of a call to <c>position</c> makes no list.  The uses are read from the lexemes of the file, so
 /// nothing is lexed again, and a query without the word <c>IN</c> costs a search.
 /// </remarks>
 internal static class SqlListUses
@@ -27,6 +32,10 @@ internal static class SqlListUses
     private const string Not = "NOT";
 
     private const string Null = "NULL";
+
+    private const string And = "AND";
+
+    private const string Or = "OR";
 
     // What the cursor over a query's lexemes meets next.
     private enum Item
@@ -42,6 +51,9 @@ internal static class SqlListUses
 
         // ")".
         Close,
+
+        // ",".
+        Comma,
 
         // A parameter lexeme.
         Parameter,
@@ -91,37 +103,63 @@ internal static class SqlListUses
 
         var uses = ImmutableArray.CreateBuilder<SqlParameterUse>(count);
 
-        // Whether each open parenthesis is that of a call to position, innermost last.  Created at the first "(".
-        List<bool>? calls = null;
+        // Each open parenthesis, innermost last.  Created at the first "(".
+        List<Parenthesis>? open = null;
         var hasList = false;
         var afterIn = false;
+        var afterIs = false;
         var afterPosition = false;
+
+        // Whether a NOT is open at the depth of the cursor, and whether one is open at a depth that holds it.
+        var notHere = false;
+        var notAbove = false;
         var cursor = new Cursor(text, lexemes, start, end, rules);
         for (var item = cursor.Next(); item != Item.End; item = cursor.Next())
         {
             if (item == Item.Word)
             {
+                if (cursor.IsWord(Not) && !afterIs)
+                {
+                    notHere = true;
+                }
+                else if (cursor.IsWord(And) || cursor.IsWord(Or))
+                {
+                    notHere = false;
+                }
+
                 afterIn = cursor.IsWord(In);
+                afterIs = cursor.IsWord(Is);
                 afterPosition = cursor.IsWord(Position);
                 continue;
             }
 
             if (item == Item.Open)
             {
-                (calls ??= []).Add(afterPosition);
+                (open ??= []).Add(new Parenthesis(afterPosition, notHere, notAbove));
+                notAbove |= notHere;
+                notHere = false;
             }
-            else if (item == Item.Close && calls is { Count: > 0 })
+            else if (item == Item.Close && open is { Count: > 0 })
             {
-                calls.RemoveAt(calls.Count - 1);
+                var closed = open[open.Count - 1];
+                open.RemoveAt(open.Count - 1);
+                notHere = closed.NotOutside;
+                notAbove = closed.NotAboveOutside;
+            }
+            else if (item == Item.Comma)
+            {
+                notHere = false;
             }
             else if (item == Item.Parameter)
             {
-                var use = Classify(afterIn && !(calls is { Count: > 0 } && calls[calls.Count - 1]), cursor);
-                hasList |= use == SqlParameterUse.List;
+                var isList = afterIn && !(open is { Count: > 0 } && open[open.Count - 1].IsPosition);
+                var use = Classify(isList, notHere || notAbove, cursor);
+                hasList |= use is SqlParameterUse.List or SqlParameterUse.NegatedList;
                 uses.Add(use);
             }
 
             afterIn = false;
+            afterIs = false;
             afterPosition = false;
         }
 
@@ -152,12 +190,13 @@ internal static class SqlListUses
         }
     }
 
-    // A use after IN is a list, unless the IN is that of a call to position.  Any other use is a null test or a value.
-    private static SqlParameterUse Classify(bool isList, Cursor cursor)
+    // A use after IN is a list, unless the IN is that of a call to position, and a negated one where a NOT is open.
+    // Any other use is a null test or a value.
+    private static SqlParameterUse Classify(bool isList, bool isNegated, Cursor cursor)
     {
         if (isList)
         {
-            return SqlParameterUse.List;
+            return isNegated ? SqlParameterUse.NegatedList : SqlParameterUse.List;
         }
 
         return IsNullTest(cursor) ? SqlParameterUse.NullTest : SqlParameterUse.Value;
@@ -224,6 +263,7 @@ internal static class SqlListUses
                     {
                         '(' => Item.Open,
                         ')' => Item.Close,
+                        ',' => Item.Comma,
                         _ => Item.Other,
                     };
                 }
@@ -252,4 +292,8 @@ internal static class SqlListUses
             }
         }
     }
+
+    // An open parenthesis: whether it is that of a call to position, and what was open outside it, to be had again
+    // when it closes.
+    private readonly record struct Parenthesis(bool IsPosition, bool NotOutside, bool NotAboveOutside);
 }

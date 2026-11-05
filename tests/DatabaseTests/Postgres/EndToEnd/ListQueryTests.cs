@@ -10,9 +10,9 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // The queries of Queries/Lists.sql, run on the seed of "app" through the methods that ListQueries gets, each of which
 // sends a parameter for each value of a list: every kind of collection, the counts on each side of the padded sizes,
-// an empty list and a null one, two lists, a list used twice, a list sent at its own count, and the counts at
-// PostgreSQL's limit of 65535 parameters and past it, which the method refuses before it sends.  The lists of the
-// limit are of ids that no account has, around the seed's own.
+// an empty list and a null one, two lists, a list used twice, a list after NOT IN beside a LEFT JOIN, a list sent at
+// its own count, and the counts at PostgreSQL's limit of 65535 parameters and past it, which the method refuses before
+// it sends.  The lists of the limit are of ids that no account has, around the seed's own.
 [Collection(UsesPostgres.Name)]
 public sealed class ListQueryTests(PostgresDatabases postgres)
 {
@@ -113,6 +113,44 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
         var accounts = await connection.ListAccountsExcept(new ListAccountsExceptArgs([]), cancellationToken: token);
 
         accounts.ShouldBe([Alice, Bob, Carol]);
+    }
+
+    // An empty list after NOT IN keeps every row the LEFT JOIN gives, carol's too, whom it fills with NULLs: the
+    // properties of the joined columns can be null, though body is NOT NULL, since a NOT IN of one value would have
+    // dropped her row.
+    [Fact]
+    public async Task NotesExcept_Empty_ReadsTheAccountWithoutANote()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesExcept(
+            new ListAccountNotesExceptArgs([]),
+            cancellationToken: token
+        );
+
+        rows.ShouldBe([
+            new ListAccountNotesExceptDto(1, "alice", "Asked for a larger plan."),
+            new ListAccountNotesExceptDto(1, "alice", "Sent the quote."),
+            new ListAccountNotesExceptDto(2, "bob", "Closed the account on site."),
+            new ListAccountNotesExceptDto(3, "carol", null),
+        ]);
+    }
+
+    [Fact]
+    public async Task NotesExcept_Ids_LeavesTheirNotesOut()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesExcept(
+            new ListAccountNotesExceptArgs([1, 3]),
+            cancellationToken: token
+        );
+
+        rows.ShouldBe([new ListAccountNotesExceptDto(1, "alice", "Sent the quote.")]);
     }
 
     [Fact]

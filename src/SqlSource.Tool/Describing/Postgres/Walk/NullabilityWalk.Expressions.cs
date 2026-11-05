@@ -296,7 +296,7 @@ internal static partial class NullabilityWalk
 
         // A child that prints no Output, and is extended or has a join under it that extends.
         private bool OpaqueAndNotPreserved(PlanNode child) =>
-            child.Output is null && (instances.IsExtended(child) || PlanInstances.ExtendsUnder(child));
+            child.Output is null && (instances.IsExtended(child) || instances.ExtendsUnder(child));
 
         // Each child that prints the value, and how: as it is, wrapped whole in parentheses, or without the
         // parentheses that wrap it whole.
@@ -355,7 +355,7 @@ internal static partial class NullabilityWalk
             PlanNode[] sides = [.. join.JoinChildren.Where(child => instances.IsUnder(found.Alias, child))];
             return
                 sides is [var side]
-                && !PlanInstances.ExtendsUnder(side)
+                && !instances.ExtendsUnder(side)
                 && ProvedTypeThrough(found.Instance, reference.Column) is { } type
                 ? (side.ParentRelationship == PlanRelationships.Outer, type)
                 : null;

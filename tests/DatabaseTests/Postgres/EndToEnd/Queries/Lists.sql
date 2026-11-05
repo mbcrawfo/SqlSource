@@ -59,3 +59,12 @@ SELECT id, name, status
 FROM accounts
 WHERE id IN @ids
 ORDER BY id;
+
+-- name: ListAccountNotesExcept
+-- summary: Each account and the body of each of its notes whose id is not in a list, and NULL for an account without
+-- summary: one, which an empty list keeps.
+SELECT a.id, a.name, n.body
+FROM accounts a
+LEFT JOIN notes n ON n.account_id = a.id
+WHERE n.id NOT IN @noteIds
+ORDER BY a.id, n.id;

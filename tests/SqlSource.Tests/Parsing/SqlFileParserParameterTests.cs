@@ -653,26 +653,39 @@ public sealed class SqlFileParserParameterTests
     private static SqlParseError ListMisused(TextSpan span, string parameter, string reason) =>
         SqlParseError.Create(SqlParseErrorKind.ListParameterMisused, span, parameter, reason);
 
+    // A list that a NOT negates in any of its uses says so, for PostgreSQL's describer.
     [Theory]
-    [InlineData("SELECT id FROM t WHERE a = @a AND id IN @ids")]
-    [InlineData("SELECT id FROM t WHERE a = @a AND id NOT IN @ids")]
-    [InlineData("SELECT id FROM t WHERE a = @a AND (id in @ids OR parent_id IN /* any */ @ids)")]
-    public void Parse_ParameterAfterIn_IsAList(string sql) =>
+    [InlineData("SELECT id FROM t WHERE a = @a AND id IN @ids", false)]
+    [InlineData("SELECT id FROM t WHERE a = @a AND id NOT IN @ids", true)]
+    [InlineData("SELECT id FROM t WHERE a = @a AND (id in @ids OR parent_id IN /* any */ @ids)", false)]
+    [InlineData("SELECT id FROM t WHERE a = @a AND (id IN @ids OR NOT (parent_id IN @ids))", true)]
+    [InlineData("SELECT id FROM t WHERE NOT a = @a AND id IN @ids", false)]
+    public void Parse_ParameterAfterIn_IsAList(string sql, bool negated) =>
         Blocks("-- name: Q\n" + sql + "\n")
             .ShouldHaveSingleItem()
             .Parameters.ShouldBe([
                 new SqlQueryParameter("a", null, null, false),
-                new SqlQueryParameter("ids", null, null, false, IsList: true),
+                new SqlQueryParameter("ids", null, null, false, IsList: true, HasNegatedUse: negated),
             ]);
 
     [Theory]
-    [InlineData("SELECT id FROM t WHERE (@ids IS NULL OR id IN @ids)")]
-    [InlineData("SELECT id FROM t WHERE @ids IS NOT NULL AND id NOT IN @ids")]
-    [InlineData("SELECT id FROM t WHERE id IN @ids OR @ids is null")]
-    public void Parse_ListWithANullTest_HasNullTest(string sql) =>
+    [InlineData("SELECT id FROM t WHERE (@ids IS NULL OR id IN @ids)", false)]
+    [InlineData("SELECT id FROM t WHERE @ids IS NOT NULL AND id NOT IN @ids", true)]
+    [InlineData("SELECT id FROM t WHERE id IN @ids OR @ids is null", false)]
+    public void Parse_ListWithANullTest_HasNullTest(string sql, bool negated) =>
         Blocks("-- name: Q\n" + sql + "\n")
             .ShouldHaveSingleItem()
-            .Parameters.ShouldBe([new SqlQueryParameter("ids", null, null, false, IsList: true, HasNullTest: true)]);
+            .Parameters.ShouldBe([
+                new SqlQueryParameter(
+                    "ids",
+                    null,
+                    null,
+                    false,
+                    IsList: true,
+                    HasNullTest: true,
+                    HasNegatedUse: negated
+                ),
+            ]);
 
     // A null test matters only of a list, so a parameter that has only null tests is one value.
     [Theory]
@@ -777,7 +790,16 @@ public sealed class SqlFileParserParameterTests
         Blocks("-- name: Q\n-- param: @ids text null -> Category\n" + sql + "\n")
             .ShouldHaveSingleItem()
             .Parameters.ShouldBe([
-                new SqlQueryParameter("ids", "text", true, true, "Category", IsList: true, HasNullTest: hasNullTest),
+                new SqlQueryParameter(
+                    "ids",
+                    "text",
+                    true,
+                    true,
+                    "Category",
+                    IsList: true,
+                    HasNullTest: hasNullTest,
+                    HasNegatedUse: hasNullTest
+                ),
             ]);
 
     [Fact]

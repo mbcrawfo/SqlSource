@@ -12,7 +12,24 @@ public sealed class SqlListUsesTests
 
     [Theory]
     [InlineData("postgres", "id IN @ids", new[] { "List" })]
-    [InlineData("postgres", "id not in @ids", new[] { "List" })]
+    [InlineData("postgres", "id not in @ids", new[] { "NegatedList" })]
+    // A NOT is open at its depth, and in every parenthesis inside it, until an AND, an OR or a comma at that depth, or
+    // the parenthesis that closes it.
+    [InlineData("postgres", "id NOT /* c */ IN @ids", new[] { "NegatedList" })]
+    [InlineData("postgres", "NOT id IN @ids", new[] { "NegatedList" })]
+    [InlineData("postgres", "NOT (id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "NOT (a = 1 AND (id IN @ids))", new[] { "NegatedList" })]
+    [InlineData("postgres", "NOT EXISTS (SELECT 1 FROM t WHERE t.id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "NOT a AND id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "NOT (a) OR id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "(NOT a) AND id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "f(NOT a, id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "id NOT IN @a AND id IN @b", new[] { "NegatedList", "List" })]
+    [InlineData("postgres", "id IN @a AND NOT id IN @b", new[] { "List", "NegatedList" })]
+    // The NOT of IS NOT tests a value and negates nothing after it.
+    [InlineData("postgres", "x IS NOT DISTINCT FROM id IN @ids", new[] { "List" })]
+    // Only a NOT negates: a test of the truth of a list is read as a list (TD-0102).
+    [InlineData("postgres", "(id IN @ids) IS FALSE", new[] { "List" })]
     [InlineData("postgres", "id IN /* c */ @ids", new[] { "List" })]
     [InlineData("postgres", "id IN\n-- c\n@ids", new[] { "List" })]
     [InlineData("postgres", "id IN /*+ hint */ @ids", new[] { "List" })]

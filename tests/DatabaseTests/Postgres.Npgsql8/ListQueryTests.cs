@@ -116,6 +116,44 @@ public sealed class ListQueryTests(AppContainer app)
         accounts.ShouldBe([Alice, Bob, Carol]);
     }
 
+    // An empty list after NOT IN keeps every row the LEFT JOIN gives, carol's too, whom it fills with NULLs: the
+    // properties of the joined columns can be null, though body is NOT NULL, since a NOT IN of one value would have
+    // dropped her row.
+    [Fact]
+    public async Task NotesExcept_Empty_ReadsTheAccountWithoutANote()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesExcept(
+            new ListAccountNotesExceptArgs([]),
+            cancellationToken: token
+        );
+
+        rows.ShouldBe([
+            new ListAccountNotesExceptDto(1, "alice", "Asked for a larger plan."),
+            new ListAccountNotesExceptDto(1, "alice", "Sent the quote."),
+            new ListAccountNotesExceptDto(2, "bob", "Closed the account on site."),
+            new ListAccountNotesExceptDto(3, "carol", null),
+        ]);
+    }
+
+    [Fact]
+    public async Task NotesExcept_Ids_LeavesTheirNotesOut()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesExcept(
+            new ListAccountNotesExceptArgs([1, 3]),
+            cancellationToken: token
+        );
+
+        rows.ShouldBe([new ListAccountNotesExceptDto(1, "alice", "Sent the quote.")]);
+    }
+
     [Fact]
     public async Task Optional_Null_FindsEveryRow()
     {

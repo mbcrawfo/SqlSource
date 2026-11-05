@@ -644,6 +644,90 @@
           "computed": false
         }
       ]
+    },
+    "ListAccountNotesExcept": {
+      "hash": "926bbc39b0106e4ae3c720afa35472529034f0e655658c3422c444ca984c6bca",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "several-tables",
+      "parameters": [
+        {
+          "name": "noteIds",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": true,
+          "nullableSource": "outer-join",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": true,
+          "nullableSource": "outer-join",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": true,
+          "nullableSource": "outer-join",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }
