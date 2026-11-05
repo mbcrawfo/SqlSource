@@ -94,7 +94,7 @@ The rows of `columns`, `operands` and `table` are one record, `SqlServerColumnRo
 
 ## 3. The vocabulary
 
-**Where each engine's words are.**  PostgreSQL's keywords are `pg_get_keywords()`; its functions, operators and types are `pg_catalog`'s rows of `pg_proc`, `pg_operator` and `pg_type`, with `information_schema`'s types.  SQL Server has no catalog of its keywords or of its intrinsic functions: the keywords are the three lists of Microsoft's [Reserved keywords (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/reserved-keywords-transact-sql), reserved (185), ODBC (235) and future (272), one for every version; the functions are the 318 names of the Transact-SQL functions reference, each tried as `SELECT F()` through `sys.dm_exec_describe_first_result_set`, error `195` meaning the server does not know it; the types are `sys.types` with `is_user_defined = 0`.
+**Where each engine's words are.**  The SQL Server lists as fetched are [beside this document](2026-11-05-query-generation-phase-10-spike/SOURCES.md).  PostgreSQL's keywords are `pg_get_keywords()`; its functions, operators and types are `pg_catalog`'s rows of `pg_proc`, `pg_operator` and `pg_type`, with `information_schema`'s types.  SQL Server has no catalog of its keywords or of its intrinsic functions: the keywords are the three lists of Microsoft's [Reserved keywords (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/reserved-keywords-transact-sql), reserved (185), ODBC (235) and future (272), one for every version; the functions are the 318 names of the Transact-SQL functions reference, each tried as `SELECT F()` through `sys.dm_exec_describe_first_result_set`, error `195` meaning the server does not know it; the types are `sys.types` with `is_user_defined = 0`.
 
 | List | Floor | Default | Only in the floor | Only in the default |
 |----|----|----|----|----|
@@ -215,14 +215,18 @@ So the design's constraint holds, with `Position` added.
 
 ## The prototype
 
-The prototype was explicit tests, which `dotnet test` runs only when asked, in `Spike10/` folders of three test projects.  It was committed once on this branch, as `f51ac107` "spike(10.0): the prototype of the spike, removed in the next commit", and removed by the commit after it, so the merged tree does not hold it and the history does.  To run it again on that commit:
+The prototype was explicit tests, which `dotnet test` runs only when asked, in `Spike10/` folders of three test projects.  It was committed once on this branch, as `f51ac107` "spike(10.0): the prototype of the spike, removed in the next commit", and removed by the commit after it, so the merged tree does not hold it and the history does.  To run it again, from the root of a checkout that holds this document:
 
 ```bash
-git switch --detach f51ac107
 export SPIKE10_OUT="$(mktemp -d)"
+mkdir -p "$SPIKE10_OUT/spike10/sources"
+cp docs/superpowers/specs/2026-11-05-query-generation-phase-10-spike/mssql-*.tsv "$SPIKE10_OUT/spike10/sources/"
+git switch --detach f51ac107
 ```
 
-and then, each from the repository's root, with Docker running for the two container projects:
+The prototype reads SQL Server's keyword and function lists from `$SPIKE10_OUT/spike10/sources/`, which the `cp` fills before the switch: the lists fetched from Microsoft's documentation on 2026-11-04 are [beside this document](2026-11-05-query-generation-phase-10-spike/SOURCES.md), with their URLs and what was left out or added.  A later fetch of the same pages may give other counts.
+
+Then, each from the repository's root, with Docker running for the two container projects:
 
 | Finding | Command |
 |----|----|
