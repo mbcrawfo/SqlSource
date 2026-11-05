@@ -61,6 +61,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListIdsDto[]> ListIds(
@@ -153,6 +154,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -162,6 +168,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }

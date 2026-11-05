@@ -82,6 +82,30 @@ public sealed class QueryMethodWriterTests
         Input = null,
     };
 
+    // StreamIds: GetUser streaming the accounts of a list of ids, IN @ids.
+    private static readonly QueryMethod StreamIds = Stream with
+    {
+        Segments = TestSidecars.Of(
+            TestModels.Literal("SELECT id FROM accounts WHERE id IN "),
+            new SqlSegment(SqlSegmentKind.List, "@ids")
+        ),
+        Input = new MethodInput(
+            "global::App.StreamIdsParams",
+            TestSidecars.Of(
+                new MethodParameter(
+                    "ids",
+                    "Ids",
+                    "int",
+                    true,
+                    false,
+                    Described: Integer,
+                    Sequence: ParameterSequence.List,
+                    ExpansionPrefix: "ids_"
+                )
+            )
+        ),
+    };
+
     [Fact]
     public void Append_OneOptionalWithParametersAndAToken_IsTheWholeMethod()
     {
@@ -1238,36 +1262,46 @@ public sealed class QueryMethodWriterTests
     [Fact]
     public void Append_StreamWithLists_ChecksTheLimitBeforeTheIterator()
     {
-        var streamIds = Stream with
-        {
-            Segments = TestSidecars.Of(
-                TestModels.Literal("SELECT id FROM accounts WHERE id IN "),
-                new SqlSegment(SqlSegmentKind.List, "@ids")
-            ),
-            Input = new MethodInput(
-                "global::App.StreamIdsParams",
-                TestSidecars.Of(
-                    new MethodParameter(
-                        "ids",
-                        "Ids",
-                        "int",
-                        true,
-                        false,
-                        Described: Integer,
-                        Sequence: ParameterSequence.List,
-                        ExpansionPrefix: "ids_"
-                    )
-                )
-            ),
-        };
-
-        var text = Write(streamIds);
+        var text = Write(StreamIds);
 
         var check = text.IndexOf("throw new global::System.ArgumentException(", StringComparison.Ordinal);
         var iterator = text.IndexOf("ReadRows(", StringComparison.Ordinal);
         check.ShouldBeGreaterThan(0);
         iterator.ShouldBeGreaterThan(check);
         ShouldBalanceItsBraces(text);
+    }
+
+    // A list counted when the method was called may change before its values are bound, as a stream's does before its
+    // loop starts: the binding throws when the list gives a value past its count, or ends before it, since the SQL
+    // names exactly its count of values.  The documentation says so.
+    [Fact]
+    public void Append_List_ThrowsWhenTheListChangedAfterItWasCounted()
+    {
+        const string Throw =
+            "throw new global::System.InvalidOperationException("
+            + "\"The list 'Ids' changed after the query counted it.\");";
+
+        var text = Write(StreamIds);
+
+        text.ShouldContain(
+            "                    foreach (var element in list0)\n"
+                + "                    {\n"
+                + "                        if (index >= count0)\n"
+                + "                        {\n"
+                + "                            "
+                + Throw
+                + "\n"
+                + "                        }\n"
+        );
+        text.ShouldContain(
+            "                    if (index < count0)\n                    {\n                        " + Throw + "\n"
+        );
+        text.ShouldContain(
+            "/// <exception cref=\"global::System.InvalidOperationException\">"
+                + "A list of <paramref name=\"parameters\" /> changed between the call and the time its values were "
+                + "sent."
+                + "</exception>\n"
+        );
     }
 
     // After the last row the iterator reads the later results inside its try, so that the move that ends the loop

@@ -299,6 +299,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListIdsDto[]> ListIds(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListIdsParams parameters,
@@ -390,6 +391,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -399,6 +405,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -470,6 +481,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListExceptDto[]> ListExcept(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListExceptParams parameters,
@@ -561,6 +573,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -570,6 +587,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -641,6 +663,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListTwoListsDto[]> ListTwoLists(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListTwoListsParams parameters,
@@ -760,6 +783,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -769,6 +797,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -787,6 +820,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list1)
                         {
+                            if (index >= count1)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Owners' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count1 ? size1 : index + 1;
                             for (; index < end; index++)
                             {
@@ -796,6 +834,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count1)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Owners' changed after the query counted it.");
                         }
                     }
                 }
@@ -867,6 +910,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListUsedTwiceDto[]> ListUsedTwice(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListUsedTwiceParams parameters,
@@ -979,6 +1023,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -988,6 +1037,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1059,6 +1113,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListOptionalDto[]> ListOptional(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListOptionalParams parameters,
@@ -1150,6 +1205,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1159,6 +1219,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1247,6 +1312,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListWithTokenDto[]> ListWithToken(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListWithTokenParams parameters,
@@ -1344,6 +1410,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1353,6 +1424,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1424,6 +1500,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListBesideItsExpansionNameDto[]> ListBesideItsExpansionName(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListBesideItsExpansionNameParams parameters,
@@ -1515,6 +1592,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1524,6 +1606,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1603,6 +1690,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListKeepsCommentsDto[]> ListKeepsComments(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListKeepsCommentsParams parameters,
@@ -1694,6 +1782,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1703,6 +1796,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1774,6 +1872,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamIdsDto> StreamIds(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamIdsParams parameters,
@@ -1874,6 +1973,11 @@ namespace App
                             var index = 0;
                             foreach (var element in list0)
                             {
+                                if (index >= count0)
+                                {
+                                    throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                                }
+
                                 var end = index + 1 == count0 ? size0 : index + 1;
                                 for (; index < end; index++)
                                 {
@@ -1883,6 +1987,11 @@ namespace App
                                     parameter.TypedValue = element;
                                     command.Parameters.Add(parameter);
                                 }
+                            }
+
+                            if (index < count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                             }
                         }
                     }
@@ -1952,6 +2061,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListConvertedDto[]> ListConverted(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListConvertedParams parameters,
@@ -2071,6 +2181,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -2080,6 +2195,11 @@ namespace App
                                 parameter.TypedValue = global::App.UserId.ToDatabase(element);
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -2098,6 +2218,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list1)
                         {
+                            if (index >= count1)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Emails' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count1 ? size1 : index + 1;
                             for (; index < end; index++)
                             {
@@ -2107,6 +2232,11 @@ namespace App
                                 parameter.TypedValue = element is { } value ? global::App.Email.ToDatabase(value) : null;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count1)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Emails' changed after the query counted it.");
                         }
                     }
                 }
@@ -2179,6 +2309,7 @@ namespace App
         /// <returns>The row, or null when there is none.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than PostgreSQL accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListOneShapeDto?> ListOneShape(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListOneShapeParams parameters,
@@ -2270,6 +2401,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -2279,6 +2415,11 @@ namespace App
                                 parameter.TypedValue = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }

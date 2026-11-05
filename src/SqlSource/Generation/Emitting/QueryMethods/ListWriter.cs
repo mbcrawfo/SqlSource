@@ -33,7 +33,8 @@ internal static class ListWriter
     public static int ParameterLimitOf(DatabaseEngine engine) => LimitOf(engine).Parameters;
 
     /// <summary>
-    /// Appends the documentation of the limit, for a method with a list.
+    /// Appends the documentation of the limit, and of a list that changed after it was counted, for a method with a
+    /// list.
     /// </summary>
     internal static void AppendDocumentation(in QueryMethodContext context, string indent)
     {
@@ -51,6 +52,14 @@ internal static class ListWriter
                 + "\" /> hold more values than "
                 + LimitOf(in context).Engine
                 + " accepts in one query."
+        );
+        XmlDocWriter.AppendException(
+            context.Builder,
+            indent,
+            "global::System.InvalidOperationException",
+            "A list of <paramref name=\""
+                + MethodArguments.Parameters
+                + "\" /> changed between the call and the time its values were sent."
         );
     }
 

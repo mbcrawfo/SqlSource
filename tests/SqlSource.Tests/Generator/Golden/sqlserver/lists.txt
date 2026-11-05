@@ -299,6 +299,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListIdsDto[]> ListIds(
@@ -397,6 +398,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -406,6 +412,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -494,6 +505,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListExceptDto[]> ListExcept(
@@ -592,6 +604,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -601,6 +618,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -689,6 +711,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListTwoListsDto[]> ListTwoLists(
@@ -815,6 +838,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -824,6 +852,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -842,6 +875,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list1)
                         {
+                            if (index >= count1)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Owners' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count1 ? size1 : index + 1;
                             for (; index < end; index++)
                             {
@@ -851,6 +889,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count1)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Owners' changed after the query counted it.");
                         }
                     }
                 }
@@ -939,6 +982,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListUsedTwiceDto[]> ListUsedTwice(
@@ -1058,6 +1102,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1067,6 +1116,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1155,6 +1209,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListOptionalDto[]> ListOptional(
@@ -1253,6 +1308,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1262,6 +1322,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1367,6 +1432,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListWithTokenDto[]> ListWithToken(
@@ -1471,6 +1537,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1480,6 +1551,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1568,6 +1644,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListBesideItsExpansionNameDto[]> ListBesideItsExpansionName(
@@ -1666,6 +1743,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1675,6 +1757,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1771,6 +1858,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListKeepsCommentsDto[]> ListKeepsComments(
@@ -1869,6 +1957,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -1878,6 +1971,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -1966,6 +2064,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamIdsDto> StreamIds(
@@ -2073,6 +2172,11 @@ namespace App
                             var index = 0;
                             foreach (var element in list0)
                             {
+                                if (index >= count0)
+                                {
+                                    throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                                }
+
                                 var end = index + 1 == count0 ? size0 : index + 1;
                                 for (; index < end; index++)
                                 {
@@ -2082,6 +2186,11 @@ namespace App
                                     parameter.Value = element;
                                     command.Parameters.Add(parameter);
                                 }
+                            }
+
+                            if (index < count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                             }
                         }
                     }
@@ -2186,6 +2295,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListConvertedDto[]> ListConverted(
@@ -2312,6 +2422,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -2321,6 +2436,11 @@ namespace App
                                 parameter.Value = global::App.UserId.ToDatabase(element);
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }
@@ -2333,10 +2453,6 @@ namespace App
                         parameter.SqlDbType = global::System.Data.SqlDbType.NVarChar;
                         parameter.Size = 100;
                         parameter.Value = (object?)default(string?) ?? global::System.DBNull.Value;
-                        if (parameter.Value is string { Length: > 100 })
-                        {
-                            parameter.Size = -1;
-                        }
                         command.Parameters.Add(parameter);
                     }
                     else
@@ -2344,6 +2460,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list1)
                         {
+                            if (index >= count1)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Emails' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count1 ? size1 : index + 1;
                             for (; index < end; index++)
                             {
@@ -2358,6 +2479,11 @@ namespace App
                                 }
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count1)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Emails' changed after the query counted it.");
                         }
                     }
                 }
@@ -2447,6 +2573,7 @@ namespace App
         /// <returns>The row, or null when there is none.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
+        /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
         /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListOneShapeDto?> ListOneShape(
@@ -2545,6 +2672,11 @@ namespace App
                         var index = 0;
                         foreach (var element in list0)
                         {
+                            if (index >= count0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+
                             var end = index + 1 == count0 ? size0 : index + 1;
                             for (; index < end; index++)
                             {
@@ -2554,6 +2686,11 @@ namespace App
                                 parameter.Value = element;
                                 command.Parameters.Add(parameter);
                             }
+                        }
+
+                        if (index < count0)
+                        {
+                            throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
                         }
                     }
                 }

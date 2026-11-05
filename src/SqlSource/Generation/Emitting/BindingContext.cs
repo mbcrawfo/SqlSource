@@ -24,6 +24,10 @@ namespace SqlSource.Generation.Emitting;
 /// The expression of the parameter's name, or null for the literal of the parameter's own: a list names each of its
 /// values by its prefix and the value's index.
 /// </param>
+/// <param name="IsNull">
+/// Whether the value bound is always a null, the one value of an empty list, which a SQL Server binding then neither
+/// checks for its length nor rounds.
+/// </param>
 internal readonly record struct BindingContext(
     StringBuilder Builder,
     string Indent,
@@ -32,7 +36,8 @@ internal readonly record struct BindingContext(
     string Parameters,
     ConversionNames Names,
     string? ValueExpression = null,
-    string? NameExpression = null
+    string? NameExpression = null,
+    bool IsNull = false
 )
 {
     /// <summary>The value bound: <see cref="ValueExpression" />, or the property's, <c>parameters.X</c>.</summary>
