@@ -49,6 +49,7 @@ PostgreSQL gives each [query parameter](concepts.md#query-parameter) a type from
 
 - **A use that says nothing of the type** is [SQLSRC226](diagnostics.md#sqlsrc226): `SELECT @p IS NULL` holds for a value of any type.  Cast the parameter where it is used, `@p::int`, or declare its type.
 - **PostgreSQL takes the type from the first use.**  In the optional filter above, the first `@name` says nothing, so without the marker the query is [SQLSRC227](diagnostics.md#sqlsrc227).  Declare the type, as above, or turn the condition round: `(name = @name OR @name IS NULL)`.
+- **A [list parameter](parameters-and-tokens.md#list-parameters) takes its values' type from its use after `IN`**, and its test for null gives none, so the optional filter `(@ids IS NULL OR id IN @ids)` needs no marker: each value of `@ids` is of the type of `id`.
 - **A parameter compared with a column of a domain takes the domain's base type**: in `WHERE email = @email`, where `email` is a domain over `text`, `@email` is a `text`, so a [type override](settings.md#setting-type-overrides) of the domain does not reach it.  Declare it as the domain, `-- param: @email public.email`, to give it the domain's C# type, or give it the C# type itself, `-- param: @email -> MyApp.Email`.
 - **The first use can also give a type you did not mean.**  In `placed_at > now() - @age`, `@age` becomes a `timestamp with time zone`, and the server then reports an operator that does not exist ([SQLSRC225](diagnostics.md#sqlsrc225)).  Write `@age::interval`, or declare it.
 - **A declared type the database does not have** is [SQLSRC228](diagnostics.md#sqlsrc228).  A type in a schema that is not on the connection's search path needs its schema: `public.user_status`.
@@ -431,6 +432,7 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 - **A `string` longer than the `varchar(n)` column it is written to is refused by the server**, with `22001`, and never cut to fit.
 - **A parameter that has a [converter](settings.md#converters)** is converted to the type of [the table](#type-table), a domain's base type for a domain, and sent as its database type too.
 - **An array parameter** takes any sequence of its element type: see [array parameters](#array-parameters).
+- **A [list parameter](parameters-and-tokens.md#list-parameters)** sends each value as a parameter of the values' type, an enum's label as that enum, and its test for null, `@ids IS NULL`, as a `boolean` of the list's name.  A query takes at most 65,535 parameters in all, which [the limit](parameters-and-tokens.md#list-limit) counts.
 - **A parameter of a [JSON](#json) type, or a class of yours in one,** is sent as its `json` or `jsonb`: a `JsonElement`, a `JsonDocument`, and on Npgsql 10 a `JsonNode`, a `JsonObject` or a `JsonArray`, by Npgsql, and on Npgsql 8 and 9 those three, and a class on every version, as their JSON's text.  A class by [the JSON opt-in](settings.md#json-opt-in) is sent as its JSON's text, as the parameter's own type: a `text` parameter as a `text`.
 
 <a id="array-parameters"></a>
@@ -455,7 +457,7 @@ In a query method, an array parameter takes any `IEnumerable<T>` of its element 
 - **A type that you give is taken as written.**  `-- param: @ids -> int[]` makes the property an `int[]`, and a [type override](settings.md#setting-type-overrides) such as `int4[]=System.Collections.Generic.List<int>` makes it that `List<int>`; neither becomes an `IEnumerable<T>`.
 - **These are not sequences, and stay as they are:** `bytea`, a `byte[]`; a multidimensional array such as `int[,]`; `int2vector` and `oidvector`; and the multiranges, which are sent as one value.
 - **A caller that reads the array back from an input model** of a `codegen` query, `ids.Length` for instance, sees an `IEnumerable<T>` now, though constructing the model with an array still compiles.  Copy the sequence into an array, `ids.ToArray()`, where you need one.
-- **`= ANY(@ids)` is the way to filter by a sequence on PostgreSQL**; `IN (@ids)` would compare to one array.
+- **`= ANY(@ids)` or `IN @ids`.**  `id = ANY(@ids)` sends the sequence as one array, so the query has one form whatever the count of values, and no limit of parameters applies to it.  `id IN @ids`, with no parentheses, is a [list parameter](parameters-and-tokens.md#list-parameters): it sends one parameter for each value, [padded](parameters-and-tokens.md#list-padding) to a few sizes, up to 65,535 parameters in all, and is written as on SQL Server, so one query's text runs on both.  Its property is an `IEnumerable<T>` in the output `models` too, where an array's is a `T[]`.  `IN (@ids)` compares with one array, and is not what you want.
 
 <a id="method-results"></a>
 

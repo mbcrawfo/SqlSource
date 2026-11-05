@@ -6,7 +6,7 @@ using SqlSource;
 namespace PostgresExamples.CodeGen;
 
 // The queries of OrderQueries.sql, the file named for the class, whose markers put their methods on the class itself:
-// ListOrdersOfUser and FindOrder are public static methods, which any code calls as
+// ListOrdersOfUser, FindOrder and ListOrdersByStatuses are public static methods, which any code calls as
 // OrderQueries.ListOrdersOfUser(connection, ...), and CountOrderLines is a method of the private nested class Sql,
 // which only this class's own code calls.  See docs/manual/settings.md#setting-member-location.
 [SqlSourceGenerate]
@@ -26,5 +26,21 @@ public static partial class OrderQueries
             )
             .ConfigureAwait(false);
         return lines.LineCount > 0;
+    }
+
+    // A method of your own that passes a list: ListOrdersByStatusesParams.Statuses is an IEnumerable<string>?, which
+    // takes this array, a List<string> or any other sequence, and the method sends one parameter for each value.  See
+    // docs/manual/parameters-and-tokens.md#list-parameters.
+    public static Task<ListOrdersByStatusesDto[]> ListOrdersNotCancelledAsync(
+        DbConnection connection,
+        CancellationToken cancellationToken = default
+    )
+    {
+        string[] notCancelled = ["pending", "shipped"];
+        return ListOrdersByStatuses(
+            connection,
+            new ListOrdersByStatusesParams(notCancelled),
+            cancellationToken: cancellationToken
+        );
     }
 }

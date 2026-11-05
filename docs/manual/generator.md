@@ -405,6 +405,8 @@ A parameter's is its [`-- param:` marker](parameters-and-tokens.md#param-marker)
 
 A PostgreSQL array parameter of a query whose output is `codegen` has the type `IEnumerable<T>` of its element, `IEnumerable<int>` for an `int4[]`, in place of `T[]`, and the query method sends any sequence: see [array parameters](postgresql.md#array-parameters).  A column's property, and a parameter's in a query whose output is `models`, stay `T[]`.
 
+A [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, has the type `IEnumerable<T>` of its values' C# type in every output: `IEnumerable<int>` for a list of `integer`.  Its values' type is found as a parameter's is, and is never nullable.
+
 <a id="model-nullability"></a>
 
 ### Which properties can be null
@@ -420,7 +422,7 @@ A property that can be null has its C# type with `?`: `int?`, which is `System.N
 - **A column's property can be null when the tool recorded that the column can be.**  Which columns can be null says when that is, for [PostgreSQL](postgresql.md#nullability) and for [SQL Server](sqlserver.md#nullability).  A column that the tool showed is never null gets a property that cannot be null.
 - **A column whose name ends in `!` gets a property that cannot be null, and one whose name ends in `?` a property that can**, whatever the tool recorded.  Write the mark at the end of the column's alias, in quotes.  Above, `initcap` is never null for a value that is not, though SqlSource treats it as possibly null: `"display_name!"` gives the property `DisplayName` the type `string` and not `string?`.  A `!` is your word that the column is never null, and the build does not check it: a [query method](#reading-rows) throws when such a column is null after all.  The mark stays in the name of the column the query returns, `display_name!`.  A query method reads the columns by position, so the name does not matter to it, but a library that matches a row's columns to properties by name, as Dapper does, does not match it to `DisplayName`: with a record model Dapper throws when it reads the rows, and with a class model it leaves the property at its default value.  Read such rows through Dapper with a [`-- column:` marker](#column-marker) instead.
 - **A column whose `-- column:` marker says `null` or `not null` gets that nullability**, whatever the tool recorded, and keeps its name: see below.
-- **A parameter's property can be null only when its [`-- param:` marker](parameters-and-tokens.md#param-marker) says `null`.**
+- **A parameter's property can be null only when its [`-- param:` marker](parameters-and-tokens.md#param-marker) says `null`**, or, for a [list parameter](parameters-and-tokens.md#list-parameters), when the query tests the list for null, as `@ids IS NULL` does.
 
 <a id="column-marker"></a>
 
@@ -612,9 +614,9 @@ The method has the name of the query, with `Async` after it under the [generator
 | `commandTimeout` | The command's timeout in seconds, or null for the driver's |
 | `cancellationToken` | Cancels opening the connection, running the query and reading its rows.  What each driver throws then is on the pages of [PostgreSQL](postgresql.md#method-results) and [SQL Server](sqlserver.md#method-results) |
 
-The method of a query with tokens raises no CA2100 ("Review SQL queries for security vulnerabilities") in your build, though it runs SQL made with their text: that text is your own code's choice, never a user's, as [tokens](parameters-and-tokens.md#tokens) says.
+The method of a query with tokens raises no CA2100 ("Review SQL queries for security vulnerabilities") in your build, though it runs SQL made with their text: that text is your own code's choice, never a user's, as [tokens](parameters-and-tokens.md#tokens) says.  Nor does the method of a query with a [list parameter](parameters-and-tokens.md#list-parameters), whose SQL is the query's own with a parameter for each value.
 
-A null `connection` or `parameters` throws `ArgumentNullException`.  The names of the arguments a query method can have, `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`, are not names a token can have ([SQLSRC275](diagnostics.md#sqlsrc275)).  What the method returns depends on the query's result shape:
+A null `connection` or `parameters` throws `ArgumentNullException`.  A method with a list parameter throws `ArgumentException` when its query would send more parameters than its database takes, and `InvalidOperationException` when a list changed after the method counted it, as [list parameters](parameters-and-tokens.md#list-limit) say.  The names of the arguments a query method can have, `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`, are not names a token can have ([SQLSRC275](diagnostics.md#sqlsrc275)).  What the method returns depends on the query's result shape:
 
 | Shape | Returns |
 |----|----|
@@ -664,6 +666,7 @@ The [result shape](sql-files.md#result-shapes) after the query's name says what 
 
 - **Each parameter is sent by its name**, without its `@`, with the value of its property of the input model, in the order of the query's [parameter list](parameters-and-tokens.md#query-parameters).  Both drivers match a name ignoring case, as SqlSource does, so `@Id` and `@id` are one parameter, and one value fills both; under `mssql`, a second spelling is the warning [SQLSRC121](diagnostics.md#sqlsrc121).  A parameter written in snake_case, `@user_id`, is filled from its property `UserId` like any other.
 - **A null value is sent as the database's `NULL`**: that of a property that can be null, and that of a property of a reference type that cannot be, which a caller can set to null all the same.
+- **A [list parameter](parameters-and-tokens.md#list-parameters) is sent as one parameter for each value**, each named after the list and sent as a parameter of the values' type, padded to one of a few sizes unless the query has `no-list-padding`.  A null list is sent as an empty one, and a list that the query tests for null also sends a parameter of its own name, null when the list is null.
 - **A parameter whose type a type override or its `-- param:` marker chose, and that has a [converter](settings.md#converters)**, is given to the converter, and the value it returns is sent.  A null is sent as `NULL`, without the converter.  A class of yours in a parameter that holds JSON is given to System.Text.Json's serializer in the same way, and its text sent: see [a class in a JSON column](settings.md#json-class).
 - **Each parameter is sent as the database type it was described with**, or that its [`-- param:` marker](parameters-and-tokens.md#param-marker) declares, and not as a type chosen from the C# type of its value.  On SQL Server it is sent with the type's length, precision and scale.  See how a parameter is sent on [PostgreSQL](postgresql.md#method-parameters) and on [SQL Server](sqlserver.md#method-parameters).
 

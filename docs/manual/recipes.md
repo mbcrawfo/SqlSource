@@ -14,6 +14,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Use the queries with Dapper or your own ADO.NET code](#dapper-and-adonet)
 - [Run the models through Dapper](#models-through-dapper)
 - [Choose a table name at run time](#table-name-at-run-time)
+- [Filter by an optional list of values](#filter-by-a-list)
 - [Let a test project see the internals of the main project](#test-project-sees-internals)
 - [Share the exceptions between two data projects and an app](#share-the-exceptions)
 
@@ -765,6 +766,28 @@ var counted = await connection.CountRows(table);
 The query's method takes the text of the token, and runs the query with the token replaced.  Under the output `sql` or `models`, the query is instead a method that returns the SQL, `Sql.CountRows(table)`, for your own code to run.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
 
 Rules: [tokens](parameters-and-tokens.md#tokens), [the signature](generator.md#method-signature), [token methods](generator.md#token-methods), [defaults](parameters-and-tokens.md#token-defaults).
+
+<a id="filter-by-a-list"></a>
+
+## Filter by an optional list of values
+
+```sql postgres
+-- name: ListOrdersByStatuses
+SELECT id, status, placed_at
+FROM orders
+WHERE (@statuses IS NULL OR status IN @statuses)
+ORDER BY placed_at DESC;
+```
+
+```csharp
+string[] notCancelled = ["pending", "shipped"];
+var orders = await connection.ListOrdersByStatuses(new ListOrdersByStatusesParams(notCancelled));
+var everyOrder = await connection.ListOrdersByStatuses(new ListOrdersByStatusesParams(null));
+```
+
+`@statuses`, written after `IN` with no parentheses, is a list, and `ListOrdersByStatusesParams.Statuses` an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The method sends a parameter for each status.  A null list returns every order, by the test `@statuses IS NULL`, and an empty one returns none.  The same query runs on SQL Server as it is.  On PostgreSQL, `status = ANY(@statuses)` sends the list as one array instead.
+
+Rules: [list parameters](parameters-and-tokens.md#list-parameters), [array parameters](postgresql.md#array-parameters).
 
 <a id="test-project-sees-internals"></a>
 

@@ -431,6 +431,35 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **A parameter of a [NetTopologySuite](#nettopologysuite) type** is sent as its `geography` or `geometry`, with the value's SRID, and a null as a `NULL` of it.
 - **`hierarchyid`, `geography`, `geometry` and a CLR type of your own assembly**, given a C# type by a [type override](settings.md#setting-type-overrides), such as `Microsoft.SqlServer.Types.SqlGeography`, are sent as their SQL Server type, and a null as a `NULL` of it.  A CLR type is named by its schema: `Money` of the schema `dbo` is sent as `dbo.Money`.
 - **A type of a newer SQL Server**, which only a type override gives a C# type too, is sent by its value, and Microsoft.Data.SqlClient chooses its type from it.
+- **A [list parameter](#list-parameters)** sends each of its values as a parameter of the values' type, as above.
+
+<a id="list-parameters"></a>
+
+### Lists
+
+```sql mssql
+-- name: ListOrdersByIds
+SELECT id, placed_at FROM dbo.orders WHERE id IN @ids;
+```
+
+SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, is how a query method sends a list of values.  Above, `ListOrdersByIdsParams.Ids` is an `IEnumerable<int>`, and each of its values is sent as an `int`, the type of `id`, as [any parameter](#method-parameters) of that type is.  A list's test for null, `@ids IS NULL`, is sent as a `bit` of the list's name.
+
+- **A query sends at most 2,098 parameters.**  SQL Server takes 2,100 parameters in one request, and Microsoft.Data.SqlClient uses two of them to send a query with parameters.  Each value of each list counts, and so does every other parameter of the query: a method whose query would send more throws `ArgumentException`, as [the limit](parameters-and-tokens.md#list-limit) says, and leaves out the [padding](parameters-and-tokens.md#list-padding) of a query that padding alone would take past it.
+- **For more values than that, send them as one JSON array** in an `nvarchar(max)` parameter, and read it with `OPENJSON`, in a database whose compatibility level is 130 or later:
+
+  ```sql mssql
+  -- name: ListOrdersByIdArray
+  -- param: @ids nvarchar(max)
+  SELECT id, placed_at FROM dbo.orders
+  WHERE id IN (SELECT CAST(value AS int) FROM OPENJSON(@ids));
+  ```
+
+  ```csharp
+  var orders = await connection.ListOrdersByIdArray(new ListOrdersByIdArrayParams(JsonSerializer.Serialize(ids)));
+  ```
+
+  The query sends one parameter whatever the count, and has one form, so SQL Server keeps one plan of it.  The marker is needed: SQL Server cannot tell the type of `@ids` from `OPENJSON(@ids)` alone.
+- **A table-valued parameter** does the same through a table type of your database, but a query method cannot send one.  Give such a query `-- output: sql`, and send its parameter with your own code.
 
 <a id="method-results"></a>
 
