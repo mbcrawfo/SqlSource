@@ -35,6 +35,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Describe each query as I save it, and have my editor start that | [Describe on save](tool.md#describe-on-save), [what your editor shows](tool.md#what-your-editor-shows), or the [recipe](recipes.md#start-the-watcher-with-your-editor) |
 | Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
 | Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |
+| Check a bug-report bundle that someone gave me | [Checking a bundle with `replay`](tool.md#replay) |
 | Know what the tool needs of my database | [PostgreSQL](postgresql.md#connecting), [SQL Server](sqlserver.md#connecting) |
 | Know why a column is recorded as possibly null | Which columns can be null in [PostgreSQL](postgresql.md#nullability) and [SQL Server](sqlserver.md#nullability) |
 | Know which queries the tool cannot describe | What can be described in [PostgreSQL](postgresql.md#what-can-be-described) and [SQL Server](sqlserver.md#what-can-be-described) |
@@ -90,7 +91,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Column types: a C# type for one column, by the column it is read from, with `columnTypes` in a settings file or a `-- column:` in the file header, or by a `-- column:` inside a query, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | C# types written by their short names, `UserId` for `MyApp.UserId`, wherever SqlSource takes a C# type | Available | [Type overrides](settings.md#setting-type-overrides) |
 | Build integration: the tool running in your build before it compiles, when a connection is configured, and `SqlSourceOnline` | Available | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
-| Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
+| Bug-report bundles | Coming | Making a bundle is coming, so attach a [log](tool.md#logs) to a report for now; [checking one with `replay`](tool.md#replay) works today |
 
 ## The pages
 
@@ -100,7 +101,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 - [Parameters and tokens](parameters-and-tokens.md): query parameters, `-- param:`, list parameters and tokens.
 - [Dialects](dialects.md): how each database's comments and strings are read, and which databases can be described.
 - [The generator](generator.md): what the `SqlSource` package generates.
-- [The tool](tool.md): the `SqlSource.Tool` package, its `sqlsource` command, and running it in the build.
+- [The tool](tool.md): the `SqlSource.Tool` package, its `sqlsource` command, running it in the build, and checking a bug-report bundle.
 - [PostgreSQL](postgresql.md): how SqlSource works with PostgreSQL.
 - [SQL Server](sqlserver.md): how SqlSource works with SQL Server.
 - [Recipes](recipes.md): short how-tos, each a sample and a link to the rules.

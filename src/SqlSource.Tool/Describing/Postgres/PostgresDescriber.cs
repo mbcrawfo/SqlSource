@@ -13,9 +13,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// describes the queries of the <c>postgres</c> dialect.
 /// </summary>
 /// <remarks>
-/// Every <c>explain</c> of the describer carries settings of the planner.  The tool makes it with none, so the
-/// planner chooses its own join methods; a test gives some to force a join method, and the replay of a capture that
-/// was recorded so gives the same.
+/// Every <c>explain</c> of the describer carries settings of the planner.  A run of the tool makes it with none, so
+/// the planner chooses its own join methods; a test gives some to force a join method, and the replay of a capture that
+/// was recorded so, a test's or <c>replay</c>'s, gives the same.
 /// </remarks>
 /// <param name="explainSettings">Settings as <c>name=value</c>, each of <see cref="PlannerSettings" />.</param>
 /// <exception cref="ArgumentException">A setting is not of the list.</exception>

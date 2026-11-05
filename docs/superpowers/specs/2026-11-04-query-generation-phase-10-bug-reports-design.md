@@ -67,7 +67,7 @@ The seam that makes it possible is built: every call a describer makes goes thro
 - **The calls a capture holds.**  PostgreSQL's include `open`, `prepare`, `columns`, `tables`, `types`, `spellings`, `check`, `explain`, `overloads`, `relations`, `partitions` and `deallocate`; SQL Server's `open`, `parameters`, `columns`, `table`, `operands`, `declared` and `probe`.  The calls of `PostgresCalls` and `SqlServerCalls` are the list of record, which 10.0 reads.  The names of the user's are in the SQL of requests, in catalog rows, in the plan's JSON and in errors.
 - **The vocabulary the tool already holds.**  PostgreSQL's `overloads` asks which function and operator names only `pg_catalog` holds ([`CatalogOverloads`](../../../src/SqlSource.Tool/Describing/Postgres/Walk/CatalogOverloads.cs)); `PlanVocabulary` names the plan's node types; `TotalFunctions` the functions the walk interprets; a type row says its schema.
 - **The walk's events**, `walk`, `walk.node`, `walk.column` and `table-match`, are written to the log through `PostgresEvents` and `SqlServerEvents`.
-- **The architecture page** has a placeholder, [Bug-report commands](../../architecture/tool.md#bug-report-commands), and the manual a row, "Bug-report bundles: Coming", in its "What works today" table.
+- **The architecture page** has a placeholder, [Bug-report commands](../../architecture/tool.md#bug-report-bundles), and the manual a row, "Bug-report bundles: Coming", in its "What works today" table.
 
 ## Approaches
 

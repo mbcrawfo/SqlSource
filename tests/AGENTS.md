@@ -9,8 +9,8 @@
 - **A library references only what every project that references it can take** ([why](README.md#the-projects)): `SqlSource.Testing` stays on the pinned Roslyn and references nothing of the tool, `TestHarness` brings no database driver and nothing of the tool, and `Tool.Testing` references the tool.
 - **A test reads the repository only through `RepositoryRoot.Path`**, never by building a path from the root, and `RepositoryRoot.WorkingFolder` is only for starting a process in the root, since `Path` is what refuses a read that `tools/test-scopes.txt` would let a change skip ([when it refuses](README.md#reading-the-repository)).
 - **The libraries' types stay `internal`**, except `SettingLevel` of `tests/SqlSource.Testing`, which a public theory takes as its row, and the harness's abstract containers, which the projects' fixtures subclass.
-- **A test reads a generated model by reflection through `ModelReflection` of `tests/DatabaseTests/TestHarness`**, which orders the properties as they are declared, since `Type.GetProperties()` does not promise that order.
-- **Every test that opens a describer opens it through `Describers.OpenAsync` of `tests/SqlSource.Tool.Testing`** (the tool's tests, `PostgresScript`, `SqlServerScript` and `FixtureReplay` among them), and none builds an `OpenRequest` but to look at it.
+- **A test reads a generated model by reflection through `ModelReflection` of `tests/DatabaseTests/TestHarness`**, which orders the properties as they are declared, since `Type.GetProperties()` does not promise it.
+- **Every test that opens a describer opens it through `Describers.OpenAsync` of `tests/SqlSource.Tool.Testing`** (`PostgresScript`, `SqlServerScript` and `FixtureReplay` among them), or replays a bundle through `BundleReplay`, and none builds an `OpenRequest` but to look at it.
 
 ## Where a test goes
 
@@ -50,7 +50,7 @@
 ## Style and CI
 
 - **Assertions are Shouldly's**, and test names are `Method_Scenario_Outcome`.  `.editorconfig` turns off the analyzer rules this needs, under `[tests/**.cs]`.
-- **`Method` is what the test calls**: the C# method in full, `DescribeAsync_` and never `Describe_`, or the command or statement it runs, as the `Describe_` of `DescribeCommandTests`, which runs `describe`, and the `Explain_` of `PlanOutputTests`.  A test of a value names the value as `Method` and what it is read under as `Scenario`, as `Patience_OfEveryWait_IsTwoMinutes`.
+- **`Method` is what the test calls**: the C# method in full, `DescribeAsync_` and never `Describe_`, or the command or statement it runs, as the `Describe_` of `DescribeCommandTests` and the `Explain_` of `PlanOutputTests`.  A test of a value names the value as `Method` and what it is read under as `Scenario`, as `Patience_OfEveryWait_IsTwoMinutes`.
 - **A test that needs another current culture takes it from `CultureScope` of `tests/SqlSource.Testing`**, which puts back the one it found.
 - **A unit-test class and a container class may share a name**, as the two `NpgsqlCheckTests` do: their folders tell them apart.
 - **Every test class is `sealed`**, a `partial` one `public sealed partial class`.

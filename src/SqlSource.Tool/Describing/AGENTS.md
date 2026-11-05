@@ -3,33 +3,33 @@
 ## The steps of a run
 
 - **`Describing/DescribeRun.cs` calls the steps in order, and they stay apart** ([a describe run](../../../docs/architecture/tool.md#a-describe-run)).  The step that decides never writes, the step that writes never decides, and the step that compares does neither.
-- **`--check` shares the run and replaces only the step that writes**, `SidecarStore`, with `Describing/SidecarCheck.cs`, which returns its differences as data.  What it says of a sidecar that would be deleted it takes from `FileOutcomes`.
+- **`--check` shares the run and replaces only the step that writes**, `SidecarStore`, with `Describing/SidecarCheck.cs`, which returns the differences as data.  What it says of a sidecar that would be deleted it takes from `FileOutcomes`.
 - **A sidecar is written whole or not at all, through `SidecarStore`**, whose remarks say which leftover temporary files a run removes.
 - **A run never leaves an older tool's entry beside a new one** (a git merge can: TD-0100).  A file's target holds an entry for each query that needs one, described in this run or current (`SidecarEntry.IsCurrentFor`, `Sidecar.IsWrittenBy`); a file with a query that has neither is left as it was.
 
 ## Filters
 
-- **A filter narrows what a run may read and change, as well as what it describes** ([writing or checking](../../../docs/architecture/tool.md#writing-or-checking)).  `tests/SqlSource.Tool.Tests/Commands/FilterRunTests.cs` holds it, and `CheckFilterTests.cs` beside it holds that `--check` reports what `describe` with the same filters would change.
+- **A filter narrows what a run may read and change, as well as what it describes** ([writing or checking](../../../docs/architecture/tool.md#writing-or-checking)).  `tests/SqlSource.Tool.Tests/Commands/FilterRunTests.cs` holds it, and `CheckFilterTests.cs` beside it holds that `--check` reports what `describe` with the same filters changes.
 - **A sidecar is deleted only in a run with no `--project`, no `--database` and no `.sql` path, in which the reporter holds nothing when `DescribeRun` decides the outcomes.**  One of a higher format version, or one that the system will not let the tool open, is never deleted.
 
 ## Databases and connections
 
-- **A database needs a describer and a connection only when a query of it must be described.**  Every selected database's connection is looked up, for the summary, and a missing one is an error only in `DatabaseRuns`.
+- **A database needs a describer and a connection only when a query of it must be described.**  Each selected database's connection is looked up for the summary, and a missing one is an error in `DatabaseRuns` alone.
 - **`SQLSOURCE_CONNECTION` is for a run with one database in `RunDecisions.DescribableDatabases`**: a selected database whose every selected query the plan failed is none of them, and `SQLSRC215` neither counts nor names it ([connections](../../../docs/architecture/tool.md#connections)).
 - **A query that the plan could not describe, and every query of a file that is not `Ready`, counts as failed and gets no further error.**
 - **A described entry or a capture that holds the secret is refused, not cleaned** ([where a connection's value goes](../../../docs/architecture/tool.md#where-a-connections-value-goes)).  An entry is searched by `Describing/EntrySecretCheck.cs`, inside the guard of `Describing/DatabaseRuns.cs`, for the whole forms alone; a finding is `SQLSRC200`, and no sidecar is written.
 - **A member of an entry that a describer gives must be left out in `EntrySecretCheck.WithoutTheDescribersPart`**, or a value in it is never found, and gets a fact in `tests/SqlSource.Tool.Tests/Describing/EntrySecretCheckTests.cs`.
-- **A capture is written through `CaptureJson.Write(DescribeCapture, ConnectionSecret)`**, which refuses one that holds a whole form or a part: `CapturingExchange` records answers as given.  The overload without the secret is for a capture known to hold no connection.
+- **A capture is written through `CaptureJson.Write(DescribeCapture, ConnectionSecret)`**, which refuses one that holds a whole form or a part: `CapturingExchange` records answers as given.  The overload without it is for a capture known to hold no connection.
 
 ## Describers
 
-- **`Describing/Describers/` is the contract a describer implements** ([the describer contract](../../../docs/architecture/postgres-describer.md#the-describer-contract)).  It uses only `Outcome`, `Reporting/`, `Logging/` and the generator's types, so a describer depends on no step of the run.  A describer's clock is `OpenRequest.Time`: it reads no `DateTime` and no `Stopwatch`.
+- **`Describing/Describers/` is the contract a describer implements** ([the describer contract](../../../docs/architecture/postgres-describer.md#the-describer-contract)).  It uses only `Outcome`, `Reporting/`, `Logging/` and the generator's types, so it depends on no step of the run.  A describer's clock is `OpenRequest.Time`: it reads no `DateTime` and no `Stopwatch`.
 - **A describer returns a failure and never throws** ([the describer contract](../../../docs/architecture/postgres-describer.md#the-describer-contract)).  What a server or a user can cause is a `DescribeFailure`, which the run reports at the query in the format of `Describing/DescribeErrors.cs`.  An exception from one is a bug of the describer and ends the run with `SQLSRC200`.
 - **A describer is registered in the `DescriberRegistry` of `ToolHost.Create`** ([the host](../../../docs/architecture/tool.md#the-host)), and a query that must be described in a dialect with none registered is `SQLSRC216`.
 - **Every call a describer makes to an engine goes through `IDescribeExchange`**, the one it is given in its `OpenRequest`, so that a run can be recorded and replayed ([the exchange](../../../docs/architecture/postgres-describer.md#the-exchange)).
 - **The fixtures of a describer are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/<engine>/<case>/`**, beside the engine's `schema.sql`; [PostgreSQL's](../../../tests/DatabaseTests/Postgres/README.md#the-describers-fixtures) and [SQL Server's](../../../tests/DatabaseTests/SqlServer/README.md#the-describers-fixtures) readmes say what a case holds and how one is recorded.  A case's `query.sql` is a complete SqlSource file with exactly one query.
-- **The fixtures are compared byte for byte**: their folder is `text eol=lf` in `.gitattributes` and has a section in `.editorconfig`.
-- **A change to an engine's `schema.sql` records every case of that engine again.**  `postgres/schema.sql` is what `tests/DatabaseTests/Postgres` applies to its container, and a change to it can move the OIDs that the captures hold.
+- **The fixtures are compared byte for byte**: `Fixtures/Describers/` and `Fixtures/Bundles/` are `text eol=lf` in `.gitattributes` and have `.editorconfig` sections.
+- **A change to an engine's `schema.sql` records every case of that engine again.**  `postgres/schema.sql` is what `tests/DatabaseTests/Postgres` applies to its container, and a change can move the OIDs that the captures hold.
 - **`tests/SqlSource.Tool.Tests/FakeDescriber.cs` is a describer written by these rules** ([test describers](../../../docs/architecture/postgres-describer.md#fixtures-and-test-describers)).  Its `OpenAsync` makes its `Outcome` with the constructor, as every opener does.
 
 ## Requests, answers and captures

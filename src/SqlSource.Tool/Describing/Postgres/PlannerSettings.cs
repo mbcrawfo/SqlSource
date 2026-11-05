@@ -6,7 +6,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
 /// The settings of the planner that a request of <c>explain</c> may carry, each as <c>name=value</c>.  The tests
-/// force a join method with them; the tool itself passes none.
+/// force a join method with them.  The tool passes none but under <c>replay</c>, which reads them from a bundle or a
+/// fixture's folder, so that a capture recorded with them is answered.
 /// </summary>
 /// <remarks>
 /// The list is closed and a value is <c>on</c> or <c>off</c>, so the text of a <c>SET LOCAL</c> holds nothing but

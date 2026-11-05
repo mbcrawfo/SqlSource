@@ -1,0 +1,16 @@
+{
+  "bundleVersion": 1,
+  "renamed": false,
+  "toolVersion": "fixture",
+  "formatVersion": 1,
+  "engine": "postgres",
+  "serverVersion": "18.6",
+  "driverVersion": "10.0.3",
+  "runtime": "fixture",
+  "operatingSystem": "fixture",
+  "outcome": {
+    "kind": "failure",
+    "id": "SQLSRC226",
+    "step": "describe parameters"
+  }
+}
