@@ -17,9 +17,6 @@ namespace SqlSource.Diagnostics;
 /// </summary>
 internal static class SettingsFileDiagnostics
 {
-    private const string GeneratorParametersDefaultHelp =
-        ".  'default' is the empty list and stands alone: write [] for it.";
-
     // The end of SQLSRC019's message for a member of libraryTypes: the names of the libraries, as the manual spells
     // them, and the states.
     private static readonly string LibraryTypesHelp =
@@ -113,16 +110,13 @@ internal static class SettingsFileDiagnostics
             _ => throw UnexpectedEnumValueException.Of(type),
         };
 
-    // The end of SQLSRC019's message, after the setting: the names of the dialects, why default stands alone, the
-    // forms of a type override's key that is written in brackets, what libraryTypes takes, or what a column type
-    // written as an object takes.  Empty for every other
-    // value.
+    // The end of SQLSRC019's message, after the setting: the names of the dialects, the forms of a type override's key
+    // that is written in brackets, what libraryTypes takes, or what a column type written as an object takes.  Empty
+    // for every other value.
     private static string HelpOf(SettingsFileError error, string argument) =>
         error.Setting switch
         {
             SettingsFileKeys.Dialect => ".  'dialect' takes " + SqlDialectName.Accepted + ".",
-            SettingsFileKeys.GeneratorParameters when GeneratorParameterList.IsDefault(argument.AsSpan()) =>
-                GeneratorParametersDefaultHelp,
             SettingsFileKeys.LibraryTypes => LibraryTypesHelp,
             SettingsFileKeys.ColumnTypes when error.IsObjectForm => ColumnTypeObjectHelp,
             SettingsFileKeys.TypeOverrides when error.Other is not null => TypeOverrideGrammar.BracketHelp(

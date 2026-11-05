@@ -3,7 +3,9 @@
 -- OrderQueries, which take the connection first, and CountOrderLines is a method of the class's private nested class
 -- Sql, the default of a nested class, which only OrderQueries' own code calls.  ListOrdersByStatuses filters by a list:
 -- @statuses, written after IN with no parentheses, is an IEnumerable<string>? of its input model, and a null list
--- leaves every order in.
+-- leaves every order in.  The generator parameter of the header applies to every query of the file, and FindOrder
+-- adds another to it.
+-- generator: async-method-suffix
 
 -- name: ListOrdersOfUser -> many
 -- summary: The orders of one user, newest first.
@@ -16,6 +18,7 @@ ORDER BY placed_at DESC;
 
 -- name: FindOrder -> one-optional
 -- summary: One order, or null.
+-- generator: sort-output
 -- member-location: class
 -- visibility: public
 SELECT id, user_id, placed_at, shipped_on

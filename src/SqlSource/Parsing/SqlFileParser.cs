@@ -22,8 +22,8 @@ internal static class SqlFileParser
     /// a directory; it names the block of a file that has no <c>-- name:</c> marker.  <paramref name="dialect" /> is
     /// the dialect, with its options, that the project gives the file.  A <c>-- dialect:</c> marker in the file's
     /// header replaces it whole for the text after the marker.  <paramref name="commentsWanted" /> says that the level
-    /// the parser cannot see, the chain of the file's folder, asks for <c>keep-comments</c>: the SQL of a query with no
-    /// list of its own is then built with its comments too.
+    /// the parser cannot see, the chain of the file's folder, turns <c>keep-comments</c> on: the SQL of a query whose
+    /// markers and file header do not name it is then built with its comments too.
     /// </summary>
     public static SqlFileParseResult Parse(
         string text,
@@ -385,9 +385,9 @@ internal static class SqlFileParser
             }
         }
 
-        // Step three: what the parser can resolve of the settings.  A query that has a list uses it whole, so it
-        // alone says whether the comments can be wanted.  A query without one may get the parameter from a level the
-        // parser does not see.
+        // Step three: what the parser can resolve of the settings.  The generator parameters merge per parameter, so
+        // the query's markers, over its file header's, decide keep-comments when they name it, and the chain the parser
+        // does not see decides it otherwise.
         private (
             SettingsLevel Markers,
             EquatableArray<SqlSegment>? Kept,
@@ -395,9 +395,7 @@ internal static class SqlFileParser
         ) ResolveSettings(SqlMarkerScope? scope, SqlMarkerScope? preamble, BuiltQuery query, int start, int end)
         {
             var markers = (scope?.Level ?? SettingsLevel.None).Over(preamble?.Level ?? SettingsLevel.None);
-            var keepsComments = markers.Parameters is { } list
-                ? (list & GeneratorParameters.KeepComments) != 0
-                : commentsWanted;
+            var keepsComments = markers.Parameters.StateOf(GeneratorParameters.KeepComments) ?? commentsWanted;
 
             if (!keepsComments)
             {

@@ -254,13 +254,29 @@ public sealed class SettingsLevelReaderTests
         level.NestedClass.ShouldBe("Users");
     }
 
-    // An array with no word is the empty list, which is set, as default is.
+    // An array with no word names no parameter, so the level says nothing.
     [Fact]
-    public void Read_ParametersAsNoElement_AreTheEmptyList()
+    public void Read_ParametersAsNoElement_NameNothing()
     {
         var source = new FakeSource([], elements: new Dictionary<SettingId, string[]> { [SettingId.Parameters] = [] });
 
-        SettingsLevelReader.Read(ref source).Parameters.ShouldBe(GeneratorParameters.None);
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+        source.InvalidParts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_ParametersInTwoStates_ReportTheRepeat()
+    {
+        var source = new FakeSource(
+            [],
+            elements: new Dictionary<SettingId, string[]>
+            {
+                [SettingId.Parameters] = ["keep-comments", "keep-comments=off"],
+            }
+        );
+
+        SettingsLevelReader.Read(ref source).Parameters.StateOf(GeneratorParameters.KeepComments).ShouldBe(true);
+        source.RepeatedKeys.ShouldBe([(SettingId.Parameters, 1, 0)]);
         source.InvalidParts.ShouldBeEmpty();
     }
 
@@ -272,7 +288,11 @@ public sealed class SettingsLevelReaderTests
             elements: new Dictionary<SettingId, string[]> { [SettingId.Parameters] = ["keep-comments", "bogus"] }
         );
 
-        SettingsLevelReader.Read(ref source).Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        SettingsLevelReader
+            .Read(ref source)
+            .Parameters.ShouldBe(
+                GeneratorParameterChoices.None.With(GeneratorParameters.KeepComments, GeneratorParameterState.On)
+            );
         source.InvalidParts.ShouldBe([(SettingId.Parameters, 1)]);
         source.Invalids.ShouldBeEmpty();
     }

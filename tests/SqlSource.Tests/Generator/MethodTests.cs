@@ -464,11 +464,11 @@ public sealed class MethodTests
             );
     }
 
-    // The method checks each token unless the query says no-token-validation.
+    // The method checks each token unless the query says token-validation=off.
     [Theory]
     [InlineData("", true)]
-    [InlineData("-- generator: no-token-validation\n", false)]
-    public void Run_TokenQuery_ChecksItsTokenUnlessNoTokenValidation(string marker, bool checks)
+    [InlineData("-- generator: token-validation=off\n", false)]
+    public void Run_TokenQuery_ChecksItsTokenUnlessTokenValidationOff(string marker, bool checks)
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,

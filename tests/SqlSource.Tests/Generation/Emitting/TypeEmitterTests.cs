@@ -447,8 +447,8 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_TwoLevels_ResolveForEachQuery()
     {
-        var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
-        var none = new SettingsLevel { Parameters = GeneratorParameters.None };
+        var keep = TestModels.ParametersOn(GeneratorParameters.KeepComments);
+        var none = new SettingsLevel { Parameters = GeneratorParameterChoices.Reset };
         static SqlQuery Kept(string name, SettingsLevel markers) =>
             TestModels.Query(name, "SELECT 1;", keptSql: "SELECT 1; -- " + name, markers: markers);
 
@@ -463,7 +463,7 @@ public sealed class TypeEmitterTests
             )
         );
 
-        // A query without a list of its own takes the file's level; a query's own marker beats it.
+        // A query whose markers do not name keep-comments takes the file's level; a query's own default beats it.
         output.Source.ShouldNotBeNull().ShouldContain("-- FromTheFile");
         output.Source.ShouldNotContain("-- FromItsMarker");
     }
@@ -646,7 +646,7 @@ public sealed class TypeEmitterTests
             "GetUser",
             "SELECT 1;",
             keptSql: "SELECT 1; -- kept",
-            markers: new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
+            markers: TestModels.ParametersOn(GeneratorParameters.KeepComments)
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
@@ -660,7 +660,7 @@ public sealed class TypeEmitterTests
         var query = TestModels.Query(
             "GetUser",
             "SELECT 1;",
-            markers: new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
+            markers: TestModels.ParametersOn(GeneratorParameters.KeepComments)
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
@@ -727,7 +727,7 @@ public sealed class TypeEmitterTests
     private static TypeOutput Emit(OutputKind? output, TargetType type, params ParsedSqlFile[] files) =>
         Emit(output, type, validateTokens: true, files);
 
-    // The files under one level, of no-token-validation unless the tokens are validated.
+    // The files under one level, with token-validation=off unless the tokens are validated.
     private static TypeOutput Emit(
         OutputKind? output,
         TargetType type,
@@ -735,9 +735,7 @@ public sealed class TypeEmitterTests
         params ParsedSqlFile[] files
     )
     {
-        var level = validateTokens
-            ? SettingsLevel.None
-            : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation };
+        var level = validateTokens ? SettingsLevel.None : TestModels.ParametersOff(GeneratorParameters.TokenValidation);
         return Emit(output, type, Array.ConvertAll(files, _ => level), files);
     }
 
@@ -784,8 +782,8 @@ public sealed class TypeEmitterTests
             EquatableArray<SqlQueryParameter>.Empty,
             tokenValidation switch
             {
-                false => new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation },
-                true => new SettingsLevel { Parameters = GeneratorParameters.None },
+                false => TestModels.ParametersOff(GeneratorParameters.TokenValidation),
+                true => new SettingsLevel { Parameters = GeneratorParameterChoices.Reset },
                 null => SettingsLevel.None,
             },
             null,
@@ -810,8 +808,8 @@ public sealed class TypeEmitterTests
     // turns them off.
     private static TypeOutput EmitWithAnErrorInTheKeptFormOfB(bool keepComments)
     {
-        var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
-        var none = new SettingsLevel { Parameters = GeneratorParameters.None };
+        var keep = TestModels.ParametersOn(GeneratorParameters.KeepComments);
+        var none = new SettingsLevel { Parameters = GeneratorParameterChoices.Reset };
         return Emit(
             OutputKind.Sql,
             TestModels.Type(),

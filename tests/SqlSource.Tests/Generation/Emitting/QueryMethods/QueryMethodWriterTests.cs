@@ -675,7 +675,7 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("global::System.InvalidOperationException");
     }
 
-    // Under no-array-pool the types the buffer serves read their rows as before the buffer.
+    // Under array-pool=off the types the buffer serves read their rows as before the buffer.
     [Theory]
     [InlineData(nameof(CollectionKind.Array), "new global::System.Collections.Generic.List<", "rows.ToArray()")]
     [InlineData(nameof(CollectionKind.IEnumerable), "new global::System.Collections.Generic.List<", "rows.ToArray()")]
@@ -693,7 +693,7 @@ public sealed class QueryMethodWriterTests
         "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<",
         "rows.DrainToImmutable()"
     )]
-    public void Append_EachPooledCollectionTypeUnderNoArrayPool_ReadsItsRowsAsBeforeThePool(
+    public void Append_EachPooledCollectionTypeUnderArrayPoolOff_ReadsItsRowsAsBeforeThePool(
         string collectionName,
         string buffer,
         string result
@@ -788,7 +788,7 @@ public sealed class QueryMethodWriterTests
     }
 
     [Fact]
-    public void Append_NoTokenValidation_DoesNotCheckTheTokens()
+    public void Append_TokenValidationOff_DoesNotCheckTheTokens()
     {
         var validated = Write(GetUser);
         var unvalidated = Write(GetUser with { ValidateTokens = false });
@@ -1581,9 +1581,9 @@ public sealed class QueryMethodWriterTests
         Write(method with { Collection = CollectionKind.IAsyncEnumerable }).ShouldBe(Write(method));
     }
 
-    // Nothing is buffered, so no-array-pool has nothing to change.
+    // Nothing is buffered, so array-pool=off has nothing to change.
     [Fact]
-    public void Append_IAsyncEnumerableUnderNoArrayPool_IsTheSameMethod() =>
+    public void Append_IAsyncEnumerableUnderArrayPoolOff_IsTheSameMethod() =>
         Write(Stream with { UseArrayPool = false }).ShouldBe(Write(Stream));
 
     [Fact]

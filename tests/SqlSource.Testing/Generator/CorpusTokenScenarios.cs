@@ -61,11 +61,11 @@ internal static partial class QueryMethodCorpus
             SELECT id, name FROM {{table:users}} WHERE id > @id;
             -- name: StreamUnchecked
             -- collection-type: IAsyncEnumerable
-            -- generator: no-token-validation
+            -- generator: token-validation=off
             -- token: {{table:users}}
             SELECT id, name FROM {{table}} WHERE id > @id;
             -- name: GetUnchecked -> one
-            -- generator: no-token-validation
+            -- generator: token-validation=off
             -- token: {{table:users}}
             SELECT id, name FROM {{table}} WHERE id = @id;
 

@@ -20,12 +20,13 @@ namespace SqlSource.Generation.Methods;
 /// <param name="ValidateTokens">Whether the method checks that each token's argument has text.</param>
 /// <param name="UseArrayPool">
 /// Whether a method of <see cref="ResultShape.Many" /> may read its rows into buffers from the shared array pool: false
-/// under <c>no-array-pool</c>.  It is the resolved setting, true for a method of any shape without the parameter, so a
-/// reader checks the shape and the collection type as well, as <see cref="Emitting.RowBuffer.IsUsedBy" /> does.
+/// under <c>array-pool=off</c>.  It is the resolved setting, true for a method of any shape unless the parameter is
+/// off, so a reader checks the shape and the collection type as well, as <see cref="Emitting.RowBuffer.IsUsedBy" />
+/// does.
 /// </param>
 /// <param name="PadsLists">
-/// Whether the method pads each list query parameter to a fixed size: false under <c>no-list-padding</c>.  It is the
-/// resolved setting, true for a method without a list.
+/// Whether the method pads each list query parameter to a fixed size: false under <c>list-padding=off</c>.  It is the
+/// resolved setting, true for a method without a list as well unless the parameter is off.
 /// </param>
 /// <param name="Input">The input model, or null when the query has no parameters.</param>
 /// <param name="Output">The output model, or null when the query's entry has no rows.</param>

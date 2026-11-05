@@ -87,12 +87,12 @@ internal static partial class QueryMethodCorpus
         );
     }
 
-    // ListIds under no-list-padding, which sends each list's values without padding them.
+    // ListIds under list-padding=off, which sends each list's values without padding them.
     private static GeneratorRun ListsWithoutPadding(CorpusEngine engine)
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: ListIds\n-- generator: no-list-padding\nSELECT id FROM accounts WHERE id IN @ids;\n"
+            "-- name: ListIds\n-- generator: list-padding=off\nSELECT id FROM accounts WHERE id IN @ids;\n"
         );
         return engine.Run(
             [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],

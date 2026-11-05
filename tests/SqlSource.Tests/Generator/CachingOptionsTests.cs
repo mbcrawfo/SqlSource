@@ -37,7 +37,7 @@ public sealed class CachingOptionsTests
         var edited = ProjectFile(
             OutputKind.Sql,
             settings: /*lang=json,strict*/
-            """{"generatorParameters": ["no-token-validation"]}"""
+            """{"generatorParameters": ["token-validation=off"]}"""
         );
         var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 

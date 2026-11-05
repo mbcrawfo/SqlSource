@@ -11,7 +11,7 @@ using Xunit;
 namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // The body of the RowBufferQueryTests of both end-to-end projects, which run it with their generated methods.  Each
-// theory reads the pooled method and its twin under no-array-pool, at a count on each side of the row buffer's sizes,
+// theory reads the pooled method and its twin under array-pool=off, at a count on each side of the row buffer's sizes,
 // and asserts that both return the numbers from 1 to the count, in order, as the collection the method declares.  An
 // even count runs on a connection that the helper opened and an odd one on the closed connection that connect gives,
 // which the methods open.
@@ -58,7 +58,7 @@ internal sealed class RowBufferReads<TConnection, TRow>(Func<TConnection> connec
             null
         );
 
-    // Reads the pooled method and its twin under no-array-pool on one connection, and asserts that both return a TRows
+    // Reads the pooled method and its twin under array-pool=off on one connection, and asserts that both return a TRows
     // and the numbers from 1 to the count, in order.  Then passes the pooled result, as the TRows it is, to afterwards.
     private async Task ShouldReadOneToTheCountAsync<TRows>(
         int count,

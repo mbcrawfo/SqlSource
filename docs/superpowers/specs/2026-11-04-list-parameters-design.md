@@ -116,6 +116,8 @@ WHERE (@categories IS NULL OR category IN @categories)
 
 A generator parameter, defined beside `no-array-pool` (`GeneratorParameters`, `GeneratorParameterList`, `QuerySettings`, `QueryMethod`, `MethodPlanner`), that sends exact counts.  It touches the settings schema, the settings and diagnostics pages, and the tests that `no-array-pool` touches.
 
+*Since built:* generator parameters now merge per option with on, off and default (#230), which renamed `no-array-pool` to `array-pool`, on by default.  The option was merged in the same form: `list-padding`, `GeneratorParameters.ListPadding`, on by default, and `list-padding=off` sends exact counts.
+
 #### PostgreSQL arrays
 
 - **In `codegen` input models, an array parameter is `IEnumerable<E>`** in place of `E[]`, and `IEnumerable<E>?` when nullable.  This applies when the property's type is `E[]` as the type map, a library or the type override gives it (so `int4[]=int?[]` gives `IEnumerable<int?>`).  It does not apply to a C# type the `-- param:` marker names after `->`, which is taken as written, or to types that are not arrays of elements: `bytea` (`byte[]`), multidimensional types such as `int[,]`, `int2vector` and `oidvector`, and multiranges.  *(My call on what counts.)*

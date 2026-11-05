@@ -24,10 +24,10 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
 // pairs: its method of AccountQueries, which reads its rows into the pooled buffer, against a hand-written method that
 // reads them into RowBufferByHand of this project, the same buffer by hand; and the method of
 // its copy GetAccountNameUnpooled, ListAccountsUnpooled or ListClosedBeforeUnpooled in the same file, the same query
-// under no-array-pool by its own marker, which reads them into a List and copies it, against a hand-written method
+// under array-pool=off by its own marker, which reads them into a List and copies it, against a hand-written method
 // that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
 // List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against rows read into RowBufferByHand and
-// copied by ToList or ToImmutableArray, and its twin under no-array-pool against a List that is returned as it is or an
+// copied by ToList or ToImmutableArray, and its twin with array-pool=off against a List that is returned as it is or an
 // ImmutableArray builder that is drained, since those are what the generated method returns.  Three more tests hold
 // the pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300 rows, to allocating less than a List
 // copied to an array, a List grown by doubling and an ImmutableArray builder that is drained, each by at least a given
@@ -51,10 +51,10 @@ public sealed class AllocationTests(PostgresApp postgres)
     // difference of a pair of calls, the same for every pair.  A call of the accounts queries allocated about 1.6 to
     // 2.7 KB here when this was set, and the two methods of each pair differed by less than an object, the difference
     // of their own state, on every run: through the pool, the generated GetAccountName allocated 16 bytes more than the
-    // hand-written one, ListAccounts the same and ListClosedBefore 8 bytes less; under no-array-pool, GetAccountName 8
+    // hand-written one, ListAccounts the same and ListClosedBefore 8 bytes less; under array-pool=off, GetAccountName 8
     // bytes more, ListAccounts 8 bytes less and ListClosedBefore 16 bytes less.  The numbers queries at 3 rows
     // allocated about 1.6 to 2.3 KB a call, and the generated method of each of their eight pairs, NumbersAsList,
-    // IList, ICollection and ImmutableArray through the pool and under no-array-pool, allocated 16 bytes more than the
+    // IList, ICollection and ImmutableArray through the pool and under array-pool=off, allocated 16 bytes more than the
     // hand-written one on every run.  The streaming StreamAccounts allocated about 2.1 KB a call, the same as its
     // hand-written iterator on every run.  A boxed value is 24 bytes.  The binding's own cost, the driver's for each
     // parameter and its DataTypeName, is in both sides alike.  So an extra boxed value, array or closure on each call
@@ -163,7 +163,7 @@ public sealed class AllocationTests(PostgresApp postgres)
     }
 
     [Fact]
-    public async Task GetAccountName_UnderNoArrayPool_AllocatesNoMoreThanByHand()
+    public async Task GetAccountName_UnderArrayPoolOff_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -205,7 +205,7 @@ public sealed class AllocationTests(PostgresApp postgres)
     }
 
     [Fact]
-    public async Task ListAccounts_UnderNoArrayPool_AllocatesNoMoreThanByHand()
+    public async Task ListAccounts_UnderArrayPoolOff_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -246,7 +246,7 @@ public sealed class AllocationTests(PostgresApp postgres)
     }
 
     [Fact]
-    public async Task ListClosedBefore_UnderNoArrayPool_AllocatesNoMoreThanByHand()
+    public async Task ListClosedBefore_UnderArrayPoolOff_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -614,7 +614,7 @@ public sealed class AllocationTests(PostgresApp postgres)
         }
     }
 
-    // GetAccountName of Queries/Accounts.sql under no-array-pool, by hand: the rows into a List, copied to an array.
+    // GetAccountName of Queries/Accounts.sql under array-pool=off, by hand: the rows into a List, copied to an array.
     [SuppressMessage(
         "Performance",
         "CA1849:Call async methods when in an async method",
@@ -742,7 +742,7 @@ public sealed class AllocationTests(PostgresApp postgres)
         }
     }
 
-    // ListAccounts of Queries/Accounts.sql under no-array-pool, by hand: closed_at and name_length may be NULL.
+    // ListAccounts of Queries/Accounts.sql under array-pool=off, by hand: closed_at and name_length may be NULL.
     [SuppressMessage(
         "Performance",
         "CA1849:Call async methods when in an async method",
@@ -876,7 +876,7 @@ public sealed class AllocationTests(PostgresApp postgres)
         }
     }
 
-    // ListClosedBefore of Queries/Accounts.sql under no-array-pool, by hand: a null date is the parameter's own null,
+    // ListClosedBefore of Queries/Accounts.sql under array-pool=off, by hand: a null date is the parameter's own null,
     // and closed_at may be NULL.
     [SuppressMessage(
         "Performance",
@@ -1075,7 +1075,7 @@ public sealed class AllocationTests(PostgresApp postgres)
         }
     }
 
-    // NumbersNoPoolAsList of Queries/RowBuffers.sql under no-array-pool, by hand, the rows into a List that is
+    // NumbersNoPoolAsList of Queries/RowBuffers.sql under array-pool=off, by hand, the rows into a List that is
     // returned, as NumbersNoPoolAsIList and NumbersNoPoolAsICollection read them too.
     [SuppressMessage(
         "Performance",
@@ -1139,7 +1139,7 @@ public sealed class AllocationTests(PostgresApp postgres)
         }
     }
 
-    // NumbersNoPoolAsImmutableArray of Queries/RowBuffers.sql under no-array-pool, by hand, the rows into a builder
+    // NumbersNoPoolAsImmutableArray of Queries/RowBuffers.sql under array-pool=off, by hand, the rows into a builder
     // that is drained.
     [SuppressMessage(
         "Performance",

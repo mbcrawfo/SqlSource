@@ -49,19 +49,21 @@ internal static class SettingsLevelReader
         return level.Equals(SettingsLevel.None) ? SettingsLevel.None : level;
     }
 
-    // The generator parameters are written as an array alone.  A word that is no generator parameter is recorded by
-    // its index, and the other words apply; an array with no word is the empty list, which is set.
-    private static GeneratorParameters? ReadParameters<TSource>(ref TSource source)
+    // The generator parameters are written as an array alone.  A word that is no generator parameter, or whose state is
+    // not valid, is recorded by its index, and the other words apply.  A word that gives a parameter another state than
+    // an earlier word gave it is recorded as a repeat of that word, and the earlier applies.  An array with no word
+    // names nothing.
+    private static GeneratorParameterChoices ReadParameters<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
         if (source.Elements(SettingId.Parameters) is not { } elements)
         {
-            return null;
+            return GeneratorParameterChoices.None;
         }
 
-        var indexes = new List<int>();
-        var parameters = GeneratorParameterList.ReadElements(elements, indexes);
-        ReportParts(ref source, SettingId.Parameters, indexes);
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+        var parameters = GeneratorParameterList.ReadElements(elements, invalid, repeated);
+        ReportParts(ref source, SettingId.Parameters, invalid, repeated);
         return parameters;
     }
 
@@ -166,18 +168,13 @@ internal static class SettingsLevelReader
         ref TSource source,
         SettingId setting,
         List<int> invalid,
-        List<(int Index, int First)>? repeated = null
+        List<(int Index, int First)> repeated
     )
         where TSource : struct, ISettingSource
     {
         foreach (var index in invalid)
         {
             source.InvalidPart(setting, index);
-        }
-
-        if (repeated is null)
-        {
-            return;
         }
 
         foreach (var (index, first) in repeated)

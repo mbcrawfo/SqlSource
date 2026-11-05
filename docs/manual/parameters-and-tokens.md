@@ -106,7 +106,7 @@ int[] ids = [4, 8, 15];
 
 A query method rounds the count of each list up to 1, 2, 4, 8, 16, 32, 64, 128, 256 or 512, and above 512 to the next multiple of 512, and fills the list with its last value.  So 3 values are sent as 4, and 600 as 1,024.  A value repeated changes no result of `IN` or `NOT IN`, and the database sees a few forms of the query, one for each size, rather than one for each count, and keeps a plan of each.
 
-- **The [generator parameter](settings.md#setting-generator-parameters) `no-list-padding`** sends each list at its own count.
+- **The [generator parameter](settings.md#setting-generator-parameters) `list-padding`** turns the padding on or off: it is on by default, and `list-padding=off` sends each list at its own count.
 - **Padding never makes a method throw.**  When the padded lists would pass [the limit](#list-limit) and the lists at their own counts would not, the method sends them at their own counts.
 - **An empty list or a null one** is sent as one parameter, a `NULL` of the values' type, in `(SELECT @ids_0 WHERE 1 = 0)`, which holds no row.
 
@@ -241,13 +241,13 @@ SELECT 'Hello, {{name}}' AS greeting;
 
 ```sql
 -- name: ListFiltered
--- generator: no-token-validation
+-- generator: token-validation=off
 SELECT id, name FROM users {{whereClause}};
 ```
 
 By default the method, a token method or a query method, checks each argument with `ArgumentException.ThrowIfNullOrWhiteSpace`: null throws `ArgumentNullException`, and an empty or blank string throws `ArgumentException`.  The check is that a value is present, not that it is safe.
 
-An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `no-token-validation` generator parameter.  Where a generator parameter can be written, and which place wins, is on [the settings page](settings.md#setting-generator-parameters).
+An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `token-validation=off` generator parameter.  Where a generator parameter can be written, and which place wins, is on [the settings page](settings.md#setting-generator-parameters).
 
 With validation off the method checks nothing.  An empty argument leaves nothing where its token was, and a null argument throws `NullReferenceException`.
 

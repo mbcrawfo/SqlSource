@@ -10,7 +10,7 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generator;
 
 // The model of a query whose entry matches a table: named after the table, shared by every query that matches it,
-// unless no-table-models is in effect or the query names its model.  Each run is at Models under postgres on Npgsql
+// unless table-models=off is in effect or the query names its model.  Each run is at Models under postgres on Npgsql
 // 10, with an entry written for each query's current hash, and every model must compile without a warning.
 public sealed class TableModelTests
 {
@@ -111,12 +111,12 @@ public sealed class TableModelTests
 
     [Theory]
     [MemberData(nameof(Levels))]
-    public void Run_NoTableModelsAtEachLevel_NamesTheModelAfterTheQuery(SettingLevel level)
+    public void Run_TableModelsOffAtEachLevel_NamesTheModelAfterTheQuery(SettingLevel level)
     {
         var settings = new LevelSettings().At(
             level,
             Setting.GeneratorParameters,
-            LevelSettings.WordsAt(level, "no-table-models")
+            LevelSettings.WordsAt(level, "table-models=off")
         );
         var files = settings.Files(AllUsers);
         var file = files[0];
@@ -132,7 +132,7 @@ public sealed class TableModelTests
         run.Sources[GetUserDtoFile].ShouldContain("    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.\n");
     }
 
-    // A parameter list that does not name no-table-models leaves table models on, whatever else it holds.
+    // A parameter list that does not name table-models=off leaves table models on, whatever else it holds.
     [Fact]
     public void Run_OtherParameters_LeaveTableModelsOn()
     {

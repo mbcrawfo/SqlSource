@@ -53,7 +53,7 @@ ORDER BY id;
 
 -- name: ListAccountsByIdsNoPadding
 -- summary: ListAccountsByIds, with each list sent at its own count.
--- generator: no-list-padding
+-- generator: list-padding=off
 -- output-model: ListedAccount
 SELECT id, name, status
 FROM accounts

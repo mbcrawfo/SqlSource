@@ -159,12 +159,12 @@ internal static class TypeModels
         else
         {
             // A row of the table a query matches is named after the table, unless the query names its model or
-            // no-table-models is in effect.  A table that gives no name leaves the query's.
+            // table-models is off.  A table that gives no name leaves the query's.
             string? tableName = null;
             if (
                 !isInput
                 && marker is null
-                && (settings.Parameters & GeneratorParameters.NoTableModels) == 0
+                && (settings.Parameters & GeneratorParameters.TableModels) != 0
                 && query.Table is { } matched
                 && PropertyNames.FromTable(matched, SqlDescribableDialects.EngineOf(file.Dialect)) is { } fromTable
             )

@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Tests.Generation;
 using Xunit;
 using static SqlSource.Tests.Parsing.ParseOf;
 
@@ -31,13 +32,17 @@ public sealed class SqlFileParserTests
     public void Parse_FileWithoutNameMarker_ReadsSummaryAndGeneratorParametersBeforeAndAmongItsSql()
     {
         const string Text =
-            "-- summary: First.\nSELECT 1 -- c\n-- generator: keep-comments no-token-validation\n"
+            "-- summary: First.\nSELECT 1 -- c\n-- generator: keep-comments token-validation=off\n"
             + "-- summary: Second.\nFROM t\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("First. Second.");
-        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.NoTokenValidation);
+        block.Markers.Parameters.ShouldBe(
+            TestModels
+                .TurnedOn(GeneratorParameters.KeepComments)
+                .With(GeneratorParameters.TokenValidation, GeneratorParameterState.Off)
+        );
         Sql(block).ShouldBe("SELECT 1\nFROM t");
         Kept(block).ShouldBe("SELECT 1 -- c\nFROM t");
     }
@@ -95,9 +100,37 @@ public sealed class SqlFileParserTests
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
-        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        block.Markers.Parameters.StateOf(GeneratorParameters.KeepComments).ShouldBe(true);
         Sql(block).ShouldBe("SELECT 1");
         Kept(block).ShouldBe("-- kept\nSELECT 1");
+    }
+
+    [Theory]
+    [InlineData("-- name: A\n-- generator: keep-comments=off\nSELECT 1 -- dropped\n")]
+    [InlineData("-- generator: default\n\n-- name: A\nSELECT 1 -- dropped\n")]
+    public void Parse_QueryTurnsKeepCommentsOff_UnderAChainThatKeepsThem_DropsTheComment(string text)
+    {
+        var block = SqlFileParser.Parse(text, "Query.sql", commentsWanted: true).Blocks.ShouldHaveSingleItem();
+
+        Sql(block).ShouldBe("SELECT 1");
+        Kept(block).ShouldBeNull();
+    }
+
+    // A file without a name line is one query and one scope, so its generator lines are one level: a later line that
+    // turns keep-comments off contradicts an earlier one that turns it on, and overrides nothing.
+    [Fact]
+    public void Parse_FileWithoutANameLine_ItsGeneratorLinesAreOneLevel()
+    {
+        const string Text = "-- generator: keep-comments\n\n-- generator: keep-comments=off\nSELECT 1 -- kept\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    TextSpans.Of(Text, "keep-comments=off"),
+                    "keep-comments=off"
+                ),
+            ]);
     }
 
     [Theory]
@@ -200,28 +233,28 @@ public sealed class SqlFileParserTests
     public void Parse_SeveralMarkersAfterTheLastSqlOfABlock_AreEachAnError()
     {
         const string Text =
-            "-- name: A\nSELECT 1\n-- generator: no-token-validation\n-- summary: s\n-- name: B\nSELECT 2";
+            "-- name: A\nSELECT 1\n-- generator: token-validation=off\n-- summary: s\n-- name: B\nSELECT 2";
 
         Errors(Text)
             .ShouldBe([
                 SqlParseError.Create(
                     SqlParseErrorKind.MarkerAtEndOfBlock,
-                    TextSpans.Of(Text, "-- generator: no-token-validation")
+                    TextSpans.Of(Text, "-- generator: token-validation=off")
                 ),
                 SqlParseError.Create(SqlParseErrorKind.MarkerAtEndOfBlock, TextSpans.Of(Text, "-- summary: s")),
             ]);
     }
 
     [Theory]
-    [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- generator: no-token-validation\nFROM t", "SELECT 1\nFROM t")]
-    [InlineData("-- name: A\n-- summary: s\n-- generator: no-token-validation\n/*+ H */", "/*+ H */")]
-    [InlineData("-- name: A\n-- summary: s\n-- generator: no-token-validation\n'x'\n-- c", "'x'")]
+    [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- generator: token-validation=off\nFROM t", "SELECT 1\nFROM t")]
+    [InlineData("-- name: A\n-- summary: s\n-- generator: token-validation=off\n/*+ H */", "/*+ H */")]
+    [InlineData("-- name: A\n-- summary: s\n-- generator: token-validation=off\n'x'\n-- c", "'x'")]
     public void Parse_MarkerWithSqlAfterItInItsBlock_IsAccepted(string text, string expectedSql)
     {
         var block = Blocks(text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("s");
-        block.Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
+        block.Markers.Parameters.ShouldBe(TestModels.TurnedOff(GeneratorParameters.TokenValidation));
         Sql(block).ShouldBe(expectedSql);
     }
 
@@ -294,7 +327,7 @@ public sealed class SqlFileParserTests
     public void Parse_WindowsLineEndings_GiveTheSameBlocksAsUnixLineEndings()
     {
         const string Unix =
-            "-- generator: no-token-validation\n\n-- name: A\n-- summary: S\nSELECT 1 -- c\nFROM {{t}}\n\n"
+            "-- generator: token-validation=off\n\n-- name: A\n-- summary: S\nSELECT 1 -- c\nFROM {{t}}\n\n"
             + "-- name: B\nSELECT 'x\ny'\n";
         var windows = Unix.Replace("\n", "\r\n", StringComparison.Ordinal);
 
@@ -306,7 +339,10 @@ public sealed class SqlFileParserTests
         windowsBlocks.Select(static block => block.Summary).ShouldBe(["S", null]);
         windowsBlocks
             .Select(static block => block.Markers.Parameters)
-            .ShouldBe([GeneratorParameters.NoTokenValidation, GeneratorParameters.NoTokenValidation]);
+            .ShouldBe([
+                TestModels.TurnedOff(GeneratorParameters.TokenValidation),
+                TestModels.TurnedOff(GeneratorParameters.TokenValidation),
+            ]);
     }
 
     [Theory]

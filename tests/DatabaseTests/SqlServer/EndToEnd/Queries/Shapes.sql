@@ -19,9 +19,9 @@ WHERE name LIKE @name OR id = @accountId
 ORDER BY id;
 
 -- name: SearchAccountsUnpooled -> many
--- summary: SearchAccounts under no-array-pool, which reads its rows into a List, for the allocation tests: the query's
--- summary: own list of generator parameters replaces every other list, so only a copy of it can take another.
--- generator: sort-input no-array-pool
+-- summary: SearchAccounts under array-pool=off, which reads its rows into a List, for the allocation tests: a query has
+-- summary: one set of generator parameters, so only a copy of it can take another.
+-- generator: sort-input array-pool=off
 -- input-model: SearchAccountsFilter
 -- output-model: SearchAccountsView
 SELECT id, name
