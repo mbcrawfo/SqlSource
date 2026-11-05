@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using SqlSource.Tool.Testing.Fixtures;
 
-namespace SqlSource.Tool.Testing.Fixtures;
+namespace SqlSource.Tool.Tests;
 
 // The cases of Fixtures/Bundles/<engine>/, which the build copies to the output: a bundle each, as a bug report's
 // unzips, found as the describers' cases are.

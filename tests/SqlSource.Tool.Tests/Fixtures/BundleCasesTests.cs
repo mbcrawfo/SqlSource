@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Bundles;
-using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Fixtures;
