@@ -136,6 +136,14 @@ namespace App
                 {
                     if (list0 is null || count0 == 0)
                     {
+                        if (list0 is not null)
+                        {
+                            foreach (var element in list0)
+                            {
+                                throw new global::System.InvalidOperationException("The list 'Ids' changed after the query counted it.");
+                            }
+                        }
+
                         var parameter = new global::Npgsql.NpgsqlParameter<int?>();
                         parameter.ParameterName = "ids_0";
                         parameter.DataTypeName = "pg_catalog.int4";

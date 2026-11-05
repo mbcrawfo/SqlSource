@@ -11,9 +11,10 @@ internal static partial class QueryMethodCorpus
 {
     // A list after IN and after NOT IN; two lists; one list used twice; a list with a null test beside a parameter
     // that is no list; a list beside a token; a list beside a parameter named as the list's first value would be; a
-    // list whose comments are kept; a stream; lists of a value type and of a class each bound through a converter; and
-    // a list in a one-optional query.  Each list's entry describes its element, as the tool writes it, with the name
-    // a PostgreSQL binding sets.
+    // list whose comments are kept; a stream; lists of a value type and of a class each bound through a converter; a
+    // list in a one-optional query; and a list of decimals, whose values SQL Server rounds to its scale of 0 and whose
+    // empty form's null it does not.  Each list's entry describes its element, as the tool writes it, with the name a
+    // PostgreSQL binding sets.
     private static GeneratorRun Lists(CorpusEngine engine)
     {
         var file = new SqlFile(
@@ -38,6 +39,7 @@ internal static partial class QueryMethodCorpus
                 + engine.TextOverrideKey
                 + "=App.Email\nSELECT id FROM accounts WHERE id IN @ids AND email IN @emails;\n"
                 + "-- name: ListOneShape -> one-optional\nSELECT id FROM accounts WHERE id IN @ids;\n"
+                + "-- name: ListAmounts\nSELECT id FROM accounts WHERE amount IN @amounts;\n"
         );
         var ids = CorpusEngine.Parameter("ids", engine.BoundInt);
         SidecarParameter[] justIds = [ids];
@@ -78,7 +80,8 @@ internal static partial class QueryMethodCorpus
                         [ids, CorpusEngine.Parameter("emails", engine.BoundText)],
                         columns
                     ),
-                    engine.Entry(file, "ListOneShape", justIds, columns)
+                    engine.Entry(file, "ListOneShape", justIds, columns),
+                    engine.Entry(file, "ListAmounts", [CorpusEngine.Parameter("amounts", engine.WholeDecimal)], columns)
                 ),
             ]
         );

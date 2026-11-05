@@ -37,6 +37,8 @@ internal static class ListBindingWriter
 
         _ = builder.Append(indent).Append("{\n");
         QueryMethodWriter.AppendIf(builder, block, list.Values + " is null || " + list.Count + " == 0");
+        var changed = ChangedOf(parameter);
+        AppendGainedCheck(builder, inner, lists, list, changed);
         var empty = EmptyOf(parameter);
         binder.Append(
             binding with
@@ -48,7 +50,6 @@ internal static class ListBindingWriter
             },
             empty
         );
-        var changed = ChangedOf(parameter);
         QueryMethodWriter.AppendEnd(builder, block);
         _ = builder
             .Append(block)
@@ -136,6 +137,36 @@ internal static class ListBindingWriter
             quote: true
         )
         + ");";
+
+    // A list counted as empty that is not null throws, before its empty form is bound, when it gives a value by the
+    // time it is bound: the SQL was built for no value.
+    private static void AppendGainedCheck(
+        StringBuilder builder,
+        string indent,
+        ListLocals lists,
+        ListLocal list,
+        string changed
+    )
+    {
+        var loop = GeneratedText.Deeper(indent);
+        QueryMethodWriter.AppendIf(builder, indent, list.Values + " is not null");
+        _ = builder
+            .Append(loop)
+            .Append("foreach (var ")
+            .Append(lists.Element)
+            .Append(" in ")
+            .Append(list.Values)
+            .Append(")\n")
+            .Append(loop)
+            .Append("{\n")
+            .Append(loop)
+            .Append(GeneratedText.Indent)
+            .Append(changed)
+            .Append('\n');
+        QueryMethodWriter.AppendEnd(builder, loop);
+        QueryMethodWriter.AppendEnd(builder, indent);
+        _ = builder.Append('\n');
+    }
 
     private static void AppendThrowWhen(StringBuilder builder, string indent, string condition, string changed)
     {

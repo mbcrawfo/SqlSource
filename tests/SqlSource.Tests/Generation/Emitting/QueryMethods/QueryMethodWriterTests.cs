@@ -1272,8 +1272,8 @@ public sealed class QueryMethodWriterTests
     }
 
     // A list counted when the method was called may change before its values are bound, as a stream's does before its
-    // loop starts: the binding throws when the list gives a value past its count, or ends before it, since the SQL
-    // names exactly its count of values.  The documentation says so.
+    // loop starts: the binding throws when the list gives a value past its count, or ends before it, and when a list
+    // counted as empty gives one, since the SQL names exactly its count of values.  The documentation says so.
     [Fact]
     public void Append_List_ThrowsWhenTheListChangedAfterItWasCounted()
     {
@@ -1295,6 +1295,20 @@ public sealed class QueryMethodWriterTests
         );
         text.ShouldContain(
             "                    if (index < count0)\n                    {\n                        " + Throw + "\n"
+        );
+        text.ShouldContain(
+            "                if (list0 is null || count0 == 0)\n"
+                + "                {\n"
+                + "                    if (list0 is not null)\n"
+                + "                    {\n"
+                + "                        foreach (var element in list0)\n"
+                + "                        {\n"
+                + "                            "
+                + Throw
+                + "\n"
+                + "                        }\n"
+                + "                    }\n\n"
+                + "                    var parameter = "
         );
         text.ShouldContain(
             "/// <exception cref=\"global::System.InvalidOperationException\">"

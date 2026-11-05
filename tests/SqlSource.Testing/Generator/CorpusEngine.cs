@@ -58,6 +58,7 @@ internal sealed record CorpusEngine(
         Json = PostgresJsonb,
         BoundInt = ModelRuns.Int4 with { BindName = "integer" },
         BoundText = ModelRuns.Text with { BindName = "text" },
+        WholeDecimal = ModelRuns.Catalog("numeric") with { BindName = "numeric" },
         UnboundedText = ModelRuns.Catalog("text") with { BindName = "text" },
         JsonArray = ModelRuns.ArrayOf(PostgresJsonb, "_jsonb") with { BindName = "jsonb[]" },
         OwnScenarios =
@@ -93,6 +94,7 @@ internal sealed record CorpusEngine(
         Json = TestSidecars.SqlServer("json", -1, 0),
         BoundInt = TestSidecars.SqlServer(),
         BoundText = TestSidecars.SqlServer("nvarchar(100)", 200, 0),
+        WholeDecimal = TestSidecars.SqlServer("decimal(10,0)", 9, 10, 0),
         UnboundedText = TestSidecars.SqlServer("nvarchar(max)", -1, 0),
         OwnScenarios =
         [
@@ -126,6 +128,10 @@ internal sealed record CorpusEngine(
     public SidecarType BoundInt { get; init; } = null!;
 
     public SidecarType BoundText { get; init; } = null!;
+
+    // A decimal of the engine as the tool describes a parameter of it, of scale 0 where the engine gives one, which a
+    // SQL Server binding rounds to a whole number.
+    public SidecarType WholeDecimal { get; init; } = null!;
 
     // A string of the engine with no limit on its length, which a column marker with `json` reads as JSON.
     public SidecarType UnboundedText { get; init; } = null!;
