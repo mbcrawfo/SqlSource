@@ -301,6 +301,38 @@ public sealed class ParameterTests(PostgresDatabases postgres)
         parameters.ShouldBe([Inferred("id", TestSidecars.Postgres()), Inferred("status", UserStatus)]);
     }
 
+    // A list parameter is described as one value of its element, as the tool sends it.
+    [Fact]
+    public async Task DescribeAsync_ListParameter_HasTheElementsType()
+    {
+        var parameters = await ShouldDescribeAsync(
+            DescribeRequests.Planned("postgres", "SELECT id FROM users WHERE id IN @ids")
+        );
+
+        parameters.ShouldBe([Inferred("ids", TestSidecars.Postgres())]);
+    }
+
+    // The test for NULL is no use of the parameter, so the use after IN fixes its type.
+    [Fact]
+    public async Task DescribeAsync_OptionalListFilter_IsDescribed()
+    {
+        var parameters = await ShouldDescribeAsync(
+            DescribeRequests.Planned("postgres", "SELECT id FROM users WHERE (@ids IS NULL OR id IN @ids)")
+        );
+
+        parameters.ShouldBe([Inferred("ids", TestSidecars.Postgres())]);
+    }
+
+    [Fact]
+    public async Task DescribeAsync_ListUsedTwice_IsDescribed()
+    {
+        var parameters = await ShouldDescribeAsync(
+            DescribeRequests.Planned("postgres", "SELECT id FROM orders WHERE id IN @ids OR user_id IN @ids")
+        );
+
+        parameters.Select(parameter => parameter.Name).ShouldBe(["ids"]);
+    }
+
     // An assignment gives a parameter the column's own type, so every base type of the schema is reached through
     // one.  A parameter has no facets: numeric(18,2) is numeric and char(2) is bpchar.
     [Theory]

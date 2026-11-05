@@ -36,11 +36,16 @@ public sealed class SampleSqlTests : IDisposable
         Sample("-- name: A\n-- token: {{where:WHERE x = 1}}\nSELECT 1 FROM t {{where}};\n")
             .ShouldBe("SELECT 1 FROM t WHERE x = 1;");
 
-    // A list's uses are segments of their own, written as the SQL wrote them.
+    // A list is described as one value of its element, so a use after IN is a list of one.
     [Fact]
-    public void Build_QueryWithAList_IsItsSql() =>
+    public void Build_ListUse_IsParenthesised() =>
+        Sample("-- name: A\nSELECT 1 FROM t WHERE id IN @ids;\n").ShouldBe("SELECT 1 FROM t WHERE id IN (@ids);");
+
+    // The test of a list for NULL is no use of the parameter: the server is told nothing about it.
+    [Fact]
+    public void Build_NullTest_IsNull() =>
         Sample("-- name: A\nSELECT 1 FROM t WHERE (@ids IS NULL OR id IN @ids);\n")
-            .ShouldBe("SELECT 1 FROM t WHERE (@ids IS NULL OR id IN @ids);");
+            .ShouldBe("SELECT 1 FROM t WHERE (NULL IS NULL OR id IN (@ids));");
 
     // The plan gives such a query a problem and the run never builds its sample.
     [Fact]

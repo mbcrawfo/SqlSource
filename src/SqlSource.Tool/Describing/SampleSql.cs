@@ -12,7 +12,9 @@ internal static class SampleSql
 {
     /// <summary>
     /// The query's SQL without comments, which the hash covers, with each token's resolved default in the place of
-    /// its <c>{{name:default}}</c>: nothing, for an empty one.
+    /// its <c>{{name:default}}</c>: nothing, for an empty one.  A list parameter is described as one value of its
+    /// element: a use after <c>IN</c> is <c>(@ids)</c>, and the test of the list for <c>NULL</c> is <c>NULL</c>, which
+    /// asks the server nothing of the parameter.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// A token has no default.  The plan gives such a query a problem, and the run does not describe it.
@@ -25,7 +27,9 @@ internal static class SampleSql
             _ = sql.Append(
                 segment.Kind switch
                 {
-                    SqlSegmentKind.Literal or SqlSegmentKind.List or SqlSegmentKind.ListNullTest => segment.Text,
+                    SqlSegmentKind.Literal => segment.Text,
+                    SqlSegmentKind.List => "(" + segment.Text + ")",
+                    SqlSegmentKind.ListNullTest => "NULL",
                     SqlSegmentKind.Token => DefaultOf(query, segment.Text),
                     _ => throw UnexpectedEnumValueException.Of(segment.Kind),
                 }
