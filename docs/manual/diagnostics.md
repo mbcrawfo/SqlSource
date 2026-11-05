@@ -253,7 +253,16 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC286](#sqlsrc286) | Connection in .env cannot be read |
 | [SQLSRC287](#sqlsrc287) | The watcher failed |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 125 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 287 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), and [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
+**A bug-report bundle**
+
+| Id | Title |
+|----|----|
+| [SQLSRC288](#sqlsrc288) | Bundle cannot be read |
+| [SQLSRC289](#sqlsrc289) | Bundle is of a newer version |
+| [SQLSRC290](#sqlsrc290) | Bundle does not answer a question of the query |
+| [SQLSRC291](#sqlsrc291) | No describer for the bundle's engine |
+
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 125 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 291 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), and [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -3108,3 +3117,55 @@ On Linux, raise the limit that the message names.  For a message about `inotify 
 A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder, such as one that was deleted or that you may not read, and then gives no help line.  It says so once while the folder stays that way, and sees the folder's changes again as soon as it can list it.
 
 See: [Describe on save](tool.md#describe-on-save)
+
+## SQLSRC288
+
+**Bundle cannot be read**
+
+A bundle is a zip file, or an unzipped folder, that someone made of one query for a bug report, and `sqlsource replay <bundle>` runs that query from it without a database.  This error means the path you gave is not a bundle the tool can read.  The message ends with the reason: the path does not exist, it is not a zip file or a folder of a bundle, a file that every bundle holds is missing, or a file of it is damaged.
+
+```console
+$ dotnet sqlsource replay /work/report.zip
+/work/report.zip : error SQLSRC288: The bundle cannot be read: the file 'bundle.json' is missing
+```
+
+Check the path first, and that the zip file was not cut short by the download or the mail that carried it.  If the path is right, ask the person who made the bundle for it again; a bundle that was edited by hand, or unzipped and zipped again with a file left out, is read the same way as a damaged one.
+
+## SQLSRC289
+
+**Bundle is of a newer version**
+
+The bundle was made by a newer version of `sqlsource` than the one you run, in a form that this version does not know.  The message names what is newer, the number the bundle has and the number this version reads.
+
+```console
+$ dotnet sqlsource replay /work/report.zip
+/work/report.zip : error SQLSRC289: The bundle's format is 3, and this version of sqlsource reads 2
+```
+
+Update the `sqlsource` tool to the latest version, and replay the bundle again.
+
+## SQLSRC290
+
+**Bundle does not answer a question of the query**
+
+`sqlsource replay` runs the query from what the bundle holds, and the bundle has no answer to something that the query asks.  The message names the question, the version of `sqlsource` that made the bundle, and the version you run.  This happens when you run a version other than the one that made the bundle, since a different version can ask something the other never did.  A bundle made from a folder says `another version of sqlsource` when it does not tell which version made it.
+
+```console
+$ dotnet sqlsource replay /work/report.zip
+/work/report.zip : error SQLSRC290: The bundle has no answer to 'column types of the table "orders"' that the query asks: it was made by sqlsource 1.4.0, and this is sqlsource 1.6.0
+```
+
+Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and replay the bundle again.  When the message says `another version of sqlsource`, ask the person who made the bundle which version it was.
+
+## SQLSRC291
+
+**No describer for the bundle's engine**
+
+The bundle is of a query for a database engine that this version of `sqlsource` cannot run a query of without a database.  The message names the engine.  It happens when the bundle was made by a newer version that supports an engine this one does not.
+
+```console
+$ dotnet sqlsource replay /work/report.zip
+/work/report.zip : error SQLSRC291: The bundle is of the engine 'mysql', which this version of sqlsource does not describe
+```
+
+Update the `sqlsource` tool to the latest version, and replay the bundle again.

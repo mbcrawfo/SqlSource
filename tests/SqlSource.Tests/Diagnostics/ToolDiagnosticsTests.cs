@@ -81,13 +81,18 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.FileCannotBeChanged,
         };
         // SQLSRC200 is formatted above, and SQLSRC215 starts with a count, SQLSRC231 with the name of the reader,
-        // and SQLSRC266 with a column's position; their own tests format them.
+        // SQLSRC266 with a column's position, and SQLSRC288 to SQLSRC291 with a sentence about the bundle, which
+        // the path they are reported at names; their own tests format them.
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)
                 .Remove(ToolDiagnostics.UnnamedConnectionNotUsed)
                 .Remove(ToolDiagnostics.ParametersReadDifferently)
                 .Remove(ToolDiagnostics.ColumnHasNoName)
+                .Remove(ToolDiagnostics.BundleCannotBeRead)
+                .Remove(ToolDiagnostics.BundleOfNewerTool)
+                .Remove(ToolDiagnostics.BundleCallMissing)
+                .Remove(ToolDiagnostics.NoDescriberForBundle)
         )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it
@@ -102,6 +107,42 @@ public sealed class ToolDiagnosticsTests
                 )
                 .ShouldContain("'/work/app'", Case.Sensitive, descriptor.Id);
         }
+    }
+
+    [Fact]
+    public void BundleMessages_FormatWithTheirArguments()
+    {
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.BundleCannotBeRead.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "the reason"
+            )
+            .ShouldBe("The bundle cannot be read: the reason");
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.BundleOfNewerTool.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "format",
+                3,
+                2
+            )
+            .ShouldBe("The bundle's format is 3, and this version of sqlsource reads 2");
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.BundleCallMissing.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "a question",
+                "sqlsource 1.4.0",
+                "1.6.0"
+            )
+            .ShouldBe(
+                "The bundle has no answer to 'a question' that the query asks: it was made by sqlsource 1.4.0, "
+                    + "and this is sqlsource 1.6.0"
+            );
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.NoDescriberForBundle.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "mysql"
+            )
+            .ShouldBe("The bundle is of the engine 'mysql', which this version of sqlsource does not describe");
     }
 
     [Fact]

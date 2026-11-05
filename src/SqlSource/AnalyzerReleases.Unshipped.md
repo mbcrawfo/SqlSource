@@ -141,3 +141,7 @@ SQLSRC284 | SqlSource | Warning | Short name finds a type that only a package br
 SQLSRC285 | SqlSource | Error | .env file cannot be read
 SQLSRC286 | SqlSource | Error | Connection in .env cannot be read
 SQLSRC287 | SqlSource | Error | The watcher failed
+SQLSRC288 | SqlSource | Error | Bundle cannot be read
+SQLSRC289 | SqlSource | Error | Bundle is of a newer version
+SQLSRC290 | SqlSource | Error | Bundle does not answer a question of the query
+SQLSRC291 | SqlSource | Error | No describer for the bundle's engine

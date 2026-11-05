@@ -525,6 +525,50 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor BundleCannotBeRead = new(
+        id: "SQLSRC288",
+        title: "Bundle cannot be read",
+        messageFormat: "The bundle cannot be read: {0}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc288",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor BundleOfNewerTool = new(
+        id: "SQLSRC289",
+        title: "Bundle is of a newer version",
+        messageFormat: "The bundle's {0} is {1}, and this version of sqlsource reads {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc289",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor BundleCallMissing = new(
+        id: "SQLSRC290",
+        title: "Bundle does not answer a question of the query",
+        messageFormat: "The bundle has no answer to '{0}' that the query asks: it was made by {1}, and this is sqlsource {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc290",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor NoDescriberForBundle = new(
+        id: "SQLSRC291",
+        title: "No describer for the bundle's engine",
+        messageFormat: "The bundle is of the engine '{0}', which this version of sqlsource does not describe",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc291",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -575,6 +619,10 @@ internal static class ToolDiagnostics
             FileNotUtf8,
             DotEnvCannotBeRead,
             DotEnvLineCannotBeRead,
-            WatchFailed
+            WatchFailed,
+            BundleCannotBeRead,
+            BundleOfNewerTool,
+            BundleCallMissing,
+            NoDescriberForBundle
         );
 }
