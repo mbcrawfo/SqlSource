@@ -313,6 +313,40 @@ public sealed class BundleReplayTests
     }
 
     [Fact]
+    public void ExpectedOf_ExpectedAndAFailureInBundleJson_IsTheEntry()
+    {
+        var recorded = BundleReplays.OfCase("postgres", "select-plain");
+        var bundle = recorded with
+        {
+            Info = Info("postgres", BundleOutcome.Failure("SQLSRC226", "describe parameters")),
+        };
+
+        var expected = BundleReplay.ExpectedOf(bundle, Path);
+
+        expected.Failure.ShouldBeNull();
+        expected
+            .Value.ShouldBeOfType<ReplayOutcome.Described>()
+            .Entry.ShouldBe(
+                BundleReplay.ExpectedOf(recorded, Path).Value.ShouldBeOfType<ReplayOutcome.Described>().Entry
+            );
+    }
+
+    [Fact]
+    public void ExpectedOf_EntryInBundleJsonAndNoExpected_IsNull()
+    {
+        var bundle = BundleReplays.OfCase("postgres", "select-plain") with
+        {
+            Info = Info("postgres", BundleOutcome.Entry),
+            Expected = null,
+        };
+
+        var expected = BundleReplay.ExpectedOf(bundle, Path);
+
+        expected.Failure.ShouldBeNull();
+        expected.Value.ShouldBeNull();
+    }
+
+    [Fact]
     public void ExpectedOf_SidecarOfTwoEntries_IsSqlsrc288()
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain");

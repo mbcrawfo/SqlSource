@@ -44,7 +44,7 @@ public sealed class EntryDifferencesTests
     }
 
     [Fact]
-    public void Of_MemberOnlyOneSideHas_IsNone()
+    public void Of_MemberNullOnOneSide_IsNull()
     {
         var expected = Expected;
         var column = expected.Columns.ShouldNotBeNull()[0];
@@ -53,6 +53,23 @@ public sealed class EntryDifferencesTests
         EntryDifferences
             .Of(expected, replayed)
             .ShouldBe(["columns[0].origin: {\"schema\":\"public\",\"table\":\"users\",\"column\":\"id\"} -> null"]);
+    }
+
+    [Fact]
+    public void Of_MemberOnlyOneSideWrites_IsNone()
+    {
+        var named = BundleReplay
+            .ExpectedOf(BundleReplays.OfCase("postgres", "insert-returning"), Path)
+            .Value.ShouldBeOfType<ReplayOutcome.Described>()
+            .Entry;
+        var parameters = named.Parameters.ToArray();
+        var type = parameters[0].Type.ShouldNotBeNull();
+        type.BindName.ShouldBe("integer");
+        parameters[0] = parameters[0] with { Type = type with { BindName = null } };
+        var unnamed = named with { Parameters = new EquatableArray<SidecarParameter>([.. parameters]) };
+
+        EntryDifferences.Of(unnamed, named).ShouldBe(["parameters[0].type.bindName: (none) -> \"integer\""]);
+        EntryDifferences.Of(named, unnamed).ShouldBe(["parameters[0].type.bindName: \"integer\" -> (none)"]);
     }
 
     [Fact]
