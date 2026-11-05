@@ -140,6 +140,30 @@ public sealed class SqlDialectRulesTests
     public void StringContinuation_OfEachDialect_IsTheRowOfTheTable(string dialect, string expected) =>
         SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect)).StringContinuation.ToString().ShouldBe(expected);
 
+    // T-SQL takes "@", "#" and "$" in a name and refuses a currency sign; the others read every character above
+    // U+007F as a letter, and take only "$" of the three.
+    [Theory]
+    [InlineData("Ansi", false)]
+    [InlineData("SqlServer", true)]
+    [InlineData("PostgreSql", false)]
+    [InlineData("MySql", false)]
+    [InlineData("MariaDb", false)]
+    [InlineData("Sqlite", false)]
+    [InlineData("Oracle", false)]
+    [InlineData("CockroachDb", false)]
+    public void IsNameCharacter_OfEachDialect_ReadsNamesAsSqlServerOrAsPostgreSqlDoes(string dialect, bool sqlServer)
+    {
+        var rules = SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
+
+        rules.IsNameCharacter('a').ShouldBeTrue();
+        rules.IsNameCharacter('_').ShouldBeTrue();
+        rules.IsNameCharacter('$').ShouldBeTrue();
+        rules.IsNameCharacter(' ').ShouldBeFalse();
+        rules.IsNameCharacter('@').ShouldBe(sqlServer);
+        rules.IsNameCharacter('#').ShouldBe(sqlServer);
+        rules.IsNameCharacter('\u20AC').ShouldBe(!sqlServer);
+    }
+
     [Theory]
     [InlineData("SELECT a, b FROM t WHERE x = 1", 0, -1)]
     [InlineData("", 0, -1)]

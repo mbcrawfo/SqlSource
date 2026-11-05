@@ -37,7 +37,7 @@ internal static class SqlParameterList
         List<SqlParseError> warnings
     )
     {
-        var (sql, occurrences, tokens, variables) = query;
+        var (sql, occurrences, tokens, variables, _) = query;
         if (sql.Parameters.Length == 0 && declarations.Count == 0 && markerDefaults.Count == 0)
         {
             return EquatableArray<SqlQueryParameter>.Empty;

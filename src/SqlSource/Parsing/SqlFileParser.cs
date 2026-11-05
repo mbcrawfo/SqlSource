@@ -344,12 +344,17 @@ internal static class SqlFileParser
             var tokenDefaults = scope?.TokenDefaults ?? [];
             var tokens = SqlTokenList.Create(text, sql, scanned.Occurrences, tokenDefaults, _errors);
 
-            // A variable is written in the SQL where it is declared, so SQL without parameters declares none.
+            // A variable is written in the SQL where it is declared, so SQL without parameters declares none, and has
+            // no use to classify.
             var variables =
                 sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
+            var uses =
+                sql.Parameters.Length == 0
+                    ? ImmutableArray<SqlParameterUse>.Empty
+                    : SqlListUses.Find(text, lexemes, start, end, rules);
             var parameters = SqlParameterList.Create(
                 rules,
-                new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables),
+                new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables, uses),
                 tokenDefaults,
                 scope?.Declarations ?? [],
                 _errors,
