@@ -172,10 +172,12 @@ The design asks that the SQL of each request made from the renamed query equal t
 
 `EngineRenamings.For` is a switch over `DatabaseEngine`, each arm on a line of its own, and the one place that names an engine's part.  Both arms give null, the arm of `PostgreSql` marked `// Built by 10.2.` and that of `SqlServer` `// Built by 10.3.`, and null means a bundle of that engine cannot be renamed.
 
-## PostgreSQL
+## Not built yet
 
-> **Not built yet.**  How PostgreSQL's part of the renaming answers each member of `IEngineRenaming`.  Built in sub-phase 10.2 of the [phase 10 design](../superpowers/specs/2026-11-04-query-generation-phase-10-bug-reports-design.md#102-renaming-for-postgresql).
+### Renaming for PostgreSQL
 
-## SQL Server
+> **Not built yet.**  How PostgreSQL's part of the renaming answers each member of `IEngineRenaming`.  Delivered by sub-phase 10.2 of phase 10 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 
-> **Not built yet.**  How SQL Server's part of the renaming answers each member of `IEngineRenaming`.  Built in sub-phase 10.3 of the [phase 10 design](../superpowers/specs/2026-11-04-query-generation-phase-10-bug-reports-design.md#103-renaming-for-sql-server).
+### Renaming for SQL Server
+
+> **Not built yet.**  How SQL Server's part of the renaming answers each member of `IEngineRenaming`.  Delivered by sub-phase 10.3 of phase 10 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
