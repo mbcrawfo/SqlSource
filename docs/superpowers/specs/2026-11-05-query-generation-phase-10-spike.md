@@ -25,7 +25,7 @@ Appendix to [the phase 10 design](2026-11-04-query-generation-phase-10-bug-repor
 
 ### PostgreSQL
 
-Every member is kept but three, `deallocate.answer.error`, `partitions.answer.error` and, below, the plan's 28 keys not read.  `error` is the one record `PostgresServerError` of every answer, `{sqlState, message, detail, hint, position}`; its members are code only for every call (no capture holds one), and [finding 5](#5-messages-and-positions) says which of them decide.
+Every member is kept but `deallocate.answer.error`, `partitions.answer.error` and `relations.answer.error`, which only the log reads, the members of an error that only the failure's printed lines read, and, below, the plan's 28 keys not read.  `error` is the one record `PostgresServerError` of every answer, `{sqlState, message, detail, hint, position}`, code only for every call, since no capture holds one; [finding 5](#5-messages-and-positions) says which members decide.  Of an error that is kept, `sqlState` and `message` are kept, the message as the text step 10 writes, and `position` on `prepare` alone; `detail`, `hint` and the position of every other call are read by `PostgresErrors.ServerLines` alone, for the failure's `server:` lines, which a bundle does not hold, and are dropped.
 
 | Call | Request (key) | Answer: read | Answer: read, never moved `*` or code only `†` | Not read |
 |----|----|----|----|----|
@@ -33,7 +33,7 @@ Every member is kept but three, `deallocate.answer.error`, `partitions.answer.er
 | `prepare` | `statement`, `sql`, `types` | `parameterTypes` | `error†` | |
 | `columns` | `statement`, `parameters` | `columns[].{ordinal, name, typeOid, tableOid, attributeNumber, typeModifier}` | `columns[].{length, precision, scale}*`, `error†` | |
 | `tables` | `oids` | `tables[].{oid, relkind, schema, name, relhassubclass, hasForeignPartition, hasInsteadRule}`, `tables[].columns[].{attnum, name, notNull, identity, generated, typeOid, notNullValidated}` | `error†` | |
-| `relations` | `relations[].{schema, name}` | as `tables`, but `columns[].attnum` and `hasForeignPartition`, which only `tables` moved | `tables[].columns[].attnum*`, `tables[].hasForeignPartition*`, `error†` | |
+| `relations` | `relations[].{schema, name}` | as `tables`, but `columns[].attnum` and `hasForeignPartition`, which only `tables` moved | `tables[].columns[].attnum*`, `tables[].hasForeignPartition*` | `error` (logged alone) |
 | `partitions` | `relations[].{schema, name}` | `rows[].{schema, name, ancestors}` (7 realistic captures, no fixture) | | `error` (logged alone) |
 | `types` | `oids` | `rows[].{oid, typname, nspname, typtype, typcategory, typelem, typbasetype, rngsubtype, multirangeRngsubtype, formatType, enumLabels, typtypmod}` | `error†` | |
 | `spellings` | `pairs[].{oid, modifier}` | `rows[].{oid, modifier, formatType}` | `error†` | |
@@ -54,7 +54,7 @@ Every member is kept but three, `deallocate.answer.error`, `partitions.answer.er
 
 ### SQL Server
 
-Every member is kept but `declared.answer.rows[].columnOrdinal`.  `error` is `SqlServerServerError`, `errors[].{number, class, state, message}`, and a row error of `columns`, `declared`, `operands` and `table` is `SqlServerDescribeError`, `{number, type, message}`; both are code only for every call.
+Every member is kept but `declared.answer.rows[].columnOrdinal`, and an error row's `class` and `state`, which on the replay's path only the failure's printed line `Msg <n>, Level <class>, State <state>` reads; the live exchange reads `class` before anything is captured.  `error` is `SqlServerServerError`, `errors[].{number, class, state, message}`, and a row error of `columns`, `declared`, `operands` and `table` is `SqlServerDescribeError`, `{number, type, message}`; both are code only for every call.
 
 | Call | Request (key) | Answer: read | Answer: read, never moved `*` or code only `†` | Not read |
 |----|----|----|----|----|
@@ -73,7 +73,7 @@ The rows of `columns`, `operands` and `table` are one record, `SqlServerColumnRo
 1. **Read by the code, never moved, because no capture has the case**: every `error` of both engines, `check.answer.driverError`, and the elements of `overloads`' lists.  A bundle of a refused query holds them, and 10.2 and 10.3 build their tests of errors by hand, since no recorded case has one.
 2. **Read by the code, never moved, though the capture has a value**: PostgreSQL `columns[].{length, precision, scale}` (`ColumnFacets.Of`, which the type's modifier decides first in every case), `check.answer.{sent, textRefused}`, `open.driverVersion`, `relations`' `attnum` and `hasForeignPartition`; SQL Server `open.{driverVersion, engineEdition, settings}`, `columns`' `columnOrdinal` and `sourceServer`, and the members of `operands` and `table` above.
 3. **Moved only when removed**, as an answer that cannot be read, since the member is not nullable and its value is never used: PostgreSQL `check.columns[].dataTypeName`, `check.sent.parameters`, `open.settings[].value`, `relations`' `columns[].{generated, identity}` and `relkind`; SQL Server `open.settings[].{name, value}`.  The renaming keeps them, renamed by their field's rule.
-4. **Read by the log alone**, `not read`: `deallocate.answer.error`, `partitions.answer.error`, `declared.answer.rows[].columnOrdinal`.  No answer member moved an outcome that the code does not read on the replay path.
+4. **Read by the log alone**, `not read`: `deallocate.answer.error`, `partitions.answer.error`, `relations.answer.error` (`RelationsOfAsync` reads its `tables` alone and goes on without them), `declared.answer.rows[].columnOrdinal`.  **Read by the failure's printed lines alone**, `not read`: PostgreSQL's `detail`, `hint` and the `position` of every call but `prepare`, which `PostgresErrors.ServerLines` alone reads.  The mutation run counted both kinds as read, since it looked for any reader in the code; a member is kept only when a decision of the pipeline reads it.  No answer member moved an outcome that the code does not read on the replay path.
 
 ## 2. The plan's strings
 
@@ -184,14 +184,14 @@ No other request differs: the SQL of `prepare` with its `$n`, its type list, `ch
 
 1. **The tool's own aliases stay.**  A quoted name spelled as digits alone, `[1]`, is the `AS [n]` of `operands` and `declared`.
 2. **A list asked in name order is put in that order again** after renaming: `relations` and `partitions`, by schema, then name, ordinal.
-3. **`<alias>_<n>` is renamed through its alias**, `<renamed>_<n>`, when the alias is the query's or the plan's and `<alias>_<n>` itself is no name of either.
+3. **`<alias>_<n>` is renamed through its alias**, `<renamed>_<n>`, when `<alias>` is a name the renaming maps and `<alias>_<n>` itself is held by no catalog answer and does not occur in the query's SQL; it is always in the plan's `Alias`, so the plan is not asked.
 4. **`CTE <name>` in `Subplan Name` keeps `CTE`**, and renames the name as `CTE Name` is renamed.
 5. **A copy of a reused parameter is renamed through its parameter**, `<renamed><separator><n>`, as `ParameterCopies` makes it.
 6. **A name's nullability mark stays**: `"name!"` and `"name?"` keep their `!` and `?`, and PostgreSQL's own `?column?` stays whole.  The describer reads no mark, so the replay passes without it, but the generator would read the bundle's alias as another nullability.
 
 **What else the renaming had to know** that the design does not say:
 
-- **A table of fields for each call of each engine**: which strings are the tool's fixed texts (`statement`, `sqlsource_<n>`; `explain.settings`; the names and values of `open`'s settings but `search_path`; the versions; `assemblyQualifiedTypeName`), which are closed codes (`relkind`, `identity`, `generated`, `typtype`, `typcategory`, `sourceType`), which are type spellings to lex (`formatType`, `dataTypeName`, `systemTypeName`, SQL Server's `params`), which are labels, and which are catalog names with their class.  These are step 12's "strings the tool writes itself"; no field was met outside the table.
+- **A table of fields for each call of each engine**: which strings are the tool's fixed texts (`statement`, `sqlsource_<n>`; `explain.settings`; the names and values of `open`'s settings but `search_path`; the versions; the `assemblyQualifiedTypeName` of a system CLR type, `geometry`, `geography` or `hierarchyid`), which are closed codes (`relkind`, `identity`, `generated`, `typtype`, `typcategory`, `sourceType`), which are type spellings to lex (`formatType`, `dataTypeName`, `systemTypeName`, SQL Server's `params`), which are labels, and which are catalog names with their class.  These are step 12's "strings the tool writes itself"; no field was met outside the table.  The corpora hold no CLR type of the user's, whose `assemblyQualifiedTypeName` names the user's assembly and type: it is a name of the user's, renamed whole as one `y_` name, since the pipeline reads only whether it is null (`SqlServerTypes.MayBeClr`), on every row that carries it, `parameters`' `suggestedAssemblyQualifiedTypeName` and the rows of `declared`, `columns`, `operands` and `table`, whose `table` rows hold every column of the table, selected or not.
 - **A row of a system database is the engine's**: `msdb.dbo.sysjobs` has the schema `dbo`, so the test by schema of step 2 would rename `sysjobs` and `job_id`; its database says it is the engine's.
 - **The logical database of a query that no marker or setting names is the dialect's name**, `postgres` or `mssql`, a word of the tool's; it stays.
 - **`search_path`** is a list whose elements may be quoted; `$user`, `public` and `pg_catalog` stay.
@@ -205,8 +205,8 @@ Not exercised by the corpora: an error, so step 10 was written and never run; a 
 Every read in `src/SqlSource.Tool/Describing/` of `PostgresServerError.{Message, Detail, Hint, Position}`, `PostgresBindError.Message`, `SqlServerErrorRow.Message` and `SqlServerDescribeError.Message`, and every constant text the tool writes into an answer.
 
 - **The parameter a message names**: confirmed.  `PostgresErrors.NamedIn` takes the first `$n` of a `42P18` or `42P08` message, and a message without one moves the id from `SQLSRC226` or `SQLSRC227` to `SQLSRC225`.  `SqlServerErrors.NamedIn` takes each `@name` of every row, but only when the first row is `11502`, `11503`, `11506` or `11507`; it chooses which parameter `SQLSRC226` names, never the id, and takes a copy back to its parameter through `CopiedSql.ParameterOfCopy`, so a message and the `parameters` request's SQL are renamed alike.
-- **The four constant texts**: confirmed, and all four are PostgreSQL's.  `PostgresErrors.Open` compares an error with no SQLSTATE to `ConnectionErrors.MultiplexingRefused` and `ConnectionErrors.UnreadableTypes`; `PostgresErrors.Prepare` compares one with no SQLSTATE to `PostgresLive.StatementNotListed`, and `08P01` to `PostgresLive.TransactionRefused`.  SQL Server compares no text: it decides by `Number`, `Class`, `State` and `Type`.  Every other text of `ConnectionErrors` and `ConnectionTexts` is written into an answer and never compared, and holds nothing of the user's.
-- **Detail and hint are never read**, only copied into `ServerLines` and the log.
+- **The four constant texts**: confirmed, and all four are PostgreSQL's.  `PostgresErrors.Open` compares an error with no SQLSTATE to `ConnectionErrors.MultiplexingRefused` and `ConnectionErrors.UnreadableTypes`; `PostgresErrors.Prepare` compares one with no SQLSTATE to `PostgresLive.StatementNotListed`, and `08P01` to `PostgresLive.TransactionRefused`.  SQL Server compares no text: from a captured answer it decides by `Number` and `Type` alone.  Every other text of `ConnectionErrors` and `ConnectionTexts` is written into an answer and never compared, and holds nothing of the user's.
+- **Detail and hint are never read** by a decision, only copied into `ServerLines` and the log, so a bundle drops them.
 - **A message is copied too**: PostgreSQL's `SQLSRC225` and SQL Server's failures of `columns` and `declared` put the first message into the failure's `Arguments`, and every message is a `server:` line.  None of it is in `bundle.json`, which keeps a failure's id and step, and none reaches an entry.
 - **Two reads are of the live exchange alone** and never see a capture: `PostgresLive.RefusedTransaction` matches PgBouncer's text, and `ConnectionErrors.AtOpen` Npgsql's `No password has been provided`; each answers a constant.
 - **`Position` is read, and decides, which the design's constraint does not say.**  Only `prepare`'s is read.  It counts code points from one in the text of the `PREPARE`, the head `PREPARE <name> (<types>\n) AS ` and the request's `sql`, not in the query's sample SQL and not in `check`'s.  A position inside the head names the parameter whose declared type is at fault, `SQLSRC228` in place of `SQLSRC225`; one after it is printed as a character of the SQL.  A renamed declared type moves the head's end and every position after it, and a renamed name in the SQL every position after the name.  The positions of every other call are dropped when the answer is read.  SQL Server's errors have none.
@@ -243,14 +243,14 @@ Each test writes its tables to `$SPIKE10_OUT/spike10/results/`.
 **Amended in the design**, each marked there "(10.0, 2026-11-05)":
 
 - **The constraint on messages**: `Position` added, read for `prepare` alone; the four constants are PostgreSQL's; SQL Server's `NamedIn` reads only four numbers' rows.  Its "Verify first" is answered.
-- **Step 1**: the list is [finding 1](#1-the-fields-the-pipeline-reads); 28 plan keys are dropped; a member that is not nullable is kept even when its value is never read.
+- **Step 1**: the list is [finding 1](#1-the-fields-the-pipeline-reads); a member is kept when a decision reads it, and dropped when only the log or a failure's printed lines read it, as an error's detail and hint are; 28 plan keys are dropped; a member that is not nullable is kept even when its value is never read.
 - **Step 2**: the vocabulary is a committed list per engine, as [finding 3](#3-the-vocabulary) chose; the names the planner makes, and the engine's words found by the renaming; a row of a system database is the engine's; a word is folded before it is compared.
 - **Step 3**: the logical database that no marker or setting names stays; the class of a name the lexer finds first is its guess.
 - **Step 5**: a nullability mark stays.
 - **Step 8**: the tool's own `AS [n]`, a list asked in name order, and the copies of a reused parameter are derived by the pipeline's rule.
 - **Step 9**: a raw name key is renamed as one name; the planner's `<alias>_<n>` and `CTE <name>`.
 - **Step 10**: the position rule.
-- **Step 12**: the table of fields.
+- **Step 12**: the table of fields; a user's CLR type's assembly-qualified name renamed whole.
 - **Step 13**: two of the causes are caught by no miss, only by the whole entry.
 
 **For 10.1**: nothing changes its scope.  The renaming's engine-neutral part takes, from its engine's part, a table of fields, the derived requests of step 8 and the vocabulary.
