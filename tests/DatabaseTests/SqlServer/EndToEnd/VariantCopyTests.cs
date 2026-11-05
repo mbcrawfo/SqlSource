@@ -31,6 +31,8 @@ public sealed class VariantCopyTests
     [InlineData("Collections/Claimed.sql", "ListCollectedAccounts", "ListCollectedAccountsAsIReadOnlyCollection")]
     [InlineData("Collections/Claimed.sql", "ListCollectedAccounts", "ListCollectedAccountsAsList")]
     [InlineData("Collections/Claimed.sql", "ListCollectedAccounts", "ListCollectedAccountsAsImmutableList")]
+    [InlineData("Lists.sql", "ListAccountsByIds", "StreamAccountsByIds")]
+    [InlineData("Lists.sql", "ListAccountsByIds", "ListAccountsByIdsNoPadding")]
     public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy)
     {
         var queries = JsonNode

@@ -12,7 +12,7 @@ namespace SqlSource.Generation.Methods;
 internal static class ListNames
 {
     // A SQL Server parameter's name holds at most 128 characters, its @ among them, and an index at most four digits,
-    // since SQL Server takes no more than 2100 parameters.
+    // since a query sends SQL Server no more than 2098 parameters.
     private const int SqlServerLongestPrefix = 127 - 4;
 
     /// <summary>

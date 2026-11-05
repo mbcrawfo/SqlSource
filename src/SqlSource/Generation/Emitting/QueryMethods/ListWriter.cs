@@ -179,12 +179,14 @@ internal static class ListWriter
     // What the method's engine takes in one query, and what its message of the limit says.
     internal static EngineLimit LimitOf(in QueryMethodContext context) => LimitOf(context.Method.Engine);
 
-    // What the engine takes in one query, and what its message of the limit says.
+    // What the engine takes in one query, and what its message of the limit says.  Each limit is the most that runs,
+    // which the end-to-end tests of both engines pin: PostgreSQL's 65535 is Npgsql's too, and of the 2100 that SQL
+    // Server takes, SqlClient sends two to sp_executesql, the statement and its declarations, beside the method's.
     private static EngineLimit LimitOf(DatabaseEngine engine) =>
         engine switch
         {
             DatabaseEngine.PostgreSql => new EngineLimit(65535, "PostgreSQL", ", or send them as an array with = ANY"),
-            DatabaseEngine.SqlServer => new EngineLimit(2100, "SQL Server", ", or use a table-valued parameter"),
+            DatabaseEngine.SqlServer => new EngineLimit(2098, "SQL Server", ", or use a table-valued parameter"),
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
 

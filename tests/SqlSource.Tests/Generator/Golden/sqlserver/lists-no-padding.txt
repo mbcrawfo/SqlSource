@@ -77,12 +77,12 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListIds' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }

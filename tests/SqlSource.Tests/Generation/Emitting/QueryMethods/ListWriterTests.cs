@@ -9,7 +9,7 @@ public sealed class ListWriterTests
 {
     [Theory]
     [InlineData(nameof(DatabaseEngine.PostgreSql), 65535)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), 2100)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), 2098)]
     public void ParameterLimitOf_EachEngine_IsTheMostParametersItTakes(string engineName, int expected) =>
         ListWriter.ParameterLimitOf(System.Enum.Parse<DatabaseEngine>(engineName)).ShouldBe(expected);
 }

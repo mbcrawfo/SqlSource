@@ -341,18 +341,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListIds' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -555,18 +555,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListExcept' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -772,12 +772,12 @@ namespace App
             var count1 = CountOf(ref list1);
             var size1 = global::System.Math.Max(count1, 1);
             var total = (long)size0 + size1;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListTwoLists' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in '"
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in '"
                         + (count1 > count0 ? "Owners" : "Ids")
                         + "', or use a table-valued parameter.",
                     "parameters"
@@ -786,7 +786,7 @@ namespace App
 
             var padded0 = PaddedSize(size0);
             var padded1 = PaddedSize(size1);
-            if (padded0 + padded1 <= 2100)
+            if (padded0 + padded1 <= 2098)
             {
                 size0 = padded0;
                 size1 = padded1;
@@ -1056,18 +1056,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListUsedTwice' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -1291,18 +1291,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = 2L + size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListOptional' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (2 + padded0 <= 2100)
+            if (2 + padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -1524,18 +1524,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListWithToken' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -1742,18 +1742,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = 1L + size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListBesideItsExpansionName' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (1 + padded0 <= 2100)
+            if (1 + padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -1964,18 +1964,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListKeepsComments' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -2178,18 +2178,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'StreamIds' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -2420,12 +2420,12 @@ namespace App
             var count1 = CountOf(ref list1);
             var size1 = global::System.Math.Max(count1, 1);
             var total = (long)size0 + size1;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListConverted' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in '"
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in '"
                         + (count1 > count0 ? "Emails" : "Ids")
                         + "', or use a table-valued parameter.",
                     "parameters"
@@ -2434,7 +2434,7 @@ namespace App
 
             var padded0 = PaddedSize(size0);
             var padded1 = PaddedSize(size1);
-            if (padded0 + padded1 <= 2100)
+            if (padded0 + padded1 <= 2098)
             {
                 size0 = padded0;
                 size1 = padded1;
@@ -2711,18 +2711,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListOneShape' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
@@ -2934,18 +2934,18 @@ namespace App
             var count0 = CountOf(ref list0);
             var size0 = global::System.Math.Max(count0, 1);
             var total = (long)size0;
-            if (total > 2100)
+            if (total > 2098)
             {
                 throw new global::System.ArgumentException(
                     "The query 'ListAmounts' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2100.  Pass fewer values in 'Amounts', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Amounts', or use a table-valued parameter.",
                     "parameters"
                 );
             }
 
             var padded0 = PaddedSize(size0);
-            if (padded0 <= 2100)
+            if (padded0 <= 2098)
             {
                 size0 = padded0;
             }
