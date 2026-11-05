@@ -38,6 +38,13 @@ public sealed class SqlRenamerTests
         return replacement;
     }
 
+    // The dialect of a theory's row, which names it as a query file does.
+    private static SqlDialect DialectOf(string name)
+    {
+        SqlDialectName.TryParse(name, out var choice).ShouldBeTrue(name);
+        return choice.Dialect;
+    }
+
     [Fact]
     public void Rename_Words_KeepsEngineWordsAndRenamesTheRest()
     {
@@ -108,9 +115,40 @@ public sealed class SqlRenamerTests
         Of(mapping, "Users", quoted: true).ShouldNotBe(Of(mapping, "users"));
     }
 
-    [Fact]
-    public void Rename_Numbers_AreKept() =>
-        Rename("SELECT 1, 2.5, 1e10, .5, 0x1F").ShouldBe("SELECT 1, 2.5, 1e10, .5, 0x1F");
+    [Theory]
+    [InlineData("postgres")]
+    [InlineData("mssql")]
+    public void Rename_Numbers_AreKept(string dialect)
+    {
+        const string Numbers = "SELECT 1, 2.5, 1e10, 1e5, .5, 1.5E-3, 1.5e-3, 2E+4, 1_000, 1_000.000_1, 1., 1.e5, 2-1";
+
+        Rename(Numbers, DialectOf(dialect)).ShouldBe(Numbers);
+    }
+
+    // A run that starts with a digit and is no number is refused whole: PostgreSQL before 15 reads 1users as 1 AS
+    // users, and a hex or binary constant holds a value as a string does.
+    [Theory]
+    [InlineData("postgres", "SELECT 1users", "1users")]
+    [InlineData("postgres", "SELECT 2secret_column FROM t", "2secret_column")]
+    [InlineData("postgres", "SELECT 1.users", "1.users")]
+    [InlineData("postgres", "SELECT 1e5users", "1e5users")]
+    [InlineData("postgres", "SELECT 1e", "1e")]
+    [InlineData("postgres", "SELECT 1e+", "1e")]
+    [InlineData("postgres", "SELECT 1_", "1_")]
+    [InlineData("postgres", "SELECT 1__000", "1__000")]
+    [InlineData("postgres", "SELECT 1.2.3", "1.2.3")]
+    [InlineData("postgres", "SELECT 0x1F", "0x1F")]
+    [InlineData("postgres", "SELECT 0b101", "0b101")]
+    [InlineData("mssql", "SELECT 0x7365637265743132", "0x7365637265743132")]
+    [InlineData("mssql", "SELECT 1users", "1users")]
+    public void Rename_RunFromADigitThatIsNoNumber_IsRefused(string dialect, string sql, string token)
+    {
+        var (renamer, _, refusals) = Renamer(DialectOf(dialect));
+
+        _ = renamer.Rename(sql, NameClass.Alias, Place, refusals.Add);
+
+        refusals.ShouldHaveSingleItem().ShouldBe(new RenamingRefusal(RefusalStep.Token, Place, token));
+    }
 
     [Fact]
     public void Rename_SqlServerPrefixes_AreKeptBeforeTheRenamedRest() =>

@@ -219,13 +219,8 @@ internal sealed partial class TokenCheck
         _mapping.IsReplacement(token)
         || _engine.IsEngineWord(token, quoted)
         || _mapping.IsKept(token, quoted)
-        || IsNumber(token);
+        || SqlRenamer.IsNumber(token);
 
     private static bool IsPunctuation(string token) =>
         token.Length == 1 && SqlRenamer.Punctuation.Contains(token[0], StringComparison.Ordinal);
-
-    private bool IsNumber(string token) =>
-        token.Length > 0
-        && char.IsAsciiDigit(token[0])
-        && token.All(character => _engine.IsWordPart(character) || character == '.');
 }

@@ -24,7 +24,8 @@ internal interface IEngineRenaming
 
     /// <summary>
     /// Whether a character starts a word in a <see cref="SqlLexemeKind.Text" /> lexeme, by the engine's own rule.
-    /// An ASCII digit is read as the start of a number before this is asked, so its answer for one is never read.
+    /// An ASCII digit is read as the start of a run that must be a number before this is asked, so its answer for one
+    /// is never read.
     /// </summary>
     bool IsWordStart(char character);
 

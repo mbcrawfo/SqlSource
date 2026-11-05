@@ -109,7 +109,8 @@ internal sealed partial class TokenCheck
         Words(text, marker.ValueSpan.End, marker.Span.End, quoteFollows: false, place);
     }
 
-    // Plain text: numbers, white space and punctuation pass, and each word must be safe.
+    // Plain text: numbers, white space and punctuation pass, a run from a digit that is no number is refused, and each
+    // word must be safe.
     private void Words(string text, int start, int end, bool quoteFollows, string place)
     {
         var at = start;
@@ -118,11 +119,13 @@ internal sealed partial class TokenCheck
             var character = text[at];
             if (char.IsAsciiDigit(character))
             {
-                at++;
-                while (at < end && (_engine.IsWordPart(text[at]) || text[at] == '.'))
+                var runEnd = SqlRenamer.NumberRunEnd(_engine, text, at, end);
+                if (!SqlRenamer.IsNumber(text.AsSpan(at, runEnd - at)))
                 {
-                    at++;
+                    Refuse(place, text[at..runEnd]);
                 }
+
+                at = runEnd;
             }
             else if (_engine.IsWordStart(character))
             {

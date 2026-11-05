@@ -38,14 +38,111 @@ internal sealed partial class SqlRenamer(
     /// </summary>
     internal const string UnnamedColumn = "?column?";
 
+    /// <summary>
+    /// The end of the run that the ASCII digit at <paramref name="start" /> begins, before <paramref name="end" />: the
+    /// engine's word parts, <c>.</c>, and a sign right after <c>e</c> or <c>E</c> and before a digit.  The run is kept
+    /// when <see cref="IsNumber" /> says it is a number, and refused whole otherwise, since an engine may read the
+    /// rest as a name, as PostgreSQL before 15 reads <c>1users</c> as <c>1 AS users</c>, or as a value, as a hex or
+    /// binary constant holds one.  The SQL renamer and the token check both split a run by this.
+    /// </summary>
+    internal static int NumberRunEnd(IEngineRenaming engine, string text, int start, int end)
+    {
+        var at = start + 1;
+        while (at < end)
+        {
+            var character = text[at];
+            var exponentSign =
+                character is '+' or '-'
+                && text[at - 1] is 'e' or 'E'
+                && at + 1 < end
+                && char.IsAsciiDigit(text[at + 1]);
+            if (!engine.IsWordPart(character) && character != '.' && !exponentSign)
+            {
+                break;
+            }
+
+            at++;
+        }
+
+        return at;
+    }
+
+    /// <summary>
+    /// Whether a text is a number, the one rule of the SQL renamer and the token check: ASCII digits, then optionally
+    /// <c>.</c> and digits, then optionally <c>e</c> or <c>E</c>, a sign and digits, the sign optional.  Each group of
+    /// digits may hold one <c>_</c> between two digits, as PostgreSQL 16 reads <c>1_000</c>; the digits after
+    /// <c>.</c> may be none, as in <c>1.</c>.
+    /// </summary>
+    internal static bool IsNumber(ReadOnlySpan<char> text)
+    {
+        var at = DigitsEnd(text, 0);
+        if (at == 0)
+        {
+            return false;
+        }
+
+        if (at < text.Length && text[at] == '.')
+        {
+            at = DigitsEnd(text, at + 1);
+        }
+
+        if (at < text.Length && text[at] is 'e' or 'E')
+        {
+            at++;
+            if (at < text.Length && text[at] is '+' or '-')
+            {
+                at++;
+            }
+
+            var digits = DigitsEnd(text, at);
+            if (digits == at)
+            {
+                return false;
+            }
+
+            at = digits;
+        }
+
+        return at == text.Length;
+    }
+
+    // The end of the digits from the index, each _ between two of them; the index itself when no digit is there.
+    private static int DigitsEnd(ReadOnlySpan<char> text, int at)
+    {
+        if (at >= text.Length || !char.IsAsciiDigit(text[at]))
+        {
+            return at;
+        }
+
+        at++;
+        while (at < text.Length)
+        {
+            if (char.IsAsciiDigit(text[at]))
+            {
+                at++;
+            }
+            else if (text[at] == '_' && at + 1 < text.Length && char.IsAsciiDigit(text[at + 1]))
+            {
+                at += 2;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return at;
+    }
+
     private readonly IEngineRenaming _engine = engine;
     private readonly NameMapping _mapping = mapping;
     private readonly SqlDialectRules _rules = SqlDialectRules.For(engine.Dialect);
 
     /// <summary>
     /// The SQL renamed.  A new word is of the class given, or a function before <c>(</c> unless the class is
-    /// <see cref="NameClass.Type" />.  SQL that does not lex, or a character that is no word, number, white space or
-    /// punctuation, is a refusal of <see cref="RefusalStep.Token" /> at the place.
+    /// <see cref="NameClass.Type" />.  SQL that does not lex, a character that is no word, number, white space or
+    /// punctuation, or a run from a digit that is no number, is a refusal of <see cref="RefusalStep.Token" /> at the
+    /// place.
     /// </summary>
     /// <param name="sql">The SQL.</param>
     /// <param name="newWords">The class of a name that the mapping does not hold yet.</param>
@@ -186,12 +283,13 @@ internal sealed partial class SqlRenamer(
                 }
                 else if (char.IsAsciiDigit(character))
                 {
-                    at++;
-                    while (at < end && (engine.IsWordPart(text[at]) || text[at] == '.'))
+                    var runEnd = NumberRunEnd(engine, text, at, end);
+                    if (!IsNumber(text.AsSpan(at, runEnd - at)))
                     {
-                        at++;
+                        Refuse(text[at..runEnd]);
                     }
 
+                    at = runEnd;
                     _into.CopyTo(at);
                 }
                 else if (engine.IsWordStart(character))
