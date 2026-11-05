@@ -1,5 +1,6 @@
 using System.Linq;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using Xunit;
 
@@ -13,7 +14,7 @@ public sealed class BundleJsonTests
         BundleVersion: 1,
         Renamed: true,
         ToolVersion: "1.4.0",
-        FormatVersion: 3,
+        FormatVersion: SidecarFormat.Version,
         Engine: "postgres",
         ServerVersion: "18.6",
         DriverVersion: "Npgsql 9.0.3",
@@ -67,6 +68,27 @@ public sealed class BundleJsonTests
         read.Failure.Descriptor.Id.ShouldBe("SQLSRC289");
         read.Failure.Path.ShouldBe(Path);
         read.Failure.Arguments.ToArray().ShouldBe(["bundleVersion", "2", "1"]);
+    }
+
+    // A sidecar format newer than this tool writes is a bundle of a newer tool, whose remedy is the same.
+    [Fact]
+    public void Read_FormatVersionNewerThanThisToolWrites_IsSqlsrc289()
+    {
+        var read = BundleJson.Read(BundleJson.Write(Info with { FormatVersion = SidecarFormat.Version + 1 }), Path);
+
+        read.Succeeded.ShouldBeFalse();
+        read.Failure.Descriptor.Id.ShouldBe("SQLSRC289");
+        read.Failure.Path.ShouldBe(Path);
+        read.Failure.Arguments.ToArray().ShouldBe(["formatVersion", "2", "1"]);
+    }
+
+    // An older sidecar format is one an older tool wrote, and is read.
+    [Fact]
+    public void Read_FormatVersionOlderThanThisToolWrites_IsRead()
+    {
+        var older = Info with { FormatVersion = SidecarFormat.Version - 1 };
+
+        BundleJson.Read(BundleJson.Write(older), Path).Value.ShouldBe(older);
     }
 
     [Theory]

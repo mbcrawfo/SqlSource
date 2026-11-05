@@ -3137,7 +3137,7 @@ See: [Checking a bundle with `replay`](tool.md#replay)
 
 **Bundle is of a newer version**
 
-The bundle was made by a newer version of `sqlsource` than the one you run, in a form that this version does not know.  The message names the member that is newer, `bundleVersion` or `captureVersion`, the number the bundle has and the number this version reads.
+The bundle was made by a newer version of `sqlsource` than the one you run, in a form that this version does not know.  The message names the member that is newer, `bundleVersion` or `captureVersion`, or `formatVersion`, the sidecar format that the bundle's answer is written in, then the number the bundle has and the number this version reads.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip

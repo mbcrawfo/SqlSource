@@ -22,7 +22,10 @@ internal static class BundleErrors
 
     /// <summary><c>SQLSRC289</c>: a version of the bundle's form is newer than this tool reads.</summary>
     /// <param name="path">The bundle's full path.</param>
-    /// <param name="member">The member that holds the version: <c>bundleVersion</c> or <c>captureVersion</c>.</param>
+    /// <param name="member">
+    /// The member that holds the version: <c>bundleVersion</c>, <c>captureVersion</c>, or <c>formatVersion</c>, the
+    /// sidecar format of the expected answer.
+    /// </param>
     /// <param name="found">The version the bundle has.</param>
     /// <param name="read">The version this tool reads.</param>
     public static ToolDiagnostic OfNewerTool(string path, string member, int found, int read) =>

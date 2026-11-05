@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using Xunit;
 
@@ -15,7 +16,7 @@ public sealed class BundleWriterTests
             BundleVersion: 1,
             Renamed: true,
             ToolVersion: "1.4.0",
-            FormatVersion: 3,
+            FormatVersion: SidecarFormat.Version,
             Engine: "postgres",
             ServerVersion: "18.6",
             DriverVersion: "Npgsql 9.0.3",

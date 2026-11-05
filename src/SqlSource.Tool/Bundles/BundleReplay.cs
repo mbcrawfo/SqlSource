@@ -226,8 +226,9 @@ internal static class BundleReplay
 
     /// <summary>
     /// What the bundle says describing its query gave: the one entry of <c>expected.json</c>, else the failure of
-    /// <c>bundle.json</c>, else null.  An <c>expected.json</c> that is no sidecar this tool reads, or that does not
-    /// hold exactly one entry, is <c>SQLSRC288</c>.
+    /// <c>bundle.json</c>, else null.  An <c>expected.json</c> of a sidecar format newer than this tool reads is
+    /// <c>SQLSRC289</c>, as a folder may have no <c>bundle.json</c> to say it; one that is no sidecar this tool reads
+    /// otherwise, or that does not hold exactly one entry, is <c>SQLSRC288</c>.
     /// </summary>
     /// <remarks>
     /// The entry has no <see cref="SidecarEntry.NameSpan" />, as one that a replay gives has none, so that the two are
@@ -253,6 +254,13 @@ internal static class BundleReplay
 
         if (read.Sidecar is not { } sidecar)
         {
+            if (read.FormatVersion is { } version && version > SidecarFormat.Version)
+            {
+                return Outcome<ReplayOutcome?, ToolDiagnostic>.Failed(
+                    BundleErrors.OfNewerTool(path, SidecarKeys.FormatVersion, version, SidecarFormat.Version)
+                );
+            }
+
             return Failed<ReplayOutcome?>(
                 path,
                 $"{BundleFiles.Expected} is of the sidecar format {read.FormatVersion}, and this version of "

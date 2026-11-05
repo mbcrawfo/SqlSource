@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
@@ -18,7 +19,7 @@ public sealed class BundleReaderTests : IDisposable
         BundleVersion: 1,
         Renamed: true,
         ToolVersion: "1.4.0",
-        FormatVersion: 3,
+        FormatVersion: SidecarFormat.Version,
         Engine: "postgres",
         ServerVersion: "18.6",
         DriverVersion: null,

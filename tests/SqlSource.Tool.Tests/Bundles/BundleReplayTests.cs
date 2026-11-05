@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
@@ -46,6 +47,14 @@ public sealed class BundleReplayTests
         }
 
         return BundleReplays.WithCapture(bundle, cut);
+    }
+
+    // The bundle with its expected.json of another sidecar format.
+    private static Bundle WithFormatVersion(Bundle bundle, int version)
+    {
+        var sidecar = JsonNode.Parse(bundle.Expected.ShouldNotBeNull()).ShouldNotBeNull();
+        sidecar["formatVersion"] = version;
+        return bundle with { Expected = sidecar.ToJsonString() };
     }
 
     [Theory]
@@ -360,6 +369,33 @@ public sealed class BundleReplayTests
         error.Arguments.ToArray().ShouldBe(["expected.json holds 2 entries, and a bundle's holds one"]);
     }
 
+    // The expected answer of a newer sidecar format is a bundle of a newer tool, as a folder without bundle.json says.
+    [Fact]
+    public void ExpectedOf_SidecarOfANewerFormat_IsSqlsrc289()
+    {
+        var bundle = WithFormatVersion(BundleReplays.OfCase("postgres", "select-plain"), SidecarFormat.Version + 1);
+
+        var error = BundleReplay.ExpectedOf(bundle, Path).Failure.ShouldNotBeNull();
+
+        error.Descriptor.Id.ShouldBe("SQLSRC289");
+        error.Path.ShouldBe(Path);
+        error.Arguments.ToArray().ShouldBe(["formatVersion", "2", "1"]);
+    }
+
+    // One of an older format is no sidecar this tool reads, and no newer tool reads it either.
+    [Fact]
+    public void ExpectedOf_SidecarOfAnOlderFormat_IsSqlsrc288()
+    {
+        var bundle = WithFormatVersion(BundleReplays.OfCase("postgres", "select-plain"), SidecarFormat.Version - 1);
+
+        var error = BundleReplay.ExpectedOf(bundle, Path).Failure.ShouldNotBeNull();
+
+        error.Descriptor.Id.ShouldBe("SQLSRC288");
+        error
+            .Arguments.ToArray()
+            .ShouldBe(["expected.json is of the sidecar format 0, and this version of sqlsource reads 1"]);
+    }
+
     [Fact]
     public void ExpectedOf_SidecarThatIsMalformed_IsSqlsrc288()
     {
@@ -376,7 +412,7 @@ public sealed class BundleReplayTests
             BundleVersion: 1,
             Renamed: false,
             ToolVersion: "1.4.0",
-            FormatVersion: 1,
+            FormatVersion: SidecarFormat.Version,
             Engine: engine,
             ServerVersion: "18.6",
             DriverVersion: null,

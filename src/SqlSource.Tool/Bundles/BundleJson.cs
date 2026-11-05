@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Bundles;
@@ -15,7 +16,8 @@ namespace SqlSource.Tool.Bundles;
 /// and with the relaxed encoder, so a reader sees a version's quotes and angle brackets as they are.  Its keys are
 /// the members of <see cref="BundleInfo" /> in camel case, and its <c>outcome</c> an object with a <c>kind</c>, and an
 /// <c>id</c> and a <c>step</c> for a failure.  A <c>bundleVersion</c> newer than <see cref="Version" /> is named
-/// before any other member is read, since a newer form may have changed them.
+/// before any other member is read, since a newer form may have changed them.  A <c>formatVersion</c> newer than the
+/// sidecar format this tool writes is named once the file reads, since the bundle's expected answer is of that format.
 /// </remarks>
 internal static class BundleJson
 {
@@ -86,7 +88,8 @@ internal static class BundleJson
 
     /// <summary>
     /// Reads the file of a bundle's info, or gives the error at the bundle: <c>SQLSRC289</c> for a
-    /// <c>bundleVersion</c> newer than this tool reads, and <c>SQLSRC288</c> naming what else is wrong.
+    /// <c>bundleVersion</c> or a <c>formatVersion</c> newer than this tool reads, and <c>SQLSRC288</c> naming what
+    /// else is wrong.
     /// </summary>
     /// <param name="text">The text of <c>bundle.json</c>.</param>
     /// <param name="path">The full path of the bundle, where the error is.</param>
@@ -139,8 +142,16 @@ internal static class BundleJson
         var operatingSystem = members.String(OperatingSystemKey);
         var outcome = members.Object(OutcomeKey) is { } element ? ReadOutcome(element, members) : null;
 
-        return members.Wrong is { } wrong
-            ? Failed(path, wrong)
+        if (members.Wrong is { } wrong)
+        {
+            return Failed(path, wrong);
+        }
+
+        // The sidecar format is versioned apart from the bundle's form, so a newer one is named once the file reads.
+        return formatVersion > SidecarFormat.Version
+            ? Outcome<BundleInfo, ToolDiagnostic>.Failed(
+                BundleErrors.OfNewerTool(path, FormatVersionKey, formatVersion.Value, SidecarFormat.Version)
+            )
             : Outcome<BundleInfo, ToolDiagnostic>.Of(
                 new BundleInfo(
                     version!.Value,

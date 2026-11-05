@@ -398,6 +398,49 @@ public sealed class ReplayTests : IDisposable
     }
 
     [Fact]
+    public async Task Replay_BundleJsonOfANewerSidecarFormat_IsSqlsrc289()
+    {
+        var folder = CopyCase("postgres", "select-plain");
+        WriteText(
+            Path.Combine(folder, BundleFiles.Info),
+            BundleJson.Write(InfoOf("postgres") with { FormatVersion = SidecarFormat.Version + 1 })
+        );
+
+        var result = await _run.RunAsync("replay", "case");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"{folder} : error SQLSRC289: The bundle's formatVersion is 2, and this version of sqlsource reads 1\n"
+                    + Expected.See("SQLSRC289")
+            )
+        );
+    }
+
+    // A folder without bundle.json, whose expected answer alone says the format.
+    [Fact]
+    public async Task Replay_ExpectedOfANewerSidecarFormat_IsSqlsrc289()
+    {
+        var folder = CopyCase("postgres", "select-plain");
+        var path = Path.Combine(folder, BundleFiles.Expected);
+        var sidecar = JsonNode.Parse(ReadText(path)).ShouldNotBeNull();
+        sidecar["formatVersion"] = SidecarFormat.Version + 1;
+        WriteText(path, sidecar.ToJsonString());
+
+        var result = await _run.RunAsync("replay", "case");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"{folder} : error SQLSRC289: The bundle's formatVersion is 2, and this version of sqlsource reads 1\n"
+                    + Expected.See("SQLSRC289")
+            )
+        );
+    }
+
+    [Fact]
     public async Task Replay_NothingAtThePath_IsSqlsrc288()
     {
         var result = await _run.RunAsync("replay", "missing.zip");
