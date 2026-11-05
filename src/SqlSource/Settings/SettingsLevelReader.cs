@@ -168,18 +168,13 @@ internal static class SettingsLevelReader
         ref TSource source,
         SettingId setting,
         List<int> invalid,
-        List<(int Index, int First)>? repeated = null
+        List<(int Index, int First)> repeated
     )
         where TSource : struct, ISettingSource
     {
         foreach (var index in invalid)
         {
             source.InvalidPart(setting, index);
-        }
-
-        if (repeated is null)
-        {
-            return;
         }
 
         foreach (var (index, first) in repeated)

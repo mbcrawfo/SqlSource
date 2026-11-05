@@ -13,12 +13,12 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generator;
 
 // The settings files, sqlsource.json, that apply to a .sql file's folder and every folder below it.  The dialect comes
-// from the header's marker, then the chain of the file's folder, and the parse's keep-comments from the chain's list.
-// Every other setting comes from the markers, then the attribute, then the chain, nearest file first; the type
-// override and the column types merge per key across them, the nearer file's entry ranking above the farther's.  A
-// type's nested class comes from the attribute, then the chain of the type's C# file.  A settings file's problems are
-// reported at its line and column when the chain of the folder of some .sql file or C# file reaches it.  Nothing that
-// MSBuild tells the generator is a setting.
+// from the header's marker, then the chain of the file's folder, and the parse takes keep-comments from the chain's
+// state of it.  Every other setting comes from the markers, then the attribute, then the chain, nearest file first;
+// the generator parameters merge per parameter across them, and the type override and the column types per key, the
+// nearer file's entry ranking above the farther's.  A type's nested class comes from the attribute, then the chain of
+// the type's C# file.  A settings file's problems are reported at its line and column when the chain of the folder of
+// some .sql file or C# file reaches it.  Nothing that MSBuild tells the generator is a setting.
 public sealed class SettingsFileTests
 {
     // ANSI and MySQL read the backticks as the quotes of an identifier, and the comment starts after it.  PostgreSQL

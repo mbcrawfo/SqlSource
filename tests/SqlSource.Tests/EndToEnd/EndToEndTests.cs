@@ -93,15 +93,15 @@ public sealed class EndToEndTests
     [Theory]
     [InlineData("")]
     [InlineData(" \t")]
-    public void ProjectWithValidationOff_QueryWithItsOwnList_RejectsAnArgumentWithoutText(string filter) =>
+    public void ProjectWithValidationOff_QueryThatResetsItsParameters_RejectsAnArgumentWithoutText(string filter) =>
         Should.Throw<ArgumentException>(() => TokenQueries.Checked("users", filter)).ParamName.ShouldBe("filter");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithItsOwnList_RejectsANullArgument() =>
+    public void ProjectWithValidationOff_QueryThatResetsItsParameters_RejectsANullArgument() =>
         Should.Throw<ArgumentNullException>(() => TokenQueries.Checked(null!, "1 = 1")).ParamName.ShouldBe("table");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithItsOwnList_ReturnsTheSqlForArgumentsWithText() =>
+    public void ProjectWithValidationOff_QueryThatResetsItsParameters_ReturnsTheSqlForArgumentsWithText() =>
         TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
 
     // The sqlsource.json of this folder sets the dialect to postgres.  ANSI would end the string at the quote after the
@@ -125,16 +125,18 @@ public sealed class EndToEndTests
     public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
         DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
-    // The header of Kept.sql lists no-token-validation and keep-comments as the generator parameters.  That the comment
-    // is there shows the header reaching the generator and replacing the settings file's list.
+    // The header of Kept.sql gives every generator parameter its default, then turns no-token-validation and
+    // keep-comments on.  The settings file does not keep comments, so that the comment is there shows the header
+    // reaching the generator and turning keep-comments on over the settings file.
     [Fact]
-    public void ProjectWithParameters_FileWithAHeader_UsesTheListOfItsHeader() =>
+    public void ProjectWithParameters_FileWithAHeader_KeepsTheCommentItsHeaderTurnsOn() =>
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
-    // Plain.sql has no header, so the settings file's list applies.  Without keep-comments it leaves the comment out,
-    // and with no-token-validation the method takes the blank text of its token, which it would throw on otherwise.
+    // Plain.sql has no header, so the settings file's generator parameters apply.  Without keep-comments it leaves the
+    // comment out, and with no-token-validation the method takes the blank text of its token, which it would throw on
+    // otherwise.
     [Fact]
-    public void ProjectWithParameters_FileWithoutAHeader_UsesTheListOfTheSettingsFile() =>
+    public void ProjectWithParameters_FileWithoutAHeader_UsesTheParametersOfTheSettingsFile() =>
         ParameterQueries.Plain("").ShouldBe("SELECT 2   AS two;");
 
     [Fact]
