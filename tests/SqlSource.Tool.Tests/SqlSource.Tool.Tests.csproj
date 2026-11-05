@@ -34,6 +34,12 @@
         -->
         <None Remove="Fixtures/Describers/**" />
         <None Include="Fixtures/Describers/**" CopyToOutputDirectory="PreserveNewest" />
+        <!--
+            Fixtures/Bundles holds the bug-report bundles that are replayed, under a folder for each engine: a bundle's
+            files as they unzip.  Fixtures/BundleCases.cs of tests/SqlSource.Tool.Testing finds them in the output.
+        -->
+        <None Remove="Fixtures/Bundles/**" />
+        <None Include="Fixtures/Bundles/**" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
     <Import Project="../Fixtures.props" />
     <ItemGroup>

@@ -39,7 +39,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 - `Describers`, which opens a describer's session as a run does, and `DescribeRequests`, which builds the `DescribeRequest` of a test;
 - `PasswordFiles`, which skips a test of a password file, and `Environments`, an environment of a test's own for what is handed `ToolHost.GetEnvironmentVariable`;
 - the named answers of a column's nullability, `NullabilityAnswers`, and PostgreSQL's type modifiers, `Typmods`;
-- in `Fixtures/`, the harness of a describer's fixtures, `FixtureCase`, `FixtureCases`, `FixtureReplay`, the case writer `FixtureCaseFiles` and `FixtureCaseRuns`, which describes a case against a server and compares it with its `expected.json` or records it, and `FixtureProjects`, which copies a fixture project and runs `dotnet msbuild` or, through `BuildAsync`, `dotnet build` on it;
+- in `Fixtures/`, the harness of a describer's fixtures, `FixtureCase`, `FixtureCases`, `BundleCases`, `FixtureReplay`, the case writer `FixtureCaseFiles` and `FixtureCaseRuns`, which describes a case against a server and compares it with its `expected.json` or records it, and `FixtureProjects`, which copies a fixture project and runs `dotnet msbuild` or, through `BuildAsync`, `dotnet build` on it;
 - `ToolProcess`, which runs the built tool's `describe` in a process of its own on a copy of a fixture project and checks its output and its sidecar, and `ErrorPaths`, which runs the error paths of `--check` and of a refused query on a copy of the fixture project `ErrorPaths`, with an `ErrorPathEngine` for the statements and describers of an engine, and `OnlineBuilds`, which builds a copy of `ErrorPaths` online against the engine's server with the tool and the generator built beside the tests;
 - in `Realistic/`, what a realistic corpus of any engine shares: `RealisticCorpus`, each engine's corpus, its files, its settings files (`ProjectSettingsFile` and `CasesSettingsFile`) and its cases, `RealisticEngine`, `RealisticCase`, `RealisticCaseReader`, `RealisticSampleChecks`, `RealisticSample`, which builds a sample as the reader builds one, for the tests of both engines, `RealisticDescriptions`, `RealisticNoise`, `RealisticClaims`, which reads the claims of a corpus's `RealisticMethods.cs`, `RealisticModels`, which finds a case's models and its method in an engine's assembly, `RealisticGeneration`, which runs the generator in process on a case's query at `Models`, for the SQL of its run through Dapper and for the refusal of its models, `RealisticCalls`, which checks and calls a case's method, `RealisticInputs`, which builds the input model of a sample and the arguments Dapper is given from it, for which the library references Dapper, and `RealisticDescribe`, which describes a case on an engine's database `realistic`, and the bodies of the checks both engines' realistic tests run, `RealisticFolderChecks`, `RealisticClaimChecks`, `RealisticDescriptionChecks`, `RealisticNullabilityChecks`, which takes the engine's oracle as a delegate and whose answer is `NullabilityRun`, and `RealisticRefusalChecks`.  Each engine's project binds them in its `Realistic/RealisticCases.cs`.
 
@@ -167,6 +167,18 @@ A change that is meant to change what the generator writes updates the corpus:
 ## The database projects
 
 The four projects of [`tests/DatabaseTests/`](DatabaseTests/README.md) run against a real server, and reference [the harness](DatabaseTests/README.md#the-harness) in `tests/DatabaseTests/TestHarness`; its readme has their table, how to run one on another image, and [the Npgsql 8 project](DatabaseTests/README.md#the-npgsql-8-project) and [the SqlClient 6.1 project](DatabaseTests/README.md#the-sqlclient-61-project), the two that pin the oldest supported driver.
+
+## Bundle fixtures
+
+`tests/SqlSource.Tool.Tests/Fixtures/Bundles/<engine>/<case>/` holds the bundles of bug reports that `sqlsource replay` is tested on, a folder for each case under the folder of its engine, `postgres` or `mssql`.  A case holds the files of a bundle as they unzip: `bundle.json`, `query.sql`, `capture.json`, and `expected.json` when the query was described.  `bundle.json` says what describing it gave: an entry, which `expected.json` holds, or a failure, with its id and its step.  Its tool, runtime and system are the fixed text `fixture`, so a case does not change with the machine that made it.
+
+The tool's tests alone replay a case, without a database, and `BundleCasesTests` checks that each gives what its folder expects.  No container test describes one, and `tools/record-fixtures.sh` never records one again.  When the capture's form moves past a case, it is deleted, and the case it showed is tested again by hand.  The folder is `text eol=lf` in `.gitattributes`, as the describers' fixtures are.
+
+To make a case of a bug report's bundle:
+
+1. Unzip it into `tests/SqlSource.Tool.Tests/Fixtures/Bundles/<engine>/<case>/`, naming the case for what it shows.
+2. Keep its `bundle.json`, and never add the `.mapping.json` file of a renamed bundle: a case is replayed from the files alone.
+3. Run `dotnet test --project tests/SqlSource.Tool.Tests -- --filter-class "*BundleCasesTests"`.  The case must give what its `bundle.json` and `expected.json` say.
 
 ## Fixture projects
 
