@@ -3152,14 +3152,14 @@ See: [Checking a bundle with `replay`](tool.md#replay)
 
 **Bundle does not answer a question of the query**
 
-`sqlsource replay` runs the query from what the bundle holds, and the bundle has no answer to something that the query asks.  The message names the question, the version of `sqlsource` that made the bundle, and the version you run.  This happens when you run a version other than the one that made the bundle, since a different version can ask something the other never did.  An unzipped folder without the bundle's own description file, `bundle.json`, says `another version of sqlsource`, since it does not tell which version made it.
+`sqlsource replay` runs the query from what the bundle holds, and the bundle has no answer to something that the query asks.  The message names the question, the version of `sqlsource` that made the bundle, and the version you run.  This happens when you run a version other than the one that made the bundle, since a different version can ask something the other never did.  It also happens when a file of the bundle was edited by hand or damaged, so that an answer it holds can no longer be read.  An unzipped folder without the bundle's own description file, `bundle.json`, says `another version of sqlsource`, since it does not tell which version made it.
 
 ```console
 $ dotnet sqlsource replay /work/report.zip
 /work/report.zip : error SQLSRC290: The bundle has no answer to 'columns' that the query asks: it was made by sqlsource 1.4.0, and this is sqlsource 1.6.0
 ```
 
-Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and replay the bundle again.  When the message says `another version of sqlsource`, ask the person who made the bundle which version it was.
+Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and replay the bundle again.  When the message says `another version of sqlsource`, ask the person who made the bundle which version it was.  When it names the same version twice, the bundle was edited by hand or damaged, and installing another version does not help: ask the person who made the bundle for it again, since a bundle edited by hand cannot be replayed.
 
 See: [Checking a bundle with `replay`](tool.md#replay)
 
