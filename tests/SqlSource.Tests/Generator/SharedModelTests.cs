@@ -915,6 +915,28 @@ public sealed class SharedModelTests
         run.Sources["App.IdFilter-Model.g.cs"].ShouldContain("IEnumerable<int> Ids");
     }
 
+    // A list is an IEnumerable of its element and a scalar is the element, so a model of one name differs.
+    [Fact]
+    public void SharedInputModel_ListAndScalarOfOneName_IsSqlsrc257()
+    {
+        var a = new SqlFile(APath, "-- name: FindA\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id IN @ids;\n");
+        var b = new SqlFile(BPath, "-- name: FindB\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id = @ids;\n");
+
+        var run = Run(
+            Source,
+            [
+                a,
+                Sidecars.Of(a, Entry(a, "FindA", [Parameter("ids")], null)),
+                b,
+                Sidecars.Of(b, Entry(b, "FindB", [Parameter("ids")], null)),
+            ]
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC257 /app/Repo/B.sql(2,1)");
+        run.Diagnostics[0]
+            .ShouldContain("the property 'Ids' is 'int' here and 'System.Collections.Generic.IEnumerable<int>' there");
+    }
+
     // GetA in A and GetB in B, each with the -- output-model: marker of the name, then the markers given.
     private static (SqlFile A, SqlFile B) OfOneName(string aMarkers, string bMarkers, string name = "UserRow") =>
         (

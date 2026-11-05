@@ -20,8 +20,6 @@ public sealed class ModelPropertyTypeTests
 {
     private const string ParamsModel = "App.FindIdsParams-Model.g.cs";
 
-    private const string ListModel = ParamsModel;
-
     private const string Enumerable = "global::System.Collections.Generic.IEnumerable<";
 
     private static readonly PostgresType IntArray = ArrayOf(Int4, "_int4");
@@ -221,7 +219,7 @@ public sealed class ModelPropertyTypeTests
         var run = RunList(Enum.Parse<OutputKind>(output), "id IN @ids", "", nullable: null);
 
         run.ShouldBeClean();
-        run.Sources[ListModel].ShouldContain("public sealed record FindIdsParams(" + Enumerable + "int> Ids);");
+        run.Sources[ParamsModel].ShouldContain("public sealed record FindIdsParams(" + Enumerable + "int> Ids);");
     }
 
     [Fact]
@@ -230,7 +228,7 @@ public sealed class ModelPropertyTypeTests
         var run = RunList(OutputKind.CodeGen, "(@ids IS NULL OR id IN @ids)", "", nullable: null);
 
         run.ShouldBeClean();
-        run.Sources[ListModel].ShouldContain("(" + Enumerable + "int>? Ids);");
+        run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "int>? Ids);");
     }
 
     // The tool writes the marker's null into the sidecar, as nullable.
@@ -242,7 +240,7 @@ public sealed class ModelPropertyTypeTests
         var run = RunList(Enum.Parse<OutputKind>(output), "id IN @ids", "-- param: @ids null\n", nullable: true);
 
         run.ShouldBeClean();
-        run.Sources[ListModel].ShouldContain("(" + Enumerable + "int>? Ids);");
+        run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "int>? Ids);");
     }
 
     [Fact]
@@ -257,7 +255,7 @@ public sealed class ModelPropertyTypeTests
         );
 
         run.ShouldBeClean();
-        run.Sources[ListModel].ShouldContain("(" + Enumerable + "global::App.AccountId> Ids);");
+        run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "global::App.AccountId> Ids);");
     }
 
     [Fact]
@@ -266,7 +264,7 @@ public sealed class ModelPropertyTypeTests
         var run = RunList(OutputKind.CodeGen, "id IN @ids", "-- type-override: int4=long\n", nullable: null);
 
         run.ShouldBeClean();
-        run.Sources[ListModel].ShouldContain("(" + Enumerable + "long> Ids);");
+        run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "long> Ids);");
     }
 
     // A list of a library's type is an IEnumerable of the library's type at CodeGen and of the base map's without it.
@@ -292,7 +290,7 @@ public sealed class ModelPropertyTypeTests
         );
 
         run.ShouldBeClean();
-        run.Sources[ListModel].ShouldContain("(" + expected + ");");
+        run.Sources[ParamsModel].ShouldContain("(" + expected + ");");
     }
 
     // FindIds, whose @ids is a list of integers, the predicate and the markers given, with the parameter's
