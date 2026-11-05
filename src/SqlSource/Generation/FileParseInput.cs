@@ -19,7 +19,8 @@ namespace SqlSource.Generation;
 /// </param>
 /// <param name="CommentsWanted">
 /// Whether the level the parser cannot see, the chain of the file's folder, turns <c>keep-comments</c> on.  A query
-/// keeps its comments when it does, unless the query's markers or its file header turn it off.
+/// keeps its comments when it does, unless the query's markers or its file header turn it off, and when they turn it
+/// on, whatever the chain says.
 /// </param>
 internal sealed record FileParseInput(
     AdditionalText File,
