@@ -157,7 +157,7 @@ Hover over a generated member to see the SQL it holds.  It is the SQL you wrote,
 - Optimizer hints are kept: `/*+ ... */` and `/*! ... */`, and where the dialect is theirs, MariaDB's `/*M! ... */` and Oracle's `--+ ...`.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect: see [dialects](dialects.md).
 - Every line ending becomes `\n`, so the SQL does not depend on how the file was checked out.
-- A query parameter such as `@id` stays as written.  A token such as `{{table}}` is replaced when your code asks for the SQL, or when the query's method runs it: see [parameters and tokens](parameters-and-tokens.md).
+- A query parameter such as `@id` stays as written.  A token such as `{{table}}` is replaced when your code asks for the SQL, or when the query's method runs it, and a [list](parameters-and-tokens.md#list-parameters), `IN @ids`, is written as one parameter for each value when the query's method runs it: see [parameters and tokens](parameters-and-tokens.md).
 
 <a id="markers-in-the-wrong-place"></a>
 

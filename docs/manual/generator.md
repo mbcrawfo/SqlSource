@@ -405,7 +405,7 @@ A parameter's is its [`-- param:` marker](parameters-and-tokens.md#param-marker)
 
 A PostgreSQL array parameter of a query whose output is `codegen` has the type `IEnumerable<T>` of its element, `IEnumerable<int>` for an `int4[]`, in place of `T[]`, and the query method sends any sequence: see [array parameters](postgresql.md#array-parameters).  A column's property, and a parameter's in a query whose output is `models`, stay `T[]`.
 
-A [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, has the type `IEnumerable<T>` of its values' C# type in every output: `IEnumerable<int>` for a list of `integer`.  Its values' type is found as a parameter's is, and is never nullable.
+A [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, has the type `IEnumerable<T>` of its values' C# type under `codegen` and `models`: `IEnumerable<int>` for a list of `integer`.  Its values' type is found as a parameter's is, and is never nullable.
 
 <a id="model-nullability"></a>
 
@@ -556,7 +556,7 @@ namespace App
 GetUserDto? user = await connection.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](settings.md#setting-output) is `codegen`, the default, gets an asynchronous method that runs it, in place of its constant or token method.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, here one row or null, by its [result shape](sql-files.md#result-shapes).  It runs on ADO.NET's `DbConnection`, through the driver your project references, Npgsql for PostgreSQL and Microsoft.Data.SqlClient for SQL Server, and uses no reflection and no library of SqlSource's.  Its SQL is a constant inside the method, which your code cannot reach: a project that runs a query's SQL itself, through Dapper or its own code, gives it the output `models`.
+A query whose [output](settings.md#setting-output) is `codegen`, the default, gets an asynchronous method that runs it, in place of its constant or token method.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, here one row or null, by its [result shape](sql-files.md#result-shapes).  It runs on ADO.NET's `DbConnection`, through the driver your project references, Npgsql for PostgreSQL and Microsoft.Data.SqlClient for SQL Server, and uses no reflection and no library of SqlSource's.  Its SQL is built inside the method, from the query's text, its [tokens](parameters-and-tokens.md#tokens) and its [lists](parameters-and-tokens.md#list-parameters), and your code cannot reach it: a project that runs a query's SQL itself, through Dapper or its own code, gives it the output `models`.
 
 <a id="which-methods"></a>
 
