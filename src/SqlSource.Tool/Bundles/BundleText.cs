@@ -10,8 +10,9 @@ namespace SqlSource.Tool.Bundles;
 /// </summary>
 /// <remarks>
 /// Every control character but the tab, those of C0, DEL and those of C1, is written as <c>\uXXXX</c> in upper case,
-/// as the JSON writer writes one, so a line of an event and a line of an error spell it alike.  A line break is one of
-/// them, so the text stays on its line.  Nothing else is changed: a text that a JSON writer wrote holds no control
+/// the JSON writer's long form; the JSON writer writes <c>\b</c>, <c>\t</c>, <c>\n</c>, <c>\f</c> and <c>\r</c> in
+/// their short form, so a quoted value of an event spells those five otherwise.  A line break is one of them, so the
+/// text stays on its line.  Nothing else is changed: a text that a JSON writer wrote holds no control
 /// character, and comes out as it went in.
 /// </remarks>
 internal static class BundleText
