@@ -88,6 +88,19 @@ public sealed class NameMappingTests
     }
 
     [Fact]
+    public void Keep_AfterName_KeepsTheReplacement()
+    {
+        var mapping = Mapping();
+        var replacement = mapping.Name("users", false, NameClass.Table);
+
+        mapping.Keep("users", false);
+
+        mapping.Name("users", false, NameClass.Table).ShouldBe(replacement);
+        mapping.TryGet("users", false, out var found).ShouldBeTrue();
+        found.ShouldBe(replacement);
+    }
+
+    [Fact]
     public void TryGet_UnknownSpelling_IsFalse() => Mapping().TryGet("x", false, out _).ShouldBeFalse();
 
     [Fact]

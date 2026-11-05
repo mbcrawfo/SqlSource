@@ -11,7 +11,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// <remarks>
 /// A replacement is the class's prefix and the HMAC-SHA256 of the class word and the folded spelling, keyed by the
 /// run's key and cut to eight lower-case hex digits; a replacement that is already given lengthens by two digits
-/// until it is free.  A spelling that is kept maps to itself and wins over a later <see cref="Name" />.
+/// until it is free.  A spelling that is kept maps to the spelling first kept, wins over a later <see cref="Name" />
+/// and carries no class; one that already has a replacement keeps it.
 /// </remarks>
 internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fold)
 {
@@ -19,6 +20,7 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
     private const string HexDigits = "0123456789abcdef";
 
     private readonly Dictionary<string, MappedName> _byKey = [with(StringComparer.Ordinal)];
+    private readonly Dictionary<string, string> _kept = [with(StringComparer.Ordinal)];
     private readonly Dictionary<string, MappedName> _literals = [with(StringComparer.Ordinal)];
     private readonly HashSet<string> _replacements = [with(StringComparer.Ordinal)];
     private readonly List<MappedName> _names = [];
@@ -30,6 +32,11 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
     public string Name(string spelling, bool quoted, NameClass cls)
     {
         var folded = fold(spelling, quoted);
+        if (_kept.TryGetValue(folded, out var kept))
+        {
+            return kept;
+        }
+
         if (_byKey.TryGetValue(folded, out var found))
         {
             return found.Replacement;
@@ -41,14 +48,30 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
         return made.Replacement;
     }
 
-    /// <summary>Keeps a spelling as it is: the engine's own name, which maps to itself.</summary>
-    public void Keep(string spelling, bool quoted) =>
-        _ = _byKey.TryAdd(fold(spelling, quoted), new MappedName(spelling, NameClass.Token, spelling));
+    /// <summary>
+    /// Keeps a spelling as it is: the engine's own name, which maps to itself.  Nothing changes for a spelling that
+    /// already has a replacement or is kept already.
+    /// </summary>
+    public void Keep(string spelling, bool quoted)
+    {
+        var folded = fold(spelling, quoted);
+        if (!_byKey.ContainsKey(folded))
+        {
+            _ = _kept.TryAdd(folded, spelling);
+        }
+    }
 
     /// <summary>Whether a spelling has a replacement, and what it is; a kept spelling is its own.</summary>
     public bool TryGet(string spelling, bool quoted, out string replacement)
     {
-        if (_byKey.TryGetValue(fold(spelling, quoted), out var found))
+        var folded = fold(spelling, quoted);
+        if (_kept.TryGetValue(folded, out var kept))
+        {
+            replacement = kept;
+            return true;
+        }
+
+        if (_byKey.TryGetValue(folded, out var found))
         {
             replacement = found.Replacement;
             return true;
