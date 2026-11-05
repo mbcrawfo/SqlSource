@@ -179,14 +179,21 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         description.Parameters.ShouldBe([new DescribedParameter("ids", Int, SidecarValues.TypeSource.Inferred)]);
     }
 
+    // The two uses are two copies, which the tool unifies.
     [Fact]
     public async Task DescribeAsync_ListUsedTwice_IsDescribed()
     {
         var description = await ShouldDescribeAsync(
-            Planned("mssql", "SELECT id FROM dbo.orders WHERE id IN @ids OR user_id IN @ids")
+            Planned(
+                "mssql",
+                "SELECT u.id FROM dbo.users u JOIN dbo.orders o ON o.user_id = u.id "
+                    + "WHERE u.id IN @ids OR o.user_id IN @ids"
+            )
         );
 
-        description.Parameters.Select(parameter => parameter.Name).ShouldBe(["ids"]);
+        description.Parameters.ShouldBe([
+            new DescribedParameter("ids", Int, SidecarValues.TypeSource.InferredFromCopies),
+        ]);
     }
 
     [Theory]

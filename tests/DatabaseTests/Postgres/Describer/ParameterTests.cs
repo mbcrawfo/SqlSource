@@ -327,10 +327,13 @@ public sealed class ParameterTests(PostgresDatabases postgres)
     public async Task DescribeAsync_ListUsedTwice_IsDescribed()
     {
         var parameters = await ShouldDescribeAsync(
-            DescribeRequests.Planned("postgres", "SELECT id FROM orders WHERE id IN @ids OR user_id IN @ids")
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id FROM users u JOIN orders o ON o.user_id = u.id WHERE u.id IN @ids OR o.user_id IN @ids"
+            )
         );
 
-        parameters.Select(parameter => parameter.Name).ShouldBe(["ids"]);
+        parameters.ShouldBe([Inferred("ids", TestSidecars.Postgres())]);
     }
 
     // An assignment gives a parameter the column's own type, so every base type of the schema is reached through
