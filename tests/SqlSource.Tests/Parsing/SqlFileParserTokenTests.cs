@@ -11,15 +11,21 @@ namespace SqlSource.Tests.Parsing;
 public sealed class SqlFileParserTokenTests
 {
     [Theory]
-    // The query's own list decides, whatever the file's input says.
+    // The query's own state of keep-comments decides, whatever the file's input says.
     [InlineData("-- name: Q\n-- generator: keep-comments\nSELECT 1 -- c\n", false, "SELECT 1 -- c")]
-    [InlineData("-- name: Q\n-- generator: sort-input\nSELECT 1 -- c\n", true, null)]
+    [InlineData("-- name: Q\n-- generator: keep-comments=off\nSELECT 1 -- c\n", true, null)]
     [InlineData("-- name: Q\n-- generator: default\nSELECT 1 -- c\n", true, null)]
-    // The preamble's list, for a query without one.
+    // The preamble's, for a query that does not name it.
     [InlineData("-- generator: keep-comments\n-- name: Q\nSELECT 1 -- c\n", false, "SELECT 1 -- c")]
+    [InlineData(
+        "-- generator: keep-comments\n-- name: Q\n-- generator: sort-input\nSELECT 1 -- c\n",
+        false,
+        "SELECT 1 -- c"
+    )]
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1 -- c\n", true, null)]
-    [InlineData("-- generator: sort-input\n-- name: Q\nSELECT 1 -- c\n", true, null)]
-    // No list at all: the file's input.
+    // Neither names it: the file's input.
+    [InlineData("-- name: Q\n-- generator: sort-input\nSELECT 1 -- c\n", true, "SELECT 1 -- c")]
+    [InlineData("-- generator: sort-input\n-- name: Q\nSELECT 1 -- c\n", true, "SELECT 1 -- c")]
     [InlineData("-- name: Q\nSELECT 1 -- c\n", true, "SELECT 1 -- c")]
     [InlineData("-- name: Q\nSELECT 1 -- c\n", false, null)]
     // Nothing to keep: one form serves.

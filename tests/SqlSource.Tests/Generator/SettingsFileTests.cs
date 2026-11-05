@@ -131,10 +131,11 @@ public sealed class SettingsFileTests
         run.Sources[GeneratorHarness.SampleFile].ShouldContain(KeptConstant);
     }
 
-    // The nearer file's list replaces the farther files' whole, the project's file's among them, so no level outside
-    // the nearer file can ask for comments, the form with them is not built and the constant has none.
+    // The nearer file's default gives every parameter its default over the farther files, the project's file among
+    // them, so no level outside the nearer file can ask for comments, the form with them is not built and the constant
+    // has none.
     [Fact]
-    public void Run_EmptyListInANearerFile_ParsesAndEmitsNoFormWithComments()
+    public void Run_DefaultInANearerFile_ParsesAndEmitsNoFormWithComments()
     {
         var run = Run(
             null,
@@ -145,7 +146,7 @@ public sealed class SettingsFileTests
                 ),
                 GeneratorHarness.SettingsFile(
                     "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                    """{"generatorParameters":[]}"""
+                    """{"generatorParameters":["default"]}"""
                 ),
                 new SqlFile(QueryPath, Kept),
             ],
@@ -270,28 +271,47 @@ public sealed class SettingsFileTests
         ModelFiles(run).ShouldBe(["App.GetUserParams-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
     }
 
-    // The nearer list has no keep-comments, so the farther file's does not reach the query.
+    // The nearer file names no-token-validation alone, so the farther file's keep-comments still reaches the query.
     [Fact]
-    public void Run_GeneratorParametersOfANearerFile_ReplaceTheFartherListWhole()
+    public void Run_GeneratorParametersOfANearerFile_MergeOverTheFartherPerParameter()
+    {
+        var type = RunUnderFarther( /*lang=json,strict*/
+            """{"generatorParameters":["no-token-validation"]}"""
+        );
+
+        type.ShouldContain(KeptConstant);
+        type.ShouldContain(" ListFrom(");
+        type.ShouldNotContain("ThrowIfNullOrWhiteSpace");
+    }
+
+    // The nearer file turns keep-comments off over the farther file's, and leaves the rest.
+    [Fact]
+    public void Run_GeneratorParameterTurnedOffInANearerFile_HidesTheFartherState()
+    {
+        var type = RunUnderFarther( /*lang=json,strict*/
+            """{"generatorParameters":["keep-comments=off"]}"""
+        );
+
+        type.ShouldContain(StrippedConstant);
+        type.ShouldNotContain("ThrowIfNullOrWhiteSpace");
+    }
+
+    // The query Kept and the query ListFrom with a token, under a farther file that turns keep-comments and
+    // no-token-validation on, and a nearer one of this text.
+    private static string RunUnderFarther(string nearer)
     {
         var run = Run(
             null,
             GeneratorHarness.SettingsFile(
                 FartherSettingsPath, /*lang=json,strict*/
-                """{"generatorParameters":["keep-comments"]}"""
+                """{"generatorParameters":["keep-comments", "no-token-validation"]}"""
             ),
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"generatorParameters":["no-token-validation"]}"""
-            ),
+            GeneratorHarness.SettingsFile(SettingsPath, nearer),
             new SqlFile(QueryPath, Kept + "\n-- name: ListFrom\nSELECT * FROM {{table}};\n")
         );
 
         run.ShouldBeClean();
-        var type = run.Sources[GeneratorHarness.SampleFile];
-        type.ShouldContain(StrippedConstant);
-        type.ShouldContain(" ListFrom(");
-        type.ShouldNotContain("ThrowIfNullOrWhiteSpace");
+        return run.Sources[GeneratorHarness.SampleFile];
     }
 
     // Within one place a key equal to the type's exactly beats a plain one that matches it ignoring case; the nearer
@@ -439,7 +459,7 @@ public sealed class SettingsFileTests
                 ),
                 GeneratorHarness.SettingsFile(
                     SettingsPath, /*lang=json,strict*/
-                    """{"generatorParameters":[]}"""
+                    """{"generatorParameters":["default"]}"""
                 ),
                 new SqlFile("/shared/Users.sql", Kept),
             ]

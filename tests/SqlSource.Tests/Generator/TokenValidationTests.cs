@@ -26,44 +26,48 @@ public sealed class TokenValidationTests
 
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
-    // The query's list replaces the file's, the file's beats the project's file, and the project's file alone decides
-    // last: the token is validated.
+    // The generator parameters merge per parameter: the query's state of no-token-validation beats the file's, the
+    // file's beats the project's file, and a level that does not name it leaves it to the one below.  Here the nearest
+    // level that names it leaves validation on, or none does: the token is validated.
     [Theory]
     // Nothing set.
     [InlineData(null, null, null)]
     // The project's file alone.
     [InlineData(null, null, "default")]
     [InlineData(null, null, "")]
-    // The file's list beats the project's file, with or without the switch.
+    // The file's state beats the project's file.
     [InlineData(null, "default", "no-token-validation")]
-    [InlineData(null, "keep-comments", "no-token-validation")]
-    // The query's list replaces the file's.
+    [InlineData(null, "no-token-validation=off", "no-token-validation")]
+    // The query's state beats the file's.
     [InlineData("default", null, "no-token-validation")]
     [InlineData("default", "no-token-validation", "no-token-validation")]
-    public void Run_MethodWhoseNearestListValidates_ChecksTheToken(
+    [InlineData("no-token-validation=default", "no-token-validation", null)]
+    public void Run_MethodWhoseNearestStateValidates_ChecksTheToken(
         string? queryGeneratorParameter,
         string? fileGeneratorParameter,
         string? projectFile
     ) => ListFromAt(queryGeneratorParameter, fileGeneratorParameter, projectFile).ShouldContain(Check);
 
-    // The same, where the nearest list that says anything turns validation off: the token is not checked.
+    // The same, where the nearest level that names no-token-validation turns it on: the token is not checked.
     [Theory]
     // The project's file alone.
     [InlineData(null, null, "no-token-validation")]
     [InlineData(null, null, " No-Token-Validation ")]
-    // The file's list.
+    // The file's state, or the project's file's under a file that does not name it.
     [InlineData(null, "no-token-validation", null)]
-    // The query's list replaces the file's.
+    [InlineData(null, "keep-comments", "no-token-validation")]
+    // The query's state beats the file's, or the file's reaches a query that does not name it.
     [InlineData("no-token-validation", null, null)]
     [InlineData("no-token-validation", "default", null)]
-    public void Run_MethodWhoseNearestListTurnsValidationOff_ChecksNothing(
+    [InlineData("sort-input", "no-token-validation", null)]
+    public void Run_MethodWhoseNearestStateTurnsValidationOff_ChecksNothing(
         string? queryGeneratorParameter,
         string? fileGeneratorParameter,
         string? projectFile
     ) => ListFromAt(queryGeneratorParameter, fileGeneratorParameter, projectFile).ShouldNotContain("Throw");
 
     [Fact]
-    public void Run_ProjectsFileOff_ChangesOnlyTheQueriesWithoutAGeneratorParameter()
+    public void Run_ProjectsFileOff_ChangesOnlyTheQueriesThatDoNotResetIt()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,

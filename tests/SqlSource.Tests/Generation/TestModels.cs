@@ -14,6 +14,14 @@ internal static class TestModels
 {
     public const string SourceFile = "/app/Repo/UserRepository.cs";
 
+    // A level that turns these generator parameters on and says nothing else.
+    public static SettingsLevel ParametersOn(GeneratorParameters parameters) =>
+        new() { Parameters = TurnedOn(parameters) };
+
+    // The generator parameters of a level that turns these on and names no other.
+    public static GeneratorParameterChoices TurnedOn(GeneratorParameters parameters) =>
+        GeneratorParameterChoices.None.With(parameters, GeneratorParameterState.On);
+
     public static LocationInfo AttributeLocation { get; } =
         new(SourceFile, new TextSpan(20, 10), new LinePositionSpan(new LinePosition(2, 1), new LinePosition(2, 11)));
 

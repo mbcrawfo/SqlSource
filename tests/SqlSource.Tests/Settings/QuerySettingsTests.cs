@@ -9,15 +9,13 @@ using Xunit;
 
 namespace SqlSource.Tests.Settings;
 
-// Every setting but the type override and the column types resolves by one rule: the most specific level that has a
-// value gives it.
+// Every setting but the generator parameters, the type override, the column types and the library types resolves by one
+// rule: the most specific level that has a value gives it.
 public sealed class QuerySettingsTests
 {
-    private static readonly SettingsLevel Keep = new() { Parameters = GeneratorParameters.KeepComments };
+    private static readonly SettingsLevel Keep = Turn(GeneratorParameters.KeepComments, GeneratorParameterState.On);
 
-    private static readonly SettingsLevel Sort = new() { Parameters = GeneratorParameters.SortInput };
-
-    private static readonly SettingsLevel Empty = new() { Parameters = GeneratorParameters.None };
+    private static readonly SettingsLevel Sort = Turn(GeneratorParameters.SortInput, GeneratorParameterState.On);
 
     // The place of a settings file, which a file's level holds.
     private static readonly SettingPlace SettingsFile = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
@@ -34,35 +32,72 @@ public sealed class QuerySettingsTests
     }
 
     [Fact]
-    public void Resolve_Parameters_ComeWholeFromTheMostSpecificLevelThatGivesAList()
+    public void Resolve_Parameters_MergePerOption()
     {
         QuerySettings.Resolve(SettingsLevel.None, Keep).KeepComments.ShouldBeTrue();
-        QuerySettings.Resolve(Keep, Sort).Parameters.ShouldBe(GeneratorParameters.KeepComments);
-        QuerySettings.Resolve(Empty, Keep).Parameters.ShouldBe(GeneratorParameters.None);
+        QuerySettings
+            .Resolve(Sort, Keep)
+            .Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.SortInput);
     }
+
+    [Fact]
+    public void Resolve_MarkersTurnAnOptionOff_OverTheFile()
+    {
+        var off = Turn(GeneratorParameters.KeepComments, GeneratorParameterState.Off);
+        var file = new SettingsLevel { Parameters = Keep.Parameters.Over(Sort.Parameters) };
+
+        var settings = QuerySettings.Resolve(off, file);
+
+        settings.KeepComments.ShouldBeFalse();
+        settings.Parameters.ShouldBe(GeneratorParameters.SortInput);
+    }
+
+    [Fact]
+    public void Resolve_MarkersThatReset_HideTheFile() =>
+        QuerySettings
+            .Resolve(new SettingsLevel { Parameters = GeneratorParameterChoices.Reset }, Keep)
+            .Parameters.ShouldBe(GeneratorParameterList.Defaults);
 
     [Fact]
     public void Resolve_NoTokenValidation_TurnsValidationOff() =>
         QuerySettings
-            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }, Keep)
+            .Resolve(Turn(GeneratorParameters.NoTokenValidation, GeneratorParameterState.On), Keep)
             .ValidateTokens.ShouldBeFalse();
 
     [Fact]
     public void Resolve_NoArrayPool_TurnsThePoolOff() =>
         QuerySettings
-            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoArrayPool }, Keep)
+            .Resolve(Turn(GeneratorParameters.NoArrayPool, GeneratorParameterState.On), Keep)
             .UseArrayPool.ShouldBeFalse();
 
     [Fact]
     public void Over_EachMember_ComesFromThisLevelWhenItHasOne()
     {
-        Keep.Over(Sort).ShouldBe(Keep);
+        var output = new SettingsLevel { Output = OutputKind.Sql };
+
+        output.Over(Sort).ShouldBe(new SettingsLevel { Output = OutputKind.Sql, Parameters = Sort.Parameters });
         SettingsLevel.None.Over(Sort).ShouldBeSameAs(Sort);
         Keep.Over(SettingsLevel.None).ShouldBeSameAs(Keep);
     }
 
     [Fact]
-    public void None_ComparedWithAnEmptyLevel_IsEqual() => new SettingsLevel().ShouldBe(SettingsLevel.None);
+    public void Over_Parameters_MergePerOption() =>
+        Keep.Over(Sort).Parameters.ShouldBe(Keep.Parameters.Over(Sort.Parameters));
+
+    [Fact]
+    public void KeepsComments_IsTheLevelsResolvedKeepComments()
+    {
+        Keep.KeepsComments.ShouldBeTrue();
+        Sort.KeepsComments.ShouldBeFalse();
+        SettingsLevel.None.KeepsComments.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void None_ComparedWithAnEmptyLevel_IsEqual()
+    {
+        new SettingsLevel().ShouldBe(SettingsLevel.None);
+        new SettingsLevel { Parameters = default }.ShouldBe(SettingsLevel.None);
+    }
 
     [Fact]
     public void Resolve_Output_IsCodeGenUnlessALevelSaysOtherwise()
@@ -452,4 +487,8 @@ public sealed class QuerySettingsTests
 
     private static SettingsLevel Columns(params ColumnType[] entries) =>
         new() { ColumnTypes = TestSidecars.Of(entries) };
+
+    // A level that gives the parameter that state, and says nothing else.
+    private static SettingsLevel Turn(GeneratorParameters parameter, GeneratorParameterState state) =>
+        new() { Parameters = GeneratorParameterChoices.None.With(parameter, state) };
 }

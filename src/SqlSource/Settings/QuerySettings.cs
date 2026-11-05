@@ -8,7 +8,7 @@ namespace SqlSource.Settings;
 /// The settings in effect for one query, from its markers and its file's level: the same for every type that claims
 /// its file.
 /// </summary>
-/// <param name="Parameters">The list of generator parameters.</param>
+/// <param name="Parameters">The generator parameters that are on.</param>
 /// <param name="Output">
 /// What is generated for the query: whether it needs an entry in its file's sidecar, and whether it gets models.
 /// </param>
@@ -72,13 +72,15 @@ internal readonly record struct QuerySettings(
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file
-    /// that has a setting gives it.  The type override, the column types and the library types are not among them:
+    /// that has a setting gives it.  The generator parameters merge per parameter instead: each is on or off as the
+    /// most specific level that names it says, else its default.  The type override, the column types and the library
+    /// types are not among them:
     /// <see cref="ResolveTypeOverrides" />, <see cref="ResolveColumnTypes" /> and <see cref="ResolveLibraries" /> give
     /// them.
     /// </summary>
     public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel file) =>
         new(
-            markers.Parameters ?? file.Parameters ?? GeneratorParameters.None,
+            markers.Parameters.Over(file.Parameters).Resolve(),
             markers.Output ?? file.Output ?? OutputKind.CodeGen,
             markers.InputModelSuffix ?? file.InputModelSuffix ?? DefaultInputModelSuffix,
             markers.OutputModelSuffix ?? file.OutputModelSuffix ?? DefaultOutputModelSuffix,

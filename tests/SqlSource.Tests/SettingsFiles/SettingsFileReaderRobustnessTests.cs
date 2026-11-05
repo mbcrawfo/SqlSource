@@ -79,7 +79,7 @@ public sealed class SettingsFileReaderRobustnessTests
         underUnknown.Errors.ShouldHaveSingleItem().Kind.ShouldBe(SettingsFileErrorKind.UnknownKey);
         asElement.Root.ShouldBe(false);
         asElement.Level.Output.ShouldBe(OutputKind.Models);
-        asElement.Level.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.SortInput);
+        asElement.Level.Parameters.Resolve().ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.SortInput);
         var wrongType = asElement.Errors.ShouldHaveSingleItem();
         wrongType.Kind.ShouldBe(SettingsFileErrorKind.WrongType);
         wrongType.Span.ShouldBe(new TextSpan(element.IndexOf("[[", StringComparison.Ordinal), 124));

@@ -5,6 +5,10 @@ namespace SqlSource.Settings;
 /// level that names nothing leaves every parameter to the levels below, and one that names an option decides it
 /// whatever they say.
 /// </summary>
+/// <remarks>
+/// Build a value through <see cref="None" />, <see cref="Reset" />, <see cref="With" /> and <see cref="Over" />, never
+/// the positional constructor, which does not hold <paramref name="On" /> to <paramref name="Named" />.
+/// </remarks>
 /// <param name="Named">The parameters this level gives a state.</param>
 /// <param name="On">
 /// The parameters this level turns on, always a subset of <paramref name="Named" />, so that equal choices compare

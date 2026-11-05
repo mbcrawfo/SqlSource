@@ -76,7 +76,8 @@ public sealed class EndToEndTests
         TokenQueries.Eight("1", "2", "3", "4", "5", "6", "7", "8").ShouldBe("SELECT 12, 3, 4, 5, 6, 7, 8, 1;");
 
     // The sqlsource.json of this folder lists sort-input and no-token-validation as the generator parameters, and
-    // Search has no list of its own.  That its method checks nothing shows the settings file reaching the generator.
+    // Search names no generator parameter of its own.  That its method checks nothing shows the settings file reaching
+    // the generator.
     [Theory]
     [InlineData("")]
     [InlineData("  ")]

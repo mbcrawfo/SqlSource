@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Tests.Generation;
 using Xunit;
 using static SqlSource.Tests.Parsing.ParseOf;
 
@@ -37,7 +38,9 @@ public sealed class SqlFileParserTests
         var block = Blocks(Text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("First. Second.");
-        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.NoTokenValidation);
+        block.Markers.Parameters.ShouldBe(
+            TestModels.TurnedOn(GeneratorParameters.KeepComments | GeneratorParameters.NoTokenValidation)
+        );
         Sql(block).ShouldBe("SELECT 1\nFROM t");
         Kept(block).ShouldBe("SELECT 1 -- c\nFROM t");
     }
@@ -95,9 +98,37 @@ public sealed class SqlFileParserTests
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
-        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        block.Markers.Parameters.StateOf(GeneratorParameters.KeepComments).ShouldBe(true);
         Sql(block).ShouldBe("SELECT 1");
         Kept(block).ShouldBe("-- kept\nSELECT 1");
+    }
+
+    [Theory]
+    [InlineData("-- name: A\n-- generator: keep-comments=off\nSELECT 1 -- dropped\n")]
+    [InlineData("-- generator: default\n\n-- name: A\nSELECT 1 -- dropped\n")]
+    public void Parse_QueryTurnsKeepCommentsOff_UnderAChainThatKeepsThem_DropsTheComment(string text)
+    {
+        var block = SqlFileParser.Parse(text, "Query.sql", commentsWanted: true).Blocks.ShouldHaveSingleItem();
+
+        Sql(block).ShouldBe("SELECT 1");
+        Kept(block).ShouldBeNull();
+    }
+
+    // A file without a name line is one query and one scope, so its generator lines are one level: a later line that
+    // turns keep-comments off contradicts an earlier one that turns it on, and overrides nothing.
+    [Fact]
+    public void Parse_FileWithoutANameLine_ItsGeneratorLinesAreOneLevel()
+    {
+        const string Text = "-- generator: keep-comments\n\n-- generator: keep-comments=off\nSELECT 1 -- kept\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    TextSpans.Of(Text, "keep-comments=off"),
+                    "keep-comments=off"
+                ),
+            ]);
     }
 
     [Theory]
@@ -221,7 +252,7 @@ public sealed class SqlFileParserTests
         var block = Blocks(text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("s");
-        block.Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
+        block.Markers.Parameters.ShouldBe(TestModels.TurnedOn(GeneratorParameters.NoTokenValidation));
         Sql(block).ShouldBe(expectedSql);
     }
 
@@ -306,7 +337,10 @@ public sealed class SqlFileParserTests
         windowsBlocks.Select(static block => block.Summary).ShouldBe(["S", null]);
         windowsBlocks
             .Select(static block => block.Markers.Parameters)
-            .ShouldBe([GeneratorParameters.NoTokenValidation, GeneratorParameters.NoTokenValidation]);
+            .ShouldBe([
+                TestModels.TurnedOn(GeneratorParameters.NoTokenValidation),
+                TestModels.TurnedOn(GeneratorParameters.NoTokenValidation),
+            ]);
     }
 
     [Theory]

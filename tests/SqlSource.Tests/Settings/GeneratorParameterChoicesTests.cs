@@ -60,13 +60,16 @@ public sealed class GeneratorParameterChoicesTests
     }
 
     [Fact]
-    public void Over_ResetAbove_HidesEveryLowerState() =>
-        GeneratorParameterChoices
-            .Reset.Over(
-                GeneratorParameterChoices.None.With(GeneratorParameters.KeepComments, GeneratorParameterState.On)
-            )
-            .Resolve()
-            .ShouldBe(GeneratorParameterList.Defaults);
+    public void Over_ResetAbove_HidesEveryLowerState()
+    {
+        var merged = GeneratorParameterChoices.Reset.Over(
+            GeneratorParameterChoices.None.With(GeneratorParameters.KeepComments, GeneratorParameterState.On)
+        );
+
+        merged.Named.ShouldBe(GeneratorParameterList.All);
+        merged.StateOf(GeneratorParameters.KeepComments).HasValue.ShouldBeTrue();
+        merged.Resolve().ShouldBe(GeneratorParameterList.Defaults);
+    }
 
     [Fact]
     public void With_TheSameStateTwice_IsEqual()

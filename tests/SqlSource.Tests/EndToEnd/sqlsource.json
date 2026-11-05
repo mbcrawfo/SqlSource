@@ -4,6 +4,6 @@
   // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models
   // would need a sidecar beside its file.
   "output": "Sql",
-  // Token validation is off, so that a query without a list of its own does not check its arguments.
+  // Token validation is off, so that a query whose markers do not turn it back on does not check its arguments.
   "generatorParameters": ["sort-input", "no-token-validation"],
 }

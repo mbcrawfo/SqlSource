@@ -10,7 +10,7 @@ Console.WriteLine($"constant: {Queries.GetUser}");
 // Without it, the empty argument throws.
 Console.WriteLine($"validation off: {Queries.ListUsers("users", "")}");
 
-// The query's own list, `default`, replaces the project's, so this one checks.
+// The query's `default` gives every generator parameter its default over the project's, so this one checks.
 try
 {
     _ = Queries.ListChecked("users", "");
@@ -21,7 +21,7 @@ catch (ArgumentException exception)
     Console.WriteLine($"validation on: {exception.GetType().Name} for {exception.ParamName}");
 }
 
-// The header of Kept.sql says keep-comments, as the second word of its list.
+// The header of Kept.sql gives every generator parameter its default, then turns keep-comments on.
 Console.WriteLine($"comments kept by the file header: {Queries.Kept}");
 
 // The project's dialect is postgres, and the header of ByHeader.sql says mysql.

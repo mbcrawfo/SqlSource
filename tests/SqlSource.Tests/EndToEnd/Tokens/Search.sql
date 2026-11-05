@@ -1,5 +1,5 @@
--- Queries with tokens.  The test project turns token validation off, so only Checked, whose own list is the default,
--- checks its arguments.
+-- Queries with tokens.  The test project turns token validation off, so only Checked, which gives every generator
+-- parameter its default, checks its arguments.
 
 -- name: Search -> many
 -- summary: Finds rows of a table.

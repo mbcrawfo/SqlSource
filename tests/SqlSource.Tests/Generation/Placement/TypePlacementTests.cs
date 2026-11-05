@@ -801,7 +801,7 @@ public sealed class TypePlacementTests
             markers: new SettingsLevel
             {
                 Output = output,
-                Parameters = parameters,
+                Parameters = TestModels.TurnedOn(parameters),
                 MemberLocation = location is { } written
                     ? new Placed<MemberLocation>(written, place ?? SettingPlace.FileHeader)
                     : null,

@@ -12,13 +12,15 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// The generator parameter no-array-pool: read at every level a list is, the nearest list replacing the farther ones
-// whole, and carried to the query's method as QueryMethod.UseArrayPool.  A many method that returns an array, a list,
-// an immutable array or one of their interfaces reads its rows into a pooled buffer without it and into a list or a
-// builder with it; every other method is written the same with it and without it.
+// The generator parameter no-array-pool: read at every level that gives generator parameters, the nearest level that
+// names it deciding, and carried to the query's method as QueryMethod.UseArrayPool.  A many method that returns an
+// array, a list, an immutable array or one of their interfaces reads its rows into a pooled buffer without it and into
+// a list or a builder with it; every other method is written the same with it and without it.
 public sealed class ArrayPoolParameterTests
 {
     private const string On = "no-array-pool";
+
+    private const string Off = "no-array-pool=off";
 
     private const string Other = "sort-input";
 
@@ -29,15 +31,17 @@ public sealed class ArrayPoolParameterTests
     [InlineData(null, null, null, null, true)]
     [InlineData(On, null, null, null, false)]
     [InlineData(On, Default, null, null, true)]
-    [InlineData(On, Other, null, null, true)]
+    [InlineData(On, Other, null, null, false)]
     [InlineData(null, On, null, null, false)]
     [InlineData(null, null, On, null, false)]
     [InlineData(Default, Other, On, null, false)]
     [InlineData(On, On, Default, null, true)]
-    [InlineData(null, null, On, Other, true)]
+    [InlineData(null, null, On, Other, false)]
     [InlineData(On, On, On, Default, true)]
     [InlineData(null, null, Default, On, false)]
-    public void Run_NoArrayPool_ComesWholeFromTheMostSpecificLevelThatGivesAList(
+    [InlineData(On, null, null, Off, true)]
+    [InlineData(Off, null, null, On, false)]
+    public void Run_NoArrayPool_ComesFromTheMostSpecificLevelThatNamesIt(
         string? projectFile,
         string? folderFile,
         string? preamble,

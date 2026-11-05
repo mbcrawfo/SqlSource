@@ -86,16 +86,29 @@ internal readonly struct SettingsFileSource(
         Add(SettingsFileErrorKind.InvalidValue, value.Spans[index], setting, value.Elements![index].Trim(), null);
     }
 
+    // A member is reported at its key, and an element at its string, each with the first one's text.
     public void RepeatedKey(SettingId setting, int index, int first)
     {
         var value = ValueOf(setting);
-        var members = value.Members!;
+        if (value.Members is { } members)
+        {
+            Add(
+                SettingsFileErrorKind.RepeatedKey,
+                value.KeySpans![index],
+                setting,
+                members[index].Key.Trim(),
+                members[first].Key.Trim()
+            );
+            return;
+        }
+
+        var elements = value.Elements!;
         Add(
             SettingsFileErrorKind.RepeatedKey,
-            value.KeySpans![index],
+            value.Spans[index],
             setting,
-            members[index].Key.Trim(),
-            members[first].Key.Trim()
+            elements[index].Trim(),
+            elements[first].Trim()
         );
     }
 

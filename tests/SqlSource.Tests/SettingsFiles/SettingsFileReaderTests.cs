@@ -62,7 +62,8 @@ public sealed class SettingsFileReaderTests
         file.Errors.ShouldBeEmpty();
         file.Root.ShouldBe(true);
         file.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.PostgreSql, SqlDialectOptions.None));
-        file.Level.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.AsyncMethodSuffix);
+        file.Level.Parameters.Resolve()
+            .ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.AsyncMethodSuffix);
         file.Level.TypeOverrides[DatabaseEngine.PostgreSql]
             .ShouldNotBeNull()
             .ShouldBe([
@@ -270,7 +271,7 @@ public sealed class SettingsFileReaderTests
         var parameters = SettingsFileReader.Read(Parameters, Place);
         var overrides = SettingsFileReader.Read(Overrides, Place);
 
-        parameters.Level.Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        parameters.Level.Parameters.Resolve().ShouldBe(GeneratorParameters.KeepComments);
         parameters.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.WrongType,
@@ -352,8 +353,8 @@ public sealed class SettingsFileReaderTests
         var withDefault = SettingsFileReader.Read(WithDefault, Place);
 
         empty.Errors.ShouldBeEmpty();
-        empty.Level.Parameters.ShouldBe(GeneratorParameters.None);
-        misspelt.Level.Parameters.ShouldBe(GeneratorParameters.SortInput);
+        empty.Level.ShouldBeSameAs(SettingsLevel.None);
+        misspelt.Level.Parameters.Resolve().ShouldBe(GeneratorParameters.SortInput);
         misspelt.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.InvalidValue,
@@ -363,20 +364,15 @@ public sealed class SettingsFileReaderTests
                 null
             ),
         ]);
-        withDefault.Level.Parameters.ShouldBeNull();
-        withDefault.Errors.ShouldBe([
-            new SettingsFileError(
-                SettingsFileErrorKind.InvalidValue,
-                Span(WithDefault, "\"default\""),
-                "generatorParameters",
-                "default",
-                null
-            ),
-        ]);
+        withDefault.Errors.ShouldBeEmpty();
+        withDefault.Level.Parameters.ShouldBe(
+            GeneratorParameterChoices.Reset.With(GeneratorParameters.SortInput, GeneratorParameterState.On)
+        );
     }
 
     // A wrong JSON type never sets a setting: an array whose every element is of the wrong type sets nothing, as an
-    // object of wrong-type members does.  [] is still the empty list: Read_GeneratorParameters_FollowTheElementRules.
+    // object of wrong-type members does, and as [] does, which names nothing:
+    // Read_GeneratorParameters_FollowTheElementRules.
     [Theory]
     [InlineData("generatorParameters", "[1]")]
     [InlineData("generatorParameters", "[1, {}]")]

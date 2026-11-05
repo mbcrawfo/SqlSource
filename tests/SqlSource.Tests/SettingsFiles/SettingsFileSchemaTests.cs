@@ -167,38 +167,22 @@ public sealed class SettingsFileSchemaTests
         Pattern(Properties.GetProperty(key)).ShouldBe(expected);
     }
 
+    // A parameter's name, alone or with a state, or default alone, as GeneratorParameterList.ReadWord reads a word.
     [Fact]
     public void Schema_PatternOfGeneratorParameters_IsGeneratedFromTheParameters()
     {
-        var names = GeneratorParameterList
-            .Names.Select(name => name.Name)
-            .Append(GeneratorParameterList.Default)
-            .Select(CaseFree);
-        var expected = @"^\s*(?:" + string.Join("|", names) + @")?\s*$";
+        var names = GeneratorParameterList.Names.Select(name => CaseFree(name.Name));
+        var states = Enum.GetValues<GeneratorParameterState>().Select(state => CaseFree(SettingValue.NameOf(state)));
+        var expected =
+            @"^\s*(?:(?:"
+            + string.Join("|", names)
+            + ")(?:=(?:"
+            + string.Join("|", states)
+            + "))?|"
+            + CaseFree(GeneratorParameterList.Default)
+            + @")?\s*$";
 
         Pattern(Properties.GetProperty(SettingsFileKeys.GeneratorParameters).GetProperty("items")).ShouldBe(expected);
-    }
-
-    // default stands alone: a list that holds it and a parameter is not valid, whatever else it holds.
-    [Fact]
-    public void Schema_DefaultBesideAParameter_IsGeneratedFromTheParameters()
-    {
-        var both = Properties
-            .GetProperty(SettingsFileKeys.GeneratorParameters)
-            .GetProperty("not")
-            .GetProperty("allOf")
-            .EnumerateArray()
-            .Select(branch => branch.GetProperty("contains"))
-            .ToArray();
-        var parameters = GeneratorParameterList.Names.Select(name => CaseFree(name.Name));
-
-        both.Length.ShouldBe(2);
-        both.ShouldAllBe(contains => contains.GetProperty("type").GetString() == "string");
-        both[0]
-            .GetProperty("pattern")
-            .GetString()
-            .ShouldBe(@"^\s*" + CaseFree(GeneratorParameterList.Default) + @"\s*$");
-        both[1].GetProperty("pattern").GetString().ShouldBe(@"^\s*(?:" + string.Join("|", parameters) + @")\s*$");
     }
 
     // A member whose key or type is empty or white space is not valid: the reader trims both.
@@ -369,6 +353,8 @@ public sealed class SettingsFileSchemaTests
     [InlineData(SettingsFileKeys.Dialect, "\"mysql , ansi-quotes\"")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"\"]")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"default\"]")]
+    [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \" Keep-Comments=OFF \", \"sort-input=Default\"]")]
+    [InlineData(SettingsFileKeys.GeneratorParameters, "[\"Sort-Input\", \"\", \" DEFAULT \", \"no-array-pool=on\"]")]
     [InlineData(
         SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
         "{\"nodaTime\": \"on\"}"
@@ -459,10 +445,13 @@ public sealed class SettingsFileSchemaTests
         """{"dialect": "mysql,,ansi-quotes"}"""
     )]
     [InlineData( /*lang=json,strict*/
-        """{"generatorParameters": ["default", "keep-comments"]}"""
+        """{"generatorParameters": ["keep-comments=maybe"]}"""
     )]
     [InlineData( /*lang=json,strict*/
-        """{"generatorParameters": ["Sort-Input", "", " DEFAULT "]}"""
+        """{"generatorParameters": ["default=off"]}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"generatorParameters": ["keep-comments = off"]}"""
     )]
     [InlineData( /*lang=json,strict*/
         """{"typeOverrides": {"int4": ""}}"""

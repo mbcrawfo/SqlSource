@@ -8,13 +8,16 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// The list of generator parameters in effect for a query, for a type that claims its file, is the one from the most
-// specific level that gives a list, whole: the query's markers, the preamble's, the settings file of the file's
-// folder, then the project's settings file.  Two parameters change a query's generated code, keep-comments
+// The generator parameters in effect for a query, for a type that claims its file, merge per option: each level, from
+// the project's settings file through the settings file of the file's folder and the file header to the query's
+// markers, turns the options it names on or off, or gives them their default, over the levels before it, and default
+// alone gives every option its default at its level.  Two parameters change a query's generated code, keep-comments
 // its SQL and no-token-validation its method's checks, and each row shows both.
 public sealed class GeneratorParameterLevelTests
 {
     private const string On = "keep-comments no-token-validation";
+
+    private const string Off = "keep-comments=off no-token-validation=off";
 
     private const string Other = "sort-input";
 
@@ -28,52 +31,63 @@ public sealed class GeneratorParameterLevelTests
 
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
-    // The levels whose most specific list keeps comments: the comment stays and the token is not checked.
+    // The levels whose nearest state of each option is on: the comment stays and the token is not checked.
     [Theory]
-    // project's file, folder's file, preamble, query
+    // project's file, folder's file, file header, query
     [InlineData(On, null, null, null)]
     [InlineData(null, On, null, null)]
     [InlineData(null, null, On, null)]
     [InlineData(Default, Other, On, null)]
     [InlineData(null, null, Default, On)]
-    public void Run_GeneratorParametersWhoseMostSpecificListKeepsComments_KeepTheComment(
+    [InlineData(On, Other, null, null)]
+    [InlineData(On, On, On, Other)]
+    [InlineData(Off, null, null, On)]
+    public void Run_GeneratorParametersWhoseNearestStateIsOn_KeepTheComment(
         string? projectFile,
         string? folderFile,
-        string? preamble,
+        string? header,
         string? query
     )
     {
-        var generated = ListFromAt(projectFile, folderFile, preamble, query);
+        var generated = ListFromAt(projectFile, folderFile, header, query);
 
         generated.ShouldContain("-- kept");
         generated.ShouldNotContain("Throw");
     }
 
-    // The levels whose most specific list does not keep comments, though a farther one does, and the run where no level
-    // gives a list, so that the default leaves them out: the list comes whole from the most specific level, so the
-    // comment goes and the token is checked.
+    // The levels whose nearest state of each option is off or the default, though a farther one turns it on, and the
+    // run where no level names them, so that the default leaves them out: the comment goes and the token is checked.
     [Theory]
-    // project's file, folder's file, preamble, query
+    // project's file, folder's file, file header, query
     [InlineData(null, null, null, null)]
     [InlineData(On, Default, null, null)]
-    [InlineData(On, Other, null, null)]
     [InlineData(On, On, Default, null)]
     [InlineData(On, On, On, Default)]
-    [InlineData(On, On, On, Other)]
-    public void Run_GeneratorParametersWhoseMostSpecificListLeavesCommentsOut_DropTheCommentAndCheckTheToken(
+    [InlineData(On, null, null, Off)]
+    public void Run_GeneratorParametersWhoseNearestStateIsOffOrTheDefault_DropTheCommentAndCheckTheToken(
         string? projectFile,
         string? folderFile,
-        string? preamble,
+        string? header,
         string? query
     )
     {
-        var generated = ListFromAt(projectFile, folderFile, preamble, query);
+        var generated = ListFromAt(projectFile, folderFile, header, query);
 
         generated.ShouldNotContain("-- kept");
         generated.ShouldContain(Check);
     }
 
-    // A keyword in braces in a kept comment is SQLSRC114 wherever the list that keeps comments is given, and the file
+    // The query turns one option off and leaves the other as the file header gives it.
+    [Fact]
+    public void Run_QueryTurnsOneParameterOff_KeepsTheOtherFromAbove()
+    {
+        var generated = ListFromAt(null, null, On, "keep-comments=off");
+
+        generated.ShouldNotContain("-- kept");
+        generated.ShouldNotContain("Throw");
+    }
+
+    // A keyword in braces in a kept comment is SQLSRC114 wherever keep-comments is given, and the file
     // then gives no members.
     [Theory]
     [InlineData(SettingLevel.ProjectFile, "(2,13)-(2,22)")]
@@ -155,7 +169,7 @@ public sealed class GeneratorParameterLevelTests
 
     // The file of Sample for a query ListFrom with a token and a kept comment, with each level's generator parameters
     // given, none where null.
-    private static string ListFromAt(string? projectFile, string? folderFile, string? preamble, string? query)
+    private static string ListFromAt(string? projectFile, string? folderFile, string? header, string? query)
     {
         var settings = new LevelSettings();
         if (folderFile is not null)
@@ -168,7 +182,7 @@ public sealed class GeneratorParameterLevelTests
         }
 
         var sql =
-            (preamble is null ? string.Empty : "-- generator: " + preamble + "\n")
+            (header is null ? string.Empty : "-- generator: " + header + "\n")
             + "-- name: ListFrom\n"
             + (query is null ? string.Empty : "-- generator: " + query + "\n")
             + "SELECT * FROM {{table}}; -- kept\n";
