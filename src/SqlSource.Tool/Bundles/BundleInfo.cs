@@ -3,7 +3,9 @@ namespace SqlSource.Tool.Bundles;
 /// <summary>
 /// The bundle's <c>bundle.json</c>: what made it, against what, and what describing its query gave.
 /// </summary>
-/// <param name="BundleVersion">The version of the bundle's form, <see cref="BundleJson.Version" /> when written.</param>
+/// <param name="BundleVersion">
+/// The version of the bundle's form, <see cref="BundleJson.Version" /> when written.
+/// </param>
 /// <param name="Renamed">Whether the bundle's names were renamed, so that it may be posted.</param>
 /// <param name="ToolVersion">The version of <c>sqlsource</c> that made it.</param>
 /// <param name="FormatVersion">The version of the sidecar's format of that <c>sqlsource</c>.</param>

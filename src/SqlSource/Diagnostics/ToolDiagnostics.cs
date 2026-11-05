@@ -550,7 +550,8 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor BundleCallMissing = new(
         id: "SQLSRC290",
         title: "Bundle does not answer a question of the query",
-        messageFormat: "The bundle has no answer to '{0}' that the query asks: it was made by {1}, and this is sqlsource {2}",
+        messageFormat: "The bundle has no answer to '{0}' that the query asks: it was made by {1}, "
+            + "and this is sqlsource {2}",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

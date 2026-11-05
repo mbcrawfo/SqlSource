@@ -90,14 +90,14 @@ internal static class BundleReplays
         using var answer = JsonDocument.Parse(
             $$"""
             {
-              "parameterTypes": null,
-              "error": {
-                "sqlState": "{{NotDeterminedState}}",
-                "message": "{{NotDeterminedMessage}}",
-                "detail": null,
-                "hint": null,
-                "position": null
-              }
+                "parameterTypes": null,
+                "error": {
+                    "sqlState": "{{NotDeterminedState}}",
+                    "message": "{{NotDeterminedMessage}}",
+                    "detail": null,
+                    "hint": null,
+                    "position": null
+                }
             }
             """
         );

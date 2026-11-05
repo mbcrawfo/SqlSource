@@ -6,13 +6,17 @@ internal enum FieldRuleKind
     /// <summary>Removed from the bundle: no decision of the pipeline reads it.</summary>
     Drop,
 
-    /// <summary>A text of the tool or of the engine, such as a statement's name or a version: kept and not checked.</summary>
+    /// <summary>
+    /// A text of the tool or of the engine, such as a statement's name or a version: kept and not checked.
+    /// </summary>
     Fixed,
 
     /// <summary>A code of a closed set, such as <c>relkind</c>: kept and not checked.</summary>
     Closed,
 
-    /// <summary>SQL, renamed lexeme by lexeme; a new word is of the rule's class, or a function before <c>(</c>.</summary>
+    /// <summary>
+    /// SQL, renamed lexeme by lexeme; a new word is of the rule's class, or a function before <c>(</c>.
+    /// </summary>
     Sql,
 
     /// <summary>A type's spelling, lexed as SQL whose new words are types.</summary>
@@ -37,7 +41,9 @@ internal enum FieldRuleKind
     Own,
 }
 
-/// <summary>The rule of one member: its kind, and the class of the names it makes, for the kinds that make any.</summary>
+/// <summary>
+/// The rule of one member: its kind, and the class of the names it makes, for the kinds that make any.
+/// </summary>
 /// <param name="Kind">What is done with the member.</param>
 /// <param name="Class">
 /// The class of a name the member holds: of the new words of <see cref="FieldRuleKind.Sql" /> and

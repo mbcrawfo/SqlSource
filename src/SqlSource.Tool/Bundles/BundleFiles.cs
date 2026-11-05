@@ -21,6 +21,8 @@ internal static class BundleFiles
     /// <summary>The settings of the planner the capture was made with, one <c>name=value</c> a line.</summary>
     public const string ExplainSettings = "explain-settings.txt";
 
-    /// <summary>What the name of the bundle's mapping file adds to the bundle's; the mapping is never inside it.</summary>
+    /// <summary>
+    /// What the name of the bundle's mapping file adds to the bundle's; the mapping is never inside it.
+    /// </summary>
     public const string MappingSuffix = ".mapping.json";
 }

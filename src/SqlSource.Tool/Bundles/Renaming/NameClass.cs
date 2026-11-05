@@ -1,6 +1,8 @@
 namespace SqlSource.Tool.Bundles.Renaming;
 
-/// <summary>What a renamed name is: the class that prefixes its replacement and that the mapping file records.</summary>
+/// <summary>
+/// What a renamed name is: the class that prefixes its replacement and that the mapping file records.
+/// </summary>
 internal enum NameClass
 {
     Schema,

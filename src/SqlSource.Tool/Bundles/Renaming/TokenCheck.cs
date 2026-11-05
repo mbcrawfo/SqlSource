@@ -10,7 +10,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// <summary>
 /// The check of every token of a renamed bundle that came from the user's database or query: each must be a
 /// replacement of the mapping, a word of the engine's, a spelling the mapping kept as the engine's, a number or one
-/// character of punctuation, and a literal must hold a replacement.  The first that is none is a refusal that names its place and the token.
+/// character of punctuation, and a literal must hold a replacement.  The first that is none is a refusal that names its
+/// place and the token.
 /// </summary>
 /// <remarks>
 /// <para>

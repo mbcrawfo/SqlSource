@@ -21,7 +21,9 @@ internal static class BundleWriter
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>Writes the bundle into the stream as a zip, and leaves the stream open.</summary>
-    /// <exception cref="ArgumentException">The bundle has no <see cref="Bundle.Info" />, which a zip must hold.</exception>
+    /// <exception cref="ArgumentException">
+    /// The bundle has no <see cref="Bundle.Info" />, which a zip must hold.
+    /// </exception>
     public static void Write(Bundle bundle, Stream into)
     {
         if (bundle.Info is null)

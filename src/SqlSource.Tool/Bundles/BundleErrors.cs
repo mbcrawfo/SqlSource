@@ -12,7 +12,9 @@ internal static class BundleErrors
 {
     /// <summary><c>SQLSRC288</c>: the bundle cannot be read, and why.</summary>
     /// <param name="path">The bundle's full path.</param>
-    /// <param name="reason">Why, in words that start in lower case, such as <c>there is no query.sql at the root of the zip</c>.</param>
+    /// <param name="reason">
+    /// Why, in words that start in lower case, such as <c>there is no query.sql at the root of the zip</c>.
+    /// </param>
     public static ToolDiagnostic CannotBeRead(string path, string reason) =>
         ToolDiagnostic.AtFile(ToolDiagnostics.BundleCannotBeRead, path, OneLine.Of(reason));
 
@@ -47,7 +49,9 @@ internal static class BundleErrors
     /// What made a bundle, as <c>SQLSRC290</c> names it: <c>sqlsource</c> and the version of its <c>bundle.json</c>, or
     /// <c>another version of sqlsource</c> for a bundle without one.
     /// </summary>
-    /// <param name="toolVersion">The <c>toolVersion</c> of the bundle's <c>bundle.json</c>, or null when it has none.</param>
+    /// <param name="toolVersion">
+    /// The <c>toolVersion</c> of the bundle's <c>bundle.json</c>, or null when it has none.
+    /// </param>
     public static string MadeBy(string? toolVersion) =>
         toolVersion is null ? "another version of sqlsource" : "sqlsource " + toolVersion;
 
