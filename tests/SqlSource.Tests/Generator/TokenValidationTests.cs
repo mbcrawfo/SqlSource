@@ -8,7 +8,7 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // Whether a generated method checks its arguments: the generator parameters merge per parameter, so the nearest level
-// that names token-validation=off decides, the query's before the file's and the file's before the generatorParameters
+// that names token-validation decides, the query's before the file's and the file's before the generatorParameters
 // of the project's settings file.  When none names it the method checks.  GeneratorParameterLevelTests has the levels
 // between the file and the project.
 public sealed class TokenValidationTests

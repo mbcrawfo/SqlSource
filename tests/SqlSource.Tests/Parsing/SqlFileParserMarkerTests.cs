@@ -33,7 +33,7 @@ public sealed class SqlFileParserMarkerTests
     public void Parse_QueryWithoutMarkers_SharesTheEmptyLevel() =>
         Blocks("-- name: Q\nSELECT 1\n").ShouldHaveSingleItem().Markers.ShouldBeSameAs(SettingsLevel.None);
 
-    // A row gives the parameters that are on beyond the defaults, as a number.
+    // A row gives the parameters it turns on besides the defaults, all of which these rows leave on, as a number.
     [Theory]
     [InlineData("-- generator: keep-comments\n-- name: Q\nSELECT 1\n", 1)]
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: sort-input\nSELECT 1\n", 5)]
@@ -41,9 +41,10 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1\n", 0)]
     [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default sort-input\nSELECT 1\n", 4)]
     public void Parse_Markers_MergeTheQuerysOverThePreamblesPerParameter(string text, int expected) =>
-        (
-            (int)(Blocks(text).ShouldHaveSingleItem().Markers.Parameters.Resolve() & ~GeneratorParameterList.Defaults)
-        ).ShouldBe(expected);
+        Blocks(text)
+            .ShouldHaveSingleItem()
+            .Markers.Parameters.Resolve()
+            .ShouldBe(GeneratorParameterList.Defaults | (GeneratorParameters)expected);
 
     [Fact]
     public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()

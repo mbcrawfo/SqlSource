@@ -28,8 +28,8 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData("-- generator: token-validation=off", 2, 0)]
     [InlineData("-- generator: array-pool=OFF table-models=off", 80, 0)]
     [InlineData("-- generator: array-pool", 64, 64)]
-    [InlineData("-- generator: KEEP-COMMENTS TOKEN-VALIDATION", 3, 3)]
-    [InlineData("-- generator: sort-input sort-output table-models async-method-suffix", 60, 60)]
+    [InlineData("-- generator: KEEP-COMMENTS Token-Validation=OFF", 3, 1)]
+    [InlineData("-- generator: sort-input sort-output table-models=off async-method-suffix", 60, 44)]
     [InlineData("-- generator: keep-comments=off sort-input", 5, 4)]
     public void Read_Words_NameTheirStates(string line, int named, int on)
     {

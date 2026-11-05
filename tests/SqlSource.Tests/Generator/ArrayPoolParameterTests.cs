@@ -41,7 +41,7 @@ public sealed class ArrayPoolParameterTests
     [InlineData(null, null, Default, Unpooled, false)]
     [InlineData(Unpooled, null, null, Pooled, true)]
     [InlineData(Pooled, null, null, Unpooled, false)]
-    public void Run_ArrayPoolOff_ComesFromTheMostSpecificLevelThatNamesIt(
+    public void Run_ArrayPool_ComesFromTheMostSpecificLevelThatNamesIt(
         string? projectFile,
         string? folderFile,
         string? preamble,
