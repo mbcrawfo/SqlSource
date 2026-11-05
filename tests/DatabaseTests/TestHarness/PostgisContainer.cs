@@ -54,10 +54,23 @@ public abstract class PostgisContainer(DbProviderFactory factory, string postgre
             {
                 return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             }
-            catch (IOException)
+            catch (IOException exception) when (IsHeldByAnother(exception))
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(250), token);
             }
         }
+    }
+
+    // Only a lock that another handle holds is waited for; any other error fails the build at once.  On Unix .NET gives
+    // that sharing violation as a plain IOException whose HResult is EWOULDBLOCK's errno, 35 on macOS and 11 on Linux;
+    // on Windows it is ERROR_SHARING_VIOLATION as an HRESULT.
+    private static bool IsHeldByAnother(IOException exception)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return exception.HResult == unchecked((int)0x80070020);
+        }
+
+        return exception.HResult == (OperatingSystem.IsMacOS() ? 35 : 11);
     }
 }
