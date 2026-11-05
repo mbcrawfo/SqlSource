@@ -22,7 +22,14 @@ internal static class SampleSql
         var sql = new StringBuilder();
         foreach (var segment in query.Segments)
         {
-            _ = sql.Append(segment.Kind == SqlSegmentKind.Literal ? segment.Text : DefaultOf(query, segment.Text));
+            _ = sql.Append(
+                segment.Kind switch
+                {
+                    SqlSegmentKind.Literal or SqlSegmentKind.List or SqlSegmentKind.ListNullTest => segment.Text,
+                    SqlSegmentKind.Token => DefaultOf(query, segment.Text),
+                    _ => throw UnexpectedEnumValueException.Of(segment.Kind),
+                }
+            );
         }
 
         return sql.ToString();

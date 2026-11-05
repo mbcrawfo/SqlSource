@@ -90,7 +90,8 @@ internal static class CommandWriter
             context.Tokens,
             context.SpelledTokens,
             locals.Span,
-            locals.State
+            locals.State,
+            expandsLists: false
         );
         _ = builder.Append(";\n");
     }

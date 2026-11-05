@@ -36,6 +36,12 @@ public sealed class SampleSqlTests : IDisposable
         Sample("-- name: A\n-- token: {{where:WHERE x = 1}}\nSELECT 1 FROM t {{where}};\n")
             .ShouldBe("SELECT 1 FROM t WHERE x = 1;");
 
+    // A list's uses are segments of their own, written as the SQL wrote them.
+    [Fact]
+    public void Build_QueryWithAList_IsItsSql() =>
+        Sample("-- name: A\nSELECT 1 FROM t WHERE (@ids IS NULL OR id IN @ids);\n")
+            .ShouldBe("SELECT 1 FROM t WHERE (@ids IS NULL OR id IN @ids);");
+
     // The plan gives such a query a problem and the run never builds its sample.
     [Fact]
     public void Build_TokenWithoutADefault_Throws() =>

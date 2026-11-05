@@ -219,8 +219,8 @@ internal static class TypeEmitter
             return;
         }
 
-        // Without a token the SQL is one literal segment.
-        var sql = segments[0].Text;
+        // Without a token the SQL is its text, a list's uses as written.
+        var sql = MethodWriter.GetSql(segments);
         XmlDocWriter.AppendMember(builder, indent, summaryXml, sql);
         _ = builder
             .Append(indent)

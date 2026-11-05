@@ -317,6 +317,49 @@ public sealed class GeneratedSourceMethodTests
             );
     }
 
+    // A list's use is a segment of its own, and the token method of a type writes it as the SQL wrote it, in the
+    // literal around it.
+    [Fact]
+    public void TokenMethod_QueryWithAListAndAToken_KeepsTheListAsWritten()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListByIds\n-- output: models\nSELECT id FROM users WHERE id IN @ids ORDER BY {{order:id}}\n"
+        );
+        var run = ModelRuns.Run(
+            file,
+            ModelRuns.Entry(file, "ListByIds", [ModelRuns.Parameter("ids")], [ModelRuns.Column("id")])
+        );
+
+        run.ShouldBeClean();
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain(
+                """
+                        /// <code>
+                        /// SELECT id FROM users WHERE id IN @ids ORDER BY {{order}}
+                        /// </code>
+                        /// </remarks>
+                        /// <param name="order">The text that replaces <c>{{order}}</c>.</param>
+                        /// <returns>The SQL with each token replaced by its argument.</returns>
+                        public static string ListByIds(string order)
+                        {
+                            global::System.ArgumentException.ThrowIfNullOrWhiteSpace(order);
+                            return string.Create(
+                                checked(47 + order.Length),
+                                order,
+                                static (span, state) =>
+                                {
+                                    "SELECT id FROM users WHERE id IN @ids ORDER BY ".CopyTo(span);
+                                    span = span.Slice(47);
+                                    state.CopyTo(span);
+                                }
+                            );
+                        }
+
+                """
+            );
+    }
+
     [Fact]
     public void Run_TokenWithADefault_GeneratesTheMethodItGeneratesWithout()
     {
