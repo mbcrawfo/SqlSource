@@ -1,6 +1,7 @@
 using System;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
+using SqlSource.Settings;
 
 namespace SqlSource.Tool.Bundles.Renaming;
 
@@ -67,13 +68,20 @@ internal sealed partial class TokenCheck
         switch (marker.Kind)
         {
             case SqlMarkerKind.Name:
-                // The result's shape after the arrow is a closed word, which the renaming kept only when it read.
+                // The result's shape after the arrow is a closed word, which must read as the generator reads it.
                 var arrow = value.IndexOf("->", StringComparison.Ordinal);
                 var name = arrow < 0 ? value : value[..arrow].TrimEnd();
                 Whole(IsSafe(name, quoted: false), place, name);
+                if (arrow >= 0)
+                {
+                    var shape = value[(arrow + 2)..];
+                    Whole(SettingValue.TryReadChoice<ResultShape>(shape.AsSpan(), out _), place, shape.Trim());
+                }
+
                 break;
             case SqlMarkerKind.Dialect:
-                // A dialect's name, which the renaming kept only when it read.
+                // A dialect's name, which must read as the generator reads it.
+                Whole(SqlDialectMarker.TryRead(text, marker, out _), place, value);
                 break;
             case SqlMarkerKind.Database:
                 Name(value, NameClass.Database, place);

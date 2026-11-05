@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Parsing;
@@ -215,5 +216,38 @@ public sealed class TokenCheckTests
                     "1users"
                 )
             );
+    }
+
+    // The shape after a name's arrow and a dialect's name are read as the generator reads them, and are refused when
+    // they do not read, whatever the renaming kept.
+    [Theory]
+    [InlineData("-- name: {0} -> secretshape\nSELECT 1", "secretshape")]
+    [InlineData("-- name: {0} ->\nSELECT 1", "")]
+    [InlineData("-- name: {0}\n-- dialect: secretdb\nSELECT 1", "secretdb")]
+    public void Check_MarkerValueThatDoesNotRead_IsRefused(string file, string token)
+    {
+        var (engine, mapping) = Mapping();
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+
+        var refusal = TokenCheck.Check(
+            engine,
+            mapping,
+            [],
+            string.Format(CultureInfo.InvariantCulture, file, query),
+            expected: null
+        );
+
+        refusal.ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", token));
+    }
+
+    [Fact]
+    public void Check_MarkerValuesThatRead_Pass()
+    {
+        var (engine, mapping) = Mapping();
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+
+        TokenCheck
+            .Check(engine, mapping, [], $"-- dialect: postgres\n-- name: {query} -> Many\nSELECT 1", expected: null)
+            .ShouldBeNull();
     }
 }
