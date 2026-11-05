@@ -246,6 +246,76 @@ public sealed class ListQueryTests(SqlServerDatabases sqlServer)
         accounts.ShouldBe([Alice, Carol]);
     }
 
+    // The two lists count together against the limit: the ids fill it but for the two statuses.
+    [Fact]
+    public async Task TwoLists_AtTheLimit_Runs()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var accounts = await connection.ListAccountsByIdsAndStatuses(
+            new ListAccountsByIdsAndStatusesArgs(IdsOf(Limit - 2), ["active", "suspended"]),
+            cancellationToken: token
+        );
+
+        accounts.ShouldBe([Alice, Carol]);
+    }
+
+    // One id more than TwoLists_AtTheLimit_Runs sends; the message names the list of more values.
+    [Fact]
+    public async Task TwoLists_OneOverTheLimit_ThrowsArgumentException()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var exception = await Should.ThrowAsync<ArgumentException>(() =>
+            connection.ListAccountsByIdsAndStatuses(
+                new ListAccountsByIdsAndStatusesArgs(IdsOf(Limit - 1), ["active", "suspended"]),
+                cancellationToken: token
+            )
+        );
+
+        exception.ParamName.ShouldBe("parameters");
+        exception.Message.ShouldStartWith(
+            "The query 'ListAccountsByIdsAndStatuses' would send 2099 parameters; SQL Server accepts 2098.  "
+                + "Pass fewer values in 'Ids', or use a table-valued parameter."
+        );
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // The null test of @ids is a parameter of its own, which counts against the limit beside the list's values.
+    [Fact]
+    public async Task Optional_AtTheLimit_Runs()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var accounts = await connection.ListAccountsOptional(
+            new ListAccountsOptionalArgs(IdsOf(Limit - 1)),
+            cancellationToken: token
+        );
+
+        accounts.ShouldBe([Alice, Carol]);
+    }
+
+    [Fact]
+    public async Task Optional_OneOverTheLimit_ThrowsArgumentException()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var exception = await Should.ThrowAsync<ArgumentException>(() =>
+            connection.ListAccountsOptional(new ListAccountsOptionalArgs(IdsOf(Limit)), cancellationToken: token)
+        );
+
+        exception.ParamName.ShouldBe("parameters");
+        exception.Message.ShouldStartWith(
+            "The query 'ListAccountsOptional' would send 2099 parameters; SQL Server accepts 2098.  "
+                + "Pass fewer values in 'Ids', or use a table-valued parameter."
+        );
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
     // The streaming method counts its lists at the call, so the limit throws there, before the connection is opened.
     [Fact]
     public async Task StreamIds_OverTheLimit_ThrowsBeforeEnumeration()
