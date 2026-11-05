@@ -365,8 +365,8 @@ internal sealed record PostgresPartitionRow(string Schema, string Name, IReadOnl
 /// included: a <c>NULL</c> is passed for each, since <c>EXPLAIN EXECUTE</c> takes no other number.
 /// </param>
 /// <param name="Settings">
-/// Settings of the planner as <c>name=value</c>, each of <see cref="PlannerSettings" />.  The tool passes none; a
-/// test forces a join method with them.
+/// Settings of the planner as <c>name=value</c>, each of <see cref="PlannerSettings" />.  A run of <c>describe</c>
+/// passes none; a test forces a join method with them, and <c>replay</c> passes those a bundle was recorded with.
 /// </param>
 internal sealed record PostgresExplainRequest(string Statement, int Parameters, IReadOnlyList<string> Settings);
 
