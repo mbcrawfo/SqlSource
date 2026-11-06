@@ -106,7 +106,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
         {
             var full = System.IO.Path.GetFullPath(given, workingDirectory);
             path = full;
-            if (FilesOfTheRun.Any(ending => full.EndsWith(ending, StringComparison.OrdinalIgnoreCase)))
+            if (IsAFileOfTheRun(full))
             {
                 return Outcome<RunLogFile, ToolDiagnostic>.Failed(
                     NotWritten(
@@ -128,6 +128,13 @@ internal sealed class RunLogFile : IRunLog, IDisposable
             );
         }
     }
+
+    /// <summary>
+    /// Whether a path names a file that a run reads or writes, a <c>.sql</c> file, a sidecar, a project or a solution,
+    /// whatever the case: a file the tool writes of its own, a log or <c>diagnose</c>'s bundle, would empty it.
+    /// </summary>
+    public static bool IsAFileOfTheRun(string path) =>
+        FilesOfTheRun.Any(ending => path.EndsWith(ending, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// The <c>SQLSRC218</c> of a log that stopped being written, with the system's reason, as <see cref="Open" />

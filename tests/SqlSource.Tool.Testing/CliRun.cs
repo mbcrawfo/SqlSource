@@ -61,6 +61,10 @@ internal sealed class CliRun : IDisposable
     // Every database of the run calls through this one, which asks the describer and keeps the call.
     public CapturingExchange Exchange { get; }
 
+    // Gives the exchange of each database of the run, by its name, in place of Exchange: one that a capture answers,
+    // for a run of a real describer with no database.
+    public Func<string, IDescribeExchange>? Exchanges { get; set; }
+
     // The clock of the run.  A clock that stands still, unless a test brings one it can move, or the machine's.
     public TimeProvider Time { get; set; } = new TestClock();
 
@@ -149,7 +153,7 @@ internal sealed class CliRun : IDisposable
             Out = Out ?? output,
             Error = error,
             Describers = ReleasedDescribers ? ToolHost.Create().Describers : new DescriberRegistry(Describers),
-            Exchange = _ => Exchange,
+            Exchange = Exchanges ?? (_ => Exchange),
             Time = Time,
             CreateFile = CreateFile ?? ToolHost.NewFile,
             ReadTextFile = ReadTextFile ?? host.ReadTextFile,

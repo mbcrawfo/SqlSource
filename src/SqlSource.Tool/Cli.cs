@@ -151,9 +151,9 @@ public static class Cli
     /// Runs the command with a host that the caller gives.  The tests call this.
     /// </summary>
     /// <remarks>
-    /// The log of the run is opened and closed here, though <c>--log</c> is an option of <c>describe</c> and of
-    /// <c>replay</c>: the error of an exception is reported here and the exit code is decided here, and both belong in
-    /// the log.
+    /// The log of the run is opened and closed here, though <c>--log</c> is an option of <c>describe</c>, of
+    /// <c>replay</c> and of <c>diagnose</c>: the error of an exception is reported here and the exit code is decided
+    /// here, and both belong in the log.
     /// </remarks>
     internal static async Task<int> RunAsync(string[] args, ToolHost host, CancellationToken cancellationToken)
     {
@@ -246,6 +246,7 @@ public static class Cli
             || !usage.IsReadTheSameBy(parsed)
             || !DescribeCommand.ReadsValuesAs(usage, parsed)
             || !ReplayCommand.ReadsValuesAs(usage, parsed)
+            || !DiagnoseCommand.ReadsValuesAs(usage, parsed)
         )
         {
             // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
@@ -268,13 +269,22 @@ public static class Cli
             return Running.Describe;
         }
 
-        return ReplayCommand.Runs(parsed) ? Running.Replay : Running.Nothing;
+        if (ReplayCommand.Runs(parsed))
+        {
+            return Running.Replay;
+        }
+
+        return DiagnoseCommand.Runs(parsed) ? Running.Diagnose : Running.Nothing;
     }
 
     // What is wrong with a command line by the rules of its command, each a whole line.  Each command gives none for
     // another.
     private static IReadOnlyList<string> CheckUsageOfTheCommand(Usage usage) =>
-        [.. DescribeCommand.CheckUsage(usage), .. ReplayCommand.CheckUsage(usage)];
+        [
+            .. DescribeCommand.CheckUsage(usage),
+            .. ReplayCommand.CheckUsage(usage),
+            .. DiagnoseCommand.CheckUsage(usage),
+        ];
 
     // Opens the log the run was given, and writes run.start: after the command line was read, so that a wrong one
     // is never logged, and before anything runs.  False when the log cannot be opened, which is reported: the run
@@ -292,12 +302,16 @@ public static class Cli
                 ReplayCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
                 ReplayCommand.LogOptionOf(commandLine.Usage)
             ),
+            Running.Diagnose => (
+                DiagnoseCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
+                DiagnoseCommand.LogOptionOf(commandLine.Usage)
+            ),
             Running.Nothing => (null, null),
             _ => throw UnexpectedEnumValueException.Of(commandLine.Runs),
         };
 
         // A build's user cannot give the build's run a log, so a run under --online points at none.  The line is
-        // describe's alone.
+        // describe's alone: diagnose says a refused query on a line of its own, and was asked for one query.
         state.MayPoint =
             commandLine.Runs == Running.Describe
             && logPath is null
@@ -371,6 +385,13 @@ public static class Cli
                     new RunTrace(events, ReplayCommand.IsVerbose(parsed) ? host.Out : null)
                 );
                 ReplayCommand.Bind(parsed, commandLine.Usage, host, state.Reporter);
+                break;
+            case Running.Diagnose:
+                state.Reporter = new Reporter(
+                    host.Error,
+                    new RunTrace(events, DiagnoseCommand.IsVerbose(parsed) ? host.Out : null)
+                );
+                DiagnoseCommand.Bind(parsed, commandLine.Usage, host, state.Reporter);
                 break;
             case Running.Nothing:
                 break;
@@ -449,6 +470,7 @@ public static class Cli
             version,
             DescribeCommand.Create(),
             ReplayCommand.Create(),
+            DiagnoseCommand.Create(),
         };
 
         // System.CommandLine's own answer to no command is an error.
@@ -474,6 +496,7 @@ public static class Cli
         Nothing,
         Describe,
         Replay,
+        Diagnose,
     }
 
     // A command line that both readers accept, as each read it, and the command it runs.

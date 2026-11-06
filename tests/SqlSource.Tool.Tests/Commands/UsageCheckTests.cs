@@ -381,6 +381,14 @@ public sealed class UsageCheckTests
             "--online",
             "--online=auto",
             "auto",
+            "diagnose",
+            "--query",
+            "--query=Q.sql:N",
+            "Q.sql:N",
+            "--out",
+            "--out=O",
+            "--scrub",
+            "--no-obfuscate",
         ];
         var root = Cli.BuildCommands();
         var disagreements = new List<string>();
@@ -393,6 +401,7 @@ public sealed class UsageCheckTests
                 usage.Messages.Count > 0
                 || DescribeCommand.CheckUsage(usage).Count > 0
                 || ReplayCommand.CheckUsage(usage).Count > 0
+                || DiagnoseCommand.CheckUsage(usage).Count > 0
                 || parsed.Errors.Count > 0
             )
             {
@@ -400,12 +409,13 @@ public sealed class UsageCheckTests
             }
 
             // The command reads the values of its options from what UsageCheck read, and System.CommandLine gives the
-            // log's path, so the two must give --project, --database, --connection, --log, --manifest and --online the
-            // same values too.
+            // log's path, so the two must give --project, --database, --connection, --log, --manifest, --online,
+            // --query, --out and --scrub the same values too.
             if (
                 !usage.IsReadTheSameBy(parsed)
                 || !DescribeCommand.ReadsValuesAs(usage, parsed)
                 || !ReplayCommand.ReadsValuesAs(usage, parsed)
+                || !DiagnoseCommand.ReadsValuesAs(usage, parsed)
             )
             {
                 disagreements.Add(string.Join(' ', args));
@@ -627,6 +637,30 @@ public sealed class UsageCheckTests
         ReplayCommand.ReadsValuesAs(usage, root.Parse(["replay", "report.zip", "--log", "other.log"])).ShouldBeFalse();
         ReplayCommand.ReadsValuesAs(usage, root.Parse(["replay", "report.zip"])).ShouldBeFalse();
         ReplayCommand.ReadsValuesAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"])).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ReadsValuesAs_DiagnoseValuesReadAsOtherValues_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        string[] args = ["diagnose", "--query", "Q.sql:N", "--out", "r.zip", "--project", "P", "--connection", "a=b"];
+        var usage = UsageCheck.Check(root, args);
+
+        DiagnoseCommand.ReadsValuesAs(usage, root.Parse(args)).ShouldBeTrue();
+        DiagnoseCommand
+            .ReadsValuesAs(usage, root.Parse(["diagnose", "--query", "Q.sql:M", "--out", "r.zip", "--project", "P"]))
+            .ShouldBeFalse();
+        DiagnoseCommand
+            .ReadsValuesAs(usage, root.Parse([.. args[..3], "--out", "s.zip", .. args[5..]]))
+            .ShouldBeFalse();
+        DiagnoseCommand.ReadsValuesAs(usage, root.Parse([.. args, "--log", "run.log"])).ShouldBeFalse();
+        DiagnoseCommand
+            .ReadsValuesAs(
+                UsageCheck.Check(root, ["diagnose", "--scrub", "a.zip"]),
+                root.Parse(["diagnose", "--scrub", "b.zip"])
+            )
+            .ShouldBeFalse();
+        DiagnoseCommand.ReadsValuesAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"])).ShouldBeTrue();
     }
 
     [Theory]

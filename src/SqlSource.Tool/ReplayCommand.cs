@@ -343,10 +343,15 @@ internal static class ReplayCommand
         return queries.ToJsonString(EntryOptions);
     }
 
-    // An error at the bundle as it is printed: at its full path, or, for a token that holds "=" or ";", at no file,
-    // with the path named by its position, in its text too, where a reason quotes it as written or as BundleErrors
-    // writes it.
-    private static ToolDiagnostic AsNamed(ToolDiagnostic error, UsageValue argument, string path)
+    /// <summary>
+    /// An error at the bundle as it is printed: at its full path, or, for a token that holds <c>=</c> or <c>;</c>, at
+    /// no file, with the path named by its position, in its text too, where a reason quotes it as written or as
+    /// <see cref="BundleErrors" /> writes it.  <c>diagnose --scrub</c> names its bundle so too.
+    /// </summary>
+    /// <param name="error">The error at the bundle's full path.</param>
+    /// <param name="argument">The token that gave the path.</param>
+    /// <param name="path">The bundle's full path.</param>
+    internal static ToolDiagnostic AsNamed(ToolDiagnostic error, UsageValue argument, string path)
     {
         if (argument.MayBePrintedAsPath)
         {

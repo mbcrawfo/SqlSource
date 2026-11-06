@@ -1,0 +1,347 @@
+using System;
+using System.Collections.Generic;
+using System.CommandLine;
+using System.CommandLine.Help;
+using System.Linq;
+using SqlSource.Generation.Paths;
+using SqlSource.Tool.Bundles;
+using SqlSource.Tool.Reporting;
+
+namespace SqlSource.Tool;
+
+/// <summary>
+/// The <c>diagnose</c> command.  With <c>--query</c> it describes one query of a project again, through an exchange
+/// that records the session, and writes a bug-report bundle of it: renamed and proved by a replay, with its mapping
+/// beside it, or raw under <c>--no-obfuscate</c>.  With <c>--scrub</c> it renames a raw bundle that it wrote, with no
+/// database and no project.  <see cref="DiagnoseRun" /> runs both.
+/// </summary>
+/// <remarks>
+/// Its project, connections, <c>.env</c>, <c>--verbose</c> and <c>--log</c> are <c>describe</c>'s, read by
+/// <c>describe</c>'s rules.  <c>--out</c> is required with both forms, and <c>--scrub</c> takes no other option.  A
+/// value of <c>--out</c> is held to the rule of <c>--log</c>, so the path it gives is always printed.
+/// </remarks>
+internal static class DiagnoseCommand
+{
+    public const string Name = "diagnose";
+
+    internal const string QueryOption = "--query";
+
+    internal const string OutOption = "--out";
+
+    internal const string NoObfuscateOption = "--no-obfuscate";
+
+    internal const string ScrubOption = "--scrub";
+
+    private const string PathArgument = "path";
+
+    private const string VerboseOption = "--verbose";
+
+    public static Command Create()
+    {
+        // The rules of DescribeCommand.Create hold: a flag has Arity = ArgumentArity.Zero, an option that takes a
+        // value takes exactly one, and one that may be repeated takes OneOrMore.  --project, --connection, --verbose
+        // and --log are describe's, with their names and their rules.
+        var path = new Argument<string>(PathArgument)
+        {
+            Description =
+                "A .sln, .slnx or .csproj file, or a directory that holds exactly one; the current directory when "
+                + "left out.",
+            Arity = ArgumentArity.ZeroOrOne,
+        };
+
+        var project = new Option<string[]>(DescribeCommand.ProjectOption)
+        {
+            Description = "A project to run on, of the solution.  May be given several times.",
+            HelpName = "path",
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false,
+        };
+
+        var connection = new Option<string[]>(DescribeCommand.ConnectionOption)
+        {
+            Description =
+                "The connection string of a database, as <name>=<connection string>.  May be given several times.",
+            HelpName = "name=value",
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false,
+        };
+
+        var query = new Option<string>(QueryOption)
+        {
+            Description =
+                "The query to report: its .sql file, a colon and its name, as its -- name: line gives it.  The last "
+                + "colon ends the file.",
+            HelpName = "file:name",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
+        var output = new Option<string>(OutOption)
+        {
+            Description =
+                "Where to write the bundle, a zip.  The mapping of its new names is written beside it, with "
+                + $"{BundleFiles.MappingSuffix} added to its name.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
+        var noObfuscate = new Option<bool>(NoObfuscateOption)
+        {
+            Description =
+                "Write the bundle with your names and SQL as they are, and no mapping.  It must not be posted.",
+            Arity = ArgumentArity.Zero,
+        };
+
+        var verbose = new Option<bool>(VerboseOption)
+        {
+            Description = "Say what the run decides for the project, the file, the database and the query, as it goes.",
+            Arity = ArgumentArity.Zero,
+        };
+
+        var log = new Option<string>(DescribeCommand.LogOption)
+        {
+            Description =
+                "Write what the run did to this file, one JSON object on a line.  The file is overwritten.  "
+                + $"{DescribeCommand.LogVariable} gives the path when the option does not.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
+        var scrub = new Option<string>(ScrubOption)
+        {
+            Description =
+                $"Rename a raw bundle that {NoObfuscateOption} wrote, with no database and no project, and write it "
+                + $"and its mapping at {OutOption}.",
+            HelpName = "bundle",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
+        return new Command(
+            Name,
+            "Writes a bug-report bundle of one query: described again, its names renamed, and proved by a replay"
+        )
+        {
+            path,
+            project,
+            connection,
+            query,
+            output,
+            noObfuscate,
+            verbose,
+            log,
+            scrub,
+        };
+    }
+
+    /// <summary>
+    /// Whether the command line runs <c>diagnose</c>: the command is named, and it is its own action that runs and not
+    /// the help's, as <see cref="DescribeCommand.Runs" /> says it of <c>describe</c>.
+    /// </summary>
+    public static bool Runs(ParseResult parsed) =>
+        parsed.CommandResult.Command.Name == Name
+        && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
+
+    /// <summary>Whether a <c>diagnose</c> that runs was given <c>--verbose</c>.</summary>
+    public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
+
+    /// <summary>
+    /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when the
+    /// run has none, as <see cref="DescribeCommand.LogPathOf" /> reads it for <c>describe</c>.
+    /// </summary>
+    public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
+    {
+        if (!Runs(parsed))
+        {
+            return null;
+        }
+
+        if (parsed.GetValue<string>(DescribeCommand.LogOption) is { } option)
+        {
+            return option;
+        }
+
+        var variable = getEnvironmentVariable(DescribeCommand.LogVariable);
+        return string.IsNullOrWhiteSpace(variable) ? null : variable;
+    }
+
+    /// <summary>
+    /// The value of <c>--log</c> as <see cref="UsageCheck" /> read it, or null when it was not given.
+    /// </summary>
+    public static UsageValue? LogOptionOf(Usage usage) =>
+        DescribeCommand.ValuesOf(usage, DescribeCommand.LogOption) is [{ } value] ? value : null;
+
+    /// <summary>
+    /// What is wrong with a command line of <c>diagnose</c> by the command's own rules, each a whole line to write.  A
+    /// line names an option or a position and never repeats a token.  Empty for another command.
+    /// </summary>
+    /// <remarks>
+    /// The command needs <c>--query</c> or <c>--scrub</c>, and <c>--out</c> with either, unless the help is asked for.
+    /// <c>--scrub</c> takes nothing but <c>--out</c>.  A value of <c>--query</c> is a file, a colon and a name, the
+    /// colon the last one so that a Windows path reads, and its file is a <c>.sql</c> path.  The argument is the unit,
+    /// of which there is one, and never a <c>.sql</c> path, which <c>--query</c> names.  A value of <c>--out</c> or
+    /// <c>--log</c> is held to <c>--log</c>'s rule, and one of <c>--connection</c>, and an argument beside one, to
+    /// <c>describe</c>'s.
+    /// </remarks>
+    public static IReadOnlyList<string> CheckUsage(Usage usage)
+    {
+        if (usage.Command.Name != Name)
+        {
+            return [];
+        }
+
+        var messages = new List<string>();
+        var helps = usage.Flags.Any(static flag => flag is HelpOption);
+        var queries = DescribeCommand.ValuesOf(usage, QueryOption);
+        var scrubs = DescribeCommand.ValuesOf(usage, ScrubOption);
+        if (!helps && queries.IsEmpty && scrubs.IsEmpty)
+        {
+            messages.Add($"sqlsource: command '{Name}' needs {QueryOption} or {ScrubOption}");
+        }
+
+        if (!helps && DescribeCommand.ValuesOf(usage, OutOption).IsEmpty)
+        {
+            messages.Add($"sqlsource: option '{OutOption}' is required");
+        }
+
+        if (!scrubs.IsEmpty)
+        {
+            CheckScrubUsage(usage, queries.IsEmpty, messages);
+        }
+
+        var connections = new HashSet<string>(DatabaseName.Comparer);
+        var hasConnection = !DescribeCommand.ValuesOf(usage, DescribeCommand.ConnectionOption).IsEmpty;
+        foreach (var value in usage.Values)
+        {
+            if (ProblemOf(value, hasConnection, connections) is { } problem)
+            {
+                messages.Add(problem);
+            }
+        }
+
+        return messages;
+    }
+
+    // What --scrub takes: --out, and the help.  --query beside it is named as its rival.
+    private static void CheckScrubUsage(Usage usage, bool hasNoQuery, List<string> messages)
+    {
+        if (!hasNoQuery)
+        {
+            messages.Add($"sqlsource: options '{QueryOption}' and '{ScrubOption}' cannot be used together");
+        }
+
+        var others =
+            usage.Values.Any(static value => value.Option?.Name is not (ScrubOption or OutOption or QueryOption))
+            || usage.Flags.Any(static flag => flag is not HelpOption);
+        if (others)
+        {
+            messages.Add($"sqlsource: option '{ScrubOption}' takes no other option but '{OutOption}'");
+        }
+    }
+
+    // What is wrong with one value, or null.
+    private static string? ProblemOf(UsageValue value, bool hasConnection, HashSet<string> connections) =>
+        value.Option?.Name switch
+        {
+            null when hasConnection && DescribeCommand.SplitConnectionOf(value) is { } split => split,
+            null when SqlPath.IsSqlFile(value.Text) =>
+                $"sqlsource: the argument at position {value.Position} is a .sql path: name the query with "
+                    + $"'{QueryOption} <file>:<name>'",
+            QueryOption => ProblemOfQuery(value),
+            OutOption => DescribeCommand.ProblemOfPath(value, OutOption, "a bundle's path", isOnline: false),
+            DescribeCommand.LogOption => DescribeCommand.ProblemOfLogPath(value, isOnline: false),
+            DescribeCommand.ConnectionOption => DescribeCommand.ProblemOfConnection(value, connections),
+            _ => null,
+        };
+
+    // What is wrong with a value of --query, or null.
+    private static string? ProblemOfQuery(UsageValue value)
+    {
+        if (QueryName.Of(value) is not { } named)
+        {
+            return $"sqlsource: the value of option '{QueryOption}' at position {value.Position} is not <file>:<name>";
+        }
+
+        return SqlPath.IsSqlFile(named.File.Text)
+            ? null
+            : $"sqlsource: the file of option '{QueryOption}' at position {value.Position} is not a .sql path";
+    }
+
+    /// <summary>
+    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--connection</c>,
+    /// <c>--log</c>, <c>--query</c>, <c>--out</c> and <c>--scrub</c> the same values, in the same order.  True for a
+    /// command other than <c>diagnose</c>.
+    /// </summary>
+    public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
+        usage.Command.Name != Name
+        || (
+            DescribeCommand.ReadsAs(usage, parsed, DescribeCommand.ProjectOption)
+            && DescribeCommand.ReadsAs(usage, parsed, DescribeCommand.ConnectionOption)
+            && DescribeCommand.ReadsAsOne(usage, parsed, DescribeCommand.LogOption)
+            && DescribeCommand.ReadsAsOne(usage, parsed, QueryOption)
+            && DescribeCommand.ReadsAsOne(usage, parsed, OutOption)
+            && DescribeCommand.ReadsAsOne(usage, parsed, ScrubOption)
+        );
+
+    /// <summary>
+    /// Gives the <c>diagnose</c> that a command line runs its action, once the run has its reporter.
+    /// </summary>
+    /// <param name="parsed">A command line for which <see cref="Runs" /> is true.</param>
+    /// <param name="usage">The same command line as <see cref="UsageCheck" /> read it, which gives the values.</param>
+    /// <param name="host">What the run takes from outside.</param>
+    /// <param name="reporter">Where the errors go, with the run's trace.</param>
+    public static void Bind(ParseResult parsed, Usage usage, ToolHost host, Reporter reporter) =>
+        parsed.CommandResult.Command.SetAction(
+            async (command, cancellationToken) =>
+            {
+                // CheckUsage has held the command line to one of the two forms, each with its --out.
+                var output = DescribeCommand.ValuesOf(usage, OutOption).Single();
+                if (DescribeCommand.ValuesOf(usage, ScrubOption) is [{ } scrub])
+                {
+                    await DiagnoseRun.ScrubAsync(scrub, output, host, reporter, cancellationToken);
+                }
+                else
+                {
+                    var query =
+                        QueryName.Of(DescribeCommand.ValuesOf(usage, QueryOption).Single())
+                        ?? throw new InvalidOperationException("A --query that is no file and name was let through.");
+                    await DiagnoseRun.QueryAsync(
+                        usage,
+                        query,
+                        output,
+                        command.GetValue<bool>(NoObfuscateOption),
+                        host,
+                        reporter,
+                        cancellationToken
+                    );
+                }
+
+                // An error is in the reporter, where the exit code is taken.
+                return 0;
+            }
+        );
+
+    /// <summary>
+    /// A value of <c>--query</c> as the run reads it: the file, before the last colon, and the query's name after it.
+    /// </summary>
+    /// <param name="File">
+    /// The file, as a value of the option at its position, so that a message names it as a path of the command line.
+    /// </param>
+    /// <param name="Query">The query's name, which a message prints.</param>
+    internal sealed record QueryName(UsageValue File, string Query)
+    {
+        /// <summary>The file and the name of a value, or null when either is missing or blank.</summary>
+        public static QueryName? Of(UsageValue value)
+        {
+            var colon = value.Text.LastIndexOf(':');
+            if (colon < 0)
+            {
+                return null;
+            }
+
+            var file = value.Text[..colon];
+            var name = value.Text[(colon + 1)..];
+            return string.IsNullOrWhiteSpace(file) || string.IsNullOrWhiteSpace(name)
+                ? null
+                : new QueryName(value with { Text = file }, name);
+        }
+    }
+}
