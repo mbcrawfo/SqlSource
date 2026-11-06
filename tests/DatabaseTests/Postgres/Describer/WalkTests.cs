@@ -65,6 +65,46 @@ public sealed class WalkTests(PostgresDatabases postgres)
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NullableOuterJoin, NullableOuterJoin]);
     }
 
+    // A list whose truth is used as a value is read as negated: the planner reads (o.id = $1) IS FALSE, = false or a
+    // cast compared as strict and makes the join inner, but an empty list makes them true where o.id is NULL.
+    [Theory]
+    [InlineData("(o.id IN @ids) IS FALSE")]
+    [InlineData("(o.id IN @ids) = false")]
+    [InlineData("false = (o.id IN @ids)")]
+    [InlineData("(o.id IN @ids) <> true")]
+    [InlineData("(o.id IN @ids) < true")]
+    [InlineData("(o.id IN @ids)::int = 0")]
+    public async Task DescribeAsync_LeftJoinThatAListsTestMakesInner_IsNullableThroughout(string condition)
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE " + condition
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NullableOuterJoin, NullableOuterJoin]);
+    }
+
+    // A list that a WHEN reads is a condition, which FALSE and NULL fail alike, and the walk proves what it can.
+    [Fact]
+    public async Task DescribeAsync_LeftJoinWithAListInWhen_KeepsTheOuterSideNotNull()
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id "
+                    + "WHERE CASE WHEN o.id IN @ids THEN true ELSE false END"
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NullableOuterJoin]);
+    }
+
     // A query without a word of the gate has no outer join for a negated list to undo, and keeps the catalog's answer.
     [Fact]
     public async Task DescribeAsync_InnerJoinWithANegatedList_KeepsTheCatalogsAnswer()

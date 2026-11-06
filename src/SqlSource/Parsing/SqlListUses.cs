@@ -14,14 +14,15 @@ namespace SqlSource.Parsing;
 /// but for the <c>NOT</c> of <c>IS NOT</c>, and stays open at its depth of parentheses, and in every parenthesis
 /// opened inside it, until an <c>AND</c>, an <c>OR</c> or a comma at that depth, or the parenthesis that closes the
 /// depth.  So <c>id NOT IN @ids</c>, <c>NOT id IN @ids</c> and <c>NOT (a AND id IN @ids)</c> negate the list, and
-/// <c>NOT a AND id IN @ids</c> does not.  A list that only a test of its truth negates, <c>(id IN @ids) IS FALSE</c>,
-/// is not read as negated (TD-0105).  Words are runs of the dialect's name characters, so <c>JOIN</c> and T-SQL's
-/// <c>x#IN</c> are not <c>IN</c>, and a quoted region is never a word.  A comment or a hint between two words is passed
-/// over as white space.  <c>position(a IN b)</c> puts a single value after <c>IN</c>, so an <c>IN</c> directly inside
-/// the parentheses of a call to <c>position</c> makes no list.  The uses are read from the lexemes of the file, so
-/// nothing is lexed again, and a query without the word <c>IN</c> costs a search.
+/// <c>NOT a AND id IN @ids</c> does not.  A list whose truth the query uses as a value, such as
+/// <c>(id IN @ids) IS FALSE</c> or <c>f(id IN @ids)</c>, is negated too, as <see cref="Conditions" /> reads it.  Words
+/// are runs of the dialect's name characters, so <c>JOIN</c> and T-SQL's <c>x#IN</c> are not <c>IN</c>, and a quoted
+/// region is never a word.  A comment or a hint between two words is passed over as white space.
+/// <c>position(a IN b)</c> puts a single value after <c>IN</c>, so an <c>IN</c> directly inside the parentheses of a
+/// call to <c>position</c> makes no list.  The uses are read from the lexemes of the file, so nothing is lexed again,
+/// and a query without the word <c>IN</c> costs a search.
 /// </remarks>
-internal static class SqlListUses
+internal static partial class SqlListUses
 {
     private const string In = "IN";
 
@@ -57,6 +58,9 @@ internal static class SqlListUses
 
         // A parameter lexeme.
         Parameter,
+
+        // A run of operator characters, such as "=" or "->>".
+        Operator,
 
         // Anything else that is not white space: a quoted region, or a character that is not a name character.
         Other,
@@ -113,11 +117,13 @@ internal static class SqlListUses
         // Whether a NOT is open at the depth of the cursor, and whether one is open at a depth that holds it.
         var notHere = false;
         var notAbove = false;
+        var conditions = new Conditions(uses);
         var cursor = new Cursor(text, lexemes, start, end, rules);
         for (var item = cursor.Next(); item != Item.End; item = cursor.Next())
         {
             if (item == Item.Word)
             {
+                conditions.Word(cursor);
                 if (cursor.IsWord(Not) && !afterIs)
                 {
                     notHere = true;
@@ -135,11 +141,17 @@ internal static class SqlListUses
 
             if (item == Item.Open)
             {
+                conditions.Open();
                 (open ??= []).Add(new Parenthesis(afterPosition, notHere, notAbove));
                 notAbove |= notHere;
                 notHere = false;
             }
-            else if (item == Item.Close && open is { Count: > 0 })
+            else if (item == Item.Close)
+            {
+                conditions.Close();
+            }
+
+            if (item == Item.Close && open is { Count: > 0 })
             {
                 var closed = open[open.Count - 1];
                 open.RemoveAt(open.Count - 1);
@@ -148,6 +160,7 @@ internal static class SqlListUses
             }
             else if (item == Item.Comma)
             {
+                conditions.Comma();
                 notHere = false;
             }
             else if (item == Item.Parameter)
@@ -155,7 +168,16 @@ internal static class SqlListUses
                 var isList = afterIn && !(open is { Count: > 0 } && open[open.Count - 1].IsPosition);
                 var use = Classify(isList, notHere || notAbove, cursor);
                 hasList |= use is SqlParameterUse.List or SqlParameterUse.NegatedList;
+                conditions.Parameter(uses.Count, use);
                 uses.Add(use);
+            }
+            else if (item == Item.Operator)
+            {
+                conditions.Operator(cursor);
+            }
+            else if (item == Item.Other)
+            {
+                conditions.Other(cursor);
             }
 
             afterIn = false;
@@ -163,6 +185,7 @@ internal static class SqlListUses
             afterPosition = false;
         }
 
+        conditions.End();
         return hasList ? uses.MoveToImmutable() : ImmutableArray<SqlParameterUse>.Empty;
     }
 
@@ -221,6 +244,20 @@ internal static class SqlListUses
         public readonly bool IsWord(string word) =>
             text.AsSpan(_word.Start, _word.Length).Equals(word.AsSpan(), StringComparison.OrdinalIgnoreCase);
 
+        // Whether the word the cursor last met is one of the given ones, ignoring case.
+        public readonly bool IsAnyWord(string[] words)
+        {
+            for (var index = 0; index < words.Length; index++)
+            {
+                if (IsWord(words[index]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public Item Next()
         {
             while (_lexeme < end)
@@ -236,6 +273,7 @@ internal static class SqlListUses
 
                     if (lexeme.Kind == SqlLexemeKind.Quoted)
                     {
+                        _word = default;
                         return Item.Other;
                     }
 
@@ -258,6 +296,13 @@ internal static class SqlListUses
                 var value = text[_offset];
                 if (!rules.IsNameCharacter(value))
                 {
+                    if (IsOperatorCharacter(value))
+                    {
+                        ReadOperator(textEnd);
+                        return Item.Operator;
+                    }
+
+                    _word = new TextSpan(_offset, 1);
                     _offset++;
                     return value switch
                     {
@@ -282,6 +327,46 @@ internal static class SqlListUses
 
             return Item.End;
         }
+
+        // An operator is a run of operator characters, which, as PostgreSQL reads it, ends in no "+" or "-" unless it
+        // holds one of ~ ! @ # % ^ & | ` ?, so that "=-1" is "=" and "-".
+        private void ReadOperator(int textEnd)
+        {
+            var operatorStart = _offset;
+            var unusual = false;
+            while (_offset < textEnd && IsOperatorCharacter(text[_offset]))
+            {
+                unusual |= text[_offset] is not ('+' or '-' or '*' or '/' or '<' or '>' or '=');
+                _offset++;
+            }
+
+            while (!unusual && _offset - operatorStart > 1 && text[_offset - 1] is '+' or '-')
+            {
+                _offset--;
+            }
+
+            _word = TextSpan.FromBounds(operatorStart, _offset);
+        }
+
+        private static bool IsOperatorCharacter(char value) =>
+            value
+                is '+'
+                    or '-'
+                    or '*'
+                    or '/'
+                    or '<'
+                    or '>'
+                    or '='
+                    or '~'
+                    or '!'
+                    or '@'
+                    or '#'
+                    or '%'
+                    or '^'
+                    or '&'
+                    or '|'
+                    or '`'
+                    or '?';
 
         private void MoveToNextLexeme()
         {

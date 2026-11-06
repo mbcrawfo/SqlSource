@@ -23,13 +23,75 @@ public sealed class SqlListUsesTests
     [InlineData("postgres", "NOT a AND id IN @ids", new[] { "List" })]
     [InlineData("postgres", "NOT (a) OR id IN @ids", new[] { "List" })]
     [InlineData("postgres", "(NOT a) AND id IN @ids", new[] { "List" })]
-    [InlineData("postgres", "f(NOT a, id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "SELECT NOT a, id IN @ids", new[] { "List" })]
     [InlineData("postgres", "id NOT IN @a AND id IN @b", new[] { "NegatedList", "List" })]
     [InlineData("postgres", "id IN @a AND NOT id IN @b", new[] { "List", "NegatedList" })]
-    // The NOT of IS NOT tests a value and negates nothing after it.
-    [InlineData("postgres", "x IS NOT DISTINCT FROM id IN @ids", new[] { "List" })]
-    // Only a NOT negates: a test of the truth of a list is read as a list (TD-0105).
-    [InlineData("postgres", "(id IN @ids) IS FALSE", new[] { "List" })]
+    // The NOT of IS NOT tests a value and negates nothing after it, though here the list is a value compared.
+    [InlineData("postgres", "WHERE NOT b AND x IS NOT DISTINCT FROM id IN @ids", new[] { "NegatedList" })]
+    // A list whose truth the query uses as a value, compared, tested, cast or passed to a call, is negated too: an
+    // empty list makes it FALSE where one value would make it NULL, and the value can turn that FALSE true.
+    [InlineData("postgres", "WHERE (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) IS NOT TRUE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE false = (id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE false = id IN @ids", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE id IN @ids = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) <> true", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) < true", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids)::int = 0", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) IN (false)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE COALESCE(id IN @ids, false) = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE CASE id IN @ids WHEN false THEN true END", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE CASE WHEN a THEN id IN @ids END = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE f(id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE a = 1 AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE x IS DISTINCT FROM y AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE left(a, 1) = 'x' AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "JOIN t ON (t.id IN @ids) = false JOIN u ON true", new[] { "NegatedList" })]
+    // A value inside a subquery or a WITH query may reach a filter of the query around it.
+    [InlineData("postgres", "WITH s AS (SELECT id IN @ids AS f FROM t) SELECT f FROM s", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT f FROM (SELECT id IN @ids AS f FROM t) s", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT (SELECT t.id IN @ids FROM t LIMIT 1)", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT f FROM (SELECT a WHERE b UNION SELECT id IN @ids AS f) s", new[] { "NegatedList" })]
+    // A list reached from WHERE, ON, HAVING or WHEN through AND, OR and parentheses alone is a condition, which FALSE
+    // and NULL fail alike, and so is one in the output of the outermost statement.
+    [InlineData("postgres", "WHERE id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE lower(id) IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE id + 1 IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE data->>'k' IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE id::text IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE (@ids IS NULL OR id IN @ids)", new[] { "NullTest", "List" })]
+    [InlineData("postgres", "WHERE a BETWEEN 1 AND 2 AND id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE a = 1 OR (b AND id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "WHERE EXISTS (SELECT 1 FROM t WHERE t.id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "WHERE CASE WHEN id IN @ids THEN false ELSE true END", new[] { "List" })]
+    [InlineData("postgres", "WHERE CASE WHEN a THEN id IN @ids ELSE false END", new[] { "List" })]
+    [InlineData("postgres", "WHERE x LIKE @p AND id IN @ids", new[] { "Value", "List" })]
+    [InlineData("postgres", "SELECT a FROM t JOIN u ON u.id IN @ids LEFT JOIN v ON true", new[] { "List" })]
+    [InlineData("postgres", "SELECT id IN @ids AS f FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT (id IN @ids) = false AS f", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t ORDER BY id IN @ids DESC", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t GROUP BY id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "SELECT a WHERE b UNION SELECT id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "UPDATE t SET f = id IN @ids WHERE a = 1", new[] { "List" })]
+    [InlineData("postgres", "DELETE FROM t WHERE a = 1 RETURNING id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "SELECT count(*) FILTER (WHERE id IN @ids) FROM t", new[] { "List" })]
+    [InlineData(
+        "postgres",
+        "INSERT INTO t SELECT a FROM u WHERE u.id IN @ids ON CONFLICT DO NOTHING",
+        new[] { "List" }
+    )]
+    // A statement's end starts the reading again at the outermost level.
+    [InlineData(
+        "postgres",
+        "SELECT (SELECT 1 WHERE (a IN @x) = false); SELECT b IN @y",
+        new[] { "NegatedList", "List" }
+    )]
+    [InlineData("postgres", "SELECT 1 WHERE (a IN @x); SELECT b IN @y", new[] { "List", "List" })]
+    // A parenthesis or a CASE left open ends with the query, and a ")" that closes nothing is passed over.
+    [InlineData("postgres", "WHERE (id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE CASE WHEN a THEN (id IN @ids) = false", new[] { "NegatedList" })]
     [InlineData("postgres", "id IN /* c */ @ids", new[] { "List" })]
     [InlineData("postgres", "id IN\n-- c\n@ids", new[] { "List" })]
     [InlineData("postgres", "id IN /*+ hint */ @ids", new[] { "List" })]
