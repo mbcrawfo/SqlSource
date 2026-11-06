@@ -58,6 +58,13 @@
         <None Include="README.md" Pack="true" PackagePath="/" />
     </ItemGroup>
     <ItemGroup>
+        <!-- PostgreSQL's vocabulary for the renaming, made by VocabularyTests of tests/DatabaseTests/Postgres. -->
+        <EmbeddedResource
+            Include="Bundles/Renaming/Postgres/postgres-vocabulary.txt"
+            LogicalName="SqlSource.Tool.Bundles.Renaming.Postgres.postgres-vocabulary.txt"
+        />
+    </ItemGroup>
+    <ItemGroup>
         <ProjectReference Include="../SqlSource/SqlSource.csproj" />
     </ItemGroup>
 </Project>

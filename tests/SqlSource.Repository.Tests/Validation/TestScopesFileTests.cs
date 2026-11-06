@@ -38,6 +38,13 @@ public sealed class TestScopesFileTests
     [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/schema.sql", nameof(TestScope.SqlServer))]
     [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/App.csproj", nameof(TestScope.Postgres))]
     [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/App.csproj", nameof(TestScope.SqlServer))]
+    [InlineData("src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresRenaming.cs", nameof(TestScope.Postgres))]
+    [InlineData("src/SqlSource.Tool/Bundles/Renaming/BundleRenamer.cs", nameof(TestScope.Both))]
+    [InlineData(
+        "tests/SqlSource.Tool.Tests/Bundles/Renaming/Postgres/PostgresRenamingTests.cs",
+        nameof(TestScope.Postgres)
+    )]
+    [InlineData("tests/SqlSource.Tool.Tests/Bundles/Renaming/BundleRenamerTests.cs", nameof(TestScope.None))]
     [InlineData("tests/SqlSource.Tool.Tests/SqlSource.Tool.Tests.csproj", nameof(TestScope.None))]
     [InlineData("tests/DatabaseTests/Postgres/Postgres.csproj", nameof(TestScope.Postgres))]
     [InlineData("tests/DatabaseTests/Postgres.Npgsql8/AppContainer.cs", nameof(TestScope.Postgres))]

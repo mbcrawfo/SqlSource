@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0102`
+Next id: `TD-0105`
 
 ## Active items
 
@@ -43,6 +43,9 @@ Next id: `TD-0102`
 | [TD-0097](TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md) | Open | 2026-11-03 | Medium | What phase 9's design says Visual Studio and VS Code show of a sidecar another process wrote, their design-time builds, the VS Code task and the file events of their saves was checked in Rider on macOS alone |
 | [TD-0100](TD-0100-a-merge-can-keep-an-older-tools-entry.md) | Open | 2026-11-04 | Medium | A sidecar records the tool's version for the whole file, so a git merge of a branch that updated the tool with one that described a query on the older tool can leave that query's entry under the new version, and neither the build nor `describe` sees it; only `describe --check` does |
 | [TD-0101](TD-0101-a-method-with-no-models-is-refused-as-one-with-models.md) | Open | 2026-11-04 | Low | A `codegen` query method that takes no models is refused with SQLSRC123 where a method with internal models would not compile, because the placement check cannot see a query's models |
+| [TD-0102](TD-0102-sql-server-renaming-folds-ignoring-case.md) | Open | 2026-11-05 | Medium | SQL Server's renaming of a bug-report bundle folds names ignoring case whatever the collation, into replacements in lower case, so a query whose names differ from the catalog's only by case, where the tool compares them by ordinal, is refused by the proof, and a case-sensitive database's two names that differ by case become one |
+| [TD-0103](TD-0103-sql-server-renaming-reads-a-money-literal-as-a-name.md) | Open | 2026-11-05 | Low | SQL Server's renaming of a bug-report bundle reads a money literal such as `$12` as a word, by the server's word rule, and renames it to a name, so the renamed SQL reads a column where the query held an amount |
+| [TD-0104](TD-0104-sql-server-renaming-cannot-read-back-some-copies.md) | Open | 2026-11-05 | Low | SQL Server's renaming of a bug-report bundle cannot read back a copy of a reused parameter that was cut to 127 characters, or one whose separator is ambiguous, as when `@x` and `@x_` are both reused, so the proof refuses the bundle |
 
 ## Columns
 

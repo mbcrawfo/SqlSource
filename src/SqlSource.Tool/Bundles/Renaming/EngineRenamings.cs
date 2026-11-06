@@ -1,4 +1,6 @@
 using SqlSource.Settings;
+using SqlSource.Tool.Bundles.Renaming.Postgres;
+using SqlSource.Tool.Bundles.Renaming.SqlServer;
 
 namespace SqlSource.Tool.Bundles.Renaming;
 
@@ -9,8 +11,8 @@ internal static class EngineRenamings
     public static IEngineRenaming? For(DatabaseEngine engine) =>
         engine switch
         {
-            DatabaseEngine.PostgreSql => null, // Built by 10.2.
-            DatabaseEngine.SqlServer => null, // Built by 10.3.
+            DatabaseEngine.PostgreSql => PostgresRenaming.Instance,
+            DatabaseEngine.SqlServer => SqlServerRenaming.Instance,
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
 }
