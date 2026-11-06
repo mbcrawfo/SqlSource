@@ -381,7 +381,7 @@ When a query gets a model, a type or a nullability that is wrong for what your d
 - **`--out` is required**: the path of the zip.  The mapping is written beside it, with `.mapping.json` added to its name, and a file at either path is overwritten.  Give a path outside your project's folder, such as `../report.zip`, since a build may copy a `.json` file of the project's folder, such as the mapping, into its output.  A path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx` is refused before anything is described ([SQLSRC218](diagnostics.md#sqlsrc218)).
 - **A query that the tool refuses makes a bundle too**, which holds the error.  The run prints `sqlsource: the query was refused: SQLSRC226`, with the error's id, before the bundle's line, and exits with `0`.  The error itself is not printed again, since `describe` showed it to you.
 - **A database that cannot be opened makes no bundle.**  Its error is printed as `describe` prints it, and the exit code is `1`.
-- **An error in another `.sql` file of the project is not printed**, and does not stop the bundle or change the exit code, since it cannot change the query: `describe` shows it, and the log holds it.  Any other error is printed, such as one in the query's own file, in a settings file or in a project.  When the query can still be described, as beside an error of another query of its file or an unknown key in a settings file, the bundle is written too and the exit code is `1`; when it cannot, as when its file holds a query name that is not valid, no bundle is written.
+- **An error in another `.sql` file of the project is not printed**, and does not stop the bundle or change the exit code, since it cannot change the query: `describe` shows it, and the log holds it.  Any other error, such as one in the query's own file, in another query of that file, in a settings file, in a project or in the `.env` file, is printed and makes no bundle, since it may change the query, and the exit code is `1`: fix it and run `diagnose` again.
 
 Attach the zip to the issue, and keep the mapping to yourself: it lists each new name beside the name of yours it stands for, so that you can read what a maintainer finds in your own names.  To see what the maintainer will see, run [`replay`](#replay) on the zip: it says `reproduced`, and its lines name the new names.
 
@@ -505,8 +505,8 @@ A connection or log variable that is empty or holds only white space is not set.
 
 | Code | When |
 |----|----|
-| `0` | The run reported no error; a `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP`, whatever its passes reported; or `diagnose` wrote its bundle, of a query that was refused too, and printed no error |
-| `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; `diagnose` wrote no bundle, wrote the bundle and not its mapping, or printed an error beside the bundle; or a run without `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
+| `0` | The run reported no error; a `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP`, whatever its passes reported; or `diagnose` wrote its bundle, of a query that was refused too |
+| `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; `diagnose` wrote no bundle, or wrote the bundle and not its mapping; or a run without `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
 | `2` | `--check` found a sidecar out of date, and nothing else went wrong; or `replay` gave another answer than the bundle's |
 
 A run that is stopped writes no further sidecar.  A second Ctrl+C ends the process at once.
@@ -580,7 +580,7 @@ $ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
 | `--scrub <bundle>` | Renames a raw bundle, with no database, no project and no connection, and writes it and its mapping at `--out`.  It takes no other option.  A bundle renamed already is [SQLSRC295](diagnostics.md#sqlsrc295), and one that cannot be read is an error as for [`replay`](#replay) |
 | `<path>`, `--project`, `--connection`, `--verbose`, `--log` | As for `describe`: see [arguments](#arguments) and [options](#options).  `<path>` names the project or solution alone, since `--query` names the one `.sql` file |
 
-It has none of `describe`'s other options.  Its connections come from the same places as `describe`'s ([connections](#connections)), and `SQLSOURCE_CONNECTION` gives the connection of the query's logical database even in a run with several, since `diagnose` describes one query.  The exit code is `0` when it wrote the bundle, a refused query's included, and its mapping unless the bundle is raw, and printed no error, and `1` otherwise: see [reporting a wrong model](#report-a-bug) for the errors it prints beside a bundle.
+It has none of `describe`'s other options.  Its connections come from the same places as `describe`'s ([connections](#connections)), and `SQLSOURCE_CONNECTION` gives the connection of the query's logical database even in a run with several, since `diagnose` describes one query.  The exit code is `0` when it wrote the bundle, a refused query's included, and its mapping unless the bundle is raw, and `1` otherwise.
 
 <a id="replay"></a>
 

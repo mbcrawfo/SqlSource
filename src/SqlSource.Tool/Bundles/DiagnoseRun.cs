@@ -29,8 +29,10 @@ namespace SqlSource.Tool.Bundles;
 /// <para>
 /// A run of <c>--query</c> plans the unit as <c>describe</c> does, with the query's file as the one filter, and
 /// describes the one query whatever its hash, through <see cref="DatabaseRuns" /> with a <see cref="RunCapture" />.  It
-/// writes no sidecar and deletes none: nothing of it reaches <see cref="SidecarStore" />.  A session that does not open
-/// makes no bundle, and its error is <c>describe</c>'s.  A query that the describer refuses makes a bundle with its
+/// writes no sidecar and deletes none: nothing of it reaches <see cref="SidecarStore" />.  An error of the plan at
+/// another <c>.sql</c> file is logged and not written; any other error written before the query is described stops
+/// the run, as one that may change the query.  A session that does not open makes no bundle, and its error is
+/// <c>describe</c>'s.  A query that the describer refuses makes a bundle with its
 /// failure, which the run says on standard output: the error is logged and not printed.
 /// </para>
 /// <para>
@@ -320,6 +322,14 @@ internal static class DiagnoseRun
             host,
             reporter
         );
+        // An error written by now, of the query's file, a settings file, a project, a C# file or the .env file, may
+        // change the query, so no bundle is made of it: the exit code is 0 exactly when a bundle is written.  An error
+        // of the plan at another .sql file was not written.
+        if (reporter.Count > reporter.UnwrittenCount)
+        {
+            return null;
+        }
+
         var capture = new RunCapture(SqlDialectName.Canonical(database.Dialect));
         await DatabaseRuns.RunAsync(selected, files, connections, host, reporter, cancellationToken, capture: capture);
 

@@ -197,30 +197,57 @@ public sealed class DiagnoseTests : IDisposable
         File.Exists(_scene.PathOf("report.zip")).ShouldBeFalse();
     }
 
-    // An error that is not at another .sql file, as one at another query of the query's own file or at a settings
-    // file, is printed, and the exit code is 1 beside the bundle.
+    // Any other error written before the query is described may change the query, so the run stops: no bundle, no
+    // line of one, and exit 1, with the error printed.  One row for each kind of place: another query of the query's
+    // own file, a settings file, a C# file, another project of the solution, and the .env file.
     [Theory]
     [InlineData("SQLSRC210", "Users.sql")]
     [InlineData("SQLSRC016", "sqlsource.json")]
-    public async Task Diagnose_AnErrorOfThePlanElsewhere_IsPrintedBesideTheBundle(string id, string at)
+    [InlineData("SQLSRC208", "Others.cs")]
+    [InlineData("SQLSRC220", "Tools/Tools.csproj")]
+    [InlineData("SQLSRC286", ".env")]
+    public async Task Diagnose_AnErrorThatMayChangeTheQuery_IsPrintedAndWritesNoBundle(string id, string at)
     {
         var fixture = _scene.Case(Plain);
-        if (at == DiagnoseScene.File)
+        _ = _scene.AddCase(fixture);
+        string[] unit = [];
+        switch (at)
         {
-            _ = _scene.AddCase(fixture, fixture.Query + "\n-- name: Other\nSELECT 1 FROM {{t}};\n");
-        }
-        else
-        {
-            _ = _scene.AddCase(fixture);
-            _scene.Project.Settings["nonsense"] = "x";
+            case DiagnoseScene.File:
+                _ = _scene.AddCase(fixture, fixture.Query + "\n-- name: Other\nSELECT 1 FROM {{t}};\n");
+                break;
+            case "sqlsource.json":
+                _scene.Project.Settings["nonsense"] = "x";
+                break;
+            case "Others.cs":
+                _ = _scene.Project.AddSource(at, Plans.TypeNamed("Others", "Source = Folder"));
+                break;
+            case "Tools/Tools.csproj":
+                var tools = _scene.Run.Folder.WriteFile(at, "<Project />");
+                _scene.Run.Processes.Projects[tools] = new FakeProject
+                {
+                    Imported = "",
+                    ProjectAssetsFile = _scene.PathOf("Tools/obj/missing.assets.json"),
+                };
+                _ = _scene.Run.Folder.WriteFile(
+                    "All.slnx",
+                    "<Solution><Project Path=\"App.csproj\" /><Project Path=\"Tools/Tools.csproj\" /></Solution>"
+                );
+                unit = ["All.slnx"];
+                break;
+            default:
+                _ = _scene.Run.Folder.WriteFile(at, "SQLSOURCE_CONNECTION_OTHER=\"Host=db\n");
+                break;
         }
 
-        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip");
+        var result = await _scene.DiagnoseAsync([.. unit, "--query", Query, "--out", "report.zip"]);
 
         result.ExitCode.ShouldBe(1);
-        result.Out.ShouldBe(_scene.Written("report.zip"));
-        result.Error.ShouldStartWith(_scene.PathOf(at) + "(");
-        result.Error.ShouldContain($": error {id}: ");
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith(_scene.PathOf(at));
+        result.Error.ShouldContain($" error {id}: ");
+        File.Exists(_scene.PathOf("report.zip")).ShouldBeFalse();
+        File.Exists(_scene.PathOf("report.zip" + BundleFiles.MappingSuffix)).ShouldBeFalse();
     }
 
     // A name is compared exactly, as the generator compares them.
