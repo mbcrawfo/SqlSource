@@ -13,7 +13,7 @@ namespace SqlSource.Tool.Watching;
 /// Which folders a <c>describe --watch</c> session watches, and what a change to a file in them asks of it.
 /// </summary>
 /// <remarks>
-/// It reads nothing but the <c>.git</c> markers that <see cref="DotEnvSearch.FoldersOf" /> looks for, whether the
+/// It reads nothing but the <c>.git</c> markers that <see cref="RepositoryFolders.FoldersOf" /> looks for, whether the
 /// folder of a project's assets file, and those above it, exist, and, outside a repository, where the nearest
 /// <c>Directory.Build.props</c> above a project is.  A set is made from the projects of one evaluation,
 /// so a session makes another when it evaluates again.  Every comparison of paths ignores case, as
@@ -73,10 +73,10 @@ internal sealed class WatchSet
         _listedFolders.UnionWith(_listed.Select(FolderOf));
         foreach (var folder in _listedFolders)
         {
-            _settingsFolders.UnionWith(DotEnvSearch.FoldersOf(folder));
+            _settingsFolders.UnionWith(RepositoryFolders.FoldersOf(folder));
         }
 
-        _envFolders.UnionWith(DotEnvSearch.FoldersOf(unitFolder));
+        _envFolders.UnionWith(RepositoryFolders.FoldersOf(unitFolder));
         Folders = FoldersOf(unitFolder, found, _settingsFolders);
     }
 
@@ -271,7 +271,7 @@ internal sealed class WatchSet
         foreach (var projectFolder in projectFolders)
         {
             recursive.Add(projectFolder);
-            alone.AddRange(DotEnvSearch.FoldersOf(projectFolder));
+            alone.AddRange(RepositoryFolders.FoldersOf(projectFolder));
         }
 
         foreach (var (project, assetsFile) in found.AssetsFiles)
@@ -280,13 +280,13 @@ internal sealed class WatchSet
             {
                 // With the folders above it, so that its deletion is seen.
                 recursive.Add(assetsFolder);
-                alone.AddRange(DotEnvSearch.FoldersOf(assetsFolder));
+                alone.AddRange(RepositoryFolders.FoldersOf(assetsFolder));
             }
         }
 
         // The folder of each listed file, and each folder above it that may hold a settings file of it.
         alone.AddRange(settingsFolders);
-        alone.AddRange(DotEnvSearch.FoldersOf(unitFolder));
+        alone.AddRange(RepositoryFolders.FoldersOf(unitFolder));
 
         // Sorted first, so that of two spellings in different case the same one stays whatever the order of the lists.
         var roots = new List<string>();
@@ -310,7 +310,7 @@ internal sealed class WatchSet
         others.AddRange([
             .. roots
                 .Concat(others)
-                .Where(folder => !DotEnvSearch.IsInRepository(folder))
+                .Where(folder => !RepositoryFolders.IsInRepository(folder))
                 .Select(Path.GetDirectoryName)
                 .OfType<string>()
                 .Select(Trim)
@@ -342,8 +342,8 @@ internal sealed class WatchSet
         }
 
         var projectFolder = FolderOf(project);
-        var root = DotEnvSearch.IsInRepository(projectFolder)
-            ? Trim(DotEnvSearch.FoldersOf(projectFolder)[^1])
+        var root = RepositoryFolders.IsInRepository(projectFolder)
+            ? Trim(RepositoryFolders.FoldersOf(projectFolder)[^1])
             : BuildPropsFolderOf(projectFolder) ?? projectFolder;
         var above = Path.GetDirectoryName(folder);
         while (above is not null && (Comparer.Equals(Trim(above), root) || IsBelow(above, root)))

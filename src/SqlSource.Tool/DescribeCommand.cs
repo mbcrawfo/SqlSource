@@ -11,6 +11,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
 using SqlSource.Settings;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
@@ -574,13 +575,14 @@ internal static class DescribeCommand
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
     // The plan's filters hold --database and the .sql paths, and not --project.  A .sql path that names no file still
     // counts as a filter, so that such a run deletes no sidecar.
-    private static DescribeOptions OptionsOf(Usage usage, RunUnit unit, RunPlan plan, RunMode mode) =>
+    private static DescribeOptions OptionsOf(Usage usage, RunUnit unit, RunPlan plan, RunMode mode, ToolHost host) =>
         new(
             mode,
             ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
             ConnectionsOf(usage),
             plan.Filters.Databases,
             UnitFolderOf(unit),
+            DotEnvSearch.FileOf(option: null, UnitFolderOf(unit), host.WorkingDirectory),
             OnlineOf(usage)
         );
 
@@ -607,7 +609,7 @@ internal static class DescribeCommand
     }
 
     /// <summary>
-    /// The full path of the folder of the unit, where the search for the run's <c>.env</c> file starts.
+    /// The full path of the folder of the unit, whose <c>.env</c> the run reads.
     /// </summary>
     internal static string UnitFolderOf(RunUnit unit) =>
         Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file in a folder.");
@@ -639,7 +641,7 @@ internal static class DescribeCommand
         CancellationToken cancellationToken
     ) => (await PlanUnitAsync(usage, host, reporter, cancellationToken))?.Plan;
 
-    // The plan, with the unit it was built for, whose folder is where the run's .env is searched for.
+    // The plan, with the unit it was built for, whose folder holds the run's .env.
     private static async Task<(RunUnit Unit, RunPlan Plan)?> PlanUnitAsync(
         Usage usage,
         ToolHost host,
@@ -855,5 +857,13 @@ internal static class DescribeCommand
         Reporter reporter,
         Action<LogValue> counted,
         CancellationToken cancellationToken
-    ) => DescribeRun.RunAsync(plan, OptionsOf(usage, unit, plan, mode), host, reporter, counted, cancellationToken);
+    ) =>
+        DescribeRun.RunAsync(
+            plan,
+            OptionsOf(usage, unit, plan, mode, host),
+            host,
+            reporter,
+            counted,
+            cancellationToken
+        );
 }

@@ -8,7 +8,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
 
-// A run takes the connection of a database from the .env file nearest to its unit when the environment has none.
+// A run takes the connection of a database from the .env file of its unit's folder when the environment has none.
 public sealed class DotEnvRunTests : IDisposable
 {
     private const string Invoices = "-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
@@ -140,23 +140,24 @@ public sealed class DotEnvRunTests : IDisposable
         result.Error.ShouldContain("\n" + NoConnectionHelp(DotEnvPath) + "\n");
     }
 
-    // The file read is the nearest to the unit, up to the root of the repository.
+    // A .env above the unit's folder is not read, though the folder above is the root of the repository.
     [Fact]
-    public async Task Run_NoConnectionAndADotEnvFileAboveTheUnit_HelpNamesTheFileRead()
+    public async Task Run_NoConnectionAndADotEnvFileAboveTheUnit_HelpNamesTheUnitsFile()
     {
         var project = Plans.Postgres(_scene.Run.Folder, directory: "repo/app").AnsweredBy(_scene.Run.Processes);
         var invoices = project.AddSql("Invoices.sql", Invoices);
         _ = _scene.Run.Folder.CreateFolder("repo/.git");
-        var read = _scene.Run.Folder.WriteFile("repo/.env", "OTHER=1\n");
+        _ = _scene.Run.Folder.WriteFile("repo/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
 
         var result = await _scene.DescribeAsync(project.ProjectPath);
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldStartWith(
             $"{invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
-                + NoConnectionHelp(read)
+                + NoConnectionHelp(_scene.Run.Folder.PathOf("repo/app/.env"))
                 + "\n"
         );
+        _scene.Describer.Opened.ShouldBeEmpty();
     }
 
     // A solution's run reads the .env of the solution's folder, not one of a project's own.
@@ -190,7 +191,8 @@ public sealed class DotEnvRunTests : IDisposable
         result.Error.ShouldContain(
             "\n"
                 + NoConnectionHelp(DotEnvPath)
-                + $".  The run did not read {listed}: it reads the .env nearest to {_scene.Run.Folder.Path}\n"
+                + $".  The run did not read {listed}: it reads {DotEnvPath} alone, and --env-file, or "
+                + "SqlSourceEnvFile in a build, names another\n"
         );
         _scene.Describer.Opened.ShouldBeEmpty();
     }
@@ -214,8 +216,8 @@ public sealed class DotEnvRunTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain(
             "    help: pass --connection reports=<connection string>, or set SQLSOURCE_CONNECTION_REPORTS in the "
-                + $"environment or in {DotEnvPath}.  The run did not read {reportsEnv}: it reads the .env nearest to "
-                + $"{_scene.Run.Folder.Path}\n"
+                + $"environment or in {DotEnvPath}.  The run did not read {reportsEnv}: it reads {DotEnvPath} alone, "
+                + "and --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain(_scene.Run.Folder.PathOf("Billing/.env"));
     }

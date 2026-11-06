@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Text;
 using SqlSource.Diagnostics;
@@ -49,12 +48,15 @@ internal static class DescribeErrors
     )
     {
         var environment = all.Environment;
+        var lookedFor = environment.LookedFor;
         var help = new StringBuilder("pass --connection ")
             .Append(connection.Database)
             .Append("=<connection string>, or set ")
             .Append(connection.Variable)
-            .Append(" in the environment or in ")
-            .Append(environment.FilePath ?? Path.Combine(environment.UnitFolder, DotEnvSearch.FileName));
+            .Append(" in the environment");
+        _ = lookedFor is not null
+            ? help.Append(" or in ").Append(lookedFor)
+            : help.Append(".  The run reads no .env file");
         if (!all.UnusedNames.IsEmpty)
         {
             _ = help.Append(".  --connection was given for ")
@@ -71,10 +73,11 @@ internal static class DescribeErrors
         var notRead = DotEnvSearch.NotRead(environment.UnitFolder, environment.FilePath, projectFolders, readTextFile);
         if (!notRead.IsEmpty)
         {
-            _ = help.Append(".  The run did not read ")
-                .Append(InWords(notRead))
-                .Append(": it reads the .env nearest to ")
-                .Append(environment.UnitFolder);
+            _ = help.Append(".  The run did not read ").Append(InWords(notRead));
+            _ = lookedFor is not null
+                ? help.Append(": it reads ").Append(lookedFor).Append(" alone")
+                : help.Append(": it reads no .env file");
+            _ = help.Append(", and --env-file, or SqlSourceEnvFile in a build, names another");
         }
 
         return ToolDiagnostic

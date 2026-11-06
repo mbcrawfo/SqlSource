@@ -83,6 +83,41 @@ public sealed class DatabaseRunsTests : IDisposable
     }
 
     [Fact]
+    public async Task Run_DatabaseWithoutAConnectionAndNoDotEnvToRead_HelpSaysTheRunReadsNone()
+    {
+        _scene.DotEnvLookedFor = null;
+
+        _ = await _scene.RunAsync(given: ["billing=" + Secrets.ConnectionWithWord]);
+
+        _scene
+            .Error.ToString()
+            .ShouldContain(
+                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
+                    + "environment.  The run reads no .env file\n"
+            );
+    }
+
+    // The .env of a project below the unit's folder is named, though the run reads none.
+    [Fact]
+    public async Task Run_DatabaseWithoutAConnectionAndNoDotEnvToReadAndAProjectsFile_HelpNamesTheFileNotRead()
+    {
+        _scene.DotEnvLookedFor = null;
+        var lib = Plans.Postgres(_scene.Folder, "Lib", "Lib");
+        _ = lib.AddSql("Other.sql", "-- name: Other\nSELECT 4;\n");
+        var libEnv = _scene.Folder.WriteFile("Lib/.env", "SQLSOURCE_CONNECTION_POSTGRES=Host=db\n");
+
+        _ = await _scene.RunAsync(Plans.Of(_scene.Project, lib), given: ["billing=" + Secrets.ConnectionWithWord]);
+
+        _scene
+            .Error.ToString()
+            .ShouldContain(
+                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
+                    + $"environment.  The run reads no .env file.  The run did not read {libEnv}: it reads no .env "
+                    + "file, and --env-file, or SqlSourceEnvFile in a build, names another\n"
+            );
+    }
+
+    [Fact]
     public async Task Run_ConnectionForANameCloseToADatabase_IsListedInTheHelpOfSqlsrc213()
     {
         _ = await _scene.RunAsync(

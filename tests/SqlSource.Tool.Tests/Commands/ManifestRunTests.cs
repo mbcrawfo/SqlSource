@@ -56,7 +56,7 @@ public sealed class ManifestRunTests : IDisposable
         _scene.Run.Processes.Requests.ShouldBeEmpty();
     }
 
-    // The .env file is searched from the folder of the project the manifest names, not from the manifest's folder.
+    // The .env file read is in the folder of the project the manifest names, not in the manifest's folder.
     [Fact]
     public async Task Run_ManifestAndAConnectionOnlyInTheDotEnvFileOfTheProject_UsesIt()
     {
