@@ -35,7 +35,7 @@ public sealed class DotEnvSearchTests : IDisposable
     [Fact]
     public void Read_NoEnvAnywhere_GivesNoFile()
     {
-        OutsideARepository.SkipUnless(_folder.Path);
+        AboveTheTempFolder.SkipWhenInARepository(_folder.Path);
         _ = _folder.CreateFolder("unit");
 
         var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
@@ -98,7 +98,7 @@ public sealed class DotEnvSearchTests : IDisposable
     [Fact]
     public void Read_OutsideARepository_ReadsOnlyTheUnitFolder()
     {
-        OutsideARepository.SkipUnless(_folder.Path);
+        AboveTheTempFolder.SkipWhenInARepository(_folder.Path);
         _ = _folder.WriteFile(".env", $"{KeyA}=Host=parent\n");
         _ = _folder.CreateFolder("unit");
 

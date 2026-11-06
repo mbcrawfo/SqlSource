@@ -50,7 +50,15 @@
 
 The review found 13 more tests of `tests/SqlSource.Tool.Tests` that fail the same way, since `WatchSet` climbs to a `.git` through the same `DotEnvSearch`: 8 cases of `Watching/WatchSetTests.cs` and 7 tests of `Commands/Watch/` (`WatchTests`, `WatchFolderTests`, `WatchDuringAPassTests`, `WatchEndingTests`).  The owner chose to guard them all.
 
-- [ ] **Step 1:** Add `OutsideARepository` at the project's root: `SkipReason` (the reason above) and `SkipUnless(string folder)`, which skips when `DotEnvSearch.IsInRepository(folder)`.  The two `DotEnvSearchTests` call it too.
+- [ ] **Step 1:** Add `AboveTheTempFolder` at the project's root: `RepositoryReason` (the reason above) and `SkipWhenInARepository(string folder)`, which skips when `DotEnvSearch.IsInRepository(folder)`.  The two `DotEnvSearchTests` call it too.
 - [ ] **Step 2:** Call it at the start of each affected test on its `TempFolder` (`watch.Run.Folder.Path` for a `WatchScene`), and in a theory only on its `repository: false` rows.
 - [ ] **Step 3:** Run `tests/SqlSource.Tool.Tests` with `TMPDIR` below a folder that holds an empty `.git`: no failure, the guarded tests skipped.  Run it with the usual temporary folder: no new skip.
 - [ ] **Step 4:** Add the rule to `tests/SqlSource.Tool.Tests/AGENTS.md`; `./format.sh`, `./pre-commit-validation.sh`, commit.
+
+### Task 3: The online build's `auto` test under a `.env` above (owner's answer to review finding R2-F1)
+
+`OnlineBuildTests.Build_AutoWithoutAConnectionSource_RunsNothingAndWritesNoFileOfIt` fails when any folder above the temporary folder holds a `.env`, since the build's `GetDirectoryNameOfFileAbove` looks up to the root of the file system.  The owner chose a skip with its own reason; the build's lookup stays as it is.
+
+- [ ] **Step 1:** Add `EnvReason` = `A folder above the temporary folder holds a .env.` and `SkipWhenAnEnvIsAbove(string folder)` to `AboveTheTempFolder`, which skips when a folder above `folder` holds a `.env` file; call it with `_fixtures.Root` at the start of that test.
+- [ ] **Step 2:** Run `tests/SqlSource.Tool.Tests` with `TMPDIR` below a folder that holds only a `.env`, and below one that holds only an empty `.git`: no failure.  With the usual temporary folder: no new skip.
+- [ ] **Step 3:** Update the rule of `tests/SqlSource.Tool.Tests/AGENTS.md`; `./format.sh`, `./pre-commit-validation.sh`, commit.

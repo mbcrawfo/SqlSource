@@ -363,7 +363,7 @@ public sealed class WatchSetTests
     public void Folders_ProjectUnit_AreItsFolderRecursiveAndTheFoldersOutside()
     {
         using var temp = new TempFolder();
-        OutsideARepository.SkipUnless(temp.Path);
+        AboveTheTempFolder.SkipWhenInARepository(temp.Path);
         var app = temp.CreateFolder("w/App");
         var shared = temp.CreateFolder("w/Shared");
         var project = Path.Combine(app, "App.csproj");
@@ -407,7 +407,7 @@ public sealed class WatchSetTests
     public void Folders_SolutionInTheRoot_IsTheRootAloneForEveryProjectBelow()
     {
         using var temp = new TempFolder();
-        OutsideARepository.SkipUnless(temp.Path);
+        AboveTheTempFolder.SkipWhenInARepository(temp.Path);
         var root = temp.CreateFolder("w");
         var a = temp.CreateFolder("w/A");
         var b = temp.CreateFolder("w/B");
@@ -430,7 +430,7 @@ public sealed class WatchSetTests
     public void Folders_TwoSpellingsOfOneFolder_AreOnce()
     {
         using var temp = new TempFolder();
-        OutsideARepository.SkipUnless(temp.Path);
+        AboveTheTempFolder.SkipWhenInARepository(temp.Path);
         var app = temp.CreateFolder("w/App");
         var project = Path.Combine(app, "App.csproj");
         var shared = temp.PathOf("w/Shared");
@@ -542,7 +542,7 @@ public sealed class WatchSetTests
         }
         else
         {
-            OutsideARepository.SkipUnless(temp.Path);
+            AboveTheTempFolder.SkipWhenInARepository(temp.Path);
         }
 
         var app = temp.CreateFolder("w/r/App");
@@ -576,7 +576,7 @@ public sealed class WatchSetTests
         }
         else
         {
-            OutsideARepository.SkipUnless(temp.Path);
+            AboveTheTempFolder.SkipWhenInARepository(temp.Path);
         }
 
         _ = temp.WriteFile(props + "/Directory.Build.props", "<Project />");
@@ -612,7 +612,7 @@ public sealed class WatchSetTests
         }
         else
         {
-            OutsideARepository.SkipUnless(temp.Path);
+            AboveTheTempFolder.SkipWhenInARepository(temp.Path);
         }
 
         var app = temp.CreateFolder("w/App");
@@ -649,7 +649,7 @@ public sealed class WatchSetTests
     public void Folders_AssetsFolderBelowTheProject_AddsNoFolder(bool restored)
     {
         using var temp = new TempFolder();
-        OutsideARepository.SkipUnless(temp.Path);
+        AboveTheTempFolder.SkipWhenInARepository(temp.Path);
         var app = temp.CreateFolder("w/App");
         if (restored)
         {
