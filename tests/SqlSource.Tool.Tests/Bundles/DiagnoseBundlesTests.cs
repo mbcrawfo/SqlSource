@@ -132,7 +132,7 @@ public sealed class DiagnoseBundlesTests
         {
             var query = planned.Query;
             var described = await session.DescribeAsync(
-                new DescribeRequest(query.Name, SampleSql.Build(query), query.Parameters),
+                new DescribeRequest(query.Name, SampleSql.Build(query, file.Dialect), query.Parameters),
                 token
             );
             if (described.Succeeded)

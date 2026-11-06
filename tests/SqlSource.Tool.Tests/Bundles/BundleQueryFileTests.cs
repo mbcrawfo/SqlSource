@@ -150,7 +150,7 @@ public sealed class BundleQueryFileTests
 
         query.Query.Name.ShouldBe(original.Query.Name);
         query.Query.Shape.ShouldBe(original.Query.Shape);
-        SampleSql.Build(query.Query).ShouldBe(SampleSql.Build(original.Query));
+        SampleSql.Build(query.Query, file.Dialect).ShouldBe(SampleSql.Build(original.Query, file.Dialect));
         // The C# type and the JSON opt-in describe nothing to the database, and query.sql drops them.
         SqlQueryParameter[] parameters = [.. query.Query.Parameters];
         parameters.ShouldBe([
