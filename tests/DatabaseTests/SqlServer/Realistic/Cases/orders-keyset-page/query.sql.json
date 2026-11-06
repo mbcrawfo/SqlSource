@@ -6,8 +6,9 @@
   "queries": {
     "ListOrdersAfter": {
       "hash": "69bc17c5b81bee3c107c0496334dd735d689bef0bed72e98839f8b307d117c67",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

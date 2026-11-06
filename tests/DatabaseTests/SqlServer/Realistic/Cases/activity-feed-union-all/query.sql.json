@@ -6,8 +6,9 @@
   "queries": {
     "GetCustomerActivity": {
       "hash": "2ec369bc7bd6868e910df96c7e04bdec0c37c70b449fcd11cf1db64cd5d6af09",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

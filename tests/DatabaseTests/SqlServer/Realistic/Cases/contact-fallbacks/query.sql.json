@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomerContacts": {
       "hash": "89d20d5c77b63e32bdb8d912e048ac14dcc171e14541cc52e9f661530f44b97c",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

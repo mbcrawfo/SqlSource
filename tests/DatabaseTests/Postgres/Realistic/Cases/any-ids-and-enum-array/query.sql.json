@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountsByIdsAndStatuses": {
       "hash": "37fe334fe0550609d5301d48dcfaac18f99ec9b77e179626cd00e855ca222c39",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

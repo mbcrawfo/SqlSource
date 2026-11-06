@@ -49,6 +49,13 @@ public sealed class SidecarComparerTests
         ShouldDiffer(entry => entry with { ResultKind = SidecarResultKind.None }, "resultKind", "\"rows\"", "\"none\"");
     }
 
+    // The tool's version differs between a developer and CI by design, so --check does not compare it.
+    [Fact]
+    public void FindDifference_EntriesDifferOnlyInToolVersion_IsNull() =>
+        SidecarComparer
+            .FindDifference(Sample() with { ToolVersion = "1.2.3" }, Sample() with { ToolVersion = "9.9.9" })
+            .ShouldBeNull();
+
     // Two names that differ only in case read one connection variable, so they are one database.
     [Fact]
     public void FindDifference_DatabaseNamesThatDifferInCase_IsNull() =>
@@ -445,25 +452,27 @@ public sealed class SidecarComparerTests
     [InlineData("h", "other", false)]
     [InlineData("h", "", false)]
     public void IsCurrentFor_HashAndDatabase_HoldsWhenBothAreTheEntrys(string hash, string database, bool expected) =>
-        Entry(hash: "h", database: "app").IsCurrentFor(hash, database).ShouldBe(expected);
+        Entry(hash: "h", database: "app", toolVersion: "1.2.3")
+            .IsCurrentFor(hash, database, "1.2.3")
+            .ShouldBe(expected);
 
     [Fact]
     public void IsCurrentFor_EntryWithoutADatabase_DoesNotHold() =>
-        Entry(hash: "h", database: null).IsCurrentFor("h", "app").ShouldBeFalse();
+        Entry(hash: "h", database: null, toolVersion: "1.2.3").IsCurrentFor("h", "app", "1.2.3").ShouldBeFalse();
 
+    [Fact]
+    public void IsCurrentFor_SameHashDatabaseAndVersion_IsTrue() =>
+        Entry(hash: "h", database: "app", toolVersion: "1.2.3").IsCurrentFor("h", "app", "1.2.3").ShouldBeTrue();
+
+    // A version is compared ordinally, whole: an older, a newer and a longer one are all another tool's.
     [Theory]
-    [InlineData(1, "1.2.3", "1.2.3", true)]
-    [InlineData(1, "1.2.3", "1.2.4", false)]
-    [InlineData(1, "1.2.3", "1.2.3.0", false)]
-    [InlineData(1, "1.2.3", "1.2.3-dev", false)]
-    [InlineData(2, "1.2.3", "1.2.3", false)]
-    [InlineData(0, "1.2.3", "1.2.3", false)]
-    public void IsWrittenBy_ToolVersion_HoldsForTheFormatOfThisReaderAndThatTool(
-        int formatVersion,
-        string written,
-        string toolVersion,
-        bool expected
-    ) => new Sidecar(formatVersion, written, Of<SidecarEntry>()).IsWrittenBy(toolVersion).ShouldBe(expected);
+    [InlineData("1.2.2")]
+    [InlineData("1.2.4")]
+    [InlineData("1.2.3.0")]
+    [InlineData("1.2.3-dev")]
+    [InlineData("")]
+    public void IsCurrentFor_OtherToolVersion_IsFalse(string toolVersion) =>
+        Entry(hash: "h", database: "app", toolVersion: "1.2.3").IsCurrentFor("h", "app", toolVersion).ShouldBeFalse();
 
     private static SidecarEntry Sample() =>
         Entry(

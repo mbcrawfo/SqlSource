@@ -6,8 +6,9 @@
   "queries": {
     "SyncOrders": {
       "hash": "9bbda0e6d413602fcbdea11a276adc81d45d00604dbb93cabab4a4aee611516b",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

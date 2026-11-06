@@ -6,8 +6,9 @@
   "queries": {
     "OrdersOfUser": {
       "hash": "4411cc3921c27a82df50f8fb23f1fcd32b04816ab4b391f093ae8a25b7543cbd",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

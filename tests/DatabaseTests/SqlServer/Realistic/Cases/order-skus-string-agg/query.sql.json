@@ -6,8 +6,9 @@
   "queries": {
     "ListOrdersWithSkus": {
       "hash": "2483792dcd9b5d8116ca933704fc099af52ef2f361183fc47f0daa95bc493fba",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

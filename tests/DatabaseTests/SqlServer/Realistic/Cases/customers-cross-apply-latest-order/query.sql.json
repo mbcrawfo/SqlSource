@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomersWithLatestOrder": {
       "hash": "da2084978876cbf9c1d3b5b675a39b5909437d0d9d84171dc8583d0b6e505723",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

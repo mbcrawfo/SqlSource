@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Shouldly;
@@ -55,7 +56,7 @@ public sealed class RunDecisionsTests : IDisposable
             .ShouldBe([QueryState.Skipped, QueryState.Skipped, QueryState.NotNeeded]);
         file.Queries[0].Entry.ShouldNotBeNull().Name.ShouldBe("GetUser");
         file.Queries[1].Entry.ShouldNotBeNull().Database.ShouldBe("billing");
-        _ = file.OnDisk.ShouldNotBeNull().Usable.ShouldNotBeNull();
+        _ = file.OnDisk.ShouldNotBeNull().Sidecar.ShouldNotBeNull();
     }
 
     [Fact]
@@ -130,6 +131,68 @@ public sealed class RunDecisionsTests : IDisposable
         _errors.ShouldBeEmpty();
     }
 
+    // A git merge can put an older tool's entry under a file this tool wrote: the entry's own version decides.
+    [Fact]
+    public void Decide_EntryOfAnotherToolInAFileOfThisTool_IsToDescribe()
+    {
+        var plan = Plans.Of(_project);
+        var file = plan.Files[0];
+        _ = SidecarFiles.Write(
+            file,
+            [
+                SidecarFiles.EntryFor(file.Queries[0]) with
+                {
+                    ToolVersion = "0.0.1",
+                },
+                SidecarFiles.EntryFor(file.Queries[1]),
+            ]
+        );
+
+        States(plan).ShouldBe([QueryState.ToDescribe, QueryState.Skipped, QueryState.NotNeeded]);
+        _errors.ShouldBeEmpty();
+    }
+
+    // The file's toolVersion is that of its last write, and decides nothing.
+    [Fact]
+    public void Decide_EntryOfThisToolInAFileOfAnotherTool_IsSkipped()
+    {
+        var plan = Plans.Of(_project);
+        var file = plan.Files[0];
+        File.WriteAllText(
+            SidecarFormat.PathFor(file.Path),
+            SidecarWriter.Write(
+                new Sidecar(
+                    SidecarFormat.Version,
+                    "0.0.1",
+                    new EquatableArray<SidecarEntry>([.. file.Queries.Take(2).Select(SidecarFiles.EntryFor)])
+                )
+            )
+        );
+
+        States(plan).ShouldBe([QueryState.Skipped, QueryState.Skipped, QueryState.NotNeeded]);
+        _errors.ShouldBeEmpty();
+    }
+
+    // The tool compares the whole version, so a build with a suffix is another tool to it.
+    [Fact]
+    public void Decide_EntryVersionWithSuffix_IsToDescribe()
+    {
+        var plan = Plans.Of(_project);
+        var file = plan.Files[0];
+        _ = SidecarFiles.Write(
+            file,
+            [
+                SidecarFiles.EntryFor(file.Queries[0]),
+                SidecarFiles.EntryFor(file.Queries[1]) with
+                {
+                    ToolVersion = PackageVersion.Prefix + "-dev",
+                },
+            ]
+        );
+
+        States(plan).ShouldBe([QueryState.Skipped, QueryState.ToDescribe, QueryState.NotNeeded]);
+    }
+
     [Fact]
     public void Decide_SidecarOfALowerFormatVersion_IsAbsent()
     {
@@ -174,7 +237,11 @@ public sealed class RunDecisionsTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        var path = SidecarFiles.Write(file, file.Queries.Take(2).Select(SidecarFiles.EntryFor), formatVersion: 2);
+        var path = SidecarFiles.Write(
+            file,
+            file.Queries.Take(2).Select(SidecarFiles.EntryFor),
+            formatVersion: SidecarFormat.Version + 1
+        );
 
         States(plan, RunMode.Force).ShouldBe([QueryState.Failed, QueryState.Failed, QueryState.NotNeeded]);
 
@@ -182,7 +249,12 @@ public sealed class RunDecisionsTests : IDisposable
             .ShouldHaveSingleItem()
             .ShouldBe(
                 ToolDiagnostic
-                    .ForFile(ToolDiagnostics.SidecarOfNewerTool, path, "2", "1")
+                    .ForFile(
+                        ToolDiagnostics.SidecarOfNewerTool,
+                        path,
+                        (SidecarFormat.Version + 1).ToString(CultureInfo.InvariantCulture),
+                        SidecarFormat.Version.ToString(CultureInfo.InvariantCulture)
+                    )
                     .WithLines(new ContinuationLine("help", "update the SqlSource.Tool package"))
             );
     }
@@ -222,7 +294,7 @@ public sealed class RunDecisionsTests : IDisposable
         _project.Settings["dialect"] = "ansi";
         var plan = Plans.Of(_project);
         plan.Files[0].State.ShouldBe(PlannedFileState.NotDescribable);
-        _ = SidecarFiles.Write(plan.Files[0], [], formatVersion: 2);
+        _ = SidecarFiles.Write(plan.Files[0], [], formatVersion: SidecarFormat.Version + 1);
 
         var file = RunDecisions.Decide(plan, RunMode.Describe, _errors)[0];
 

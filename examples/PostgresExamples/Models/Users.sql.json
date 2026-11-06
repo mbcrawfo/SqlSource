@@ -6,8 +6,9 @@
   "queries": {
     "GetUser": {
       "hash": "383f177b4bf10b884e2c5f5c6b4398dbccc859a599acd12eb21ce721cf959e69",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {

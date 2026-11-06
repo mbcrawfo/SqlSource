@@ -6,8 +6,9 @@
   "queries": {
     "JobsAndDatabases": {
       "hash": "c04b99230abe173dfe8c2eafc68cd8adc1495f846a86041c5d39bd9b4677f2cf",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

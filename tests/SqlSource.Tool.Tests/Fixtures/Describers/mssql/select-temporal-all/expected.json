@@ -6,8 +6,9 @@
   "queries": {
     "PriceHistory": {
       "hash": "e8e7608691ba55dae536a6eac41168314049c552a5ddcaaa9779896ae109301c",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

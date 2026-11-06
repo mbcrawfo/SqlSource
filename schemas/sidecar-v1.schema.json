@@ -21,9 +21,8 @@
       "const": 1
     },
     "toolVersion": {
-      "description": "The version of the tool that wrote the file, as major.minor.patch with no prerelease suffix, so that a local build and a CI build of one version write the same file. The generator warns when it differs from its own, and the tool keeps no entry of a file another version wrote.",
-      "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+      "description": "The version of the tool that last wrote the file, as major.minor.patch with no prerelease suffix, so that a local build and a CI build of one version write the same file. Each entry has the version of the tool that wrote it. The generator warns when this version or an entry's differs from its own.",
+      "$ref": "#/$defs/toolVersion"
     },
     "queries": {
       "description": "One entry for each query of the .sql file that needs a description, keyed by the query's name and in the file's order. The tool never writes a file with no entry.",
@@ -34,27 +33,32 @@
   },
   "$defs": {
     "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "toolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "triState": { "type": ["boolean", "null"] },
     "ordinal": { "type": "integer", "minimum": 0 },
     "query": {
       "description": "What the database said of one query.",
       "type": "object",
-      "required": ["hash", "engine", "database", "serverVersion", "resultKind", "parameters"],
+      "required": ["hash", "toolVersion", "database", "engine", "serverVersion", "resultKind", "parameters"],
       "additionalProperties": false,
       "properties": {
         "hash": {
           "description": "SHA-256, in lower-case hex, of the UTF-8 bytes of: the engine's name; a line feed; the query's SQL without comments, each token written as {{name:default}}; a line feed; and a line for each parameter that a -- param: marker declares with a type or a nullability. It ties the entry to the query's text: an entry whose hash is not the query's is stale. Changing its input raises formatVersion.",
           "$ref": "#/$defs/hash"
         },
-        "engine": {
-          "description": "The canonical name of the file's dialect, which picks the shape of every type object in the entry: 'postgres' or 'mssql'.",
-          "type": "string",
-          "enum": ["postgres", "mssql"]
+        "toolVersion": {
+          "description": "The version of the tool that described the query, written as the file's toolVersion is. It differs from the file's when a git merge brings in an entry that another version wrote, and with hash and database it decides whether the entry is current: the tool describes the query again when it is not the tool's own version, and the generator warns.",
+          "$ref": "#/$defs/toolVersion"
         },
         "database": {
           "description": "The name of the database the query was described against, as the settings name it. The tool compares it ignoring case.",
           "type": "string",
           "minLength": 1
+        },
+        "engine": {
+          "description": "The canonical name of the file's dialect, which picks the shape of every type object in the entry: 'postgres' or 'mssql'.",
+          "type": "string",
+          "enum": ["postgres", "mssql"]
         },
         "serverVersion": {
           "description": "Informational: the server's version, short so that a change of server shows in a diff as one word. PostgreSQL: server_version cut at its first space, '16.4'. SQL Server: SERVERPROPERTY('ProductVersion'), '16.0.4135.4'.",

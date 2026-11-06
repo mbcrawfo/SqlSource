@@ -6,8 +6,9 @@
   "queries": {
     "UpsertProduct": {
       "hash": "aed38501b7e2d4b1bb1ca265ef963c877d2217345adff3ffc73929b7b31b6229",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

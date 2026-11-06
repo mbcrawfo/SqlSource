@@ -6,8 +6,9 @@
   "queries": {
     "SearchEverything": {
       "hash": "a8f82fb9c844e6203e07d1efd711ec64b9e9e1652a3bb2e606e69b1618ff25d1",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

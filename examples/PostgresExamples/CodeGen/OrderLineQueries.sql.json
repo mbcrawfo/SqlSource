@@ -6,8 +6,9 @@
   "queries": {
     "ListOrderLines": {
       "hash": "a6917672b65f7ed76d793f38675552dd465f83fdea0b95b0d532c89d53f7d406",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -130,8 +131,9 @@
     },
     "ListLatestOrderPerProduct": {
       "hash": "108cc31788a84c4105d9447cd306e4d55a5f8bdd22e4bd73da1db9370d8cfeab",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

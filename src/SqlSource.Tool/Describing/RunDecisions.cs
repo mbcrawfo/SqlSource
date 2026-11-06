@@ -126,8 +126,8 @@ internal static class RunDecisions
 
         if (
             query is { Hash: { } hash, Database: { } database }
-            && onDisk?.Usable?.Find(query.Query.Name) is { } entry
-            && entry.IsCurrentFor(hash, database)
+            && onDisk?.Sidecar?.Find(query.Query.Name) is { } entry
+            && entry.IsCurrentFor(hash, database, PackageVersion.Prefix)
         )
         {
             return new QueryWork(query, QueryState.Skipped, entry);

@@ -6,8 +6,9 @@
   "queries": {
     "ListOrdersInStatuses": {
       "hash": "6fabbf46771695ae5c6a1e8fee7d61656ae91548e1a19f84b26ac75d7402f57a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

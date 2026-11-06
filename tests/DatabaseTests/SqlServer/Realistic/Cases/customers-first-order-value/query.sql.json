@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomersFirstOrderValue": {
       "hash": "616c76178788eb43fe9bf414517d26a6fa73d19ffb4982602b7709b1f2ebdbd4",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

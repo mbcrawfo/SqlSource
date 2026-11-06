@@ -6,8 +6,9 @@
   "queries": {
     "ListReservationsOverlapping": {
       "hash": "09805358901a5f474f6c490a98f48f62ace6afe4316d340009c351e83b47b7ab",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

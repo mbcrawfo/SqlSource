@@ -6,8 +6,9 @@
   "queries": {
     "CountOrdersByStatusAndCity": {
       "hash": "7a8dace6bb5ea501b9a0a6b6fbcf94fd07036ddab3a210a354f3c79d97153f78",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

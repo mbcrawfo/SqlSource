@@ -6,8 +6,9 @@
   "queries": {
     "ListOrderLines": {
       "hash": "2c454db5a5c86240105aa6c9f04e298f1ba4119351e4454ef2cf77f0b4354bc6",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -127,8 +128,9 @@
     },
     "ListLatestOrderPerProduct": {
       "hash": "95202d34fe904c5228fe5cec8223431a7fa3654c665d1c876b825cd1d5c68541",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

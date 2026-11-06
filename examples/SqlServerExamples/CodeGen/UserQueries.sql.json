@@ -6,8 +6,9 @@
   "queries": {
     "FindUserByEmail": {
       "hash": "c859ccc69e374129327f8ea50d94efd0abe7bc8aa4a41671bcfebdd5ece40bb5",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -97,8 +98,9 @@
     },
     "ChangeUserEmail": {
       "hash": "482a6bf8212eb021ede3ae2a5b5682e8cf6b683231c6f7f91962cdc4c7b3b4f7",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -134,8 +136,9 @@
     },
     "ListUsersNewestFirst": {
       "hash": "48003f0a731a75c819d0acf83d2013d4eb9c9e4804e054e669b71c028fee9d5c",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -208,8 +211,9 @@
     },
     "StreamUsersOldestFirst": {
       "hash": "e483817a6cb3183306e9c7790abeaf005f3fb41065fe4cbe21fb32beeb8effac",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -282,8 +286,9 @@
     },
     "ListUsersSortedBy": {
       "hash": "a693111c134fa0a9d130085bdb4d44c7ae37d01b8c53b22aa470917fa9f77179",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

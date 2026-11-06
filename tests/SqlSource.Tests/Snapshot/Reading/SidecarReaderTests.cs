@@ -36,7 +36,8 @@ public sealed class SidecarReaderTests
         + ", 'identity': false, 'computed': false}]";
 
     private const string EntryJson =
-        "{'hash': 'h', 'engine': 'postgres', 'database': 'app', 'serverVersion': '16.4', 'resultKind': 'rows'"
+        "{'hash': 'h', 'toolVersion': '1.2.0', 'engine': 'postgres', 'database': 'app', "
+        + "'serverVersion': '16.4', 'resultKind': 'rows'"
         + ", 'matchesTable': {'schema': 'public', 'table': 'users'}, 'plan': 'walked', 'tableMatch': 'matched'"
         + ", 'parameters': "
         + ParametersJson
@@ -77,6 +78,7 @@ public sealed class SidecarReaderTests
                         "Q",
                         new TextSpan(text.IndexOf("\"Q\"", StringComparison.Ordinal), 3),
                         "h",
+                        "1.2.0",
                         "postgres",
                         "app",
                         "16.4",
@@ -129,6 +131,7 @@ public sealed class SidecarReaderTests
                 "DeleteUser",
                 new TextSpan(text.IndexOf("\"DeleteUser\"", StringComparison.Ordinal), 12),
                 "1e2d3c4b5a6f7e8d9c0b1a2f3e4d5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d",
+                "0.4.0",
                 "postgres",
                 "app",
                 "16.4",
@@ -249,7 +252,7 @@ public sealed class SidecarReaderTests
     // What the reader cannot do without, removed.  The span is the opening brace of the object that lacks it.
     [Theory]
     [InlineData("'toolVersion': '1.2.3', ", "", "{'formatVersion'", "toolVersion")]
-    [InlineData("'hash': 'h', ", "", "{'engine'", "hash")]
+    [InlineData("'hash': 'h', ", "", "{'toolVersion'", "hash")]
     [InlineData("'engine': 'postgres', ", "", "{'hash'", "engine")]
     [InlineData(", 'resultKind': 'rows'", "", "{'hash'", "resultKind")]
     [InlineData(", 'parameters': " + ParametersJson, "", "{'hash'", "parameters")]
@@ -302,6 +305,38 @@ public sealed class SidecarReaderTests
     public void Read_TopLevelKeyRemoved_IsMissingKeyAtTheFirstBrace(string text, string key) =>
         ShouldBeMalformed(Q(text), SidecarErrorKind.MissingKey, "{", 1, key);
 
+    // An entry's tool version decides whether it is current, so a reader cannot do without it, and a sidecar that
+    // an earlier build of the tool wrote has none, so is malformed.
+    [Fact]
+    public void Read_EntryWithoutToolVersion_IsMissingKey() =>
+        ShouldBeMalformed(
+            Change("'toolVersion': '1.2.0', ", ""),
+            SidecarErrorKind.MissingKey,
+            "{'hash'",
+            1,
+            "toolVersion"
+        );
+
+    [Fact]
+    public void Read_EntryToolVersionNull_IsWrongType() =>
+        ShouldBeMalformed(
+            Change("'toolVersion': '1.2.0'", "'toolVersion': null"),
+            SidecarErrorKind.WrongType,
+            "null, 'engine'",
+            4,
+            "toolVersion"
+        );
+
+    // A merge can bring in an entry that another version of the tool wrote: its version is its own, not the file's.
+    [Fact]
+    public void Read_EntryToolVersion_IsKept()
+    {
+        var sidecar = ShouldBeRead(Change("'toolVersion': '1.2.0'", "'toolVersion': '0.9.7'"));
+
+        sidecar.ToolVersion.ShouldBe("1.2.3");
+        sidecar.Queries[0].ToolVersion.ShouldBe("0.9.7");
+    }
+
     [Theory]
     [InlineData("'maxLength': 4, ", "maxLength")]
     [InlineData("'precision': 10, ", "precision")]
@@ -351,7 +386,8 @@ public sealed class SidecarReaderTests
     public void Read_EveryKeyAReaderCanDoWithoutRemoved_ReadsNull()
     {
         var text = Q(
-            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'engine': 'postgres'"
+            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
+                + "'toolVersion': '1.2.0', 'engine': 'postgres'"
                 + ", 'resultKind': 'rows', 'parameters': [{'name': 'id', 'ordinal': 0, 'nullable': null}]"
                 + ", 'columns': [{'ordinal': 0, 'name': 'id', 'type': "
                 + IntType
@@ -378,7 +414,8 @@ public sealed class SidecarReaderTests
             "{'name': 'n', 'kind': 'base', 'schema': 's', 'internalName': 'i', 'length': null, 'precision': null"
             + ", 'scale': null, 'element': null, 'base': null, 'labels': null, 'subtype': null}";
         var text = Q(
-            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'engine': 'postgres'"
+            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
+                + "'toolVersion': '1.2.0', 'engine': 'postgres'"
                 + ", 'database': null, 'serverVersion': null, 'resultKind': 'rows', 'matchesTable': null"
                 + ", 'plan': null, 'tableMatch': null"
                 + ", 'parameters': [{'name': 'id', 'ordinal': 0, 'type': null, 'nullable': null, 'typeSource': null}]"
@@ -392,6 +429,7 @@ public sealed class SidecarReaderTests
 
         entry.ShouldBe(
             Entry(
+                toolVersion: "1.2.0",
                 database: null,
                 serverVersion: null,
                 plan: null,
@@ -421,7 +459,7 @@ public sealed class SidecarReaderTests
     [Theory]
     [InlineData("'toolVersion': '1.2.3'", "'toolVersion': null", "null, 'queries'", "toolVersion")]
     [InlineData("'queries': {'Q': " + EntryJson + "}", "'queries': null", "null}", "queries")]
-    [InlineData("'hash': 'h'", "'hash': null", "null, 'engine'", "hash")]
+    [InlineData("'hash': 'h'", "'hash': null", "null, 'toolVersion'", "hash")]
     [InlineData("'engine': 'postgres'", "'engine': null", "null, 'database'", "engine")]
     [InlineData("'resultKind': 'rows'", "'resultKind': null", "null, 'matchesTable'", "resultKind")]
     [InlineData("'parameters': " + ParametersJson, "'parameters': null", "null, 'columns'", "parameters")]
@@ -451,7 +489,8 @@ public sealed class SidecarReaderTests
     public void Read_ColumnsAsNull_IsWrongTypeUnderEitherResultKind(string resultKind) =>
         ShouldBeMalformed(
             Q(
-                "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'engine': 'postgres'"
+                "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
+                    + "'toolVersion': '1.2.0', 'engine': 'postgres'"
                     + ", 'resultKind': '"
                     + resultKind
                     + "', 'parameters': [], 'columns': null}}}"
@@ -473,7 +512,8 @@ public sealed class SidecarReaderTests
     [InlineData("'toolVersion': '1.2.3'", "'toolVersion': 123", "123", 3, "toolVersion")]
     [InlineData("'queries': {'Q': " + EntryJson + "}", "'queries': []", "[]", 2, "queries")]
     [InlineData("'Q': " + EntryJson, "'Q': 5", "5}}", 1, "Q")]
-    [InlineData("'hash': 'h'", "'hash': 5", "5, 'engine'", 1, "hash")]
+    [InlineData("'hash': 'h'", "'hash': 5", "5, 'toolVersion'", 1, "hash")]
+    [InlineData("'toolVersion': '1.2.0'", "'toolVersion': 120", "120, 'engine'", 3, "toolVersion")]
     [InlineData("'hash': 'h'", "'hash': ['h', {}]", "['h', {}]", 9, "hash")]
     [InlineData("'database': 'app'", "'database': 5", "5, 'serverVersion'", 1, "database")]
     [InlineData("'serverVersion': '16.4'", "'serverVersion': 16.4", "16.4", 4, "serverVersion")]
@@ -615,6 +655,13 @@ public sealed class SidecarReaderTests
     // One name written two ways is one name.
     [InlineData("'Q': " + EntryJson, "'Q': " + EntryJson + ", '\\u0051': 5", "'\\u0051'", 8, "Q")]
     [InlineData("'hash': 'h'", "'hash': 'h', 'hash': 'i'", "'hash': 'i'", 6, "hash")]
+    [InlineData(
+        "'toolVersion': '1.2.0'",
+        "'toolVersion': '1.2.0', 'toolVersion': '8'",
+        "'toolVersion': '8'",
+        13,
+        "toolVersion"
+    )]
     [InlineData("'hash': 'h'", "'hash': 'h', 'h\\u0061sh': 'i'", "'h\\u0061sh'", 11, "hash")]
     [InlineData("'table': 'users'}", "'table': 'users', 'table': 'x'}", "'table': 'x'", 7, "table")]
     [InlineData("'nullable': null, ", "'nullable': null, 'nullable': false, ", "'nullable': false", 10, "nullable")]
@@ -646,8 +693,10 @@ public sealed class SidecarReaderTests
     {
         var text = Q(
             "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {"
-                + "'q': {'hash': 'a', 'engine': 'postgres', 'resultKind': 'none', 'parameters': []}, "
-                + "'Q': {'hash': 'b', 'engine': 'postgres', 'resultKind': 'none', 'parameters': []}}}"
+                + "'q': {'hash': 'a', "
+                + "'toolVersion': '1.2.0', 'engine': 'postgres', 'resultKind': 'none', 'parameters': []}, "
+                + "'Q': {'hash': 'b', "
+                + "'toolVersion': '1.2.0', 'engine': 'postgres', 'resultKind': 'none', 'parameters': []}}}"
         );
 
         var sidecar = ShouldBeRead(text);
@@ -710,7 +759,7 @@ public sealed class SidecarReaderTests
                 .Replace("'resultKind': 'rows'", "'resultKind': 'none'", StringComparison.Ordinal)
         );
 
-        ShouldBeMalformed(text, SidecarErrorKind.MissingKey, "{'engine'", 1, "hash");
+        ShouldBeMalformed(text, SidecarErrorKind.MissingKey, "{'toolVersion'", 1, "hash");
     }
 
     [Theory]
@@ -999,7 +1048,8 @@ public sealed class SidecarReaderTests
     )
     {
         var text = Q(
-            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'resultKind': '"
+            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
+                + "'toolVersion': '1.2.0', 'resultKind': '"
                 + resultKind
                 + "', 'parameters': "
                 + parameters
@@ -1029,7 +1079,7 @@ public sealed class SidecarReaderTests
                 + ", 'schema': 'pg_catalog', 'kind': 'base', 'name': 'integer'}, 'ordinal': 0, 'name': 'id'}]"
                 + ", 'tableMatch': 'matched', 'plan': 'walked', 'matchesTable': {'table': 'users', 'schema': 'public'}"
                 + ", 'resultKind': 'rows', 'serverVersion': '16.4', 'database': 'app', 'engine': 'postgres'"
-                + ", 'hash': 'h'}}, 'toolVersion': '1.2.3', 'formatVersion': 1}"
+                + ", 'toolVersion': '1.2.0', 'hash': 'h'}}, 'toolVersion': '1.2.3', 'formatVersion': 1}"
         );
         return text;
     }
@@ -1058,12 +1108,21 @@ public sealed class SidecarReaderTests
     public void Read_EntryWithoutRows_HasNoColumns()
     {
         var text = Q(
-            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'engine': 'mssql'"
+            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
+                + "'toolVersion': '1.2.0', 'engine': 'mssql'"
                 + ", 'database': 'app', 'serverVersion': '16.4', 'resultKind': 'none', 'parameters': []}}}"
         );
 
         WithoutSpans(ShouldBeRead(text))
-            .ShouldBe(SidecarOf(Entry(engine: SidecarValues.Engine.SqlServer, resultKind: SidecarResultKind.None)));
+            .ShouldBe(
+                SidecarOf(
+                    Entry(
+                        toolVersion: "1.2.0",
+                        engine: SidecarValues.Engine.SqlServer,
+                        resultKind: SidecarResultKind.None
+                    )
+                )
+            );
     }
 
     [Fact]
@@ -1169,7 +1228,8 @@ public sealed class SidecarReaderTests
     // A file with one column of one type, under an engine.
     private static string FileOf(string engine, string type) =>
         Q(
-            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'engine': '"
+            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
+                + "'toolVersion': '1.2.0', 'engine': '"
                 + engine
                 + "', 'resultKind': 'rows', 'parameters': [], 'columns': [{'ordinal': 0, 'name': 'c', 'type': "
                 + type
@@ -1179,7 +1239,8 @@ public sealed class SidecarReaderTests
     // A file with one parameter of one type, under an engine.
     private static string ParameterFileOf(string engine, string type) =>
         Q(
-            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'engine': '"
+            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', "
+                + "'toolVersion': '1.2.0', 'engine': '"
                 + engine
                 + "', 'resultKind': 'none', 'parameters': [{'name': 'p', 'ordinal': 0, 'type': "
                 + type

@@ -6,8 +6,9 @@
   "queries": {
     "AddNote": {
       "hash": "e097a700b747527da54a667ba48cf290e3aaaec06f10f5bd1442569b6d317a3b",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -106,8 +107,9 @@
     },
     "AddNoteForDapper": {
       "hash": "e097a700b747527da54a667ba48cf290e3aaaec06f10f5bd1442569b6d317a3b",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -206,8 +208,9 @@
     },
     "RenameAccount": {
       "hash": "e2d17d1eceac279c3ed2eff3d2c4d9d40aab934cc9077c5ce73aebc01ecfa8fb",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -282,8 +285,9 @@
     },
     "MergeAccountStatus": {
       "hash": "c73b8f423b7ecd9c09fe865307f9cc458c25b1330c5cbd8c4f9f915d8d689893",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

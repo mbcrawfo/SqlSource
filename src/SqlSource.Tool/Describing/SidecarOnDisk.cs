@@ -15,7 +15,7 @@ namespace SqlSource.Tool.Describing;
 /// <param name="Text">The text of the file, or null when there is none that can be opened.</param>
 /// <param name="Sidecar">
 /// The sidecar, when it was read in this version of the format, whichever version of the tool wrote it.
-/// <c>--check</c> compares it; a run that writes keeps entries of <see cref="Usable" /> alone.
+/// <c>--check</c> compares it; a run that writes keeps an entry of it only when the entry is current.
 /// </param>
 /// <param name="FormatVersion">The format version of the file, or null when it is absent or malformed.</param>
 /// <param name="OpenFailure">
@@ -30,19 +30,12 @@ internal sealed record SidecarOnDisk(
     string? OpenFailure
 )
 {
-    /// <summary>
-    /// The sidecar, when this version of the tool wrote it in this version of the format.  Only such a one has
-    /// entries a run keeps: an entry from an older tool never stands beside a new one.  A git merge can still put
-    /// one there, since the version is the file's (TD-0100).
-    /// </summary>
-    public Sidecar? Usable => Sidecar is { } sidecar && sidecar.IsWrittenBy(PackageVersion.Prefix) ? sidecar : null;
-
     /// <summary>The format version of the file, when it is higher than the tool's.</summary>
     public int? NewerFormat => FormatVersion is { } version && version > SidecarFormat.Version ? version : null;
 
     /// <summary>
     /// Reads the sidecar of a <c>.sql</c> file.  One that is absent, that the system will not open, that is
-    /// malformed, or that has a lower format version or another tool version is not usable, and is written again.
+    /// malformed, or that has a lower format version has no <see cref="Sidecar" />, and is written again.
     /// </summary>
     public static SidecarOnDisk Read(string sqlPath)
     {

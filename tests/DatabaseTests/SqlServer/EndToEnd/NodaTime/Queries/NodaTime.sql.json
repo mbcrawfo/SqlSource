@@ -6,8 +6,9 @@
   "queries": {
     "InsertNodaValues": {
       "hash": "eb315f407f4da6be02f3e3cc2107dcf33590ce47cb4cbe1798908e74e3eb118c",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -99,8 +100,9 @@
     },
     "GetNodaValues": {
       "hash": "76f7935f6984eed02bdd1218e896c77d6b1384c5fb182e5182eceee7a94af5b3",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

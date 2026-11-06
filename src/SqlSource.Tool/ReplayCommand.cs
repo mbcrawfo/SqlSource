@@ -305,7 +305,7 @@ internal static class ReplayCommand
     }
 
     // What sets the expected answer apart from the replayed one: none when they are the same.  Two entries are the
-    // same when a sidecar writes them the same.
+    // same when a sidecar writes them the same, whichever version of the tool wrote each.
     private static IReadOnlyList<string> DifferencesOf(ReplayOutcome expected, ReplayOutcome replayed) =>
         (expected, replayed) switch
         {

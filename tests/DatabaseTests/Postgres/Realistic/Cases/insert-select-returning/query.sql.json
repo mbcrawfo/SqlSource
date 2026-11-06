@@ -6,8 +6,9 @@
   "queries": {
     "CreateRenewalOrders": {
       "hash": "e95f276678cceed70956b8cf40cc50fef7ddf95569c8ff03ee5befa657be6077",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {

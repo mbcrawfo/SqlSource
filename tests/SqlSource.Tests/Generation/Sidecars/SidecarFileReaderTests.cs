@@ -16,8 +16,8 @@ public sealed class SidecarFileReaderTests
     private const string SqlPath = "app/Users.sql";
 
     private const string Entry =
-        "{\"hash\": \"h\", \"engine\": \"postgres\", \"database\": \"app\", \"serverVersion\": \"16.4\""
-        + ", \"resultKind\": \"none\", \"parameters\": []}";
+        "{\"hash\": \"h\", \"toolVersion\": \"1.2.3\", \"database\": \"app\", \"engine\": \"postgres\""
+        + ", \"serverVersion\": \"16.4\", \"resultKind\": \"none\", \"parameters\": []}";
 
     private const string TwoEntries =
         "{\n"

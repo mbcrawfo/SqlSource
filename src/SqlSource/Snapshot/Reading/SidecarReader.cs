@@ -31,6 +31,7 @@ internal static class SidecarReader
     private static readonly string[] EntryKeys =
     [
         SidecarKeys.Hash,
+        SidecarKeys.ToolVersion,
         SidecarKeys.Engine,
         SidecarKeys.Database,
         SidecarKeys.ServerVersion,
@@ -214,6 +215,7 @@ internal static class SidecarReader
         if (
             cursor.Error is not null
             || members.Hash is not { } hash
+            || members.ToolVersion is not { } toolVersion
             || members.Engine is not { } engine
             || members.ResultKind is not { } kind
         )
@@ -231,6 +233,7 @@ internal static class SidecarReader
             name,
             nameSpan,
             hash,
+            toolVersion,
             engine,
             members.Database,
             members.ServerVersion,
@@ -253,6 +256,9 @@ internal static class SidecarReader
             {
                 case SidecarKeys.Hash:
                     members.Hash = cursor.ReadString(key, orNull: false);
+                    break;
+                case SidecarKeys.ToolVersion:
+                    members.ToolVersion = cursor.ReadString(key, orNull: false);
                     break;
                 case SidecarKeys.Engine:
                     members.Engine = cursor.ReadString(key, orNull: false);
@@ -323,6 +329,7 @@ internal static class SidecarReader
     {
         var seen = members.Seen;
         cursor.Require(EntryKeys, seen, brace, SidecarKeys.Hash);
+        cursor.Require(EntryKeys, seen, brace, SidecarKeys.ToolVersion);
         cursor.Require(EntryKeys, seen, brace, SidecarKeys.Engine);
         cursor.Require(EntryKeys, seen, brace, SidecarKeys.ResultKind);
         cursor.Require(EntryKeys, seen, brace, SidecarKeys.Parameters);
@@ -363,6 +370,8 @@ internal static class SidecarReader
         public int Seen { get; set; }
 
         public string? Hash { get; set; }
+
+        public string? ToolVersion { get; set; }
 
         public string? Engine { get; set; }
 

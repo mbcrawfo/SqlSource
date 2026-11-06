@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountProfiles": {
       "hash": "f199408cc372c73a25134c913d0211915a23143383fcc5249e66d015bd83d945",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

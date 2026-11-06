@@ -24,7 +24,7 @@ public sealed class SidecarWriterTests
     [Fact]
     public void Write_EntryWithoutRows_HasTheLayoutOfTheFormat()
     {
-        var sidecar = SidecarOf(Entry(resultKind: SidecarResultKind.None));
+        var sidecar = SidecarOf(Entry(toolVersion: "1.2.0", resultKind: SidecarResultKind.None));
 
         SidecarWriter
             .Write(sidecar)
@@ -39,8 +39,9 @@ public sealed class SidecarWriterTests
                     "  \"queries\": {",
                     "    \"Q\": {",
                     "      \"hash\": \"h\",",
-                    "      \"engine\": \"postgres\",",
+                    "      \"toolVersion\": \"1.2.0\",",
                     "      \"database\": \"app\",",
+                    "      \"engine\": \"postgres\",",
                     "      \"serverVersion\": \"16.4\",",
                     "      \"resultKind\": \"none\",",
                     "      \"parameters\": []",
@@ -221,7 +222,30 @@ public sealed class SidecarWriterTests
     {
         var text = SidecarWriter.Write(SidecarOf(Entry(database: null, serverVersion: null)));
 
-        text.ShouldContain("      \"database\": null,\n      \"serverVersion\": null,\n");
+        text.ShouldContain(
+            "      \"database\": null,\n      \"engine\": \"postgres\",\n      \"serverVersion\": null,\n"
+        );
+    }
+
+    // The keys that decide whether an entry is current are adjacent lines, so that git sees a conflict when one
+    // branch updates the tool and another describes the query again.
+    [Fact]
+    public void Write_Entry_PutsToolVersionBetweenHashAndDatabase()
+    {
+        var text = SidecarWriter.Write(SidecarOf(Entry(toolVersion: "0.9.1")));
+
+        text.ShouldContain(
+            string.Join(
+                "\n",
+                "    \"Q\": {",
+                "      \"hash\": \"h\",",
+                "      \"toolVersion\": \"0.9.1\",",
+                "      \"database\": \"app\",",
+                "      \"engine\": \"postgres\",",
+                "      \"serverVersion\": \"16.4\",",
+                "      \"resultKind\": \"rows\","
+            )
+        );
     }
 
     [Fact]

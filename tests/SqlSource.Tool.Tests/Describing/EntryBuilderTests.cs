@@ -64,6 +64,7 @@ public sealed class EntryBuilderTests : IDisposable
                 "GetUser",
                 default,
                 query.Hash.ShouldNotBeNull(),
+                PackageVersion.Prefix,
                 "postgres",
                 "Billing",
                 "16.4",

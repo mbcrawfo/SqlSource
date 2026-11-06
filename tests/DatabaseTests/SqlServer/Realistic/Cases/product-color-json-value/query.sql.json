@@ -6,8 +6,9 @@
   "queries": {
     "ListProductsByColor": {
       "hash": "1e9b636e94cd609c8dfd4b43b58ab3eca4dc7180baadf1b6e38220a1e2f16e63",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

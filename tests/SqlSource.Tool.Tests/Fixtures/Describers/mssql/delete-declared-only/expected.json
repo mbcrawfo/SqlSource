@@ -6,8 +6,9 @@
   "queries": {
     "PurgeOrders": {
       "hash": "6bd3b9d30c43bb167ed0ad13705ed89819abf9e8319e9c62416be04e9b81f55f",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [

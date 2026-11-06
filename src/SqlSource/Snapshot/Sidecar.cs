@@ -8,7 +8,10 @@ namespace SqlSource.Snapshot;
 /// docs/architecture/sidecar-format.md.
 /// </summary>
 /// <param name="FormatVersion">The version of the format.</param>
-/// <param name="ToolVersion">The version of the tool that wrote the file, as <c>major.minor.patch</c>.</param>
+/// <param name="ToolVersion">
+/// The version of the tool that last wrote the file, as <c>major.minor.patch</c>.  Each entry holds the version of the
+/// tool that wrote it.
+/// </param>
 /// <param name="Queries">An entry for each query that needs types, in the file's order.</param>
 internal sealed record Sidecar(int FormatVersion, string ToolVersion, EquatableArray<SidecarEntry> Queries)
 {
@@ -26,13 +29,4 @@ internal sealed record Sidecar(int FormatVersion, string ToolVersion, EquatableA
 
         return null;
     }
-
-    /// <summary>
-    /// Whether the file has the format of this version and was written by the tool of
-    /// <paramref name="toolVersion" />.  With <see cref="SidecarEntry.IsCurrentFor" /> it is the test of a current
-    /// entry: an entry from an older tool is never kept.  A git merge can still put one there, since the version is
-    /// the file's (TD-0100).
-    /// </summary>
-    public bool IsWrittenBy(string toolVersion) =>
-        FormatVersion == SidecarFormat.Version && string.Equals(ToolVersion, toolVersion, StringComparison.Ordinal);
 }

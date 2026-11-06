@@ -6,8 +6,9 @@
   "queries": {
     "AddTwoOrderLines": {
       "hash": "e8b812062f30a2092db1675ecf5e2d32a8cb748de4d411619fdfc6e2a423f9f6",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

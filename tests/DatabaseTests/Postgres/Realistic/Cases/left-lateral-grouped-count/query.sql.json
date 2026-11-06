@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountsWithOrderStats": {
       "hash": "d00bf25335309edce7b4bf29575d5e69aea225f040002244458357c2e5bfd6f8",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

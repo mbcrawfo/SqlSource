@@ -6,8 +6,9 @@
   "queries": {
     "ListBigCustomers": {
       "hash": "8210b25f1e16fd769d5e2dbd9997bb2416838895f07d16edd30b610be0cefd8a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

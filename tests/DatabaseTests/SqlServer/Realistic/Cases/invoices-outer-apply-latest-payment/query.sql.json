@@ -6,8 +6,9 @@
   "queries": {
     "ListInvoicesWithLatestPayment": {
       "hash": "f50f4e133dc198db4fbfef96e7f1995502d462263ede0840553d5aeebd9602ac",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

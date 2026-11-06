@@ -6,8 +6,9 @@
   "queries": {
     "TypedByEmail": {
       "hash": "e88f00239e5051a156c1e693257d08a42e824042e7d74c2b2eb51fa8e74f8ec6",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

@@ -15,9 +15,10 @@ namespace SqlSource.Tool.Bundles;
 /// <remarks>
 /// <para>
 /// Each entry is written by <c>SidecarWriter</c> as a sidecar of that one entry, with one format version and one tool
-/// version for both, and the two are compared member by member: so a difference is one of the file, in its names, and
-/// a member the writer leaves out for one entry is missing.  Unlike <c>describe --check</c>, every member is compared,
-/// the server's version and the provenance among them, since a replay must give the bundle's answer whole.
+/// version for both, the entry's own included, and the two are compared member by member: so a difference is one of
+/// the file, in its names, and a member the writer leaves out for one entry is missing.  Unlike
+/// <c>describe --check</c>, every other member is compared, the server's version and the provenance among them, since
+/// a replay must give the bundle's answer whole.
 /// </para>
 /// <para>
 /// A difference is <c>&lt;path&gt;: &lt;expected JSON&gt; -&gt; &lt;replayed JSON&gt;</c>.  The path starts inside the
@@ -29,7 +30,7 @@ internal static class EntryDifferences
 {
     private const string None = "(none)";
 
-    // Any version: both entries are written with it.
+    // Any version: both entries, and the sidecar of each, are written with it.
     private const string ToolVersion = "replay";
 
     private static readonly JsonSerializerOptions ValueOptions = new()
@@ -54,7 +55,11 @@ internal static class EntryDifferences
     private static JsonObject EntryOf(SidecarEntry entry)
     {
         var text = SidecarWriter.Write(
-            new Sidecar(SidecarFormat.Version, ToolVersion, new EquatableArray<SidecarEntry>([entry]))
+            new Sidecar(
+                SidecarFormat.Version,
+                ToolVersion,
+                new EquatableArray<SidecarEntry>([entry with { ToolVersion = ToolVersion }])
+            )
         );
         var queries =
             JsonNode.Parse(text)?["queries"]?.AsObject()

@@ -6,8 +6,9 @@
   "queries": {
     "OrdersWithOwner": {
       "hash": "396a93980b1f11432d4076bc3128ee0e6cab4ebbce3dfa1c0d6b9d239a2b379c",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

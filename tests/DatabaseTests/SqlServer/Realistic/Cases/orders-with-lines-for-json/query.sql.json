@@ -6,8 +6,9 @@
   "queries": {
     "ListOrdersWithLines": {
       "hash": "5bccf28cf7ee09b3b22954a756f57d9df3410f05f5c612d3cb534c07d07b467a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

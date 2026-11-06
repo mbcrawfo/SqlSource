@@ -6,8 +6,9 @@
   "queries": {
     "ListOrdersOfUser": {
       "hash": "b1c63af1f698b908550768275beb22836de39aa561a06f97e7b41a82316b5b97",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -89,8 +90,9 @@
     },
     "FindOrder": {
       "hash": "aeca24fa1a9414f5480f2083825bdc8e9dfb0cca5d4ad08892327e33c6c058cb",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -191,8 +193,9 @@
     },
     "CountOrderLines": {
       "hash": "6e10399412e851e09798828c0d129a116f7bc83acbdd993dcd151ac48717a09a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -232,8 +235,9 @@
     },
     "ListOrdersByStatuses": {
       "hash": "8bdc5fcb4568481663449a2cfee15e15d0883fe4ceef156c70b272e07cb019ba",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

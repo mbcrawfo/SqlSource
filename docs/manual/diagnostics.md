@@ -2181,13 +2181,15 @@ See: [Sidecar files](tool.md#sidecar-files)
 
 **Sidecar was written by another version of the tool**
 
-The sidecar was written by a version of the `sqlsource` tool other than the version of the `SqlSource` package the project uses.  The package and the tool share a version, so this means that the tool and the package reference are out of step, or that the package was updated and the sidecars were not written again.  The sidecar is read and used all the same, since its format is the one this package reads.  A version's suffix, such as `-dev` in `0.1.0-dev`, is not compared.
+The sidecar, or an entry of it, was written by a version of the `sqlsource` tool other than the version of the `SqlSource` package the project uses.  The package and the tool share a version, so this means that the tool and the package reference are out of step, or that the package was updated and the sidecars were not written again.  The sidecar is read and used all the same, since its format is the one this package reads.  A version's suffix, such as `-dev` in `0.1.0-dev`, is not compared.
 
 ```console
 /work/App/Queries/Users.sql.json(1,1): warning SQLSRC240: The sidecar was written by sqlsource 0.1.0, and this project uses SqlSource 0.2.0.  Bring the tool and the package to one version, and run 'sqlsource describe'.
 ```
 
-Update the tool or the package so that both have one version, run `dotnet sqlsource describe`, and commit the sidecars.  The tool describes every query of a file that another version wrote.
+Each entry of a sidecar records the version that wrote it, so a git merge can bring an entry of an older version into a sidecar that this version wrote.  Such an entry is warned at its query's key, with the entry's version in the message.  A sidecar gets one warning however many of its entries are of another version: at its start when the sidecar itself was written by another version, and otherwise at the first such entry.
+
+Update the tool or the package so that both have one version, run `dotnet sqlsource describe`, and commit the sidecars.  The tool describes again every entry that another version wrote.
 
 This is a warning, so that a build goes on while the sidecars are written again.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
 

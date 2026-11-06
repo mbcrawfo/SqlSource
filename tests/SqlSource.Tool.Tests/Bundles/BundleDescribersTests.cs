@@ -29,10 +29,14 @@ public sealed class BundleDescribersTests
         var replayed = await BundleReplays.ReplayAsync(bundle, Path, registry);
 
         described.Value.ShouldBeOfType<PostgresDescriber>().ShouldNotBeSameAs(registry.Find(SqlDialect.PostgreSql));
+        // The entry a replay gives is this tool's.
         replayed
             .ShouldBeOfType<ReplayOutcome.Described>()
             .Entry.ShouldBe(
-                BundleReplay.ExpectedOf(bundle, Path).Value.ShouldBeOfType<ReplayOutcome.Described>().Entry
+                BundleReplay.ExpectedOf(bundle, Path).Value.ShouldBeOfType<ReplayOutcome.Described>().Entry with
+                {
+                    ToolVersion = PackageVersion.Prefix,
+                }
             );
     }
 
