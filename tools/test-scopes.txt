@@ -24,9 +24,11 @@ postgres tests/SqlSource.Tool.Tests/Bundles/Renaming/Postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/*
 
+sqlserver src/SqlSource.Tool/Bundles/Renaming/SqlServer/*
 sqlserver src/SqlSource.Tool/Describing/SqlServer/*
 sqlserver tests/DatabaseTests/SqlServer/*
 sqlserver tests/DatabaseTests/SqlServer.SqlClient61/*
+sqlserver tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/*
 

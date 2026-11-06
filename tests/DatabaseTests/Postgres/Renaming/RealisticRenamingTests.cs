@@ -15,7 +15,6 @@ using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing.Bundles;
-using SqlSource.Tool.Testing.Fixtures;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
@@ -148,24 +147,15 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
     }
 
     // The case described through a capturing exchange, as diagnose captures one: its entry, or the failure's id and
-    // step for a case the describer refuses.  The raw bundle has no planner settings, as the corpus is described
-    // with none.
-    private async Task<Bundle> RawAsync(RealisticCase found)
-    {
-        var fixture = found.AsFixture;
-        var capture = new DescribeCapture(fixture.Engine);
-        var described = await FixtureReplay.DescribeOrRefuseThroughAsync(
-            fixture,
+    // step for a case the describer refuses.  No realistic case has planner settings, as the corpus is described with
+    // none.
+    private Task<Bundle> RawAsync(RealisticCase found) =>
+        RawBundles.CaptureAsync(
+            found.AsFixture,
             static _ => new PostgresDescriber(),
             databases.RealisticConnectionString,
-            new CapturingExchange(LiveExchange.Instance, capture)
+            LiveExchange.Instance
         );
-        var outcome = described.Succeeded ? BundleOutcome.Entry : OutcomeOf(described.Failure);
-        return RawBundles.Of(fixture.Query, capture, described.Value, outcome, []);
-    }
-
-    private static BundleOutcome OutcomeOf(DescribeFailure failure) =>
-        BundleOutcome.Failure(failure.Descriptor.Id, failure.Step is { } step ? DescribeStepName.Of(step) : null);
 
     // The answers of the capture's calls of explain, as their JSON holds them.
     private static string PlanOf(Bundle bundle)

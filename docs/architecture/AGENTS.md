@@ -32,8 +32,9 @@ Each page is in this folder.
 | `src/SqlSource.Tool/Logging` and `src/SqlSource.Tool/Reporting` | `tool.md` | `## Logging and reporting` |
 | `src/SqlSource.Tool/Watching` | `tool.md` | `## Watch mode`, `## Folders` |
 | `src/SqlSource.Tool/Bundles` | `bundles.md` | `## The bundle`, `## replay` |
-| `src/SqlSource.Tool/Bundles/Renaming` | `bundles.md` | `## Renaming`, `## The engine's contract`, `### Renaming for SQL Server` under `## Not built yet` |
+| `src/SqlSource.Tool/Bundles/Renaming` | `bundles.md` | `## Renaming`, `## The engine's contract`; `## Renaming for PostgreSQL` and `## Renaming for SQL Server` for `EngineRenamings`, which gives each engine's part |
 | `src/SqlSource.Tool/Bundles/Renaming/Postgres` | `bundles.md` | `## Renaming for PostgreSQL` |
+| `src/SqlSource.Tool/Bundles/Renaming/SqlServer` | `bundles.md` | `## Renaming for SQL Server` |
 | `src/SqlSource.Tool/Describing/Describers` | `postgres-describer.md` | `## The describer contract` |
 | `src/SqlSource.Tool/Describing/Capture` | `postgres-describer.md` | `## Capture and replay` |
 | `src/SqlSource.Tool/Describing/Postgres`, with `Columns/`, `Statements/` and `Types/` | `postgres-describer.md`, `postgres-nullability.md` | `## One describe, step by step`, `## Building parameters and columns`, `## Matching a table`, `## Errors`, `## Why a query cannot run a statement`; `## Nullability` in `postgres-nullability.md` |

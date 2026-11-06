@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Describing.Capture;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Testing.Fixtures;
 
 namespace SqlSource.Tool.Testing.Bundles;
@@ -16,6 +18,12 @@ internal static class RawBundles
 {
     // What made the bundle: its tool, runtime and system.
     public const string Maker = FixtureReplay.ToolVersion;
+
+    // The members of the answer of "open" that hold the server's version, PostgreSQL's and SQL Server's, and the
+    // driver's version, the same for every engine.
+    private const string ServerVersion = "serverVersion";
+    private const string ProductVersion = "productVersion";
+    private const string DriverVersion = "driverVersion";
 
     // A case of the describers' fixtures as a raw bundle: its query, capture, expected.json and planner settings, with
     // an entry outcome, or the failure given.
@@ -31,7 +39,29 @@ internal static class RawBundles
         return Of(fixture.Query, capture, fixture.Expected, outcome, fixture.ExplainSettings);
     }
 
-    // A raw bundle of a query and its capture, with the expected.json and the planner settings given.
+    // The case described as FixtureReplay.DescribeOrRefuseThroughAsync describes it, through a capturing exchange over
+    // the live one, as diagnose captures one, as a raw bundle: an entry, with its expected.json, or the failure's id
+    // and step for a query the describer refuses, with none.  A session that does not open throws.
+    public static async Task<Bundle> CaptureAsync(
+        FixtureCase fixture,
+        Func<FixtureCase, IQueryDescriber> describer,
+        string connection,
+        IDescribeExchange live
+    )
+    {
+        var capture = new DescribeCapture(fixture.Engine);
+        var described = await FixtureReplay.DescribeOrRefuseThroughAsync(
+            fixture,
+            describer,
+            connection,
+            new CapturingExchange(live, capture)
+        );
+        var outcome = described.Succeeded ? BundleOutcome.Entry : OutcomeOf(described.Failure);
+        return Of(fixture.Query, capture, described.Value, outcome, fixture.ExplainSettings);
+    }
+
+    // A raw bundle of a query and its capture, with the expected.json and the planner settings given.  The server's
+    // version is the open's serverVersion, as PostgreSQL's answers it, or its productVersion, as SQL Server's does.
     public static Bundle Of(
         string query,
         DescribeCapture capture,
@@ -49,15 +79,19 @@ internal static class RawBundles
             Maker,
             SidecarFormat.Version,
             capture.Engine,
-            StringOf(open.Answer, "serverVersion")
-                ?? throw new InvalidOperationException("The capture's open answers no serverVersion."),
-            StringOf(open.Answer, "driverVersion"),
+            StringOf(open.Answer, ServerVersion)
+                ?? StringOf(open.Answer, ProductVersion)
+                ?? throw new InvalidOperationException("The capture's open answers no server's version."),
+            StringOf(open.Answer, DriverVersion),
             Maker,
             Maker,
             outcome
         );
         return new Bundle(info, query, CaptureJson.Write(capture), expected, explainSettings);
     }
+
+    private static BundleOutcome OutcomeOf(DescribeFailure failure) =>
+        BundleOutcome.Failure(failure.Descriptor.Id, failure.Step is { } step ? DescribeStepName.Of(step) : null);
 
     private static string? StringOf(JsonElement answer, string member) =>
         answer.ValueKind == JsonValueKind.Object
