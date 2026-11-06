@@ -69,6 +69,14 @@ LEFT JOIN notes n ON n.account_id = a.id
 WHERE n.id NOT IN @noteIds
 ORDER BY a.id, n.id;
 
+-- name: ListAccountNotesNotListed
+-- summary: ListAccountNotesExcept, written with IS FALSE in place of NOT, which an empty list keeps as it does NOT.
+SELECT a.id, a.name, n.body
+FROM accounts a
+LEFT JOIN notes n ON n.account_id = a.id
+WHERE (n.id IN @noteIds) IS FALSE
+ORDER BY a.id, n.id;
+
 -- name: ListAccountNotesOptional
 -- summary: The accounts whose ids are in a list, each with the body of each of its notes, or, when the list is null,
 -- summary: the notes alone.  A list that holds an account without a note gives its row, with a NULL body.
