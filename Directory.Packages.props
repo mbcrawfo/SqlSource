@@ -9,9 +9,8 @@
         <PackageVersion Include="Dapper" Version="2.1.89" />
         <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.5" />
         <!--
-            A validator of JSON Schema, for tests/SqlSource.Tests alone: nothing that ships references it.  Its
-            source is MIT and its binaries come under the Open Source Maintenance Fee.  The owner chose it with
-            that known; see the spec of phase 2.1 of query generation.
+            Its binaries come under the Open Source Maintenance Fee, and its source is MIT.  The owner chose it with
+            that known, for tests/SqlSource.Tests alone: nothing that ships may reference it.
         -->
         <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
         <!--
@@ -19,69 +18,23 @@
             and the tests reference requires at least this version.
         -->
         <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
-        <!--
-            4.14.0 is the compiler in the .NET SDK 9.0.300 and Visual Studio 2022 17.14, the oldest hosts SqlSource
-            supports.
-            Raising it drops those hosts: do not raise it without changing the support target in README.md.
-            src/SqlSource.Tool and the tests override it to run on a current compiler.
-            tests/SqlSource.Tests.RoslynFloor does not, and runs the generator tests on this version.
-        -->
         <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
-        <!--
-            The driver of the SQL Server describer and of tests/DatabaseTests/SqlServer.
-            examples/SqlServerExamples/README.md lists this version.
-        -->
+        <!-- examples/SqlServerExamples/README.md lists this version. -->
         <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
-        <!--
-            The types of hierarchyid, geography and geometry, which tests/DatabaseTests/SqlServer writes and reads
-            through the query methods.  It brings nothing that Microsoft.Data.SqlClient does not.
-        -->
         <PackageVersion Include="Microsoft.SqlServer.Types" Version="170.1000.7" />
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
-        <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
-        <!--
-            The library of NetTopologySuite's geometries, which the tool gets from Npgsql.NetTopologySuite and
-            tests/DatabaseTests/SqlServer references, pinned here so that every project that brings it has this
-            version.  tests/DatabaseTests/Postgres.Npgsql8 and tests/DatabaseTests/SqlServer.SqlClient61 override it
-            to 2.5.0, the floor of Npgsql.NetTopologySuite 8 and of SqlSource, which central transitive pinning would
-            otherwise hold here.  examples/SqlServerExamples/README.md lists this version.
-        -->
+        <!-- examples/SqlServerExamples/README.md lists this version. -->
         <PackageVersion Include="NetTopologySuite" Version="2.6.0" />
-        <!--
-            NetTopologySuite's reader and writer of SQL Server's bytes, for the projects that read and send SQL
-            Server's geography and geometry through generated code.  2.1.0 is also SqlSource's floor of it.
-            examples/SqlServerExamples/README.md lists this version.
-        -->
+        <!-- examples/SqlServerExamples/README.md lists this version. -->
         <PackageVersion Include="NetTopologySuite.IO.SqlServerBytes" Version="2.1.0" />
-        <!--
-            The library of NodaTime's types, which tests/DatabaseTests/Postgres gets from Npgsql.NodaTime and
-            tests/DatabaseTests/SqlServer, tests/DatabaseTests/QueryMethodAllocation and examples/SqlServerExamples
-            reference.  tests/DatabaseTests/Postgres.Npgsql8 overrides it to 3.1.9, the floor that Npgsql.NodaTime 8
-            needs, and tests/DatabaseTests/SqlServer.SqlClient61 to 3.1.9, SqlSource's floor: central transitive pinning
-            would otherwise hold it here.  examples/SqlServerExamples/README.md lists this version.
-        -->
+        <!-- examples/SqlServerExamples/README.md lists this version. -->
         <PackageVersion Include="NodaTime" Version="3.3.7" />
-        <!--
-            The driver of the PostgreSQL describer.  The tool's driver is its own: the floor of the Npgsql that a
-            consumer's project may use is decided with the generated code, not here.
-            examples/PostgresExamples/README.md lists this version.  The event ids that NpgsqlRunLogger forwards to
-            the run's log were read from this version's source, and NpgsqlRunLoggerTests fails on another until they
-            are read again.
-        -->
+        <!-- examples/PostgresExamples/README.md lists this version. -->
         <PackageVersion Include="Npgsql" Version="10.0.3" />
-        <!--
-            The plugin of Npgsql for NodaTime, the version that pairs with the Npgsql above, through which
-            tests/DatabaseTests/Postgres runs the queries of EndToEnd/NodaTime/.  tests/DatabaseTests/Postgres.Npgsql8
-            overrides it to the 8.0 release that pairs with its driver.  examples/PostgresExamples/README.md lists this
-            version.
-        -->
+        <!-- examples/PostgresExamples/README.md lists this version. -->
         <PackageVersion Include="Npgsql.NodaTime" Version="10.0.3" />
-        <!--
-            The plugin of Npgsql for NetTopologySuite, the version that pairs with the Npgsql above, through which the
-            tool's PostgreSQL describer binds a PostGIS parameter for its check.  examples/PostgresExamples/README.md
-            lists this version.
-        -->
+        <!-- examples/PostgresExamples/README.md lists this version. -->
         <PackageVersion Include="Npgsql.NetTopologySuite" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />
         <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
@@ -94,22 +47,10 @@
             first build without CVE-2026-70162 and CVE-2026-84008.  Remove it when SqlClient brings that build or later.
         -->
         <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
-        <!--
-            Starts the SQL Server of tests/DatabaseTests/TestHarness, which the SQL Server projects describe against.
-            It needs Docker.
-        -->
         <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
-        <!--
-            Starts the PostgreSQL of tests/DatabaseTests/TestHarness, which the PostgreSQL projects describe against.
-            It needs Docker.
-        -->
         <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
         <PackageVersion Include="xunit.analyzers" Version="2.1.0" />
         <PackageVersion Include="xunit.v3" Version="4.0.1" />
-        <!--
-            For tests/SqlSource.Testing, tests/SqlSource.Tool.Testing and tests/DatabaseTests/TestHarness: what a
-            library of the tests takes of xunit, at the version xunit.v3 brings.
-        -->
         <PackageVersion Include="xunit.v3.assert" Version="4.0.1" />
         <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.1" />
     </ItemGroup>
