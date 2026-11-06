@@ -24,7 +24,7 @@ public sealed class BundleLeaksTests
 
     private const string QuotedOrder = "SELECT 1 AS \"Order\" ORDER BY 1;";
 
-    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer).ShouldNotBeNull();
+    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer);
 
     // The keywords of the sources, folded as PostgreSQL folds them.
     private static bool IsEngineWord(string word, bool quoted) =>

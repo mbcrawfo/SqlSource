@@ -55,6 +55,31 @@ public sealed class RunLogRedactionTests : IDisposable
         (await File.ReadAllTextAsync(Log, TestContext.Current.CancellationToken)).ShouldNotContain(Secrets.Marker);
     }
 
+    // diagnose's paths, as describe's: a value that holds "=" or ";" is the mark, with its option and its separator,
+    // and one that holds neither is written as typed.  A command line with such an --out is wrong and is never logged,
+    // so its row is read from what UsageCheck read.
+    [Theory]
+    [InlineData("--query|***", "--query", "Host=db;Password=" + Secrets.Marker + ".sql:Q", "--out", "r.zip")]
+    [InlineData("--query=***", "--query=Users.sql:Password=" + Secrets.Marker, "--out", "r.zip")]
+    [InlineData("--query|Users.sql:GetUser", "--query", "Users.sql:GetUser", "--out", "r.zip")]
+    [InlineData("--scrub|***", "--scrub", "Host=db;Password=" + Secrets.Marker, "--out", "r.zip")]
+    [InlineData("--scrub:***", "--scrub:Host=db;Password=" + Secrets.Marker, "--out", "r.zip")]
+    [InlineData("--out|***", "--out", "a;" + Secrets.Marker + ".zip", "--scrub", "raw.zip")]
+    [InlineData("--out=***", "--out=a=" + Secrets.Marker + ".zip", "--scrub", "raw.zip")]
+    public void LoggedArguments_DiagnosePathThatHoldsAnEqualsSignOrASemicolon_IsTheMark(
+        string logged,
+        params string[] args
+    )
+    {
+        string[] line = ["diagnose", .. args];
+        var usage = UsageCheck.Check(Cli.BuildCommands(), line);
+
+        usage.Messages.ShouldBeEmpty();
+        LoggedArguments
+            .Of(usage, line)
+            .ShouldBe(LogValue.ListOfTexts(["diagnose", .. logged.Split('|'), .. args[^2..]]));
+    }
+
     // The value was typed where "name=value" stands and the shell split it: the line is wrong, and nothing is logged.
     [Fact]
     public async Task Run_WrongCommandLineThatHoldsAValue_WritesNoLog()

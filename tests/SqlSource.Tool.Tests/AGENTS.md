@@ -15,10 +15,11 @@
 - **A test of the online build gives the build the stand-in of the tool through `StandIn.CommandSwitch` and tells it what to do through `StandIn.Tell`**, never a script, which would not run on Windows.
 - **A test that starts a program of the operating system skips with `Programs.SkipUnlessOnPath`** where the program is missing, and one that needs a program that waits takes it from `Programs.Waiter`, whichever the operating system.
 
-## Fixture projects
+## Fixture projects and bundles
 
 - **`Fixtures/Projects/` holds projects that are never built or restored.**  They are not compiled into the test project, and a test that leaves an `obj` in the repository, or a file in a fixture, is a bug ([fixture projects](../README.md#fixture-projects)).
 - **`Fixtures/Projects/OddPaths` holds a folder whose name has `;`, `=`, `%`, a quote and a non-ASCII letter on purpose.**
+- **`tools/check-package-install.sh` replays `Fixtures/Bundles/postgres/select-left-join` with the packed tool**, so moving, renaming or changing that case changes the script and `needs_packages` of `pre-commit-validation.sh` in the same commit.
 
 ## Descriptors
 

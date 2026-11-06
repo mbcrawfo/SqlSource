@@ -81,8 +81,9 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.FileCannotBeChanged,
         };
         // SQLSRC200 is formatted above, and SQLSRC215 starts with a count, SQLSRC231 with the name of the reader,
-        // SQLSRC266 with a column's position, and SQLSRC288 to SQLSRC291 with a sentence about the bundle, which
-        // the path they are reported at names; their own tests format them.
+        // SQLSRC266 with a column's position, SQLSRC288 to SQLSRC291 with a sentence about the bundle, which the
+        // path they are reported at names, SQLSRC292 with a query's name, and SQLSRC293 and SQLSRC294 with a sentence
+        // about a renamed bundle; their own tests format them.
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)
@@ -93,6 +94,9 @@ public sealed class ToolDiagnosticsTests
                 .Remove(ToolDiagnostics.BundleOfNewerTool)
                 .Remove(ToolDiagnostics.BundleCallMissing)
                 .Remove(ToolDiagnostics.NoDescriberForBundle)
+                .Remove(ToolDiagnostics.QueryNotInFile)
+                .Remove(ToolDiagnostics.BundleCannotBeMadeSafe)
+                .Remove(ToolDiagnostics.RenamedBundleDoesNotReproduce)
         )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it
@@ -143,6 +147,40 @@ public sealed class ToolDiagnosticsTests
                 "mysql"
             )
             .ShouldBe("The bundle is of the engine 'mysql', which this version of sqlsource does not describe");
+    }
+
+    [Fact]
+    public void DiagnoseMessages_FormatWithTheirArguments()
+    {
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.QueryNotInFile.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "GetUser",
+                "/work/App/Users.sql",
+                "the reason"
+            )
+            .ShouldBe("There is no query 'GetUser' to diagnose in '/work/App/Users.sql': the reason");
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.BundleCannotBeMadeSafe.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "the reason",
+                "query.sql",
+                "customer_ssn"
+            )
+            .ShouldBe("The bundle cannot be made safe to post: the reason, at query.sql, found customer_ssn");
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.RenamedBundleDoesNotReproduce.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "expected.json"
+            )
+            .ShouldBe("The renamed bundle does not reproduce the query's answer: its replay differs at expected.json");
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.BundleIsNotRaw.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/report.zip",
+                "the reason"
+            )
+            .ShouldBe("'/work/report.zip' is not a raw bundle: the reason");
     }
 
     [Fact]

@@ -146,3 +146,7 @@ SQLSRC288 | SqlSource | Error | Bundle cannot be read
 SQLSRC289 | SqlSource | Error | Bundle is of a newer version
 SQLSRC290 | SqlSource | Error | Bundle does not answer a question of the query
 SQLSRC291 | SqlSource | Error | Bundle's engine is not supported
+SQLSRC292 | SqlSource | Error | Query is not in the file
+SQLSRC293 | SqlSource | Error | Bundle cannot be made safe to post
+SQLSRC294 | SqlSource | Error | Renamed bundle does not reproduce the query's answer
+SQLSRC295 | SqlSource | Error | Bundle is not a raw bundle

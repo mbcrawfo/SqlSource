@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -426,6 +427,42 @@ public sealed class SecretTests : IDisposable
         log.ShouldContain("\"run.start\"");
     }
 
+    // Where a path of diagnose stands, the file of --query and the bundle of --scrub, and the name of --query, under
+    // --log and SQLSOURCE_LOG.  Nothing of the value is printed, and run.start holds the mark in its place.
+    [Theory]
+    [InlineData("212", false, "--query", Secrets.ConnectionWithMarker + ".sql:Q", "--out", "r.zip")]
+    [InlineData("212", true, "--query", Secrets.ConnectionWithMarker + ".sql:Q", "--out", "r.zip")]
+    [InlineData("212", true, "--query=a.sql:" + Secrets.ConnectionWithMarker, "--out", "r.zip")]
+    [InlineData("288", true, "--scrub", Secrets.ConnectionWithMarker, "--out", "r.zip")]
+    [InlineData("288", true, "--out", "r.zip", "--scrub:" + Secrets.ConnectionWithMarker)]
+    public async Task Diagnose_ConnectionStringWherePathsStand_IsNeverPrintedOrLogged(
+        string id,
+        bool fromVariable,
+        params string[] args
+    )
+    {
+        if (fromVariable)
+        {
+            _scene.Run.Environment["SQLSOURCE_LOG"] = "run.log";
+        }
+
+        string[] logOption = fromVariable ? [] : ["--log", "run.log"];
+        var result = await _scene.Run.RunAsync(["diagnose", .. args, .. logOption]);
+
+        ShouldHold(result, id);
+        var log = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf("run.log"),
+            TestContext.Current.CancellationToken
+        );
+        log.ShouldNotContain(Secrets.Marker);
+        LogReader
+            .Read(_scene.Run.Folder.PathOf("run.log"))[0]
+            .GetProperty("arguments")
+            .EnumerateArray()
+            .Select(static item => item.GetString())
+            .ShouldContain(static item => item != null && item.EndsWith("***", StringComparison.Ordinal));
+    }
+
     // The rule for an unknown option: nothing after it is read.
     [Fact]
     public async Task Run_MisspeltConnectionOptionFollowedByTheValue_NamesTheOptionAlone()
@@ -720,5 +757,65 @@ public sealed class SecretTests : IDisposable
         (
             await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken)
         ).ShouldNotContain(Secrets.Marker);
+    }
+
+    // diagnose describes through a capturing exchange, and writes the capture into a bundle that is sent: nothing of
+    // the value is printed, logged, said under --verbose or written into the zip.
+    [Fact]
+    public async Task Diagnose_ValueOnTheCommandLine_IsNeverPrintedLoggedOrWritten()
+    {
+        using var scene = new DiagnoseScene();
+        _ = scene.AddCase(scene.Case("select-plain"));
+
+        var result = await scene.DiagnoseAsync(
+            "--query",
+            "Users.sql:GetEverything",
+            "--out",
+            "raw.zip",
+            "--no-obfuscate",
+            "--connection",
+            "postgres=" + Secrets.ConnectionWithMarker,
+            "--verbose",
+            "--log",
+            "run.log"
+        );
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
+        var log = await File.ReadAllTextAsync(scene.PathOf("run.log"), TestContext.Current.CancellationToken);
+        log.ShouldNotContain(Secrets.Marker);
+        var bundle = BundleReplays.Read(scene.PathOf("raw.zip"));
+        bundle.Capture.ShouldNotContain(Secrets.Marker);
+        bundle.Query.ShouldNotContain(Secrets.Marker);
+    }
+
+    // A capture that holds the value is a fault of the describer, as an entry that holds it is: the run ends, and no
+    // bundle is written.
+    [Fact]
+    public async Task Diagnose_CaptureThatHoldsTheValue_EndsTheRunAndWritesNoBundle()
+    {
+        using var scene = new DiagnoseScene();
+        var fixture = scene.Case("select-plain");
+        _ = scene.AddCase(fixture);
+        var capture = JsonNode.Parse(fixture.Capture).ShouldNotBeNull();
+        var open = capture["calls"]!.AsArray().First(static call => call!["method"]!.GetValue<string>() == "open")!;
+        open["answer"]!["settings"]!.AsArray().Add(new JsonObject { ["name"] = "x_note", ["value"] = Secrets.Marker });
+        scene.AnswerWith(CaptureJson.Read(capture.ToJsonString()).Value.ShouldNotBeNull());
+        scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.ConnectionWithMarker;
+
+        var result = await scene.DiagnoseAsync(
+            "--query",
+            "Users.sql:GetEverything",
+            "--out",
+            "raw.zip",
+            "--no-obfuscate"
+        );
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldStartWith("sqlsource : error SQLSRC200: ");
+        File.Exists(scene.PathOf("raw.zip")).ShouldBeFalse();
     }
 }

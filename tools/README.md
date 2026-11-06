@@ -52,6 +52,7 @@ Last, it runs the packed tool through the build, with no database.  The folder m
 - With the same `.env` and `SqlSourceOnline` unset, so `auto`, the build passes and its detailed log holds the tool's `sqlsource: summary:` line, since a current entry needs no connection.
 - The script changes the SQL of `GetUser`, so that its entry is stale.  `dotnet sqlsource describe` must exit with 1 and report `SQLSRC213` at `Users.sql`, and the build under `auto` must fail, show the tool's line `sqlsource: offline: no connection for postgres; the build uses the committed sidecars` and report the generator's `SQLSRC244` at `Queries/Users.sql`.
 - Without the `.env`, a build with `SqlSourceOnline` `true` must fail with the tool's `SQLSRC213` at `Users.sql`, on one line that ends with its `see:` link, and no `MSB3073` of Exec.
+- `dotnet sqlsource replay` of `tests/SqlSource.Tool.Tests/Fixtures/Bundles/postgres/select-left-join`, a committed folder of a bug-report bundle, exits with 0 and prints `sqlsource: reproduced: the pipeline gives this answer`.  A replay needs no database, project or MSBuild, so this shows that the packed tool carries what a replay needs.
 
 Every check reads a line that only the real tool writes.  Without an argument the script packs both packages first.
 

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
@@ -28,8 +29,13 @@ namespace SqlSource.Tool.Describing;
 /// This is the one place outside <c>Cli</c> that catches every exception: a describer's, which is a bug of the
 /// describer and may hold the connection's value.  It is thrown again as a <see cref="DescriberFaultException" />
 /// without the value, and the run ends.  A description that holds the value, which would be written into a sidecar,
-/// is such a bug too (<see cref="EntrySecretCheck" />).  A cancellation is not caught: a run that was cancelled ends
-/// as cancelled, not as <c>SQLSRC200</c>.
+/// is such a bug too (<see cref="EntrySecretCheck" />), and so is a capture that holds it.  A cancellation is not
+/// caught: a run that was cancelled ends as cancelled, not as <c>SQLSRC200</c>.
+/// </para>
+/// <para>
+/// A run given a <see cref="RunCapture" />, as <c>diagnose</c>'s is, records its session and keeps what a query's
+/// refusal was: the refusal is reported without being written, since the bundle holds it.  A run given none is
+/// <c>describe</c>'s.
 /// </para>
 /// </remarks>
 internal static class DatabaseRuns
@@ -48,6 +54,10 @@ internal static class DatabaseRuns
     /// Whether the run is offline (<see cref="DescribeRun" />): a database with no connection fails its queries and
     /// reports nothing, where the run would report <c>SQLSRC213</c>.
     /// </param>
+    /// <param name="capture">
+    /// Where the run records its one session, or null for a run that records nothing.  A second session for it is a
+    /// fault of the tool.
+    /// </param>
     public static async Task RunAsync(
         ImmutableArray<PlannedDatabase> selected,
         ImmutableArray<FileWork> files,
@@ -56,7 +66,8 @@ internal static class DatabaseRuns
         Reporter reporter,
         CancellationToken cancellationToken,
         OnlineMode online = OnlineMode.Off,
-        bool offline = false
+        bool offline = false,
+        RunCapture? capture = null
     )
     {
         foreach (var database in selected)
@@ -83,7 +94,7 @@ internal static class DatabaseRuns
                 connections,
                 host,
                 reporter,
-                (online, offline),
+                new DatabaseMode(online, offline, capture),
                 cancellationToken
             );
         }
@@ -99,7 +110,7 @@ internal static class DatabaseRuns
         Connections connections,
         ToolHost host,
         Reporter reporter,
-        (OnlineMode Online, bool Offline) mode,
+        DatabaseMode mode,
         CancellationToken cancellationToken
     )
     {
@@ -148,7 +159,12 @@ internal static class DatabaseRuns
         var secret = new ConnectionSecret(value, given.Parts, [database.Name, engine], [given.Rewrite]);
         var trace = reporter.Trace.Without(secret);
         var guard = new Guard(secret, host.GetEnvironmentVariable, cancellationToken);
-        var request = new OpenRequest(database.Name, value, host.Exchange(database.Name), host.Time);
+        var request = new OpenRequest(
+            database.Name,
+            value,
+            ExchangeOf(database.Name, engine, host, mode.Capture),
+            host.Time
+        );
         var log = new SessionRunLog(reporter.Trace.Log, secret, engine + ".");
         var opened = await guard.CallAsync(() => describer.OpenAsync(request, log, cancellationToken));
         // The value and not Succeeded, here and where a query is described: a describer may have given null for
@@ -169,7 +185,7 @@ internal static class DatabaseRuns
             return;
         }
 
-        var run = new SessionRun(session, guard, host.Time, reporter, trace);
+        var run = new SessionRun(session, guard, host.Time, reporter, trace, mode.Capture);
         try
         {
             await DescribeAllAsync(database, queries, run, mode.Online, cancellationToken);
@@ -182,6 +198,34 @@ internal static class DatabaseRuns
         }
 
         await guard.CallAsync(session.DisposeAsync);
+        if (mode.Capture is { } capture)
+        {
+            capture.Text = guard.Call(() => NoSecretIn(capture.Capture, secret));
+        }
+    }
+
+    // The host's exchange, or for a run that records, the host's behind one that adds each call to the capture.
+    private static IDescribeExchange ExchangeOf(string database, string engine, ToolHost host, RunCapture? capture)
+    {
+        var exchange = host.Exchange(database);
+        if (capture is null)
+        {
+            return exchange;
+        }
+
+        // A bug of the tool, outside the guard: the calls of two sessions, or of another engine, replay as neither.
+        if (
+            capture.Capture.Calls.Count != 0
+            || !string.Equals(capture.Capture.Engine, engine, StringComparison.Ordinal)
+        )
+        {
+            throw new InvalidOperationException(
+                $"A capture of '{capture.Capture.Engine}' records one session, and the run opens '{database}' of "
+                    + $"'{engine}' after {capture.Capture.Calls.Count} calls."
+            );
+        }
+
+        return new CapturingExchange(exchange, capture.Capture);
     }
 
     private static async Task DescribeAllAsync(
@@ -196,6 +240,11 @@ internal static class DatabaseRuns
         var secret = guard.Secret;
         var server = guard.Call(() => run.Session.Server);
         guard.Call(() => RunEvents.Opened(run.Trace, database, server));
+        if (run.Capture is { } capture)
+        {
+            capture.Server = server;
+        }
+
         foreach (var query in queries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -228,8 +277,10 @@ internal static class DatabaseRuns
                     database,
                     server,
                     run.Reporter,
-                    online
+                    online,
+                    write: run.Capture is null
                 );
+                query.Failure = failure;
                 query.State = QueryState.Failed;
                 RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);
             }
@@ -237,7 +288,8 @@ internal static class DatabaseRuns
     }
 
     // A failure a describer gave is read under the guard, where a null is the describer's fault, and redacted before
-    // it is printed.  It is returned redacted, for the events the caller writes.
+    // it is printed, or before it is reported without being written.  It is returned redacted, for the events the
+    // caller writes.
     private static DescribeFailure ReportFailure(
         Guard guard,
         Func<DescribeFailure?> failureOf,
@@ -245,7 +297,8 @@ internal static class DatabaseRuns
         PlannedDatabase database,
         ServerInfo? server,
         Reporter reporter,
-        OnlineMode online
+        OnlineMode online,
+        bool write = true
     )
     {
         var secret = guard.Secret;
@@ -253,7 +306,16 @@ internal static class DatabaseRuns
             guard.Call(() => failureOf() ?? throw new InvalidOperationException(Guard.Nothing)),
             secret
         );
-        reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server, online), secret));
+        var error = Redaction.Of(DescribeErrors.Failure(failure, planned, database, server, online), secret);
+        if (write)
+        {
+            reporter.Report(error);
+        }
+        else
+        {
+            reporter.ReportWithoutWriting(error);
+        }
+
         return failure;
     }
 
@@ -264,6 +326,13 @@ internal static class DatabaseRuns
                 $"The describer put the connection's value in its description of the query '{entry.Name}'."
             )
             : entry;
+
+    // A capture goes into a bundle that is sent, and the writer refuses one that holds a whole form or a part.
+    private static string NoSecretIn(DescribeCapture capture, ConnectionSecret secret)
+    {
+        var written = CaptureJson.Write(capture, secret);
+        return written.Succeeded ? written.Value : throw new InvalidOperationException(written.Failure);
+    }
 
     private static ToolDiagnostic NoConnection(
         PlannedQuery first,
@@ -318,8 +387,13 @@ internal static class DatabaseRuns
         Guard Guard,
         TimeProvider Time,
         Reporter Reporter,
-        RunTrace Trace
+        RunTrace Trace,
+        RunCapture? Capture
     );
+
+    // What the run's options make of each database: the help of one that cannot be opened, whether one with no
+    // connection is held back silently, and where its session is recorded.
+    private sealed record DatabaseMode(OnlineMode Online, bool Offline, RunCapture? Capture);
 
     // What a describer says of a connection's value before its session is opened.  The rewrite is none for a value
     // that its driver cannot read.  It is a class and not a record, since a record prints its members.

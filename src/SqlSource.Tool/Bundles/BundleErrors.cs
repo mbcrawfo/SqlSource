@@ -1,5 +1,7 @@
+using System;
 using System.Globalization;
 using SqlSource.Diagnostics;
+using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Bundles;
@@ -59,6 +61,69 @@ internal static class BundleErrors
     /// </param>
     public static string MadeBy(string? toolVersion) =>
         toolVersion is null ? "another version of sqlsource" : "sqlsource " + toolVersion;
+
+    /// <summary>
+    /// <c>SQLSRC293</c> or <c>SQLSRC294</c>: the renaming refused the bundle, which is not written.  A refusal of the
+    /// replay is <c>SQLSRC294</c>, at its place; any other is <c>SQLSRC293</c>, with its reason, its place and the text
+    /// found, which is the user's own.  Each says how to send a raw bundle instead.
+    /// </summary>
+    /// <param name="path">The full path the bundle would have been written at.</param>
+    /// <param name="refusal">The renaming's refusal.</param>
+    public static ToolDiagnostic CannotBeMadeSafe(string path, RenamingRefusal refusal)
+    {
+        ToolDiagnostic error;
+        if (refusal.Step == RefusalStep.Replay)
+        {
+            error = ToolDiagnostic.AtFile(
+                ToolDiagnostics.RenamedBundleDoesNotReproduce,
+                path,
+                BundleText.Of(refusal.Place)
+            );
+        }
+        else
+        {
+            var found = refusal.Token is { } token ? BundleText.Of(token) : "(none)";
+            error = ToolDiagnostic.AtFile(
+                ToolDiagnostics.BundleCannotBeMadeSafe,
+                path,
+                ReasonOf(refusal.Step),
+                BundleText.Of(refusal.Place),
+                found
+            );
+        }
+
+        return error.WithLines(
+            new ContinuationLine(
+                "help",
+                "make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw "
+                    + "bundle is ready, without attaching it: a maintainer will say how to send it"
+            )
+        );
+    }
+
+    /// <summary><c>SQLSRC295</c>: <c>--scrub</c> was given a bundle that is not raw.</summary>
+    /// <param name="path">The bundle's full path.</param>
+    /// <param name="isRenamed">
+    /// Whether its <c>bundle.json</c> says it is renamed; otherwise it has none that says it is raw.
+    /// </param>
+    public static ToolDiagnostic NotRaw(string path, bool isRenamed) =>
+        ToolDiagnostic.AtFile(
+            ToolDiagnostics.BundleIsNotRaw,
+            path,
+            BundleText.Of(path),
+            isRenamed ? "it is renamed already" : $"it has no {BundleFiles.Info} that says it is raw"
+        );
+
+    // Why a step of the renaming refused, as SQLSRC293 says it.
+    private static string ReasonOf(RefusalStep step) =>
+        step switch
+        {
+            RefusalStep.Token => "a word is not one of the new names",
+            RefusalStep.RequestSql => "the query the database was asked is not the renamed query",
+            RefusalStep.PlanString => "a text the database gave does not read the same once renamed",
+            RefusalStep.Replay => throw new ArgumentException("A refusal of the replay is SQLSRC294.", nameof(step)),
+            _ => throw UnexpectedEnumValueException.Of(step),
+        };
 
     /// <summary><c>SQLSRC291</c>: this tool has no describer of the bundle's engine.</summary>
     /// <param name="path">The bundle's full path.</param>

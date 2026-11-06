@@ -26,4 +26,4 @@ For a `Custom Scan`: a scan of one relation names it in `Relation Name` with an 
 
 ## Trigger
 
-A user's report of a column they expected to be non-nullable, with a bundle of phase 10 that shows a `Custom Scan` or a `RETURNING` of `OLD` or `NEW`; a project on an extension that plans its own scans.
+A user's report of a column they expected to be non-nullable, with a bundle of `sqlsource diagnose` that shows a `Custom Scan` or a `RETURNING` of `OLD` or `NEW`; a project on an extension that plans its own scans.

@@ -16,7 +16,7 @@ The owner's decision, on 2026-11-05: "agree, make it tech debt".
 
 ## Impact
 
-Medium.  A query that spells a name in another case than the catalog does, where the tool compares it by ordinal, is common in SQL Server, whose default collations ignore case.  Its bundle cannot be renamed, and must be sent raw and privately.  No user sees it yet: no command renames a bundle until `diagnose`.  A bundle of a case-sensitive database can merge two names; the proof refuses it when that changes the answer, and otherwise the bundle replays as the original did.
+Medium.  A query that spells a name in another case than the catalog does, where the tool compares it by ordinal, is common in SQL Server, whose default collations ignore case.  Its bundle cannot be renamed: `diagnose` refuses it with `SQLSRC294`, and it must be sent raw and privately, as the manual's [known issues of the tool](../manual/tool.md#known-issues) say.  A bundle of a case-sensitive database can merge two names; the proof refuses it when that changes the answer, and otherwise the bundle replays as the original did.
 
 ## Proposed fix
 

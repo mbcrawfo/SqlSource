@@ -188,12 +188,12 @@ The four projects of [`tests/DatabaseTests/`](DatabaseTests/README.md) run again
 
 `tests/SqlSource.Tool.Tests/Fixtures/Bundles/<engine>/<case>/` holds the bundles of bug reports that `sqlsource replay` is tested on, a folder for each case under the folder of its engine, `postgres` or `mssql`.  A case holds the files of a bundle as they unzip: `bundle.json`, `query.sql`, `capture.json`, and `expected.json` when the query was described.  `bundle.json` says what describing it gave: an entry, which `expected.json` holds, or a failure, with its id and its step.  A case keeps the report's `bundle.json` whole, so `replay` can name the version and the machine that made it; the committed cases, two copied from the describers' recorded fixtures and one built by hand, have `fixture` in place of a tool version, a runtime and a system, since no user's run made them.
 
-The tool's tests alone replay a case, without a database: `BundleCases.cs`, at the root of `tests/SqlSource.Tool.Tests`, finds the cases, and `BundleCasesTests` checks that each gives what its folder expects.  No container test describes one, and `tools/record-fixtures.sh` never records one again.  When the capture's form moves past a case, it is deleted, and the case it showed is tested again by hand.  The folder is `text eol=lf` in `.gitattributes`, as the describers' fixtures are.
+The tool's tests replay the cases, without a database: `BundleCases.cs`, at the root of `tests/SqlSource.Tool.Tests`, finds them, and `BundleCasesTests` checks that each gives what its folder expects.  `tools/check-package-install.sh` also replays `postgres/select-left-join` with the packed tool, so moving, renaming or changing that case changes the script in the same commit.  No container test describes one, and `tools/record-fixtures.sh` never records one again.  When the capture's form moves past a case, it is deleted, and the case it showed is tested again by hand.  The folder is `text eol=lf` in `.gitattributes`, as the describers' fixtures are.
 
 To make a case of a bug report's bundle:
 
 1. Unzip it into `tests/SqlSource.Tool.Tests/Fixtures/Bundles/<engine>/<case>/`, naming the case for what it shows.
-2. Keep its `bundle.json`, and never add the `.mapping.json` file of a renamed bundle: a case is replayed from the files alone.
+2. Keep its `bundle.json`, and never add the `.mapping.json` file of a renamed bundle: a case is replayed from the files alone.  Never commit a raw bundle, one sent privately, whose `bundle.json` says `"renamed": false`: rename it first with `dotnet sqlsource diagnose --scrub <bundle> --out <zip>`, and make the case of the zip it writes; one that `--scrub` refuses cannot become a case.
 3. Run `dotnet test --project tests/SqlSource.Tool.Tests -- --filter-class "*BundleCasesTests"`.  The case must give what its `bundle.json` and `expected.json` say.
 
 ## Fixture projects

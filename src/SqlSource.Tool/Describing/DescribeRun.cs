@@ -65,21 +65,16 @@ internal static class DescribeRun
             RunEvents.Query(trace, query);
         }
 
-        // 3: the connection of every selected database is looked up, since the summary says which have none, in
-        // the environment and then in the .env file nearest to the unit.  A file that cannot be read gives no value.
-        var environment = ConnectionEnvironment.Load(options.UnitFolder, host);
-        foreach (var error in environment.Errors)
-        {
-            reporter.Report(error);
-        }
-
+        // 3: the connection of every selected database is looked up, since the summary says which have none.
         var selected = RunDecisions.SelectedDatabases(plan);
-        var connections = Connections.Resolve(
-            [.. selected.Select(static database => database.Name)],
-            [.. RunDecisions.DescribableDatabases(plan).Select(static database => database.Name)],
-            [.. plan.Databases.Select(static database => database.Name)],
+        var connections = ConnectionsOf(
+            plan,
+            selected,
+            RunDecisions.DescribableDatabases(plan),
             options.Connections,
-            environment
+            options.UnitFolder,
+            host,
+            reporter
         );
         // Found before the databases are run, which changes the queries' states.
         var offline = OfflineDatabases(options.Online, files, selected, connections);
@@ -164,6 +159,45 @@ internal static class DescribeRun
         {
             await host.Out.WriteLineAsync(prefix + line);
         }
+    }
+
+    /// <summary>
+    /// The connections of the selected databases, from the command line, the environment and then the <c>.env</c>
+    /// file nearest to the unit, with what is wrong with that file reported.  A file that cannot be read gives no
+    /// value.  <c>diagnose</c> looks up the connection of its one database here.
+    /// </summary>
+    /// <param name="plan">The plan of the run, whose databases a value of <c>--connection</c> may name.</param>
+    /// <param name="selected">The databases whose connection is looked up.</param>
+    /// <param name="describable">
+    /// The selected databases that can be described, which decide whether <c>SQLSOURCE_CONNECTION</c> is for one.
+    /// </param>
+    /// <param name="given">The values of <c>--connection</c>.</param>
+    /// <param name="unitFolder">The full path of the folder of the run's unit, where the search starts.</param>
+    /// <param name="host">The environment and the files.</param>
+    /// <param name="reporter">Where the errors of the <c>.env</c> file go.</param>
+    internal static Connections ConnectionsOf(
+        RunPlan plan,
+        ImmutableArray<PlannedDatabase> selected,
+        ImmutableArray<PlannedDatabase> describable,
+        ImmutableArray<ConnectionArgument> given,
+        string unitFolder,
+        ToolHost host,
+        Reporter reporter
+    )
+    {
+        var environment = ConnectionEnvironment.Load(unitFolder, host);
+        foreach (var error in environment.Errors)
+        {
+            reporter.Report(error);
+        }
+
+        return Connections.Resolve(
+            [.. selected.Select(static database => database.Name)],
+            [.. describable.Select(static database => database.Name)],
+            [.. plan.Databases.Select(static database => database.Name)],
+            given,
+            environment
+        );
     }
 
     // The databases with a query to describe, in the plan's order, when the run is offline; none otherwise.  Under

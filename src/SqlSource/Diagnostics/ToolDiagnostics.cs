@@ -570,6 +570,50 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor QueryNotInFile = new(
+        id: "SQLSRC292",
+        title: "Query is not in the file",
+        messageFormat: "There is no query '{0}' to diagnose in '{1}': {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc292",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor BundleCannotBeMadeSafe = new(
+        id: "SQLSRC293",
+        title: "Bundle cannot be made safe to post",
+        messageFormat: "The bundle cannot be made safe to post: {0}, at {1}, found {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc293",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor RenamedBundleDoesNotReproduce = new(
+        id: "SQLSRC294",
+        title: "Renamed bundle does not reproduce the query's answer",
+        messageFormat: "The renamed bundle does not reproduce the query's answer: its replay differs at {0}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc294",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor BundleIsNotRaw = new(
+        id: "SQLSRC295",
+        title: "Bundle is not a raw bundle",
+        messageFormat: "'{0}' is not a raw bundle: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc295",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -624,6 +668,10 @@ internal static class ToolDiagnostics
             BundleCannotBeRead,
             BundleOfNewerTool,
             BundleCallMissing,
-            NoDescriberForBundle
+            NoDescriberForBundle,
+            QueryNotInFile,
+            BundleCannotBeMadeSafe,
+            RenamedBundleDoesNotReproduce,
+            BundleIsNotRaw
         );
 }

@@ -12,7 +12,7 @@ The word rule is the server's rule for names, the one `QuoteReader` and the desc
 
 ## Impact
 
-Low.  No name or literal of the user's leaks: the amount is replaced like any word of the user's.  The renamed bundle misleads the maintainer about what the query held: `SELECT $12 AS price` reads as the selection of a column.  No user sees it yet: no command renames a bundle until `diagnose`.
+Low.  No name or literal of the user's leaks: the amount is replaced like any word of the user's.  The renamed bundle misleads the maintainer about what the query held: `SELECT $12 AS price` reads as the selection of a column.  `diagnose` and `diagnose --scrub` write such a bundle.  The user is not told, since nothing of theirs leaks and a query rarely holds a money literal, so the manual has no known issue of it.
 
 ## Proposed fix
 

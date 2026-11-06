@@ -102,13 +102,17 @@ scope_of() {
 }
 
 # A path that can change what is packed or how the packages are checked.  README.md is the generator's readme, and
-# tools/check-package-install.sh copies the example's Users.sql and its sidecar.  Every .props and .targets file at the
-# root counts, since MSBuild imports the Directory.Build files and Directory.Packages.props on its own, and any of them
-# can import another.
+# tools/check-package-install.sh copies the example's Users.sql and its sidecar, and replays the bundle of
+# tests/SqlSource.Tool.Tests/Fixtures/Bundles/postgres/select-left-join with the packed tool.  Every .props and .targets
+# file at the root counts, since MSBuild imports the Directory.Build files and Directory.Packages.props on its own, and
+# any of them can import another.
 needs_packages() {
     packages=false
     case "$1" in
-    src/* | tools/package-install/* | tools/check-*.sh | examples/PostgresExamples/Models/Users.sql*) packages=true ;;
+    src/* | tools/package-install/* | tools/check-*.sh | examples/PostgresExamples/Models/Users.sql* | \
+        tests/SqlSource.Tool.Tests/Fixtures/Bundles/postgres/select-left-join/*)
+        packages=true
+        ;;
     */*) ;;
     *.props | *.targets | global.json | *.slnx | dotnet-tools.json | README.md) packages=true ;;
     esac
