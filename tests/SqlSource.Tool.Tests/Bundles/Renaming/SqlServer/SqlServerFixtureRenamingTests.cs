@@ -45,9 +45,9 @@ public sealed class SqlServerFixtureRenamingTests
 
         var renamed = await RenamedAsync(raw, key: 1);
 
-        BundleLeaks
-            .ProvenanceOf(renamed.Bundle.Expected.ShouldNotBeNull())
-            .ShouldBe(BundleLeaks.ProvenanceOf(raw.Expected.ShouldNotBeNull()));
+        Provenance
+            .Of(renamed.Bundle.Expected.ShouldNotBeNull())
+            .ShouldBe(Provenance.Of(raw.Expected.ShouldNotBeNull()));
     }
 
     [Theory]
@@ -77,9 +77,9 @@ public sealed class SqlServerFixtureRenamingTests
         var second = await RenamedAsync(raw, key: 2);
 
         second.Bundle.Query.ShouldNotBe(first.Bundle.Query);
-        BundleLeaks
-            .ProvenanceOf(second.Bundle.Expected.ShouldNotBeNull())
-            .ShouldBe(BundleLeaks.ProvenanceOf(first.Bundle.Expected.ShouldNotBeNull()));
+        Provenance
+            .Of(second.Bundle.Expected.ShouldNotBeNull())
+            .ShouldBe(Provenance.Of(first.Bundle.Expected.ShouldNotBeNull()));
     }
 
     // msdb.dbo.sysjobs is a table of dbo, renamed as a user's table of a system database is, and master.sys.databases

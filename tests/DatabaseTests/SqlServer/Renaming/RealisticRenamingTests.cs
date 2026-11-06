@@ -54,7 +54,7 @@ public sealed class RealisticRenamingTests(SqlServerDatabases sqlServer)
         bundle.Info.ShouldBe(info with { Renamed = true });
         if (raw.Expected is { } expected)
         {
-            BundleLeaks.ProvenanceOf(bundle.Expected.ShouldNotBeNull()).ShouldBe(BundleLeaks.ProvenanceOf(expected));
+            Provenance.Of(bundle.Expected.ShouldNotBeNull()).ShouldBe(Provenance.Of(expected));
         }
         else
         {
