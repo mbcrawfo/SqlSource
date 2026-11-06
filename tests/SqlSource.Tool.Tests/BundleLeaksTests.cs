@@ -96,13 +96,15 @@ public sealed class BundleLeaksTests
     }
 
     [Fact]
-    public void EngineRowNames_OfAnotherDatabasesTables_AreTheEnginesNames()
+    public void EngineRowNames_OfAViewOfSys_AreTheEnginesNames()
     {
         var raw = RawOf("select-other-database");
 
         var names = BundleLeaks.EngineRowNames(raw, Part);
 
-        names.ShouldContain("sysjobs");
+        names.ShouldContain("databases");
+        names.ShouldContain("database_id");
+        names.ShouldNotContain("sysjobs");
         names.ShouldNotContain("JobsAndDatabases");
     }
 

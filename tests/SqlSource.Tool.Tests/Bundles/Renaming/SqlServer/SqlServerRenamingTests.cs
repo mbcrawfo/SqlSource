@@ -114,15 +114,37 @@ public sealed class SqlServerRenamingTests
     }
 
     [Theory]
-    [InlineData("columns", "sourceDatabase", "msdb")]
-    [InlineData("operands", "sourceDatabase", "MSSQLSystemResource")]
-    [InlineData("table", "sourceSchema", "INFORMATION_SCHEMA")]
-    [InlineData("columns", "sourceSchema", "Sys")]
-    public void IsEngineRow_ARowOfTheServers_IsTrue(string method, string member, string value)
+    [InlineData("columns", "master", "sys")]
+    [InlineData("columns", "fixtures", "Sys")]
+    [InlineData("operands", "fixtures", "INFORMATION_SCHEMA")]
+    [InlineData("table", "msdb", "information_schema")]
+    [InlineData("columns", "mssqlsystemresource", "sys")]
+    [InlineData("operands", "MSSQLSystemResource", "dbo")]
+    [InlineData("table", "mssqlsystemresource", "sales")]
+    [InlineData("columns", "mssqlsystemresource", null)]
+    public void IsEngineRow_ARowOfTheServers_IsTrue(string method, string database, string? schema)
     {
-        var row = new JsonObject { ["sourceDatabase"] = "fixtures", ["sourceSchema"] = "dbo" };
-        row[member] = value;
+        var row = new JsonObject { ["sourceDatabase"] = database, ["sourceSchema"] = schema };
         Engine.IsEngineRow(method, "answer.rows[]", row).ShouldBeTrue();
+    }
+
+    // A user's tables can be in a system database, as they are when a connection string names master, so a row's
+    // database alone does not make it the engine's.
+    [Theory]
+    [InlineData("columns", "master")]
+    [InlineData("operands", "msdb")]
+    [InlineData("table", "model")]
+    [InlineData("columns", "tempdb")]
+    [InlineData("columns", "MASTER")]
+    public void IsEngineRow_ADboRowOfASystemDatabase_IsFalse(string method, string database)
+    {
+        var row = new JsonObject
+        {
+            ["sourceDatabase"] = database,
+            ["sourceSchema"] = "dbo",
+            ["sourceTable"] = "users",
+        };
+        Engine.IsEngineRow(method, "answer.rows[]", row).ShouldBeFalse();
     }
 
     [Theory]

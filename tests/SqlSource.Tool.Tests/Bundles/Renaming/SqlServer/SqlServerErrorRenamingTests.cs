@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -19,8 +22,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
 
-// The errors and refusals of SQL Server's part, which no recorded fixture holds: each case is a fixture's raw bundle
-// with one answer edited by hand, its outcome made by replaying it raw, then renamed.
+// The errors, refusals and sessions of SQL Server's part that no recorded fixture holds: each case is a fixture's raw
+// bundle with its capture edited by hand, its outcome made by replaying it raw, then renamed.
 public sealed partial class SqlServerErrorRenamingTests
 {
     private const string Engine = "mssql";
@@ -143,6 +146,30 @@ public sealed partial class SqlServerErrorRenamingTests
         renamed.Bundle.Expected.ShouldBeNull();
     }
 
+    // A user whose tables are in a system database, as they are when a connection string names master, gets a bundle
+    // whose rows of dbo are renamed: the leak search keeps no name from the bundle's rows, so it trusts no row.
+    [Theory]
+    [InlineData("master")]
+    [InlineData("msdb")]
+    [InlineData("model")]
+    [InlineData("tempdb")]
+    public async Task RenameAsync_TablesOfASystemDatabase_LeaksNoNameOfTheUsers(string database)
+    {
+        const string Session = "fixtures";
+        var raw = await EditedAsync("select-left-join", capture => WithDatabase(capture, Session, database));
+        raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
+        raw.Capture.ShouldNotContain(Session);
+        var schema = await File.ReadAllTextAsync(
+            Path.Combine(FixtureCases.Root, Engine, "schema.sql"),
+            TestContext.Current.CancellationToken
+        );
+
+        var renamed = await RenamedAsync(raw);
+
+        renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
+        BundleLeaks.Find(renamed.Bundle, Part, new HashSet<string>(), schema, raw.Query).ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task RenameAsync_MemberWithNoRule_IsRefusedAtItsPlace()
     {
@@ -238,6 +265,43 @@ public sealed partial class SqlServerErrorRenamingTests
             query => WithParameter(query, parameter)
         );
         return (raw, copy.ShouldNotBeNull());
+    }
+
+    // Every database member of the node and its children, "database" of open and "sourceDatabase" of a row, that
+    // names the database given, named as the other.
+    private static void WithDatabase(JsonNode? node, string database, string other)
+    {
+        if (node is JsonArray items)
+        {
+            foreach (var item in items)
+            {
+                WithDatabase(item, database, other);
+            }
+
+            return;
+        }
+
+        if (node is not JsonObject members)
+        {
+            return;
+        }
+
+        foreach (var (name, value) in members.ToArray())
+        {
+            if (
+                name is "database" or "sourceDatabase"
+                && value is JsonValue text
+                && text.GetValueKind() == JsonValueKind.String
+                && text.GetValue<string>() == database
+            )
+            {
+                members[name] = other;
+            }
+            else
+            {
+                WithDatabase(value, database, other);
+            }
+        }
     }
 
     // The text with the parameter "@before", and each copy of it, written as the parameter given.

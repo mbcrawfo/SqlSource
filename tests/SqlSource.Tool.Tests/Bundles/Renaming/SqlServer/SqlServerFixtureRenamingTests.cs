@@ -82,6 +82,26 @@ public sealed class SqlServerFixtureRenamingTests
             .ShouldBe(BundleLeaks.ProvenanceOf(first.Bundle.Expected.ShouldNotBeNull()));
     }
 
+    // msdb.dbo.sysjobs is a table of dbo, renamed as a user's table of a system database is, and master.sys.databases
+    // a view of sys, kept.
+    [Fact]
+    public async Task RenameAsync_RelationsOfSystemDatabases_KeepOnlyTheNamesOfSys()
+    {
+        var raw = RawOf("select-other-database");
+
+        var renamed = await RenamedAsync(raw, key: 1);
+
+        foreach (var name in new[] { "sysjobs", "job_id" })
+        {
+            renamed.Bundle.Query.ShouldNotContain(name, Case.Insensitive);
+            renamed.Bundle.Capture.ShouldNotContain(name, Case.Insensitive);
+        }
+
+        renamed.Bundle.Query.ShouldContain("msdb.dbo.");
+        renamed.Bundle.Query.ShouldContain("master.sys.databases");
+        renamed.Bundle.Query.ShouldContain("database_id");
+    }
+
     private static Bundle RawOf(string name) =>
         RawBundles.OfFixture(FixtureCases.Of(Engine).Single(found => found.Name == name));
 

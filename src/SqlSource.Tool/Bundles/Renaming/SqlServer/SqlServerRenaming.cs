@@ -12,8 +12,8 @@ namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
 /// <summary>
 /// SQL Server's part of the renaming: its word rule, a fold that ignores case, the words of
 /// <see cref="SqlServerVocabulary" />, the rules of <see cref="SqlServerFields" />, the rows of <c>sys</c>,
-/// <c>INFORMATION_SCHEMA</c> and the system databases, the copies of a reused parameter, and the renaming of a
-/// message by <see cref="SqlServerMessages" />.
+/// <c>INFORMATION_SCHEMA</c> and the system resource, the copies of a reused parameter, and the renaming of a message
+/// by <see cref="SqlServerMessages" />.
 /// </summary>
 /// <remarks>
 /// A name folds ignoring case whatever the database's collation, which no member is given.  SQL Server has no plan
@@ -26,6 +26,11 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     private const string ClrHead = "MICROSOFT.SQLSERVER.TYPES.SQL";
     private const string ClrAssembly = ", MICROSOFT.SQLSERVER.TYPES, VERSION=";
     private const string ClrTail = ", CULTURE=NEUTRAL, PUBLICKEYTOKEN=89845DCD8080CC91";
+
+    // The database whose relations are the server's own, folded: the system resource, which the describer names as
+    // the source of a system view's columns.  A user's tables can be in master, msdb, model or tempdb, so no other
+    // database says that a row is the engine's.
+    private const string SystemResource = "MSSQLSYSTEMRESOURCE";
 
     private static readonly string[] ClrTypes = ["GEOMETRY", "GEOGRAPHY", "HIERARCHYID"];
 
@@ -66,9 +71,14 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     public FieldRule? RuleOf(string method, string path) => SqlServerFields.RuleOf(method, path);
 
     /// <summary>
-    /// A column of a result set whose source is of <c>sys</c>, of <c>INFORMATION_SCHEMA</c> or of a system database,
-    /// or the request of <c>table</c> of a relation of <c>sys</c> or <c>INFORMATION_SCHEMA</c>.
+    /// A column of a result set whose source is of <c>sys</c>, of <c>INFORMATION_SCHEMA</c> or of the system resource,
+    /// <c>mssqlsystemresource</c>, or the request of <c>table</c> of a relation of <c>sys</c> or
+    /// <c>INFORMATION_SCHEMA</c>.
     /// </summary>
+    /// <remarks>
+    /// A row of <c>dbo</c> or another schema of <c>master</c>, <c>msdb</c>, <c>model</c> or <c>tempdb</c> is the
+    /// user's, since a user's tables are there when the connection names that database.
+    /// </remarks>
     public bool IsEngineRow(string method, string path, JsonObject row)
     {
         if (!ColumnMethods.Contains(method, StringComparer.Ordinal))
@@ -78,7 +88,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
         return path switch
         {
-            "answer.rows[]" => IsSystemSchema(row, "sourceSchema") || IsSystemDatabase(row, "sourceDatabase"),
+            "answer.rows[]" => IsSystemSchema(row, "sourceSchema") || IsSystemResource(row, "sourceDatabase"),
             CaptureRenamer.Request => method == SqlServerCallNames.Table && IsSystemSchema(row, "schema"),
             _ => false,
         };
@@ -160,15 +170,9 @@ internal sealed class SqlServerRenaming : IEngineRenaming
         StringOf(row, member) is { } schema
         && SystemSchemas.Contains(SqlServerVocabulary.Fold(schema), StringComparer.Ordinal);
 
-    private static bool IsSystemDatabase(JsonObject row, string member) =>
+    private static bool IsSystemResource(JsonObject row, string member) =>
         StringOf(row, member) is { } database
-        && SqlServerVocabulary.SystemDatabases.Any(system =>
-            string.Equals(
-                SqlServerVocabulary.Fold(system),
-                SqlServerVocabulary.Fold(database),
-                StringComparison.Ordinal
-            )
-        );
+        && string.Equals(SqlServerVocabulary.Fold(database), SystemResource, StringComparison.Ordinal);
 
     private static string? StringOf(JsonObject row, string member) =>
         row[member] is JsonValue value && value.GetValueKind() == JsonValueKind.String

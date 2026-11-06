@@ -8,7 +8,9 @@ namespace SqlSource.DatabaseTests.SqlServer.Renaming;
 
 // The words of SQL Server's two corpora that are the user's: the describer fixtures and the realistic cases.  A word
 // is the user's when the corpus's schema.sql defines it or the query makes it, as an alias, a CTE name or a column
-// alias does.  A word that SQL Server defines is the engine's, and is in SqlServerVocabulary or in EngineRowNames.
+// alias does, and when it names a relation of dbo, or one of its columns, in a system database, as sysjobs and job_id
+// of msdb.dbo.sysjobs do, since the renaming renames such a row as it renames the user's tables there.  A word that
+// SQL Server defines is the engine's, and is in SqlServerVocabulary or in EngineRowNames.
 internal static class CorpusUserWords
 {
     // The user's words in their natural spelling, sorted.
@@ -100,6 +102,7 @@ internal static class CorpusUserWords
         "is_grand_total",
         "is_open",
         "j",
+        "job_id",
         "kind",
         "label",
         "largest_weighted",
@@ -215,6 +218,7 @@ internal static class CorpusUserWords
         "status",
         "status_label",
         "stock",
+        "sysjobs",
         "t",
         "tax",
         "time_zone",
@@ -244,10 +248,6 @@ internal static class CorpusUserWords
         "database_id",
         // The view sys.databases.
         "databases",
-        // The column job_id of msdb.dbo.sysjobs.
-        "job_id",
-        // The table msdb.dbo.sysjobs.
-        "sysjobs",
     ];
 
     /// <summary>The user's words, folded as <see cref="SqlServerRenaming.Fold" /> folds.</summary>
