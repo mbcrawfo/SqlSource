@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0103`
+Next id: `TD-0104`
 
 ## Active items
 
@@ -44,6 +44,7 @@ Next id: `TD-0103`
 | [TD-0100](TD-0100-a-merge-can-keep-an-older-tools-entry.md) | Open | 2026-11-04 | Medium | A sidecar records the tool's version for the whole file, so a git merge of a branch that updated the tool with one that described a query on the older tool can leave that query's entry under the new version, and neither the build nor `describe` sees it; only `describe --check` does |
 | [TD-0101](TD-0101-a-method-with-no-models-is-refused-as-one-with-models.md) | Open | 2026-11-04 | Low | A `codegen` query method that takes no models is refused with SQLSRC123 where a method with internal models would not compile, because the placement check cannot see a query's models |
 | [TD-0102](TD-0102-a-list-negated-without-not-is-trusted-to-filter-nulls.md) | Open | 2026-11-05 | Low | On PostgreSQL, a list that `IS FALSE`, `IS NOT TRUE`, a comparison with `false`, a `CASE` or a `COALESCE` negates, in a query with an outer join, is not read as negated: the describer can prove a column of the optional side not null that an empty list leaves null, and the generated reader throws |
+| [TD-0103](TD-0103-an-empty-list-fails-in-a-sql-server-aggregate.md) | Open | 2026-11-05 | Low | On SQL Server, a query method whose list is inside an aggregate's argument, a `GROUP BY` expression or an `OUTPUT` clause throws `SqlException` (130, 144 or 10705) when the list is empty or null, since its empty form is a subquery, which SQL Server refuses there |
 
 ## Columns
 

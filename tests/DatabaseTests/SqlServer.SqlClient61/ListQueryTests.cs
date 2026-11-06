@@ -112,6 +112,52 @@ public sealed class ListQueryTests(AppContainer app)
         accounts.ShouldBe([Alice, Bob, Carol]);
     }
 
+    // A list inside an aggregate runs while it holds a value: carol alone is suspended.
+    [Fact]
+    public async Task CountStatuses_List_CountsInTheAggregate()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var counts = await connection.CountAccountsWithStatuses(
+            new CountAccountsWithStatusesArgs(["suspended"]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithStatusesDto(1)]);
+    }
+
+    // An empty list is sent as a subquery, which SQL Server refuses inside an aggregate: Msg 130, a known issue of the
+    // manual's sqlserver.md (TD-0103).
+    [Fact]
+    public async Task CountStatuses_Empty_IsRefusedByTheServer()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            connection.CountAccountsWithStatuses(new CountAccountsWithStatusesArgs([]), cancellationToken: token)
+        );
+
+        thrown.Number.ShouldBe(130);
+    }
+
+    // The known issue's workaround: the test in a WITH query, and the aggregate over its result, runs for an empty
+    // list, which matches no account.
+    [Fact]
+    public async Task CountStatusesTestedFirst_Empty_CountsNone()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var counts = await connection.CountAccountsWithStatusesTestedFirst(
+            new CountAccountsWithStatusesTestedFirstArgs([]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithStatusesTestedFirstDto(0)]);
+    }
+
     [Fact]
     public async Task Optional_Null_FindsEveryRow()
     {

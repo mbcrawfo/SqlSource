@@ -516,4 +516,16 @@ SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-pa
 
 - **A query method fails on a connection that wraps a `SqlConnection` and creates parameters of its own.**  Give the method the `SqlConnection` inside: see [the generator's known issues](generator.md#known-issues).
 
+- **On SQL Server, a list inside an aggregate, a `GROUP BY` expression or an `OUTPUT` clause fails when it is empty or null.**  A query such as `SELECT SUM(CASE WHEN status IN @statuses THEN 1 ELSE 0 END) AS matching FROM dbo.accounts` runs for every list that holds a value, and throws `SqlException` when the list is empty or null: "Cannot perform an aggregate function on an expression containing an aggregate or a subquery." (130), or the error of a `GROUP BY` (144) or of an `OUTPUT` clause (10705).  The build and describing succeed.  Test the list in a `WITH` query, or a subquery in `FROM`, and aggregate its result, which runs for an empty list too:
+
+  ```sql mssql
+  -- name: CountAccountsWithStatuses
+  WITH tested AS (
+      SELECT CASE WHEN status IN @statuses THEN 1 ELSE 0 END AS hit
+      FROM dbo.accounts
+  )
+  SELECT SUM(hit) AS matching
+  FROM tested;
+  ```
+
 - **A `-- param:` type whose name holds an accent written as a separate combining mark, a letter number such as `Ⅰ`, or an invisible formatting character after its first character** is refused as [SQLSRC228](diagnostics.md#sqlsrc228), "it is not written as a type name", though SQL Server accepts the name.  Write that part of the name in brackets, as in `-- param: @p dbo.[PartⅠ]`, or write an accented letter as one character.

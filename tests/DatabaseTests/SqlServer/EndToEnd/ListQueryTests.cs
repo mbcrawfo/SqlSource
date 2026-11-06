@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using Shouldly;
 using Xunit;
 
@@ -10,9 +11,10 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
 // The queries of Queries/Lists.sql, run on the seed of "app" through the methods that ListQueries gets, each of which
 // sends a parameter for each value of a list: every kind of collection, the counts on each side of the padded sizes,
-// an empty list and a null one, two lists, a list used twice, a list sent at its own count, and the counts at the most
-// parameters a query sends SQL Server and past it, which the method refuses before it sends.  The lists of the limit
-// are of ids that no account has, around the seed's own.
+// an empty list and a null one, two lists, a list used twice, a list inside an aggregate, which SQL Server refuses
+// empty, and its workaround, a list sent at its own count, and the counts at the most parameters a query sends SQL
+// Server and past it, which the method refuses before it sends.  The lists of the limit are of ids that no account
+// has, around the seed's own.
 [Collection(UsesSqlServer.Name)]
 public sealed class ListQueryTests(SqlServerDatabases sqlServer)
 {
@@ -109,6 +111,52 @@ public sealed class ListQueryTests(SqlServerDatabases sqlServer)
         var accounts = await connection.ListAccountsExcept(new ListAccountsExceptArgs([]), cancellationToken: token);
 
         accounts.ShouldBe([Alice, Bob, Carol]);
+    }
+
+    // A list inside an aggregate runs while it holds a value: carol alone is suspended.
+    [Fact]
+    public async Task CountStatuses_List_CountsInTheAggregate()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var counts = await connection.CountAccountsWithStatuses(
+            new CountAccountsWithStatusesArgs(["suspended"]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithStatusesDto(1)]);
+    }
+
+    // An empty list is sent as a subquery, which SQL Server refuses inside an aggregate: Msg 130, a known issue of the
+    // manual's sqlserver.md (TD-0103).
+    [Fact]
+    public async Task CountStatuses_Empty_IsRefusedByTheServer()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            connection.CountAccountsWithStatuses(new CountAccountsWithStatusesArgs([]), cancellationToken: token)
+        );
+
+        thrown.Number.ShouldBe(130);
+    }
+
+    // The known issue's workaround: the test in a WITH query, and the aggregate over its result, runs for an empty
+    // list, which matches no account.
+    [Fact]
+    public async Task CountStatusesTestedFirst_Empty_CountsNone()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var counts = await connection.CountAccountsWithStatusesTestedFirst(
+            new CountAccountsWithStatusesTestedFirstArgs([]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithStatusesTestedFirstDto(0)]);
     }
 
     [Fact]

@@ -59,3 +59,19 @@ SELECT id, name, status
 FROM dbo.accounts
 WHERE id IN @ids
 ORDER BY id;
+
+-- name: CountAccountsWithStatuses
+-- summary: How many accounts have a status in a list, the test inside an aggregate, which SQL Server refuses for an
+-- summary: empty or a null list.
+SELECT SUM(CASE WHEN status IN @statuses THEN 1 ELSE 0 END) AS matching
+FROM dbo.accounts;
+
+-- name: CountAccountsWithStatusesTestedFirst
+-- summary: CountAccountsWithStatuses, with the test in a WITH query and the aggregate over its result, which SQL Server
+-- summary: runs for an empty list too.
+WITH tested AS (
+    SELECT CASE WHEN status IN @statuses THEN 1 ELSE 0 END AS hit
+    FROM dbo.accounts
+)
+SELECT SUM(hit) AS matching
+FROM tested;
