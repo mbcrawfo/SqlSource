@@ -113,6 +113,7 @@ public sealed class OnlineBuildTests : IDisposable
     [Fact]
     public async Task Build_AutoWithoutAConnectionSource_RunsNothingAndWritesNoFileOfIt()
     {
+        AboveTheTempFolder.SkipWhenAnEnvIsAbove(_fixtures.Root);
         await PassesAsync(NoVariables);
 
         StandIn.RunsIn(_folder).ShouldBeEmpty();

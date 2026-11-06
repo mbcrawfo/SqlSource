@@ -476,51 +476,8 @@
         }
       ]
     },
-    "Sleep": {
-      "hash": "27c7b925394500c7bfec55b3b6f23355f4d5b67c70162a0e017268b60cab3684",
-      "toolVersion": "0.1.0",
-      "database": "app",
-      "engine": "postgres",
-      "serverVersion": "18.6",
-      "resultKind": "rows",
-      "matchesTable": null,
-      "plan": "walked",
-      "tableMatch": "no-origin",
-      "parameters": [
-        {
-          "name": "seconds",
-          "ordinal": 0,
-          "type": {
-            "name": "double precision",
-            "bindName": "double precision",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "float8"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        }
-      ],
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "slept",
-          "type": {
-            "name": "integer",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "int4"
-          },
-          "nullable": false,
-          "nullableSource": "expression",
-          "origin": null,
-          "identity": null,
-          "computed": null
-        }
-      ]
-    },
-    "ListThenSleep": {
-      "hash": "e65127d05327367a17fd809c96c76d51361fae9b6d49a80f88d8d52ea211dc14",
+    "ListThenWait": {
+      "hash": "9b605d30359dd8414f5239e0459b3d90ad0af4887d777ef0fe6a8784f227607b",
       "toolVersion": "0.1.0",
       "database": "app",
       "engine": "postgres",
@@ -544,14 +501,14 @@
           "typeSource": "inferred"
         },
         {
-          "name": "seconds",
+          "name": "lockKey",
           "ordinal": 1,
           "type": {
-            "name": "integer",
-            "bindName": "integer",
+            "name": "bigint",
+            "bindName": "bigint",
             "kind": "base",
             "schema": "pg_catalog",
-            "internalName": "int4"
+            "internalName": "int8"
           },
           "nullable": null,
           "typeSource": "inferred"
