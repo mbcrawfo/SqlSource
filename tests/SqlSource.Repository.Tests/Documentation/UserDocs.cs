@@ -6,9 +6,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using SqlSource.Testing;
 
-namespace SqlSource.Tests.Documentation;
+namespace SqlSource.Repository.Tests.Documentation;
 
 // The documents a user reads: the readme of the repository, the readme of the tool, and the pages of docs/manual/.
 // The tests of this folder read them as text: their links, the anchors a link may name, and the fenced blocks.

@@ -4,11 +4,11 @@
 
 ## Projects and libraries
 
-- **A test project compiles no `.cs` file of another project, with one exception.**  Code that two test projects need is in one of the libraries, which they reference.  The exception is `tests/SqlSource.Tests/Generator/`, whose test classes `tests/SqlSource.Tests.RoslynFloor` compiles a second time against Roslyn 4.14.0.  `tests/SqlSource.Tests/TestLayoutTests.cs` checks this.
-- **The three libraries, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing`, hold no tests.**  A helper that one test project alone uses stays in that project; one that a second project comes to need moves into a library.
+- **A test project compiles no `.cs` file of another project, with one exception.**  Code that two test projects need is in one of the libraries, which they reference.  The exception is `tests/SqlSource.Tests/Generator/`, whose test classes `tests/SqlSource.Tests.RoslynFloor` compiles a second time against Roslyn 4.14.0.  `TestLayoutTests` checks this.
+- **The libraries ([the list](README.md#the-projects)) hold no tests.**  A helper that one test project alone uses stays in that project, but for the repository's reads, in `tests/SqlSource.Repository`; one a second project needs moves into a library.
 - **A library references only what every project that references it can take** ([why](README.md#the-projects)): `SqlSource.Testing` stays on the pinned Roslyn and references nothing of the tool, `TestHarness` brings no database driver and nothing of the tool, and `Tool.Testing` references the tool.
 - **A test reads the repository only through `RepositoryRoot.Path`**, never by building a path from the root, and `RepositoryRoot.WorkingFolder` is only for starting a process in the root, since `Path` is what refuses a read that `tools/test-scopes.txt` would let a change skip ([when it refuses](README.md#reading-the-repository)).
-- **The libraries' types stay `internal`**, except `SettingLevel` of `tests/SqlSource.Testing`, which a public theory takes as its row, and the harness's abstract containers, which the projects' fixtures subclass.
+- **The libraries' types stay `internal`**, except `tests/SqlSource.Repository`'s, `SettingLevel` of `tests/SqlSource.Testing`, which a public theory takes as its row, and the harness's abstract containers, which the projects' fixtures subclass.
 - **A test reads a generated model by reflection through `ModelReflection` of `tests/DatabaseTests/TestHarness`**, which orders the properties as they are declared, since `Type.GetProperties()` does not promise it.
 - **Every test that opens a describer opens it through `Describers.OpenAsync` of `tests/SqlSource.Tool.Testing`** (`PostgresScript`, `SqlServerScript` and `FixtureReplay` among them), or replays a bundle through `BundleReplay`, and none builds an `OpenRequest` but to look at it.
 
@@ -45,7 +45,7 @@
 
 ## Documents
 
-- **`tests/SqlSource.Tests/Documentation/` checks the links, anchors and SQL samples of the documents a user reads, and the limits of every `AGENTS.md`.**
+- **`tests/SqlSource.Repository.Tests/Documentation/` checks the links, anchors and SQL samples of the documents a user reads, and the limits of every `AGENTS.md`.**
 
 ## Style and CI
 

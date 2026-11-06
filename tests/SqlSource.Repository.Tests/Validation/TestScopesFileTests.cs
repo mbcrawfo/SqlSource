@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Shouldly;
-using SqlSource.Testing;
 using Xunit;
 
-namespace SqlSource.Tests.Validation;
+namespace SqlSource.Repository.Tests.Validation;
 
 // tools/test-scopes.txt itself.  pre-commit-validation.sh trusts it to decide which database tests a change can skip,
 // so a line that matches nothing, left behind by a renamed folder, would skip tests it should run.

@@ -1,9 +1,8 @@
 using System;
 using Shouldly;
-using SqlSource.Testing;
 using Xunit;
 
-namespace SqlSource.Tests.Validation;
+namespace SqlSource.Repository.Tests.Validation;
 
 // The reader of tools/test-scopes.txt, tested on small texts: the pattern language, which line wins, and the lines that
 // name a test project.  The file itself is checked by TestScopesFileTests.

@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 
-namespace SqlSource.Testing;
+namespace SqlSource.Repository;
 
 // The files that a test project's items name, read from its project files as MSBuild would resolve them.  For the
 // tests that guard what a project may reach outside its folder.
-internal static class ProjectIncludes
+public static class ProjectIncludes
 {
     private const string ThisFileFolder = "$(MSBuildThisFileDirectory)";
     private const string ProjectFolder = "$(MSBuildProjectDirectory)";
@@ -126,12 +126,12 @@ internal static class ProjectIncludes
 
                 yield return (file, folder);
                 var document = XDocument.Load(file);
-                foreach (var import in Imports(Path.GetDirectoryName(file)!, folder, document))
+                foreach (
+                    var import in Imports(Path.GetDirectoryName(file)!, folder, document)
+                        .Where(import => import.StartsWith(tests, StringComparison.Ordinal) && File.Exists(import))
+                )
                 {
-                    if (import.StartsWith(tests, StringComparison.Ordinal) && File.Exists(import))
-                    {
-                        files.Enqueue(import);
-                    }
+                    files.Enqueue(import);
                 }
 
                 if (file != current)

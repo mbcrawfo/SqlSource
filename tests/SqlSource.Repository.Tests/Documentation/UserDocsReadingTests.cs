@@ -2,7 +2,7 @@ using System.Linq;
 using Shouldly;
 using Xunit;
 
-namespace SqlSource.Tests.Documentation;
+namespace SqlSource.Repository.Tests.Documentation;
 
 // How UserDocs reads a document, on lines of its own: the other tests of this folder trust it, so a form it reads
 // wrongly would pass them without checking what it holds.

@@ -3,10 +3,9 @@ using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 using Shouldly;
-using SqlSource.Testing;
 using Xunit;
 
-namespace SqlSource.Tests.Validation;
+namespace SqlSource.Repository.Tests.Validation;
 
 // ProjectIncludes on small projects made for each case, in a repository of the test's own.
 public sealed class ProjectIncludesTests : IDisposable

@@ -4,10 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
-using SqlSource.Testing;
 using Xunit;
 
-namespace SqlSource.Tests.Documentation;
+namespace SqlSource.Repository.Tests.Documentation;
 
 // The limits of the root AGENTS.md's guidelines on every AGENTS.md: a rule of at most 80 words, and a file of at most
 // 8 KB, or 16 KB for the root's.  A rule is a list item or a paragraph with the lines it wraps onto, so a long rule

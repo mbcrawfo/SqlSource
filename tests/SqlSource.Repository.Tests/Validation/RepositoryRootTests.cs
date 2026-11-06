@@ -1,10 +1,9 @@
 using System;
 using System.IO;
 using Shouldly;
-using SqlSource.Testing;
 using Xunit;
 
-namespace SqlSource.Tests.Validation;
+namespace SqlSource.Repository.Tests.Validation;
 
 // The run-time check of RepositoryRoot, on small scopes texts and projects of its own, so that no test here depends
 // on the real table.  The tests of PathFor read real folders of the repository.
@@ -107,16 +106,16 @@ public sealed class RepositoryRootTests
     [Fact]
     public void PathFor_FolderWithBinAndObjOfTheOtherEngine_ChecksOnlyItsOtherFiles()
     {
-        string[] folder = ["tests", "SqlSource.Tests"];
+        string[] folder = ["tests", "SqlSource.Repository.Tests"];
         Directory.Exists(RepositoryRoot.Path([.. folder, "bin"])).ShouldBeTrue();
         Directory.Exists(RepositoryRoot.Path([.. folder, "obj"])).ShouldBeTrue();
         const string Build = """
             project postgres tests/PgTests/PgTests.csproj
-            sqlserver tests/SqlSource.Tests/bin/*
-            sqlserver tests/SqlSource.Tests/obj/*
-            postgres tests/SqlSource.Tests/*
+            sqlserver tests/SqlSource.Repository.Tests/bin/*
+            sqlserver tests/SqlSource.Repository.Tests/obj/*
+            postgres tests/SqlSource.Repository.Tests/*
             """;
-        var source = "tests/SqlSource.Tests/Validation/RepositoryRootTests.cs";
+        var source = "tests/SqlSource.Repository.Tests/Validation/RepositoryRootTests.cs";
 
         _ = Should.NotThrow(() => RepositoryRoot.PathFor(Pg, TestScopes.Parse(Build), folder));
         var thrown = Should.Throw<InvalidOperationException>(() =>
@@ -127,6 +126,6 @@ public sealed class RepositoryRootTests
     }
 
     [Fact]
-    public void RunningProject_InThisProject_IsSqlSourceTests() =>
-        RepositoryRoot.RunningProject.ShouldBe("SqlSource.Tests");
+    public void RunningProject_InThisProject_IsSqlSourceRepositoryTests() =>
+        RepositoryRoot.RunningProject.ShouldBe("SqlSource.Repository.Tests");
 }

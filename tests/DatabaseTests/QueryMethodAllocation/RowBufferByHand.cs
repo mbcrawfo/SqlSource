@@ -4,10 +4,11 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation;
 // hand-written methods of the allocation tests of both engines, which make the generated method's calls.
 // From its declaration to its last brace it is the generated SqlSourceRowBuffer<T> of
 // src/SqlSource/Generation/Emitting/RowBuffer.cs but its attribute and its name, at the depth of a file-scoped
-// namespace, and RowBufferTests of tests/SqlSource.Tests fails when the two differ: a change to the generated buffer
-// changes this one with it.  So CSharpier and the rules of the repository's own code leave it as it is generated, and
-// dotnet format with them: IDE0001 would drop each global::, IDE0028 would write new List<T>() as [], IDE0301 would
-// write Array.Empty<T>() as [], IDE1006 would name its fields with a '_' and IDE0251 would make Return readonly.
+// namespace, and RowBufferByHandTests of tests/SqlSource.Repository.Tests fails when the two differ: a change to the
+// generated buffer changes this one with it.  So CSharpier and the rules of the repository's own code leave it as it
+// is generated, and dotnet format with them: IDE0001 would drop each global::, IDE0028 would write new List<T>() as
+// [], IDE0301 would write Array.Empty<T>() as [], IDE1006 would name its fields with a '_' and IDE0251 would make
+// Return readonly.
 #pragma warning disable IDE0001, IDE0028, IDE0301, IDE1006, IDE0251
 // csharpier-ignore-start
 internal struct RowBufferByHand<T>

@@ -4,7 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Shouldly;
 using SqlSource.Parsing;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;

@@ -3,7 +3,7 @@ using System.Linq;
 using Shouldly;
 using Xunit;
 
-namespace SqlSource.Tests.Documentation;
+namespace SqlSource.Repository.Tests.Documentation;
 
 // The links of the documents a user reads.  A link that goes to a file or an anchor that is not there leaves the
 // reader at the top of a long page, or on a page that is not found, so each is followed here.

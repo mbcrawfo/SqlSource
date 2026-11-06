@@ -13,13 +13,13 @@
      - Nothing about developing or releasing the project belongs there; link to `CONTRIBUTING.md`.
      - It is packed as the `SqlSource` package's readme on nuget.org, and `src/SqlSource.Tool/README.md`, the tool's short page, as `SqlSource.Tool`'s, so every link in both is an absolute URL.
    - **The two packed readmes have rules of their own.**
-     - nuget.org shows them with HTML turned off, so they hold no raw HTML and no `<a id>` line: their headings are linked by GitHub's slug, and renaming one means updating every link to it, which the link test in `tests/SqlSource.Tests/Documentation/` catches.
+     - nuget.org shows them with HTML turned off, so they hold no raw HTML and no `<a id>` line: their headings are linked by GitHub's slug, and renaming one means updating every link to it, which the link test in `tests/SqlSource.Repository.Tests/Documentation/` catches.
      - A feature still to come is this callout, word for word: `> **Coming in a later release.**  <One sentence on what it will do.>  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).`
      - Install and update commands carry `--prerelease`, and the NuGet badge is `nuget/vpre`, until the first stable release takes them out (`docs/publishing.md`).
      - A `sql` sample's info string names its dialect (`sql postgres`), or says `fragment` or `error`, since a test parses it.
      - Never name the describer, a plan or `EXPLAIN`, a field of the sidecar, or a tech-debt or deferred id.
    - `docs/manual/` is for the user with a specific need: one part of a project configured differently, a complex query, a database's limits, a build error to look up.  Each topic has one page; the entry page, `docs/manual/README.md`, routes a reader by need, and its "What works today" table is the one record of what is delivered.
-   - `docs/manual/diagnostics.md` is the manual's list of diagnostics: what each `SQLSRC` error means and how to fix it.  A change that adds, removes or changes a diagnostic updates it.  A test in `tests/SqlSource.Tests/Diagnostics/` fails when its sections and the descriptors disagree; the explanations are yours to keep true.
+   - `docs/manual/diagnostics.md` is the manual's list of diagnostics: what each `SQLSRC` error means and how to fix it.  A change that adds, removes or changes a diagnostic updates it.  A test in `tests/SqlSource.Repository.Tests/Diagnostics/` fails when its sections and the descriptors disagree; the explanations are yours to keep true.
    - `CONTRIBUTING.md` is the developer readme.  It holds the required tools, one sentence per project, and the commands to build, test, check, pack and run, with detail in the documents it links to.  A change to a required tool, or to how the project is built, tested, checked or packed, updates it.  So does adding or removing a project.
    - `docs/architecture/` explains how the components work and hand work to each other, as the code is today, for a developer who needs to understand one before changing it.  A change that makes a page wrong updates it.  Delivering a phase of query generation replaces that phase's placeholder with a description of what was built.  A new component, such as another describer, gets its page or section in the change that adds it.
    - `tests/README.md`, `tests/DatabaseTests/README.md`, `tests/DatabaseTests/Postgres/README.md`, `tests/DatabaseTests/SqlServer/README.md`, `tools/README.md` and `.github/workflows/README.md` each hold the procedures of their area.  A change to a project, script, workflow or procedure they describe updates them in the same PR.
@@ -79,6 +79,6 @@ A periodic review of the code's folder growth, comments and duplicated patterns 
 10. New nested AGENTS.md files: allowed.
 11. File-specific quirks: comment in that file.
 12. Push-down: aggressive.
-13. One rule per bullet, of at most 80 words, and a file of at most 8 KB, or 16 KB for this root file; `tests/SqlSource.Tests/Documentation/AgentsFileTests.cs` checks both.  Detail an agent needs only for some tasks, such as how a describer reads a database, goes in `docs/architecture/`, which an agent reads when its task needs it.
+13. One rule per bullet, of at most 80 words, and a file of at most 8 KB, or 16 KB for this root file; `tests/SqlSource.Repository.Tests/Documentation/AgentsFileTests.cs` checks both.  Detail an agent needs only for some tasks, such as how a describer reads a database, goes in `docs/architecture/`, which an agent reads when its task needs it.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

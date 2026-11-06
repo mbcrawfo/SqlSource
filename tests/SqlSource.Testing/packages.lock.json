@@ -94,6 +94,9 @@
       "sqlsource": {
         "type": "Project"
       },
+      "sqlsource.repository": {
+        "type": "Project"
+      },
       "Microsoft.CodeAnalysis.Analyzers": {
         "type": "CentralTransitive",
         "requested": "[5.9.0, )",
