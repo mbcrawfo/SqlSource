@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -25,6 +26,8 @@ public sealed class OnlineBuildTests : IDisposable
         ".SqlSource.sidecars",
         ".SqlSource.online",
     ];
+
+    private const string DotEnvText = "SQLSOURCE_CONNECTION=Host=localhost\n";
 
     private static readonly Dictionary<string, string> NoVariables = [];
 
@@ -135,14 +138,93 @@ public sealed class OnlineBuildTests : IDisposable
         run.Manifest.ShouldContain("File=" + SqlFile);
     }
 
+    // The build looks for a .env in the project's folder alone, as the tool does.
     [Fact]
-    public async Task Build_AutoWithADotEnvInAFolderAbove_RunsTheTool()
+    public async Task Build_AutoWithADotEnvInAFolderAbove_RunsNothing()
     {
-        _ = _fixtures.WriteFile(".env", "SQLSOURCE_CONNECTION=Host=localhost\n");
+        _ = _fixtures.WriteFile(".env", DotEnvText);
 
         await PassesAsync(NoVariables);
 
-        StandIn.RunsIn(_folder).ShouldHaveSingleItem().Arguments.TakeLast(2).ShouldBe(["--online", "auto"]);
+        StandIn.RunsIn(_folder).ShouldBeEmpty();
+        OnlineFiles().ShouldBeEmpty();
+    }
+
+    // Under auto the build goes online exactly when the tool, given the command the build gives it, reads a file, and
+    // that is the file the layout means, by its path from the folder of the copies.  A build under true shows the
+    // command when auto runs nothing.
+    [Theory]
+    [InlineData("the project's .env", "Online/.env")]
+    [InlineData("a .env above", null)]
+    [InlineData("SqlSourceEnvFile relative", "shared.env")]
+    [InlineData("SqlSourceEnvFile absolute", "shared.env")]
+    [InlineData("SqlSourceEnvFile in a Directory.Build.props", "shared.env")]
+    [InlineData("SqlSourceEnvFile missing", null)]
+    [InlineData("a folder named .env", null)]
+    [InlineData("SqlSourceEnvFile none with the project's .env", null)]
+    public async Task Build_EnvLayout_GoesOnlineExactlyWhenTheToolReadsAFile(string layout, string? expected)
+    {
+        var arguments = Lay(layout);
+
+        await PassesAsync(NoVariables, arguments);
+        var wentOnline = StandIn.RunsIn(_folder).Count == 1;
+        await PassesAsync(NoVariables, [.. arguments, "-p:SqlSourceOnline=true"]);
+
+        var runs = StandIn.RunsIn(_folder);
+        runs.Count.ShouldBe(wentOnline ? 2 : 1);
+        var read = DotEnvSearch
+            .Read(DotEnvSearch.FileOf(EnvFileOption(runs[^1]), _folder, _folder), ToolHost.ReadText)
+            .Path;
+        wentOnline.ShouldBe(read is not null);
+        read.ShouldBe(expected is null ? null : _fixtures.PathOf(expected));
+    }
+
+    [Fact]
+    public async Task Build_TrueWithEnvFileNone_PassesEnvFileNone()
+    {
+        _ = _fixtures.WriteFile("Online/.env", DotEnvText);
+
+        await PassesAsync(
+            NoVariables,
+            "-p:SqlSourceOnline=true",
+            FixtureProjects.PropertySwitch("SqlSourceEnvFile", " NONE ")
+        );
+
+        StandIn
+            .RunsIn(_folder)
+            .ShouldHaveSingleItem()
+            .Arguments.Skip(3)
+            .ShouldBe(["--online", "true", "--env-file", "none"]);
+    }
+
+    // The path is in a folder whose name the shell would read a $, a " or a % of, and cmd a %; Windows allows no " in
+    // a name.
+    [Fact]
+    public async Task Build_EnvFileInAFolderWithShellCharacters_PassesItsFullPath()
+    {
+        var folder = OperatingSystem.IsWindows() ? "a $b c %d" : "a $b \"c\" %d";
+        var file = _fixtures.WriteFile(folder + "/.env", DotEnvText);
+
+        await PassesAsync(NoVariables, FixtureProjects.PropertySwitch("SqlSourceEnvFile", file));
+
+        StandIn.RunsIn(_folder).ShouldHaveSingleItem().Arguments.TakeLast(2).ShouldBe(["--env-file", file]);
+    }
+
+    // A build with SqlSourceEnvFile not set, or blank, gives the tool the command it always has, which reads the
+    // project folder's .env as the build does.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ")]
+    public async Task Build_DefaultEnvFile_PassesNoEnvFileOption(string? value)
+    {
+        _ = _fixtures.WriteFile("Online/.env", DotEnvText);
+
+        await PassesAsync(
+            NoVariables,
+            value is null ? [] : [FixtureProjects.PropertySwitch("SqlSourceEnvFile", value)]
+        );
+
+        StandIn.RunsIn(_folder).ShouldHaveSingleItem().Arguments.Skip(3).ShouldBe(["--online", "auto"]);
     }
 
     [Fact]
@@ -204,10 +286,11 @@ public sealed class OnlineBuildTests : IDisposable
     [InlineData("Online/sqlsource.json")]
     [InlineData("Online/Queries/Users.sql.json")]
     [InlineData("Online/UserRepository.cs")]
-    [InlineData(".env")]
+    [InlineData("Online/.env")]
+    [InlineData("shared.env", "../shared.env")]
     [InlineData(".config/dotnet-tools.json")]
     [InlineData("dotnet-tools.json")]
-    public async Task Build_AfterAnInputIsTouched_RunsTheToolOnceMore(string input)
+    public async Task Build_AfterAnInputIsTouched_RunsTheToolOnceMore(string input, string? envFile = null)
     {
         var path = _fixtures.PathOf(input);
         if (!File.Exists(path))
@@ -215,11 +298,14 @@ public sealed class OnlineBuildTests : IDisposable
             _ = _fixtures.WriteFile(input, input.EndsWith(".json", StringComparison.Ordinal) ? EmptyToolManifest : "");
         }
 
-        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
-        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
+        string[] arguments = envFile is null
+            ? ["-p:SqlSourceOnline=true"]
+            : ["-p:SqlSourceOnline=true", $"-p:SqlSourceEnvFile={envFile}"];
+        await PassesAsync(NoVariables, arguments);
+        await PassesAsync(NoVariables, arguments);
         StandIn.RunsIn(_folder).Count.ShouldBe(1, "the second build, with nothing changed");
         File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
-        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
+        await PassesAsync(NoVariables, arguments);
 
         StandIn.RunsIn(_folder).Count.ShouldBe(2);
     }
@@ -601,6 +687,59 @@ public sealed class OnlineBuildTests : IDisposable
         Path.GetFileName(run.Arguments[2]).ShouldBe(OddName + ManifestSuffix);
         run.Manifest.ShouldNotBeNull().ShouldContain("Project=" + odd);
         Path.GetFileName(run.Arguments[^1]).ShouldBe(OddName + ".SqlSource.log");
+    }
+
+    // Writes the files of a layout of Build_EnvLayout_GoesOnlineExactlyWhenTheToolReadsAFile, and gives the switches
+    // of its build.
+    private string[] Lay(string layout)
+    {
+        switch (layout)
+        {
+            case "the project's .env":
+                _ = _fixtures.WriteFile("Online/.env", DotEnvText);
+                return [];
+            case "a .env above":
+                _ = _fixtures.WriteFile(".env", DotEnvText);
+                return [];
+            case "SqlSourceEnvFile relative":
+                _ = _fixtures.WriteFile("shared.env", DotEnvText);
+                return ["-p:SqlSourceEnvFile=../shared.env"];
+            case "SqlSourceEnvFile absolute":
+                return
+                [
+                    FixtureProjects.PropertySwitch("SqlSourceEnvFile", _fixtures.WriteFile("shared.env", DotEnvText)),
+                ];
+            case "SqlSourceEnvFile in a Directory.Build.props":
+                _ = _fixtures.WriteFile("shared.env", DotEnvText);
+                _ = _fixtures.WriteFile(
+                    "Directory.Build.props",
+                    """
+                    <Project>
+                        <PropertyGroup>
+                            <SqlSourceEnvFile>$(MSBuildThisFileDirectory)shared.env</SqlSourceEnvFile>
+                        </PropertyGroup>
+                    </Project>
+                    """
+                );
+                return [];
+            case "SqlSourceEnvFile missing":
+                return ["-p:SqlSourceEnvFile=../missing.env"];
+            case "a folder named .env":
+                _ = Directory.CreateDirectory(Path.Combine(_folder, ".env"));
+                return [];
+            case "SqlSourceEnvFile none with the project's .env":
+                _ = _fixtures.WriteFile("Online/.env", DotEnvText);
+                return [FixtureProjects.PropertySwitch("SqlSourceEnvFile", " None ")];
+            default:
+                throw new ArgumentOutOfRangeException(nameof(layout), layout, null);
+        }
+    }
+
+    // The value of the run's --env-file, or null when it has none.
+    private static string? EnvFileOption(StandInRun run)
+    {
+        var index = run.Arguments.ToList().IndexOf("--env-file");
+        return index < 0 ? null : run.Arguments[index + 1];
     }
 
     private const string EmptyToolManifest = /*lang=json,strict*/
