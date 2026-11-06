@@ -85,13 +85,7 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
         }
 
         var schema = await File.ReadAllTextAsync(RealisticCases.Corpus.Schema, TestContext.Current.CancellationToken);
-        BundleLeaks
-            .Of(
-                renamed.Bundle,
-                [schema, found.AsFixture.Query],
-                static spelling => PostgresWords.IsEngineWord(spelling, quoted: false)
-            )
-            .ShouldBeEmpty();
+        BundleLeaks.Of(renamed.Bundle, [schema, found.AsFixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
     }
 
     [Fact]

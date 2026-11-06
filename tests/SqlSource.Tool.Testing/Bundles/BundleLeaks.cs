@@ -11,9 +11,10 @@ namespace SqlSource.Tool.Testing.Bundles;
 
 // What of a schema's and a query's text a renamed bundle still holds, found without asking the renaming: every name
 // and literal of the sources, lexed as PostgreSQL, but the engine's words, sought in each file of the bundle.  A name
-// is sought as a whole word, case-insensitively, and a literal of four characters or more as a substring, or as a
-// whole word when it is one, since a word that holds it, such as the setting standard_conforming_strings, is another
-// word.  After the leak search of phase 10's spike (f51ac107).
+// is sought as a whole word, an unquoted one case-insensitively and a quoted one as written, so that "Order" is
+// sought though its fold is a keyword and ORDER BY is not it, and a literal of four characters or more as a
+// substring, or as a whole word when it is one, since a word that holds it, such as the setting
+// standard_conforming_strings, is another word.  After the leak search of phase 10's spike (f51ac107).
 internal static class BundleLeaks
 {
     // A shorter literal is too common a substring to be sought.
@@ -27,17 +28,24 @@ internal static class BundleLeaks
     private const string MethodMember = "method";
 
     // The leaks found, each as "name <name> in <file>" or "literal '<literal>' in <file>"; empty when none.
-    public static IReadOnlyList<string> Of(Bundle renamed, IEnumerable<string> sources, Func<string, bool> isEngineWord)
+    // isEngineWord is asked of a name with whether the source quotes it, and of a literal as unquoted.
+    public static IReadOnlyList<string> Of(
+        Bundle renamed,
+        IEnumerable<string> sources,
+        Func<string, bool, bool> isEngineWord
+    )
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var quotedNames = new HashSet<string>(StringComparer.Ordinal);
         var literals = new HashSet<string>(StringComparer.Ordinal);
         foreach (var source in sources)
         {
-            Originals(source, names, literals);
+            Originals(source, names, quotedNames, literals);
         }
 
-        _ = names.RemoveWhere(name => isEngineWord(name));
-        _ = literals.RemoveWhere(literal => literal.Length < ShortestLiteral || isEngineWord(literal));
+        _ = names.RemoveWhere(name => isEngineWord(name, false));
+        _ = quotedNames.RemoveWhere(name => isEngineWord(name, true));
+        _ = literals.RemoveWhere(literal => literal.Length < ShortestLiteral || isEngineWord(literal, false));
 
         var texts = TextsOf(renamed).ToList();
         var words = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -52,11 +60,17 @@ internal static class BundleLeaks
         }
 
         var leaks = new List<string>();
-        foreach (var name in names.Order(StringComparer.Ordinal))
+        var sought = names
+            .Select(static name => (Name: name, Comparison: StringComparison.OrdinalIgnoreCase))
+            .Concat(quotedNames.Select(static name => (Name: name, Comparison: StringComparison.Ordinal)))
+            .DistinctBy(static name => name.Name, StringComparer.Ordinal)
+            .OrderBy(static name => name.Name, StringComparer.Ordinal);
+        foreach (var (name, comparison) in sought)
         {
+            var wordsIn = comparison == StringComparison.Ordinal ? exactWords : words;
             var found = IsOneWord(name)
-                ? words.GetValueOrDefault(name)
-                : texts.FirstOrDefault(text => text.Text.Contains(name, StringComparison.OrdinalIgnoreCase)).File;
+                ? wordsIn.GetValueOrDefault(name)
+                : texts.FirstOrDefault(text => text.Text.Contains(name, comparison)).File;
             if (found is not null)
             {
                 leaks.Add($"name {name} in {found}");
@@ -79,9 +93,13 @@ internal static class BundleLeaks
 
     // The names and literals of a text: the words of plain text but a string's prefix, quoted names without the
     // nullability mark that the renaming keeps, parameters, the value of -- name: and what -- param: declares, and the
-    // contents of string literals.  Comments hold nothing
-    // that the renaming keeps, since it empties them.
-    private static void Originals(string text, HashSet<string> names, HashSet<string> literals)
+    // contents of string literals.  Comments hold nothing that the renaming keeps, since it empties them.
+    private static void Originals(
+        string text,
+        HashSet<string> names,
+        HashSet<string> quotedNames,
+        HashSet<string> literals
+    )
     {
         var lexed = SqlLexer.Lex(text, SqlDialectRules.PostgreSql);
         if (lexed.Error is { } error)
@@ -108,7 +126,7 @@ internal static class BundleLeaks
                     break;
                 case SqlLexemeKind.Quoted when part[0] == '"':
                     var quoted = part[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal);
-                    _ = names.Add(quoted.Length > 1 && quoted[^1] is '!' or '?' ? quoted[..^1] : quoted);
+                    _ = quotedNames.Add(quoted.Length > 1 && quoted[^1] is '!' or '?' ? quoted[..^1] : quoted);
                     break;
                 case SqlLexemeKind.Quoted when part[0] == '$':
                     var tag = part[..(part.IndexOf('$', 1) + 1)];
@@ -124,7 +142,7 @@ internal static class BundleLeaks
                     _ = names.Add(part[NameMarker.Length..].Trim());
                     break;
                 case SqlLexemeKind.LineComment when part.StartsWith(ParamMarker, StringComparison.Ordinal):
-                    Originals(part[ParamMarker.Length..], names, literals);
+                    Originals(part[ParamMarker.Length..], names, quotedNames, literals);
                     break;
                 case SqlLexemeKind.LineComment:
                 case SqlLexemeKind.BlockComment:

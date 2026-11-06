@@ -251,7 +251,7 @@ Each file of the folder has its tests in `tests/SqlSource.Tool.Tests/Bundles/Ren
 - `PostgresClassificationTests` finds, without asking the renaming, each word of a fixture's plans that neither the query, the schema nor a catalog answer holds, which is the engine's or the planner's, and fails when the renamed plan does not keep it.
 - On a container, `Renaming/RealisticRenamingTests` of `tests/DatabaseTests/Postgres` renames the realistic corpus as captured live, which CI runs on the floor and default images, and `Renaming/VocabularyTests` checks the vocabulary: [the realistic corpus renamed](../../tests/DatabaseTests/Postgres/README.md#the-realistic-corpus-renamed).
 
-`BundleLeaks` lexes the sources as PostgreSQL, and seeks a name as a whole word, ignoring case, and a literal of four characters or more as a substring, or as a whole word when it is one; it does not seek the engine's words or a shorter literal, and does not seek in the names of members, a call's `method`, the sidecar's header or a string of one character outside a plan, such as a `relkind`, which a one-letter alias would match.
+`BundleLeaks` lexes the sources as PostgreSQL, and seeks a name as a whole word, an unquoted one ignoring case and a quoted one as written, so that `"Order"` is sought though its fold is a keyword and `ORDER BY` is not it, and a literal of four characters or more as a substring, or as a whole word when it is one; it does not seek the engine's words, asked of a name with whether the source quotes it, or a shorter literal, and does not seek in the names of members, a call's `method`, the sidecar's header or a string of one character outside a plan, such as a `relkind`, which a one-letter alias would match.
 
 ## Not built yet
 

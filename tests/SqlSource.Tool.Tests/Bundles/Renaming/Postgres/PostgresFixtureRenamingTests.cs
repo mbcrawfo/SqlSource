@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Bundles.Renaming;
+using SqlSource.Tool.Bundles.Renaming.Postgres;
 using SqlSource.Tool.Testing.Bundles;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -50,7 +51,7 @@ public sealed class PostgresFixtureRenamingTests
         var renamed = await PostgresRenamings.RenamedAsync(RawBundles.OfFixture(fixture));
 
         BundleLeaks
-            .Of(renamed.Bundle, [PostgresRenamings.Schema, fixture.Query], PostgresRenamings.IsEngineWord)
+            .Of(renamed.Bundle, [PostgresRenamings.Schema, fixture.Query], PostgresWords.IsEngineWord)
             .ShouldBeEmpty();
     }
 

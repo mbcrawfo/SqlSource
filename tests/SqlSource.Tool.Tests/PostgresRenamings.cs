@@ -54,6 +54,4 @@ internal static class PostgresRenamings
         var renamed = await RenameAsync(raw, key);
         return renamed.Value.ShouldNotBeNull(renamed.Failure?.ToString());
     }
-
-    public static bool IsEngineWord(string spelling) => PostgresWords.IsEngineWord(spelling, quoted: false);
 }

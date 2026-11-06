@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Tool.Bundles;
+using SqlSource.Tool.Bundles.Renaming.Postgres;
 using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
@@ -10,7 +11,11 @@ public sealed class BundleLeaksTests
     private const string Source =
         "-- name: FindUser\nSELECT u.id, \"Full Name!\" FROM users u WHERE u.status = 'active' AND u.id = @id;\n";
 
-    private static bool IsEngineWord(string word) => word.ToUpperInvariant() is "SELECT" or "FROM" or "WHERE" or "AND";
+    private const string QuotedOrder = "SELECT 1 AS \"Order\" ORDER BY 1;";
+
+    // The keywords of the sources, folded as PostgreSQL folds them.
+    private static bool IsEngineWord(string word, bool quoted) =>
+        PostgresWords.Fold(word, quoted) is "select" or "from" or "where" or "and" or "as" or "order" or "by";
 
     [Fact]
     public void Of_NothingLeft_IsEmpty() =>
@@ -117,6 +122,17 @@ public sealed class BundleLeaksTests
                 IsEngineWord
             )
             .ShouldBe(["literal 'on hold' in capture.json"]);
+
+    // "Order" is the user's name though its fold is the keyword order, and is sought as written.
+    [Fact]
+    public void Of_QuotedNameFoldedToAnEngineWord_IsSought() =>
+        BundleLeaks
+            .Of(BundleOf("SELECT 1 AS \"Order\"", "{}"), [QuotedOrder], IsEngineWord)
+            .ShouldBe(["name Order in query.sql"]);
+
+    [Fact]
+    public void Of_QuotedName_IsSoughtInItsCase() =>
+        BundleLeaks.Of(BundleOf("SELECT 1 AS a_1 ORDER BY 1", "{}"), [QuotedOrder], IsEngineWord).ShouldBeEmpty();
 
     private static Bundle BundleOf(string query, string capture) => new(null, query, capture, null, []);
 }
