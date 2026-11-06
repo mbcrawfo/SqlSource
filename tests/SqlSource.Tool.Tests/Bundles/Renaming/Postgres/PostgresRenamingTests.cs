@@ -5,12 +5,10 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
-using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.Postgres;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing.Bundles;
-using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.Postgres;
@@ -21,16 +19,13 @@ public sealed class PostgresRenamingTests
 {
     private const string Fixture = "select-declared-domain";
 
-    // Where the bundle's errors would be.  Nothing is read there.
-    private const string Path = "/work/report.zip";
-
     [Fact]
     public async Task RenameAsync_SelectDeclaredDomain_RenamesAndReplays()
     {
-        var fixture = FixtureCases.Of("postgres").Single(found => found.Name == Fixture);
+        var fixture = PostgresRenamings.Fixture(Fixture);
         var raw = RawBundles.OfFixture(fixture);
 
-        var renamed = await RenameAsync(raw);
+        var renamed = await PostgresRenamings.RenameAsync(raw);
 
         var result = renamed.Value.ShouldNotBeNull(renamed.Failure?.ToString());
         var files = RenamingBundles.FilesOf(result.Bundle).ToList();
@@ -45,7 +40,7 @@ public sealed class PostgresRenamingTests
         }
 
         Provenance.Of(result.Bundle.Expected!).ShouldBe(Provenance.Of(raw.Expected!));
-        BundleLeaks.Of(result.Bundle, [fixture.Query], IsEngineWord).ShouldBeEmpty();
+        BundleLeaks.Of(result.Bundle, [fixture.Query], PostgresRenamings.IsEngineWord).ShouldBeEmpty();
     }
 
     [Fact]
@@ -121,28 +116,6 @@ public sealed class PostgresRenamingTests
         );
         _ = Should.Throw<InvalidOperationException>(() => PostgresRenaming.Instance.WordsOf(field));
     }
-
-    private static async Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(Bundle raw)
-    {
-        var describer = BundleDescribers.For(
-            SqlDialect.PostgreSql,
-            ToolHost.Create().Describers,
-            raw.ExplainSettings,
-            raw.Info.ShouldNotBeNull().Engine,
-            Path
-        );
-        describer.Failure.ShouldBeNull();
-
-        return await BundleRenamer.RenameAsync(
-            raw,
-            PostgresRenaming.Instance,
-            describer.Value.ShouldNotBeNull(),
-            RenamingBundles.Key(7),
-            TestContext.Current.CancellationToken
-        );
-    }
-
-    private static bool IsEngineWord(string spelling) => PostgresWords.IsEngineWord(spelling, quoted: false);
 
     private static bool WordIn(string text, string word) =>
         Regex.IsMatch(text, $"(?<![\\w$]){Regex.Escape(word)}(?![\\w$])", RegexOptions.IgnoreCase);
