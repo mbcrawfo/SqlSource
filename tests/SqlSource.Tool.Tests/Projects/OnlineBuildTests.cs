@@ -310,6 +310,34 @@ public sealed class OnlineBuildTests : IDisposable
         StandIn.RunsIn(_folder).Count.ShouldBe(2);
     }
 
+    // The file SqlSourceEnvFile names is the run's choice, so naming another runs the tool again, though the file it
+    // comes to name is older than the stamp.
+    [Fact]
+    public async Task Build_AfterSqlSourceEnvFileNamesAnotherFile_RunsTheToolOnceMore()
+    {
+        var older = _fixtures.WriteFile("b.env", DotEnvText);
+        File.SetLastWriteTimeUtc(older, DateTime.UtcNow.AddHours(-1));
+        var newer = _fixtures.WriteFile("a.env", DotEnvText);
+
+        await PassesAsync(NoVariables, "-p:SqlSourceEnvFile=../a.env");
+        await PassesAsync(NoVariables, "-p:SqlSourceEnvFile=../b.env");
+
+        StandIn.RunsIn(_folder).Select(EnvFileOption).ShouldBe([newer, older]);
+    }
+
+    // None reads no file, which is a choice of its own, though the project folder's .env is older than the stamp.
+    [Fact]
+    public async Task Build_TrueAfterSqlSourceEnvFileTurnsToNone_RunsTheToolOnceMore()
+    {
+        var file = _fixtures.WriteFile("Online/.env", DotEnvText);
+        File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddHours(-1));
+
+        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
+        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true", "-p:SqlSourceEnvFile=none");
+
+        StandIn.RunsIn(_folder).Select(EnvFileOption).ShouldBe([null, "none"]);
+    }
+
     [Fact]
     public async Task Build_AfterASidecarIsDeleted_RunsTheToolOnceMoreAndCompilesWithoutIt()
     {

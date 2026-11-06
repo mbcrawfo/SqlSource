@@ -327,9 +327,11 @@ public sealed partial class BuildFileTests
     }
 
     // The inputs of the run: the manifest; the .sql files and the settings files among the AdditionalFiles items; the
-    // sidecars of the .sql files that exist; the list of them, which a deleted sidecar changes; the file of the value
-    // and the package's folder; the .env file, when a file is at its path; and the tool manifests above the project.
-    // Each file the target writes, it writes only when its text changes, under obj, and adds to FileWrites.
+    // sidecars of the .sql files that exist; the list of them, which a deleted sidecar changes; the file of the value,
+    // the package's folder and the .env file's path, none under none, which a change of SqlSourceEnvFile changes when
+    // the file it names is older than the stamp; the .env file, when a file is at its path; and the tool manifests
+    // above the project.  Each file the target writes, it writes only when its text changes, under obj, and adds to
+    // FileWrites.
     [Fact]
     public void Targets_ListSidecars_WritesTheFilesTheRunComparesAndGathersItsInputs()
     {
@@ -368,6 +370,7 @@ public sealed partial class BuildFileTests
                 ("SqlSourceSidecarListed", "Include=@(SqlSourceSidecarOfSqlFile->Exists())"),
                 ("SqlSourceOnlineValueLine", "Include=$(SqlSourceOnlineValue)"),
                 ("SqlSourceOnlineValueLine", "Include=$(MSBuildThisFileDirectory)"),
+                ("SqlSourceOnlineValueLine", "Include=$([MSBuild]::Escape($(SqlSourceEnvFilePath)))"),
                 ("FileWrites", "Include=$(SqlSourceSidecarList)"),
                 ("FileWrites", "Include=$(SqlSourceOnlineValueFile)"),
             ]);

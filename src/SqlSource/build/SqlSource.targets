@@ -549,14 +549,15 @@
         the run compares is written in the configuration that runs the tool, before its check of what is up to date,
         wherever it is called from.  It writes two files under obj, each only when its text changes: the list of the
         sidecars of the .sql files that exist, so that a deleted sidecar runs the tool again, and the value of
-        SqlSourceOnline with the folder of this file, whose path in NuGet's cache names the package's version, so
-        that a change of either does.  NuGet keeps a package's files at the time they were packed, so the files
-        themselves would not.  WriteLinesToFile writes an empty file for an empty list.
+        SqlSourceOnline with the folder of this file, whose path in NuGet's cache names the package's version, and the
+        path of the .env file, which no line gives under none, so that a change of any of them does.  NuGet keeps a
+        package's files at the time they were packed, and the file SqlSourceEnvFile comes to name can be older than the
+        stamp, so the files themselves would not.  WriteLinesToFile writes an empty file for an empty list.
 
         It gathers the run's inputs too: the manifest; the .sql files and the settings files among the AdditionalFiles
         items; the sidecars of the .sql files, so that one a checkout replaced is described again; the two files above;
-        the .env that the connection source found; and the tool manifests above the project, which dotnet tool
-        update rewrites.  GetPathOfFileAbove takes no folder in the name, so the tool manifest under .config is found
+        the .env file, when a file is at its path; and the tool manifests above the project, which dotnet tool update
+        rewrites.  GetPathOfFileAbove takes no folder in the name, so the tool manifest under .config is found
         by its folder.  Each found path comes from a property function, which gives it unescaped, so it is escaped
         before it is an item.
     -->
@@ -576,6 +577,7 @@
             <SqlSourceSidecarListed Include="@(SqlSourceSidecarOfSqlFile->Exists())" />
             <SqlSourceOnlineValueLine Include="$(SqlSourceOnlineValue)" />
             <SqlSourceOnlineValueLine Include="$(MSBuildThisFileDirectory)" />
+            <SqlSourceOnlineValueLine Include="$([MSBuild]::Escape($(SqlSourceEnvFilePath)))" />
         </ItemGroup>
         <WriteLinesToFile
             File="$(SqlSourceSidecarList)"
