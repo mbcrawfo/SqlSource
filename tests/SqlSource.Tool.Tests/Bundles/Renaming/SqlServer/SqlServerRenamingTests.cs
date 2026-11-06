@@ -238,6 +238,12 @@ public sealed class SqlServerRenamingTests
             .CopyOf("before___3", new HashSet<string>(["before_"], SqlParameterName.Comparer))
             .ShouldBe(("before_", "_3"));
 
+    // The shortest parameter the query holds is taken, so x__1, a copy of @x_ when the query holds both @x and @x_, is
+    // read back as a copy of x, which the proof refuses.  This is TD-0104's second case.
+    [Fact]
+    public void CopyOf_ACopyOfTwoParametersOfTheQuery_IsTheShortest() =>
+        Engine.CopyOf("x__1", new HashSet<string>(["x", "x_"], SqlParameterName.Comparer)).ShouldBe(("x", "_1"));
+
     [Theory]
     [InlineData("before_x")]
     [InlineData("other_1")]
