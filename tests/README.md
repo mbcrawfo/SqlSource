@@ -1,6 +1,6 @@
 # Tests
 
-SqlSource has eight test projects, three libraries that they share and a stand-in of the tool: three test projects under `tests/`, and the five that run against a real database under [`tests/DatabaseTests/`](DatabaseTests/README.md), which need Docker running.  `dotnet test --solution SqlSource.slnx` runs every test project but `tests/DatabaseTests/QueryMethodAllocation`, which only the nightly runs, and [`CONTRIBUTING.md`](../CONTRIBUTING.md) has the commands to build and test.
+SqlSource has nine test projects, four libraries that they share and a stand-in of the tool: four test projects under `tests/`, and the five that run against a real database under [`tests/DatabaseTests/`](DatabaseTests/README.md), which need Docker running.  `dotnet test --solution SqlSource.slnx` runs every test project but `tests/DatabaseTests/QueryMethodAllocation`, which only the nightly runs, and [`CONTRIBUTING.md`](../CONTRIBUTING.md) has the commands to build and test.
 
 ## The projects
 

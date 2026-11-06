@@ -23,7 +23,7 @@ The two projects that ship are:
 - `src/SqlSource` is the source generator, and the package `SqlSource`.  [`docs/architecture/generator.md`](docs/architecture/generator.md) explains how it works.
 - `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.  [`docs/architecture/tool.md`](docs/architecture/tool.md) explains how it works.
 
-The eight test projects, the three libraries they share and a stand-in of the tool, which [`tests/README.md`](tests/README.md) describes:
+The nine test projects, the four libraries they share and a stand-in of the tool, which [`tests/README.md`](tests/README.md) describes:
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.

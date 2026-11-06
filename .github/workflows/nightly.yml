@@ -79,7 +79,8 @@ jobs:
       - name: Test
         run: |
           status=0
-          for project in tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor tests/SqlSource.Tool.Tests; do
+          for project in tests/SqlSource.Repository.Tests tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor \
+              tests/SqlSource.Tool.Tests; do
               dotnet test --project "$project" --configuration "$CONFIGURATION" --no-build \
                   --results-directory "artifacts/test-results/$(basename "$project")" \
                   --report-github --report-github-summary-include-passed false || status=1
