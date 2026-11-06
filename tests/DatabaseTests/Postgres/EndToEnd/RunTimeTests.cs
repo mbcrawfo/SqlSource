@@ -55,12 +55,14 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
     }
 
     // The update waits on the row's lock, which outlasts the test, and Npgsql cancels the command when its timeout
-    // passes, and throws.
+    // passes, and throws.  The source has no command timeout of its own, so only the call's ends the wait.  The
+    // connection is disposed after the lock, so that a call that outlasts the wait ends before its connection does.
     [Fact]
     public async Task TouchAccount_RowLockedPastACommandTimeoutOfOneSecond_Throws()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
+        await using var source = EndToEndSources.AppWithoutCommandTimeout(postgres);
+        await using var connection = source.CreateConnection();
         await using var holder = await source.OpenConnectionAsync(token);
         await using var rowLock = await HoldAsync(
             holder,
@@ -68,10 +70,16 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
             LockedAccountId,
             token
         );
-        await using var connection = source.CreateConnection();
 
         var exception = await Should.ThrowAsync<NpgsqlException>(() =>
-            connection.TouchAccount(new TouchAccountArgs(LockedAccountId), commandTimeout: 1, cancellationToken: token)
+            Eventually.WithinAsync(
+                connection.TouchAccount(
+                    new TouchAccountArgs(LockedAccountId),
+                    commandTimeout: 1,
+                    cancellationToken: token
+                ),
+                "the update outlasted its command timeout of one second"
+            )
         );
 
         _ = exception.InnerException.ShouldBeOfType<TimeoutException>();
@@ -92,16 +100,18 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
     }
 
     // The token is cancelled once the server waits on the lock before the last row, when the method has read most of
-    // the rows before it and waits in the read for the next.  The lock is released only after the call has ended.
+    // the rows before it and waits in the read for the next.  The source has no command timeout of its own, so only the
+    // token ends the wait.  The lock is released once the call has ended, or once the test stops waiting for it, and
+    // before the connection is disposed.
     [Fact]
     public async Task ListThenWait_TokenCancelledDuringTheRead_ThrowsOperationCanceled()
     {
         var token = TestContext.Current.CancellationToken;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(token);
-        await using var source = EndToEndSources.App(postgres);
+        await using var source = EndToEndSources.AppWithoutCommandTimeout(postgres);
+        await using var connection = source.CreateConnection();
         await using var holder = await source.OpenConnectionAsync(token);
         await using var lastRowLock = await HoldAsync(holder, "SELECT pg_advisory_xact_lock($1)", LastRowLock, token);
-        await using var connection = source.CreateConnection();
 
         _ = await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
@@ -110,9 +120,12 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
             var cancelOnceWaiting = CancelOnceWaitingAsync(source, holder.ProcessID, cancel, token);
             try
             {
-                _ = await connection.ListThenWait(
-                    new ListThenWaitArgs(RowsBeforeTheWait, LastRowLock),
-                    cancellationToken: cancel.Token
+                _ = await Eventually.WithinAsync(
+                    connection.ListThenWait(
+                        new ListThenWaitArgs(RowsBeforeTheWait, LastRowLock),
+                        cancellationToken: cancel.Token
+                    ),
+                    "the read outlasted the cancellation of its token"
                 );
             }
             finally
