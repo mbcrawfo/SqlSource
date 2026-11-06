@@ -466,7 +466,10 @@ internal static class PostgresPlanRenamer
             or JsonValueKind.Null:
                 break;
             default:
-                throw UnexpectedEnumValueException.Of(value.ValueKind);
+                // JsonValueKind is the runtime's, which a newer runtime may extend; today's has no other kind, so this
+                // cannot be reached. A kind it adds is added as a word whole, which the token check refuses.
+                words.Add(value.GetRawText());
+                break;
         }
     }
 
@@ -613,7 +616,9 @@ internal static class PostgresPlanRenamer
                 case JsonValueKind.Object or JsonValueKind.Array or JsonValueKind.Undefined:
                     return Refuse(value.GetRawText());
                 default:
-                    throw UnexpectedEnumValueException.Of(value.ValueKind);
+                    // JsonValueKind is the runtime's, which a newer runtime may extend; today's has no other kind, so
+                    // this cannot be reached. A kind it adds holds something unknown, so the plan is refused.
+                    return Refuse(value.GetRawText());
             }
         }
 
