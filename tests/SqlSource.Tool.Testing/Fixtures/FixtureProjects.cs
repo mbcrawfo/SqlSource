@@ -22,6 +22,8 @@ internal sealed class FixtureProjects : IDisposable
     private static readonly string[] ClearedForABuild =
     [
         "SQLSOURCE_LOG",
+        "SqlSourceOnline",
+        "SqlSourceEnvFile",
         "CI",
         "TF_BUILD",
         "TEAMCITY_VERSION",
@@ -97,7 +99,8 @@ internal sealed class FixtureProjects : IDisposable
     // Runs "dotnet build" on a project, which restores it first, and gives its exit code and what it wrote, with the
     // terminal logger off, so that each line is a line of the build, and with no MSBuild node left after it.  The build
     // has the test process's environment less every variable that could take it online, keep it offline as in CI, or
-    // put a secret in its log, whatever the developer's shell or the runner has, and the variables given.
+    // put a secret in its log, whatever the developer's shell or the runner has, and the variables given, which are
+    // set after that and so win.
     public static async Task<(int ExitCode, string Output)> BuildAsync(
         string project,
         IReadOnlyDictionary<string, string> environment,
@@ -170,8 +173,9 @@ internal sealed class FixtureProjects : IDisposable
         return start;
     }
 
-    // The connections and SQLSOURCE_LOG, the variables of the CI services that the package reads, GitHub's for good
-    // measure, and the one that has MSBuild log every variable with its value.
+    // The connections and SQLSOURCE_LOG, SqlSourceOnline and SqlSourceEnvFile, which MSBuild reads from the environment
+    // as properties and the manual has users set there, the variables of the CI services that the package reads,
+    // GitHub's for good measure, and the one that has MSBuild log every variable with its value.
     private static bool IsClearedForABuild(string name) =>
         name.StartsWith("SQLSOURCE_CONNECTION", StringComparison.OrdinalIgnoreCase)
         || ClearedForABuild.Contains(name, StringComparer.OrdinalIgnoreCase);
