@@ -888,7 +888,10 @@ internal static class SqlServerVocabulary
     // The documented functions (mssql-functions.tsv of the phase 10 spike, fetched 2026-11-04, with STRING_SPLIT and
     // GENERATE_SERIES, which its table of contents lacks) that the probe of
     // tests/DatabaseTests/SqlServer/Renaming/VocabularyTests.cs found on the floor image or on the default one, on
-    // 2026-11-05, leaving out those that a keyword list holds already, such as LEFT.
+    // 2026-11-05, leaving out those that a keyword list holds already, such as LEFT.  CHANGETABLE and PREDICT, the
+    // documented rowset functions of "CHANGETABLE (Transact-SQL)" and "PREDICT (Transact-SQL)", fetched 2026-11-05,
+    // are added by hand: the server reads each only with its own syntax, CHANGES or VERSION and MODEL =, so the probe's
+    // empty call is no call of either, and it finds neither on either image.
     /// <summary>The documented functions that the floor or the default image knows.</summary>
     public static IReadOnlyList<string> Functions { get; } =
     [
@@ -918,6 +921,7 @@ internal static class SqlServerVocabulary
         "CERTPRIVATEKEY",
         "CERTPROPERTY",
         "CERT_ID",
+        "CHANGETABLE",
         "CHARINDEX",
         "CHECKSUM",
         "CHECKSUM_AGG",
@@ -1068,6 +1072,7 @@ internal static class SqlServerVocabulary
         "PERMISSIONS",
         "PI",
         "POWER",
+        "PREDICT",
         "PRODUCT",
         "PUBLISHINGSERVERNAME",
         "PWDCOMPARE",

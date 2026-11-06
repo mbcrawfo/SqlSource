@@ -213,7 +213,7 @@ A number or a boolean is kept, an error's number, class and state among them.  A
 - the words that are not reserved and that a statement reads, such as `APPLY`, `INSERTED` and `OPENJSON`;
 - the words of the table hints, the query hints, a window's frame, `FOR XML`, `FOR JSON` and `FOR SYSTEM_TIME` that no keyword list holds, such as `NOLOCK`, `MAXDOP`, `FOLLOWING` and `INCLUDE_NULL_VALUES`, from the syntax of their pages;
 - the pseudo-columns with their `$`, such as `$action`, and the global variables with their `@@`, such as `@@ROWCOUNT`;
-- the documented functions either image knows, those of the documentation's table of contents with `STRING_SPLIT` and `GENERATE_SERIES`, which it lacks, and the system types of either image's `sys.types`;
+- the documented functions either image knows, those of the documentation's table of contents with `STRING_SPLIT` and `GENERATE_SERIES`, which it lacks, and `CHANGETABLE` and `PREDICT`, which the server reads only with their own syntax and so `VocabularyTests` cannot find; and the system types of either image's `sys.types`;
 - the schemas `dbo`, `sys` and `INFORMATION_SCHEMA`, and the system databases;
 - `sp_executesql`, the one system procedure kept ([what building it found](#what-building-sql-servers-part-found));
 - `ROWSTAT\u0000`, the name of browse mode 2's hidden row with its NUL, which `columns` and `table` capture with the rest ([browse mode 2](sqlserver-describer.md#browse-mode-2)).  `ROWSTAT` without it is not the engine's, so a user's column of that name is renamed.

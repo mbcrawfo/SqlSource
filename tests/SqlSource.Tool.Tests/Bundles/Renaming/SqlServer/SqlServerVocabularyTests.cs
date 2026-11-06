@@ -84,6 +84,8 @@ public sealed class SqlServerVocabularyTests
     [InlineData("CONTAINED")]
     [InlineData("STRING_SPLIT")]
     [InlineData("GENERATE_SERIES")]
+    [InlineData("CHANGETABLE")]
+    [InlineData("PREDICT")]
     public void Contains_AWordOfAClauseOrATableValuedFunction_IsTrue(string spelling) =>
         SqlServerVocabulary.Contains(spelling).ShouldBeTrue(spelling);
 
