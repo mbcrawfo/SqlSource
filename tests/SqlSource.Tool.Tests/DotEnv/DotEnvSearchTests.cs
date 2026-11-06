@@ -35,6 +35,7 @@ public sealed class DotEnvSearchTests : IDisposable
     [Fact]
     public void Read_NoEnvAnywhere_GivesNoFile()
     {
+        Assert.SkipWhen(DotEnvSearch.IsInRepository(_folder.Path), "The temporary folder is inside a git work tree.");
         _ = _folder.CreateFolder("unit");
 
         var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
@@ -97,6 +98,7 @@ public sealed class DotEnvSearchTests : IDisposable
     [Fact]
     public void Read_OutsideARepository_ReadsOnlyTheUnitFolder()
     {
+        Assert.SkipWhen(DotEnvSearch.IsInRepository(_folder.Path), "The temporary folder is inside a git work tree.");
         _ = _folder.WriteFile(".env", $"{KeyA}=Host=parent\n");
         _ = _folder.CreateFolder("unit");
 

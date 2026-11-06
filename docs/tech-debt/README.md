@@ -54,7 +54,6 @@ Next id: `TD-0114`
 | [TD-0110](TD-0110-a-poller-of-a-folder-alone-sees-no-folder-made-in-it.md) | Open | 2026-11-06 | Low | Under `DOTNET_USE_POLLING_FILE_WATCHER`, a watch of a folder alone sees no folder made or deleted in it, so `describe --watch` misses a new folder outside the folders it watches with their folders below, and reports the deletion of such a folder as `SQLSRC287` |
 | [TD-0111](TD-0111-the-poller-tests-run-beside-a-real-timer.md) | Open | 2026-11-06 | Low | `PollingFolderWatcherTests` gives the watcher a clock whose timer is the system's, so a poll every second can land between two steps of a test's change |
 | [TD-0112](TD-0112-two-postgresql-run-time-tests-race-a-sleep.md) | Open | 2026-11-06 | Low | Two PostgreSQL run-time tests hold their command with a 30-second `pg_sleep`, which a stalled runner can outlast |
-| [TD-0113](TD-0113-two-env-search-tests-assume-no-repository-above-the-temporary-folder.md) | Open | 2026-11-06 | Low | Two `DotEnvSearchTests` fail when the temporary folder is inside a git work tree |
 
 ## Columns
 

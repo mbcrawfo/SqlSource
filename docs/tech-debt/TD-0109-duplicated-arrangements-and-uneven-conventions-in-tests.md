@@ -2,7 +2,7 @@
 
 ## Problem
 
-The maintainability review of 2026-11-06, after the bug-report bundles of phase 10, found these in `tests/`.  Items 1 to 41 come from the first sweep of `tests/`, items 42 to 54 from a sweep of the folders it left out; each location was confirmed by a checker that did not find it.  The tests that depend on a timer or on the machine are TD-0111 to TD-0113.  Paths are under `tests/`.
+The maintainability review of 2026-11-06, after the bug-report bundles of phase 10, found these in `tests/`.  Items 1 to 41 come from the first sweep of `tests/`, items 42 to 54 from a sweep of the folders it left out; each location was confirmed by a checker that did not find it.  The tests that depend on a timer or on the machine are TD-0111 and TD-0112.  Paths are under `tests/`.
 
 ### Duplicated helpers and arrangements
 
