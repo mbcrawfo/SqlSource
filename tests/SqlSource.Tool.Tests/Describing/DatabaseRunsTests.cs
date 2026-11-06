@@ -77,7 +77,8 @@ public sealed class DatabaseRunsTests : IDisposable
             .ShouldBe(
                 $"{more}(1,10): error SQLSRC213: No connection is given for the database 'postgres'\n"
                     + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES "
-                    + $"in the environment or in {DotEnvPath}\n"
+                    + $"in the environment or in {DotEnvPath}"
+                    + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
                     + Expected.See("SQLSRC213")
             );
     }
@@ -134,7 +135,8 @@ public sealed class DatabaseRunsTests : IDisposable
             .ShouldContain(
                 "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
                     + $"environment or in {DotEnvPath}.  "
-                    + "--connection was given for postgress, Billng, which are no databases of this run\n"
+                    + "--connection was given for postgress, Billng, which are no databases of this run"
+                    + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
             );
     }
 
@@ -157,7 +159,8 @@ public sealed class DatabaseRunsTests : IDisposable
                 "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
                     + $"environment or in {DotEnvPath}.  "
                     + "--connection was given for postgress, which is no database of this run.  "
-                    + "The values of --connection at positions 5 and 9 name no databases of this run\n"
+                    + "The values of --connection at positions 5 and 9 name no databases of this run"
+                    + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
             );
         _scene.Error.ToString().ShouldNotContain("reports");
         _scene.Error.ToString().ShouldNotContain("Host");
@@ -192,7 +195,7 @@ public sealed class DatabaseRunsTests : IDisposable
                 "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
                     + $"environment or in {DotEnvPath}.  "
                     + sentence
-                    + "\n"
+                    + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
             );
     }
 

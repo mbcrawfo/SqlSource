@@ -151,7 +151,8 @@ public sealed class OnlineRunTests : IDisposable
         );
         result.Error.ShouldContain(
             "; help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES "
-                + $"in the environment or in {DotEnvPath}; "
+                + $"in the environment or in {DotEnvPath}"
+                + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another; "
         );
         result.Error.ShouldContain("; see: " + Expected.See("SQLSRC213")[9..]);
         EveryErrorIsOneLine(result.Error);

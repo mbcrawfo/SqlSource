@@ -34,6 +34,11 @@ public sealed class DotEnvRunTests : IDisposable
         "    help: pass --connection billing=<connection string>, or set SQLSOURCE_CONNECTION_BILLING in the "
         + $"environment or in {file}";
 
+    // The same, with the sentence that says the run reads that file alone, as when no other .env was found.
+    private static string NoConnectionHelpReadingAlone(string file) =>
+        NoConnectionHelp(file)
+        + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another";
+
     [Fact]
     public async Task Run_ValueOnlyInTheDotEnvFile_DescribesAndExitsZero()
     {
@@ -89,7 +94,7 @@ public sealed class DotEnvRunTests : IDisposable
                     + "read: a quote is not closed\n"
                     + Expected.See("SQLSRC286")
                     + $"{_invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
-                    + NoConnectionHelp(DotEnvPath)
+                    + NoConnectionHelpReadingAlone(DotEnvPath)
                     + "\n"
                     + Expected.See("SQLSRC213")
                     + DescribeScene.RunAgain
@@ -138,7 +143,19 @@ public sealed class DotEnvRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldContain("\n" + NoConnectionHelp(DotEnvPath) + "\n");
+        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(DotEnvPath) + "\n");
+    }
+
+    // The unit's own .env is read and has no value for the database: the run still says it reads that file alone.
+    [Fact]
+    public async Task Run_UnitsDotEnvFileWithoutTheVariable_HelpSaysTheRunReadsThatFileAlone()
+    {
+        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_REPORTS=Host=db\n");
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(DotEnvPath) + "\n");
     }
 
     // A .env above the unit's folder is not read, though the folder above is the root of the repository.
@@ -155,7 +172,7 @@ public sealed class DotEnvRunTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldStartWith(
             $"{invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
-                + NoConnectionHelp(_scene.Run.Folder.PathOf("repo/app/.env"))
+                + NoConnectionHelpReadingAlone(_scene.Run.Folder.PathOf("repo/app/.env"))
                 + "\n"
         );
         _scene.Describer.Opened.ShouldBeEmpty();
@@ -195,6 +212,7 @@ public sealed class DotEnvRunTests : IDisposable
                 + $".  The run did not read {listed}: it reads {DotEnvPath} alone, and --env-file, or "
                 + "SqlSourceEnvFile in a build, names another\n"
         );
+        result.Error.ShouldNotContain("reads that file alone");
         _scene.Describer.Opened.ShouldBeEmpty();
     }
 
@@ -221,6 +239,7 @@ public sealed class DotEnvRunTests : IDisposable
                 + "and --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain(_scene.Run.Folder.PathOf("Billing/.env"));
+        result.Error.ShouldNotContain("reads that file alone");
     }
 
     [Fact]
@@ -310,7 +329,7 @@ public sealed class DotEnvRunTests : IDisposable
                 1,
                 "billing (postgres): 0 described, 0 skipped, 1 failed\n",
                 $"{_invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
-                    + NoConnectionHelp(_scene.Run.Folder.PathOf("missing/.env"))
+                    + NoConnectionHelpReadingAlone(_scene.Run.Folder.PathOf("missing/.env"))
                     + "\n"
                     + Expected.See("SQLSRC213")
                     + DescribeScene.RunAgain

@@ -81,6 +81,13 @@ internal static class DescribeErrors
                     .Append(" alone, and --env-file, or SqlSourceEnvFile in a build, names another")
                 : help.Append(": --env-file, or SqlSourceEnvFile in a build, names a file to read");
         }
+        else if (lookedFor is not null)
+        {
+            // The file may be there and lack the variable, or be missing; either way the run reads no other.
+            _ = help.Append(
+                ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another"
+            );
+        }
 
         return ToolDiagnostic
             .At(ToolDiagnostics.DatabaseHasNoConnection, query.Query.NameLocation, connection.Database)
