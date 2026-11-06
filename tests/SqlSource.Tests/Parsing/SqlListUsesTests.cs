@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
@@ -239,21 +240,54 @@ public sealed class SqlListUsesTests
         (GC.GetAllocatedBytesForCurrentThread() - before).ShouldBe(0);
     }
 
-    // The reading of conditions keeps its frames and the state of each use in arrays rented from the pool, so a query
-    // of ten frames, more than the first array holds, allocates what a flat one does with as many parameters and as
-    // deep parentheses, which the reading of NOT keeps in a list of its own.
+    // The reading of conditions keeps its frames and where each use waits in arrays rented from the pool, so Find
+    // allocates its result alone: once the pool holds them, a flat query and one of 21 frames, more than the 16 slots
+    // of the first array, allocate what three uses do.  No parenthesis, whose depth the reading of NOT keeps in a list.
     [Fact]
-    public void Find_QueryOfManyFrames_AllocatesWhatAFlatOneDoes()
+    public void Find_QueryWithLists_AllocatesItsUsesAlone()
     {
-        const string Flat = "SELECT (a) FROM t WHERE ((a IN @a)) AND b IN @b AND c IN @b";
-        const string Nested =
-            "SELECT CASE WHEN a THEN CASE WHEN a THEN CASE WHEN a THEN "
-            + "CASE WHEN a THEN CASE WHEN a THEN CASE WHEN a THEN "
-            + "ARRAY[ARRAY[ARRAY[(x IN @a)::int]]] END END END END END END "
-            + "FROM t WHERE ((b IN @b) IS FALSE) AND c IN @b";
+        const string Flat = "SELECT a FROM t WHERE a IN @a AND b IN @b AND c IN @b";
+        var nested =
+            "SELECT "
+            + string.Concat(Enumerable.Repeat("CASE WHEN a THEN ", 10))
+            + string.Concat(Enumerable.Repeat("ARRAY[", 10))
+            + "x IN @a"
+            + new string(']', 10)
+            + string.Concat(Enumerable.Repeat(" END", 10))
+            + " FROM t WHERE b IN @b IS FALSE AND c IN @b";
         var rules = SqlDialectRules.PostgreSql;
+        var uses = UsesAllocated(3);
 
-        Allocated(Nested, rules).ShouldBe(Allocated(Flat, rules));
+        Allocated(Flat, rules).ShouldBe(uses);
+        Allocated(nested, rules).ShouldBe(uses);
+    }
+
+    // What building a result of that many uses allocates, as Find builds one.
+    private static long UsesAllocated(int count)
+    {
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = Build(count);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = Build(count);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+
+        static ImmutableArray<SqlParameterUse> Build(int count)
+        {
+            var builder = ImmutableArray.CreateBuilder<SqlParameterUse>(count);
+            for (var index = 0; index < count; index++)
+            {
+                builder.Add(SqlParameterUse.List);
+            }
+
+            return builder.MoveToImmutable();
+        }
     }
 
     [Theory]
