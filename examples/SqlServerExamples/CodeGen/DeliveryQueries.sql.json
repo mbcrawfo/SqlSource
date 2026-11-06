@@ -6,8 +6,9 @@
   "queries": {
     "RecordDelivery": {
       "hash": "1da5232eb65b55b6b077b6940ba342de402493f45af0c99b383140ac40ba7ddf",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -80,8 +81,9 @@
     },
     "FindDelivery": {
       "hash": "0281aa5b81713dc766ab505c452741e7ac4a4203a36f6928bb3c5b3aafc8f3ad",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

@@ -6,8 +6,9 @@
   "queries": {
     "CurrentPrices": {
       "hash": "ec7651a9239ad33912476d7306824902d48af5dbd6785ef72767bb22b9869ed2",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

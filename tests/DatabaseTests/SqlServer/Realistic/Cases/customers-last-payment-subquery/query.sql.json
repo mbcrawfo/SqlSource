@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomersWithLastPayment": {
       "hash": "90dd0342f1b065c2ed33112e3e139f01a1f79ab6f5e28047f03be6e222a04250",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

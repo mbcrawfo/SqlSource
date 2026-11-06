@@ -30,6 +30,7 @@ public sealed class EntrySecretCheckTests
         "GetUser",
         default,
         "0123abcd",
+        "1.2.3",
         "postgres",
         "main",
         "16.4",

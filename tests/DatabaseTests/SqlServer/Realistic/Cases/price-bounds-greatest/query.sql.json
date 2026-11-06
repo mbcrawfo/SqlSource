@@ -6,8 +6,9 @@
   "queries": {
     "ListPriceBounds": {
       "hash": "38599a5833f3e87344d1ede122ff135b62dfe51963e0a277d82860878627f4c0",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

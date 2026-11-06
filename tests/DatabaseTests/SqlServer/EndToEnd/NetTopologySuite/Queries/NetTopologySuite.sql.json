@@ -6,8 +6,9 @@
   "queries": {
     "InsertSpatialValues": {
       "hash": "a053eb9483aff03ba3871a6edae52d8eefeb14b042f1fb9614e451020c6ea89f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -61,8 +62,9 @@
     },
     "GetSpatialValues": {
       "hash": "f8fbc34207e1c4285845183c937823df8299fd59e71f74af0faf8bc9e0384af3",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -154,8 +156,9 @@
     },
     "ListGeographyValues": {
       "hash": "09456ef5f7e3e25f503ad1275652272fda72eef9812a2f38244e636ae5bd6b20",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

@@ -6,8 +6,9 @@
   "queries": {
     "RankProductsBySales": {
       "hash": "ed710854e239f6d7ed62212cd3d2d56688b38b5fb3dd487c19d7eee4130d2d9b",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

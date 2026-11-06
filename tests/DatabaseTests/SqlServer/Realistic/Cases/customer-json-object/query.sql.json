@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomerCards": {
       "hash": "de4fe429de47923e5c9e45cd05247c8e580c0aeb39e84f1664d62f1c19d2ec76",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

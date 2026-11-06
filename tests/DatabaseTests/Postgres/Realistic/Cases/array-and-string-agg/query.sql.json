@@ -6,8 +6,9 @@
   "queries": {
     "ListPurchasedProductsByAccount": {
       "hash": "21c252938c180b42be7b32aa7676e35f515f3fe9d41401f62d4e9a629f3cf5cf",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

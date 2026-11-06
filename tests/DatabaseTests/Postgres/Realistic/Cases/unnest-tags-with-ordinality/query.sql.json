@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountTags": {
       "hash": "578027dadc0d7f67864c6756ddf795dc13d638e56af5cf6e38776bfcf766c77e",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

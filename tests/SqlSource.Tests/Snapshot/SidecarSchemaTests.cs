@@ -66,7 +66,13 @@ public sealed class SidecarSchemaTests
     [InlineData("\"plan\": \"not-needed\",", "")]
     [InlineData("\"typeSource\": \"declared\"", "\"typeSource\": \"guessed\"")]
     [InlineData("\"engine\": \"postgres\"", "\"engine\": \"sqlite\"")]
-    [InlineData("\"toolVersion\": \"0.4.0\"", "\"toolVersion\": \"0.4.0-dev\"")]
+    [InlineData("\"toolVersion\": \"0.4.0\",\n  \"queries\"", "\"toolVersion\": \"0.4.0-dev\",\n  \"queries\"")]
+    [InlineData(
+        "\"toolVersion\": \"0.4.0\",\n      \"database\"",
+        "\"toolVersion\": \"0.4.0-dev\",\n      \"database\""
+    )]
+    [InlineData("\"toolVersion\": \"0.4.0\",\n      \"database\"", "\"toolVersion\": null,\n      \"database\"")]
+    [InlineData("\"toolVersion\": \"0.4.0\",\n      \"database\"", "\"database\"")]
     [InlineData("\"formatVersion\": 1", "\"formatVersion\": 2")]
     [InlineData("\"bindName\": \"integer\"", "\"bindName\": 3")]
     [InlineData("\"bindName\": \"integer\"", "\"bindName\": \"\"")]

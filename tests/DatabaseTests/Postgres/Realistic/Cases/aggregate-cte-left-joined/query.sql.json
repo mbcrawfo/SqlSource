@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountSpending": {
       "hash": "0450cd1a46e79d591576ba02da35168223d7a67b2b4159505fc8791d61541d14",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

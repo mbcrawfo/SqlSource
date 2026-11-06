@@ -78,9 +78,10 @@ internal static class RenamingProof
         );
     }
 
-    // A miss is a request the renaming did not make as the pipeline does.  An entry differs at its first member; a
-    // failure, or an outcome of the other kind, by what each is.  A bundle with no answer to compare is proved by a
-    // replay that asks nothing the capture lacks.
+    // A miss is a request the renaming did not make as the pipeline does.  An entry differs at its first member, as
+    // EntryDifferences compares them, whichever version of the tool wrote each; a failure, or an outcome of the other
+    // kind, by what each is.  A bundle with no answer to compare is proved by a replay that asks nothing the capture
+    // lacks.
     private static RenamingRefusal? Compare(ReplayOutcome? expected, ReplayOutcome replayed)
     {
         if (replayed is ReplayOutcome.Missed missed)
@@ -96,11 +97,9 @@ internal static class RenamingProof
         if (expected is ReplayOutcome.Described described && replayed is ReplayOutcome.Described other)
         {
             var differences = EntryDifferences.Of(described.Entry, other.Entry);
-            return new RenamingRefusal(
-                RefusalStep.Replay,
-                BundleFiles.Expected,
-                differences.Count > 0 ? differences[0] : null
-            );
+            return differences.Count > 0
+                ? new RenamingRefusal(RefusalStep.Replay, BundleFiles.Expected, differences[0])
+                : null;
         }
 
         var file = expected is ReplayOutcome.Described ? BundleFiles.Expected : BundleFiles.Info;

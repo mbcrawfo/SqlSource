@@ -6,8 +6,9 @@
   "queries": {
     "ListCategoriesWithAncestors": {
       "hash": "f1c2c0fe7e8dd619664b057eafbdfb0601cb21ec5dfb150ca1d1b24c030af79a",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

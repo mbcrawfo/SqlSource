@@ -6,8 +6,9 @@
   "queries": {
     "ListActiveAccountsFreeDuring": {
       "hash": "aed8b5937b05b12ad2196ac9f92999113a90d4a2ce1fef152d1a39d38f7359c8",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

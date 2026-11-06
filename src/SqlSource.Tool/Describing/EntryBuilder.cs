@@ -61,6 +61,7 @@ internal static class EntryBuilder
             query.Query.Name,
             default,
             query.Hash ?? throw new InvalidOperationException($"The query '{query.Query.Name}' needs no entry."),
+            PackageVersion.Prefix,
             SqlDialectName.Canonical(dialect),
             database,
             server.Version,

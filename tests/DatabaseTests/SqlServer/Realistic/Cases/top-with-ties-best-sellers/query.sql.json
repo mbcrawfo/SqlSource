@@ -6,8 +6,9 @@
   "queries": {
     "ListBestSellers": {
       "hash": "a5f721723fa98c51e37839cba43258bbfb0882cd1b86de6e72847ca337093e3d",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

@@ -6,8 +6,9 @@
   "queries": {
     "OrderSummaries": {
       "hash": "8934f45dc7c2ed39226277a02f1bb05de7da1b91ddd23e6f7292f63e7980cd69",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

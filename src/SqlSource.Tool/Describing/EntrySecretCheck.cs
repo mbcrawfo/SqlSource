@@ -76,6 +76,7 @@ internal static class EntrySecretCheck
             entry.Name,
             entry.NameSpan,
             entry.Hash,
+            entry.ToolVersion,
             entry.Engine,
             entry.Database,
             ServerVersion: null,

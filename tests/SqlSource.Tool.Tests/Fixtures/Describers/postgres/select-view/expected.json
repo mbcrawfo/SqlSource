@@ -6,8 +6,9 @@
   "queries": {
     "ListActiveUsers": {
       "hash": "4c490ed6de1f4b9585e30b6ef0c09dfb91174184d572c7b594c89a36d239d001",
-      "engine": "postgres",
+      "toolVersion": "fixture",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {

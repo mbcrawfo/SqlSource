@@ -6,8 +6,9 @@
   "queries": {
     "ListOpenAccountsWithRecentEvents": {
       "hash": "9ecd812f75466fbd04fb25d30c809d56e3bf7ac7d7294bf3d88ef0ffc50b14ea",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

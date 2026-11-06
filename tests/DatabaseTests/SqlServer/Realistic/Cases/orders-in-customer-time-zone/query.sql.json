@@ -6,8 +6,9 @@
   "queries": {
     "ListOrdersInCustomerTimeZone": {
       "hash": "5dbff85c48365342d07cdec8eccb32abfbcfde9e96bf52f611430ca8ac425fd7",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

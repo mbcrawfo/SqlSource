@@ -6,8 +6,9 @@
   "queries": {
     "GetCustomerOrderSummary": {
       "hash": "40c00eff729d6abccaf5892bcbd727d098c86fd10adc3c0eae1393ac130364a7",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

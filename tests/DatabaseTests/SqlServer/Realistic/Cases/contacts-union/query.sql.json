@@ -6,8 +6,9 @@
   "queries": {
     "SearchContactNames": {
       "hash": "0e808ffa07f7250bec79c388e6ba92d67d121505fff86514170fe348e181f207",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

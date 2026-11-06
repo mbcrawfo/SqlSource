@@ -6,8 +6,9 @@
   "queries": {
     "OrdersWithNameLength": {
       "hash": "c27421ee86bf3a393274e626b287cb249b9b5f2824b94927bfda447e7a6c626d",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

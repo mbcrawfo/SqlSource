@@ -6,8 +6,9 @@
   "queries": {
     "GetUserOrders": {
       "hash": "a6297da1d0437c6c7640c0f4559852f94aa735e63d1d1b6707845c5cba4b1dea",
-      "engine": "postgres",
+      "toolVersion": "fixture",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

@@ -6,8 +6,9 @@
   "queries": {
     "GetLocatedName": {
       "hash": "d7729da58107129dfdde01d0f4b490a0cd7c81bbfca5c945ac6634f75b6eb7d3",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -71,8 +72,9 @@
     },
     "GetLocatedNameInternal": {
       "hash": "d7729da58107129dfdde01d0f4b490a0cd7c81bbfca5c945ac6634f75b6eb7d3",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -136,8 +138,9 @@
     },
     "GetLocatedNamePrivate": {
       "hash": "d7729da58107129dfdde01d0f4b490a0cd7c81bbfca5c945ac6634f75b6eb7d3",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -201,8 +204,9 @@
     },
     "GetLocatedNameNested": {
       "hash": "d7729da58107129dfdde01d0f4b490a0cd7c81bbfca5c945ac6634f75b6eb7d3",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

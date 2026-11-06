@@ -6,8 +6,9 @@
   "queries": {
     "UserById": {
       "hash": "1ffdf2a559e06dd6323cb35b621204a6f446b0e0f42ff5b85a38a72dc7447bbe",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

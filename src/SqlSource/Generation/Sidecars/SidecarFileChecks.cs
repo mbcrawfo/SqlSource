@@ -8,8 +8,8 @@ using SqlSource.Snapshot.Reading;
 namespace SqlSource.Generation.Sidecars;
 
 /// <summary>
-/// The checks of a sidecar itself, before any of its entries: whether it can be read, its format, and the version of
-/// the tool that wrote it.
+/// The checks of a sidecar itself, before any of its entries is checked against its query: whether it can be read, its
+/// format, and the versions of the tool that wrote it and each of its entries.
 /// </summary>
 internal static class SidecarFileChecks
 {
@@ -22,19 +22,13 @@ internal static class SidecarFileChecks
         var result = file.Result;
         if (result.Sidecar is { } sidecar)
         {
-            if (
-                !string.Equals(
-                    PackageVersion.PrefixOf(sidecar.ToolVersion),
-                    PackageVersion.Prefix,
-                    StringComparison.Ordinal
-                )
-            )
+            if (OtherToolVersion(sidecar, file) is { } other)
             {
                 diagnostics.Add(
                     DiagnosticInfo.Create(
                         SqlDiagnostics.SidecarToolVersionDiffers,
-                        file.Start,
-                        sidecar.ToolVersion,
+                        other.Location,
+                        other.Version,
                         PackageVersion.Prefix
                     )
                 );
@@ -68,6 +62,31 @@ internal static class SidecarFileChecks
         );
         return null;
     }
+
+    // The first version of another tool, at the file's start when it is the file's own, and otherwise at the key of
+    // the first entry that a git merge brought from another: one warning for the sidecar.
+    private static (string Version, LocationInfo Location)? OtherToolVersion(Sidecar sidecar, SidecarFile file)
+    {
+        if (!IsThisTools(sidecar.ToolVersion))
+        {
+            return (sidecar.ToolVersion, file.Start);
+        }
+
+        for (var index = 0; index < sidecar.Queries.Count; index++)
+        {
+            var version = sidecar.Queries[index].ToolVersion;
+            if (!IsThisTools(version))
+            {
+                return (version, file.EntryLocations[index]);
+            }
+        }
+
+        return null;
+    }
+
+    // A version's suffix, as -dev, is not compared.
+    private static bool IsThisTools(string toolVersion) =>
+        string.Equals(PackageVersion.PrefixOf(toolVersion), PackageVersion.Prefix, StringComparison.Ordinal);
 
     /// <summary>
     /// What the message of <c>SQLSRC237</c> says is wrong.

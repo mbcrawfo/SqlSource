@@ -6,8 +6,9 @@
   "queries": {
     "OrdersWithoutNote": {
       "hash": "74c876b46f6106e3e7f68ed034c32cc8e173a261218da22c536331ad42713f1a",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

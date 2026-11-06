@@ -6,8 +6,9 @@
   "queries": {
     "GetUser": {
       "hash": "5a1d8c0e9b7f3a2c4d6e8f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c",
-      "engine": "postgres",
+      "toolVersion": "0.4.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "16.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -136,8 +137,9 @@
     },
     "CreateUser": {
       "hash": "9c3b2a1f0e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
-      "engine": "postgres",
+      "toolVersion": "0.4.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "16.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -240,8 +242,9 @@
     },
     "DeleteUser": {
       "hash": "1e2d3c4b5a6f7e8d9c0b1a2f3e4d5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d",
-      "engine": "postgres",
+      "toolVersion": "0.4.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "16.4",
       "resultKind": "none",
       "parameters": [
@@ -262,8 +265,9 @@
     },
     "ListUsers": {
       "hash": "7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e",
-      "engine": "postgres",
+      "toolVersion": "0.4.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "16.4",
       "resultKind": "rows",
       "matchesTable": null,

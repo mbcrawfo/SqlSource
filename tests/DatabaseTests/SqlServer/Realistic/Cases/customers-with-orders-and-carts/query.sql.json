@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomersWithOrdersAndOpenCarts": {
       "hash": "9ee40dd55e7204feed27b8a85569f233407d8596fe419c1b59a91088ce482a79",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

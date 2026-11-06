@@ -6,8 +6,9 @@
   "queries": {
     "InsertJsonValues": {
       "hash": "438618c30de15d3c00150f16eef70c0dff4fab324a42aff8612d983bef3e3c97",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "none",
       "parameters": [
@@ -196,8 +197,9 @@
     },
     "GetJsonValues": {
       "hash": "24a3027d99f332dd2d4e428c859a4c8972c3025c35e4fe86aed10afc9766b0b2",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
@@ -485,8 +487,9 @@
     },
     "GetRequiredJson": {
       "hash": "0c3db6b46c8da5e84bf7bb34bcaf1ead8889dd017f3bf6312552f37d49c6e6b8",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

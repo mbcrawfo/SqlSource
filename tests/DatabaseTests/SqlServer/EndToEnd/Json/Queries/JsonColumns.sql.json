@@ -6,8 +6,9 @@
   "queries": {
     "InsertJsonColumns": {
       "hash": "8dca3ad69608972fe07d9d7c6322e577db9a0360151ca9a8462e66fd7037304b",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -51,8 +52,9 @@
     },
     "GetJsonColumns": {
       "hash": "7ffc2ec63169a1b09df05a288300ba543247523deca775af506b87e24d386ded",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

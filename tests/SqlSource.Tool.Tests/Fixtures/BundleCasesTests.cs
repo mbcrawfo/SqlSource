@@ -36,7 +36,17 @@ public sealed class BundleCasesTests
 
         var replayed = await BundleReplays.ReplayAsync(bundle, Path);
 
-        replayed.ShouldBe(expected.Value.ShouldNotBeNull());
+        // The entry a replay gives is this tool's.
+        replayed.ShouldBe(
+            expected.Value.ShouldNotBeNull() switch
+            {
+                ReplayOutcome.Described described => described with
+                {
+                    Entry = described.Entry with { ToolVersion = PackageVersion.Prefix },
+                },
+                var refused => refused,
+            }
+        );
         info.Engine.ShouldBe(engine);
     }
 }

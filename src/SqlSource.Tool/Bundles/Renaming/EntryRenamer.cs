@@ -34,6 +34,7 @@ internal static class EntryRenamer
     private static readonly Dictionary<string, FieldRule> Neutral = new(StringComparer.Ordinal)
     {
         [SidecarKeys.Hash] = FieldRule.Fixed,
+        [SidecarKeys.ToolVersion] = FieldRule.Fixed,
         [SidecarKeys.Engine] = FieldRule.Fixed,
         [SidecarKeys.Database] = FieldRule.Name(NameClass.Database),
         [SidecarKeys.ServerVersion] = FieldRule.Fixed,

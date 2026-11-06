@@ -6,8 +6,9 @@
   "queries": {
     "ListTopCustomers": {
       "hash": "d5b10574f598b29d5727a858c332258819a4702e284cfe4ab88373c3fea3121c",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

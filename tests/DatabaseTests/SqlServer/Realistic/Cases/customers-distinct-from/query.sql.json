@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomersOutsideTimeZone": {
       "hash": "24ca2b86856e2275eda22a3903b0974ca0e5d73dbdf87088f3dcd9bec10a7874",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

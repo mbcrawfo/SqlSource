@@ -6,8 +6,9 @@
   "queries": {
     "GetCart": {
       "hash": "39c22ffb686214623ede532e00c90a6832b1e30de1fd1623580cfc418684b03e",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

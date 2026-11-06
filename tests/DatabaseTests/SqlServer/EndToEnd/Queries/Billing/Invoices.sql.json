@@ -6,8 +6,9 @@
   "queries": {
     "ListInvoices": {
       "hash": "00ce465f2476f21f94b1bb1103d1f9fe0047c9170f277170c56f61b3a0ba1bce",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "billing",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -136,8 +137,9 @@
     },
     "GetInvoice": {
       "hash": "95c649ccedfe9c1b7b220861c333401bbd121985e6db8b9b71a68298a2689eaf",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "billing",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

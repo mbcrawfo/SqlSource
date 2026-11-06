@@ -71,7 +71,7 @@ internal static class TestSidecars
     ) => new(ordinal, name, type, nullable, nullableSource, origin, identity, computed);
 
     // An entry with rows has one column unless it is given some; an entry without rows has no columns, no table
-    // and no provenance.
+    // and no provenance.  Its tool version is this build's unless it is given one.
     public static SidecarEntry Entry(
         string name = "Q",
         string hash = "h",
@@ -83,7 +83,8 @@ internal static class TestSidecars
         string? plan = SidecarValues.Plan.NotNeeded,
         string? tableMatch = SidecarValues.TableMatch.NoOrigin,
         SidecarParameter[]? parameters = null,
-        SidecarColumn[]? columns = null
+        SidecarColumn[]? columns = null,
+        string? toolVersion = null
     )
     {
         var rows = resultKind == SidecarResultKind.Rows;
@@ -92,6 +93,7 @@ internal static class TestSidecars
             name,
             default,
             hash,
+            toolVersion ?? PackageVersion.Prefix,
             engine,
             database,
             serverVersion,

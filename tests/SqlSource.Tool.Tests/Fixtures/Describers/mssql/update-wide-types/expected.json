@@ -6,8 +6,9 @@
   "queries": {
     "ClearNicknames": {
       "hash": "b901b824d291c223e7e84d0c96609c82529075c7e1637e632aa6264b35b68cef",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [

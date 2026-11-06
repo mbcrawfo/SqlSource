@@ -6,8 +6,9 @@
   "queries": {
     "ListProductsNotOrderedSince": {
       "hash": "5ea1eba270097d4fc91c772a2058ec350b1ed0d87f9361803cfc7c82764bed95",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

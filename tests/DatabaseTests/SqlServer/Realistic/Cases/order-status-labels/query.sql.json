@@ -6,8 +6,9 @@
   "queries": {
     "ListOrderStatusLabels": {
       "hash": "de5193199f22761a0c753894c8f38d2325fa731bab68306af0256369637cf1fa",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

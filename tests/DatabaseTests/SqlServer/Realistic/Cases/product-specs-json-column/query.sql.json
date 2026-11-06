@@ -6,8 +6,9 @@
   "queries": {
     "ListProductSpecs": {
       "hash": "2e734ad5b621fec620b2970207e46395e74fef1a098302d69cc2979b9d95ebfb",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

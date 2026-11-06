@@ -90,7 +90,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_SidecarOfAHigherFormatVersion_IsNotSqlsrc221AndItsQueriesAreDescribed()
     {
         _ = await DescribeFirstAsync();
-        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = 2 });
+        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = SidecarFormat.Version + 1 });
         await File.WriteAllTextAsync(Sidecar, newer, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync("--check");
@@ -474,7 +474,11 @@ public sealed class CheckTests : IDisposable
                 {
                     ToolVersion = "0.0.1",
                 },
-                [.. sidecar.Queries.Reverse().Select(entry => entry with { ServerVersion = "99.9" })]
+                [
+                    .. sidecar
+                        .Queries.Reverse()
+                        .Select(entry => entry with { ServerVersion = "99.9", ToolVersion = "0.0.1" }),
+                ]
             )
         );
 

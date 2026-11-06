@@ -17,7 +17,8 @@ namespace SqlSource.Tool.Testing.Fixtures;
 // case's name.
 internal static class FixtureReplay
 {
-    // The toolVersion of an expected.json: a fixed one, so that a new version of the tool touches no fixture.
+    // The toolVersion of an expected.json, the file's and its entry's: a fixed one, so that a new version of the tool
+    // touches no fixture.
     public const string ToolVersion = "fixture";
 
     // The connection of a replayed session.  Nothing opens, and the run's redaction wants one value to look for.
@@ -89,7 +90,10 @@ internal static class FixtureReplay
                 return Outcome<string, DescribeFailure>.Failed(described.Failure);
             }
 
-            var entry = EntryBuilder.Build(planned, dialect, database, session.Server, described.Value);
+            var entry = EntryBuilder.Build(planned, dialect, database, session.Server, described.Value) with
+            {
+                ToolVersion = ToolVersion,
+            };
             return Outcome<string, DescribeFailure>.Of(
                 SidecarWriter.Write(
                     new Sidecar(SidecarFormat.Version, ToolVersion, new EquatableArray<SidecarEntry>([entry]))
