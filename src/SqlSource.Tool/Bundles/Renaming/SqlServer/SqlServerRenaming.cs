@@ -72,12 +72,21 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     /// <summary>
     /// A column of a result set whose source is of <c>sys</c>, of <c>INFORMATION_SCHEMA</c> or of the system resource,
-    /// <c>mssqlsystemresource</c>, or the request of <c>table</c> of a relation of <c>sys</c> or
-    /// <c>INFORMATION_SCHEMA</c>.
+    /// <c>mssqlsystemresource</c>, under its source column's own name, or the request of <c>table</c> of a relation of
+    /// <c>sys</c> or <c>INFORMATION_SCHEMA</c>.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A row of <c>dbo</c> or another schema of <c>master</c>, <c>msdb</c>, <c>model</c> or <c>tempdb</c> is the
     /// user's, since a user's tables are there when the connection names that database.
+    /// </para>
+    /// <para>
+    /// A row's <c>name</c> is the column's alias, which is the user's, and the renaming keeps every name of a row of
+    /// the engine's, an alias too, and every spelling of it in the bundle.  So a column of the server's is the
+    /// engine's only when its name, without a nullability mark and folded, is its <c>sourceColumn</c> folded, is the
+    /// ASCII digits of the tool's <c>AS [n]</c>, or is null.  A column under an alias is renamed whole, which is safe,
+    /// since a renamed object of <c>sys</c> still replays.
+    /// </para>
     /// </remarks>
     public bool IsEngineRow(string method, string path, JsonObject row)
     {
@@ -88,7 +97,8 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
         return path switch
         {
-            "answer.rows[]" => IsSystemSchema(row, "sourceSchema") || IsSystemResource(row, "sourceDatabase"),
+            "answer.rows[]" => (IsSystemSchema(row, "sourceSchema") || IsSystemResource(row, "sourceDatabase"))
+                && IsUnaliased(row),
             CaptureRenamer.Request => method == SqlServerCallNames.Table && IsSystemSchema(row, "schema"),
             _ => false,
         };
@@ -169,6 +179,32 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     private static bool IsSystemSchema(JsonObject row, string member) =>
         StringOf(row, member) is { } schema
         && SystemSchemas.Contains(SqlServerVocabulary.Fold(schema), StringComparer.Ordinal);
+
+    // A column's name is its source column's, without a nullability mark and folded, the tool's AS [n], or null.
+    private static bool IsUnaliased(JsonObject row)
+    {
+        if (row["name"] is null)
+        {
+            return true;
+        }
+
+        if (StringOf(row, "name") is not { } name)
+        {
+            return false;
+        }
+
+        if (name.Length > 0 && name.All(char.IsAsciiDigit))
+        {
+            return true;
+        }
+
+        return StringOf(row, "sourceColumn") is { } column
+            && string.Equals(
+                SqlServerVocabulary.Fold(RenamingRun.MarkOf(name).Stem),
+                SqlServerVocabulary.Fold(column),
+                StringComparison.Ordinal
+            );
+    }
 
     private static bool IsSystemResource(JsonObject row, string member) =>
         StringOf(row, member) is { } database

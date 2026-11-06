@@ -22,16 +22,26 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
 
-// The errors, refusals and sessions of SQL Server's part that no recorded fixture holds: each case is a fixture's raw
-// bundle with its capture edited by hand, its outcome made by replaying it raw, then renamed.
+// The errors, refusals, sessions and columns of the server's own relations that no recorded fixture of SQL Server
+// holds: each case is a fixture's raw bundle with its capture edited by hand, its outcome made by replaying it raw,
+// then renamed by SQL Server's part.
 public sealed partial class SqlServerErrorRenamingTests
 {
     private const string Engine = "mssql";
 
     private const string Columns = "columns";
 
+    private const string OtherDatabase = "select-other-database";
+
+    // The variants of a column of the server's that keeps its names.
+    private const string OwnName = "own name";
+    private const string OperandOfAProof = "operand of a proof";
+
     // The members of a request that hold SQL or declarations.
     private static readonly string[] RequestTexts = ["sql", "params"];
+
+    // The members of a column's row that name its source.
+    private static readonly string[] SourceMembers = ["sourceDatabase", "sourceSchema", "sourceTable", "sourceColumn"];
 
     private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer).ShouldNotBeNull();
 
@@ -170,6 +180,79 @@ public sealed partial class SqlServerErrorRenamingTests
         BundleLeaks.Find(renamed.Bundle, Part, new HashSet<string>(), schema, raw.Query).ShouldBeEmpty();
     }
 
+    // A column of the server's under an alias of the user's is no row of the engine's: its alias, and a column of the
+    // user's spelled as the alias, are renamed.  The leak search keeps only the source members of the server's rows,
+    // never a row's name, so it does not repeat the rule under test.
+    [Theory]
+    [InlineData("acme_payroll_db", "acme_payroll_db", "sys.databases.database_id", false)]
+    [InlineData("[Acme Payroll]", "Acme Payroll", "sys.databases.database_id", false)]
+    [InlineData("[acme_payroll_db!]", "acme_payroll_db!", "sys.databases.database_id", false)]
+    [InlineData("secret_alias", "secret_alias", "INFORMATION_SCHEMA.COLUMNS.COLUMN_NAME", false)]
+    [InlineData("job_id", "job_id", "sys.databases.database_id", true)]
+    public async Task RenameAsync_AnAliasOfAColumnOfTheServers_IsRenamed(
+        string written,
+        string alias,
+        string source,
+        bool first
+    )
+    {
+        var (schema, table, column) = SourceOf(source);
+        var sql =
+            (first ? $"SELECT d.{column} AS {written}, j.job_id" : $"SELECT j.job_id, d.{column} AS {written}")
+            + $"\nFROM msdb.dbo.sysjobs AS j\nCROSS JOIN master.{schema}.{table} AS d;";
+        var raw = await EditedAsync(
+            OtherDatabase,
+            capture =>
+            {
+                WithSql(capture, sql);
+                var rows = CallOf(capture, Columns)["answer"]!["rows"]!.AsArray();
+                var row = rows.Single(static row => row!["sourceSchema"]?.GetValue<string>() == "sys")!;
+                row["name"] = alias;
+                row["sourceSchema"] = schema;
+                row["sourceTable"] = table;
+                row["sourceColumn"] = column;
+                if (first)
+                {
+                    _ = rows.Remove(row);
+                    rows.Insert(0, row);
+                }
+            },
+            query => WithBody(query, sql)
+        );
+        raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
+        var stem = RenamingRun.MarkOf(alias).Stem;
+
+        var renamed = await RenamedAsync(raw);
+
+        renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
+        renamed.Bundle.Query.ShouldNotContain(stem, Case.Insensitive);
+        renamed.Bundle.Capture.ShouldNotContain(stem, Case.Insensitive);
+        renamed.Bundle.Expected.ShouldNotBeNull().ShouldNotContain(stem, Case.Insensitive);
+        BundleLeaks
+            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+            .ShouldBeEmpty();
+    }
+
+    // A column of the server's under its own name, or under the tool's AS [1] of operands, is a row of the engine's,
+    // whose names are kept.
+    [Theory]
+    [InlineData(OwnName)]
+    [InlineData(OperandOfAProof)]
+    public async Task RenameAsync_AColumnOfTheServersUnderItsOwnName_KeepsTheServersNames(string variant)
+    {
+        var raw = variant == OwnName ? RawBundles.OfFixture(FixtureOf(OtherDatabase)) : await OperandOfSysAsync();
+        raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
+
+        var renamed = await RenamedAsync(raw);
+
+        renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
+        renamed.Bundle.Query.ShouldContain("master.sys.databases AS ");
+        renamed.Bundle.Query.ShouldContain(".database_id");
+        BundleLeaks
+            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+            .ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task RenameAsync_MemberWithNoRule_IsRefusedAtItsPlace()
     {
@@ -266,6 +349,117 @@ public sealed partial class SqlServerErrorRenamingTests
         );
         return (raw, copy.ShouldNotBeNull());
     }
+
+    // select-other-database as "SELECT MAX(d.database_id) AS top_id FROM master.sys.databases AS d GROUP BY
+    // d.database_id;", whose aggregate's operand the describer asks about in operands, as the tool's AS [1] over the
+    // column of sys, to prove the column cannot be NULL.
+    private static async Task<Bundle> OperandOfSysAsync()
+    {
+        const string Sql =
+            "SELECT MAX(d.database_id) AS top_id\nFROM master.sys.databases AS d\nGROUP BY d.database_id;";
+        return await EditedAsync(
+            OtherDatabase,
+            capture =>
+            {
+                WithSql(capture, Sql);
+                var columns = CallOf(capture, Columns);
+                var rows = columns["answer"]!["rows"]!.AsArray();
+                var sys = rows.Single(static row => row!["sourceSchema"]?.GetValue<string>() == "sys")!.AsObject();
+                var hidden = rows.Single(static row => row!["isHidden"]!.GetValue<bool>())!.AsObject();
+                var total = sys.DeepClone().AsObject();
+                total["columnOrdinal"] = 1;
+                total["name"] = "top_id";
+                total["isNullable"] = true;
+                foreach (var member in SourceMembers)
+                {
+                    total[member] = null;
+                }
+
+                var operand = sys.DeepClone().AsObject();
+                operand["columnOrdinal"] = 1;
+                operand["name"] = "1";
+                var hiddenOfColumns = hidden.DeepClone().AsObject();
+                hiddenOfColumns["columnOrdinal"] = 2;
+                var hiddenOfOperands = hidden.DeepClone().AsObject();
+                hiddenOfOperands["columnOrdinal"] = 2;
+                columns["answer"]!["rows"] = new JsonArray(total, hiddenOfColumns);
+
+                var operands = new JsonObject
+                {
+                    ["method"] = SqlServerCallNames.Operands,
+                    ["request"] = new JsonObject
+                    {
+                        ["sql"] = "SELECT d.database_id\nAS [1]\nFROM master.sys.databases AS d",
+                        ["params"] = null,
+                    },
+                    ["answer"] = Answer(
+                        ("rows", new JsonArray(operand, hiddenOfOperands)),
+                        ("errors", null),
+                        ("error", null)
+                    ),
+                };
+                capture["calls"]!.AsArray().Add(operands);
+            },
+            query => WithBody(query, Sql)
+        );
+    }
+
+    // The three parts of "<schema>.<table>.<column>".
+    private static (string Schema, string Table, string Column) SourceOf(string source)
+    {
+        var parts = source.Split('.');
+        return (parts[0], parts[1], parts[2]);
+    }
+
+    // Every request's sql written as the SQL given.
+    private static void WithSql(JsonObject capture, string sql)
+    {
+        foreach (var call in capture["calls"]!.AsArray().Select(static call => call!.AsObject()))
+        {
+            if (call["request"]!["sql"] is not null)
+            {
+                call["request"]!["sql"] = sql;
+            }
+        }
+    }
+
+    // The query file's first line, its marker of the query's name, over the SQL given.
+    private static string WithBody(string query, string sql) =>
+        query[..(query.IndexOf('\n', StringComparison.Ordinal) + 1)] + sql + "\n";
+
+    // The source members of the rows of the server's own relations in the raw bundle: what the renaming keeps of
+    // them, found from the server's sources alone and never from a row's name, which may be the user's alias.
+    private static HashSet<string> SourcesOfServersRows(Bundle raw)
+    {
+        var kept = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var call in Parse(raw.Capture)["calls"]!.AsArray())
+        {
+            if (call!["answer"]!["rows"] is not JsonArray rows || call["method"]!.GetValue<string>() == "parameters")
+            {
+                continue;
+            }
+
+            foreach (var row in rows.Select(static row => row!.AsObject()))
+            {
+                var schema = row["sourceSchema"]?.GetValue<string>().ToUpperInvariant();
+                var database = row["sourceDatabase"]?.GetValue<string>().ToUpperInvariant();
+                if (schema is "SYS" or "INFORMATION_SCHEMA" || database == "MSSQLSYSTEMRESOURCE")
+                {
+                    kept.UnionWith(SourceMembers.Select(member => row[member]?.GetValue<string>()).OfType<string>());
+                }
+            }
+        }
+
+        return kept;
+    }
+
+    private static FixtureCase FixtureOf(string name) => FixtureCases.Of(Engine).Single(found => found.Name == name);
+
+    private static Task<string> SchemaAsync() =>
+        File.ReadAllTextAsync(
+            Path.Combine(FixtureCases.Root, Engine, "schema.sql"),
+            TestContext.Current.CancellationToken
+        );
 
     // Every database member of the node and its children, "database" of open and "sourceDatabase" of a row, that
     // names the database given, named as the other.

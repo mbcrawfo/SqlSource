@@ -128,6 +128,55 @@ public sealed class SqlServerRenamingTests
         Engine.IsEngineRow(method, "answer.rows[]", row).ShouldBeTrue();
     }
 
+    // A column of the server's under its own name, folded, with or without a nullability mark, under the tool's AS [n],
+    // or under no name.
+    [Theory]
+    [InlineData("database_id", "database_id")]
+    [InlineData("DATABASE_ID", "database_id")]
+    [InlineData("database_id!", "database_id")]
+    [InlineData("database_id?", "database_id")]
+    [InlineData("1", "database_id")]
+    [InlineData("12", "database_id")]
+    [InlineData(null, "database_id")]
+    public void IsEngineRow_AColumnOfTheServersUnderItsOwnName_IsTrue(string? name, string column)
+    {
+        var row = new JsonObject
+        {
+            ["name"] = name,
+            ["sourceDatabase"] = "mssqlsystemresource",
+            ["sourceSchema"] = "sys",
+            ["sourceTable"] = "databases",
+            ["sourceColumn"] = column,
+        };
+        Engine.IsEngineRow("columns", "answer.rows[]", row).ShouldBeTrue();
+        Engine.IsEngineRow("operands", "answer.rows[]", row).ShouldBeTrue();
+    }
+
+    // A column of the server's under an alias is the user's: the alias is the user's name, which the renaming would
+    // keep with the row's other names.
+    [Theory]
+    [InlineData("acme_payroll_db", "database_id")]
+    [InlineData("Acme Payroll", "database_id")]
+    [InlineData("acme_payroll_db!", "database_id")]
+    [InlineData("database_id_", "database_id")]
+    [InlineData("database_id!!", "database_id")]
+    [InlineData("!", "database_id")]
+    [InlineData("1a", "database_id")]
+    [InlineData("١", "database_id")]
+    [InlineData("database_id", null)]
+    [InlineData("secret_alias", "COLUMN_NAME")]
+    public void IsEngineRow_AColumnOfTheServersUnderAnAlias_IsFalse(string name, string? column)
+    {
+        var row = new JsonObject
+        {
+            ["name"] = name,
+            ["sourceDatabase"] = "mssqlsystemresource",
+            ["sourceSchema"] = column == "COLUMN_NAME" ? "INFORMATION_SCHEMA" : "sys",
+            ["sourceColumn"] = column,
+        };
+        Engine.IsEngineRow("columns", "answer.rows[]", row).ShouldBeFalse(name);
+    }
+
     // A user's tables can be in a system database, as they are when a connection string names master, so a row's
     // database alone does not make it the engine's.
     [Theory]

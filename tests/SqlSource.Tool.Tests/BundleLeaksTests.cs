@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Shouldly;
 using SqlSource.Settings;
@@ -106,6 +107,28 @@ public sealed class BundleLeaksTests
         names.ShouldContain("database_id");
         names.ShouldNotContain("sysjobs");
         names.ShouldNotContain("JobsAndDatabases");
+    }
+
+    // A row whose name is an alias of the user's is no row of the engine's, so none of its names is kept.
+    [Fact]
+    public void EngineRowNames_OfAnAliasOfAColumnOfSys_LeaveOutItsRow()
+    {
+        var raw = RawOf("select-other-database");
+        raw = raw with
+        {
+            Capture = raw.Capture.Replace(
+                "\"name\": \"database_id\"",
+                "\"name\": \"acme_payroll_db\"",
+                StringComparison.Ordinal
+            ),
+        };
+
+        var names = BundleLeaks.EngineRowNames(raw, Part);
+
+        raw.Capture.ShouldContain("acme_payroll_db");
+        names.ShouldNotContain("acme_payroll_db");
+        names.ShouldNotContain("database_id");
+        names.ShouldNotContain("databases");
     }
 
     [Fact]
