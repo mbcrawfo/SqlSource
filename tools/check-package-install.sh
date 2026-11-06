@@ -9,7 +9,8 @@
 # NuGet imports buildMultiTargeting/SqlSource.targets only for a package reference, so no other test reaches it.
 # Last, installs the packed tool of the same version into a project of one query, with a tool manifest, and builds it
 # under each value of SqlSourceOnline, with no database: the packed package starts the packed tool, and the build
-# shows what the tool printed, its summary, its offline line and its errors.
+# shows what the tool printed, its summary, its offline line and its errors.  It then replays a committed bug-report
+# bundle with the packed tool, which needs no database, and checks that the pipeline reproduces the bundle's answer.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
 # own build applies to it, and it restores from the folder that holds the packages and from nowhere else.
 # Usage: check-package-install.sh [directory]   The directory holds one SqlSource.<version>.nupkg and one
@@ -30,6 +31,9 @@ REMOVED='Queries/ByProject.sql'
 REMOVED_MEMBER='ByProject'
 # The query that the last project copies, with its sidecar beside it: GetUser, of the database postgres.
 ONLINE_QUERY='examples/PostgresExamples/Models/Users.sql'
+# The bundle that the packed tool replays: a folder of the fixtures of the tool's tests, as a user's unzipped one is.
+REPLAYED_BUNDLE='tests/SqlSource.Tool.Tests/Fixtures/Bundles/postgres/select-left-join'
+REPLAY_OUTCOME='sqlsource: reproduced: the pipeline gives this answer'
 
 if [[ $# -gt 1 ]]; then
     echo 'Usage: check-package-install.sh [directory]' >&2
@@ -448,10 +452,20 @@ if ! grep -q 'Users\.sql([0-9]*,[0-9]*): error SQLSRC213: .*; see: https://' "$w
     online_fails 'did not show the error SQLSRC213 of the tool on one line under true' "$work/online-true.log"
 fi
 
+# replay runs the bundle with no database, no project and no MSBuild, and a bundle whose answer the pipeline gives
+# again exits with 0 after the line that says so.
+code=0
+dotnet sqlsource replay "$repo_root/$REPLAYED_BUNDLE" >"$work/online-replay.log" 2>&1 || code=$?
+if [[ "$code" -ne 0 ]] || ! grep -q -x -F "$REPLAY_OUTCOME" "$work/online-replay.log"; then
+    online_fails "exited with $code from dotnet sqlsource replay $REPLAYED_BUNDLE, not with 0 and '$REPLAY_OUTCOME'" \
+        "$work/online-replay.log"
+fi
+
 echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED,"
 echo "check-package-install: which has SqlSourceImported and writes its project manifest,"
 echo "check-package-install: and whose next build compiles again after a .sql file is removed,"
 echo "check-package-install: and into a web project, whose build and publish copy no .sql, sidecar or settings file,"
 echo "check-package-install: and into a project of two target frameworks, whose outer build runs the tool once,"
 echo "check-package-install: and runs the packed tool through the build of a project," \
-    'under each value of SqlSourceOnline'
+    'under each value of SqlSourceOnline,'
+echo "check-package-install: and replays a bug-report bundle with it: $REPLAY_OUTCOME"
