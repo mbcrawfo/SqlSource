@@ -113,27 +113,30 @@ public sealed class PostgresPlanRenamerTests
             .ShouldBe(["f_my_total(a_x.a_amount)", "count(*)", "\"f_My Fn\"(a_x.a_amount)"]);
     }
 
-    [Fact]
-    public void Rename_CteSubplanName_KeepsCte()
+    [Theory]
+    [InlineData("recent")]
+    [InlineData("Recent")]
+    [InlineData("recent orders")]
+    public void Rename_CteSubplanName_KeepsCte(string cte)
     {
         var node = new JsonObject
         {
             ["Node Type"] = "CTE Scan",
-            ["CTE Name"] = "recent",
+            ["CTE Name"] = cte,
             ["Plans"] = new JsonArray(
                 new JsonObject
                 {
                     ["Node Type"] = "Seq Scan",
                     ["Parent Relationship"] = "InitPlan",
-                    ["Subplan Name"] = "CTE recent",
+                    ["Subplan Name"] = "CTE " + cte,
                 }
             ),
         };
 
         var root = Root(Rename(node));
 
-        Text(root["CTE Name"]).ShouldBe("a_recent");
-        Text(root["Plans"]![0]!["Subplan Name"]).ShouldBe("CTE a_recent");
+        Text(root["Plans"]![0]!["Subplan Name"]).ShouldBe("CTE " + Text(root["CTE Name"]));
+        Text(root["CTE Name"]).ShouldNotBe(cte);
     }
 
     [Fact]
