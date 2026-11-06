@@ -48,6 +48,17 @@ public sealed class SqlListUsesTests
     [InlineData("postgres", "WHERE x IS DISTINCT FROM y AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
     [InlineData("postgres", "WHERE left(a, 1) = 'x' AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
     [InlineData("postgres", "JOIN t ON (t.id IN @ids) = false JOIN u ON true", new[] { "NegatedList" })]
+    // A comma inside brackets, the GROUP of WITHIN GROUP and a name after "." end no condition.
+    [InlineData("postgres", "WHERE a && ARRAY[1, 2] AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE a[1:2] = ARRAY[3, 4] AND (id IN @ids) = false", new[] { "NegatedList" })]
+    [InlineData(
+        "postgres",
+        "SELECT a FROM t HAVING percentile_cont(0.5) WITHIN GROUP (ORDER BY a) > 0 AND (id IN @ids) IS FALSE",
+        new[] { "NegatedList" }
+    )]
+    [InlineData("postgres", "WHERE t.set = 1 AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE t.by = 1 AND t.output = 2 AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT a FROM t GROUP BY a HAVING (a IN @ids) IS FALSE", new[] { "NegatedList" })]
     // A value inside a subquery or a WITH query may reach a filter of the query around it.
     [InlineData("postgres", "WITH s AS (SELECT id IN @ids AS f FROM t) SELECT f FROM s", new[] { "NegatedList" })]
     [InlineData("postgres", "SELECT f FROM (SELECT id IN @ids AS f FROM t) s", new[] { "NegatedList" })]
@@ -72,6 +83,16 @@ public sealed class SqlListUsesTests
     [InlineData("postgres", "SELECT (id IN @ids) = false AS f", new[] { "List" })]
     [InlineData("postgres", "SELECT a FROM t ORDER BY id IN @ids DESC", new[] { "List" })]
     [InlineData("postgres", "SELECT a FROM t GROUP BY id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t GROUP BY a HAVING a IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE ARRAY[1, 2] && a AND id IN @ids", new[] { "List" })]
+    // A call, a CASE or a bracket inside the outermost output is output too, but a subquery's own output is not.
+    [InlineData("postgres", "SELECT coalesce(id IN @ids, false) FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT coalesce(false, id IN @ids) FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT CASE (id IN @ids) WHEN true THEN 1 END", new[] { "List" })]
+    [InlineData("postgres", "SELECT ARRAY[1, (id IN @ids)::int]", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t ORDER BY coalesce(id IN @ids, false)", new[] { "List" })]
+    [InlineData("postgres", "SELECT f((SELECT t.id IN @ids FROM t))", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT count(*) FILTER (WHERE (id IN @ids) IS FALSE) FROM t", new[] { "NegatedList" })]
     [InlineData("postgres", "SELECT a WHERE b UNION SELECT id IN @ids", new[] { "List" })]
     [InlineData("postgres", "UPDATE t SET f = id IN @ids WHERE a = 1", new[] { "List" })]
     [InlineData("postgres", "DELETE FROM t WHERE a = 1 RETURNING id IN @ids", new[] { "List" })]

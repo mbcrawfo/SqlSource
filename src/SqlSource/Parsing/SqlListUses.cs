@@ -53,6 +53,12 @@ internal static partial class SqlListUses
         // ")".
         Close,
 
+        // "[".
+        OpenBracket,
+
+        // "]".
+        CloseBracket,
+
         // ",".
         Comma,
 
@@ -174,6 +180,14 @@ internal static partial class SqlListUses
             else if (item == Item.Operator)
             {
                 conditions.Operator(cursor);
+            }
+            else if (item == Item.OpenBracket)
+            {
+                conditions.OpenBracket();
+            }
+            else if (item == Item.CloseBracket)
+            {
+                conditions.CloseBracket();
             }
             else if (item == Item.Other)
             {
@@ -309,6 +323,8 @@ internal static partial class SqlListUses
                         '(' => Item.Open,
                         ')' => Item.Close,
                         ',' => Item.Comma,
+                        '[' => Item.OpenBracket,
+                        ']' => Item.CloseBracket,
                         _ => Item.Other,
                     };
                 }

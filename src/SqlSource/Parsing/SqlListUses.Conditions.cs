@@ -5,11 +5,27 @@ namespace SqlSource.Parsing;
 
 internal static partial class SqlListUses
 {
+    // What opened a frame.
+    private enum FrameKind
+    {
+        // The outermost level, which no item opens.
+        Outermost,
+
+        // "(".
+        Parenthesis,
+
+        // "[", of an array or a subscript.
+        Bracket,
+
+        // CASE, which END closes.
+        Case,
+    }
+
     // What the operands of a frame stand in.
     private enum Context
     {
         // The output of the outermost statement: its SELECT list, ORDER BY, GROUP BY, RETURNING or SET, whose values
-        // reach no filter.
+        // reach no filter, and any call, CASE or bracket inside it.
         Output,
 
         // A condition of WHERE, ON, HAVING or WHEN, which FALSE and NULL fail alike.
@@ -29,7 +45,7 @@ internal static partial class SqlListUses
     /// is used as a value is <see cref="SqlParameterUse.NegatedList" />, as one a <c>NOT</c> negates is.
     /// </summary>
     /// <remarks>
-    /// A frame is opened at each <c>(</c> and each <c>CASE</c>.  A list is a condition when it is reached from
+    /// A frame is opened at each <c>(</c>, <c>[</c> and <c>CASE</c>.  A list is a condition when it is reached from
     /// <c>WHERE</c>, <c>ON</c>, <c>HAVING</c> or <c>WHEN</c> through <c>AND</c>, <c>OR</c> and parentheses alone, with
     /// no comparison, test, operator or other word in its operand, or when it stands in the outermost statement's
     /// output.  Any other list is a value.  The reading never misses a list that the planner can read as strict, and
@@ -38,7 +54,7 @@ internal static partial class SqlListUses
     private sealed class Conditions(ImmutableArray<SqlParameterUse>.Builder uses)
     {
         // Words that end an operand and the condition it is in: what follows is output at the outermost level, and a
-        // value in a frame.
+        // value in a frame.  A word after "." is a name, never one of these.
         private static readonly string[] Clauses =
         [
             "SELECT",
@@ -67,12 +83,13 @@ internal static partial class SqlListUses
             "OUTER",
             "LATERAL",
             "INTO",
-            "OUTPUT",
-            "OPTION",
             "UPDATE",
             "DELETE",
             "INSERT",
         ];
+
+        // Words that end an operand where no CASE is open: THEN and ELSE of a MERGE, and the END of a block.
+        private static readonly string[] Ends = ["THEN", "ELSE", "END"];
 
         // Words that test or compare the value before them, so that a list beside one is a value.
         private static readonly string[] Tests =
@@ -110,26 +127,52 @@ internal static partial class SqlListUses
         private static readonly string[] Comparisons = ["=", "<", ">", "<=", ">=", "<>", "!=", "!<", "!>"];
 
         // The open frames, the outermost first.  It is never empty.
-        private readonly List<Frame> _frames = [new Frame(Context.Output, isCase: false)];
+        private readonly List<Frame> _frames = [new Frame(FrameKind.Outermost, Context.Output, inOutput: true)];
 
         // Whether a "(" now is a parenthesis of its own, by the item before it.
         private bool _groupFollows = true;
 
-        // Whether the word before is DISTINCT, after which FROM is that of IS DISTINCT FROM.
-        private bool _afterDistinct;
+        // What the item before was, where a word reads by it.
+        private Before _before;
+
+        // The items before a word that change what it is.
+        private enum Before
+        {
+            Other,
+
+            // DISTINCT, after which FROM is that of IS DISTINCT FROM.
+            Distinct,
+
+            // WITHIN, after which GROUP is that of WITHIN GROUP.
+            Within,
+
+            // ".", after which a word is a name.
+            Dot,
+        }
 
         private Frame Top => _frames[_frames.Count - 1];
-
-        private bool IsOutermost => _frames.Count == 1;
 
         // A word.  The cursor is a copy, so it may look at the item after the word.
         public void Word(Cursor cursor)
         {
-            var afterDistinct = _afterDistinct;
-            _afterDistinct = cursor.IsWord("DISTINCT");
-            _groupFollows = cursor.IsAnyWord(BeforeGroup);
+            var before = _before;
+            _before = Before.Other;
+            if (cursor.IsWord("DISTINCT"))
+            {
+                _before = Before.Distinct;
+            }
+            else if (cursor.IsWord("WITHIN"))
+            {
+                _before = Before.Within;
+            }
+
+            _groupFollows = before != Before.Dot && cursor.IsAnyWord(BeforeGroup);
             var top = Top;
-            if (cursor.IsWord(And) || cursor.IsWord(Or))
+            if (before == Before.Dot)
+            {
+                MakeUnclean(top);
+            }
+            else if (cursor.IsWord(And) || cursor.IsWord(Or))
             {
                 EndOperand(top);
             }
@@ -138,24 +181,28 @@ internal static partial class SqlListUses
                 EndOperand(top);
                 top.Context = Context.Filter;
             }
-            else if (cursor.IsWord("THEN") || cursor.IsWord("ELSE"))
+            else if ((cursor.IsWord("THEN") || cursor.IsWord("ELSE")) && top.Kind == FrameKind.Case)
             {
                 EndOperand(top);
-                top.Context = top.IsCase ? Context.Group : AfterClause();
+                top.Context = Context.Group;
             }
             else if (cursor.IsWord("CASE"))
             {
-                MakeUnclean(top);
-                _frames.Add(new Frame(Context.Value, isCase: true));
+                Push(FrameKind.Case, Context.Value);
             }
-            else if (cursor.IsWord("END") && top.IsCase)
+            else if (cursor.IsWord("END") && top.Kind == FrameKind.Case)
             {
                 Pop();
             }
-            else if (cursor.IsWord("END") || IsClause(cursor, afterDistinct))
+            else if (cursor.IsAnyWord(Ends) || IsClause(cursor, before))
             {
                 EndOperand(top);
-                top.Context = AfterClause();
+                if (top.Kind != FrameKind.Outermost)
+                {
+                    top.InOutput = false;
+                }
+
+                top.Context = AfterClause(top);
             }
             else if (cursor.IsAnyWord(Tests))
             {
@@ -169,48 +216,35 @@ internal static partial class SqlListUses
 
         public void Open()
         {
-            var top = Top;
-            MakeUnclean(top);
-            _frames.Add(new Frame(_groupFollows ? Context.Group : Context.Value, isCase: false));
+            Push(FrameKind.Parenthesis, _groupFollows ? Context.Group : Context.Value);
             _groupFollows = true;
-            _afterDistinct = false;
         }
 
-        // A ")" closes the frames down to the nearest "(", one that closes nothing is passed over.
-        public void Close()
+        public void OpenBracket()
         {
-            _afterDistinct = false;
-            _groupFollows = false;
-            var index = _frames.Count - 1;
-            while (index > 0 && _frames[index].IsCase)
-            {
-                index--;
-            }
-
-            if (index == 0)
-            {
-                return;
-            }
-
-            while (_frames.Count > index)
-            {
-                Pop();
-            }
+            Push(FrameKind.Bracket, Context.Value);
+            _groupFollows = true;
         }
+
+        // A ")" closes the frames down to the nearest "(", and one that closes nothing is passed over.
+        public void Close() => CloseTo(FrameKind.Parenthesis);
+
+        // A "]" closes the frames down to the nearest "[", and one that closes nothing is passed over.
+        public void CloseBracket() => CloseTo(FrameKind.Bracket);
 
         public void Comma()
         {
-            _afterDistinct = false;
+            _before = Before.Other;
             _groupFollows = true;
             var top = Top;
             EndOperand(top);
-            top.Context = AfterClause();
+            top.Context = AfterClause(top);
         }
 
         // A run of operator characters.
         public void Operator(Cursor cursor)
         {
-            _afterDistinct = false;
+            _before = Before.Other;
             _groupFollows = true;
             var top = Top;
             if (cursor.IsAnyWord(Comparisons))
@@ -227,7 +261,7 @@ internal static partial class SqlListUses
         // statement.
         public void Other(Cursor cursor)
         {
-            _afterDistinct = false;
+            _before = cursor.IsWord(".") ? Before.Dot : Before.Other;
             _groupFollows = true;
             if (cursor.IsWord(";"))
             {
@@ -241,7 +275,7 @@ internal static partial class SqlListUses
         // A parameter, and the use read of it so far: a list that no NOT negates waits for its operand to end.
         public void Parameter(int index, SqlParameterUse use)
         {
-            _afterDistinct = false;
+            _before = Before.Other;
             _groupFollows = false;
             var top = Top;
             if (use == SqlParameterUse.List)
@@ -265,19 +299,22 @@ internal static partial class SqlListUses
             EndOperand(top);
             top.Context = Context.Output;
             _groupFollows = true;
-            _afterDistinct = false;
+            _before = Before.Other;
         }
 
-        // A clause word, but for LEFT and RIGHT, which are clauses only when no "(" makes them calls, and FROM after
-        // DISTINCT.
-        private static bool IsClause(Cursor cursor, bool afterDistinct)
+        // A clause word, but for LEFT and RIGHT, which are clauses only when no "(" makes them calls, FROM after
+        // DISTINCT and GROUP after WITHIN.
+        private static bool IsClause(Cursor cursor, Before before)
         {
             if (cursor.IsWord("LEFT") || cursor.IsWord("RIGHT"))
             {
                 return cursor.Next() != Item.Open;
             }
 
-            if (cursor.IsWord("FROM") && afterDistinct)
+            if (
+                (cursor.IsWord("FROM") && before == Before.Distinct)
+                || (cursor.IsWord("GROUP") && before == Before.Within)
+            )
             {
                 return false;
             }
@@ -285,7 +322,39 @@ internal static partial class SqlListUses
             return cursor.IsAnyWord(Clauses);
         }
 
-        private Context AfterClause() => IsOutermost ? Context.Output : Context.Value;
+        // A frame opened inside the output of the outermost statement is output too, until a clause word in it, a
+        // subquery's SELECT, makes it a value.
+        private void Push(FrameKind kind, Context context)
+        {
+            var top = Top;
+            MakeUnclean(top);
+            var inOutput = top.Context == Context.Output;
+            _frames.Add(new Frame(kind, inOutput ? Context.Output : context, inOutput));
+            _before = Before.Other;
+        }
+
+        private void CloseTo(FrameKind kind)
+        {
+            _before = Before.Other;
+            _groupFollows = false;
+            var index = _frames.Count - 1;
+            while (index > 0 && _frames[index].Kind != kind)
+            {
+                index--;
+            }
+
+            if (index == 0)
+            {
+                return;
+            }
+
+            while (_frames.Count > index)
+            {
+                Pop();
+            }
+        }
+
+        private static Context AfterClause(Frame frame) => frame.InOutput ? Context.Output : Context.Value;
 
         // Anything after a list's parameter applies to its truth, so it makes the operand of a list a value.
         private static void MakeUnclean(Frame frame)
@@ -331,11 +400,14 @@ internal static partial class SqlListUses
             frame.Clean = true;
         }
 
-        private sealed class Frame(Context context, bool isCase)
+        private sealed class Frame(FrameKind kind, Context context, bool inOutput)
         {
+            public FrameKind Kind { get; } = kind;
+
             public Context Context { get; set; } = context;
 
-            public bool IsCase { get; } = isCase;
+            // Whether the frame stands in the output of the outermost statement, where a comma keeps it output.
+            public bool InOutput { get; set; } = inOutput;
 
             // Whether no comparison, test or other item has met the operand, so far.
             public bool Clean { get; set; } = true;
