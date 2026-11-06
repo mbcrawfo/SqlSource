@@ -48,6 +48,23 @@ internal static class FixtureReplay
         IDescribeExchange exchange
     )
     {
+        var described = await DescribeOrRefuseThroughAsync(fixture, describer, connection, exchange);
+        return described.Succeeded
+            ? described.Value
+            : throw new InvalidOperationException(
+                $"The query of the case {fixture} was not described: {described.Failure.Descriptor.Id}."
+            );
+    }
+
+    // The same steps, with the failure of a query the describer refuses given and not thrown, as diagnose makes a
+    // bundle of a failure.  A session that does not open still throws.
+    public static async Task<Outcome<string, DescribeFailure>> DescribeOrRefuseThroughAsync(
+        FixtureCase fixture,
+        Func<FixtureCase, IQueryDescriber> describer,
+        string connection,
+        IDescribeExchange exchange
+    )
+    {
         var token = TestContext.Current.CancellationToken;
         var (planned, dialect) = Plan(fixture, token);
         var query = planned.Query;
@@ -67,16 +84,16 @@ internal static class FixtureReplay
                 new DescribeRequest(query.Name, SampleSql.Build(query, dialect), query.Parameters),
                 token
             );
-            if (described.Value is not { } description)
+            if (!described.Succeeded)
             {
-                throw new InvalidOperationException(
-                    $"The query of the case {fixture} was not described: {described.Failure?.Descriptor.Id}."
-                );
+                return Outcome<string, DescribeFailure>.Failed(described.Failure);
             }
 
-            var entry = EntryBuilder.Build(planned, dialect, database, session.Server, description);
-            return SidecarWriter.Write(
-                new Sidecar(SidecarFormat.Version, ToolVersion, new EquatableArray<SidecarEntry>([entry]))
+            var entry = EntryBuilder.Build(planned, dialect, database, session.Server, described.Value);
+            return Outcome<string, DescribeFailure>.Of(
+                SidecarWriter.Write(
+                    new Sidecar(SidecarFormat.Version, ToolVersion, new EquatableArray<SidecarEntry>([entry]))
+                )
             );
         }
     }

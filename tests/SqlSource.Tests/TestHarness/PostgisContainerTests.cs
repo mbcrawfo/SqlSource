@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using Xunit;
 
 namespace SqlSource.Tests.TestHarness;

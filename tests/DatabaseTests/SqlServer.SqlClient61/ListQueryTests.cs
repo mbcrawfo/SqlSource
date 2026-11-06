@@ -128,7 +128,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     // An empty list is sent as a subquery, which SQL Server refuses inside an aggregate: Msg 130, a known issue of the
-    // manual's sqlserver.md (TD-0103).
+    // manual's sqlserver.md (TD-0106).
     [Fact]
     public async Task CountStatuses_Empty_IsRefusedByTheServer()
     {

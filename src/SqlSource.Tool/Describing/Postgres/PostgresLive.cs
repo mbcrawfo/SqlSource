@@ -51,7 +51,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string StatementModeRefusal = "transaction blocks not allowed in statement pooling mode";
 
     // The settings of a session that change a description, in the order "open" answers them.
-    private static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
+    public static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
 
     // The server's version, then each setting of SettingNames in its order.
     private static readonly string OpenSql =

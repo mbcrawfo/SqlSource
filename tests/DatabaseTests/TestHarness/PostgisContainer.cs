@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
+using SqlSource.Repository;
 using SqlSource.Testing;
 
 namespace SqlSource.DatabaseTests.TestHarness;

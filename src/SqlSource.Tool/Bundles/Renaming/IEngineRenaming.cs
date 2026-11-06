@@ -62,9 +62,10 @@ internal interface IEngineRenaming
 
     /// <summary>
     /// Whether a row of an answer is the engine's own, whose names are kept: a type or relation of
-    /// <c>pg_catalog</c> or <c>information_schema</c>, a row of <c>sys</c> or of a system database.  The renaming asks
-    /// before it renames the row's names, and keeps every name of a row this says is the engine's, which the token
-    /// check then trusts wherever it is spelled.  It decides by the row alone and changes nothing.
+    /// <c>pg_catalog</c> or <c>information_schema</c>, a row of <c>sys</c>, <c>INFORMATION_SCHEMA</c> or SQL Server's
+    /// system resource.  The renaming asks before it renames the row's names, and keeps every name of a row this says
+    /// is the engine's, which the token check then trusts wherever it is spelled.  It decides by the row alone and
+    /// changes nothing.
     /// </summary>
     /// <param name="method">The call's method.</param>
     /// <param name="path">The path of the row from the call, such as <c>answer.rows[]</c>.</param>

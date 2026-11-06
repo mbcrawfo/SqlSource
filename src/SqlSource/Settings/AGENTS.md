@@ -14,7 +14,7 @@ Plain data and the readers of values.  See [settings](../../../docs/architecture
 ## Documenting a setting
 
 - **A setting a user can write is documented in `docs/manual/settings.md` alone**: a row of its table with every place it can be written and its status, and a section anchored `setting-<name>`.  A new marker also gets a row in the marker index of `docs/manual/sql-files.md`.
-- **A new generator parameter gets its name in each of these places.**  In `settings.md`, the Values cell of the Generator parameters row and the table under `#setting-generator-parameters`.  Its built-in default, if it has one, in `GeneratorParameterList.Defaults`.  The section of `SQLSRC109` in `docs/manual/diagnostics.md`, and the list of parameters in `tests/SqlSource.Tests/Diagnostics/DiagnosticsDocumentTests.cs`, which checks the section against that list.  The list and the patterns of `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against `GeneratorParameterList.Names`.
+- **A new generator parameter gets its name in each of these places.**  In `settings.md`, the Values cell of the Generator parameters row and the table under `#setting-generator-parameters`.  Its built-in default, if it has one, in `GeneratorParameterList.Defaults`.  The section of `SQLSRC109` in `docs/manual/diagnostics.md`, and the list of parameters in `tests/SqlSource.Repository.Tests/Diagnostics/DiagnosticsDocumentTests.cs`, which checks the section against that list.  The list and the patterns of `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against `GeneratorParameterList.Names`.
 - **A setting accepted before the change that gives it an effect says so in its status**, and that change flips it.
 
 ## The type override

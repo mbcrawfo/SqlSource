@@ -39,7 +39,7 @@ internal static class PostgresSearchPath
 
     // The schemas of the path in order, each with whether it was quoted, with "" read as one quote.  Null when a quote
     // does not close.
-    private static List<(string Name, bool Quoted)>? Schemas(string searchPath)
+    public static List<(string Name, bool Quoted)>? Schemas(string searchPath)
     {
         var schemas = new List<(string Name, bool Quoted)>();
         var name = new StringBuilder();

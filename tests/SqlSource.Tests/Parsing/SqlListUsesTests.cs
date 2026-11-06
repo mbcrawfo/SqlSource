@@ -28,7 +28,7 @@ public sealed class SqlListUsesTests
     [InlineData("postgres", "id IN @a AND NOT id IN @b", new[] { "List", "NegatedList" })]
     // The NOT of IS NOT tests a value and negates nothing after it.
     [InlineData("postgres", "x IS NOT DISTINCT FROM id IN @ids", new[] { "List" })]
-    // Only a NOT negates: a test of the truth of a list is read as a list (TD-0102).
+    // Only a NOT negates: a test of the truth of a list is read as a list (TD-0105).
     [InlineData("postgres", "(id IN @ids) IS FALSE", new[] { "List" })]
     [InlineData("postgres", "id IN /* c */ @ids", new[] { "List" })]
     [InlineData("postgres", "id IN\n-- c\n@ids", new[] { "List" })]

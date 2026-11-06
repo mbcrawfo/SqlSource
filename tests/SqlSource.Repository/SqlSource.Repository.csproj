@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Where the repository is and which of its files a test project may read.  It references nothing, so that every
+        test project and library can take it, the ones pinned to the oldest Roslyn or driver among them.  A library of
+        the tests, never a test project of its own.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>false</IsTestProject>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="SqlSource.Repository.Tests" />
+    </ItemGroup>
+</Project>

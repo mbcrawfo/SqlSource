@@ -15,7 +15,7 @@ namespace SqlSource.Parsing;
 /// opened inside it, until an <c>AND</c>, an <c>OR</c> or a comma at that depth, or the parenthesis that closes the
 /// depth.  So <c>id NOT IN @ids</c>, <c>NOT id IN @ids</c> and <c>NOT (a AND id IN @ids)</c> negate the list, and
 /// <c>NOT a AND id IN @ids</c> does not.  A list that only a test of its truth negates, <c>(id IN @ids) IS FALSE</c>,
-/// is not read as negated (TD-0102).  Words are runs of the dialect's name characters, so <c>JOIN</c> and T-SQL's
+/// is not read as negated (TD-0105).  Words are runs of the dialect's name characters, so <c>JOIN</c> and T-SQL's
 /// <c>x#IN</c> are not <c>IN</c>, and a quoted region is never a word.  A comment or a hint between two words is passed
 /// over as white space.  <c>position(a IN b)</c> puts a single value after <c>IN</c>, so an <c>IN</c> directly inside
 /// the parentheses of a call to <c>position</c> makes no list.  The uses are read from the lexemes of the file, so

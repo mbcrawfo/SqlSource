@@ -32,6 +32,7 @@
     <ItemGroup>
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
+        <InternalsVisibleTo Include="SqlSource.Repository.Tests" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>
@@ -55,6 +56,13 @@
     </ItemGroup>
     <ItemGroup>
         <None Include="README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+    <ItemGroup>
+        <!-- PostgreSQL's vocabulary for the renaming, made by VocabularyTests of tests/DatabaseTests/Postgres. -->
+        <EmbeddedResource
+            Include="Bundles/Renaming/Postgres/postgres-vocabulary.txt"
+            LogicalName="SqlSource.Tool.Bundles.Renaming.Postgres.postgres-vocabulary.txt"
+        />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../SqlSource/SqlSource.csproj" />

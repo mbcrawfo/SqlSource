@@ -87,7 +87,7 @@
             OutputItemType="Analyzer"
             ReferenceOutputAssembly="false"
         />
-        <ProjectReference Include="../../SqlSource.Testing/SqlSource.Testing.csproj" />
+        <ProjectReference Include="../../SqlSource.Repository/SqlSource.Repository.csproj" />
         <ProjectReference Include="../TestHarness/TestHarness.csproj" />
     </ItemGroup>
     <Import Project="../../../src/SqlSource/build/SqlSource.targets" />
