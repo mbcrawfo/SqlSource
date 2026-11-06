@@ -17,12 +17,13 @@ public sealed partial class SidecarReaderRobustnessTests
     [Fact]
     public void Read_FileWithAMergeConflict_IsInvalidJsonAtTheMarker()
     {
-        const string Line = "  \"toolVersion\": \"0.4.0\",\n";
+        // The file's own version: each entry's has a deeper indent.
+        const string Line = "\n  \"toolVersion\": \"0.4.0\",";
         var text = SidecarExamples
             .Read(SidecarExamples.Users)
             .Replace(
                 Line,
-                "<<<<<<< HEAD\n" + Line + "=======\n  \"toolVersion\": \"0.5.0\",\n>>>>>>> theirs\n",
+                "\n<<<<<<< HEAD" + Line + "\n=======\n  \"toolVersion\": \"0.5.0\",\n>>>>>>> theirs",
                 StringComparison.Ordinal
             );
 

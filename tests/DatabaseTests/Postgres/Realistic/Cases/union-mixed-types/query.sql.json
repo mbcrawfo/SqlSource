@@ -6,8 +6,9 @@
   "queries": {
     "ListItemsNeedingAttention": {
       "hash": "c2b210b830d9733516f6a84c712d367032d1fda1d508c6f41473c506f077fc56",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

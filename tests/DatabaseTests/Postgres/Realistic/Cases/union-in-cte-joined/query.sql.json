@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountActivitySince": {
       "hash": "c4a68267b090f95b0d405dd6eda79019c6f20e7bfb9670e8350bf49bc8cb4b4c",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

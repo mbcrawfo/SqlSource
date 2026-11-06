@@ -1,6 +1,7 @@
 using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Bundles;
 using Xunit;
 
@@ -27,6 +28,15 @@ public sealed class EntryDifferencesTests
 
     [Fact]
     public void Of_SameEntry_IsEmpty() => EntryDifferences.Of(Expected, Expected).ShouldBeEmpty();
+
+    // A bundle is replayed by another version of the tool than the one that made it, and each writes its own.
+    [Fact]
+    public void Of_EntriesOfTwoToolVersions_IsEmpty()
+    {
+        var entry = TestSidecars.Entry("GetUser", toolVersion: "1.4.0");
+
+        EntryDifferences.Of(entry, entry with { ToolVersion = "0.0.1" }).ShouldBeEmpty();
+    }
 
     [Fact]
     public void Of_ColumnNullabilityChanged_NamesItsPath()

@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomerPayments": {
       "hash": "2eb21efc4aaf6f5aa7bc9a4105c7361ca6d4e74969f4acd83434075e6ffe18d8",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

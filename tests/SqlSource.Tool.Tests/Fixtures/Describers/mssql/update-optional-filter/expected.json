@@ -6,8 +6,9 @@
   "queries": {
     "MarkByName": {
       "hash": "0f967b4055af86eb560c390f5948b361dc9705be7db4135332161fdc0319cb49",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [

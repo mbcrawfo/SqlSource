@@ -6,8 +6,9 @@
   "queries": {
     "ImportProducts": {
       "hash": "db781fc799232310aa4b959f8c645ac25ddf4c4505e3ab0e4a68374efb4028ed",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

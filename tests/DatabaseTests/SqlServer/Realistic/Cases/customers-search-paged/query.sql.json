@@ -6,8 +6,9 @@
   "queries": {
     "SearchCustomers": {
       "hash": "8b7fbcfd71557c875374f0f004a639d4711ea3796629d36112485922c770c025",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

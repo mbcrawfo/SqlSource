@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountsByIds": {
       "hash": "ba911f0cc44da9048eb45dd0c91427a066209c9c5451bdb33c045aa7e7c18b63",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -89,8 +90,9 @@
     },
     "ListAccountsExcept": {
       "hash": "181063bd2ffa7e382476b797a32998038f54454f541f517312d3c1547a9eea05",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -172,8 +174,9 @@
     },
     "ListAccountsOptional": {
       "hash": "96466a1f040bff715e96ae7c8d1f0a625a672225f04b65560720d18373e33062",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -255,8 +258,9 @@
     },
     "ListAccountsByIdsAndStatuses": {
       "hash": "10e14c3aeb6d6b1fef136db50488d37f159136fe858d862f4a10174af80781bc",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -350,8 +354,9 @@
     },
     "ListAccountsUsedTwice": {
       "hash": "0c342605315536ff9d863c38c02eec806b29e34d23266876916be113c04bd325",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -433,8 +438,9 @@
     },
     "StreamAccountsByIds": {
       "hash": "ba911f0cc44da9048eb45dd0c91427a066209c9c5451bdb33c045aa7e7c18b63",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -516,8 +522,9 @@
     },
     "ListAccountsByIdsNoPadding": {
       "hash": "ba911f0cc44da9048eb45dd0c91427a066209c9c5451bdb33c045aa7e7c18b63",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -599,8 +606,9 @@
     },
     "CountAccountsWithStatuses": {
       "hash": "8989178c39cfcb4f55e49a5004e6c3a4a8d980d230aa4280d989ee303b754da4",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -640,8 +648,9 @@
     },
     "CountAccountsWithStatusesTestedFirst": {
       "hash": "33ffd3a5cc87c2df7032be21132a9de80b525a6a297137baf71c632241c9c0e1",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

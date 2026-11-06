@@ -104,12 +104,12 @@ internal sealed class SidecarFaker(int seed, bool lenient)
             }
         }
 
-        var version = string.Create(
-            CultureInfo.InvariantCulture,
-            $"{_random.Int(0, 20)}.{_random.Int(0, 20)}.{_random.Int(0, 20)}"
-        );
-        return new Sidecar(SidecarFormat.Version, version, Of(entries.ToArray()));
+        return new Sidecar(SidecarFormat.Version, Version(), Of(entries.ToArray()));
     }
+
+    // A version for the file and one for each entry, drawn apart: after a merge an entry's may be another's.
+    private string Version() =>
+        string.Create(CultureInfo.InvariantCulture, $"{_random.Int(0, 20)}.{_random.Int(0, 20)}.{_random.Int(0, 20)}");
 
     private SidecarEntry Entry(string name)
     {
@@ -130,6 +130,7 @@ internal sealed class SidecarFaker(int seed, bool lenient)
             name,
             default,
             hash,
+            Version(),
             engine,
             database,
             serverVersion,

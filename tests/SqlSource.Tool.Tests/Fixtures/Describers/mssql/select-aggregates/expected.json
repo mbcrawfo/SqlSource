@@ -6,8 +6,9 @@
   "queries": {
     "OrderTotals": {
       "hash": "76773cb3b9f8b6dab4c303998f69796d163e16ee5f4c94a5e0e9752d19674a91",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

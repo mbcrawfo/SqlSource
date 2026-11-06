@@ -6,8 +6,9 @@
   "queries": {
     "GetAccountStatusSummary": {
       "hash": "2f61d0d3bac26577fb383702fa7156ff9b4262e8ab22c07465d41ea3e1898f1a",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

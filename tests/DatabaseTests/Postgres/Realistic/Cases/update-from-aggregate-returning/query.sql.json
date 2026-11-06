@@ -6,8 +6,9 @@
   "queries": {
     "RecalculateInvoicesSince": {
       "hash": "1a52704b34eb4456549519548e8114cd99f43ccd5faf408370e4cac66316f687",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

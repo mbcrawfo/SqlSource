@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomersLastOrderInvoice": {
       "hash": "a53cb127398e7832da55c825beb10b3fa091e1294bf97c3a0dee61274f2cd7d2",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

@@ -6,8 +6,9 @@
   "queries": {
     "InsertJsonValues": {
       "hash": "2344ebda63755c33a5d0a79f278bbbc94f9761625b24d6a99502cbe2de84d68f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -147,8 +148,9 @@
     },
     "GetJsonValues": {
       "hash": "d53d3fe0f71b94dfdda17ac86f059a4a75a684a0aa9c6323d97da40128205791",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -382,8 +384,9 @@
     },
     "GetRequiredJson": {
       "hash": "005fad6147758a6f726cd03d575e73aeedf7a1f887a72b696ea919216ea22a5a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -446,8 +449,9 @@
     },
     "GetPlainMeta": {
       "hash": "d9bef2bc216feed789533f7f1b4953eab63f7bfe538ae0cbc0c8acd633da2181",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

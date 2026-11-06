@@ -84,12 +84,13 @@ public sealed class DescribeCommandTests : IDisposable
         return await run.RunAsync("describe", project);
     }
 
-    // An entry as two runs that describe the same query give it: where its name stands in the text, the version of
-    // the server and the name of the database are left out.
+    // An entry as two runs that describe the same query give it: where its name stands in the text, the versions of
+    // the tool and of the server, and the name of the database are left out.
     private static SidecarEntry Comparable(SidecarEntry entry) =>
         entry with
         {
             NameSpan = default,
+            ToolVersion = "*",
             ServerVersion = "*",
             Database = "*",
         };

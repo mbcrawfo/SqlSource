@@ -6,8 +6,9 @@
   "queries": {
     "OrdersRenamed": {
       "hash": "4f2b1520c72fc0ceff39a2f6846470e6809e7d68319a3656d65e8b02dfce400e",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

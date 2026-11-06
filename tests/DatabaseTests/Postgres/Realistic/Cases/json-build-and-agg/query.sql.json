@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountsWithOrdersAsJson": {
       "hash": "0dea2dfae521e4d0f6c2f44105f516519688e73ed23b5712efa85484aca54296",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

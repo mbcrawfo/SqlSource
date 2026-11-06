@@ -6,8 +6,9 @@
   "queries": {
     "AddUser": {
       "hash": "7c96e9890522492782d9612f7cc993d52924ef79160f18309f4c0fe2ea286bba",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [

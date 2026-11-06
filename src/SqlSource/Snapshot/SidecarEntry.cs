@@ -12,6 +12,10 @@ namespace SqlSource.Snapshot;
 /// writer does not read it.
 /// </param>
 /// <param name="Hash">The hash of the query that was described.</param>
+/// <param name="ToolVersion">
+/// The version of the tool that described the query, as <c>major.minor.patch</c>.  The file's version is that of its
+/// last write, and a git merge can put beside it an entry that another version wrote.
+/// </param>
 /// <param name="Engine">The canonical name of the engine, which picks the shape of every type in the entry.</param>
 /// <param name="Database">The logical name of the database the query was described against.</param>
 /// <param name="ServerVersion">The server's version.  Informational.</param>
@@ -25,6 +29,7 @@ internal sealed record SidecarEntry(
     string Name,
     TextSpan NameSpan,
     string Hash,
+    string ToolVersion,
     string Engine,
     string? Database,
     string? ServerVersion,
@@ -37,9 +42,12 @@ internal sealed record SidecarEntry(
 )
 {
     /// <summary>
-    /// Whether the entry describes the query with this hash against this database.  The name of a database is
-    /// compared ignoring case: two names that differ only in case read one connection variable.
+    /// Whether the entry describes the query with this hash against this database, and the tool of
+    /// <paramref name="toolVersion" /> described it: an entry from another tool is never kept.  The name of a
+    /// database is compared ignoring case: two names that differ only in case read one connection variable.
     /// </summary>
-    public bool IsCurrentFor(string hash, string database) =>
-        string.Equals(Hash, hash, StringComparison.Ordinal) && DatabaseName.Comparer.Equals(Database, database);
+    public bool IsCurrentFor(string hash, string database, string toolVersion) =>
+        string.Equals(Hash, hash, StringComparison.Ordinal)
+        && DatabaseName.Comparer.Equals(Database, database)
+        && string.Equals(ToolVersion, toolVersion, StringComparison.Ordinal);
 }

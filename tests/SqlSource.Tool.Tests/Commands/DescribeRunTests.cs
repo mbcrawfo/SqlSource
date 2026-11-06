@@ -138,9 +138,64 @@ public sealed class DescribeRunTests : IDisposable
         (await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(written);
     }
 
+    // An older tool wrote the file and each of its entries.
     [Fact]
     public Task Run_SidecarOfAnotherToolVersion_IsWrittenAgainWithEveryQueryDescribed() =>
-        ShouldBeWrittenAgainAsync((_, sidecar) => SidecarWriter.Write(sidecar with { ToolVersion = "0.0.1" }));
+        ShouldBeWrittenAgainAsync(
+            (_, sidecar) =>
+                SidecarWriter.Write(
+                    sidecar with
+                    {
+                        ToolVersion = "0.0.1",
+                        Queries = new EquatableArray<SidecarEntry>([
+                            .. sidecar.Queries.Select(entry => entry with { ToolVersion = "0.0.1" }),
+                        ]),
+                    }
+                )
+        );
+
+    // What a git merge can leave: a file of this tool that holds one entry of an older one.
+    [Fact]
+    public async Task Run_OneEntryOfAnotherToolVersion_IsDescribedAloneAndTheFileWrittenAgain()
+    {
+        _ = await _scene.DescribeAsync();
+        var written = await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken);
+        var sidecar = SidecarFiles.Read(_users);
+        var merged = sidecar with
+        {
+            Queries = new EquatableArray<SidecarEntry>([
+                sidecar.Queries[0],
+                sidecar.Queries[1] with
+                {
+                    ToolVersion = "0.0.1",
+                },
+            ]),
+        };
+        await File.WriteAllTextAsync(Sidecar, SidecarWriter.Write(merged), TestContext.Current.CancellationToken);
+        _scene.Describer.Described.Clear();
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(new CliResult(0, "postgres (postgres): 1 described, 1 skipped, 0 failed\n", ""));
+        _scene.Describer.Described.Select(request => request.Name).ShouldBe(["ListUsers"]);
+        (await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(written);
+        SidecarFiles.Read(_users).Queries.ShouldAllBe(entry => entry.ToolVersion == PackageVersion.Prefix);
+    }
+
+    // The file's own version is that of its last write: its entries are current, and only the file is written.
+    [Fact]
+    public async Task Run_SidecarOfAnotherToolVersionWithCurrentEntries_IsWrittenAgainWithNothingDescribed()
+    {
+        _ = await _scene.DescribeAsync();
+        var written = await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken);
+        var older = SidecarWriter.Write(SidecarFiles.Read(_users) with { ToolVersion = "0.0.1" });
+        await File.WriteAllTextAsync(Sidecar, older, TestContext.Current.CancellationToken);
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(new CliResult(0, "postgres (postgres): 0 described, 2 skipped, 0 failed\n", ""));
+        (await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(written);
+    }
 
     [Fact]
     public Task Run_SidecarOfALowerFormatVersion_IsWrittenAgainWithEveryQueryDescribed() =>
@@ -154,7 +209,7 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_SidecarOfAHigherFormatVersion_IsSqlsrc221AndTheFileIsLeftAlone()
     {
         _ = await _scene.DescribeAsync();
-        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = 2 });
+        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = SidecarFormat.Version + 1 });
         await File.WriteAllTextAsync(Sidecar, newer, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync("--force");

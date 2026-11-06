@@ -6,8 +6,9 @@
   "queries": {
     "ListCategoryTree": {
       "hash": "09f44c5bbf10fb0f716a0fdc0fbd70135222a7b6ed97a69c6afe4a03b54a1edf",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

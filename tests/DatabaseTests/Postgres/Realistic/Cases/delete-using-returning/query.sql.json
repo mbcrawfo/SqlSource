@@ -6,8 +6,9 @@
   "queries": {
     "CancelReservationsOfStatus": {
       "hash": "857ed21e27349649e58603b2cead59007d883bf4692a541c48271ab20cc4b9ff",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

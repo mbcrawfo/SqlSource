@@ -6,8 +6,9 @@
   "queries": {
     "ListPaymentsForReconciliation": {
       "hash": "3d7380d783a06ba6c2071f11a17935221b9e5f826fce115f10924d42393fdcd2",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

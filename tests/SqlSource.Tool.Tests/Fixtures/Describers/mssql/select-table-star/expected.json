@@ -6,8 +6,9 @@
   "queries": {
     "AllUsers": {
       "hash": "f7b7223297aa5cfcdf261c0b3adc45a65dde87f02c4821df42427a34f88714f5",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

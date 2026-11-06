@@ -6,8 +6,9 @@
   "queries": {
     "OrdersReordered": {
       "hash": "952ce76d7c67e1fe986a84b3309163e5c54ab5626202882b60a032c9126174e2",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

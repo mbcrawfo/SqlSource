@@ -6,8 +6,9 @@
   "queries": {
     "WalkSubqueryKept": {
       "hash": "a6955b66a6ff8997725f70ff49672525f0fede34c935452b9a64820631240b3f",
-      "engine": "postgres",
+      "toolVersion": "fixture",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

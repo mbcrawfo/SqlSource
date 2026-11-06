@@ -6,8 +6,9 @@
   "queries": {
     "SearchAccounts": {
       "hash": "74ca762a4f0847583a06af650c3a94e3c13845186f86252074190f09916ae014",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

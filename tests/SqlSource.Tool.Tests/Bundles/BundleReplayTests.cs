@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -68,7 +69,10 @@ public sealed class BundleReplayTests
 
         expected.Failure.ShouldBeNull();
         var entry = expected.Value.ShouldBeOfType<ReplayOutcome.Described>().Entry;
-        replayed.ShouldBeOfType<ReplayOutcome.Described>().Entry.ShouldBe(entry);
+        // The entry a replay gives is this tool's.
+        replayed
+            .ShouldBeOfType<ReplayOutcome.Described>()
+            .Entry.ShouldBe(entry with { ToolVersion = PackageVersion.Prefix });
     }
 
     [Fact]
@@ -379,7 +383,13 @@ public sealed class BundleReplayTests
 
         error.Descriptor.Id.ShouldBe("SQLSRC289");
         error.Path.ShouldBe(Path);
-        error.Arguments.ToArray().ShouldBe(["formatVersion", "2", "1"]);
+        error
+            .Arguments.ToArray()
+            .ShouldBe([
+                "formatVersion",
+                (SidecarFormat.Version + 1).ToString(CultureInfo.InvariantCulture),
+                SidecarFormat.Version.ToString(CultureInfo.InvariantCulture),
+            ]);
     }
 
     // One of an older format is no sidecar this tool reads, and no newer tool reads it either.
@@ -393,7 +403,10 @@ public sealed class BundleReplayTests
         error.Descriptor.Id.ShouldBe("SQLSRC288");
         error
             .Arguments.ToArray()
-            .ShouldBe(["expected.json is of the sidecar format 0, and this version of sqlsource reads 1"]);
+            .ShouldBe([
+                $"expected.json is of the sidecar format {SidecarFormat.Version - 1}, and this version of sqlsource "
+                    + $"reads {SidecarFormat.Version}",
+            ]);
     }
 
     [Fact]

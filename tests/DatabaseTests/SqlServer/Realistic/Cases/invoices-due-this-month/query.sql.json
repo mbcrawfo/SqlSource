@@ -6,8 +6,9 @@
   "queries": {
     "ListInvoicesDueInMonth": {
       "hash": "79fd5e1c9923b5d1b704f99b30d9f330a2eee82146e6450c92995eee279655df",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

@@ -6,8 +6,9 @@
   "queries": {
     "InsertSpatialOverrides": {
       "hash": "e033039baf771c12bec38437942e674b8aff5c18d02cc55061f2fa6cb2c47980",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -61,8 +62,9 @@
     },
     "GetSpatialOverrides": {
       "hash": "48eb55707d704914c9a757e6b6c8f8b12d05a0368cd57184ecc8216f22e8b41f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
