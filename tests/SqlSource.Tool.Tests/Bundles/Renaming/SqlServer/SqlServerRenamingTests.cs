@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Statements;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
@@ -175,6 +176,34 @@ public sealed class SqlServerRenamingTests
     [InlineData("before_1x")]
     [InlineData("before_١")]
     public void CopyOf_AnyOtherName_IsNull(string name) => Engine.CopyOf(name, Before).ShouldBeNull(name);
+
+    // A copy that ParameterCopies cut to fit 127 characters, as its own tests hold, has no parameter before its
+    // separator, so it is not read back and the proof refuses the bundle.  This is TD-0104.
+    [Fact]
+    public void CopyOf_ACopyCutToFit_IsNull()
+    {
+        var name = new string('a', ParameterCopies.MaximumCopyLength);
+        var cut = new string('a', ParameterCopies.MaximumCopyLength - 2) + "_1";
+
+        Engine.CopyOf(cut, new HashSet<string>([name], SqlParameterName.Comparer)).ShouldBeNull();
+    }
+
+    // A money literal starts with $, which starts a word by the engine's word rule, so it is renamed to a name.  This
+    // is TD-0103.
+    [Fact]
+    public void Sql_AMoneyLiteral_IsRenamedToAName()
+    {
+        const string Sql = "SELECT $12 AS price";
+        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold);
+        var run = RenamingRun.For(Engine, mapping, Sql);
+
+        var renamed = run.At("query.sql").Sql(Sql, NameClass.Alias).Text;
+
+        run.Refusal.ShouldBeNull();
+        mapping.TryGet("$12", quoted: false, out var money).ShouldBeTrue();
+        money.ShouldMatch("^a_[0-9a-f]{8}$");
+        renamed.ShouldBe($"SELECT {money} AS {mapping.Name("price", quoted: false, NameClass.Alias)}");
+    }
 
     [Fact]
     public void RenameOwn_AMessage_IsItsParametersRenamed()

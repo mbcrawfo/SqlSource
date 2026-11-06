@@ -47,6 +47,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     public SqlDialect Dialect => SqlDialect.SqlServer;
 
+    // A $ starts a word, so a money literal such as $12 is renamed as a name: TD-0103.
     public bool IsWordStart(char character) => QuoteReader.IsNameCharacterOfSqlServer(character);
 
     public bool IsWordPart(char character) => QuoteReader.IsNameCharacterOfSqlServer(character);
@@ -88,6 +89,10 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     /// parameter and <c>_</c> with the digits: the renamed query's copies need one <c>_</c>, since a renamed name is
     /// its class's prefix and hex digits.  The shortest parameter that the query holds is taken.
     /// </summary>
+    /// <remarks>
+    /// A copy whose parameter's part was cut to fit is not read back, and a copy of a parameter whose name ends in
+    /// <c>_</c> can be read back as another's, which the proof refuses: TD-0104.
+    /// </remarks>
     public (string Parameter, string Suffix)? CopyOf(string name, IReadOnlySet<string> queryParameters)
     {
         var digits = name.Length;
