@@ -320,7 +320,11 @@ internal sealed class WatchSet
 
         // A poller of a folder with its folders below lists nothing below a bin, obj or .git folder of it but an assets
         // file, so the folder of the run's .env file there is watched alone too.
-        if (envFile is not null && IsBelowAnIgnoredFolderOf(FolderOf(envFile), roots))
+        if (
+            envFile is not null
+            && IsBelowAnIgnoredFolderOf(FolderOf(envFile), roots)
+            && !others.Contains(FolderOf(envFile), Comparer)
+        )
         {
             others.Add(FolderOf(envFile));
         }

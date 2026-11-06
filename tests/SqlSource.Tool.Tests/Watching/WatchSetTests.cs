@@ -545,6 +545,26 @@ public sealed class WatchSetTests
         );
     }
 
+    // Its folder is also the folder of a listed settings file, in another case.
+    [Fact]
+    public void Folders_NamedEnvFileInAFolderAlreadyListed_IsThatFolderOnce()
+    {
+        using var temp = new TempFolder();
+        AboveTheTempFolder.SkipWhenInARepository(temp.Path);
+        var app = temp.CreateFolder("w/App");
+        var obj = temp.CreateFolder("w/App/obj");
+        var project = Path.Combine(app, "App.csproj");
+        var set = WithEnv(
+            Path.Combine(obj.ToUpperInvariant(), "local.env"),
+            project,
+            app,
+            [project],
+            [Manifest(project, [Path.Combine(app, "Users.sql")], [Path.Combine(obj, "sqlsource.json")], [])]
+        );
+
+        set.Folders.Count(entry => RunProjects.PathComparer.Equals(entry.Folder, obj)).ShouldBe(1);
+    }
+
     [Fact]
     public void Folders_SolutionInTheRoot_IsTheRootAloneForEveryProjectBelow()
     {
