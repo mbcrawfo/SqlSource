@@ -104,8 +104,8 @@ public sealed class SqlClientProbeTests
         DriverDiagnostics(twoFiles).ShouldBe([Expected]);
     }
 
-    // A vector column below 6.1 has no C# type, so the query has no model and the project compiles beside its two
-    // errors: the project's, and the query's.  On 6.1 the same entry gives a model that compiles.
+    // A vector column below 6.1 has no C# type, and the project compiles beside its two errors: the project's, and the
+    // query's.  On 6.1 the same entry runs clean.
     [Fact]
     public void Run_VectorColumnBelowSqlClient61_IsSqlsrc270AndCompiles()
     {

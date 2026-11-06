@@ -360,7 +360,7 @@ public sealed class GeneratorParityTests : IDisposable
     public void Claims_OfTheSameSourcesAndFiles_AreTheTypeFilesOfTheGenerator(string name)
     {
         var (types, sources, sqlFiles, constants) = Cases[name];
-        // The harness of the generator parses C# 12, the newest that its oldest Roslyn reads.
+        // The harness of the generator parses C# 12, the language of generated code, and the project is given the same.
         var project = new TestProject(_folder) { LangVersion = "12.0" };
         project.Constants.AddRange(constants ?? []);
         var written = sources.Select(source => new SourceFile(

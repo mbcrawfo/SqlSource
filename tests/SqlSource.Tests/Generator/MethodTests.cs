@@ -318,8 +318,8 @@ public sealed class MethodTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
-    // One file of a query at each output, by its marker, under the run's member location class, so the method and
-    // the constants are public members of the public type.
+    // One file of a query at each output, by its marker, under the run's member location class, so the constants are
+    // public members of the public type and the method is in the methods file.
     [Fact]
     public void Run_MixedType_HasConstantsMethodsAndModels()
     {

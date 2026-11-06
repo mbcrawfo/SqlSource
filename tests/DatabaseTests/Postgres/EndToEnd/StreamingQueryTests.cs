@@ -25,9 +25,10 @@ public sealed class StreamingQueryTests(PostgresDatabases postgres)
     // The seed's three accounts.
     private static readonly CollectedAccount[] Accounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];
 
-    // The count of the numbers that a break leaves unread.  The query sorts them, so the server is still sending when
-    // the loop stops, and a stream that cancelled its command on the break would abort the transaction of the caller;
-    // with 10,000 rows the server has sent them all by then and a cancel changes nothing.
+    // The count of the numbers that the stream is asked for, nearly all of which a break leaves unread.  The query
+    // sorts them, so the server is still sending when the loop stops, and a stream that cancelled its command on the
+    // break would abort the transaction of the caller; with 10,000 rows the server has sent them all by then and a
+    // cancel changes nothing.
     private const int ManyRows = 1_000_000;
 
     [Fact]
@@ -250,9 +251,8 @@ public sealed class StreamingQueryTests(PostgresDatabases postgres)
 
     // The break ends the stream while the transaction is open and the server is still sending rows: the stream's
     // reader is closed and its command is not cancelled, which would abort the transaction, so the commit that follows
-    // commits what the transaction did.  A temporary table keeps what the
-    // transaction writes out of the seed, which every test of the collection shares, and lives as long as the
-    // connection.
+    // commits what the transaction did.  A temporary table keeps what the transaction writes out of the seed, which
+    // every test of the collection shares, and lives as long as the connection.
     [Fact]
     public async Task StreamNumbers_BreakPartwayInATransaction_TheTransactionCommits()
     {

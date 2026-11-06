@@ -27,7 +27,7 @@ internal static class EndToEndSources
     }
 
     // "app" as App sets it up, with Npgsql.NodaTime's plugin, which reads and writes the NodaTime types of the queries
-    // of NodaTime/, whose folder leaves the library on: a data source the application builds for those methods.
+    // of NodaTime/, whose folder turns the library back on: a data source the application builds for those methods.
     public static NpgsqlDataSource AppWithNodaTime(PostgresDatabases postgres)
     {
         var builder = new NpgsqlDataSourceBuilder(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
@@ -37,7 +37,7 @@ internal static class EndToEndSources
     }
 
     // "gis" of the PostGIS container, with Npgsql.NetTopologySuite's plugin, which reads and writes the geometries of
-    // the queries of NetTopologySuite/, whose folder leaves the library on.
+    // the queries of NetTopologySuite/, whose folder turns the library back on.
     public static NpgsqlDataSource GisWithNetTopologySuite(PostgisDatabases postgis)
     {
         var builder = new NpgsqlDataSourceBuilder(postgis.ConnectionStringOf(PostgisDatabases.GisDatabase));

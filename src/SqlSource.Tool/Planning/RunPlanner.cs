@@ -76,9 +76,9 @@ internal static class RunPlanner
     }
 
     // The claimed files of one project, in the order of their paths, each with the settings files that reach it, and
-    // the number of its listed files that no type of it claims.  The errors of the project are added: SQLSRC208, then
-    // the problems of the settings files that its .sql files and C# files reach, as the generator reports them, of
-    // each file once in the run.
+    // the number of its listed files that no type of it claims.  The errors of the project are added: those of reading
+    // its attributes, SQLSRC208 and SQLSRC271, then the problems of the settings files that its .sql files and C# files
+    // reach, as the generator reports them, of each file once in the run.
     private static (List<ClaimedFile> Claimed, int Unclaimed) ReadProject(
         ProjectManifest manifest,
         RunSettingsFiles settingsFiles,

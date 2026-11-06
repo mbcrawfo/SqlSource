@@ -75,8 +75,8 @@ public sealed class OperandsQueryTests
         OperandsQuery.AnswersOf(answer, 1).ShouldBe(Answers(false));
     }
 
-    // A CLR type, by its assembly or by the name of one of the system's, and a row of no type, may be a CLR type,
-    // whatever the operand's nullability; an alias type such as sysname is none.
+    // A CLR type, by its assembly or by the name of one of the system's, and a row of no type, may be a CLR type; an
+    // alias type such as sysname is none.  Each row here is of an operand answered not null.
     [Theory]
     [InlineData(
         "geometry",

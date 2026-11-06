@@ -16,7 +16,8 @@ namespace SqlSource.Testing.Generator;
 //   Driver: the references of a run that gives none.
 //   Int, Text: an integer and a string of the engine, as a sidecar describes them.
 //   IntOverrideKey, TextOverrideKey: the names of Int and Text in a `-- type-override:` marker.
-// The members after the record's own give what a shared scenario needs of the engine beyond these.
+// The members after the record's own give the engine's own scenarios, and what a shared scenario needs of the engine
+// beyond these.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.

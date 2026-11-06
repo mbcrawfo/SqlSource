@@ -20,11 +20,12 @@ namespace SqlSource.Tool.Planning;
 /// <remarks>
 /// It matches the attribute by its name and reads <c>Source</c> alone, as it is written, and the type's name, which
 /// names its file when there is no <c>Source</c>: nothing else on the attribute changes what is described, and any
-/// other argument, literal or not, is stepped over.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>: an alias,
-/// a type of the same name in another namespace, and an attribute inside <c>#if</c> under a configuration other than
-/// the manifest's.  A <c>Source</c> outside ASCII in a file that is not UTF-8 is not read, nor a type's name outside
-/// ASCII when there is no <c>Source</c>: on Windows the compiler reads that file in the system's code page, so the text
-/// here would not be the text it resolves.
+/// other argument, literal or not, is stepped over.  What it reads differently from the generator is in
+/// <c>docs/tech-debt/TD-0031</c>: an alias, a type of the same name in another namespace, an attribute inside
+/// <c>#if</c> under a configuration other than the manifest's, and the attribute on two partial declarations of one
+/// type.  A <c>Source</c> outside ASCII in a file that is not UTF-8 is not read, nor a type's name outside ASCII when
+/// there is no <c>Source</c>: on Windows the compiler reads that file in the system's code page, so the text here would
+/// not be the text it resolves.
 /// </remarks>
 internal static class AttributeReader
 {

@@ -11,8 +11,8 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate pg_catalog.count(text) of CatalogCount,
 // the operator pg_catalog.* of CatalogOperator, the schema zz of OperatorsAfterTheCatalog, the schema
 // shadowing_operators of ShadowingOperators, the schema shadowing_equals of ShadowingEquals, describer_canary,
-// command_widgets, error_path_widgets, session_gone and transaction_kept, is made by its test and dropped in a
-// finally.
+// command_widgets, the schemas command_old and command_new, error_path_widgets, session_gone and transaction_kept, is
+// made by its test and dropped in a finally.
 internal static class ScratchSchema
 {
     /// <summary>

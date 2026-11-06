@@ -108,8 +108,8 @@ public sealed class GeneratedSourceWarningTests
         bool compilationReference
     )
     {
-        // Both assemblies hold the generated attribute and enums, each marked embedded, so this one does not see the
-        // other's copies, and the compiler has no conflict (CS0436) to warn about inside the generated file.
+        // Both assemblies hold the generated attributes, each marked embedded, so this one does not see the other's
+        // copies, and the compiler has no conflict (CS0436) to warn about inside the generated file.
         var other = GeneratorHarness
             .CreateProject(
                 OutputKind.Sql,

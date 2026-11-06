@@ -32,8 +32,8 @@ internal interface IDriverProbe
     /// <summary>
     /// The diagnostics of the project's reference to the driver, each once, in the order they are reported: too old,
     /// then newer than known.  Empty when the project does not reference the driver or references one that the map
-    /// knows.  Computed from the probe's members, never a member of the probe, so that it takes no part in the probe's
-    /// equality.
+    /// knows.  Computed from the probe's members on each read and never stored, so that it takes no part in the
+    /// probe's equality.
     /// </summary>
     IEnumerable<DriverFinding> Findings { get; }
 }

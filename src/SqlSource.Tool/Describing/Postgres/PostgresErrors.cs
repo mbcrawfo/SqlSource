@@ -251,14 +251,14 @@ internal static class PostgresErrors
         );
 
     /// <summary>
-    /// What a failed <c>prepare</c> is reported as.  A statement that is not listed after it, <c>42P05</c>, a
-    /// statement that already exists, and a transaction the server refused, <c>08P01</c> with
-    /// <see cref="PostgresLive.TransactionRefused" />, are a connection that does not keep a session,
-    /// <c>SQLSRC236</c>, whichever the position; <c>42P14</c>, a utility statement, is <c>SQLSRC233</c>, as a
-    /// backstop for what <see cref="StatementShape" /> misses; an error the server positions inside the type list
-    /// is the declared type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c>
-    /// and <c>SQLSRC227</c>; anything else is the server rejecting the query, <c>SQLSRC225</c>.  <c>42P05</c> is
-    /// matched by its SQLSTATE alone: the message may be translated.
+    /// What a failed <c>prepare</c> is reported as.  A statement that is not listed after it
+    /// (<see cref="PostgresLive.StatementNotListed" />), a statement that already exists, <c>42P05</c>, and a
+    /// transaction the server refused, <c>08P01</c> with <see cref="PostgresLive.TransactionRefused" />, are a
+    /// connection that does not keep a session, <c>SQLSRC236</c>, whichever the position; <c>42P14</c>, a utility
+    /// statement, is <c>SQLSRC233</c>, as a backstop for what <see cref="StatementShape" /> misses; an error the
+    /// server positions inside the type list is the declared type's, <c>SQLSRC228</c>; <c>42P18</c> and
+    /// <c>42P08</c> name a parameter, <c>SQLSRC226</c> and <c>SQLSRC227</c>; anything else is the server rejecting
+    /// the query, <c>SQLSRC225</c>.  <c>42P05</c> is matched by its SQLSTATE alone: the message may be translated.
     /// </summary>
     public static DescribeFailure Prepare(
         PostgresServerError error,

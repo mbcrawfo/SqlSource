@@ -39,8 +39,8 @@ internal sealed record PathCollision(string NormalizedPath, string Path, string 
         ImmutableArray<PathCollision>.Builder? collisions = null;
         foreach (var file in files)
         {
-            // The one ordinal comparison of normalised paths in the generator: it looks for the difference of case
-            // that SqlPath.Comparer ignores.
+            // This file holds the generator's only ordinal comparisons of normalised paths: this one looks for the
+            // difference of case that SqlPath.Comparer ignores.
             var index = SqlPath.IndexOf(sortedPaths, file.NormalizedPath, static path => path);
             if (index < 0 || string.Equals(sortedPaths[index], file.NormalizedPath, StringComparison.Ordinal))
             {

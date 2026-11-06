@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0108`
+Next id: `TD-0114`
 
 ## Active items
 
@@ -49,6 +49,12 @@ Next id: `TD-0108`
 | [TD-0105](TD-0105-a-list-negated-without-not-is-trusted-to-filter-nulls.md) | Open | 2026-11-05 | Low | On PostgreSQL, a list that `IS FALSE`, `IS NOT TRUE`, a comparison with `false`, a `CASE` or a `COALESCE` negates, in a query with an outer join, is not read as negated: the describer can prove a column of the optional side not null that an empty list leaves null, and the generated reader throws |
 | [TD-0106](TD-0106-an-empty-list-fails-in-a-sql-server-aggregate.md) | Open | 2026-11-05 | Low | On SQL Server, a query method whose list is inside an aggregate's argument, a `GROUP BY` expression or an `OUTPUT` clause throws `SqlException` (130, 144 or 10705) when the list is empty or null, since its empty form is a subquery, which SQL Server refuses there |
 | [TD-0107](TD-0107-a-lists-null-test-in-an-index-predicate-cannot-be-described.md) | Open | 2026-11-05 | Low | On PostgreSQL, a query whose list is tested for null inside the index predicate of `ON CONFLICT (...) WHERE` cannot be described: the server refuses the subquery that stands for the test there |
+| [TD-0108](TD-0108-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-11-06 | Medium | Duplicated logic and uneven conventions in `src/`, most in the bug-report bundles: the renaming copies readings of the describer and the generator, the two engines' rule tables are spelled and pinned differently, and the commands and the run's context are copied by hand |
+| [TD-0109](TD-0109-duplicated-arrangements-and-uneven-conventions-in-tests.md) | Open | 2026-11-06 | Medium | Duplicated arrangements and uneven conventions in `tests/`, most in the bundle and renaming tests, and 22 tests whose comment said more than their assertions check |
+| [TD-0110](TD-0110-a-poller-of-a-folder-alone-sees-no-folder-made-in-it.md) | Open | 2026-11-06 | Low | Under `DOTNET_USE_POLLING_FILE_WATCHER`, a watch of a folder alone sees no folder made or deleted in it, so `describe --watch` misses a new folder outside the project's folder and reports a deleted one as `SQLSRC287` |
+| [TD-0111](TD-0111-the-poller-tests-run-beside-a-real-timer.md) | Open | 2026-11-06 | Low | `PollingFolderWatcherTests` gives the watcher a clock whose timer is the system's, so a poll every second can land between two steps of a test's change |
+| [TD-0112](TD-0112-two-postgresql-run-time-tests-race-a-sleep.md) | Open | 2026-11-06 | Low | Two PostgreSQL run-time tests hold their command with a 30-second `pg_sleep`, which a stalled runner can outlast |
+| [TD-0113](TD-0113-two-env-search-tests-assume-no-repository-above-the-temporary-folder.md) | Open | 2026-11-06 | Low | Two `DotEnvSearchTests` fail when the temporary folder is inside a git work tree |
 
 ## Columns
 

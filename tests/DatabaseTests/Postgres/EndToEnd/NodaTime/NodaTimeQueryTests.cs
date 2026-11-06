@@ -11,7 +11,7 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd.NodaTime;
 
-// The queries of Queries/NodaTime.sql, whose folder leaves NodaTime on, so that its columns and parameters take
+// The queries of Queries/NodaTime.sql, whose folder turns NodaTime back on, so that its columns and parameters take
 // NodaTime's types, read and written through Npgsql.NodaTime on a data source that calls UseNodaTime(): every column of
 // noda_values written by InsertNodaValues and read back by GetNodaValues, in a transaction that is rolled back.
 // Postgres.Npgsql8 runs the first two tests, with the same rows, on Npgsql 8.

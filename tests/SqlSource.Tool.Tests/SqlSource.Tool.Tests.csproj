@@ -19,10 +19,10 @@
     </ItemGroup>
     <ItemGroup>
         <!--
-            Fixtures/Projects holds projects that the tests run "dotnet msbuild" on.  They are no code of this
-            project.  Fixtures/FixtureProjects.cs of tests/SqlSource.Tool.Testing copies one out of the repository
-            before it is used, so they go to the output.  The package's MSBuild files and the repository's
-            global.json come beside them from ../Fixtures.props.
+            Fixtures/Projects holds projects that the tests run "dotnet msbuild" and "dotnet build" on.  They are no
+            code of this project.  Fixtures/FixtureProjects.cs of tests/SqlSource.Tool.Testing copies one out of the
+            repository before it is used, so they go to the output.  The package's MSBuild files and the
+            repository's global.json come beside them from ../Fixtures.props.
         -->
         <Compile Remove="Fixtures/Projects/**" />
         <None Remove="Fixtures/Projects/**" />

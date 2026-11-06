@@ -15,8 +15,9 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// The describer of PostgreSQL where no server is needed: what "open" answered becomes the session's server or the
-// failure, and a connection string the driver cannot read is a failure too.
+// The describer of PostgreSQL where no server is needed: its dialect, the secrets of a connection string, the password
+// Npgsql would take from the environment or a password file among them, its rewrite, the settings it is made with, and
+// what "open" answered, the session's server or the failure, a connection string the driver cannot read included.
 public sealed class PostgresDescriberTests
 {
     [Fact]
@@ -161,7 +162,8 @@ public sealed class PostgresDescriberTests
         secrets.ShouldBeEmpty();
     }
 
-    // Npgsql reads a password file only for a string that has no Password, as it reads the environment's.
+    // SSL Password is no Password: Npgsql still takes PGPASSWORD for a string that has only an SSL Password, so both
+    // are secrets.
     [Fact]
     public void SecretsOf_SslPasswordOnlyAndPgPasswordSet_IsBoth() =>
         new PostgresDescriber()

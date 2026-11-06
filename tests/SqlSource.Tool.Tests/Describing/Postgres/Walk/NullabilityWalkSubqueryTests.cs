@@ -21,9 +21,9 @@ public sealed class NullabilityWalkSubqueryTests
             Output = output,
         };
 
-    // The row-number dedupe: the subquery keeps a LEFT JOIN, which the planner swapped into a Right join with b, the
-    // side it extends, as its outer child.  The scan prints the columns in its own order, and they are found by their
-    // origins.
+    // The shape of the realistic case row-number-dedupe: the subquery keeps a LEFT JOIN, which the planner swapped into
+    // a Right join with b, the side it extends, as its outer child.  The scan prints the columns in its own order, and
+    // they are found by their origins.
     [Fact]
     public void Run_ColumnThroughASubqueryScan_IsAnsweredByItsOrigin()
     {

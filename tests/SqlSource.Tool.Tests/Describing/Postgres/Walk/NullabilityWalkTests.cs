@@ -98,8 +98,8 @@ public sealed class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
 
-    // A query that gives a table's columns aliases, users u(a, b), prints them under the aliases: the check takes it
-    // for another statement's plan, and the join's answer stands.
+    // A query that gives a table's columns aliases, users u(a, b), prints them under the aliases, which name another
+    // column than the origin's: the join's answer stands all the same.
     [Fact]
     public void Run_ReferenceThatNamesAnotherColumnUnderALeftJoin_KeepsTheJoinsAnswer() =>
         AnswersOf(Run(LeftJoin("a.other", "b.other"), NotNull, NotNull)).ShouldBe([NotNullCatalog, NullableOuterJoin]);

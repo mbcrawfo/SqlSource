@@ -22,7 +22,8 @@
     </ItemGroup>
     <ItemGroup>
         <!--
-            The five test projects of this folder, and the three that read EngineImage or ModelReflection.
+            The five test projects of this folder; SqlSource.Tests, whose TestHarness/ tests the harness's own types;
+            and SqlSource.Tool.Testing and SqlSource.Tool.Tests, which read EngineImage or ModelReflection.
         -->
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres.Npgsql8" />

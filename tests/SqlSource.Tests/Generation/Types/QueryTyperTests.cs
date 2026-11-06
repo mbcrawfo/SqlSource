@@ -160,9 +160,10 @@ public sealed class QueryTyperTests
             .Arguments.ShouldBe(["column 'c0'", "vector(3)", "6.1", "of an unknown version"]);
     }
 
-    // The help of each SQL Server type that has no C# type: a sidecar edited by hand, or written by a newer tool, gets
-    // an entry to write, with sys. before a name that is no key without it or that is the alias of another type, or
-    // the help to describe again.  Each type is a column's, but the null type, which only a parameter can have.
+    // The help of each SQL Server type that has no C# type: a spatial type names the packages that read it, and a
+    // sidecar edited by hand, or written by a newer tool, gets an entry to write, with sys. before a name that is no
+    // key without it or that is the alias of another type, or the help to describe again.  Each type is a column's,
+    // but the null type, which only a parameter can have.
     [Fact]
     public void Type_SqlServerGeographyWithNoMapping_GivesTheHelp() =>
         ShouldGiveTheHelp(

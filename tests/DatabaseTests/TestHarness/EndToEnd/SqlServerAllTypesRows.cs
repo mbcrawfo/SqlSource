@@ -6,12 +6,12 @@ using Shouldly;
 
 namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
-// The rows of all_types and of new_types that the seed of SQL Server's end-to-end database "app" holds, as the models
-// of the tables read through Dapper have them: row 1 with a value in every column, row 2 with NULL in every column but
-// id and, in all_types, rowversion_value, which the server fills in every row.  A row is read by reflection, so that
-// every project that reads the tables shares the expectations, whatever SqlClient it runs.  This library cannot
-// reference SqlClient, so a SqlVector<float> is compared through its Memory, and a rowversion by its length alone,
-// since the server chooses its value.
+// The rows of all_types and of new_types that the seed of SQL Server's end-to-end database "app" holds, as the
+// generated models of the tables have them, read through Dapper or a generated method: row 1 with a value in every
+// column, row 2 with NULL in every column but id and, in all_types, rowversion_value, which the server fills in every
+// row.  A row is read by reflection, so that every project that reads the tables shares the expectations, whatever
+// SqlClient it runs.  This library cannot reference SqlClient, so a SqlVector<float> is compared through its Memory,
+// and a rowversion by its length alone, since the server chooses its value.
 internal static class SqlServerAllTypesRows
 {
     public const int FullRowId = 1;

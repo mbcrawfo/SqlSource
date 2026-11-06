@@ -86,7 +86,9 @@ public sealed class SettingsFileSchemaTests
         }
     }
 
-    // Each anyOf is a list for completion and a pattern, which Choices and Pattern read by their places.
+    // On a property or its items, each anyOf is a list for completion and a pattern, which Choices and Pattern read by
+    // their places.  The anyOf of the library types' names and values and of a column type's value sit deeper, and
+    // their own tests check them.
     [Fact]
     public void Schema_AnyOf_IsOnTheChoicesTheDialectAndTheParametersAlone()
     {

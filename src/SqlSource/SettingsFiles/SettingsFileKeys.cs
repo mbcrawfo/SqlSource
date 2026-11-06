@@ -5,7 +5,7 @@ using SqlSource.Settings;
 namespace SqlSource.SettingsFiles;
 
 /// <summary>
-/// The keys of a settings file, by the table of the settings files design.  Keys are matched ordinally.
+/// The keys of a settings file.  Keys are matched ordinally.
 /// </summary>
 internal static class SettingsFileKeys
 {
@@ -79,7 +79,7 @@ internal static class SettingsFileKeys
         Visibility,
     ];
 
-    /// <summary>Every key, in the order of the design's table.</summary>
+    /// <summary>Every key of the top level.</summary>
     public static ImmutableArray<string> All { get; } =
         ImmutableArray.Create(
             Schema,

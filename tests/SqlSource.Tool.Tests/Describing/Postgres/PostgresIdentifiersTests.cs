@@ -4,8 +4,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// The one reader of a quoted name, the one bare-name rule and PostgreSQL's rule for a character of a word, which
-// every reader of the describer calls.
+// How PostgreSQL writes a name: the one reader of a quoted name, the bare-name rule, PostgreSQL's rule for a character
+// of a word, and the number of a $n.
 public sealed class PostgresIdentifiersTests
 {
     [Theory]

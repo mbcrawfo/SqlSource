@@ -10,9 +10,9 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// token check and the replay, are the renaming's, which asks this part and never names an engine.
 /// </summary>
 /// <remarks>
-/// Each engine builds its part against this contract and does not change it: PostgreSQL's in 10.2 and SQL Server's in
-/// 10.3.  A member never reads a database, the host or a file, holds nothing of one bundle once that bundle is renamed,
-/// and never writes a name of its own making: every replacement comes from the scope's mapping.
+/// Each engine's part, PostgreSQL's and SQL Server's, is built against this contract, which changes only by the
+/// agreement of both.  A member never reads a database, the host or a file, holds nothing of one bundle once that
+/// bundle is renamed, and never writes a name of its own making: every replacement comes from the scope's mapping.
 /// </remarks>
 internal interface IEngineRenaming
 {

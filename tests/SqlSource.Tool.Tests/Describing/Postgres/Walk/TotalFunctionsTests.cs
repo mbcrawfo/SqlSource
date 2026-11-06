@@ -59,7 +59,8 @@ public sealed class TotalFunctionsTests
             .AggregateResult("string_agg", [BuiltInTypes.Text, BuiltInTypes.Text])
             .ShouldBe(BuiltInTypes.Text);
 
-    // The catalog has no max of a varchar, which the plan prints cast to text, and array_agg is polymorphic.
+    // The catalog has no max of a varchar, which the plan prints cast to text, array_agg is polymorphic, count of an
+    // argument is CatalogOverloads' and not this table's, and no row takes an argument of no known type.
     [Theory]
     [InlineData("max", BuiltInTypes.Varchar)]
     [InlineData("array_agg", BuiltInTypes.Int4)]

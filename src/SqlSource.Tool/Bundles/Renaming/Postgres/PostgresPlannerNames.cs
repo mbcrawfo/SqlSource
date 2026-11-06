@@ -7,8 +7,8 @@ namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 
 /// <summary>
 /// The names PostgreSQL's parser and planner make up and a plan prints: the aliases of a set operation and a
-/// <c>VALUES</c> list, the columns of one, a window with no name, a sub-plan's words and the like, found by the spike
-/// of phase 10 in the source of 14 to 18 and in their plans.
+/// <c>VALUES</c> list, the columns of one, a window with no name, a sub-plan's words and the like, found in the source
+/// of PostgreSQL 14 to 18 and in their plans.
 /// </summary>
 /// <remarks>
 /// A name is compared as folded.  A form whose letters are upper case, such as <c>*SELECT* 1</c>, is quoted where a

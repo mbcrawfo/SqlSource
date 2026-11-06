@@ -52,8 +52,8 @@ public sealed class ConverterObsoleteTests
         methods.ShouldContain(EmailWrite);
     }
 
-    // Phase 8.1's methods name a mapped type in GetFieldValue<T>, and an obsolete one warns there as it would in a
-    // model.
+    // A method reads a mapped type that has no converter through GetFieldValue<T>, and an obsolete one warns there as
+    // it would in a model.
     [Fact]
     public void Run_ObsoleteMappedTypeUnderCodeGen_DisablesItsWarning()
     {

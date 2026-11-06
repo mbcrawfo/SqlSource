@@ -10,7 +10,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
 
-// Every string member of SqlServerCalls.cs' records and of the entry's SQL Server type has its rule.
+// The rule of each member of SqlServerCalls.cs' records and of the entry's SQL Server type that is written out here,
+// and a rule for every string that the SQL Server fixtures' captures hold.  A member that neither names has no check.
 public sealed class SqlServerFieldsTests
 {
     private static readonly string[] Methods =

@@ -16,9 +16,10 @@ namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 /// <remarks>
 /// The members are those of the records of <c>PostgresCalls.cs</c>, as <c>CaptureJson.Options</c> names them, and
 /// <c>PostgresFieldRulesTests</c> fails when a string member has no rule or a rule names no member.  What the pipeline
-/// reads of each is the spike of phase 10's finding 1.  An error's detail and hint, and its position but for
-/// <c>prepare</c>'s, are read by nothing and dropped, as is the whole error of <c>deallocate</c>, <c>partitions</c> and
-/// <c>relations</c>.
+/// reads of each is finding 1 of the phase 10 spike,
+/// <c>docs/superpowers/specs/2026-11-05-query-generation-phase-10-spike.md</c>.  An error's detail and hint, and its
+/// position but for <c>prepare</c>'s, are read by nothing and dropped, as is the whole error of <c>deallocate</c>,
+/// <c>partitions</c> and <c>relations</c>.
 /// </remarks>
 internal static class PostgresFieldRules
 {

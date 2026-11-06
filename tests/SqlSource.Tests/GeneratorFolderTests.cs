@@ -7,8 +7,8 @@ using Xunit;
 
 namespace SqlSource.Tests;
 
-// The rules of Generator/AGENTS.md that a test can check: tests/SqlSource.Tests.RoslynFloor compiles every file of
-// Generator/ again, so the folder holds test classes alone, and each says so on its first line.
+// The rules of Generator/AGENTS.md that a test can check: tests/SqlSource.Tests.RoslynFloor compiles every .cs file of
+// Generator/ again, so each is a test class, and each says so on its first line.
 public sealed class GeneratorFolderTests
 {
     private static readonly string GeneratorTests = RepositoryRoot.Path("tests", "SqlSource.Tests", "Generator");

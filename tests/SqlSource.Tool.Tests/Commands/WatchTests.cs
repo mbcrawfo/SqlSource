@@ -243,7 +243,7 @@ public sealed class WatchTests : IAsyncDisposable
             .ShouldBe(["run.start", "pass.start", "pass.end", "pass.start", "pass.end", "run.end"]);
         names[0].ShouldBe("run.start");
         names[^1].ShouldBe("run.end");
-        // Every other event is of a pass, between its two.
+        // The first event after run.start opens a pass, and the last before run.end closes one.
         names[1].ShouldBe("pass.start");
         names[^2].ShouldBe("pass.end");
         PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);

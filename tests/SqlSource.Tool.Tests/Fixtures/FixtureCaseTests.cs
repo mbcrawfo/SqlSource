@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Fixtures;
 
-// What a case reads of its folder beside its three texts.
+// What a case reads of its folder: its three texts and its explain settings.
 public sealed class FixtureCaseTests : IDisposable
 {
     private readonly TempFolder _folder = new();

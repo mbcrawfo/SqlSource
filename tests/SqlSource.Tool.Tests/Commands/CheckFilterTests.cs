@@ -47,7 +47,7 @@ public sealed class CheckFilterTests : IDisposable
         );
     }
 
-    // Each query of a sidecar that is absent or cannot be read counts under "differ".
+    // Each query of a sidecar that is absent counts under "differ".
     [Fact]
     public async Task Check_NoSidecars_CountsEveryQueryUnderDiffer()
     {

@@ -122,8 +122,8 @@ public sealed class JsonQueryTests(PostgresDatabases postgres)
         read.TextMeta.ShouldBeNull();
     }
 
-    // A JSON null in a column that the query says cannot be null throws at the read, a class's from the serializer
-    // and a node's from the driver's read, or from the generated conversion on Npgsql 8.
+    // A JSON null in a column that the query says cannot be null throws at the read, a class's after the serializer
+    // and a node's after the driver's read, or after the generated conversion on Npgsql 8.
     [Theory]
     [InlineData("meta")]
     [InlineData("node")]

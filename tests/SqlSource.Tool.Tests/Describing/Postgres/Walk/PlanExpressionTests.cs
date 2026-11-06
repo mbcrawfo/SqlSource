@@ -348,7 +348,8 @@ public sealed class PlanExpressionTests
         PlanExpression.NullableOf(entry, Grouped(groupsHaveRows: false)).ShouldBeNull();
 
     // A FILTER may leave a group no row, a window's frame may be empty, an argument may be NULL, and array_agg and an
-    // ordered-set aggregate are in no row of the table.
+    // ordered-set aggregate are in no row of the table; nor is a call of another form or number of arguments, of
+    // another schema or spelling, or over a reference in parentheses.
     [Theory]
     [InlineData("max(created_at) FILTER (WHERE (id > 1))")]
     [InlineData("sum(id) OVER w1")]
@@ -688,8 +689,8 @@ public sealed class PlanExpressionTests
     public void NullableOf_FormsOverACommonType_AreRead(string entry) =>
         PlanExpression.NullableOf(entry, CommonTypes(groupsHaveRows: true)).ShouldBe(false);
 
-    // A domain's column is proved of the domain, which no row of the tables takes, and a form of no known type feeds
-    // nothing.
+    // A domain's column is proved of the domain, which no row of the tables takes, a form of no known type feeds
+    // nothing, and a FILTER may leave a group no row.
     [Theory]
     [InlineData("sum(COALESCE(amount, '1'::numeric))")]
     [InlineData("(COALESCE(amount, amount) + '1'::numeric)")]

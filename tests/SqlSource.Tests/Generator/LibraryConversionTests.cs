@@ -170,8 +170,8 @@ public sealed class LibraryConversionTests
         run.Sources.Keys.ShouldNotContain(ClassFile);
     }
 
-    // An override to one of NodaTime's types finds the library's edge whether the switch is on or not, and the class
-    // is emitted for it.
+    // An override to one of NodaTime's types finds the library's edge with the switch off, and the class is emitted
+    // for it.
     [Theory]
     [InlineData("datetime2", "NodaTime.Instant", "InstantFromDateTime", "DateTimeFromInstant")]
     [InlineData("time", "NodaTime.Duration", "DurationFromTimeSpan", "TimeSpanFromDuration")]
@@ -392,8 +392,8 @@ public sealed class LibraryConversionTests
         methods.ShouldNotContain("NodaTimeConversions");
     }
 
-    // An override to each of System.Text.Json's types, on nvarchar(max) and on json with the switch off: each column
-    // is converted by the edge of its type.
+    // A -- column: marker naming each of System.Text.Json's types, on nvarchar(max) and on json with the switch off:
+    // each column is converted by the edge of its type.
     [Theory]
     [InlineData("System.Text.Json.JsonDocument", "JsonDocumentFromString")]
     [InlineData("System.Text.Json.Nodes.JsonNode", "JsonNodeFromString")]
@@ -557,7 +557,7 @@ public sealed class LibraryConversionTests
         run.Sources.Keys.ShouldNotContain(JsonClassFile);
     }
 
-    // A type at Models has JsonElement in its models and calls nothing.
+    // A type at Models, with json on, calls nothing: its models keep the type map's string.
     [Fact]
     public void Run_NoCodeGenUse_EmitsNoJsonConversions()
     {
@@ -670,7 +670,7 @@ public sealed class LibraryConversionTests
         run.Sources[JsonClassFile].ShouldBe(JsonConversions.Source);
     }
 
-    // The entry of a query of Run_JsonGeneratedCode_CompilesWithoutWarnings, over the types the override names: v<i>
+    // The entry of a query of Run_JsonGeneratedCode_CompilesWithoutWarnings, over the types its markers name: v<i>
     // and its parameter not null, and maybe_v<i> nullable; the even ones of the first database type and the odd ones
     // of the second, or of its array for an array.
     private static SidecarEntry JsonEntry(SqlFile file, string query, string[] types, SidecarType even, SidecarType odd)

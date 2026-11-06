@@ -103,8 +103,7 @@ public sealed class SetOperationTests(PostgresDatabases postgres)
             NotNullSetOperation,
         ]);
 
-    // A branch's NULL, a nullable column of a branch, and the extended side of a LEFT JOIN in a branch: the column
-    // may be NULL, and is.
+    // A branch's NULL and a nullable column of a branch: the column may be NULL, and is.
     [Theory]
     [InlineData("SELECT u.id FROM users u UNION ALL SELECT NULL::integer", 0)]
     [InlineData("SELECT NULL::integer UNION ALL SELECT u.id FROM users u", 0)]

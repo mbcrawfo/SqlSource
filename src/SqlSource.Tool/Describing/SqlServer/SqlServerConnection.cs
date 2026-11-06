@@ -276,9 +276,9 @@ internal sealed class SqlServerConnection(string connectionString, IRunLog log) 
 
     /// <summary>
     /// Why the connection cannot be used, in the describer's own words: one of the texts of
-    /// <see cref="ConnectionErrors" />, which a <c>live</c> function answers through
-    /// <see cref="ConnectionErrors.Own" />.  SqlClient's <see cref="SqlException" /> has no public constructor, so the
-    /// describer's own refusals are this.
+    /// <see cref="ConnectionErrors" />, or <see cref="ConnectionTexts.LostConnection" />, which a <c>live</c> function
+    /// answers through <see cref="ConnectionErrors.Own" />.  SqlClient's <see cref="SqlException" /> has no public
+    /// constructor, so the describer's own refusals are this.
     /// </summary>
     /// <remarks>
     /// It derives from <see cref="InvalidOperationException" /> and has the standard constructors for the reasons

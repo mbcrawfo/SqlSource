@@ -666,8 +666,8 @@ public sealed class WatchSetTests
     }
 
     // A file or a folder in a folder that holds a listed file, outside every project's folder, which a glob of the
-    // project may list now; and a settings file in the folder of a listed file or above it, up to the repository's
-    // root, which may apply to it now.
+    // project may list now; a settings file in the folder of a listed file or above it, up to the repository's root,
+    // which may apply to it now; and a .sql file in the project's own folder, as any unlisted file under the project.
     [Theory]
     [InlineData("sqlsource.json", true, false)]
     [InlineData("sqlsource.json", false, false)]

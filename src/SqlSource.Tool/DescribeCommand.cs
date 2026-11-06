@@ -64,7 +64,7 @@ internal static class DescribeCommand
         // given once, and an array with OneOrMore when it may be repeated, since System.CommandLine rejects a second
         // ExactlyOne.  UsageCheck rejects that second one itself, since System.CommandLine's message repeats the
         // value.  An option is added to --help in the change that gives it an effect, not before: one that is read
-        // and checked earlier is Hidden until then, as --database was in sub-phase 2.4.
+        // and checked earlier is Hidden until then.
 
         // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
         var path = new Argument<string[]>(PathArgument)

@@ -1,5 +1,7 @@
 # AGENTS.md - src/SqlSource.Tool/Describing/Postgres
 
+- **Only PostgreSQL's code goes here**: `tools/test-scopes.txt` scopes the folder to `postgres`, so `pre-commit-validation.sh` runs none of SQL Server's container tests for a change here; what both engines need goes above.
+
 ## A describe
 
 - **`PostgresSession.DescribeAsync` holds the order of a describe**: its four checks, `prepare` first and `deallocate` in its `finally`, and `DescribePreparedAsync` the steps between them, in the order of [one describe, step by step](../../../../docs/architecture/postgres-describer.md#one-describe-step-by-step).  A call that has nothing to ask is not made.

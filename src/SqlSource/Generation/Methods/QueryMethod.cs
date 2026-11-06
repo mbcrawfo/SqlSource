@@ -161,7 +161,7 @@ internal sealed record MethodOutput(
 /// <param name="ThrowsOnJsonNull">
 /// Whether the read of the column, which is not null, can give null for a value that is not a <c>NULL</c>, a JSON
 /// <c>null</c>, which then throws: for a property of a <see cref="Converters.JsonTypes.IsNode" /> type, whether
-/// converted or read by the driver, and for the serializer's read of a reference type whole.
+/// converted or read by the driver, and for the serializer's read of the whole value.
 /// </param>
 internal sealed record MethodColumn(
     string Name,

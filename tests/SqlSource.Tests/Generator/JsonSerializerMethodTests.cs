@@ -395,7 +395,7 @@ public sealed class JsonSerializerMethodTests
         write.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
-    // A class whose converters are of another type keeps 8.2's rule: SQLSRC279, and no serializer.
+    // A class whose converters are of another type keeps the converters' rule: SQLSRC279, and no serializer.
     [Theory]
     [InlineData("Npgsql 10", "jsonb")]
     [InlineData("SqlClient 7", "json")]
@@ -425,8 +425,8 @@ public sealed class JsonSerializerMethodTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
-    // A class on a string column that does not hold JSON, without the opt-in or a converter, is read as 8.2 reads it,
-    // by the driver, with no diagnostic.
+    // A class on a string column that does not hold JSON, without the opt-in or a converter, is read by the driver, as
+    // any class without converters is, with no diagnostic.
     [Theory]
     [InlineData("Npgsql 10")]
     [InlineData("SqlClient 7")]

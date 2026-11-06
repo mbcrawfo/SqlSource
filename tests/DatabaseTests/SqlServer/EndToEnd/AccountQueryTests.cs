@@ -8,8 +8,8 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
 // The queries of Queries/Accounts.sql, run through their generated methods on the seed of "app" with their input models
 // as the parameters, into their output models: AccountQueries' methods, extensions of the connection in this
-// namespace, and Reporting.AccountReports', in the extension class of its own namespace.  Each method opens the
-// connection it is given and closes it again.
+// namespace, and Reporting.AccountReports', in the extension class of its own namespace.  Each method is given a closed
+// connection, which it opens; RunTimeArgumentTests pins that it closes it again.
 [Collection(UsesSqlServer.Name)]
 public sealed class AccountQueryTests(SqlServerDatabases sqlServer)
 {

@@ -6,8 +6,8 @@ namespace SqlSource.Tool.Tests.Bundles;
 
 public sealed class BundleTextTests
 {
-    // A control character of each kind, and how it is printed: C0's escape and bell, DEL, and C1's CSI and next line,
-    // and the line breaks, which are C0's too.
+    // A control character of each kind, and how it is printed: C0's escape, bell and NUL, DEL, and C1's CSI and next
+    // line, and the line breaks, which are C0's too.
     public static TheoryData<string, string> Controls =>
         new()
         {

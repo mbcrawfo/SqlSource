@@ -4,7 +4,7 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// The instances of each plan of one walk, found once each: of the whole plan, and of each plan inside it that the
-/// walk reads as a plan of its own, a scan's or a set operation's input.
+/// walk reads as a plan of its own, a scan's, a subquery's <c>SubPlan</c> or a set operation's input.
 /// </summary>
 /// <remarks>
 /// Built from the tree and the answer of <c>partitions</c> alone, which are all <see cref="PlanInstances" /> reads,

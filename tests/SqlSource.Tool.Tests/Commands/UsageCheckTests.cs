@@ -8,7 +8,8 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Commands;
 
 // Most tests give UsageCheck a command built here, apart from the tool's, so that a change to the tool's options
-// does not move them; those that use Cli.BuildCommands run over the tool's own commands and DescribeCommand's rules.
+// does not move them; those that use Cli.BuildCommands run over the tool's own commands and the rules of
+// DescribeCommand, ReplayCommand and DiagnoseCommand.
 public sealed class UsageCheckTests
 {
     private static Command Root()

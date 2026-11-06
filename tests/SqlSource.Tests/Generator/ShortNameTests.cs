@@ -17,8 +17,8 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // A C# type written by its short name in the type override, which the compilation resolves against the project's
-// types and its references', and which generated code then writes by its full name.  Each run is at Models under
-// postgres on Npgsql 10, with an entry written for each query's current hash.
+// types and its references', and which generated code then writes by its full name.  Each run is under postgres on
+// Npgsql 10, at Models unless it says otherwise, with an entry written for each query that needs one.
 public sealed class ShortNameTests
 {
     private const string Place = "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;

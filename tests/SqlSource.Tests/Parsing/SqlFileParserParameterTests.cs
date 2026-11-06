@@ -775,7 +775,7 @@ public sealed class SqlFileParserParameterTests
         Errors(text).ShouldBe([ListMisused(TextSpans.Of(text, value), "@ids", WithJson)]);
     }
 
-    // A json opt-in on a parameter that is no list is the JSON opt-in, as before.
+    // A json opt-in on a parameter that is no list is the JSON opt-in.
     [Fact]
     public void Parse_JsonMarkerOnAParameterInParentheses_IsNotAList() =>
         Blocks("-- name: Q\n-- param: @a -> json Tag\nSELECT id FROM t WHERE id IN (@a)\n")

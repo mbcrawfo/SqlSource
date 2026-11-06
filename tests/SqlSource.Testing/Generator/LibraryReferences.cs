@@ -15,7 +15,8 @@ namespace SqlSource.Testing.Generator;
 // looks for.
 //
 // The versions of Downloaded are those of the PackageDownload items of SqlSource.Testing.csproj: a mismatch builds and
-// fails only when a test runs.  The plugins' are those of the Npgsql of NpgsqlReferences that they pair with.
+// fails only when a test runs.  Npgsql.NodaTime's are those of the Npgsql of NpgsqlReferences that it pairs with, and
+// Npgsql.NetTopologySuite's of the same major.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.

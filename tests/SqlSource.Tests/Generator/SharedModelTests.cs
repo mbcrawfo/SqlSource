@@ -979,7 +979,6 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBeEmpty();
     }
 
-    // The sidecar of the file with an entry of the query that has rows of the columns and no parameters.
     // Users and its sidecar, claimed by the types of the source, under a project's settings file whose input and output
     // suffixes are equal.
     private static GeneratorRun RunWithEqualSuffixes(string source) =>
@@ -990,6 +989,7 @@ public sealed class SharedModelTests
             """{"inputModelSuffix": "Model", "outputModelSuffix": "Model"}"""
         );
 
+    // The sidecar of the file with an entry of the query that has rows of the columns and no parameters.
     private static SqlFile Sidecar(SqlFile file, string name, SidecarColumn[] columns) =>
         Sidecars.Of(file, Entry(file, name, [], columns));
 }

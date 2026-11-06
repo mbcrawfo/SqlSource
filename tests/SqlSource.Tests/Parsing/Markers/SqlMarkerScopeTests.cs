@@ -97,8 +97,8 @@ public sealed class SqlMarkerScopeTests
             ]);
     }
 
-    // The member location and the visibility carry the place of their scope, and the span of the first marker that set
-    // each.  A file with no name marker is one query.
+    // The member location and the visibility carry the place of their scope; the spans of the markers are
+    // Read_PlacementMarkers_AreTheSpansOfTheFirstMarkerThatSetThem's.  A file with no name marker is one query.
     // An internal enum cannot be the parameter of a public test method, so a row gives the names.
     [Theory]
     [InlineData("Preamble", "FileHeader")]
