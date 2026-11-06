@@ -28,6 +28,16 @@ internal static class EndToEndSources
     public static SqlConnection App(SqlServerDatabases sqlServer) =>
         new(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase));
 
+    // A connection to "app" with no command timeout in place of SqlClient's default of 30 seconds, for a test whose
+    // command waits on a lock until the test acts: only the call's own commandTimeout or token ends that wait.
+    public static SqlConnection AppWithoutCommandTimeout(SqlServerDatabases sqlServer) =>
+        new(
+            new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase))
+            {
+                CommandTimeout = 0,
+            }.ConnectionString
+        );
+
     // A connection to "app" that is not pooled, for a test that changes a setting of the session that the pool would
     // hand to the next test: disposing it ends the session.
     public static SqlConnection AppUnpooled(SqlServerDatabases sqlServer) =>

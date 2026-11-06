@@ -1,6 +1,6 @@
 -- The queries of the settings of query methods, claimed by MethodQueries: each result shape, what rowcount counts, a
--- token, and the method's suffix, run on the seed's accounts and notes; and two that sleep, for the command's timeout
--- and its cancellation.
+-- token, and the method's suffix, run on the seed's accounts and notes; and one that waits on a lock before its last
+-- row, for a cancellation during the read.
 
 -- name: TouchAccount
 -- summary: Updates an account without changing it, as rowcount by default, since it returns no rows.
@@ -40,15 +40,12 @@ SELECT id, name FROM accounts ORDER BY id;
 -- summary: An update inside a WITH whose last statement is a SELECT, which counts as -1, as a SELECT does.
 WITH u AS (UPDATE accounts SET name = name WHERE id = @accountId RETURNING id) SELECT id FROM u;
 
--- name: Sleep -> none
--- summary: Sleeps for a number of seconds and returns nothing, for the timeout and the cancellation of the command.
-SELECT 1 AS slept FROM pg_sleep(@seconds);
-
--- name: ListThenSleep
--- summary: The numbers from one to a count, which sleeps for a number of seconds before the last, so that the server
--- summary: has sent most of the rows before it when the sleep starts.
+-- name: ListThenWait
+-- summary: The numbers from one to a count, which waits for a shared advisory lock before the last, so that the server
+-- summary: has sent most of the rows before it when the wait starts.
+-- A SELECT with no FROM computes its list only for a row its WHERE keeps, so the last row alone takes the lock.
 SELECT n FROM generate_series(1, @count) AS n
-CROSS JOIN LATERAL (SELECT FROM pg_sleep(CASE WHEN n = @count THEN @seconds ELSE 0 END)) AS s;
+LEFT JOIN LATERAL (SELECT pg_advisory_xact_lock_shared(@lockKey) WHERE n = @count) AS w ON true;
 
 -- name: ListThenRaise
 -- summary: The accounts into an array, and then a division by zero after them, which the method throws.
