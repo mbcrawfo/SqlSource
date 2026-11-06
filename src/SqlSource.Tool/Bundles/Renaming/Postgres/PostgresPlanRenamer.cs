@@ -24,9 +24,11 @@ namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 /// </para>
 /// <para>
 /// The planner prints a partition's scan, or a child of an inherited table, under its parent's alias and a number,
-/// <c>orders_1</c> (<see cref="PlanPartitions" />), which neither the query nor a catalog holds.  Such a name is
-/// renamed through the alias, <c>t_1234abcd_1</c>, so that the members of an <c>Append</c> keep one prefix, and the
-/// token check reads it by its stem.
+/// <c>orders_1</c> (<see cref="PlanPartitions" />), which the query does not hold.  Such a name is renamed through
+/// the alias, <c>t_1234abcd_1</c>, so that the members of an <c>Append</c> keep one prefix, and the token check reads
+/// it by its stem.  The members of an <c>Append</c> that <see cref="PlanPartitions.ShapeOf" /> reads as one prefix are
+/// renamed so whatever the mapping holds of their spelling, since a partition may be named as its scan, and so is
+/// the same spelling where it qualifies a column; a <c>Relation Name</c> keeps its table's own replacement.
 /// </para>
 /// </remarks>
 internal static class PostgresPlanRenamer
@@ -476,6 +478,9 @@ internal static class PostgresPlanRenamer
     // One plan renamed, written as it is read, which stops at its first refusal.
     private sealed class Renaming(RenamingField field, IRenamingScope scope)
     {
+        // The aliases of the members of the plan's Appends that the walk reads as one prefix (AddChildren).
+        private readonly Dictionary<string, (string Stem, string Suffix)> _children = [with(StringComparer.Ordinal)];
+
         public string? Run()
         {
             using var document = Parse(field.Value);
@@ -491,6 +496,8 @@ internal static class PostgresPlanRenamer
                 writer.WriteStartArray();
                 foreach (var element in document.RootElement.EnumerateArray())
                 {
+                    _children.Clear();
+                    AddChildren(element.GetProperty(PlanKeys.Plan), _children);
                     writer.WriteStartObject();
                     writer.WritePropertyName(PlanKeys.Plan);
                     if (!Node(writer, element.GetProperty(PlanKeys.Plan)))
@@ -558,6 +565,12 @@ internal static class PostgresPlanRenamer
 
                     writer.WriteEndArray();
                     return true;
+                case KeyKind.Name when member.NameEquals(PlanKeys.Alias):
+                    return Text(
+                        writer,
+                        value,
+                        name => MemberOf(name, quoted: true) ?? NameOf(name, quoted: true, NameClass.Alias)
+                    );
                 case KeyKind.Name:
                     var cls = NameKeyClasses[member.Name];
                     return Text(writer, value, name => NameOf(name, quoted: true, cls));
@@ -639,6 +652,72 @@ internal static class PostgresPlanRenamer
             return scope.Name(spelling, quoted, cls);
         }
 
+        // The Alias of each member of an Append that PlanPartitions.ShapeOf reads as one prefix, at and under the
+        // node through Plans, as PlanNode reads a plan, with its stem and suffix.  A key that holds no string is read
+        // as absent, which gives no prefix.
+        private static void AddChildren(JsonElement node, Dictionary<string, (string Stem, string Suffix)> children)
+        {
+            if (
+                node.ValueKind != JsonValueKind.Object
+                || !node.TryGetProperty(PlanKeys.Plans, out var plans)
+                || plans.ValueKind != JsonValueKind.Array
+            )
+            {
+                return;
+            }
+
+            var members = plans.EnumerateArray().Select(static member => ShallowOf(member, [])).ToArray();
+            if (PlanPartitions.ShapeOf(ShallowOf(node, members)) is not null)
+            {
+                foreach (var alias in members.Select(static member => member.Alias!))
+                {
+                    children[alias] = ChildOf(alias)!.Value;
+                }
+            }
+
+            foreach (var child in plans.EnumerateArray())
+            {
+                AddChildren(child, children);
+            }
+        }
+
+        // A node with the keys that PlanPartitions.ShapeOf reads, and the children given.
+        private static PlanNode ShallowOf(JsonElement node, IReadOnlyList<PlanNode> plans) =>
+            new(
+                StringOf(node, PlanKeys.NodeType) ?? string.Empty,
+                JoinType: null,
+                StringOf(node, PlanKeys.ParentRelationship),
+                Output: null,
+                StringOf(node, PlanKeys.Alias),
+                StringOf(node, PlanKeys.RelationName),
+                StringOf(node, PlanKeys.Schema),
+                SubplanName: null,
+                CteName: null,
+                Command: null,
+                HasGroupingSets: false,
+                Strategy: null,
+                HasGroupKey: false,
+                HasFilter: false,
+                SubplansRemoved: 0,
+                plans
+            );
+
+        private static string? StringOf(JsonElement node, string key) =>
+            node.ValueKind == JsonValueKind.Object
+            && node.TryGetProperty(key, out var value)
+            && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+
+        // The alias of a member that the walk reads in one prefix, renamed through its stem whatever the mapping holds
+        // of its spelling, when the stem is mapped or the engine's; else null.  The renamed members then share the
+        // stem's replacement as their prefix, as the original's members share the stem.
+        private string? MemberOf(string spelling, bool quoted) =>
+            _children.TryGetValue(spelling, out var child)
+            && (scope.IsMapped(child.Stem, quoted) || PostgresWords.IsEngineWord(child.Stem, quoted))
+                ? scope.Name(child.Stem, quoted, NameClass.Alias) + child.Suffix
+                : null;
+
         private string? Subplan(string text) =>
             text.Length > CtePrefix.Length && text.StartsWith(CtePrefix, StringComparison.Ordinal)
                 ? CtePrefix + NameOf(text[CtePrefix.Length..], quoted: true, NameClass.Alias)
@@ -664,11 +743,14 @@ internal static class PostgresPlanRenamer
                     index + 1 < tokens.Count && tokens[index + 1].Kind == PlanTokens.Kind.Open
                         ? NameClass.Function
                         : NameClass.Alias;
+                var qualifier = Qualifies(tokens, index);
                 var replacement = token.Kind switch
                 {
-                    PlanTokens.Kind.Word => NameOf(written, quoted: false, cls),
+                    PlanTokens.Kind.Word => (qualifier ? MemberOf(written, quoted: false) : null)
+                        ?? NameOf(written, quoted: false, cls),
                     PlanTokens.Kind.QuotedName => Quoted(
-                        NameOf(PostgresIdentifiers.Unquote(written), quoted: true, cls)
+                        (qualifier ? MemberOf(PostgresIdentifiers.Unquote(written), quoted: true) : null)
+                            ?? NameOf(PostgresIdentifiers.Unquote(written), quoted: true, cls)
                     ),
                     PlanTokens.Kind.String => "'"
                         + scope
@@ -698,6 +780,16 @@ internal static class PostgresPlanRenamer
 
             return renamed.Append(text, at, text.Length - at).ToString();
         }
+
+        // Whether the token qualifies a column, as PlanPartitions.WithoutAlias reads one: a "." directly follows it and
+        // none directly precedes it.
+        private static bool Qualifies(List<PlanTokens.Token> tokens, int index) =>
+            index + 1 < tokens.Count
+            && IsDotAt(tokens[index + 1], tokens[index].End)
+            && (index == 0 || !IsDotAt(tokens[index - 1], tokens[index].Start - 1));
+
+        private static bool IsDotAt(PlanTokens.Token token, int at) =>
+            token.Kind == PlanTokens.Kind.Dot && token.Start == at;
 
         private static bool HasNameCharacter(string token) =>
             token.Any(static character => char.IsLetterOrDigit(character) || character == '_');

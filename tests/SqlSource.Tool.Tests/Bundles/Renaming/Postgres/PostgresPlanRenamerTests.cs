@@ -192,6 +192,165 @@ public sealed class PostgresPlanRenamerTests
         Texts(member["Output"]).ShouldBe(["t_orders_1.c_id"]);
     }
 
+    // Partitions named as the planner names their scans: the members' aliases are spellings that the catalog maps as
+    // tables, and are still renamed through the stem, here mapped as an alias so that the two replacements differ,
+    // wherever they qualify a column in the plan; a Relation Name keeps its table's replacement.
+    [Theory]
+    [InlineData("Append")]
+    [InlineData("Merge Append")]
+    public void Rename_MembersNamedAsTheirPartitions_ShareTheStemsPrefix(string nodeType)
+    {
+        var scope = PartitionScope();
+        var first = PartitionMember("orders_1", "orders_1.note", "\"orders_1\".id");
+        first["Filter"] = "(orders_1.id > 0)";
+        first["Plans"] = new JsonArray(
+            new JsonObject
+            {
+                ["Node Type"] = "Aggregate",
+                ["Parent Relationship"] = "SubPlan",
+                ["Subplan Name"] = "SubPlan 1",
+                ["Output"] = new JsonArray("max(orders_1.id)"),
+                ["Filter"] = "(u.id = orders_1.user_id)",
+                ["Group Key"] = new JsonArray("orders_1.user_id"),
+            }
+        );
+        var node = new JsonObject
+        {
+            ["Node Type"] = nodeType,
+            ["Output"] = new JsonArray("orders.note"),
+            ["Plans"] = new JsonArray(first, PartitionMember("orders_2", "orders_2.note", "\"orders_2\".id")),
+        };
+
+        var root = Root(Rename(node, scope));
+
+        scope.Refusals.ShouldBeEmpty();
+        Texts(root["Output"]).ShouldBe(["a_orders.c_note"]);
+        var members = root["Plans"]!.AsArray();
+        members.Select(static member => Text(member!["Alias"])).ShouldBe(["a_orders_1", "a_orders_2"]);
+        members.Select(static member => Text(member!["Relation Name"])).ShouldBe(["t_orders_1", "t_orders_2"]);
+        Texts(members[0]!["Output"]).ShouldBe(["a_orders_1.c_note", "\"a_orders_1\".c_id"]);
+        Texts(members[1]!["Output"]).ShouldBe(["a_orders_2.c_note", "\"a_orders_2\".c_id"]);
+        Text(members[0]!["Filter"]).ShouldBe("(a_orders_1.c_id > 0)");
+        var subPlan = members[0]!["Plans"]![0]!;
+        Texts(subPlan["Output"]).ShouldBe(["max(a_orders_1.c_id)"]);
+        Text(subPlan["Filter"]).ShouldBe("(a_u.c_id = a_orders_1.c_user_id)");
+        Texts(subPlan["Group Key"]).ShouldBe(["a_orders_1.c_user_id"]);
+        var renamed = PlanNode.Read(PlanOf(root.AsObject())).ShouldNotBeNull();
+        PlanPartitions.ShapeOf(renamed).ShouldBe("a_orders");
+    }
+
+    // The spelling of a member that does not qualify a column, or that qualifies one after a ".", is no alias the
+    // walk reads, and is renamed as a name of its own.
+    [Fact]
+    public void Rename_MembersSpellingThatQualifiesNoColumn_IsItsOwnName()
+    {
+        var scope = PartitionScope();
+        var node = new JsonObject
+        {
+            ["Node Type"] = "Append",
+            ["Plans"] = new JsonArray(
+                PartitionMember("orders_1", "orders_1", "orders_1(orders_1.id)", "s.orders_1.id"),
+                PartitionMember("orders_2")
+            ),
+        };
+
+        var member = Root(Rename(node, scope))["Plans"]![0]!;
+
+        scope.Refusals.ShouldBeEmpty();
+        Texts(member["Output"]).ShouldBe(["t_orders_1", "t_orders_1(a_orders_1.c_id)", "a_s.t_orders_1.c_id"]);
+    }
+
+    // Outside an Append whose members the walk reads as one prefix, a spelling the mapping holds keeps its own
+    // replacement: a scan alone, an Append whose members have two prefixes, a second plan of the answer, and the
+    // members of a stem that nothing maps.
+    [Fact]
+    public void Rename_MappedChildOutsideOnePrefix_IsItsOwnName()
+    {
+        var scope = PartitionScope();
+        _ = scope.Name("items_2", quoted: true, NameClass.Table);
+        var alone = new JsonObject
+        {
+            ["Node Type"] = "Seq Scan",
+            ["Relation Name"] = "orders_1",
+            ["Alias"] = "orders_1",
+            ["Output"] = new JsonArray("orders_1.id"),
+        };
+        var twoPrefixes = new JsonObject
+        {
+            ["Node Type"] = "Append",
+            ["Plans"] = new JsonArray(PartitionMember("orders_1", "orders_1.id"), PartitionMember("items_2")),
+        };
+        var onePrefix = new JsonObject
+        {
+            ["Node Type"] = "Append",
+            ["Plans"] = new JsonArray(PartitionMember("orders_1"), PartitionMember("orders_2")),
+        };
+        var secondPlan = new JsonArray(
+            new JsonObject { ["Plan"] = onePrefix },
+            new JsonObject { ["Plan"] = alone.DeepClone() }
+        ).ToJsonString();
+
+        Text(Root(Rename(alone, scope))["Alias"]).ShouldBe("t_orders_1");
+        Texts(Root(Rename(alone, scope))["Output"]).ShouldBe(["t_orders_1.c_id"]);
+        var members = Root(Rename(twoPrefixes, scope))["Plans"]!.AsArray();
+        members.Select(static member => Text(member!["Alias"])).ShouldBe(["t_orders_1", "t_items_2"]);
+        Texts(members[0]!["Output"]).ShouldBe(["t_orders_1.c_id"]);
+        var second = JsonNode.Parse(PostgresPlanRenamer.Rename(FieldOf(secondPlan), scope))![1]!["Plan"]!;
+        Text(second["Alias"]).ShouldBe("t_orders_1");
+        Texts(second["Output"]).ShouldBe(["t_orders_1.c_id"]);
+        scope.Refusals.ShouldBeEmpty();
+
+        var unmapped = Scope();
+        _ = unmapped.Name("orders_1", quoted: true, NameClass.Table);
+        _ = unmapped.Name("orders_2", quoted: true, NameClass.Table);
+        Root(Rename(onePrefix, unmapped))["Plans"]!
+            .AsArray()
+            .Select(static member => Text(member!["Alias"]))
+            .ShouldBe(["t_orders_1", "t_orders_2"]);
+    }
+
+    // A table named as an engine word, whose partitions are named as their scans: the members keep the word and its
+    // suffix, as an alias of no partition of it does (Rename_ChildOfAnEngineWord_KeepsTheWord).
+    [Fact]
+    public void Rename_MembersOfAnEngineWordNamedAsTheirPartitions_KeepTheWord()
+    {
+        var scope = Scope();
+        _ = scope.Name("name_1", quoted: true, NameClass.Table);
+        _ = scope.Name("name_2", quoted: true, NameClass.Table);
+        var node = new JsonObject
+        {
+            ["Node Type"] = "Append",
+            ["Plans"] = new JsonArray(PartitionMember("name_1", "name_1.id"), PartitionMember("name_2")),
+        };
+
+        var members = Root(Rename(node, scope))["Plans"]!.AsArray();
+
+        members.Select(static member => Text(member!["Alias"])).ShouldBe(["name_1", "name_2"]);
+        members.Select(static member => Text(member!["Relation Name"])).ShouldBe(["t_name_1", "t_name_2"]);
+        Texts(members[0]!["Output"]).ShouldBe(["name_1.a_id"]);
+    }
+
+    // A member whose Alias holds no string has no prefix, and is kept as the plan holds it.
+    [Fact]
+    public void Rename_MemberWithAnAliasOfNoString_GivesNoPrefix()
+    {
+        var scope = PartitionScope();
+        var odd = PartitionMember("orders_1");
+        odd["Alias"] = 1;
+        var node = new JsonObject
+        {
+            ["Node Type"] = "Append",
+            ["Plans"] = new JsonArray(odd, PartitionMember("orders_2", "orders_2.id")),
+        };
+
+        var members = Root(Rename(node, scope))["Plans"]!.AsArray();
+
+        scope.Refusals.ShouldBeEmpty();
+        members[0]!["Alias"]!.GetValue<int>().ShouldBe(1);
+        Text(members[1]!["Alias"]).ShouldBe("t_orders_2");
+        Texts(members[1]!["Output"]).ShouldBe(["t_orders_2.c_id"]);
+    }
+
     [Fact]
     public void Rename_ChildAliasHeldBySql_IsItsOwnName()
     {
@@ -624,6 +783,39 @@ public sealed class PostgresPlanRenamerTests
         PostgresPlanRenamer.WordsOf(FieldOf(plan)).ShouldBe([plan == "not json" ? plan : "(a.b"]);
 
     private static FakeRenamingScope Scope() => new(PostgresWords.IsEngineWord, PostgresWords.Fold);
+
+    // The names a bundle of orders, partitioned into orders_1 and orders_2, maps before its plan: the query's orders,
+    // here as an alias so that its replacement is told from a table's, the partitions' tables, and the columns.
+    private static FakeRenamingScope PartitionScope()
+    {
+        var scope = Scope();
+        _ = scope.Name("orders", quoted: true, NameClass.Alias);
+        _ = scope.Name("orders_1", quoted: true, NameClass.Table);
+        _ = scope.Name("orders_2", quoted: true, NameClass.Table);
+        _ = scope.Name("id", quoted: true, NameClass.Column);
+        _ = scope.Name("note", quoted: true, NameClass.Column);
+        _ = scope.Name("user_id", quoted: true, NameClass.Column);
+        return scope;
+    }
+
+    // A scan of a partition of public under an alias that is the partition's own name, as a member of an Append.
+    private static JsonObject PartitionMember(string name, params string[] output)
+    {
+        var member = new JsonObject
+        {
+            ["Node Type"] = "Seq Scan",
+            ["Parent Relationship"] = "Member",
+            ["Relation Name"] = name,
+            ["Schema"] = "public",
+            ["Alias"] = name,
+        };
+        if (output.Length > 0)
+        {
+            member["Output"] = new JsonArray([.. output.Select(static entry => (JsonNode)entry)]);
+        }
+
+        return member;
+    }
 
     private static RenamingField FieldOf(string plan) =>
         new(3, PostgresCallNames.Explain, PlanPath, plan, new JsonObject { ["plan"] = plan });
