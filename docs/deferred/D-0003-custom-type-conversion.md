@@ -2,7 +2,7 @@
 
 ## Planned
 
-The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) plans a project-level type override (phase 5), map rows that convert a value with a read and a write expression (phase 7), and binding a parameter by its type's `bindName` from the sidecar (phase 8).  The [fix of the gaps of the check against Npgsql](../superpowers/specs/2026-10-15-td-0045-npgsql-check-gaps-design.md) recorded that nothing plans a conversion a project declares for a type the driver cannot write.  [Sub-phase 8.2](../superpowers/specs/2026-10-24-query-generation-phase-8-2-converters-design.md) delivered that conversion for every type the base map gives a C# type, and left out, as a non-goal, making a composite, a table's row type or another type that `SQLSRC232` refuses bindable.
+The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) plans a project-level type override (phase 5), map rows that convert a value with a read and a write expression (phase 7), and binding a parameter by its type's `bindName` from the sidecar (phase 8).  The [fix of the gaps of the check against Npgsql](https://github.com/mbcrawfo/SqlSource/blob/b997875efe96a73842ac179c2cdd10779de5a8c9/docs/superpowers/specs/2026-10-15-td-0045-npgsql-check-gaps-design.md) recorded that nothing plans a conversion a project declares for a type the driver cannot write.  [Sub-phase 8.2](../superpowers/specs/2026-10-24-query-generation-phase-8-2-converters-design.md) delivered that conversion for every type the base map gives a C# type, and left out, as a non-goal, making a composite, a table's row type or another type that `SQLSRC232` refuses bindable.
 
 ## Delivered instead
 

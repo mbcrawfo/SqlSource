@@ -10,7 +10,7 @@ The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.m
 
 ## Why deferred
 
-The tool describes a query through `PREPARE`, which cannot take `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest.  The other route, a describe of the unprepared statement through Npgsql, has open problems, listed below, and the [design of the fix of the describer's parameter gaps](../superpowers/specs/2026-10-14-td-0043-postgresql-describer-parameter-gaps-design.md) was to make the refusal clear, not to build a second route.
+The tool describes a query through `PREPARE`, which cannot take `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest.  The other route, a describe of the unprepared statement through Npgsql, has open problems, listed below, and the [design of the fix of the describer's parameter gaps](https://github.com/mbcrawfo/SqlSource/blob/b997875efe96a73842ac179c2cdd10779de5a8c9/docs/superpowers/specs/2026-10-14-td-0043-postgresql-describer-parameter-gaps-design.md) was to make the refusal clear, not to build a second route.
 
 ## Remaining work
 
