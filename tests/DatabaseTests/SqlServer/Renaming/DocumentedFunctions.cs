@@ -3,7 +3,8 @@ using System.Collections.Generic;
 namespace SqlSource.DatabaseTests.SqlServer.Renaming;
 
 // The "name" column of mssql-functions.tsv in docs/superpowers/specs/2026-11-05-query-generation-phase-10-spike/,
-// the documented functions of Microsoft's table of contents, fetched 2026-11-04.
+// the documented functions of Microsoft's table of contents, fetched 2026-11-04, then the table-valued functions that
+// its node "Functions" lacks.
 internal static class DocumentedFunctions
 {
     public static IReadOnlyList<string> Names { get; } =
@@ -326,5 +327,10 @@ internal static class DocumentedFunctions
         "VERSION",
         "XACT_STATE",
         "YEAR",
+        // The table-valued functions that the node "Functions" of the table of contents lacks, from their own pages of
+        // Microsoft's documentation, "STRING_SPLIT (Transact-SQL)" and "GENERATE_SERIES (Transact-SQL)", fetched
+        // 2026-11-05.
+        "GENERATE_SERIES",
+        "STRING_SPLIT",
     ];
 }

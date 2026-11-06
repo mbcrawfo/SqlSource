@@ -766,6 +766,80 @@ internal static class SqlServerVocabulary
         "UNBOUNDED",
     ];
 
+    // Fetched 2026-11-05 from the syntax of Microsoft's "Table hints (Transact-SQL)", "Query hints (Transact-SQL)",
+    // "OVER clause (Transact-SQL)", "FOR clause (Transact-SQL)" and "Query data in a system-versioned temporal table",
+    // leaving out the words that another list holds already, such as INDEX and PRECEDING.
+    /// <summary>
+    /// The words of the table hints, the query hints, a window's frame, <c>FOR XML</c>, <c>FOR JSON</c> and
+    /// <c>FOR SYSTEM_TIME</c>.
+    /// </summary>
+    public static IReadOnlyList<string> ClauseWords { get; } =
+    [
+        "AUTO",
+        "BASE64",
+        "CONTAINED",
+        "DISABLE",
+        "DISABLE_OPTIMIZED_PLAN_FORCING",
+        "ELEMENTS",
+        "EXPAND",
+        "EXPLICIT",
+        "EXTERNALPUSHDOWN",
+        "FAST",
+        "FOLLOWING",
+        "FORCE",
+        "FORCED",
+        "FORCESCAN",
+        "FORCESEEK",
+        "FORCE_ANN_ONLY",
+        "HASH",
+        "HINT",
+        "IGNORE_CONSTRAINTS",
+        "IGNORE_NONCLUSTERED_COLUMNSTORE_INDEX",
+        "IGNORE_TRIGGERS",
+        "INCLUDE_NULL_VALUES",
+        "KEEP",
+        "KEEPDEFAULTS",
+        "KEEPFIXED",
+        "KEEPIDENTITY",
+        "LOOP",
+        "MAXDOP",
+        "MAXRECURSION",
+        "MAX_GRANT_PERCENT",
+        "MIN_GRANT_PERCENT",
+        "NOEXPAND",
+        "NOLOCK",
+        "NOWAIT",
+        "NO_PERFORMANCE_SPOOL",
+        "OPTIMIZE",
+        "PAGLOCK",
+        "PARAMETERIZATION",
+        "QUERYTRACEON",
+        "RAW",
+        "READCOMMITTED",
+        "READCOMMITTEDLOCK",
+        "READPAST",
+        "READUNCOMMITTED",
+        "REPEATABLEREAD",
+        "ROBUST",
+        "ROOT",
+        "ROWLOCK",
+        "SCALEOUTEXECUTION",
+        "SERIALIZABLE",
+        "SIMPLE",
+        "SNAPSHOT",
+        "SPATIAL_WINDOW_MAX_CELLS",
+        "TABLOCK",
+        "TABLOCKX",
+        "TYPE",
+        "UPDLOCK",
+        "VIEWS",
+        "WITHOUT_ARRAY_WRAPPER",
+        "XLOCK",
+        "XMLDATA",
+        "XMLSCHEMA",
+        "XSINIL",
+    ];
+
     // Written by hand on 2026-11-05 from Microsoft's documentation of the pseudo-columns.
     /// <summary>The pseudo-columns, written with their <c>$</c>.</summary>
     public static IReadOnlyList<string> PseudoColumns { get; } =
@@ -811,7 +885,8 @@ internal static class SqlServerVocabulary
         "@@VERSION",
     ];
 
-    // The documented functions (mssql-functions.tsv of the phase 10 spike, fetched 2026-11-04) that the probe of
+    // The documented functions (mssql-functions.tsv of the phase 10 spike, fetched 2026-11-04, with STRING_SPLIT and
+    // GENERATE_SERIES, which its table of contents lacks) that the probe of
     // tests/DatabaseTests/SqlServer/Renaming/VocabularyTests.cs found on the floor image or on the default one, on
     // 2026-11-05, leaving out those that a keyword list holds already, such as LEFT.
     /// <summary>The documented functions that the floor or the default image knows.</summary>
@@ -920,6 +995,7 @@ internal static class SqlServerVocabulary
         "FORMATMESSAGE",
         "FULLTEXTCATALOGPROPERTY",
         "FULLTEXTSERVICEPROPERTY",
+        "GENERATE_SERIES",
         "GETANSINULL",
         "GETDATE",
         "GETUTCDATE",
@@ -1037,6 +1113,7 @@ internal static class SqlServerVocabulary
         "STR",
         "STRING_AGG",
         "STRING_ESCAPE",
+        "STRING_SPLIT",
         "STUFF",
         "SUSER_ID",
         "SUSER_NAME",
@@ -1137,6 +1214,7 @@ internal static class SqlServerVocabulary
         .Concat(Odbc)
         .Concat(Future)
         .Concat(NonReserved)
+        .Concat(ClauseWords)
         .Concat(PseudoColumns)
         .Concat(GlobalVariables)
         .Concat(Functions)

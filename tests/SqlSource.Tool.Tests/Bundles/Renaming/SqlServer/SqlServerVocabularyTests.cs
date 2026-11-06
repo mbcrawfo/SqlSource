@@ -14,6 +14,7 @@ public sealed class SqlServerVocabularyTests
             "Odbc",
             "Future",
             "NonReserved",
+            "ClauseWords",
             "PseudoColumns",
             "GlobalVariables",
             "Functions",
@@ -41,6 +42,49 @@ public sealed class SqlServerVocabularyTests
     [InlineData("geography")]
     [InlineData("SP_EXECUTESQL")]
     public void Contains_AWordOfTheServer_IsTrue(string spelling) =>
+        SqlServerVocabulary.Contains(spelling).ShouldBeTrue(spelling);
+
+    // The words of the table hints, the query hints, a window's frame, FOR JSON, FOR XML and FOR SYSTEM_TIME, and the
+    // table-valued functions that the table of contents of the documentation lacks.
+    [Theory]
+    [InlineData("FOLLOWING")]
+    [InlineData("NOLOCK")]
+    [InlineData("READPAST")]
+    [InlineData("UPDLOCK")]
+    [InlineData("ROWLOCK")]
+    [InlineData("TABLOCK")]
+    [InlineData("TABLOCKX")]
+    [InlineData("PAGLOCK")]
+    [InlineData("XLOCK")]
+    [InlineData("NOWAIT")]
+    [InlineData("READUNCOMMITTED")]
+    [InlineData("READCOMMITTED")]
+    [InlineData("REPEATABLEREAD")]
+    [InlineData("SERIALIZABLE")]
+    [InlineData("SNAPSHOT")]
+    [InlineData("FORCESEEK")]
+    [InlineData("FORCESCAN")]
+    [InlineData("NOEXPAND")]
+    [InlineData("MAXDOP")]
+    [InlineData("HASH")]
+    [InlineData("LOOP")]
+    [InlineData("OPTIMIZE")]
+    [InlineData("UNKNOWN")]
+    [InlineData("FAST")]
+    [InlineData("KEEPFIXED")]
+    [InlineData("EXPAND")]
+    [InlineData("VIEWS")]
+    [InlineData("AUTO")]
+    [InlineData("RAW")]
+    [InlineData("ROOT")]
+    [InlineData("INCLUDE_NULL_VALUES")]
+    [InlineData("WITHOUT_ARRAY_WRAPPER")]
+    [InlineData("ELEMENTS")]
+    [InlineData("TYPE")]
+    [InlineData("CONTAINED")]
+    [InlineData("STRING_SPLIT")]
+    [InlineData("GENERATE_SERIES")]
+    public void Contains_AWordOfAClauseOrATableValuedFunction_IsTrue(string spelling) =>
         SqlServerVocabulary.Contains(spelling).ShouldBeTrue(spelling);
 
     [Theory]
