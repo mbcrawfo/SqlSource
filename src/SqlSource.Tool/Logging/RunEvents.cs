@@ -14,9 +14,9 @@ namespace SqlSource.Tool.Logging;
 /// The events of a run, each built in one place, so that an event has one set of members wherever it is written.
 /// </summary>
 /// <remarks>
-/// A member is added and never renamed: people read the log, and so does phase 10's bundle.  None of these is
-/// handed a connection's value.  The ones of a database after its connection is found are written through
-/// <see cref="RunTrace.Without" />, since they hold what a describer gave.
+/// A member is added and never renamed: people read the log, as <c>replay</c>'s lines read a describer's events.
+/// None of these is handed a connection's value.  The ones of a database after its connection is found are written
+/// through <see cref="RunTrace.Without" />, since they hold what a describer gave.
 /// </remarks>
 internal static class RunEvents
 {

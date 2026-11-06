@@ -63,6 +63,7 @@ internal static class Hosts
             time ?? new TestClock(),
             ToolHost.NewFile,
             ReadUnderTheTemporaryFolder,
+            ToolHost.OpenRead,
             Runtime,
             OperatingSystem,
             WatchUnderTheTemporaryFolder
@@ -83,6 +84,7 @@ internal static class Hosts
             time ?? new TestClock(),
             ToolHost.NewFile,
             ReadUnderTheTemporaryFolder,
+            ToolHost.OpenRead,
             Runtime,
             OperatingSystem,
             WatchUnderTheTemporaryFolder

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Invocation;
@@ -150,8 +151,9 @@ public static class Cli
     /// Runs the command with a host that the caller gives.  The tests call this.
     /// </summary>
     /// <remarks>
-    /// The log of the run is opened and closed here, though <c>--log</c> is an option of <c>describe</c>: the error
-    /// of an exception is reported here and the exit code is decided here, and both belong in the log.
+    /// The log of the run is opened and closed here, though <c>--log</c> is an option of <c>describe</c> and of
+    /// <c>replay</c>: the error of an exception is reported here and the exit code is decided here, and both belong in
+    /// the log.
     /// </remarks>
     internal static async Task<int> RunAsync(string[] args, ToolHost host, CancellationToken cancellationToken)
     {
@@ -227,7 +229,7 @@ public static class Cli
         var root = BuildCommands();
 
         var usage = UsageCheck.Check(root, args);
-        var messages = usage.Messages.Count > 0 ? usage.Messages : DescribeCommand.CheckUsage(usage);
+        var messages = usage.Messages.Count > 0 ? usage.Messages : CheckUsageOfTheCommand(usage);
         if (messages.Count > 0)
         {
             foreach (var line in messages)
@@ -239,7 +241,12 @@ public static class Cli
         }
 
         var parsed = root.Parse(args, Parser);
-        if (parsed.Errors.Count > 0 || !usage.IsReadTheSameBy(parsed) || !DescribeCommand.ReadsValuesAs(usage, parsed))
+        if (
+            parsed.Errors.Count > 0
+            || !usage.IsReadTheSameBy(parsed)
+            || !DescribeCommand.ReadsValuesAs(usage, parsed)
+            || !ReplayCommand.ReadsValuesAs(usage, parsed)
+        )
         {
             // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
             // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
@@ -249,9 +256,25 @@ public static class Cli
             return null;
         }
 
-        // Whether the command line runs "describe", once.
-        return new ParsedCommandLine(usage, parsed, DescribeCommand.Runs(parsed));
+        // Which command the command line runs, once.
+        return new ParsedCommandLine(usage, parsed, RunningOf(parsed));
     }
+
+    // Which command of the tool a command line runs, if any: the root's help and version run none.
+    private static Running RunningOf(ParseResult parsed)
+    {
+        if (DescribeCommand.Runs(parsed))
+        {
+            return Running.Describe;
+        }
+
+        return ReplayCommand.Runs(parsed) ? Running.Replay : Running.Nothing;
+    }
+
+    // What is wrong with a command line by the rules of its command, each a whole line.  Each command gives none for
+    // another.
+    private static IReadOnlyList<string> CheckUsageOfTheCommand(Usage usage) =>
+        [.. DescribeCommand.CheckUsage(usage), .. ReplayCommand.CheckUsage(usage)];
 
     // Opens the log the run was given, and writes run.start: after the command line was read, so that a wrong one
     // is never logged, and before anything runs.  False when the log cannot be opened, which is reported: the run
@@ -259,10 +282,24 @@ public static class Cli
     private static bool OpenLog(ParsedCommandLine commandLine, string[] args, RunState state)
     {
         var host = state.Host;
-        var logPath = DescribeCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable);
-        // A build's user cannot give the build's run a log, so a run under --online points at none.
+        var (logPath, logOption) = commandLine.Runs switch
+        {
+            Running.Describe => (
+                DescribeCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
+                DescribeCommand.LogOptionOf(commandLine.Usage)
+            ),
+            Running.Replay => (
+                ReplayCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
+                ReplayCommand.LogOptionOf(commandLine.Usage)
+            ),
+            Running.Nothing => (null, null),
+            _ => throw UnexpectedEnumValueException.Of(commandLine.Runs),
+        };
+
+        // A build's user cannot give the build's run a log, so a run under --online points at none.  The line is
+        // describe's alone.
         state.MayPoint =
-            commandLine.RunsDescribe
+            commandLine.Runs == Running.Describe
             && logPath is null
             && DescribeCommand.OnlineOf(commandLine.Parsed) == OnlineMode.Off;
 
@@ -279,13 +316,7 @@ public static class Cli
             return true;
         }
 
-        var opened = RunLogFile.Open(
-            logPath,
-            host.WorkingDirectory,
-            host.CreateFile,
-            host.Time,
-            DescribeCommand.LogOptionOf(commandLine.Usage)
-        );
+        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time, logOption);
         if (!opened.Succeeded)
         {
             state.Reporter.Report(opened.Failure);
@@ -304,7 +335,7 @@ public static class Cli
         return true;
     }
 
-    // Gives "describe" its action with the reporter of the run, and invokes the command.
+    // Gives the command that runs its action with the reporter of the run, and invokes the command.
     private static async Task<int> InvokeAsync(
         ParsedCommandLine commandLine,
         RunState state,
@@ -313,20 +344,38 @@ public static class Cli
     {
         var host = state.Host;
         var parsed = commandLine.Parsed;
-        if (commandLine.RunsDescribe)
-        {
-            // What the run says of itself: to the log, when it has one, and to the person watching under
-            // --verbose.
-            IRunLog events = state.Log is { } log ? log : NullRunLog.Instance;
 
-            // The reporter of the run: from here on every error is also an event of the log.  The command
-            // gets its action only now, so that it cannot run with another.
-            state.Reporter = new Reporter(
-                host.Error,
-                new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null),
-                oneLine: DescribeCommand.OnlineOf(parsed) != OnlineMode.Off
-            );
-            DescribeCommand.Bind(parsed, commandLine.Usage, host, state.Reporter, counts => state.Databases = counts);
+        // What the run says of itself: to the log, when it has one, and to the person watching under --verbose.
+        // The reporter of the run: from here on every error is also an event of the log.  The command gets its
+        // action only now, so that it cannot run with another.
+        IRunLog events = state.Log is { } log ? log : NullRunLog.Instance;
+        switch (commandLine.Runs)
+        {
+            case Running.Describe:
+                state.Reporter = new Reporter(
+                    host.Error,
+                    new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null),
+                    oneLine: DescribeCommand.OnlineOf(parsed) != OnlineMode.Off
+                );
+                DescribeCommand.Bind(
+                    parsed,
+                    commandLine.Usage,
+                    host,
+                    state.Reporter,
+                    counts => state.Databases = counts
+                );
+                break;
+            case Running.Replay:
+                state.Reporter = new Reporter(
+                    host.Error,
+                    new RunTrace(events, ReplayCommand.IsVerbose(parsed) ? host.Out : null)
+                );
+                ReplayCommand.Bind(parsed, commandLine.Usage, host, state.Reporter);
+                break;
+            case Running.Nothing:
+                break;
+            default:
+                throw UnexpectedEnumValueException.Of(commandLine.Runs);
         }
 
         var invocation = new InvocationConfiguration
@@ -399,6 +448,7 @@ public static class Cli
             new HelpOption("--help", "-h", "-?"),
             version,
             DescribeCommand.Create(),
+            ReplayCommand.Create(),
         };
 
         // System.CommandLine's own answer to no command is an error.
@@ -417,8 +467,17 @@ public static class Cli
         }
     }
 
-    // A command line that both readers accept, as each read it.
-    private sealed record ParsedCommandLine(Usage Usage, ParseResult Parsed, bool RunsDescribe);
+    // The command of the tool that a command line runs.
+    private enum Running
+    {
+        // The root's help or version, or a command's help.
+        Nothing,
+        Describe,
+        Replay,
+    }
+
+    // A command line that both readers accept, as each read it, and the command it runs.
+    private sealed record ParsedCommandLine(Usage Usage, ParseResult Parsed, Running Runs);
 
     // What the steps of one run share.
     private sealed class RunState(ToolHost host)

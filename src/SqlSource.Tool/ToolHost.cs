@@ -32,6 +32,10 @@ namespace SqlSource.Tool;
 /// The text of the file at a full path, or null when there is no file there: none, or a folder.  It throws an
 /// <see cref="IOException" /> or an <see cref="UnauthorizedAccessException" /> when the file cannot be read.
 /// </param>
+/// <param name="OpenReadFile">
+/// The file at a full path opened for reading, or null when there is no file there: none, or a folder.  It throws an
+/// <see cref="IOException" /> or an <see cref="UnauthorizedAccessException" /> when the file cannot be opened.
+/// </param>
 /// <param name="Runtime">The .NET that runs the tool, as the log's <c>run.start</c> names it.</param>
 /// <param name="OperatingSystem">The system the tool runs on, as the log's <c>run.start</c> names it.</param>
 /// <param name="Watch">
@@ -51,6 +55,7 @@ internal sealed record ToolHost(
     TimeProvider Time,
     Func<string, Stream> CreateFile,
     Func<string, string?> ReadTextFile,
+    Func<string, Stream?> OpenReadFile,
     string Runtime,
     string OperatingSystem,
     Func<WatchRequest, IDisposable> Watch
@@ -74,6 +79,7 @@ internal sealed record ToolHost(
             TimeProvider.System,
             NewFile,
             ReadText,
+            OpenRead,
             RuntimeInformation.FrameworkDescription,
             RuntimeInformation.OSDescription,
             WatchFolder
@@ -109,6 +115,31 @@ internal sealed record ToolHost(
         try
         {
             return File.ReadAllText(path);
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The <see cref="OpenReadFile"/> of a real run: the file opened for reading and shared for reading, or null when
+    /// the path is a folder or there is no file.
+    /// </summary>
+    internal static Stream? OpenRead(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         }
         catch (FileNotFoundException)
         {

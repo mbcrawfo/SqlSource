@@ -168,6 +168,18 @@ A change that is meant to change what the generator writes updates the corpus:
 
 The four projects of [`tests/DatabaseTests/`](DatabaseTests/README.md) run against a real server, and reference [the harness](DatabaseTests/README.md#the-harness) in `tests/DatabaseTests/TestHarness`; its readme has their table, how to run one on another image, and [the Npgsql 8 project](DatabaseTests/README.md#the-npgsql-8-project) and [the SqlClient 6.1 project](DatabaseTests/README.md#the-sqlclient-61-project), the two that pin the oldest supported driver.
 
+## Bundle fixtures
+
+`tests/SqlSource.Tool.Tests/Fixtures/Bundles/<engine>/<case>/` holds the bundles of bug reports that `sqlsource replay` is tested on, a folder for each case under the folder of its engine, `postgres` or `mssql`.  A case holds the files of a bundle as they unzip: `bundle.json`, `query.sql`, `capture.json`, and `expected.json` when the query was described.  `bundle.json` says what describing it gave: an entry, which `expected.json` holds, or a failure, with its id and its step.  A case keeps the report's `bundle.json` whole, so `replay` can name the version and the machine that made it; the committed cases, two copied from the describers' recorded fixtures and one built by hand, have `fixture` in place of a tool version, a runtime and a system, since no user's run made them.
+
+The tool's tests alone replay a case, without a database: `BundleCases.cs`, at the root of `tests/SqlSource.Tool.Tests`, finds the cases, and `BundleCasesTests` checks that each gives what its folder expects.  No container test describes one, and `tools/record-fixtures.sh` never records one again.  When the capture's form moves past a case, it is deleted, and the case it showed is tested again by hand.  The folder is `text eol=lf` in `.gitattributes`, as the describers' fixtures are.
+
+To make a case of a bug report's bundle:
+
+1. Unzip it into `tests/SqlSource.Tool.Tests/Fixtures/Bundles/<engine>/<case>/`, naming the case for what it shows.
+2. Keep its `bundle.json`, and never add the `.mapping.json` file of a renamed bundle: a case is replayed from the files alone.
+3. Run `dotnet test --project tests/SqlSource.Tool.Tests -- --filter-class "*BundleCasesTests"`.  The case must give what its `bundle.json` and `expected.json` say.
+
 ## Fixture projects
 
 `tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests`, `FixtureProjectTests`, `TerminationTests`, `SettingsFileSearchTests` and `TransitivePackageAssembliesTargetTests` copy one to a temporary folder outside the repository, with the package's MSBuild files of `build/` and `buildMultiTargeting/` and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code, the third through the tool started as a process, and the fourth as a design-time build of an IDE, which restores the copy first, and as a `dotnet build` with the generator beside the tests, through a symbolic link, which it skips on Windows.  `OnlineBuildTests` and `OnlineMultiTargetTests`, the tests of the online build, run `dotnet build` on a copy through `FixtureProjects.BuildAsync`, which restores it, clears the variables that would take the build online, keep it offline as in CI or log a secret, and sets `DOTNET_CLI_UI_LANGUAGE` to `en`, since some tests read MSBuild's own lines, with the stand-in of the tool as the build's command, or the real `dotnet sqlsource` for a tool that cannot start.  So these tests need the SDK that `global.json` pins, and take a second or two each; a build of `OnlineMulti` restores the reference pack of .NET 8 from the package source the first time.

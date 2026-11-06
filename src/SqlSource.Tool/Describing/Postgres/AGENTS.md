@@ -7,7 +7,7 @@
 - **A relation, an attribute or a type that another session dropped between two calls is `SQLSRC225` through `PostgresErrors.SchemaChanged`, never a throw**; the throws that remain guard a bug of the describer.
 - **An OID the describer names is a constant of `BuiltInTypes`.**
 - **`explain` asks for a generic plan through the prepared statement**, under `SET LOCAL`s that it ends by rolling back to the describe's savepoint, and never with `ANALYZE` or `GENERIC_PLAN` ([the plan](../../../../docs/architecture/postgres-nullability.md#the-plan)).
-- **`PlannerSettings` are for the tests, and its list is closed**: `ToolHost.Create` registers the describer with the constructor that takes none.
+- **`PlannerSettings` are for the tests and for `replay`, and its list is closed**: `ToolHost.Create` registers the describer with none, and `Bundles/BundleDescribers.cs` alone makes one with a folder's settings.
 
 ## The connection, the calls and the errors
 
