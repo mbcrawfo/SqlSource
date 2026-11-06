@@ -32,6 +32,7 @@
     <ItemGroup>
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
+        <InternalsVisibleTo Include="SqlSource.Repository.Tests" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>

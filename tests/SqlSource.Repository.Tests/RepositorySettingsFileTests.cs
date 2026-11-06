@@ -1,11 +1,10 @@
 using System.IO;
 using Shouldly;
-using SqlSource.Repository;
 using SqlSource.Settings;
 using SqlSource.SettingsFiles;
 using Xunit;
 
-namespace SqlSource.Tests;
+namespace SqlSource.Repository.Tests;
 
 // The settings file at the root of the repository, which every project of it reaches last.
 public sealed class RepositorySettingsFileTests

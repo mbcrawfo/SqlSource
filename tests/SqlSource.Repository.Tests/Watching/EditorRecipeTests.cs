@@ -7,12 +7,11 @@ using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
-using SqlSource.Repository;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Watching;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Watching;
+namespace SqlSource.Repository.Tests.Watching;
 
 // Holds the VS Code task of docs/manual/recipes.md#start-the-watcher-with-your-editor to what the tool writes.  A
 // change to the watch's two markers, to the format of the tool's errors, or to the recipe without the other fails it:

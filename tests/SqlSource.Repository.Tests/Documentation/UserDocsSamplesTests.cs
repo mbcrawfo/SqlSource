@@ -8,7 +8,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using Xunit;
 
-namespace SqlSource.Tests.Documentation;
+namespace SqlSource.Repository.Tests.Documentation;
 
 // The SQL a user copies from a document must be SQL that SqlSource reads.  A block is marked `sql`, and the word after
 // it says how it is read: a dialect (`sql postgres`, or `sql mysql,ansi-quotes`), `fragment` for a part of a file

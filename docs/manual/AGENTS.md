@@ -38,7 +38,7 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 - **`diagnostics.md`.**  A new diagnostic gets a row in the index, a `## SQLSRCnnn` section whose first bold line is its descriptor's title, and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.
 - Keep true the paragraphs giving each area's range of ids.  Never give a heading another anchor: every error's help link is the lower-case id's slug.
 - **A new page** is listed under "The pages" of the entry page, with a "Find what you need" row for each need it answers.
-- **Tests.**  The tests in `tests/SqlSource.Tests/Documentation/` and `Diagnostics/DiagnosticsDocumentTests.cs` say in comments what fails them.  None checks whether a page is true today and free of internals.
+- **Tests.**  The tests in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/DiagnosticsDocumentTests.cs` say in comments what fails them.  None checks whether a page is true today and free of internals.
 
 ## When a phase lands
 

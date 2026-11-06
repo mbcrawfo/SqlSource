@@ -45,7 +45,7 @@
 
 ## Documents
 
-- **`tests/SqlSource.Tests/Documentation/` checks the links, anchors and SQL samples of the documents a user reads, and the limits of every `AGENTS.md`.**
+- **`tests/SqlSource.Repository.Tests/Documentation/` checks the links, anchors and SQL samples of the documents a user reads, and the limits of every `AGENTS.md`.**
 
 ## Style and CI
 

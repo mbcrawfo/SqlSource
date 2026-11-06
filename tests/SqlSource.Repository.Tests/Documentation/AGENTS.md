@@ -1,4 +1,4 @@
-# AGENTS.md - tests/SqlSource.Tests/Documentation
+# AGENTS.md - tests/SqlSource.Repository.Tests/Documentation
 
 - **`UserDocsLinksTests` checks the links and anchors of `README.md`, `src/SqlSource.Tool/README.md` and every page of `docs/manual/` but its `AGENTS.md`, `UserDocsSamplesTests` the SQL in their fenced blocks, and `AgentsFileTests` the limits of every `AGENTS.md`.**
 - **`UserDocs.cs` finds the user documents through `RepositoryRoot.Path`** and is the one place that knows what counts as a user document.

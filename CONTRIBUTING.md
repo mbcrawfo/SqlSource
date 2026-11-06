@@ -27,7 +27,7 @@ The eight test projects, the three libraries they share and a stand-in of the to
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
-- `tests/SqlSource.Repository.Tests` runs the checks of the repository's own files: its test scopes, and the library that finds the repository and guards what a test project reads of it.
+- `tests/SqlSource.Repository.Tests` runs the checks of the repository's own files: the user docs, the `AGENTS.md` files, the test scopes and the library that finds the repository and guards what a test project reads of it.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
 - `tests/DatabaseTests/Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models and methods from its own queries and runs every described query through its method, and needs Docker.
 - `tests/DatabaseTests/Postgres.Npgsql8` writes and reads every mapped type, every NodaTime type, NetTopologySuite's and the JSON types and classes through the generated methods, reads the mapped types through Dapper, and breaks out of a streaming method, on Npgsql 8, the oldest supported driver, and needs Docker.

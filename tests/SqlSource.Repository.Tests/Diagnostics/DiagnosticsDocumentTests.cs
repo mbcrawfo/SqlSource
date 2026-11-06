@@ -8,10 +8,9 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
-using SqlSource.Repository;
 using Xunit;
 
-namespace SqlSource.Tests.Diagnostics;
+namespace SqlSource.Repository.Tests.Diagnostics;
 
 // docs/manual/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that
 // is added, removed or renamed fails them until the document says the same.
