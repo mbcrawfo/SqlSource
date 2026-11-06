@@ -91,6 +91,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
     public async Task Watch_WatchedFolderDeletedAndMadeAgainOutsideARepository_IsWatchedAgain()
     {
         await using var watch = new WatchScene("App");
+        OutsideARepository.SkipUnless(watch.Run.Folder.Path);
         _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
         var settings = watch.Run.Folder.WriteFile("libs/Shared/sqlsource.json", "{}");
         var shared = Path.GetDirectoryName(settings)!;

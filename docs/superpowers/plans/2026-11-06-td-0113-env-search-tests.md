@@ -45,3 +45,12 @@
 - [ ] **Step 4: Run the class with the usual temporary folder.**  Expected: every test passes, none skipped.
 - [ ] **Step 5: Resolve the item** (delete file, remove row, rewrite TD-0109's sentence); `grep -rn "TD-0113" . --exclude-dir=bin --exclude-dir=obj` finds only this plan.
 - [ ] **Step 6: `./format.sh`, then `./pre-commit-validation.sh`, then commit.**
+
+### Task 2: The other tests outside a repository (owner's answer to review finding R1-F1)
+
+The review found 13 more tests of `tests/SqlSource.Tool.Tests` that fail the same way, since `WatchSet` climbs to a `.git` through the same `DotEnvSearch`: 8 cases of `Watching/WatchSetTests.cs` and 7 tests of `Commands/Watch/` (`WatchTests`, `WatchFolderTests`, `WatchDuringAPassTests`, `WatchEndingTests`).  The owner chose to guard them all.
+
+- [ ] **Step 1:** Add `OutsideARepository` at the project's root: `SkipReason` (the reason above) and `SkipUnless(string folder)`, which skips when `DotEnvSearch.IsInRepository(folder)`.  The two `DotEnvSearchTests` call it too.
+- [ ] **Step 2:** Call it at the start of each affected test on its `TempFolder` (`watch.Run.Folder.Path` for a `WatchScene`), and in a theory only on its `repository: false` rows.
+- [ ] **Step 3:** Run `tests/SqlSource.Tool.Tests` with `TMPDIR` below a folder that holds an empty `.git`: no failure, the guarded tests skipped.  Run it with the usual temporary folder: no new skip.
+- [ ] **Step 4:** Add the rule to `tests/SqlSource.Tool.Tests/AGENTS.md`; `./format.sh`, `./pre-commit-validation.sh`, commit.

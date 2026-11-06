@@ -343,6 +343,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
     public async Task Watch_SaveInAFolderTheEvaluationAdded_DuringThatPass_GivesOneMorePass()
     {
         await using var watch = new WatchScene("App");
+        OutsideARepository.SkipUnless(watch.Run.Folder.Path);
         var users = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
         var shared = watch.Run.Folder.WriteFile("Shared/sqlsource.json", "{}");
         await watch.StartAsync("App/App.csproj", "--log", "run.log");
@@ -376,6 +377,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
     [Fact]
     public async Task Watch_EvaluationThatKeepsAFolder_KeepsItsWatch()
     {
+        OutsideARepository.SkipUnless(_watch.Run.Folder.Path);
         await _watch.StartAsync();
         var first = _watch.Watcher.Open.ToList();
         first.Select(request => request.Folder).ShouldBe([_watch.Above, _watch.Run.Folder.Path]);
@@ -393,6 +395,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
     public async Task Watch_FolderThatLeavesTheSet_IsClosedAfterTheNewOnesAreOpen()
     {
         await using var watch = new WatchScene("App");
+        OutsideARepository.SkipUnless(watch.Run.Folder.Path);
         _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
         var shared = watch.Run.Folder.WriteFile("Shared/sqlsource.json", "{}");
         var other = watch.Run.Folder.WriteFile("Other/sqlsource.json", "{}");
@@ -425,6 +428,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
     public async Task Watch_FolderThatAppearsLater_IsWatchedByTheNextEvaluation()
     {
         await using var watch = new WatchScene("App");
+        OutsideARepository.SkipUnless(watch.Run.Folder.Path);
         _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
         var shared = watch.Run.Folder.PathOf("Shared/sqlsource.json");
         watch.Project.ListSettings(shared);
