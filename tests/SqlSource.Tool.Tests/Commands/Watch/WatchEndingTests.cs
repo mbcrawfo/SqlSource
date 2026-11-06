@@ -166,6 +166,7 @@ public sealed class WatchEndingTests : IAsyncDisposable
     [Fact]
     public async Task Watch_StoppedDuringAPass_ExitsZeroAndWritesNoSidecar()
     {
+        AboveTheTempFolder.SkipWhenInARepository(_watch.Run.Folder.Path);
         var gate = new ProcessGate();
         _watch.Run.Processes.BeforeAnswer = gate.PassAsync;
         _ = _watch.Begin();

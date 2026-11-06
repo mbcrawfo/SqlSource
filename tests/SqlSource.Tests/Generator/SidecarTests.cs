@@ -70,8 +70,8 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC238 {SidecarStart}: The sidecar has format 2, and this version of SqlSource reads format 1.  "
-                + "Update the SqlSource package.",
+            $"SQLSRC238 {SidecarStart}: The sidecar has format {SidecarFormat.Version + 1}, and this version of "
+                + $"SqlSource reads format {SidecarFormat.Version}.  Update the SqlSource package.",
         ]);
         run.SeverityOf("SQLSRC238").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
@@ -92,8 +92,8 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC239 {SidecarStart}: The sidecar has format 0, and this version of SqlSource reads format 1.  Run "
-                + "'sqlsource describe' to write it again.",
+            $"SQLSRC239 {SidecarStart}: The sidecar has format {SidecarFormat.Version - 1}, and this version of "
+                + $"SqlSource reads format {SidecarFormat.Version}.  Run 'sqlsource describe' to write it again.",
         ]);
         run.SeverityOf("SQLSRC239").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
@@ -117,6 +117,31 @@ public sealed class SidecarTests
             $"SQLSRC240 {SidecarStart}: The sidecar was written by sqlsource 99.0.0-dev, and this project uses "
                 + $"SqlSource {PackageVersion.Prefix}.  Bring the tool and the package to one version, and run "
                 + "'sqlsource describe'.",
+        ]);
+        run.SeverityOf("SQLSRC240").ShouldBe(DiagnosticSeverity.Warning);
+        UsableEntries(run).ShouldBe(["GetUser"]);
+    }
+
+    // What a git merge can leave: a sidecar of this version with an entry of another.
+    [Fact]
+    public void Run_EntryOfAnotherToolVersion_IsAWarningAtItsKeyAndTheEntryIsUsed()
+    {
+        var run = Run(
+            OutputKind.Models,
+            GeneratorHarness.UsersFile,
+            Sidecars.Of(
+                GeneratorHarness.UsersFile,
+                CurrentEntry(GeneratorHarness.UsersFile, "GetUser") with
+                {
+                    ToolVersion = "99.0.0",
+                }
+            )
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC240 {GeneratorHarness.UsersPath}.json(7,5)-(7,14): The sidecar was written by sqlsource 99.0.0, "
+                + $"and this project uses SqlSource {PackageVersion.Prefix}.  Bring the tool and the package to one "
+                + "version, and run 'sqlsource describe'.",
         ]);
         run.SeverityOf("SQLSRC240").ShouldBe(DiagnosticSeverity.Warning);
         UsableEntries(run).ShouldBe(["GetUser"]);
@@ -231,7 +256,7 @@ public sealed class SidecarTests
         );
 
         withOrphan.Diagnostics.ShouldBe([
-            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(16,5)-(16,11): The entry 'Gone' names no query of the file "
                 + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         UsableEntries(withOrphan).ShouldBe(["GetUser"]);
@@ -395,7 +420,7 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(16,5)-(16,11): The entry 'Gone' names no query of the file "
                 + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         run.SeverityOf("SQLSRC245").ShouldBe(DiagnosticSeverity.Warning);
@@ -555,7 +580,7 @@ public sealed class SidecarTests
                 + "'models' needs one.  Run 'sqlsource describe'.",
         ]);
         run.Diagnostics.ShouldBe([
-            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,17): The entry 'CountUsers' names no query of the "
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(16,5)-(16,17): The entry 'CountUsers' names no query of the "
                 + "file that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         UsableEntries(run).ShouldBe(["GetUser"]);
@@ -658,7 +683,7 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(16,5)-(16,11): The entry 'Gone' names no query of the file "
                 + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         UsableEntries(run).ShouldBe(["GetUser"]);

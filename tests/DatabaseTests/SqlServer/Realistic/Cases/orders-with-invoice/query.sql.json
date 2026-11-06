@@ -6,8 +6,9 @@
   "queries": {
     "ListOrdersWithInvoice": {
       "hash": "4185a41c08866959f6320a0e90abefa8fe2f78873c2a3ce5e7aa067ab17ebfea",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

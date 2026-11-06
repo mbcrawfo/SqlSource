@@ -6,8 +6,9 @@
   "queries": {
     "CreateCustomer": {
       "hash": "046cf3d92f1f99b2d092066033255ea1900319c726e09623e1d9e0b7354c3142",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

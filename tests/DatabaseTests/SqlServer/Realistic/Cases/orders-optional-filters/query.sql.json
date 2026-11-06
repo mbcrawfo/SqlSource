@@ -6,8 +6,9 @@
   "queries": {
     "SearchOrders": {
       "hash": "52e27e8456f9475a0a56ed7085365de326187b256885fa4d6c933233cb658fb1",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

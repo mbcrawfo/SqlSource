@@ -6,8 +6,9 @@
   "queries": {
     "ListPriceHistory": {
       "hash": "355e77db64a7ada3662bcc74a333f7d4cecd80e7b2dbeaa0c304580b0a8c9508",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

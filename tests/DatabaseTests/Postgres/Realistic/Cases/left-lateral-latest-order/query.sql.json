@@ -6,8 +6,9 @@
   "queries": {
     "ListAccountsWithLatestOrderAndInvoice": {
       "hash": "e603f4a3ef496a791607eef482243bf0fe1c8b0ba7bbc60a2856336191223e43",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

@@ -6,8 +6,9 @@
   "queries": {
     "UpsertStock": {
       "hash": "b8ac3de7b29228271adec6434ce348d9d2eb9fce74da52c89ca35ad12f1aae5a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

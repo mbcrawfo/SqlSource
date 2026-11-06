@@ -412,7 +412,8 @@ public sealed class ReplayTests : IDisposable
             new CliResult(
                 1,
                 "",
-                $"{folder} : error SQLSRC289: The bundle's formatVersion is 2, and this version of sqlsource reads 1\n"
+                $"{folder} : error SQLSRC289: The bundle's formatVersion is {SidecarFormat.Version + 1}, and this "
+                    + $"version of sqlsource reads {SidecarFormat.Version}\n"
                     + Expected.See("SQLSRC289")
             )
         );
@@ -434,7 +435,8 @@ public sealed class ReplayTests : IDisposable
             new CliResult(
                 1,
                 "",
-                $"{folder} : error SQLSRC289: The bundle's formatVersion is 2, and this version of sqlsource reads 1\n"
+                $"{folder} : error SQLSRC289: The bundle's formatVersion is {SidecarFormat.Version + 1}, and this "
+                    + $"version of sqlsource reads {SidecarFormat.Version}\n"
                     + Expected.See("SQLSRC289")
             )
         );
@@ -482,6 +484,8 @@ public sealed class ReplayTests : IDisposable
         var expectedPath = Path.Combine(folder, BundleFiles.Expected);
         var entry = JsonNode.Parse(ReadText(expectedPath)).ShouldNotBeNull()["queries"].ShouldNotBeNull();
         File.Delete(expectedPath);
+        // The entry it gives is this tool's.
+        entry["GetUserOrders"].ShouldNotBeNull()["toolVersion"] = PackageVersion.Prefix;
 
         var result = await _run.RunAsync("replay", "case");
 

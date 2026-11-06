@@ -6,8 +6,9 @@
   "queries": {
     "ListCategoriesBoughtPerAccount": {
       "hash": "d7818a76b1ec814c2b1032b8db67f876985a6a0e27bbf7d0e01567bed2b52cd5",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

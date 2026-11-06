@@ -6,8 +6,9 @@
   "queries": {
     "ListAllTypes": {
       "hash": "ca077e2c1d78339b718e2bce149aacac7f07c64676a74c368d2b5ea0142caca3",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -634,8 +635,9 @@
     },
     "ListAllTypesForDapper": {
       "hash": "ca077e2c1d78339b718e2bce149aacac7f07c64676a74c368d2b5ea0142caca3",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -1262,8 +1264,9 @@
     },
     "InsertAllTypes": {
       "hash": "3e1d89506a21ddbd9deacacef457084a7896fc643598a723ac3a647711c11fc4",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -2255,8 +2258,9 @@
     },
     "InsertAllTypesForDapper": {
       "hash": "3e1d89506a21ddbd9deacacef457084a7896fc643598a723ac3a647711c11fc4",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -3248,8 +3252,9 @@
     },
     "WriteAllTypes": {
       "hash": "24887554237b71d010ea0cc537530284d860ecf55d7d44f02ba578eb6efb3f0a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -4253,8 +4258,9 @@
     },
     "FindByRowversion": {
       "hash": "b087eb999131d1ed635f25146e46524c57f2a7e10cc0f0197dc0a7fb8dadea06",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4298,8 +4304,9 @@
     },
     "FindByDatetime2": {
       "hash": "61a26adc3aefcb337b283fe4fbe2e5c92d3feffbd7752bcf0d2b03469d0af7b5",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4343,8 +4350,9 @@
     },
     "FindByChar": {
       "hash": "62463daf533d5f0cba1018f85df5d49458c3805186bb544f5c5768d2e233209a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4388,8 +4396,9 @@
     },
     "FindByDecimal": {
       "hash": "3508d65cf7ef8919f334f7651c051b0cea62b728ddae0245ce957811df406516",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4433,8 +4442,9 @@
     },
     "WriteDecimalsOfScale0": {
       "hash": "9cc23604941b9fe082b93e2c77c83f661def7bf816f05d7f6a1ef14ffb5ade62",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4501,8 +4511,9 @@
     },
     "FindDecimalOfScale0": {
       "hash": "3a43e3bab2a1d400a67159d89fc6b68904913ff53d0b3b43e60443e105230f8a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4542,8 +4553,9 @@
     },
     "WriteDatetime2Of3": {
       "hash": "8bed69a66396cdb2a5457e27bc46e5f1578260a2cfd6d135f23ea0cbcd25ab91",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4583,8 +4595,9 @@
     },
     "FindDatetime2Of3": {
       "hash": "fae789bd1e354a7886752a4be98820585736807bfa9646f1337411d256d0ef87",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -4624,8 +4637,9 @@
     },
     "ListTinyintLevels": {
       "hash": "091e1314ce12f11ba407e59ef93e2666d0d480f875aa41b579169743f5a6e550",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

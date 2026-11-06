@@ -6,8 +6,9 @@
   "queries": {
     "ListOrderHistoryWithRunningTotals": {
       "hash": "1b230fa51047416af3471efebe4be13790d5a7f68cec812f12e8274d67ac6fd3",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

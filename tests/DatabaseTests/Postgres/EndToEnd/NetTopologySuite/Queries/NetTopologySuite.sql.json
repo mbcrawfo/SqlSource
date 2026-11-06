@@ -6,8 +6,9 @@
   "queries": {
     "InsertSpatialValues": {
       "hash": "399650a8f07489945504835d948354d4a23792381794acc7ec2ad6aa286ccf33",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "gis",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "none",
       "parameters": [
@@ -118,8 +119,9 @@
     },
     "GetSpatialValues": {
       "hash": "15f403284fcdccd4a22cbd1a781733350c613e588ed05945c279b1a89336237b",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "gis",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
@@ -293,8 +295,9 @@
     },
     "GetPointValue": {
       "hash": "86623bb6c81ebcbbd7bc60ffd7c6a70831bf1e831165e6ac160398944f594101",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "gis",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -339,8 +342,9 @@
     },
     "GetPolygonValue": {
       "hash": "1b2252e6a715041eab0182888b9410f19b12472db4fded2c8b1740384963f399",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "gis",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

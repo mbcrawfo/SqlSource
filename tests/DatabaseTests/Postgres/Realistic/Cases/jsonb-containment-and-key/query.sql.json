@@ -6,8 +6,9 @@
   "queries": {
     "FindEventsByPayload": {
       "hash": "ea7e8e019a1d92b7840b9f79f2920da96e23d1e807d5af7c9d7d4d2a2a9e4afe",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

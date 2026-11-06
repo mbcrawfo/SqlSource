@@ -51,6 +51,7 @@ public sealed class WatchTests : IAsyncDisposable
     [Fact]
     public async Task Watch_Start_DescribesThenWritesTheWatchingMarker()
     {
+        AboveTheTempFolder.SkipWhenInARepository(_watch.Run.Folder.Path);
         await _watch.StartAsync();
 
         _watch.Output.ShouldBe($"{OneDescribed}\n{WatchSession.WatchingMarker}\n");

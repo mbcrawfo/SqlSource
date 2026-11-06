@@ -6,8 +6,9 @@
   "queries": {
     "UpdateOrderNote": {
       "hash": "81a33b7cdbb05c96b5dea1fa592b5f25d1a264fc8feabc57b7e9e9ad4307b5d6",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

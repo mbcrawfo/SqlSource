@@ -6,8 +6,9 @@
   "queries": {
     "SearchProducts": {
       "hash": "56f4a83a7cff49de24bdccf9c700af8a96615dc221c7a4d8b2bdab93ccf6c14c",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

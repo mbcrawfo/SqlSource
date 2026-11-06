@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomerOrderGaps": {
       "hash": "314fbf7a11461955c8f41eac4d5fee9159f4b17b9daad8cca507433b2601d3cf",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

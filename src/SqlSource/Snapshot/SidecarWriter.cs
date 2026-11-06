@@ -36,9 +36,12 @@ internal static class SidecarWriter
     {
         var rows = entry.ResultKind == SidecarResultKind.Rows;
         json.BeginObject(entry.Name);
+        // The three keys that decide whether an entry is current stand together, so that git sees a tool update and
+        // a change of one query on adjacent lines: a merge of the two is a conflict.
         json.WriteString(SidecarKeys.Hash, entry.Hash);
-        json.WriteString(SidecarKeys.Engine, entry.Engine);
+        json.WriteString(SidecarKeys.ToolVersion, entry.ToolVersion);
         json.WriteString(SidecarKeys.Database, entry.Database);
+        json.WriteString(SidecarKeys.Engine, entry.Engine);
         json.WriteString(SidecarKeys.ServerVersion, entry.ServerVersion);
         json.WriteString(SidecarKeys.ResultKind, rows ? SidecarValues.ResultKind.Rows : SidecarValues.ResultKind.None);
         if (rows)

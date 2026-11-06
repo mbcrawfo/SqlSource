@@ -6,8 +6,9 @@
   "queries": {
     "GetPriceListAsOf": {
       "hash": "2458b27696eb4502cf8cda60ec78ccb50f8c83a15c71e39b7bbd1307ba912503",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

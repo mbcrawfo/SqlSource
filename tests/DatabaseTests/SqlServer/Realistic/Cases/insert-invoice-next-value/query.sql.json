@@ -6,8 +6,9 @@
   "queries": {
     "IssueInvoiceForOrder": {
       "hash": "9c2cf92edf936f669fc7e53f3d4b19eed72272c83884c090e57b8d44bbdc605a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

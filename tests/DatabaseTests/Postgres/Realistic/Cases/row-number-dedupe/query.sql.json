@@ -6,8 +6,9 @@
   "queries": {
     "ListLatestOrderPerOpenAccount": {
       "hash": "821d266d4d566a6135fe2c0421544d157303510eed0954ce648131ee84b33aac",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

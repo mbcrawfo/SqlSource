@@ -6,8 +6,9 @@
   "queries": {
     "AddOrder": {
       "hash": "6f17c019b0160e131253b99e740986f4f2869868f3d7334bea2f749cf383d17e",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

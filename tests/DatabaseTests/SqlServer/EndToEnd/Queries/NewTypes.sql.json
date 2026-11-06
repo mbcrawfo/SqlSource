@@ -6,8 +6,9 @@
   "queries": {
     "ListNewTypes": {
       "hash": "2abd3cf30efc4a7396ee33e0d62b530c2c933b05f8759da22412f783186cbc20",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -79,8 +80,9 @@
     },
     "ListNewTypesForDapper": {
       "hash": "2abd3cf30efc4a7396ee33e0d62b530c2c933b05f8759da22412f783186cbc20",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -152,8 +154,9 @@
     },
     "WriteNewTypes": {
       "hash": "453d8bb99867821ac1dd3b2090e5a0c59d7d6f2537468010c4e290d43b26d74c",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {
@@ -262,8 +265,9 @@
     },
     "GetNewType": {
       "hash": "13ed5a1583a0367bd361e7cddd4c1ab82453be5e3712b24ce56b205853c5bcab",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -326,8 +330,9 @@
     },
     "MeasureVectorDistance": {
       "hash": "11bb1ecf0db1add29acd32689a76a94b62f12568709a2df9cde897cc34563be4",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

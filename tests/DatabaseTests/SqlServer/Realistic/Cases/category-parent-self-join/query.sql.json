@@ -6,8 +6,9 @@
   "queries": {
     "ListCategoriesWithParent": {
       "hash": "8206c68f64e91313346ee4c3e1d05227c3ab359459107213e0ea458e91d599e2",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

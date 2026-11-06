@@ -6,8 +6,9 @@
   "queries": {
     "ListShippingOptions": {
       "hash": "5c64018e652e06e2253b87357638a9cff21b00519a8a3211432513da108a58fc",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

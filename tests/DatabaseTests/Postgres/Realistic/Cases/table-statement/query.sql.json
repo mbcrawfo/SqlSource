@@ -6,8 +6,9 @@
   "queries": {
     "ListLatestInvoices": {
       "hash": "a9fcd201a7a0d45a59bd82505ca8adab6690b6e13411b324a45be3bfb1d3dd00",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {

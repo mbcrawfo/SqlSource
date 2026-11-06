@@ -6,8 +6,9 @@
   "queries": {
     "ListRecentBuyersWithLastLogin": {
       "hash": "4eef5af27021f0038a27d73a5725cfc23a65c47e8789203f308e0a58c8e907c8",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

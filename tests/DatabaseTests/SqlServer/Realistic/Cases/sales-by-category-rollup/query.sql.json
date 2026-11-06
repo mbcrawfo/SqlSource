@@ -6,8 +6,9 @@
   "queries": {
     "GetSalesByCategory": {
       "hash": "67b9ec6823c927c7765a125d562f1cade4648ea3b2fdf91c40832eeca9bb78eb",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

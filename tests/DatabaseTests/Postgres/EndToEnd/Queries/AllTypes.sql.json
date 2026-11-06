@@ -6,8 +6,9 @@
   "queries": {
     "ListAllTypes": {
       "hash": "c7b5aebbe85273ea8a6d37a759495935e84c776f5b3144c2d9c2b7d603c88ee0",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
@@ -1584,8 +1585,9 @@
     },
     "ListAllTypesForDapper": {
       "hash": "c7b5aebbe85273ea8a6d37a759495935e84c776f5b3144c2d9c2b7d603c88ee0",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
@@ -3162,8 +3164,9 @@
     },
     "InsertAllTypes": {
       "hash": "271889c8f7b7d9b8f5ecb3d43e21866ad4b4753b030982ce056c29f55b1879ab",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
@@ -5308,8 +5311,9 @@
     },
     "InsertAllTypesForDapper": {
       "hash": "271889c8f7b7d9b8f5ecb3d43e21866ad4b4753b030982ce056c29f55b1879ab",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
@@ -7454,8 +7458,9 @@
     },
     "InsertEveryType": {
       "hash": "ffa29880ceb23de4b68afed6cb3c47576866d9129f69e7d0d197025dabea2a62",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {

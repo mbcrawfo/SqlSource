@@ -6,8 +6,9 @@
   "queries": {
     "FindUserByEmail": {
       "hash": "f37aec7c9e29ecbd2723c6a5e8339fa2265afac8ea05f9091902cec9430aec5d",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -102,8 +103,9 @@
     },
     "ChangeUserEmail": {
       "hash": "792c83b524f43eeb309e5564c2bca51056cd73ad6598abeb29ba63bc0c6424c3",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "none",
       "parameters": [
@@ -143,8 +145,9 @@
     },
     "ListUsersNewestFirst": {
       "hash": "84d1e954292d7144f20d0cfa0ffdeec99d3f853ff7e14dfb8eb4b225a677ba6b",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -219,8 +222,9 @@
     },
     "StreamUsersOldestFirst": {
       "hash": "59c470c8286054693b6b49faa1468616c503d87c2683b61c4369f55679dfa256",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
@@ -295,8 +299,9 @@
     },
     "ListUsersSortedBy": {
       "hash": "b741e0b71d7732f2ecfc31d260ca30b48e202e7a48b0cbce3dffa5a67a5d4590",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

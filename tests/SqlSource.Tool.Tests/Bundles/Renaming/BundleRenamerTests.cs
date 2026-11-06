@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Bundles.Renaming;
@@ -172,6 +173,28 @@ public sealed partial class BundleRenamerTests
         var refusal = Refused(await RenamingBundles.RenameAsync(raw, engine));
 
         refusal.ShouldBe(new RenamingRefusal(RefusalStep.RequestSql, "capture.json call 'describe'", null));
+    }
+
+    // A bundle of another version of the tool, whose entry is that version's: the replay gives this one's, and the
+    // renamed entry keeps the bundle's.
+    [Fact]
+    public async Task RenameAsync_EntryOfAnotherToolVersion_IsProvedAndKeepsItsVersion()
+    {
+        var raw = await RenamingBundles.RawAsync();
+        var sidecar = SidecarReader.Read(raw.Expected.ShouldNotBeNull()).Sidecar.ShouldNotBeNull();
+        var entry = sidecar.Queries.ShouldHaveSingleItem() with { ToolVersion = RenamingBundles.ToolVersion };
+        var older = raw with
+        {
+            Expected = SidecarWriter.Write(sidecar with { Queries = new EquatableArray<SidecarEntry>([entry]) }),
+        };
+
+        var renamed = Renamed(await RenamingBundles.RenameAsync(older));
+
+        SidecarReader
+            .Read(renamed.Bundle.Expected.ShouldNotBeNull())
+            .Sidecar.ShouldNotBeNull()
+            .Queries.ShouldHaveSingleItem()
+            .ToolVersion.ShouldBe(RenamingBundles.ToolVersion);
     }
 
     [Fact]

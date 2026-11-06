@@ -8,8 +8,8 @@ namespace SqlSource.Snapshot;
 /// <c>database</c>, <c>resultKind</c>, <c>matchesTable</c>, each parameter's and column's <c>name</c>,
 /// <c>ordinal</c>, <c>type</c> and <c>nullable</c>, and each column's <c>origin</c>, in that order.  The origin is
 /// compared because column types are matched against it, a quoted part exactly, so each of its parts is compared
-/// ordinally.  The server's version, provenance, identity and computed are not compared: the version differs between
-/// machines by design, and provenance, identity and computed are informational.
+/// ordinally.  The entry's tool version, the server's version, provenance, identity and computed are not compared: the
+/// two versions differ between machines by design, and provenance, identity and computed are informational.
 /// </summary>
 /// <remarks>
 /// Each comparison returns a difference whose path starts at what it compares, and its caller puts its own path in

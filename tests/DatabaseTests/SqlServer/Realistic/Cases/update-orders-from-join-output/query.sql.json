@@ -6,8 +6,9 @@
   "queries": {
     "MarkShippedOrdersDelivered": {
       "hash": "8439ac03fa42644668efed0de2b5610fb5116c1f5ba68a44d4138049ca2c54d2",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

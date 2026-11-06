@@ -653,9 +653,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // A warning a project may configure: a sidecar of another version of the tool is still read and used, since the
-    // format is the same.  An error would break every build after the package is updated until the tool runs.  A
-    // project that commits its sidecars and treats warnings as errors may list it in WarningsNotAsErrors.
+    // A warning a project may configure: a sidecar, or an entry of one, of another version of the tool is still read
+    // and used, since the format is the same.  An error would break every build after the package is updated until
+    // the tool runs.  A project that commits its sidecars and treats warnings as errors may list it in
+    // WarningsNotAsErrors.
     public static readonly DiagnosticDescriptor SidecarToolVersionDiffers = new(
         id: "SQLSRC240",
         title: "Sidecar was written by another version of the tool",

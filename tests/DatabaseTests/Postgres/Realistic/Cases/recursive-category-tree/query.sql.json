@@ -6,8 +6,9 @@
   "queries": {
     "ListCategoryTree": {
       "hash": "a66a1302c05232b143d6ae5ce5d0cb5e36d03b0a4985672801e3b6ae80621fb9",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

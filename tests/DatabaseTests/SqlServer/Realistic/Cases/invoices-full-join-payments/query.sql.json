@@ -6,8 +6,9 @@
   "queries": {
     "ListBillingActivity": {
       "hash": "c843933f5da0cc73f3719956d05465ef5212280c7d58ea0f40652cbcc784d8a5",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

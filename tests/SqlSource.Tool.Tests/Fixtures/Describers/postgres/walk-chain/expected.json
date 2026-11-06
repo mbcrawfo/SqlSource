@@ -6,8 +6,9 @@
   "queries": {
     "WalkChain": {
       "hash": "e1ac258c7f71e36112939b6e74fb35a77ba00d2ed18bfcb996814b9a69dac9e1",
-      "engine": "postgres",
+      "toolVersion": "fixture",
       "database": "postgres",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

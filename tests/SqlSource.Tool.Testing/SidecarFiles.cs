@@ -18,7 +18,7 @@ internal static class SidecarFiles
     public static DateTime Old { get; } = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
 
     // The text of a sidecar that a newer tool wrote: a format above the one this tool writes.
-    public static string Newer { get; } = Empty(2, "9.9.9");
+    public static string Newer { get; } = Empty(SidecarFormat.Version + 1, "9.9.9");
 
     // An entry that is current for the query: its hash and its database, a statement without rows, and the query's
     // parameters as the tool writes them, by name as the SQL spells it and in its order, without a type.
@@ -42,7 +42,8 @@ internal static class SidecarFiles
             new Sidecar(formatVersion, toolVersion ?? PackageVersion.Prefix, EquatableArray<SidecarEntry>.Empty)
         );
 
-    // Writes a sidecar beside the file and gives its path.  The versions are the tool's unless given.
+    // Writes a sidecar beside the file and gives its path.  The versions are the tool's unless given, and a tool
+    // version given is its entries' too, as that tool would have written them.
     public static string Write(
         PlannedFile file,
         IEnumerable<SidecarEntry> entries,
@@ -51,10 +52,11 @@ internal static class SidecarFiles
     )
     {
         var path = SidecarFormat.PathFor(file.Path);
+        var written = toolVersion is null ? entries : entries.Select(entry => entry with { ToolVersion = toolVersion });
         var sidecar = new Sidecar(
             formatVersion,
             toolVersion ?? PackageVersion.Prefix,
-            new EquatableArray<SidecarEntry>([.. entries])
+            new EquatableArray<SidecarEntry>([.. written])
         );
         File.WriteAllText(path, SidecarWriter.Write(sidecar));
         return path;

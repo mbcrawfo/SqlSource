@@ -6,8 +6,9 @@
   "queries": {
     "FlagOrdersWithOverdueInvoices": {
       "hash": "7d2e2319c512f8d589585bb75cc0f850c1bbbcc2f8d4593784f6327afff912ef",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

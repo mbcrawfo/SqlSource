@@ -6,8 +6,9 @@
   "queries": {
     "InsertNodaOverrides": {
       "hash": "1b35dd2387f3ac2241e69cb82988210ba6f940ad8aab655094283946eb06ce2e",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -63,8 +64,9 @@
     },
     "GetNodaOverrides": {
       "hash": "f6f57f075dbe82267564a0bb19dbf7028a3a7eaecf2a6cc190ed2be4a4687ead",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

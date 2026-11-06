@@ -6,8 +6,9 @@
   "queries": {
     "ListCurrentProductSales": {
       "hash": "8af2a44bb4cbda8b5102cf7d772a760f0b968b71b4dce5980e3060be336db449",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

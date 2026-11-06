@@ -6,8 +6,9 @@
   "queries": {
     "ListCategoryFilterOptions": {
       "hash": "e5c1bd78f40dc2b01c8a306ef08754b8798d082a6de057aa1cb280e399fa1b9e",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

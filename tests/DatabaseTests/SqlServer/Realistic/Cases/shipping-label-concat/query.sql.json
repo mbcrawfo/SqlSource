@@ -6,8 +6,9 @@
   "queries": {
     "ListShippingLabels": {
       "hash": "cc314959717df84816953c6036578a239b61efe2241e77f2ce8cd38e90c9fdef",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

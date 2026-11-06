@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -79,7 +80,12 @@ public sealed class BundleJsonTests
         read.Succeeded.ShouldBeFalse();
         read.Failure.Descriptor.Id.ShouldBe("SQLSRC289");
         read.Failure.Path.ShouldBe(Path);
-        read.Failure.Arguments.ToArray().ShouldBe(["formatVersion", "2", "1"]);
+        read.Failure.Arguments.ToArray()
+            .ShouldBe([
+                "formatVersion",
+                (SidecarFormat.Version + 1).ToString(CultureInfo.InvariantCulture),
+                SidecarFormat.Version.ToString(CultureInfo.InvariantCulture),
+            ]);
     }
 
     // An older sidecar format is one an older tool wrote, and is read.

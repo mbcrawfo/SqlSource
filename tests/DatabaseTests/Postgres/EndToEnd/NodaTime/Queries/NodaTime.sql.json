@@ -6,8 +6,9 @@
   "queries": {
     "InsertNodaValues": {
       "hash": "a3b42a35e05d904d569b15b71d5acb6b11178dc7bfa3ad87ac9087f1c3a4f92b",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "none",
       "parameters": [
@@ -409,8 +410,9 @@
     },
     "GetNodaValues": {
       "hash": "9013e3038ebb803c9cdaf33f608cebe4574976be1cb85c2d18909f592c47904d",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {

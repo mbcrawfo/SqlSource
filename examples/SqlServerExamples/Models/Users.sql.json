@@ -6,8 +6,9 @@
   "queries": {
     "GetUser": {
       "hash": "95eed1e761c1c046c3596b0f0825f49cb229dad422c3c437905471a09e4b0db7",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": {

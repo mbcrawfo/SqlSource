@@ -6,8 +6,9 @@
   "queries": {
     "GetOrder": {
       "hash": "386ca53988520c84ff04298e100771565e8c2af3dcd700d22c3f48d2f592694e",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -127,8 +128,9 @@
     },
     "ListOrdersPlacedSince": {
       "hash": "e04abb7fd74576ba7fcb02059ccbdc4c03bda66e272eaef29dfbce74967e4c56",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -203,8 +205,9 @@
     },
     "CountShippedOrders": {
       "hash": "fc7b72a600f8792fce792ea051eae5c4151084fd589b919cbf45d6e7b78885e7",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -250,8 +253,9 @@
     },
     "ListOrderMonths": {
       "hash": "45fb903260d7e9758574d4fbaa3849e3e4c205481d681639b37d295981290bce",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -297,8 +301,9 @@
     },
     "AddOrder": {
       "hash": "3232f291f739c3d7f466321c64a02631120ae090388b3bae52c8966499ad2663",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

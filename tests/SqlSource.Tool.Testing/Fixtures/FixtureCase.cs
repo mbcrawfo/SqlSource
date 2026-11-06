@@ -16,7 +16,7 @@ internal sealed record FixtureCase(string Engine, string Name, string Folder)
     // The calls of describing the query, as CaptureJson writes them.
     public const string CaptureFile = "capture.json";
 
-    // A sidecar with the one entry, as SidecarWriter writes it, with the toolVersion "fixture".
+    // A sidecar with the one entry, as SidecarWriter writes it, whose toolVersion and its entry's are "fixture".
     public const string ExpectedFile = "expected.json";
 
     // The settings of the planner that the case's "explain" carries, one name=value on a line: a case whose name

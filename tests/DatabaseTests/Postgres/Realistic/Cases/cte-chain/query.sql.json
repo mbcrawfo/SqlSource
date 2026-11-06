@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomerLifetimeValue": {
       "hash": "d5bbd46a0c35413b171d07dd052ece2dc9894baf48f3f6e7a8196b1dfb5f517b",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

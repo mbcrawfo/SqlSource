@@ -6,8 +6,9 @@
   "queries": {
     "ListCustomersInGoodStanding": {
       "hash": "7628ff669836774a7147066df5e7e7c4b58383ca8f5f20ea9edfd15ded155617",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

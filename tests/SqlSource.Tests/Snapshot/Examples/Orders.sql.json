@@ -6,8 +6,9 @@
   "queries": {
     "GetOrder": {
       "hash": "2b4d6f8a0c2e4a6c8e0a2c4e6a8c0e2a4c6e8a0c2e4a6c8e0a2c4e6a8c0e2a4c",
-      "engine": "mssql",
+      "toolVersion": "0.4.0",
       "database": "sales",
+      "engine": "mssql",
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -131,8 +132,9 @@
     },
     "CreateOrder": {
       "hash": "8e0a2c4e6a8c0e2a4c6e8a0c2e4a6c8e0a2c4e6a8c0e2a4c6e8a0c2e4a6c8e0a",
-      "engine": "mssql",
+      "toolVersion": "0.4.0",
       "database": "sales",
+      "engine": "mssql",
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -223,8 +225,9 @@
     },
     "ArchiveOrder": {
       "hash": "4c6e8a0c2e4a6c8e0a2c4e6a8c0e2a4c6e8a0c2e4a6c8e0a2c4e6a8c0e2a4c6e",
-      "engine": "mssql",
+      "toolVersion": "0.4.0",
       "database": "sales",
+      "engine": "mssql",
       "serverVersion": "16.0.4135.4",
       "resultKind": "none",
       "parameters": [
@@ -244,8 +247,9 @@
     },
     "SearchOrders": {
       "hash": "0a2c4e6a8c0e2a4c6e8a0c2e4a6c8e0a2c4e6a8c0e2a4c6e8a0c2e4a6c8e0a2c",
-      "engine": "mssql",
+      "toolVersion": "0.4.0",
       "database": "sales",
+      "engine": "mssql",
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
       "matchesTable": null,

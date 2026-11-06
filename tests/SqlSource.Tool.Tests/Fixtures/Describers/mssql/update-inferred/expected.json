@@ -6,8 +6,9 @@
   "queries": {
     "RenameUser": {
       "hash": "b3d613da9fb5a460e185b7660ae6880cfd6b1f878de073dd975df71942b5f9e9",
-      "engine": "mssql",
+      "toolVersion": "fixture",
       "database": "mssql",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [

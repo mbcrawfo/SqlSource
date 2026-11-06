@@ -6,8 +6,9 @@
   "queries": {
     "EchoCube": {
       "hash": "44d1ac9ddc453a6c7a366d7c5e3e4bdbec3e65f0c8fa9298045c71feb128dec7",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

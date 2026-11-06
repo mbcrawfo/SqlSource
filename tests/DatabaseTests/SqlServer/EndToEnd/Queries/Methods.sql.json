@@ -6,8 +6,9 @@
   "queries": {
     "TouchAccount": {
       "hash": "8fc648e5dfd45078b70cac7c3fa1912e2f5d920c1de561c3c95465848cd0d09a",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -27,8 +28,9 @@
     },
     "SetAccountStatus": {
       "hash": "acf20dac1a53a35bf346afb3d041d1fbc3c06c4320d423585c7947beed19aa39",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -60,8 +62,9 @@
     },
     "GetAccountInRange": {
       "hash": "6e0ed7c5e0009348980301b40db4189a8c98caecc0bb024841004052d6e8407f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -136,8 +139,9 @@
     },
     "FindAccountInRange": {
       "hash": "6e0ed7c5e0009348980301b40db4189a8c98caecc0bb024841004052d6e8407f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -212,8 +216,9 @@
     },
     "ListAccountsWhere": {
       "hash": "7a748424ff2e3a08650cf0cd86bf0443fc160968b41709824d5acb650f5cb5f0",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -276,8 +281,9 @@
     },
     "AddTwoNotes": {
       "hash": "f2992aed31512a64581683b2ddcf822a4d0797d62d7a5d1a5474692bd38e188f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -357,8 +363,9 @@
     },
     "CountReadAccounts": {
       "hash": "31d9c1f875e8c51a20f28f3f88e69c8e8c0b8b140d3ca63ada5cf78c452f1f82",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -408,16 +415,18 @@
     },
     "TouchAccountsQuietly": {
       "hash": "951a277f5b18fe9683899f483aee4e4306e7bd854f59b36acb692dafbbbef239",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": []
     },
     "TouchAccountQuietly": {
       "hash": "6b006fec11be4a6114ec528088938563f49d286db61d0c440e7539782a484fc9",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "none",
       "parameters": [
@@ -437,8 +446,9 @@
     },
     "TouchAndCountAccounts": {
       "hash": "b722aba1ed1e4abdcd41d05075d36df085873690228b256328452ba0eb84c6a3",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -513,8 +523,9 @@
     },
     "TouchAndGetAccount": {
       "hash": "b722aba1ed1e4abdcd41d05075d36df085873690228b256328452ba0eb84c6a3",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -589,8 +600,9 @@
     },
     "GetFirstOfTwoAccounts": {
       "hash": "6b3ac0c4a993c7e38dfb9a4d54f59966bc5219a0e6bb05708229a9e6ce085458",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -665,8 +677,9 @@
     },
     "ListThenRaise": {
       "hash": "0a9ea1910866ecf778c26f5b9f04873a048c70addb308c93226f5141c0906aa7",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -716,8 +729,9 @@
     },
     "ListThenFailConversion": {
       "hash": "a155dc4471b6bd31990cc9a4ad6ced0ac759d8f703be7b2e0134abce3f8b5d0c",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -767,8 +781,9 @@
     },
     "GetTwoThenFailConversion": {
       "hash": "627981bc66dd04426a5f747bcf768b3d18e973a9a052426e038a47ef1bcb13ff",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -818,8 +833,9 @@
     },
     "GetTwoThenRaise": {
       "hash": "a740f1895c60314d0c42ed3e3c160f04c6865992c87847932aae537c267816eb",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -869,8 +885,9 @@
     },
     "ListNullAtThirdThenFailConversion": {
       "hash": "98c627a3dc12f6d4e5943518f9164fe4d1ad239a25dc646c528cdc900b21ae95",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -916,8 +933,9 @@
     },
     "ListFailingAtSecondThenFailConversion": {
       "hash": "7beab156e09f7f4fb1efb24848f2b77c647285862e6d8fe179ac32144a4cfd95",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -963,8 +981,9 @@
     },
     "RunThenRaise": {
       "hash": "38dfcf69d060a6bc691720d9606180093675cae644d141a9faf0563ead0ee7f6",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1014,8 +1033,9 @@
     },
     "GetThenRaise": {
       "hash": "35ed8d605ba6c093877a5a53a9d6111fe8477c3b7ae383245634208a21250433",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1065,8 +1085,9 @@
     },
     "FindThenRaise": {
       "hash": "dcd26a21393a6fa2a571b9c060c8abec85a601981802ba7ac1a14d932729c09b",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1116,8 +1137,9 @@
     },
     "FindNoneThenRaise": {
       "hash": "2a718d3dbdb859f164c36494bbb0059706d99854fc1eb052d88ebdc8c022ae84",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1167,8 +1189,9 @@
     },
     "CountThenRaise": {
       "hash": "06b81d3b48b07b69fd17d5c8cbfdd70f7ff1b063dbeba2f1075313e1d09c8abe",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1218,8 +1241,9 @@
     },
     "MergeAccountStatuses": {
       "hash": "16ff881011b124d8b4bbbabf8d43637ecb2b3cde2f1c218ce995c1b6078cc9a3",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1290,8 +1314,9 @@
     },
     "ListAccountIdsCancellingOnRead": {
       "hash": "59cc8ee4f653af5397751c8aaead1cf9df7d25d492cdc81cec9a4b48f0fcacf5",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

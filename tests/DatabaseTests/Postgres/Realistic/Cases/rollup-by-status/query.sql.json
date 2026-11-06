@@ -6,8 +6,9 @@
   "queries": {
     "GetRevenueByStatusAndMonth": {
       "hash": "3367413aea874aeb36d87b3916cbb8388066ec74a1d0e713e09afd4fb1c5419b",
-      "engine": "postgres",
+      "toolVersion": "0.1.0",
       "database": "realistic",
+      "engine": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,

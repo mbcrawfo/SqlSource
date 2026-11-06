@@ -215,6 +215,7 @@ public sealed class QueryTyperTests
                 "GetUser",
                 default,
                 "h",
+                PackageVersion.Prefix,
                 SidecarValues.Engine.SqlServer,
                 "app",
                 "17.0",
