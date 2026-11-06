@@ -30,7 +30,7 @@ public sealed class PostgresRefusalTests
     private const string DescribeParameters = "describe parameters";
 
     [Fact]
-    public async Task Rename_PlanStringThatDoesNotRead_IsRefusedAtThePlan()
+    public async Task RenameAsync_PlanStringThatDoesNotRead_IsRefusedAtThePlan()
     {
         var raw = Edited(Planned, calls => EditPlan(calls[ExplainCall]!, plan => plan[PlanKeys.Output]![0] = "(u.id"));
 
@@ -46,7 +46,7 @@ public sealed class PostgresRefusalTests
     }
 
     [Fact]
-    public async Task Rename_UnknownStringMember_IsRefusedAtIt()
+    public async Task RenameAsync_UnknownStringMember_IsRefusedAtIt()
     {
         var raw = Edited(Declared, calls => calls[3]!["answer"]!["tables"]![0]!["comment"] = "the users of the app");
 
@@ -62,7 +62,7 @@ public sealed class PostgresRefusalTests
     }
 
     [Fact]
-    public async Task Rename_UnknownSetting_IsRefused()
+    public async Task RenameAsync_UnknownSetting_IsRefused()
     {
         var raw = Edited(
             Declared,
@@ -80,7 +80,7 @@ public sealed class PostgresRefusalTests
     }
 
     [Fact]
-    public async Task Rename_ErrorOfPrepare_ReplaysToTheSameFailure()
+    public async Task RenameAsync_ErrorOfPrepare_ReplaysToTheSameFailure()
     {
         var bundle = BundleReplays.PrepareTypeNotDetermined();
         var raw = RawBundles.Of(
@@ -98,7 +98,7 @@ public sealed class PostgresRefusalTests
     }
 
     [Fact]
-    public async Task Rename_ErrorWithTheUsersText_KeepsNoneOfIt()
+    public async Task RenameAsync_ErrorWithTheUsersText_KeepsNoneOfIt()
     {
         var failed = PrepareFailed(
             Declared,
@@ -120,7 +120,7 @@ public sealed class PostgresRefusalTests
     }
 
     [Fact]
-    public async Task Rename_PrepareErrorInTheTypeList_ReplaysToSQLSRC228()
+    public async Task RenameAsync_PrepareErrorInTheTypeList_ReplaysToSQLSRC228()
     {
         var fixture = PostgresRenamings.Fixture(TwoDeclared);
         var prepare = RequestOf(BundleReplays.CaptureOf(BundleReplays.Read(fixture.Folder)));
@@ -147,7 +147,7 @@ public sealed class PostgresRefusalTests
     // A table named as a word of the engine's, partitioned or inherited and scanned without an alias, is printed
     // name_1: neither the renaming nor the token check can tell the planner's suffix from the user's name.
     [Fact]
-    public async Task Rename_PartitionChildOfAnEngineWord_IsRefusedAtItsToken()
+    public async Task RenameAsync_PartitionChildOfAnEngineWord_IsRefusedAtItsToken()
     {
         var raw = Edited(
             Planned,

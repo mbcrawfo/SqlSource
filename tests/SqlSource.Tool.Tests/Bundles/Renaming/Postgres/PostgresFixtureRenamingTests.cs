@@ -26,7 +26,7 @@ public sealed class PostgresFixtureRenamingTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public async Task Rename_Fixture_ReplaysWithTheOriginalsProvenance(string name)
+    public async Task RenameAsync_Fixture_ReplaysWithTheOriginalsProvenance(string name)
     {
         var raw = RawBundles.OfFixture(PostgresRenamings.Fixture(name));
 
@@ -44,7 +44,7 @@ public sealed class PostgresFixtureRenamingTests
 
     [Theory]
     [MemberData(nameof(Renamed))]
-    public async Task Rename_Fixture_LeaksNothing(string name)
+    public async Task RenameAsync_Fixture_LeaksNothing(string name)
     {
         var fixture = PostgresRenamings.Fixture(name);
 
@@ -57,7 +57,7 @@ public sealed class PostgresFixtureRenamingTests
 
     [Theory]
     [MemberData(nameof(Renamed))]
-    public async Task Rename_TwiceWithTwoKeys_GivesOtherNamesAndTheSameProvenance(string name)
+    public async Task RenameAsync_TwiceWithTwoKeys_GivesOtherNamesAndTheSameProvenance(string name)
     {
         var raw = RawBundles.OfFixture(PostgresRenamings.Fixture(name));
 

@@ -66,7 +66,7 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public async Task Rename_Case_ReplaysWithTheOriginalsProvenanceAndLeaksNothing(string name)
+    public async Task RenameAsync_Case_ReplaysWithTheOriginalsProvenanceAndLeaksNothing(string name)
     {
         var found = RealisticCases.Corpus.ReadNamed(name);
         found.SkipUnlessRunsOn(databases.Major);
@@ -89,7 +89,7 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
     }
 
     [Fact]
-    public async Task Rename_Intersect_KeepsThePlannersSetName()
+    public async Task RenameAsync_Intersect_KeepsThePlannersSetName()
     {
         Assert.SkipUnless(
             databases.Major < NoSetNameFrom,
