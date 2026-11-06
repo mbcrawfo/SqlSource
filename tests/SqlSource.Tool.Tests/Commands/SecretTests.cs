@@ -427,6 +427,42 @@ public sealed class SecretTests : IDisposable
         log.ShouldContain("\"run.start\"");
     }
 
+    // Where a path of diagnose stands, the file of --query and the bundle of --scrub, and the name of --query, under
+    // --log and SQLSOURCE_LOG.  Nothing of the value is printed, and run.start holds the mark in its place.
+    [Theory]
+    [InlineData("212", false, "--query", Secrets.ConnectionWithMarker + ".sql:Q", "--out", "r.zip")]
+    [InlineData("212", true, "--query", Secrets.ConnectionWithMarker + ".sql:Q", "--out", "r.zip")]
+    [InlineData("212", true, "--query=a.sql:" + Secrets.ConnectionWithMarker, "--out", "r.zip")]
+    [InlineData("288", true, "--scrub", Secrets.ConnectionWithMarker, "--out", "r.zip")]
+    [InlineData("288", true, "--out", "r.zip", "--scrub:" + Secrets.ConnectionWithMarker)]
+    public async Task Diagnose_ConnectionStringWherePathsStand_IsNeverPrintedOrLogged(
+        string id,
+        bool fromVariable,
+        params string[] args
+    )
+    {
+        if (fromVariable)
+        {
+            _scene.Run.Environment["SQLSOURCE_LOG"] = "run.log";
+        }
+
+        string[] logOption = fromVariable ? [] : ["--log", "run.log"];
+        var result = await _scene.Run.RunAsync(["diagnose", .. args, .. logOption]);
+
+        ShouldHold(result, id);
+        var log = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf("run.log"),
+            TestContext.Current.CancellationToken
+        );
+        log.ShouldNotContain(Secrets.Marker);
+        LogReader
+            .Read(_scene.Run.Folder.PathOf("run.log"))[0]
+            .GetProperty("arguments")
+            .EnumerateArray()
+            .Select(static item => item.GetString())
+            .ShouldContain(static item => item != null && item.EndsWith("***", StringComparison.Ordinal));
+    }
+
     // The rule for an unknown option: nothing after it is read.
     [Fact]
     public async Task Run_MisspeltConnectionOptionFollowedByTheValue_NamesTheOptionAlone()

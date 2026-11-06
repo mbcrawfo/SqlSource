@@ -16,11 +16,13 @@ namespace SqlSource.Tool.Logging;
 /// comes here: the run ended before the log was opened.
 /// </para>
 /// <para>
-/// A path, which is an argument or the value of <c>--project</c>, <c>--log</c> or <c>--manifest</c>, is written only
-/// where a message may print it (<see cref="UsageValue.MayBePrintedAsPath" />).  A <c>--database</c> value and a
-/// <c>--connection</c> value are never written: <c>run.start</c> comes before the plan, which decides whether such a
-/// name would be printed.  The <c>database</c> events and <c>run.end</c> name every selected database, and
-/// <c>connectionSource</c> says which got its connection from <c>--connection</c>.
+/// A path, which is an argument or the value of <c>--project</c>, <c>--log</c>, <c>--manifest</c>, or of
+/// <c>diagnose</c>'s <c>--query</c>, <c>--out</c> or <c>--scrub</c>, is written only where a message may print it
+/// (<see cref="UsageValue.MayBePrintedAsPath" />).  A value of <c>--query</c> is tested whole, so a <c>=</c> or a
+/// <c>;</c> in its file or in its name replaces it.  A <c>--database</c> value and a <c>--connection</c> value are
+/// never written: <c>run.start</c> comes before the plan, which decides whether such a name would be printed.  The
+/// <c>database</c> events and <c>run.end</c> name every selected database, and <c>connectionSource</c> says which got
+/// its connection from <c>--connection</c>.
 /// </para>
 /// </remarks>
 internal static class LoggedArguments
@@ -42,8 +44,13 @@ internal static class LoggedArguments
         value.Option?.Name switch
         {
             DescribeCommand.DatabaseOption or DescribeCommand.ConnectionOption => true,
-            null or DescribeCommand.ProjectOption or DescribeCommand.LogOption or DescribeCommand.ManifestOption =>
-                !value.MayBePrintedAsPath,
+            null
+            or DescribeCommand.ProjectOption
+            or DescribeCommand.LogOption
+            or DescribeCommand.ManifestOption
+            or DiagnoseCommand.QueryOption
+            or DiagnoseCommand.OutOption
+            or DiagnoseCommand.ScrubOption => !value.MayBePrintedAsPath,
             _ => false,
         };
 }
