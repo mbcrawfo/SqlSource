@@ -81,7 +81,7 @@ The members of `SqlServerRenaming`:
 | `Fold` | upper-invariant by character, `quoted` ignored |
 | `IsEngineWord` | `SqlServerVocabulary.Contains`; a spelling of ASCII digits alone (the tool's `AS [n]`); a system CLR type's assembly-qualified name, `Microsoft.SqlServer.Types.Sql(Geometry\|Geography\|HierarchyId), Microsoft.SqlServer.Types, Version=<digits and dots>, Culture=neutral, PublicKeyToken=89845dcd8080cc91`, compared folded |
 | `RuleOf` | `SqlServerFields.RuleOf` |
-| `IsEngineRow` | a row at `answer.rows[]` of `columns`, `operands` or `table` whose `sourceSchema` folds to `SYS` or `INFORMATION_SCHEMA`, or whose `sourceDatabase` is a system database; `table`'s `request` whose `schema` is `sys` or `INFORMATION_SCHEMA`; nothing else |
+| `IsEngineRow` | a row at `answer.rows[]` of `columns`, `operands` or `table` whose `sourceSchema` folds to `SYS` or `INFORMATION_SCHEMA`, or whose `sourceDatabase` folds to `MSSQLSYSTEMRESOURCE`, so that a `dbo` row of `master`, `msdb`, `model` or `tempdb` is the user's (owner, review finding R1-F1); `table`'s `request` whose `schema` is `sys` or `INFORMATION_SCHEMA`; nothing else |
 | `CopyOf` | the name as `<prefix><one or more _><ASCII digits>` with `<prefix>` in `queryParameters` (whose comparer ignores case): `(prefix, "_" + digits)`; otherwise null |
 | `Register`, `Derive` | nothing |
 | `RenameOwn` | `SqlServerMessages.Rename(field.Value, scope, s => IsEngineWord(s, false))` |
