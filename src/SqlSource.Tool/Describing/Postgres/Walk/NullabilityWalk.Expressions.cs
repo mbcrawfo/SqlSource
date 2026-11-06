@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 

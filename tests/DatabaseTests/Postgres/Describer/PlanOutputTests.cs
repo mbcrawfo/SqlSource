@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.Describer;

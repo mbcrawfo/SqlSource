@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SqlSource.Tool.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 /// <summary>
 /// An entry of a plan's <c>Output</c> as tokens of the plan's quoting: what <see cref="PlanExpression" /> reads its

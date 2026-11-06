@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 /// <summary>
 /// The names of functions and operators that only <c>pg_catalog</c> holds: no other schema holds a function or an

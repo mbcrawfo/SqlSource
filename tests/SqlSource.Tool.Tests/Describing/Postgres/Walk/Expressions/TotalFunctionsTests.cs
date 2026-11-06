@@ -1,9 +1,9 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
-using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk.Expressions;
 
 // The closed tables of the operators, functions and aggregates of pg_catalog that never return NULL for arguments that
 // are not, looked up by their exact argument types.  tests/DatabaseTests/Postgres/Describer/CatalogPinTests.cs holds

@@ -3,7 +3,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 /// <summary>
 /// The operators and functions of <c>pg_catalog</c> that never return <c>NULL</c> for arguments that are not, and the

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Kind = SqlSource.Tool.Describing.Postgres.Walk.PlanTokens.Kind;
+using Kind = SqlSource.Tool.Describing.Postgres.Walk.Expressions.PlanTokens.Kind;
 
-namespace SqlSource.Tool.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 // The proofs of types: the type of a span that is a value never NULL of a known type, the type of a constant, a
 // test, count or a ranking that the text alone fixes, with the built-in types a quoted literal's cast names, and the

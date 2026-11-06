@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Kind = SqlSource.Tool.Describing.Postgres.Walk.PlanTokens.Kind;
+using Kind = SqlSource.Tool.Describing.Postgres.Walk.Expressions.PlanTokens.Kind;
 
-namespace SqlSource.Tool.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 // The reader of nullability forms: whether the server can never return NULL for a span, always does, or the span is
 // no form, with COALESCE, GREATEST, LEAST and a CASE over values that cannot be NULL.  A span that is no such form is

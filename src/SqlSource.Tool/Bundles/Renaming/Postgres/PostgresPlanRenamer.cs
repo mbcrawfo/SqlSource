@@ -9,6 +9,7 @@ using System.Text.Json.Nodes;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 

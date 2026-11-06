@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Kind = SqlSource.Tool.Describing.Postgres.Walk.PlanTokens.Kind;
+using Kind = SqlSource.Tool.Describing.Postgres.Walk.Expressions.PlanTokens.Kind;
 
-namespace SqlSource.Tool.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 // The reader's forms of pg_catalog, which a search path decides and the proofs of types read
 // (PlanExpression.Proofs.cs): an operator, a function, a cast, an aggregate and the ANY over a subplan's column, with

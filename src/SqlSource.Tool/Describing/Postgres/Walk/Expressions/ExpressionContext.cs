@@ -1,6 +1,6 @@
 using System;
 
-namespace SqlSource.Tool.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 /// <summary>What the walk tells <see cref="PlanExpression" /> of the plan an entry is read in.</summary>
 /// <param name="CatalogFunctions">

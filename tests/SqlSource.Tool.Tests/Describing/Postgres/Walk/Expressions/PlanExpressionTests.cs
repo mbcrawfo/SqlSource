@@ -3,9 +3,10 @@ using System.Collections.Frozen;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk.Expressions;
 
 // An entry of a plan's Output read as a whole: the forms that can never be NULL, the NULL constant, and the texts that
 // start or end like a form and are none.  The texts are as PostgreSQL 14 and 18 print them, which

@@ -11,6 +11,7 @@ using SqlSource.Tool.Describing.Postgres.Columns;
 using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Describing.Postgres.Types;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.Postgres;

@@ -12,6 +12,7 @@ using SqlSource.Tool.Bundles.Renaming.Postgres;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using SqlSource.Tool.Testing.Bundles;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;

@@ -1,11 +1,11 @@
 using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
-using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk.Expressions;
 
 // The closed table of the names of pg_catalog whose every overload is never NULL under its condition.
 // tests/DatabaseTests/Postgres/Describer/CatalogPinTests.cs holds every overload to the catalog of 14 and 18.
