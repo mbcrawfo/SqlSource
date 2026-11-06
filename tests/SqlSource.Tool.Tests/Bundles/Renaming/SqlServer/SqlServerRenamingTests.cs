@@ -73,6 +73,26 @@ public sealed class SqlServerRenamingTests
         true
     )]
     [InlineData(
+        "Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=abc, Culture=neutral, "
+            + "PublicKeyToken=89845dcd8080cc91",
+        true
+    )]
+    [InlineData(
+        "Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=1..0, Culture=neutral, "
+            + "PublicKeyToken=89845dcd8080cc91",
+        true
+    )]
+    [InlineData(
+        "Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=.1, Culture=neutral, "
+            + "PublicKeyToken=89845dcd8080cc91",
+        true
+    )]
+    [InlineData(
+        "Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=1., Culture=neutral, "
+            + "PublicKeyToken=89845dcd8080cc91",
+        true
+    )]
+    [InlineData(
         "Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=10.0.0.0, Culture=neutral, "
             + "PublicKeyToken=0000000000000000",
         true
