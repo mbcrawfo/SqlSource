@@ -1,6 +1,6 @@
 using SqlSource.Snapshot;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The part of the golden corpus of query methods that holds the scenarios lists and lists-no-padding: the methods of
 // queries whose parameters are lists, which send one parameter for each value.  QueryMethodCorpus.cs lists the cases.

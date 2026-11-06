@@ -3,7 +3,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The part of the golden corpus of query methods that holds the scenarios of the libraries and of the drivers:
 // nodatime, NodaTime's types read and written; json, classes read and written through System.Text.Json; and

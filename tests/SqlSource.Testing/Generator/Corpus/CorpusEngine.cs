@@ -6,7 +6,7 @@ using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using OutputKind = SqlSource.Settings.OutputKind;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // One engine of the golden corpus of query methods: what a scenario needs to write its queries' entries and run them
 // for this engine, and the scenarios only it has.  A shared scenario is written once against these, so that a new

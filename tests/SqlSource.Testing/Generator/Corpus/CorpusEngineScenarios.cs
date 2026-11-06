@@ -2,7 +2,7 @@ using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The part of the golden corpus of query methods that holds the scenarios only one engine has, which CorpusEngine.cs
 // lists among each engine's own: PostgreSQL's binding, a parameter of each kind of type Npgsql binds, and by-element,

@@ -1,6 +1,6 @@
 using SqlSource.Snapshot;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The part of the golden corpus of query methods that holds the scenario converters: parameters and columns read and
 // bound through the converters of a value type and of a class, and a column read through an obsolete converter.

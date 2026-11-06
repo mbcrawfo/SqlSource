@@ -5,7 +5,7 @@ using System.Text;
 using SqlSource.Generation.Exceptions;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The cases of the golden corpus of query methods: for each engine of CorpusEngine.All, the shared scenarios and then
 // the engine's own, each named `<engine>/<scenario>`, the path of its golden file under GoldenFiles.Folder.  See "The

@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Repository;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The golden files of the query-method corpus: a run rendered to text, compared with the file of its case under
 // Folder, and written there only when SQLSOURCE_UPDATE_GOLDEN is 1.  See "The golden corpus of query methods" in

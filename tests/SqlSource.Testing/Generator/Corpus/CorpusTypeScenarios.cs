@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The part of the golden corpus of query methods that holds the scenarios of the types that claim the queries:
 // placement, where each member location and visibility and each kind of type puts the methods, and diagnostics, the

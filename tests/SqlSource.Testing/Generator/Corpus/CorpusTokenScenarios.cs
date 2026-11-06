@@ -1,7 +1,7 @@
 using System.Linq;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Testing.Generator;
+namespace SqlSource.Testing.Generator.Corpus;
 
 // The part of the golden corpus of query methods that holds the scenario tokens: the methods of queries with tokens,
 // in each shape, with a token named as a keyword that is not reserved, as each local of a method, and with and without
