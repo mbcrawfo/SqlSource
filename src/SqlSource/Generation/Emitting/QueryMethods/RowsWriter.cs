@@ -46,8 +46,11 @@ internal static class RowsWriter
             return;
         }
 
-        // A method that checks for a rollback has the read, its drain and its returns in a try whose catch checks.
-        if (!context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead))
+        // A method that checks for a rollback has the read, its drain and its returns in a try whose catches check: the
+        // database's error first, then an exception of the method's own.
+        var checksAfterDatabaseError = context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError);
+        var checksAtRead = context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead);
+        if (!checksAfterDatabaseError && !checksAtRead)
         {
             AppendRows(in context, indent, output);
             return;
@@ -56,7 +59,15 @@ internal static class RowsWriter
         _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
         AppendRows(in context, GeneratedText.Deeper(indent), output);
         QueryMethodWriter.AppendEnd(builder, indent);
-        ExecutionCapabilityWriter.AppendRollbackCheck(in context, indent);
+        if (checksAfterDatabaseError)
+        {
+            ExecutionCapabilityWriter.AppendDatabaseErrorCheck(in context, indent);
+        }
+
+        if (checksAtRead)
+        {
+            ExecutionCapabilityWriter.AppendRollbackCheck(in context, indent);
+        }
     }
 
     // The rows read into the buffer and the collection returned, or the one row read and returned, each return after

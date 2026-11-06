@@ -35,8 +35,15 @@ internal static class ExecutionCapabilityRules
     /// <para>
     /// SQL Server, <see cref="ExecutionCapabilities.ChecksRollbackAtRead" />, on a method that reads rows: an exception
     /// of the method's own leaves the rest of the batch to the reader's disposal, which drops an error there that rolls
-    /// back the transaction unannounced, so a catch reports it.  A database error at a row is thrown as it is, so a
-    /// later error of the batch that rolls the transaction back goes unreported (TD-0090).
+    /// back the transaction unannounced, so a catch reports it.
+    /// </para>
+    /// <para>
+    /// SQL Server, <see cref="ExecutionCapabilities.ChecksRollbackAfterDatabaseError" />, on a method that reads rows:
+    /// a database error at a row, or one that the drain before a return throws, leaves the rest of the batch unread,
+    /// and a later error there can roll the transaction back.  The transaction's <c>Connection</c> is still set when
+    /// the read throws, even when that error itself rolled it back, so a catch reads the rest of the batch, disposes
+    /// the reader, and reports the rollback only when a later error was raised and the <c>Connection</c> is then
+    /// null; otherwise the database's error is thrown as it is.
     /// </para>
     /// <para>
     /// SQL Server, <see cref="ExecutionCapabilities.DrainsWhenLeftAtARow" />, on a method that streams: a break, a
@@ -53,7 +60,9 @@ internal static class ExecutionCapabilityRules
             DatabaseEngine.SqlServer => ExecutionCapabilities.RefusesCompletedTransaction
                 | (
                     readsRows
-                        ? ExecutionCapabilities.DrainsLaterResults | ExecutionCapabilities.ChecksRollbackAtRead
+                        ? ExecutionCapabilities.DrainsLaterResults
+                            | ExecutionCapabilities.ChecksRollbackAtRead
+                            | ExecutionCapabilities.ChecksRollbackAfterDatabaseError
                         : ExecutionCapabilities.None
                 )
                 | (method.Streams ? ExecutionCapabilities.DrainsWhenLeftAtARow : ExecutionCapabilities.None),

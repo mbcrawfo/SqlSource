@@ -5,7 +5,7 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the statements that a query's method's <see cref="ExecutionCapabilities" /> turn on: the refusal of a
-/// completed transaction, the catch that checks for a rollback, and the loops that drain the later results, with
+/// completed transaction, the catches that check for a rollback, and the loops that drain the later results, with
 /// the documentation of what they throw.  The phases of <see cref="QueryMethodWriter" /> keep the structure of the
 /// buffered and streamed reading, ask a flag at each point where one applies, and call in here.  Why each flag exists
 /// is said once, at <see cref="ExecutionCapabilityRules.Of" />.
@@ -40,7 +40,18 @@ internal static class ExecutionCapabilityWriter
             );
         }
 
-        if (capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead))
+        // A streaming method does not check after a database error yet, so it documents its own exception alone.
+        if (capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError) && !context.Streams)
+        {
+            XmlDocWriter.AppendException(
+                builder,
+                indent,
+                RolledBackCref,
+                "The query threw an exception of its own, or the database raised an error, its inner exception, and an "
+                    + "error that the rest of the query raised then rolled back the transaction."
+            );
+        }
+        else if (capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead))
         {
             XmlDocWriter.AppendException(
                 builder,
@@ -126,6 +137,78 @@ internal static class ExecutionCapabilityWriter
             .Append("{\n")
             .Append(blockIndent)
             .Append(GeneratedText.Indent)
+            .Append("throw new ")
+            .Append(RolledBackType)
+            .Append('(')
+            .Append(SymbolDisplay.FormatLiteral(context.Method.QueryName, quote: true))
+            .Append(", ")
+            .Append(locals.Exception)
+            .Append(");\n");
+        QueryMethodWriter.AppendEnd(builder, blockIndent);
+        _ = builder.Append('\n').Append(blockIndent).Append("throw;\n");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends the catch of a read, for the database's error, which comes before <see cref="AppendRollbackCheck" />'s.
+    /// With a transaction given, it reads the rest of the batch without the caller's token, as the reader's disposal
+    /// would, and notes whether an error was raised there; any other exception of that read, such as a cancellation,
+    /// is dropped, as the disposal would drop it.  It then disposes the reader, and when a later error was raised and
+    /// the transaction's <c>Connection</c> is null, it throws the exception that says so, with the database's error as
+    /// its inner exception; otherwise it throws the database's error as it is.  The <c>Connection</c> is still set
+    /// when the read throws, even when that error itself rolled the transaction back, and a database error that rolls
+    /// it back ends the batch, so a later error is what tells that the rest of the batch caused the rollback.
+    /// <see cref="ExecutionCapabilities.ChecksRollbackAfterDatabaseError" /> turns it on.
+    /// </summary>
+    public static void AppendDatabaseErrorCheck(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var blockIndent = GeneratedText.Deeper(indent);
+        var innerIndent = GeneratedText.Deeper(blockIndent);
+        _ = builder
+            .Append(indent)
+            .Append("catch (global::System.Data.Common.DbException ")
+            .Append(locals.Exception)
+            .Append(") when (")
+            .Append(locals.Transaction)
+            .Append(" is not null)\n")
+            .Append(indent)
+            .Append("{\n")
+            .Append(blockIndent)
+            .Append("var ")
+            .Append(locals.RaisedLater)
+            .Append(" = false;\n")
+            .Append(blockIndent)
+            .Append("try\n")
+            .Append(blockIndent)
+            .Append("{\n");
+        AppendDrainLoop(in context, innerIndent, NoCancellation);
+        QueryMethodWriter.AppendEnd(builder, blockIndent);
+        _ = builder
+            .Append(blockIndent)
+            .Append("catch (global::System.Data.Common.DbException)\n")
+            .Append(blockIndent)
+            .Append("{\n")
+            .Append(innerIndent)
+            .Append(locals.RaisedLater)
+            .Append(" = true;\n");
+        QueryMethodWriter.AppendEnd(builder, blockIndent);
+        _ = builder.Append(blockIndent).Append("catch (global::System.Exception)\n").Append(blockIndent).Append("{\n");
+        QueryMethodWriter.AppendEnd(builder, blockIndent);
+        _ = builder.Append('\n').Append(blockIndent);
+        _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Reader, "DisposeAsync");
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = builder
+            .Append(blockIndent)
+            .Append("if (")
+            .Append(locals.RaisedLater)
+            .Append(" && ")
+            .Append(locals.Transaction)
+            .Append(".Connection is null)\n")
+            .Append(blockIndent)
+            .Append("{\n")
+            .Append(innerIndent)
             .Append("throw new ")
             .Append(RolledBackType)
             .Append('(')

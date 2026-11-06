@@ -30,4 +30,10 @@ internal enum ExecutionCapabilities
     /// A streaming method drains the later results in a <c>finally</c> when its loop is left at a row.
     /// </summary>
     DrainsWhenLeftAtARow = 8,
+
+    /// <summary>
+    /// The reading of rows is in a <c>try</c> whose <c>catch</c>, for the database's error, reads the rest of the
+    /// batch and reports a transaction that a later error there rolled back.
+    /// </summary>
+    ChecksRollbackAfterDatabaseError = 16,
 }

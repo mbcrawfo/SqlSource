@@ -25,6 +25,12 @@ public sealed class QueryMethodWriterTests
         "/// <exception cref=\"global::System.InvalidOperationException\">"
         + "The transaction has completed: it was committed or rolled back before the query ran.</exception>\n";
 
+    // The documentation of the exception of a rolled-back transaction by a method that checks after a database error.
+    private const string RolledBackAfterDatabaseErrorDocumentation =
+        "/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">"
+        + "The query threw an exception of its own, or the database raised an error, its inner exception, and an error "
+        + "that the rest of the query raised then rolled back the transaction.</exception>\n";
+
     private const string ReaderLine =
         "var reader = await command.ExecuteReaderAsync("
         + "global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);\n";
@@ -430,6 +436,7 @@ public sealed class QueryMethodWriterTests
                     + "\n"
                     + "            return rows.ToArray();\n"
                     + "        }\n"
+                    + DatabaseErrorCheck("        ")
                     + TransactionCheck("        ")
                     + "    }\n"
                     + "    finally\n"
@@ -457,9 +464,13 @@ public sealed class QueryMethodWriterTests
                 + "\n"
                 + "            return row;\n"
                 + "        }\n"
+                + DatabaseErrorCheck("        ")
                 + TransactionCheck("        ")
         );
-        Regex.Count(text, "NextResultAsync", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
+        // The catch of the database's error reads the rest of the batch without the token, after a throw.
+        Regex
+            .Count(text, "NextResultAsync\\(cancellationToken\\)", RegexOptions.None, TimeSpan.FromSeconds(1))
+            .ShouldBe(1);
     }
 
     // No row drains too, so that a later error is thrown rather than hidden behind the null.
@@ -484,15 +495,20 @@ public sealed class QueryMethodWriterTests
                 + "\n"
                 + "            return row;\n"
                 + "        }\n"
+                + DatabaseErrorCheck("        ")
                 + TransactionCheck("        ")
         );
-        Regex.Count(text, "NextResultAsync", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(2);
+        // The catch of the database's error reads the rest of the batch without the token, after a throw.
+        Regex
+            .Count(text, "NextResultAsync\\(cancellationToken\\)", RegexOptions.None, TimeSpan.FromSeconds(1))
+            .ShouldBe(2);
     }
 
     // On SQL Server an error the rest of the batch raises, read when the reader is disposed after the method's own
     // exception, can roll back the transaction unannounced, so the whole read is in a try whose catch disposes the
-    // reader and, when the transaction is gone, throws an exception that says so.  The database's error and the
-    // caller's cancellation are thrown as they are, and a method given no transaction catches nothing.
+    // reader and, when the transaction is gone, throws an exception that says so.  The database's error has a catch
+    // of its own before it, which reads the rest of the batch and reports a rollback that a later error caused; the
+    // caller's cancellation is thrown as it is, and a method given no transaction catches nothing.
     [Theory]
     [InlineData(nameof(ResultShape.Many))]
     [InlineData(nameof(ResultShape.One))]
@@ -510,7 +526,8 @@ public sealed class QueryMethodWriterTests
             "        await using var readerScope = "
             + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);\n";
         const string TryStart = "        try\n        {\n";
-        var end = "        }\n" + TransactionCheck("        ") + "    }\n    finally\n";
+        var end =
+            "        }\n" + DatabaseErrorCheck("        ") + TransactionCheck("        ") + "    }\n    finally\n";
 
         text.ShouldContain(Scope + TryStart);
         text.ShouldContain(end);
@@ -518,26 +535,24 @@ public sealed class QueryMethodWriterTests
         var read = text[start..text.IndexOf(end, StringComparison.Ordinal)].Split('\n')[..^1];
         read.ShouldAllBe(line => line.Length == 0 || line.StartsWith("            ", StringComparison.Ordinal));
         read[^1].ShouldStartWith("            return ");
-        Regex.Count(text, "catch \\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
+        // The catch of the database's error, the two of its drain, and the catch of the method's own exception.
+        Regex.Count(text, "catch \\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(4);
     }
 
-    // Each SQL Server shape that reads rows says when it throws the exception of a rolled-back transaction.
+    // Each SQL Server shape that reads rows into a collection or one row says when it throws the exception of a
+    // rolled-back transaction, after its own exception or the database's error.
     [Theory]
-    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.Array))]
-    [InlineData(nameof(ResultShape.One), nameof(CollectionKind.Array))]
-    [InlineData(nameof(ResultShape.OneOptional), nameof(CollectionKind.Array))]
-    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.IAsyncEnumerable))]
-    public void Append_SqlServerShapeReadingRows_DocumentsTheRolledBackTransaction(
-        string shapeName,
-        string collectionName
-    ) =>
-        Write(
-                SqlServerGetUser with
-                {
-                    Shape = Enum.Parse<ResultShape>(shapeName),
-                    Collection = Enum.Parse<CollectionKind>(collectionName),
-                }
-            )
+    [InlineData(nameof(ResultShape.Many))]
+    [InlineData(nameof(ResultShape.One))]
+    [InlineData(nameof(ResultShape.OneOptional))]
+    public void Append_SqlServerShapeReadingRows_DocumentsTheRolledBackTransaction(string shapeName) =>
+        Write(SqlServerGetUser with { Shape = Enum.Parse<ResultShape>(shapeName), Collection = CollectionKind.Array })
+            .ShouldContain(RolledBackAfterDatabaseErrorDocumentation);
+
+    // A SQL Server stream says when it throws the exception of a rolled-back transaction after its own exception.
+    [Fact]
+    public void Append_SqlServerStreams_DocumentsTheRolledBackTransaction() =>
+        Write(SqlServerStream)
             .ShouldContain(
                 "/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">"
                     + "The query threw an exception of its own, its inner exception, and an error that the rest of "
@@ -610,7 +625,7 @@ public sealed class QueryMethodWriterTests
         );
         Regex
             .Count(text, "\\.Connection is null\\)\n", RegexOptions.None, TimeSpan.FromSeconds(1))
-            .ShouldBe(shapeName is nameof(ResultShape.None) or nameof(ResultShape.RowCount) ? 1 : 2);
+            .ShouldBe(shapeName is nameof(ResultShape.None) or nameof(ResultShape.RowCount) ? 1 : 3);
         text.IndexOf(CompletedTransactionCheck("    "), StringComparison.Ordinal)
             .ShouldBeLessThan(text.IndexOf("var wasClosed", StringComparison.Ordinal));
     }
@@ -1491,6 +1506,34 @@ public sealed class QueryMethodWriterTests
         ShouldBalanceItsBraces(text);
     }
 
+    // An engine that checks for a rollback after a database error alone has the read in a try whose one catch takes
+    // the database's error, reads the rest of the batch, and reports a rollback that a later error caused; an
+    // exception of the method's own is not caught.
+    [Fact]
+    public void Append_CheckingRollbackAfterDatabaseErrorAlone_CatchesTheDatabasesErrorAroundTheRows()
+    {
+        var text = WriteWith(GetUser, ExecutionCapabilities.ChecksRollbackAfterDatabaseError);
+
+        text.ShouldContain(RolledBackAfterDatabaseErrorDocumentation);
+        text.ShouldNotContain(CompletedTransactionDocumentation);
+
+        text.ShouldContain("            return row;\n        }\n" + DatabaseErrorCheck("        ") + "    }\n");
+        text.ShouldNotContain("is not (global::System.Data.Common.DbException");
+        ShouldBalanceItsBraces(text);
+    }
+
+    // A token named as the flag of a later error renames the flag, which no argument may hide.
+    [Fact]
+    public void Append_SqlServerTokenNamedRaisedLater_RenamesTheFlag() =>
+        Write(
+                SqlServerGetUser with
+                {
+                    Shape = ResultShape.One,
+                    Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("raisedLater")),
+                }
+            )
+            .ShouldContain(DatabaseErrorCheck("        ", raisedLater: "raisedLater1"));
+
     // An engine that refuses a completed transaction alone refuses it, and documents that exception and no other of
     // the capabilities'.
     [Fact]
@@ -1512,7 +1555,8 @@ public sealed class QueryMethodWriterTests
             ExecutionCapabilities.RefusesCompletedTransaction
             | ExecutionCapabilities.DrainsLaterResults
             | ExecutionCapabilities.ChecksRollbackAtRead
-            | ExecutionCapabilities.DrainsWhenLeftAtARow;
+            | ExecutionCapabilities.DrainsWhenLeftAtARow
+            | ExecutionCapabilities.ChecksRollbackAfterDatabaseError;
 
         WriteWith(SqlServerStream with { Engine = DatabaseEngine.PostgreSql }, all).ShouldBe(Write(SqlServerStream));
     }
@@ -1620,6 +1664,7 @@ public sealed class QueryMethodWriterTests
             Token("ReadRows"),
             Token("atRow"),
             Token("exception"),
+            Token("raisedLater"),
             Token("yield")
         );
         var withVector = GetUser.Output! with
@@ -1757,6 +1802,67 @@ public sealed class QueryMethodWriterTests
         + "    await reader.DisposeAsync().ConfigureAwait(false);\n"
         + indent
         + "    if (transaction.Connection is null)\n"
+        + indent
+        + "    {\n"
+        + indent
+        + "        throw new global::SqlSource.TransactionRolledBackException(\"GetUser\", "
+        + exception
+        + ");\n"
+        + indent
+        + "    }\n"
+        + "\n"
+        + indent
+        + "    throw;\n"
+        + indent
+        + "}\n";
+
+    // The catch of a database's error by a SQL Server method of GetUser that reads rows into a collection or one row,
+    // at an indent, with the names of the exception and of the flag unless others are given.
+    private static string DatabaseErrorCheck(
+        string indent,
+        string exception = "exception",
+        string raisedLater = "raisedLater"
+    ) =>
+        indent
+        + "catch (global::System.Data.Common.DbException "
+        + exception
+        + ") when (transaction is not null)\n"
+        + indent
+        + "{\n"
+        + indent
+        + "    var "
+        + raisedLater
+        + " = false;\n"
+        + indent
+        + "    try\n"
+        + indent
+        + "    {\n"
+        + Drain(indent + "        ", "global::System.Threading.CancellationToken.None")
+        + indent
+        + "    }\n"
+        + indent
+        + "    catch (global::System.Data.Common.DbException)\n"
+        + indent
+        + "    {\n"
+        + indent
+        + "        "
+        + raisedLater
+        + " = true;\n"
+        + indent
+        + "    }\n"
+        + indent
+        + "    catch (global::System.Exception)\n"
+        + indent
+        + "    {\n"
+        + indent
+        + "    }\n"
+        + "\n"
+        + indent
+        + "    await reader.DisposeAsync().ConfigureAwait(false);\n"
+        + indent
+        + "    if ("
+        + raisedLater
+        + " && transaction.Connection is null)\n"
         + indent
         + "    {\n"
         + indent
