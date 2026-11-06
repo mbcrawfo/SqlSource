@@ -273,6 +273,7 @@ internal static class SqlFileParser
                 {
                     MemberLocationMarker = scope?.MemberLocationMarker,
                     VisibilityMarker = scope?.VisibilityMarker,
+                    DeclaredVariables = query.DeclaredVariables,
                 }
             );
         }
@@ -344,19 +345,33 @@ internal static class SqlFileParser
             var tokenDefaults = scope?.TokenDefaults ?? [];
             var tokens = SqlTokenList.Create(text, sql, scanned.Occurrences, tokenDefaults, _errors);
 
-            // A variable is written in the SQL where it is declared, so SQL without parameters declares none.
+            // A variable is written in the SQL where it is declared, so SQL without parameters declares none, and has
+            // no use to classify.
             var variables =
                 sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
+            var uses =
+                sql.Parameters.Length == 0
+                    ? ImmutableArray<SqlParameterUse>.Empty
+                    : SqlListUses.Find(text, lexemes, start, end, rules);
             var parameters = SqlParameterList.Create(
                 rules,
-                new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables),
+                new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables, uses),
                 tokenDefaults,
                 scope?.Declarations ?? [],
                 _errors,
                 _warnings
             );
 
-            return new BuiltQuery(sql, scanned.Segments, scanned.Occurrences, tokens, parameters);
+            var segments = SqlListSegments.Split(scanned.Segments, scanned.Occurrences, sql, uses, parameters);
+            return new BuiltQuery(
+                sql,
+                segments,
+                scanned.Occurrences,
+                tokens,
+                parameters,
+                uses,
+                variables?.ToNames() ?? EquatableArray<string>.Empty
+            );
         }
 
         // A comment is gone from the SQL that the tokens are found in, and so is any "}}" it holds: in a default, that
@@ -436,15 +451,24 @@ internal static class SqlFileParser
             FindCommentsInHeads(query, ignoredTokens, start, end, ref errors);
             FindOpenedDefaults(kept, start, end, ref errors);
 
+            // Both forms are built from the same lexemes, so each holds the same parameters in the same order, and the
+            // uses read from those lexemes are this form's too.  The split finds each at this form's places.
+            var segments = SqlListSegments.Split(
+                scanned.Segments,
+                scanned.Occurrences,
+                kept,
+                query.Uses,
+                query.Parameters
+            );
             if (errors is null)
             {
-                return (scanned.Segments, EquatableArray<SqlParseError>.Empty);
+                return (segments, EquatableArray<SqlParseError>.Empty);
             }
 
             // Each check finds its errors in order, and the three together are put in the file's order, as a file's
             // errors are, with a stable sort.
             return (
-                scanned.Segments,
+                segments,
                 new EquatableArray<SqlParseError>(
                     errors.Count == 1
                         ? errors.ToImmutable()
@@ -645,13 +669,15 @@ internal static class SqlFileParser
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
             _errors.Add(SqlParseError.Create(kind, span, arguments));
 
-        // What step two gives.
+        // What step two gives.  Uses is what each parameter of Sql is used as, or empty when no use is a list.
         private readonly record struct BuiltQuery(
             SqlBlockText Sql,
             EquatableArray<SqlSegment> Segments,
             EquatableArray<SqlTokenOccurrence> Occurrences,
             EquatableArray<SqlToken> Tokens,
-            EquatableArray<SqlQueryParameter> Parameters
+            EquatableArray<SqlQueryParameter> Parameters,
+            ImmutableArray<SqlParameterUse> Uses,
+            EquatableArray<string> DeclaredVariables
         );
     }
 }

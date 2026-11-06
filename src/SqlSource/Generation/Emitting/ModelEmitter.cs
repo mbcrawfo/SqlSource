@@ -155,7 +155,7 @@ internal static class ModelEmitter
     // T? is Nullable<T> for a value type and the annotation for a reference type: the same text for both.
     private static StringBuilder AppendType(StringBuilder builder, ModelProperty property)
     {
-        _ = builder.Append(property.Type.Text);
+        _ = builder.Append(property.DeclaredType);
         return property.IsNullable ? builder.Append('?') : builder;
     }
 

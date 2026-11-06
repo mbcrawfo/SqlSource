@@ -6,6 +6,7 @@ using System.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Types;
+using SqlSource.Parsing;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
@@ -257,14 +258,19 @@ internal static class ModelReader
                 continue;
             }
 
+            // The parse's parameter, found as the typing finds it, by its name ignoring case, or null.
+            var at = SqlParameterName.IndexOf(query.Parameters, parameter.Name.AsSpan());
+            var declared = at >= 0 ? query.Parameters[at] : null;
+            var list = declared is { IsList: true };
             properties.Add(
                 new ModelProperty(
                     name,
                     types[index],
-                    parameter.Nullable == true,
+                    parameter.Nullable == true || declared is { IsList: true, HasNullTest: true },
                     ParameterDocumentation(parameter, reading.Text),
                     MessageSubject.Of(MessageSubject.Parameter, parameter.Name),
-                    false
+                    false,
+                    list ? ParameterSequence.List : ArrayOrNone(parameter, types[index], declared)
                 )
             );
         }
@@ -317,6 +323,23 @@ internal static class ModelReader
 
         return new EquatableArray<ModelProperty>(properties.ToImmutable());
     }
+
+    private static ParameterSequence ArrayOrNone(
+        SidecarParameter parameter,
+        PropertyType type,
+        SqlQueryParameter? declared
+    ) => IsArraySequence(parameter, type, declared) ? ParameterSequence.Array : ParameterSequence.None;
+
+    // Whether a CodeGen method sends the parameter from any sequence: a PostgreSQL array, or a domain over one, whose
+    // C# type is an array of one rank, E[], that the type map, a library or the type override gave.  A C# type that the
+    // parameter's -- param: marker names after -> is taken as written, the marker found as the typing finds it, by
+    // its name ignoring case.  bytea is no array of the database's, and a multirange is an array of the C# alone.
+    private static bool IsArraySequence(SidecarParameter parameter, PropertyType type, SqlQueryParameter? declared) =>
+        parameter.Type is { } described
+        && IsArrayType(described)
+        && type.Text.EndsWith("[]", StringComparison.Ordinal)
+        && type.Text.IndexOf("[,", StringComparison.Ordinal) < 0
+        && declared?.ClrType is null;
 
     // Whether Npgsql reads the type as an array, which is also how it reads a domain whose base type is one.
     private static bool IsArrayType(SidecarType type) =>

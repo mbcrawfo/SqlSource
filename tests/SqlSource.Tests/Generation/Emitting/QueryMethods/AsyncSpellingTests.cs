@@ -65,5 +65,11 @@ public sealed class AsyncSpellingTests
     }
 
     [Fact]
-    public void IteratorModifiers_AreStaticAsync() => AsyncSpelling.IteratorModifiers.ShouldBe("static async ");
+    public void IteratorModifiersOf_CapturingNothing_IsStaticAsync() =>
+        AsyncSpelling.IteratorModifiersOf(captures: false).ShouldBe("static async ");
+
+    // An iterator that reads the lists the method counted captures their locals, which a static one cannot.
+    [Fact]
+    public void IteratorModifiersOf_Capturing_IsAsync() =>
+        AsyncSpelling.IteratorModifiersOf(captures: true).ShouldBe("async ");
 }

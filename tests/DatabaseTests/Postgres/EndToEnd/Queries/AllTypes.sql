@@ -53,11 +53,11 @@ INSERT INTO all_types (
 RETURNING *;
 
 -- name: InsertAllTypesForDapper
--- summary: InsertAllTypes again, at the output models, whose constant the Dapper tests run.
+-- summary: InsertAllTypes again, at the output models, whose constant the Dapper tests run.  Its input model is its
+-- own, since an array parameter is an array here and any sequence in InsertAllTypes' method.
 -- type-override: timestamptz = default
 -- output: models
 -- member-location: class
--- input-model: InsertAllTypesArgs
 INSERT INTO all_types (
     id,
     bool_value, int2_value, int4_value, int8_value, float4_value, float8_value, numeric_value, money_value,

@@ -7,6 +7,7 @@ using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Methods;
+using SqlSource.Generation.Models;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
@@ -41,6 +42,7 @@ public sealed class QueryMethodWriterTests
         CollectionKind.List,
         DatabaseEngine.PostgreSql,
         TestSidecars.Of(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
+        true,
         true,
         true,
         new MethodInput(
@@ -78,6 +80,30 @@ public sealed class QueryMethodWriterTests
     {
         Engine = DatabaseEngine.SqlServer,
         Input = null,
+    };
+
+    // StreamIds: GetUser streaming the accounts of a list of ids, IN @ids.
+    private static readonly QueryMethod StreamIds = Stream with
+    {
+        Segments = TestSidecars.Of(
+            TestModels.Literal("SELECT id FROM accounts WHERE id IN "),
+            new SqlSegment(SqlSegmentKind.List, "@ids")
+        ),
+        Input = new MethodInput(
+            "global::App.StreamIdsParams",
+            TestSidecars.Of(
+                new MethodParameter(
+                    "ids",
+                    "Ids",
+                    "int",
+                    true,
+                    false,
+                    Described: Integer,
+                    Sequence: ParameterSequence.List,
+                    ExpansionPrefix: "ids_"
+                )
+            )
+        ),
     };
 
     [Fact]
@@ -1229,6 +1255,67 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain(" await.Length");
         text.ShouldNotContain("(await, b)");
         text.ShouldNotContain(" await,");
+    }
+
+    // The values of a list are counted, and their number checked, when the method is called, so the limit throws
+    // there and not when the loop asks for the first row.
+    [Fact]
+    public void Append_StreamWithLists_ChecksTheLimitBeforeTheIterator()
+    {
+        var text = Write(StreamIds);
+
+        var check = text.IndexOf("throw new global::System.ArgumentException(", StringComparison.Ordinal);
+        var iterator = text.IndexOf("ReadRows(", StringComparison.Ordinal);
+        check.ShouldBeGreaterThan(0);
+        iterator.ShouldBeGreaterThan(check);
+        ShouldBalanceItsBraces(text);
+    }
+
+    // A list counted when the method was called may change before its values are bound, as a stream's does before its
+    // loop starts: the binding throws when the list gives a value past its count, or ends before it, and when a list
+    // counted as empty gives one, since the SQL names exactly its count of values.  The documentation says so.
+    [Fact]
+    public void Append_List_ThrowsWhenTheListChangedAfterItWasCounted()
+    {
+        const string Throw =
+            "throw new global::System.InvalidOperationException("
+            + "\"The list 'Ids' changed after the query counted it.\");";
+
+        var text = Write(StreamIds);
+
+        text.ShouldContain(
+            "                    foreach (var element in list0)\n"
+                + "                    {\n"
+                + "                        if (index >= count0)\n"
+                + "                        {\n"
+                + "                            "
+                + Throw
+                + "\n"
+                + "                        }\n"
+        );
+        text.ShouldContain(
+            "                    if (index < count0)\n                    {\n                        " + Throw + "\n"
+        );
+        text.ShouldContain(
+            "                if (list0 is null || count0 == 0)\n"
+                + "                {\n"
+                + "                    if (list0 is not null)\n"
+                + "                    {\n"
+                + "                        foreach (var element in list0)\n"
+                + "                        {\n"
+                + "                            "
+                + Throw
+                + "\n"
+                + "                        }\n"
+                + "                    }\n\n"
+                + "                    var parameter = "
+        );
+        text.ShouldContain(
+            "/// <exception cref=\"global::System.InvalidOperationException\">"
+                + "A list of <paramref name=\"parameters\" /> changed between the call and the time its values were "
+                + "sent."
+                + "</exception>\n"
+        );
     }
 
     // After the last row the iterator reads the later results inside its try, so that the move that ends the loop

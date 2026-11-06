@@ -4,8 +4,8 @@ namespace SqlSource.Settings;
 
 /// <summary>
 /// The generator parameters: the switches a level can name, each on or off.  Most are off by default;
-/// <see cref="TokenValidation" />, <see cref="TableModels" /> and <see cref="ArrayPool" /> are on, and
-/// <see cref="GeneratorParameterList.Defaults" /> names them.
+/// <see cref="TokenValidation" />, <see cref="TableModels" />, <see cref="ArrayPool" /> and <see cref="ListPadding" />
+/// are on, and <see cref="GeneratorParameterList.Defaults" /> names them.
 /// </summary>
 [Flags]
 internal enum GeneratorParameters
@@ -40,4 +40,9 @@ internal enum GeneratorParameters
     /// <c>array-pool</c>: a query's method reads its rows through the shared array pool.  On by default.
     /// </summary>
     ArrayPool = 64,
+
+    /// <summary>
+    /// <c>list-padding</c>: a list query parameter's values are sent padded to a fixed size.  On by default.
+    /// </summary>
+    ListPadding = 128,
 }

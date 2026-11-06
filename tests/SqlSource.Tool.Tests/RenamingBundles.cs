@@ -67,7 +67,7 @@ internal static class RenamingBundles
         {
             var sql = query.Query;
             var described = await session.DescribeAsync(
-                new DescribeRequest(sql.Name, SampleSql.Build(sql), sql.Parameters),
+                new DescribeRequest(sql.Name, SampleSql.Build(sql, dialect), sql.Parameters),
                 token
             );
             if (described.Value is { } description)

@@ -13,6 +13,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Configure part of a project differently | [Configure one folder differently](settings.md#configure-a-folder), or the [recipe](recipes.md#folder-with-another-dialect) |
 | Leave some `.sql` files out | [Which `.sql` files are included](settings.md#included-files), or the [recipe](recipes.md#leave-migration-scripts-out) |
 | Give a query parameter a type | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| Filter by a list of values, `IN @ids`, or by an optional one | [List parameters](parameters-and-tokens.md#list-parameters), or the [recipe](recipes.md#filter-by-a-list) |
 | Choose a table name or a clause at run time | [Tokens](parameters-and-tokens.md#tokens), or the [recipe](recipes.md#table-name-at-run-time) |
 | Choose the dialect a file is read by | [Choosing a dialect](dialects.md#choosing-a-dialect) |
 | Use SQL Server, or another database | [SQL Server](sqlserver.md), [database support](dialects.md#database-support) |
@@ -63,7 +64,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Settings files: `sqlsource.json` in a folder, for it and every folder below | Available | [Settings files](settings.md#settings-files) |
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `table-models` | Available | [All settings](settings.md#all-settings) |
-| The settings for query methods: collection type, and the generator parameters `async-method-suffix` and `array-pool` | Available | [All settings](settings.md#all-settings) |
+| The settings for query methods: collection type, and the generator parameters `async-method-suffix`, `array-pool` and `list-padding` | Available | [All settings](settings.md#all-settings) |
 | Where each query's members go and how visible they are: member location, visibility and nested class, in markers and settings files | Available | [Where the members go](settings.md#setting-member-location) |
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
@@ -74,6 +75,8 @@ SqlSource is in early development.  This table is the one list of what works in 
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
 | The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available | [Types](postgresql.md#type-map) |
+| PostgreSQL array parameters accept any `IEnumerable<T>` in query methods | Available | [Array parameters](postgresql.md#array-parameters) |
+| List parameters: `IN @list`, expanded by the query methods on PostgreSQL and SQL Server | Available | [List parameters](parameters-and-tokens.md#list-parameters) |
 | Describing SQL Server queries | Available | [SQL Server](sqlserver.md) |
 | The C# type of each column and parameter of a described SQL Server query, and an error in the build for one that has none | Available | [Types](sqlserver.md#types) |
 | Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models), [SQL Server](sqlserver.md#models) |
@@ -95,7 +98,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 - [Concepts](concepts.md): how the pieces fit together, and the terms the manual uses.
 - [`.sql` files](sql-files.md): the file format, and an index of every marker.
 - [Settings](settings.md): every setting, where it can be set and which place wins.
-- [Parameters and tokens](parameters-and-tokens.md): query parameters, `-- param:` and tokens.
+- [Parameters and tokens](parameters-and-tokens.md): query parameters, `-- param:`, list parameters and tokens.
 - [Dialects](dialects.md): how each database's comments and strings are read, and which databases can be described.
 - [The generator](generator.md): what the `SqlSource` package generates.
 - [The tool](tool.md): the `SqlSource.Tool` package, its `sqlsource` command, running it in the build, and checking a bug-report bundle.

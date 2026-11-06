@@ -15,9 +15,13 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// The answer of <c>partitions</c>, by relation, or null when it was not asked: every <c>Append</c> is then read as a
 /// set operation.
 /// </param>
+/// <param name="distrustsJoinReduction">
+/// Whether every join but a semi join is read as extending both sides, as <see cref="WalkScope" /> says.
+/// </param>
 internal sealed class PlanInstancesCache(
     PlanNode tree,
-    IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? partitions
+    IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? partitions,
+    bool distrustsJoinReduction = false
 )
 {
     private readonly Dictionary<PlanNode, PlanInstances> _found = [with(ReferenceEqualityComparer.Instance)];
@@ -30,7 +34,7 @@ internal sealed class PlanInstancesCache(
     {
         if (!_found.TryGetValue(root, out var found))
         {
-            found = PlanInstances.Find(root, tree, partitions ?? PlanInstances.NoPartitions);
+            found = PlanInstances.Find(root, tree, partitions ?? PlanInstances.NoPartitions, distrustsJoinReduction);
             _found[root] = found;
         }
 

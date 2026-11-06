@@ -299,6 +299,7 @@ internal static class MethodPlanner
             settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments,
             settings.ValidateTokens,
             settings.UseArrayPool,
+            settings.PadsLists,
             methodInput,
             methodOutput,
             query.NameLocation
@@ -496,7 +497,7 @@ internal static class MethodPlanner
         out MethodInput? methodInput
     )
     {
-        var (input, key, file, _, usable) = context;
+        var (input, key, file, engine, usable) = context;
         var (_, queryIndex, query, _, _) = usable;
         methodInput = null;
         if (models.Input is not { } properties)
@@ -514,19 +515,28 @@ internal static class MethodPlanner
 
         var parameters = ImmutableArray.CreateBuilder<MethodParameter>(properties.Count);
         var isBlocked = false;
+        var lists = 0;
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
+            var parameter = query.Parameters[index];
             var write = reading.ConversionOf(property, false, ref isBlocked);
+            // A list's property is of its element, so its conversion is the element's.
+            var prefix = parameter.IsList
+                ? ListNames.PrefixOf(parameter, lists++, query.Parameters, query.DeclaredVariables, engine)
+                : null;
             parameters.Add(
                 new MethodParameter(
-                    query.Parameters[index].Name,
+                    parameter.Name,
                     property.Name,
                     property.Type.Text,
                     property.Type.IsValueType,
                     property.IsNullable,
                     write,
-                    models.ParameterTypes?[index]
+                    models.ParameterTypes?[index],
+                    property.Sequence,
+                    parameter.HasNullTest,
+                    prefix
                 )
             );
         }

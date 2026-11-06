@@ -81,7 +81,7 @@ internal static class FixtureReplay
         await using (session)
         {
             var described = await session.DescribeAsync(
-                new DescribeRequest(query.Name, SampleSql.Build(query), query.Parameters),
+                new DescribeRequest(query.Name, SampleSql.Build(query, dialect), query.Parameters),
                 token
             );
             if (!described.Succeeded)

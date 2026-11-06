@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
@@ -14,6 +13,9 @@ namespace SqlSource.Generation.Emitting;
 /// </summary>
 internal abstract class ParameterBinder
 {
+    /// <summary>The call that copies a sequence into a new array, before its argument.</summary>
+    protected const string ToArray = "global::System.Linq.Enumerable.ToArray(";
+
     private static readonly ParameterBinder Postgres = new PostgresParameterBinder();
 
     private static readonly ParameterBinder SqlServer = new SqlServerParameterBinder();
@@ -37,6 +39,18 @@ internal abstract class ParameterBinder
     public abstract void Append(in BindingContext context, MethodParameter bound);
 
     /// <summary>
+    /// Appends the binding of a list's null test: a parameter of the list's own name, a boolean of the database's that
+    /// is null when the list is null and true otherwise, which the SQL's <c>IS NULL</c> or <c>IS NOT NULL</c> reads in
+    /// place of the list.
+    /// </summary>
+    /// <param name="context">
+    /// What every parameter of the method is bound with, whose <see cref="BindingContext.ValueExpression" /> is the
+    /// list's value.
+    /// </param>
+    /// <param name="list">The list.</param>
+    public abstract void AppendNullTest(in BindingContext context, MethodParameter list);
+
+    /// <summary>
     /// Appends the binding by value alone: the name, without the <c>@</c>, and the value, with nothing else set.  A
     /// nullable property, and any property of a reference type, which a caller can set to null all the same, sends
     /// <c>DBNull.Value</c> for null.  A property with a converter sends the converter's result, and the converter
@@ -55,7 +69,7 @@ internal abstract class ParameterBinder
             .Append(context.Indent)
             .Append(context.Parameter)
             .Append(".ParameterName = ")
-            .Append(SymbolDisplay.FormatLiteral(bound.Name, quote: true))
+            .Append(context.NameOf(bound))
             .Append(";\n")
             .Append(context.Indent)
             .Append(context.Parameter)
@@ -83,17 +97,11 @@ internal abstract class ParameterBinder
         }
         else if (bound.IsNullable || !bound.IsValueType)
         {
-            _ = builder
-                .Append("(object?)")
-                .Append(context.Parameters)
-                .Append('.')
-                .Append(bound.Property)
-                .Append(" ?? ")
-                .Append(nullText);
+            _ = builder.Append("(object?)").Append(context.ValueOf(bound)).Append(" ?? ").Append(nullText);
         }
         else
         {
-            _ = builder.Append(context.Parameters).Append('.').Append(bound.Property);
+            _ = builder.Append(context.ValueOf(bound));
         }
     }
 
@@ -101,7 +109,9 @@ internal abstract class ParameterBinder
     /// Appends the converter's result for the property's value.  A value that can be null is matched first, so that
     /// the converter never sees a null, and the result, after <paramref name="cast" />, is then the arm of a
     /// conditional whose other arm is <paramref name="nullText" />.  An array converted by element, which is of a
-    /// reference type and so matched too, sends the database's array.
+    /// reference type and so matched too, sends the database's array.  An array that the property holds as any
+    /// sequence, <see cref="MethodParameter.IsArraySequence" />, is copied into an array first when it is not one,
+    /// since the converter and <c>Array.ConvertAll</c> take an array.
     /// </summary>
     /// <param name="context">What every parameter of the method is bound with.</param>
     /// <param name="bound">The parameter, and the property that gives its value.</param>
@@ -119,29 +129,37 @@ internal abstract class ParameterBinder
         var builder = context.Builder;
         if (!bound.IsNullable && bound.IsValueType)
         {
-            AppendCall(builder, write, context.Parameters + "." + bound.Property);
+            AppendCall(builder, write, context.ValueOf(bound));
             return;
         }
 
-        _ = builder
-            .Append(context.Parameters)
-            .Append('.')
-            .Append(bound.Property)
-            .Append(" is { } ")
-            .Append(context.Names.Value)
-            .Append(" ? ")
-            .Append(cast);
+        AppendMatch(context, bound);
+        _ = builder.Append(cast);
+        var value = ArrayOf(bound, context.Names.Value);
         if (write.IsByElement)
         {
-            AppendByElement(builder, write, context.Names);
+            AppendByElement(builder, write, context.Names, value);
         }
         else
         {
-            AppendCall(builder, write, context.Names.Value);
+            AppendCall(builder, write, value);
         }
 
         _ = builder.Append(" : ").Append(nullText);
     }
+
+    /// <summary>
+    /// Appends the match of the property's value that is not null, <c>parameters.X is { } value ? </c>, or of the
+    /// binding's value expression, before the arm that reads <c>value</c>, the pattern variable of
+    /// <see cref="ConversionNames.Value" />.
+    /// </summary>
+    protected static void AppendMatch(in BindingContext context, MethodParameter bound) =>
+        _ = context.Builder.Append(context.ValueOf(bound)).Append(" is { } ").Append(context.Names.Value).Append(" ? ");
+
+    // The value, the pattern variable of the property's value that is not null, as an array: as it is, unless the
+    // property holds the array as any sequence, which is then copied into an array when it is not one.
+    private static string ArrayOf(MethodParameter bound, string value) =>
+        bound.IsArraySequence ? value + " as " + bound.TypeText + " ?? " + ToArray + value + ")" : value;
 
     // The converter's call of the value; for the spatial read path, the shared writer's bytes of it, as SqlBytes.
     private static void AppendCall(StringBuilder builder, Conversion write, string value)
@@ -170,12 +188,13 @@ internal abstract class ParameterBinder
     }
 
     /// <summary>
-    /// Appends <c>Array.ConvertAll</c> of the value, by a static lambda that converts each element.  An element of a
-    /// reference type, or one the property writes nullable, can be null, and a null is sent as a <c>NULL</c> element,
-    /// the converter not called for it; the result's element, <see cref="ConvertedElementText" />, is then nullable,
-    /// of any database element, unlike the element a column is read as.
+    /// Appends <c>Array.ConvertAll</c> of <paramref name="value" />, an array, by a static lambda that converts each
+    /// element.  An element of a reference type, or one the property writes nullable, can be null, and a null is sent
+    /// as a <c>NULL</c> element, the converter not called for it; the result's element,
+    /// <see cref="ConvertedElementText" />, is then nullable, of any database element, unlike the element a column is
+    /// read as.
     /// </summary>
-    protected static void AppendByElement(StringBuilder builder, Conversion write, ConversionNames names)
+    protected static void AppendByElement(StringBuilder builder, Conversion write, ConversionNames names, string value)
     {
         var canBeNull = CanElementBeNull(write);
         var element = canBeNull && !write.ElementIsNullable ? write.ElementText + "?" : write.ElementText;
@@ -186,7 +205,7 @@ internal abstract class ParameterBinder
             .Append(", ")
             .Append(database)
             .Append(">(")
-            .Append(names.Value)
+            .Append(value)
             .Append(", static ")
             .Append(names.Element)
             .Append(" => ");

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SqlSource.Parsing.Tokens;
 
 namespace SqlSource.Parsing;
@@ -13,9 +14,14 @@ namespace SqlSource.Parsing;
 /// The names the SQL declares as local variables, or null when the dialect has none, the SQL has no parameter or it
 /// declares none.
 /// </param>
+/// <param name="Uses">
+/// What each parameter of the SQL is used as, in the order of <see cref="SqlBlockText.Parameters" />, or empty when no
+/// use is a list, and every use is then read as a value.
+/// </param>
 internal readonly record struct SqlScannedQuery(
     SqlBlockText Sql,
     EquatableArray<SqlTokenOccurrence> Occurrences,
     EquatableArray<SqlToken> Tokens,
-    SqlDeclaredVariables? Variables
+    SqlDeclaredVariables? Variables,
+    ImmutableArray<SqlParameterUse> Uses
 );

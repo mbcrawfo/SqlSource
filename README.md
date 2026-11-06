@@ -229,6 +229,10 @@ A `.sql` file that no `[SqlSourceGenerate]` type claims is not read, so scripts 
 
 Write a token with a default, `{{table:orders}}`, where the name goes.  The query becomes a method that takes the text to put there.  The default is only a sample that the tool describes the query with; a query whose output is `sql` needs none.  Nothing is escaped, so pass only text that your own code chooses, never a value a user typed.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#table-name-at-run-time) and [tokens](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/parameters-and-tokens.md#tokens).
 
+### Can I pass a list to `IN`?
+
+Yes: write the parameter directly after `IN`, with no parentheses, `WHERE id IN @ids`.  Its property in the input model is an `IEnumerable<int>`, which takes an array, a `List<int>` or any other sequence, and the query method sends a parameter for each value, on PostgreSQL and on SQL Server.  `(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#filter-by-a-list) and [list parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/parameters-and-tokens.md#list-parameters).
+
 ### How do I see the SQL that was generated?
 
 Hover over the member in your editor: its documentation holds the SQL as it was generated, with the markers and comments taken out.  See [documentation in IntelliSense](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#intellisense) and [what reaches the generated SQL](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sql-files.md#generated-sql).

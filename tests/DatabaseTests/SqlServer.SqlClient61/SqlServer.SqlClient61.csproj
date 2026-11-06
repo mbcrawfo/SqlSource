@@ -2,8 +2,8 @@
     <!--
         The end-to-end read of all_types and new_types through Dapper, and their write and read through the generated
         methods, the write and read of noda_values through the methods and NodaTime 3.1.9, of spatial_values through
-        the methods, NetTopologySuite 2.5.0 and NetTopologySuite.IO.SqlServerBytes 2.1.0, and of json_values and
-        json_columns through the methods, on
+        the methods, NetTopologySuite 2.5.0 and NetTopologySuite.IO.SqlServerBytes 2.1.0, of json_values and
+        json_columns through the methods, and the list parameters up to SQL Server's limit of 2,098 parameters, on
         Microsoft.Data.SqlClient 6.1.7, the newest release of 6.1, the oldest version that is supported.  A project of
         its own, since the end-to-end project gets SqlClient 7 through the tool it references.  The generator comes
         from a project reference, which does not bring the package's MSBuild files, so the real ones are imported here
@@ -31,6 +31,11 @@
         <AdditionalFiles Include="../SqlServer/EndToEnd/Queries/NewTypes.sql" Link="Queries/%(Filename)%(Extension)" />
         <AdditionalFiles
             Include="../SqlServer/EndToEnd/Queries/NewTypes.sql.json"
+            Link="Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles Include="../SqlServer/EndToEnd/Queries/Lists.sql" Link="Queries/%(Filename)%(Extension)" />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Queries/Lists.sql.json"
             Link="Queries/%(Filename)%(Extension)"
         />
         <AdditionalFiles Include="../SqlServer/EndToEnd/Queries/Streaming.sql" Link="Queries/%(Filename)%(Extension)" />

@@ -13,7 +13,12 @@ namespace SqlSource.Generation.Emitting;
 /// <remarks>
 /// <c>T</c> is the property's type, with <c>?</c> for a nullable value type; for a converted property, the database
 /// side of its converter, with <c>?</c> when it is a value type and the property can be null; and for an array
-/// converted by element, the array <c>Array.ConvertAll</c> gives.  A null is bound as <c>TypedValue = null</c>, never
+/// converted by element, the array <c>Array.ConvertAll</c> gives.  An array that the property holds as any sequence,
+/// <see cref="MethodParameter.IsArraySequence" />, is bound as an <c>IList&lt;E&gt;</c> of its element, or of the
+/// database's element when it is converted by element, since Npgsql sends an array from an <c>E[]</c> or an
+/// <c>IList&lt;E&gt;</c> alone and finds how from <c>T</c>, not from the value: a value that is an
+/// <c>IList&lt;E&gt;</c> is bound as it is, and any other sequence is copied once into an array.  A converter of the
+/// whole array is bound as its result is.  A null is bound as <c>TypedValue = null</c>, never
 /// <c>DBNull.Value</c>, which the setter of <c>NpgsqlParameter&lt;T&gt;.Value</c> refuses.  No <c>NpgsqlDbType</c> is
 /// named, so the binding compiles and binds alike on every supported Npgsql.
 /// <para>
@@ -26,6 +31,8 @@ namespace SqlSource.Generation.Emitting;
 /// </remarks>
 internal sealed class PostgresParameterBinder : ParameterBinder
 {
+    private const string IList = "global::System.Collections.Generic.IList<";
+
     /// <inheritdoc />
     public override void Append(in BindingContext context, MethodParameter bound)
     {
@@ -41,7 +48,7 @@ internal sealed class PostgresParameterBinder : ParameterBinder
             .Append(context.Indent)
             .Append(context.Parameter)
             .Append(".ParameterName = ")
-            .Append(SymbolDisplay.FormatLiteral(bound.Name, quote: true))
+            .Append(context.NameOf(bound))
             .Append(";\n");
         if (DataTypeNameOf(bound.Described) is { } dataTypeName)
         {
@@ -63,6 +70,32 @@ internal sealed class PostgresParameterBinder : ParameterBinder
             .Append(context.Parameter)
             .Append(");\n");
     }
+
+    /// <inheritdoc />
+    public override void AppendNullTest(in BindingContext context, MethodParameter list) =>
+        _ = context
+            .Builder.Append(context.Indent)
+            .Append("var ")
+            .Append(context.Parameter)
+            .Append(" = new global::Npgsql.NpgsqlParameter<bool?>();\n")
+            .Append(context.Indent)
+            .Append(context.Parameter)
+            .Append(".ParameterName = ")
+            .Append(context.NameOf(list))
+            .Append(";\n")
+            .Append(context.Indent)
+            .Append(context.Parameter)
+            .Append(".DataTypeName = \"pg_catalog.bool\";\n")
+            .Append(context.Indent)
+            .Append(context.Parameter)
+            .Append(".TypedValue = ")
+            .Append(context.ValueOf(list))
+            .Append(" is null ? null : true;\n")
+            .Append(context.Indent)
+            .Append(context.Command)
+            .Append(".Parameters.Add(")
+            .Append(context.Parameter)
+            .Append(");\n");
 
     /// <summary>
     /// The name the parameter of a type is bound by: null when the type has no <c>bindName</c>, and otherwise the
@@ -117,12 +150,18 @@ internal sealed class PostgresParameterBinder : ParameterBinder
     {
         switch (bound.Write)
         {
+            case null when bound.IsArraySequence:
+                _ = builder.Append(IList).Append(ConversionPlanner.ElementOf(bound.TypeText)).Append('>');
+                break;
             case null:
                 _ = builder.Append(bound.TypeText).Append(bound.IsNullable && bound.IsValueType ? "?" : "");
                 break;
             case { IsByElement: false } write:
                 var canBeNull = bound.IsNullable || !bound.IsValueType;
                 _ = builder.Append(write.DatabaseText).Append(write.DatabaseIsValueType && canBeNull ? "?" : "");
+                break;
+            case var write when bound.IsArraySequence:
+                _ = builder.Append(IList).Append(ConvertedElementText(write)).Append('>');
                 break;
             case var write:
                 _ = builder.Append(ConvertedElementText(write)).Append("[]");
@@ -131,16 +170,31 @@ internal sealed class PostgresParameterBinder : ParameterBinder
     }
 
     // The property's value, or its converter's result, by a conditional typed by TypedValue, whose null is the null
-    // of T.
+    // of T.  A sequence that is no IList of its element is copied into an array.
     private static void AppendValue(in BindingContext context, MethodParameter bound)
     {
+        var builder = context.Builder;
         if (bound.Write is { } write)
         {
             AppendConverted(context, bound, write, "", "null");
         }
+        else if (bound.IsArraySequence)
+        {
+            var value = context.Names.Value;
+            AppendMatch(context, bound);
+            _ = builder
+                .Append(value)
+                .Append(" as ")
+                .Append(IList)
+                .Append(ConversionPlanner.ElementOf(bound.TypeText))
+                .Append("> ?? ")
+                .Append(ToArray)
+                .Append(value)
+                .Append(") : null");
+        }
         else
         {
-            _ = context.Builder.Append(context.Parameters).Append('.').Append(bound.Property);
+            _ = builder.Append(context.ValueOf(bound));
         }
     }
 }

@@ -109,4 +109,12 @@ internal enum SqlParseErrorKind
     /// spelling and the first, each with its prefix.
     /// </summary>
     ParameterInTwoSpellings,
+
+    /// <summary>
+    /// A list parameter, one that the SQL writes directly after <c>IN</c>, stands where a list cannot: as one value, in
+    /// a token's default, or under a <c>-- param:</c> marker with the JSON opt-in.  A parameter directly after
+    /// <c>IN</c> in a token's default is one too, though it is no list elsewhere.  Arguments: the parameter, with its
+    /// prefix, as written where it is reported; and the reason, which ends the first sentence.
+    /// </summary>
+    ListParameterMisused,
 }

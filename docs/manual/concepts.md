@@ -82,7 +82,7 @@ SqlSource uses the word "parameter" for three different things.  The manual alwa
 
 #### Query parameter
 
-A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written.  A `-- param:` marker gives one its database type, whether it can be null, or a C# type of your choice.  See [parameters and tokens](parameters-and-tokens.md).
+A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written, but for a [list](parameters-and-tokens.md#list-parameters), `IN @ids`, which a query method writes as one parameter for each value.  A `-- param:` marker gives one its database type, whether it can be null, or a C# type of your choice.  See [parameters and tokens](parameters-and-tokens.md).
 
 <a id="generator-parameter"></a>
 

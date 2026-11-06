@@ -41,7 +41,7 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
             return;
         }
 
-        var (builder, indent, command, parameter, _, _) = context;
+        var (builder, indent, command, parameter, _, _, _, _, _) = context;
         _ = builder
             .Append(indent)
             .Append("var ")
@@ -54,7 +54,7 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
             .Append(indent)
             .Append(parameter)
             .Append(".ParameterName = ")
-            .Append(SymbolDisplay.FormatLiteral(bound.Name, quote: true))
+            .Append(context.NameOf(bound))
             .Append(";\n");
         if (row.SqlDbType is { } sqlDbType)
         {
@@ -93,17 +93,52 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
         }
 
         _ = builder.Append(";\n");
-        if (row.ValueText is { } valueText && facet > 0)
+        // A null has no length, and no scale to round.
+        if (row.ValueText is { } valueText && facet > 0 && !context.IsNull)
         {
             AppendOverLong(builder, indent, parameter, valueText, facet, row.Wider);
         }
 
-        if (row.Facet == Facet.PrecisionAndScale && type.Scale == 0)
+        if (row.Facet == Facet.PrecisionAndScale && type.Scale == 0 && !context.IsNull)
         {
             AppendRoundedToScale0(builder, indent, parameter);
         }
 
         _ = builder.Append(indent).Append(command).Append(".Parameters.Add(").Append(parameter).Append(");\n");
+    }
+
+    /// <inheritdoc />
+    public override void AppendNullTest(in BindingContext context, MethodParameter list)
+    {
+        var (builder, indent, command, parameter, _, _, _, _, _) = context;
+        _ = builder
+            .Append(indent)
+            .Append("var ")
+            .Append(parameter)
+            .Append(" = (")
+            .Append(SqlParameterType)
+            .Append(')')
+            .Append(command)
+            .Append(".CreateParameter();\n")
+            .Append(indent)
+            .Append(parameter)
+            .Append(".ParameterName = ")
+            .Append(context.NameOf(list))
+            .Append(";\n");
+        AppendSqlDbType(builder, indent, parameter, "Bit");
+        _ = builder
+            .Append(indent)
+            .Append(parameter)
+            .Append(".Value = ")
+            .Append(context.ValueOf(list))
+            .Append(" is null ? ")
+            .Append(DbNull)
+            .Append(" : true;\n")
+            .Append(indent)
+            .Append(command)
+            .Append(".Parameters.Add(")
+            .Append(parameter)
+            .Append(");\n");
     }
 
     /// <summary>

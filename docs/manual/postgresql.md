@@ -49,6 +49,7 @@ PostgreSQL gives each [query parameter](concepts.md#query-parameter) a type from
 
 - **A use that says nothing of the type** is [SQLSRC226](diagnostics.md#sqlsrc226): `SELECT @p IS NULL` holds for a value of any type.  Cast the parameter where it is used, `@p::int`, or declare its type.
 - **PostgreSQL takes the type from the first use.**  In the optional filter above, the first `@name` says nothing, so without the marker the query is [SQLSRC227](diagnostics.md#sqlsrc227).  Declare the type, as above, or turn the condition round: `(name = @name OR @name IS NULL)`.
+- **A [list parameter](parameters-and-tokens.md#list-parameters) takes its values' type from its use after `IN`**, and its test for null gives none, so the optional filter `(@ids IS NULL OR id IN @ids)` needs no marker: each value of `@ids` is of the type of `id`.
 - **A parameter compared with a column of a domain takes the domain's base type**: in `WHERE email = @email`, where `email` is a domain over `text`, `@email` is a `text`, so a [type override](settings.md#setting-type-overrides) of the domain does not reach it.  Declare it as the domain, `-- param: @email public.email`, to give it the domain's C# type, or give it the C# type itself, `-- param: @email -> MyApp.Email`.
 - **The first use can also give a type you did not mean.**  In `placed_at > now() - @age`, `@age` becomes a `timestamp with time zone`, and the server then reports an operator that does not exist ([SQLSRC225](diagnostics.md#sqlsrc225)).  Write `@age::interval`, or declare it.
 - **A declared type the database does not have** is [SQLSRC228](diagnostics.md#sqlsrc228).  A type in a schema that is not on the connection's search path needs its schema: `public.user_status`.
@@ -114,6 +115,7 @@ SqlSource treats a column as possibly null when:
 - **The table column can hold null**: it is not `NOT NULL`, or its `NOT NULL` was added as `NOT VALID` and not validated.
 - **The table can return null where its column says it cannot**: the table has or had inheritance children, it is partitioned and a foreign table is one of its partitions, or it has a `DO INSTEAD` rule on `INSERT`, `UPDATE` or `DELETE`.  Every column of such a table is possibly null.
 - **An outer join can fill the column with null**: a column of the optional side of a `LEFT`, `RIGHT` or `FULL` join.
+- **The query holds one of the words `LEFT`, `RIGHT`, `FULL`, `OUTER`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD` or `NEW`, and a [list](parameters-and-tokens.md#list-parameters) after a `NOT`**, as in `o.id NOT IN @ids`, `NOT o.id IN @ids` or `NOT (o.id IN @ids)`, and the column is of a table that the query joins to another, on either side of the join.  A word counts anywhere outside a string or a comment, even as the name of a function such as `left(name, 3)` in a query whose joins are all inner, and outside a quoted name, but for `"old"` and `"new"`, in any case, and a name written `U&"..."`, which count as `OLD` and `NEW`.  A condition such as `o.id NOT IN @ids` on the optional side of a `LEFT JOIN` drops the rows the join fills with null for every list but an empty one, which keeps them, so every joined column of such a query is possibly null.  The column of a query with no join, and every column of a query that holds none of the words, is not affected.
 - **The column comes from a view or a materialized view.**  PostgreSQL does not record whether a view's column can be null.
 - **The column comes from a foreign table.**  PostgreSQL does not enforce `NOT NULL` on its remote rows.
 - **It is `NULL`**, or an expression that is not in the list above, such as `initcap(name)`, `array_agg(...)` without `GROUP BY` or with `FILTER`, `upper(during)` of a range, `price * quantity` where either column can hold null, `sum(total)` without `GROUP BY` or with a `GROUP BY` whose every column the `WHERE` sets to one value, `EXISTS (...)` before PostgreSQL 17, or a call of another function.
@@ -221,7 +223,7 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 
 | Kind | C# type |
 |----|----|
-| An array | Its element's C# type with `[]`: `int[]` for `int4[]`, `string[]` for `text[]`, `string[]` for an array of an enum |
+| An array | Its element's C# type with `[]`: `int[]` for `int4[]`, `string[]` for `text[]`, `string[]` for an array of an enum.  A parameter in a query method is an `IEnumerable<T>` of that element: see [array parameters](#array-parameters) |
 | A domain | Its base type's C# type: a domain over `text` is a `string` |
 | An enum | `string`.  Npgsql reads an enum as its label.  To read it as a C# enum, map it with the type override, `public.user_status=MyApp.UserStatus`, and call `MapEnum<MyApp.UserStatus>()` on the application's data source builder |
 | A range or a multirange that the table does not name, a range of your own over `int4` included | None: SQLSRC246.  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project without Npgsql references it first, since that type is Npgsql's |
@@ -395,7 +397,8 @@ A described PostgreSQL query gets the [models](generator.md#models) that every d
 
 - **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or [NodaTime's](#nodatime) or [NetTopologySuite's](#nettopologysuite) for a query whose output is `codegen` in a project that references `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, or [System.Text.Json's](#json) for one where the library types turn `json` on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A column's alias can say otherwise with `!` or `?`, and so can a [`-- column:` marker](generator.md#column-marker).
-- **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since PostgreSQL does not say whether a parameter can be null.
+- **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, or, for a [list parameter](parameters-and-tokens.md#list-parameters), when the query tests the list for null, as `@ids IS NULL` does, since PostgreSQL does not say whether a parameter can be null.
+- **An array parameter's property is an `IEnumerable<T>`** in the input model of a query whose output is `codegen`, and a `T[]` in that of a query whose output is `models`: see [array parameters](#array-parameters).  A column's property is a `T[]` in both.
 - **A column with no name**, which PostgreSQL calls `?column?`, as an expression or a literal without an alias, is [SQLSRC253](diagnostics.md#sqlsrc253), and the query gets no models until it is fixed.  Give it an alias.
 - **A query whose rows are a whole table** gets a model named after the table, with the table's schema before its name unless the schema is `public`: `users` gives `UsersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](generator.md#table-models).
 - **Updating Npgsql from 9 to 10** changes the types of the properties for `date`, `time`, `cidr`, `daterange` and `datemultirange`, as [which version of Npgsql](#which-npgsql) says, and so the models.
@@ -429,7 +432,33 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 - **A parameter declared as a domain is sent as the domain's base type**, so the domain's `CHECK` is not applied to it.  Compared with a column of the domain, a value that the domain refuses finds no row, and the server checks it only when it is written to such a column.
 - **A `string` longer than the `varchar(n)` column it is written to is refused by the server**, with `22001`, and never cut to fit.
 - **A parameter that has a [converter](settings.md#converters)** is converted to the type of [the table](#type-table), a domain's base type for a domain, and sent as its database type too.
+- **An array parameter** takes any sequence of its element type: see [array parameters](#array-parameters).
+- **A [list parameter](parameters-and-tokens.md#list-parameters)** sends each value as a parameter of the values' type, an enum's label as that enum, and its test for null, `@ids IS NULL`, as a `boolean` of the list's name.  A query takes at most 65,535 parameters in all, which [the limit](parameters-and-tokens.md#list-limit) counts.
 - **A parameter of a [JSON](#json) type, or a class of yours in one,** is sent as its `json` or `jsonb`: a `JsonElement`, a `JsonDocument`, and on Npgsql 10 a `JsonNode`, a `JsonObject` or a `JsonArray`, by Npgsql, and on Npgsql 8 and 9 those three, and a class on every version, as their JSON's text.  A class by [the JSON opt-in](settings.md#json-opt-in) is sent as its JSON's text, as the parameter's own type: a `text` parameter as a `text`.
+
+<a id="array-parameters"></a>
+
+### Array parameters
+
+```sql postgres
+-- name: FindUsersByIds
+SELECT id, name FROM users WHERE id = ANY(@ids);
+```
+
+```csharp
+HashSet<int> ids = [3, 1, 2];
+FindUsersByIdsDto[] users = await connection.FindUsersByIds(new FindUsersByIdsParams(ids));
+```
+
+In a query method, an array parameter takes any `IEnumerable<T>` of its element type: an array, a `List<T>`, a `HashSet<T>`, an `ImmutableArray<T>` or the result of a LINQ query.  Above, `FindUsersByIdsParams.Ids` is an `IEnumerable<int>`.  The same holds for an array of a library's type, such as NodaTime's or NetTopologySuite's, and for a parameter that can be null, an `IEnumerable<T>?`, which is sent as `NULL`.
+
+- **A sequence is read once.**  An array, a `List<T>`, an `ImmutableArray<T>`, a `ReadOnlyCollection<T>` and any other `IList<T>` are sent as they are.  A `HashSet<T>`, a type that is only an `ICollection<T>` or an `IReadOnlyList<T>`, and a lazy sequence are copied into an array once, as the method sends them, so a lazy sequence is enumerated once and never twice.  The order of a `HashSet<T>` is the set's own, and so is the order of the array it gives.
+- **A null element** is sent as a `NULL` element, so the element type must be one that can be null: see [what to know about some types](#type-notes).
+- **The `models` output keeps `T[]`.**  An input model of a query whose output is `models` holds an array as an array, so that a library such as Dapper can send it as one.  A model of one name shared by a query whose output is `codegen` and one whose output is `models` therefore differs, and is [SQLSRC257](diagnostics.md#sqlsrc257), which names both property types.  Name the models apart with [`-- output-model:`](settings.md#setting-model-name) or `-- input-model:`.
+- **A C# type that a `-- param:` marker gives is taken as written.**  `-- param: @ids -> int[]` makes the property an `int[]`.  So is a [type override](settings.md#setting-type-overrides) to a type that is not an array of one rank: `int4[]=System.Collections.Generic.List<int>` makes it that `List<int>`.  An override to an array still becomes an `IEnumerable<T>` of its element, as the type table's does: `int4[]=long[]`, or `int4=long`, which makes the array a `long[]`, gives an `IEnumerable<long>`.
+- **These are not sequences, and stay as they are:** `bytea`, a `byte[]`; a multidimensional array such as `int[,]`; `int2vector` and `oidvector`; and the multiranges, which are sent as one value.
+- **A caller that reads the array back from an input model** of a `codegen` query, `ids.Length` for instance, sees an `IEnumerable<T>` now, though constructing the model with an array still compiles.  Copy the sequence into an array, `ids.ToArray()`, where you need one.
+- **`= ANY(@ids)` or `IN @ids`.**  `id = ANY(@ids)` sends the sequence as one array, so the query has one form whatever the count of values, and no limit of parameters applies to it.  `id IN @ids`, with no parentheses, is a [list parameter](parameters-and-tokens.md#list-parameters): it sends one parameter for each value, [padded](parameters-and-tokens.md#list-padding) to a few sizes, up to 65,535 parameters in all, and is written as on SQL Server, so one query's text runs on both.  Its property is an `IEnumerable<T>` in the output `models` too, where an array's is a `T[]`.  `IN (@ids)` compares with one array, and is not what you want.
 
 <a id="method-results"></a>
 
@@ -467,3 +496,5 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 - **A query over a table with many partitions is slow to describe.**  The tool looks at every partition of a partitioned table, whatever the query's conditions, when it works out which columns can be null.  On a table of thousands of partitions each such query takes longer to describe, and the [log](tool.md#logs) of the run grows.  Only describing is slower; nothing else is affected.
 - **A function marked `IMMUTABLE` can run while a query is described.**  See [what describing does](#what-describing-does).
 - **A query method fails on a connection that wraps Npgsql's and creates parameters of its own.**  Give the method the `NpgsqlConnection` inside: see [the generator's known issues](generator.md#known-issues).
+- **A list tested for null in the index predicate of `ON CONFLICT` cannot be described.**  In `INSERT ... ON CONFLICT (sku) WHERE (@kinds IS NULL OR kind IN @kinds) DO NOTHING`, describing the query fails with the database's "cannot use subquery in index predicate".  Test the list for null elsewhere, such as in the `WHERE` of `DO UPDATE` or of the `SELECT` that the `INSERT` reads, or give the query [`-- output: sql`](settings.md#setting-output), which describes nothing.
+- **A list that something other than `NOT` negates can make a query method throw on an empty list.**  In a query with an outer join, a list whose test is turned round by `IS FALSE`, `IS NOT TRUE`, a comparison with `false`, a `CASE` or a `COALESCE`, as in `WHERE (o.id IN @ids) IS FALSE`, is not seen as negated, unlike `NOT (o.id IN @ids)` [above](#nullability).  A column of the optional side can then get a property that cannot be null, and the method throws when an empty list keeps a row that the outer join filled with null.  Write the test with `NOT`, or mark such a column `null` with a [`-- column:` marker](generator.md#column-marker).

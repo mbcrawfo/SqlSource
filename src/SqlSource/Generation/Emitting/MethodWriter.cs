@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Placement;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
@@ -79,18 +80,20 @@ internal static class MethodWriter
         }
 
         _ = builder.Append(bodyIndent).Append("return ");
-        AppendCreate(builder, argumentIndent, bodyIndent, segments, parameters, parameters, span, state);
+        AppendCreate(builder, argumentIndent, bodyIndent, segments, parameters, parameters, span, state, lists: null);
         _ = builder.Append(";\n").Append(indent).Append("}\n");
     }
 
     /// <summary>
-    /// Appends the <c>string.Create(...)</c> expression that builds the SQL from the token arguments, without the
-    /// statement around it.  The token method returns it, and a query's method keeps it in a local.
+    /// Appends the <c>string.Create(...)</c> expression that builds the SQL from the token arguments and the lists,
+    /// without the statement around it.  The token method returns it, and a query's method keeps it in a local.
     /// </summary>
     /// <param name="builder">The source being built.</param>
     /// <param name="argumentIndent">The whitespace that starts each argument of <c>string.Create</c>.</param>
     /// <param name="bodyIndent">The whitespace that starts the line of the closing parenthesis.</param>
-    /// <param name="segments">The query's SQL.  It holds at least one token.</param>
+    /// <param name="segments">
+    /// The query's SQL.  It holds at least one token, or a use of a list when <paramref name="lists" /> is given.
+    /// </param>
     /// <param name="tokens">The token names, as <see cref="GetTokens" /> gives them.</param>
     /// <param name="arguments">
     /// How each token's argument is written, in the order of <paramref name="tokens" />: its name, or <c>@await</c>
@@ -98,6 +101,10 @@ internal static class MethodWriter
     /// </param>
     /// <param name="span">The name of the lambda's span, which no token has.</param>
     /// <param name="state">The name of the lambda's state, which no token has.</param>
+    /// <param name="lists">
+    /// The lists of a query's method, each use of which is written as the list's values, or null to write each use as
+    /// the SQL writes it, as a token method does, whose caller binds no list.
+    /// </param>
     internal static void AppendCreate(
         StringBuilder builder,
         string argumentIndent,
@@ -106,21 +113,23 @@ internal static class MethodWriter
         List<string> tokens,
         List<string> arguments,
         string span,
-        string state
+        string state,
+        ListLocals? lists
     )
     {
         var stepIndent = argumentIndent + GeneratedText.Indent;
+        var values = lists is null ? arguments : ListSqlWriter.StateOf(arguments, lists);
         _ = builder.Append("string.Create(\n").Append(argumentIndent);
-        AppendLength(builder, segments, tokens, arguments);
+        AppendLength(builder, segments, tokens, arguments, lists);
         _ = builder.Append(",\n").Append(argumentIndent);
-        if (arguments.Count == 1)
+        if (values.Count == 1)
         {
-            _ = builder.Append(arguments[0]);
+            _ = builder.Append(values[0]);
         }
         else
         {
             _ = builder.Append('(');
-            AppendList(builder, arguments, string.Empty);
+            AppendList(builder, values, string.Empty);
             _ = builder.Append(')');
         }
 
@@ -134,7 +143,7 @@ internal static class MethodWriter
             .Append(") =>\n")
             .Append(argumentIndent)
             .Append("{\n");
-        AppendSteps(builder, stepIndent, segments, tokens, span, state);
+        AppendSteps(builder, stepIndent, segments, tokens, values.Count, span, state, lists);
         _ = builder.Append(argumentIndent).Append("}\n").Append(bodyIndent).Append(')');
     }
 
@@ -157,11 +166,12 @@ internal static class MethodWriter
     }
 
     /// <summary>
-    /// The SQL as the documentation shows it, with each token in its plain form.
+    /// The SQL as the documentation and a constant show it, with each token in its plain form and each use of a list as
+    /// the SQL writes it.
     /// </summary>
     internal static string GetSql(EquatableArray<SqlSegment> segments)
     {
-        // Without a token the SQL is one literal segment, which needs no copy.
+        // Without a token or a list the SQL is one literal segment, which needs no copy.
         if (segments.Count == 1 && segments[0].Kind == SqlSegmentKind.Literal)
         {
             return segments[0].Text;
@@ -170,10 +180,14 @@ internal static class MethodWriter
         var sql = new StringBuilder();
         foreach (var segment in segments)
         {
-            _ =
-                segment.Kind == SqlSegmentKind.Token
-                    ? sql.Append("{{").Append(segment.Text).Append("}}")
-                    : sql.Append(segment.Text);
+            _ = segment.Kind switch
+            {
+                SqlSegmentKind.Literal or SqlSegmentKind.List or SqlSegmentKind.ListNullTest => sql.Append(
+                    segment.Text
+                ),
+                SqlSegmentKind.Token => sql.Append("{{").Append(segment.Text).Append("}}"),
+                _ => throw UnexpectedEnumValueException.Of(segment.Kind),
+            };
         }
 
         return sql.ToString();
@@ -202,31 +216,38 @@ internal static class MethodWriter
     }
 
     // The length of the result: the literal text as one number, then each parameter's length, times how often its
-    // token appears.  A sum or a product is checked: unchecked, a total above the largest int wraps around, and one
-    // that wraps to zero or a small number would give a short string and not an exception.
+    // token appears, and then the length of each list's uses.  A sum or a product is checked: unchecked, a total above
+    // the largest int wraps around, and one that wraps to zero or a small number would give a short string and not an
+    // exception.  A query with a list has literal text before its first use, so its length starts with a number.
     private static void AppendLength(
         StringBuilder builder,
         EquatableArray<SqlSegment> segments,
         List<string> parameters,
-        List<string> arguments
+        List<string> arguments,
+        ListLocals? lists
     )
     {
         var literalLength = 0;
         var uses = new int[parameters.Count];
+        var listUses = new int[lists?.Each.Count ?? 0];
         foreach (var segment in segments)
         {
-            if (segment.Kind == SqlSegmentKind.Token)
+            if (IsText(segment.Kind, lists is not null))
+            {
+                literalLength += segment.Text.Length;
+            }
+            else if (segment.Kind == SqlSegmentKind.Token)
             {
                 uses[parameters.IndexOf(segment.Text)]++;
             }
             else
             {
-                literalLength += segment.Text.Length;
+                listUses[lists!.IndexOf(segment.Text)]++;
             }
         }
 
         // One length by itself cannot overflow.
-        var isChecked = literalLength > 0 || parameters.Count > 1 || uses[0] > 1;
+        var isChecked = literalLength > 0 || parameters.Count > 1 || listUses.Length > 0 || uses[0] > 1;
         if (isChecked)
         {
             _ = builder.Append("checked(");
@@ -249,46 +270,80 @@ internal static class MethodWriter
             }
         }
 
+        for (var index = 0; index < listUses.Length; index++)
+        {
+            if (listUses[index] > 0)
+            {
+                ListSqlWriter.AppendLength(builder, lists!, index, listUses[index]);
+            }
+        }
+
         if (isChecked)
         {
             _ = builder.Append(')');
         }
     }
 
-    // One copy for each segment, and after each but the last a slice that moves the span past what was copied.
+    // One copy for each token and for each run of text between two, and after each but the last a slice that moves
+    // the span past what was copied.  A use of a list that is written as text is part of the run it stands in, so the
+    // steps are those of the same SQL without a list; one that is expanded writes the list's values.
     private static void AppendSteps(
         StringBuilder builder,
         string indent,
         EquatableArray<SqlSegment> segments,
         List<string> parameters,
+        int stateCount,
         string span,
-        string state
+        string state,
+        ListLocals? lists
     )
     {
-        for (var index = 0; index < segments.Count; index++)
+        var index = 0;
+        while (index < segments.Count)
         {
             var segment = segments[index];
             string source;
             string length;
-            if (segment.Kind == SqlSegmentKind.Token)
+            if (IsText(segment.Kind, lists is not null))
             {
-                // A tuple of one element cannot be written, so one parameter is the state itself.
-                source =
-                    parameters.Count == 1
-                        ? state
-                        : state
-                            + ".Item"
-                            + (parameters.IndexOf(segment.Text) + 1).ToString(CultureInfo.InvariantCulture);
+                var start = index;
+                index++;
+                while (index < segments.Count && IsText(segments[index].Kind, lists is not null))
+                {
+                    index++;
+                }
+
+                var text = TextOf(segments, start, index);
+                source = SymbolDisplay.FormatLiteral(text, quote: true);
+                length = text.Length.ToString(CultureInfo.InvariantCulture);
+            }
+            else if (segment.Kind == SqlSegmentKind.Token)
+            {
+                source = StateItem(state, stateCount, parameters.IndexOf(segment.Text));
                 length = source + ".Length";
+                index++;
             }
             else
             {
-                source = SymbolDisplay.FormatLiteral(segment.Text, quote: true);
-                length = segment.Text.Length.ToString(CultureInfo.InvariantCulture);
+                var list = lists!.IndexOf(segment.Text);
+                var count = ListSqlWriter.CountPlaceOf(parameters, list);
+                index++;
+                ListSqlWriter.AppendSteps(
+                    builder,
+                    indent,
+                    lists,
+                    list,
+                    segment.Text,
+                    span,
+                    StateItem(state, stateCount, count),
+                    StateItem(state, stateCount, count + 1),
+                    index == segments.Count
+                );
+                continue;
             }
 
             _ = builder.Append(indent).Append(source).Append(".CopyTo(").Append(span).Append(");\n");
-            if (index < segments.Count - 1)
+            if (index < segments.Count)
             {
                 _ = builder
                     .Append(indent)
@@ -301,4 +356,37 @@ internal static class MethodWriter
             }
         }
     }
+
+    // Whether a segment is written as its text.  A list's use is, unless the list is expanded, and a null test always
+    // is: a query method sends a parameter of the list's name for it.
+    private static bool IsText(SqlSegmentKind kind, bool expandsLists) =>
+        kind switch
+        {
+            SqlSegmentKind.Literal or SqlSegmentKind.ListNullTest => true,
+            SqlSegmentKind.List => !expandsLists,
+            SqlSegmentKind.Token => false,
+            _ => throw UnexpectedEnumValueException.Of(kind),
+        };
+
+    // The text of the segments from start up to end, one segment's own when there is one.
+    private static string TextOf(EquatableArray<SqlSegment> segments, int start, int end)
+    {
+        if (end == start + 1)
+        {
+            return segments[start].Text;
+        }
+
+        var text = new StringBuilder();
+        for (var index = start; index < end; index++)
+        {
+            _ = text.Append(segments[index].Text);
+        }
+
+        return text.ToString();
+    }
+
+    // The state's value at the place, from 0: a tuple of one element cannot be written, so one value is the state
+    // itself.
+    private static string StateItem(string state, int stateCount, int place) =>
+        stateCount == 1 ? state : state + ".Item" + (place + 1).ToString(CultureInfo.InvariantCulture);
 }

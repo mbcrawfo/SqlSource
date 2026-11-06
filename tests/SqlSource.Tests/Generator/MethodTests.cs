@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -23,6 +24,50 @@ public sealed class MethodTests
     );
 
     private static readonly SidecarEntry[] UsersEntries = EntriesOf(Users);
+
+    // A list's method sends a parameter for each value, named after the list; the golden corpus holds the whole method.
+    [Fact]
+    public void Run_QueryWithAList_GetsAMethodThatSendsEachValue()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: FindIds\nSELECT id FROM users WHERE id IN @ids;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "FindIds", [Parameter("ids")], [Column("id")])]);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" FindIds(\n");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("parameter.ParameterName = \"ids_\" + index.ToString(");
+        run.Sources["App.FindIdsParams-Model.g.cs"].ShouldContain("IEnumerable<int> Ids");
+    }
+
+    // A variable the query declares is no parameter, but SQL Server refuses a parameter of its name, so a list's
+    // values are never sent by it.
+    [Fact]
+    public void RunSqlServer_ListBesideADeclaredVariableOfItsFirstValuesName_TakesAnotherPrefix()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: FindIds\nDECLARE @ids_0 int = 5;\nSELECT id FROM dbo.users WHERE id IN @ids OR id = @ids_0;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "FindIds",
+                    [TestSidecars.Parameter(0, "ids", TestSidecars.SqlServer(), false)],
+                    [TestSidecars.Column(0, "id", TestSidecars.SqlServer())]
+                ),
+            ]
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("parameter.ParameterName = \"ids__\" + index.ToString(");
+        run.Sources[MethodRuns.MethodsFile].ShouldNotContain("\"ids_\" + index");
+    }
 
     [Fact]
     public void Run_CodeGenQuery_IsAnExtensionMethodOfTheTypesExtensionClass()
@@ -545,10 +590,11 @@ public sealed class MethodTests
     }
 
     // A PostgreSQL parameter is a parameter of Npgsql of the type of the value bound, by the canonical name of the type
-    // the entry describes it by: the database's type for a converted one.
+    // the entry describes it by: the database's type for a converted one, and an IList of its element for an array,
+    // which its property holds as any sequence.
     [Theory]
     [InlineData("base", "int", "pg_catalog.int4")]
-    [InlineData("array", "int[]", "pg_catalog._int4")]
+    [InlineData("array", "global::System.Collections.Generic.IList<int>", "pg_catalog._int4")]
     [InlineData("enum", "string", "public.mood")]
     [InlineData("domain", "string", "public.email")]
     [InlineData("range", "global::NpgsqlTypes.NpgsqlRange<int>", "pg_catalog.int4range")]

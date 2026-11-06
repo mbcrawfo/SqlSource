@@ -47,7 +47,10 @@ public sealed class GeneratorParameterChoicesTests
         GeneratorParameterChoices
             .Reset.Resolve()
             .ShouldBe(
-                GeneratorParameters.TokenValidation | GeneratorParameters.TableModels | GeneratorParameters.ArrayPool
+                GeneratorParameters.TokenValidation
+                    | GeneratorParameters.TableModels
+                    | GeneratorParameters.ArrayPool
+                    | GeneratorParameters.ListPadding
             );
 
     [Fact]

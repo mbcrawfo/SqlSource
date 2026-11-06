@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness.EndToEnd;
-using SqlSource.Tool.Testing;
+using SqlSource.Testing;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;

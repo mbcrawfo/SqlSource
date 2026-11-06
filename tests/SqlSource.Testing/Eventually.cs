@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace SqlSource.Tool.Testing;
+namespace SqlSource.Testing;
 
 // The waits of the tests, each on the test's token and none for longer than Patience: a test that waits for
 // something that never comes fails with what it waited for, and a run that is cancelled ends at once.

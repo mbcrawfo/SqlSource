@@ -159,6 +159,43 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         description.Parameters.ShouldHaveSingleItem().Type.ShouldBe(sqlServer.Major >= 17 ? BigInt : Int);
     }
 
+    // A list parameter is described as one value of its element, as the tool sends it.
+    [Fact]
+    public async Task DescribeAsync_ListParameter_HasTheElementsType()
+    {
+        var description = await ShouldDescribeAsync(Planned("mssql", "SELECT id FROM dbo.users WHERE id IN @ids"));
+
+        description.Parameters.ShouldBe([new DescribedParameter("ids", Int, SidecarValues.TypeSource.Inferred)]);
+    }
+
+    // The test for NULL is no use of the parameter, so the use after IN fixes its type.
+    [Fact]
+    public async Task DescribeAsync_OptionalListFilter_IsDescribed()
+    {
+        var description = await ShouldDescribeAsync(
+            Planned("mssql", "SELECT id FROM dbo.users WHERE (@ids IS NULL OR id IN @ids)")
+        );
+
+        description.Parameters.ShouldBe([new DescribedParameter("ids", Int, SidecarValues.TypeSource.Inferred)]);
+    }
+
+    // The two uses are two copies, which the tool unifies.
+    [Fact]
+    public async Task DescribeAsync_ListUsedTwice_IsDescribed()
+    {
+        var description = await ShouldDescribeAsync(
+            Planned(
+                "mssql",
+                "SELECT u.id FROM dbo.users u JOIN dbo.orders o ON o.user_id = u.id "
+                    + "WHERE u.id IN @ids OR o.user_id IN @ids"
+            )
+        );
+
+        description.Parameters.ShouldBe([
+            new DescribedParameter("ids", Int, SidecarValues.TypeSource.InferredFromCopies),
+        ]);
+    }
+
     [Theory]
     [InlineData("SELECT id FROM dbo.users WHERE id = @p", "int", "int", 4, 10, false)]
     [InlineData("SELECT id FROM dbo.users WHERE email = @p", "dbo.Email", "nvarchar(320)", 640, 0, true)]
