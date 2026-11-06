@@ -198,6 +198,32 @@ public sealed class WatchChangeTests : IAsyncDisposable
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
+    // The file that --env-file names, outside the unit's folder, is watched and read again for each pass in place of
+    // the unit's .env.
+    [Fact]
+    public async Task Watch_EnvFileNamedByTheOptionWritten_TheNextPassUsesItsValue()
+    {
+        await using var watch = new WatchScene("App");
+        var users = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
+        _ = watch.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
+        _ = watch.Run.Folder.WriteFile("App/.env", "SQLSOURCE_CONNECTION_POSTGRES=Host=unit\n");
+        var envFile = watch.Run.Folder.WriteFile("config/dev.env", "SQLSOURCE_CONNECTION_POSTGRES=Host=first\n");
+        await watch.StartAsync("App/App.csproj", "--env-file", "config/dev.env");
+        var manifestRuns = watch.ManifestRuns;
+        await File.WriteAllTextAsync(
+            envFile,
+            "SQLSOURCE_CONNECTION_POSTGRES=Host=second\n",
+            TestContext.Current.CancellationToken
+        );
+        await File.WriteAllTextAsync(users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
+
+        await watch.ChangeAsync(Changed(envFile));
+
+        watch.Describer.Opened.Select(request => request.Connection).ShouldBe(["Host=first", "Host=second"]);
+        watch.ManifestRuns.ShouldBe(manifestRuns);
+        (await watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     // How JetBrains' editors save: the file is moved aside, a new one moved into its place, and the old one deleted.
     [Fact]
     public async Task Watch_SaveByRenameOverAListedFile_RunsNoManifestTarget()

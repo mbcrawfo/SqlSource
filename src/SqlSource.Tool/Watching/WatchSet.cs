@@ -3,7 +3,6 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Projects;
 using Path = System.IO.Path;
 
@@ -54,12 +53,13 @@ internal sealed class WatchSet
     private readonly HashSet<string> _listed = [with(Comparer)];
     private readonly HashSet<string> _listedFolders = [with(Comparer)];
     private readonly HashSet<string> _settingsFolders = [with(Comparer)];
-    private readonly HashSet<string> _envFolders = [with(Comparer)];
+    private readonly string? _envFile;
 
-    private WatchSet(string unitPath, string unitFolder, FoundProjects found)
+    private WatchSet(string unitPath, string unitFolder, string? envFile, FoundProjects found)
     {
         var manifests = found.Manifests;
         _unitPath = unitPath;
+        _envFile = envFile;
         _projectFolders = [.. manifests.Select(manifest => FolderOf(manifest.ProjectPath)).Distinct(Comparer)];
         foreach (var manifest in manifests)
         {
@@ -76,30 +76,32 @@ internal sealed class WatchSet
             _settingsFolders.UnionWith(RepositoryFolders.FoldersOf(folder));
         }
 
-        _envFolders.UnionWith(RepositoryFolders.FoldersOf(unitFolder));
-        Folders = FoldersOf(unitFolder, found, _settingsFolders);
+        Folders = FoldersOf(unitFolder, envFile, found, _settingsFolders);
     }
 
     /// <summary>
     /// The folders to watch, sorted by ordinal comparison so that two sets compare: the unit's folder, the folder of
     /// each project, with or without a manifest, and the folder of each project's assets file, or the nearest that
     /// exists above it in the project's repository, with their folders below; and each other folder that holds a listed
-    /// file, or may hold a settings file of one, a <c>.env</c> or a <c>Directory.*</c> file, or is above an assets
-    /// file's folder in its repository, alone.  So each folder above one of these, up to the root of its repository,
-    /// is watched too, and under the system's events sees it deleted or made, which a poller of a folder alone does
-    /// not; outside a repository the folder above each is watched alone.  None is below another that is watched with
-    /// its folders below, and none is there twice.  A folder may not exist, which the session skips.
+    /// file, or may hold a settings file of one, the run's <c>.env</c> file or a <c>Directory.*</c> file, or is above
+    /// the unit's folder or an assets file's folder in its repository, alone.  So each folder above one of these, up to
+    /// the root of its repository, is watched too, and under the system's events sees it deleted or made, which a
+    /// poller of a folder alone does not; outside a repository the folder above each is watched alone.  None is below
+    /// another that is watched with its folders below, and none is there twice.  A folder may not exist, which the
+    /// session skips.
     /// </summary>
     public ImmutableArray<(string Folder, bool Recursive)> Folders { get; }
 
     /// <summary>
     /// Makes the set of a unit: the solution or the project <paramref name="unitPath" /> in
-    /// <paramref name="unitFolder" />, and what an evaluation of it found: the projects it runs, the manifests of those
-    /// that use SqlSource, and the assets files of their restores.  A project without a manifest is watched too, so
-    /// that its restore, or the package added to it, starts a pass.
+    /// <paramref name="unitFolder" />, the full path of the <c>.env</c> file its run reads, or null when it reads none,
+    /// and what an evaluation of it found: the projects it runs, the manifests of those that use SqlSource, and the
+    /// assets files of their restores.  A project without a manifest is watched too, so that its restore, or the
+    /// package added to it, starts a pass.  A change to <paramref name="envFile" /> asks for a pass, and one to any
+    /// other <c>.env</c> asks nothing, since the run reads no other.
     /// </summary>
-    public static WatchSet Of(string unitPath, string unitFolder, FoundProjects found) =>
-        new(unitPath, unitFolder, found);
+    public static WatchSet Of(string unitPath, string unitFolder, string? envFile, FoundProjects found) =>
+        new(unitPath, unitFolder, envFile, found);
 
     /// <summary>
     /// What the change asks of the session.  A <see cref="FileChangeKind.Renamed" /> asks as much as the larger of its
@@ -174,13 +176,7 @@ internal sealed class WatchSet
             return WatchEffect.Evaluate;
         }
 
-        return
-            !isFolder
-            && Comparer.Equals(name, DotEnvSearch.FileName)
-            && Path.GetDirectoryName(path) is { } folder
-            && _envFolders.Contains(folder)
-            ? WatchEffect.Describe
-            : WatchEffect.None;
+        return !isFolder && Comparer.Equals(path, _envFile) ? WatchEffect.Describe : WatchEffect.None;
     }
 
     private bool IsEvaluationFile(string path, string name) =>
@@ -257,6 +253,7 @@ internal sealed class WatchSet
 
     private static ImmutableArray<(string Folder, bool Recursive)> FoldersOf(
         string unitFolder,
+        string? envFile,
         FoundProjects found,
         IEnumerable<string> settingsFolders
     )
@@ -286,7 +283,14 @@ internal sealed class WatchSet
 
         // The folder of each listed file, and each folder above it that may hold a settings file of it.
         alone.AddRange(settingsFolders);
+
+        // The folders above the unit's, so that its deletion is seen, and the folder of the run's .env file with those
+        // above it, so that the file and its folder are seen made.
         alone.AddRange(RepositoryFolders.FoldersOf(unitFolder));
+        if (envFile is not null)
+        {
+            alone.AddRange(RepositoryFolders.FoldersOf(FolderOf(envFile)));
+        }
 
         // Sorted first, so that of two spellings in different case the same one stays whatever the order of the lists.
         var roots = new List<string>();

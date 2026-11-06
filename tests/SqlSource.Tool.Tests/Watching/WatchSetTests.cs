@@ -53,7 +53,36 @@ public sealed class WatchSetTests
         ImmutableArray<string> projects,
         ImmutableArray<ProjectManifest> manifests,
         params (string Project, string AssetsFile)[] assetsFiles
-    ) => WatchSet.Of(unitPath, unitFolder, new FoundProjects(projects, manifests, [.. assetsFiles]));
+    ) => WithEnv(Path.Combine(unitFolder, ".env"), unitPath, unitFolder, projects, manifests, assetsFiles);
+
+    // The set of a run that reads the .env file given, or none when it is null.
+    private static WatchSet WithEnv(
+        string? envFile,
+        string unitPath,
+        string unitFolder,
+        ImmutableArray<string> projects,
+        ImmutableArray<ProjectManifest> manifests,
+        params (string Project, string AssetsFile)[] assetsFiles
+    ) => WatchSet.Of(unitPath, unitFolder, envFile, new FoundProjects(projects, manifests, [.. assetsFiles]));
+
+    private static WatchSet AppSetWithEnv(string? envFile) =>
+        WithEnv(
+            envFile,
+            AppProject,
+            AppFolder,
+            [AppProject],
+            [Manifest(AppProject, [Users, Common], [Settings], [Compiled])]
+        );
+
+    private static void ShouldBeForEveryKind(WatchSet set, string path, WatchEffect effect)
+    {
+        var aside = Path.Combine(Path.GetDirectoryName(path)!, "old.env");
+        set.Classify(Changed(path)).ShouldBe(effect);
+        set.Classify(Created(path)).ShouldBe(effect);
+        set.Classify(Deleted(path)).ShouldBe(effect);
+        set.Classify(Renamed(aside, path)).ShouldBe(effect);
+        set.Classify(Renamed(path, aside)).ShouldBe(effect);
+    }
 
     private static WatchSet AppSet() =>
         Of(AppProject, AppFolder, [AppProject], [Manifest(AppProject, [Users, Common], [Settings], [Compiled])]);
@@ -143,25 +172,61 @@ public sealed class WatchSetTests
             .ShouldBe(WatchEffect.None);
     }
 
+    // A run with no --env-file reads the .env of the unit's folder, and no other.
     [Fact]
-    public void Classify_EnvInAFolderOfTheSearch_IsDescribeForEveryKind()
+    public void Classify_EnvOfTheUnitFolder_Describes()
     {
         var set = AppSet();
-        var env = P("App/.env");
 
-        set.Classify(Changed(env)).ShouldBe(WatchEffect.Describe);
-        set.Classify(Created(env)).ShouldBe(WatchEffect.Describe);
-        set.Classify(Deleted(env)).ShouldBe(WatchEffect.Describe);
-        set.Classify(Renamed(P("App/old.env"), env)).ShouldBe(WatchEffect.Describe);
-        set.Classify(Renamed(env, P("App/old.env"))).ShouldBe(WatchEffect.Describe);
+        ShouldBeForEveryKind(set, P("App/.env"), WatchEffect.Describe);
     }
 
     [Fact]
-    public void Classify_EnvInAFolderOutsideTheSearch_IsNone()
+    public void Classify_EnvBelowTheUnitFolder_DoesNothing()
     {
         var set = AppSet();
 
         set.Classify(Changed(P("App/Queries/.env"))).ShouldBe(WatchEffect.None);
+    }
+
+    // Not even in a folder above it in its repository, which the set still watches for the settings files and the
+    // Directory.* files there.
+    [Fact]
+    public void Classify_EnvAboveTheUnitFolder_DoesNothing()
+    {
+        using var temp = new TempFolder();
+        _ = temp.CreateFolder("repo/.git");
+        var repo = temp.PathOf("repo");
+        var app = temp.CreateFolder("repo/src/App");
+        var project = Path.Combine(app, "App.csproj");
+        var set = Of(project, app, [project], [Manifest(project, [Path.Combine(app, "Users.sql")], [], [])]);
+
+        set.Folders.ShouldContain((repo, false));
+        ShouldBeForEveryKind(set, Path.Combine(repo, ".env"), WatchEffect.None);
+        ShouldBeForEveryKind(set, temp.PathOf("repo/src/.env"), WatchEffect.None);
+    }
+
+    // The file that --env-file names, whatever its name, in place of the .env of the unit's folder.
+    [Fact]
+    public void Classify_NamedEnvFileOutsideTheUnit_Describes()
+    {
+        var set = AppSetWithEnv(P("config/dev.env"));
+
+        ShouldBeForEveryKind(set, P("config/dev.env"), WatchEffect.Describe);
+        set.Classify(Changed(P("CONFIG/DEV.ENV"))).ShouldBe(WatchEffect.Describe);
+        set.Classify(Changed(P("App/.env"))).ShouldBe(WatchEffect.None);
+        set.Classify(Changed(P("config/.env"))).ShouldBe(WatchEffect.None);
+    }
+
+    // --env-file none: the run reads no file, so no .env asks for a pass.
+    [Fact]
+    public void Classify_AnyEnvUnderNone_DoesNothing()
+    {
+        var set = AppSetWithEnv(null);
+
+        ShouldBeForEveryKind(set, P("App/.env"), WatchEffect.None);
+        ShouldBeForEveryKind(set, P(".env"), WatchEffect.None);
+        set.Classify(Changed(P("config/dev.env"))).ShouldBe(WatchEffect.None);
     }
 
     [Fact]
@@ -385,7 +450,7 @@ public sealed class WatchSetTests
     }
 
     [Fact]
-    public void Folders_EnvAndDirectoryFoldersGoUpToTheRepository()
+    public void Folders_AboveTheUnitAndItsProject_GoUpToTheRepository()
     {
         using var temp = new TempFolder();
         _ = temp.CreateFolder("repo/.git");
@@ -398,8 +463,31 @@ public sealed class WatchSetTests
         set.Folders.ShouldBe([(app, true), (repo, false), (src, false)], ignoreOrder: true);
         set.Folders.Select(entry => entry.Folder)
             .ShouldBe(set.Folders.Select(entry => entry.Folder).Order(StringComparer.Ordinal));
-        set.Classify(Changed(Path.Combine(repo, ".env"))).ShouldBe(WatchEffect.Describe);
         set.Classify(Changed(Path.Combine(src, "Directory.Build.props"))).ShouldBe(WatchEffect.Evaluate);
+        set.Classify(Created(Path.Combine(src, "sqlsource.json"))).ShouldBe(WatchEffect.Evaluate);
+    }
+
+    // Its folder alone, with the folders above it in its repository, beside those that the unit's set watches anyway.
+    [Fact]
+    public void Folders_NamedEnvFileOutsideTheUnit_WatchesItsFolderAlone()
+    {
+        using var temp = new TempFolder();
+        _ = temp.CreateFolder("repo/.git");
+        var repo = temp.PathOf("repo");
+        var src = temp.CreateFolder("repo/src");
+        var app = temp.CreateFolder("repo/src/App");
+        var config = temp.CreateFolder("repo/config");
+        var project = Path.Combine(app, "App.csproj");
+        var set = WithEnv(
+            Path.Combine(config, "dev.env"),
+            project,
+            app,
+            [project],
+            [Manifest(project, [Path.Combine(app, "Users.sql")], [], [])]
+        );
+
+        set.Folders.ShouldBe([(app, true), (config, false), (repo, false), (src, false)], ignoreOrder: true);
+        set.Classify(Changed(Path.Combine(config, "dev.env"))).ShouldBe(WatchEffect.Describe);
     }
 
     [Fact]
