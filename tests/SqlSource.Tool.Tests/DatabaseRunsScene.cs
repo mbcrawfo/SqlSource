@@ -52,14 +52,19 @@ internal sealed class DatabaseRunsScene : IDisposable
     // The files of the last run.
     public ImmutableArray<FileWork> Files { get; private set; }
 
+    // The reporter of the last run, which writes to Error.
+    public Reporter? Reporter { get; private set; }
+
     // Decides for the plan and runs its databases.  Both databases have a connection unless "given" says otherwise.
     // The value at index i of "given" stands at position (2 * i) + 3, as if each followed "describe --connection".
+    // A capture is given to the run as diagnose gives one.
     public async Task<ImmutableArray<FileWork>> RunAsync(
         RunPlan? plan = null,
         bool registered = true,
         string[]? given = null,
         CancellationToken? cancellationToken = null,
-        IQueryDescriber? describer = null
+        IQueryDescriber? describer = null,
+        RunCapture? capture = null
     )
     {
         plan ??= Plans.Of(Project);
@@ -82,13 +87,15 @@ internal sealed class DatabaseRunsScene : IDisposable
             Exchange = _ => Exchange,
         };
 
+        Reporter = new Reporter(Error);
         await DatabaseRuns.RunAsync(
             selected,
             files,
             connections,
             host,
-            new Reporter(Error),
-            cancellationToken ?? TestContext.Current.CancellationToken
+            Reporter,
+            cancellationToken ?? TestContext.Current.CancellationToken,
+            capture: capture
         );
         return files;
     }

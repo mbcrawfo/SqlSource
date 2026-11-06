@@ -262,7 +262,16 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC290](#sqlsrc290) | Bundle does not answer a question of the query |
 | [SQLSRC291](#sqlsrc291) | Bundle's engine is not supported |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 125 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 291 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), and [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
+**Making a bug report with `diagnose`**
+
+| Id | Title |
+|----|----|
+| [SQLSRC292](#sqlsrc292) | Query is not in the file |
+| [SQLSRC293](#sqlsrc293) | Bundle cannot be made safe to post |
+| [SQLSRC294](#sqlsrc294) | Renamed bundle does not reproduce the query's answer |
+| [SQLSRC295](#sqlsrc295) | Bundle is not a raw bundle |
+
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 125 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 295 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), and [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -3177,3 +3186,61 @@ $ dotnet sqlsource replay /work/report.zip
 Update the `sqlsource` tool to the latest version, and replay the bundle again.
 
 See: [Checking a bundle with `replay`](tool.md#replay)
+
+## SQLSRC292
+
+**Query is not in the file**
+
+`sqlsource diagnose --query <file>:<name>` makes a bug report of one query, and the query it names cannot be described from that file.  The message names the query and the file, and ends with the reason, one of two:
+
+- `the file has no query of that name`: no `-- name:` of the file gives the name after the last `:`.  Names are compared exactly, by case too, so `getUser` does not find `GetUser`.
+- `the query's output is sql, which needs no description`: the query is in the file, but its output is `sql`, so it is never described against the database and a bug report of it would hold nothing.
+
+```console
+/work/App/Queries/Users.sql : error SQLSRC292: There is no query 'getUser' to diagnose in '/work/App/Queries/Users.sql': the file has no query of that name
+```
+
+Copy the name from the query's `-- name:` line, letter for letter.  A query whose output is `sql` gets no description to report: if its generated code is wrong, open an issue that shows the query and the code you got.
+
+## SQLSRC293
+
+**Bundle cannot be made safe to post**
+
+`sqlsource diagnose` gives every name of your schema and of your query a new name in the bundle it makes, so that the bundle can be posted in a public issue, and checks the bundle before it writes it.  This error means the check found something it could not rename safely.  Rather than blank it out, which would make a bundle that no longer shows the problem, it writes no bundle.  The message gives the reason, the place in the bundle and the text it found, or `(none)` when the reason names no text.
+
+The text found is yours, such as a name of your schema, so do not paste this error into an issue.
+
+```console
+/tmp/report.zip : error SQLSRC293: The bundle cannot be made safe to post: a word is not one of the new names, at query.sql, found ssn_hash
+    help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it
+```
+
+Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
+
+## SQLSRC294
+
+**Renamed bundle does not reproduce the query's answer**
+
+`sqlsource diagnose` checks the bundle it renamed by running the query from it, as `sqlsource replay` does, before it writes it.  This error means the renamed bundle gives another answer than your query got from your database, so it would not show the problem, and no bundle was written.  The message names the place in the bundle where the answers differ.  It is a fault of the renaming and not of your query.
+
+```console
+/tmp/report.zip : error SQLSRC294: The renamed bundle does not reproduce the query's answer: its replay differs at expected.json
+    help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it
+```
+
+Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
+
+## SQLSRC295
+
+**Bundle is not a raw bundle**
+
+`sqlsource diagnose --scrub <bundle>` gives the names of a raw bundle, one that `diagnose --no-obfuscate` made, new names, so that it can be posted.  This error means the bundle you gave is not a raw bundle, and nothing was written.  The message names the bundle and ends with the reason, one of two:
+
+- `it is renamed already`: `diagnose` without `--no-obfuscate`, or an earlier `--scrub`, made it, and its names are new names already.
+- `it has no bundle.json that says it is raw`: the bundle has no `bundle.json`, the file in which `diagnose` says how it made a bundle, or its `bundle.json` does not say the bundle is raw, as for a bundle edited by hand, or unzipped and zipped again without it.
+
+```console
+/tmp/report.zip : error SQLSRC295: '/tmp/report.zip' is not a raw bundle: it is renamed already
+```
+
+A bundle that is renamed already can be posted as it is, with the mapping that was written beside it kept to yourself.  For the other reason, make the raw bundle again with `diagnose --no-obfuscate`, and give `--scrub` that one.

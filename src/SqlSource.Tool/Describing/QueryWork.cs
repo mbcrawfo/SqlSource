@@ -1,4 +1,5 @@
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 
 namespace SqlSource.Tool.Describing;
@@ -15,6 +16,12 @@ internal sealed class QueryWork(PlannedQuery planned, QueryState state, SidecarE
 
     /// <summary>The entry the file's target holds for the query: the kept one, or the new one.</summary>
     public SidecarEntry? Entry { get; set; } = entry;
+
+    /// <summary>
+    /// Why the describer refused the query, with the connection's secret removed; null for a query it did not
+    /// refuse.  <c>diagnose</c> puts it in the bundle of a refused query.
+    /// </summary>
+    public DescribeFailure? Failure { get; set; }
 
     /// <summary>
     /// Whether <c>--check</c> reported a difference at the query, or at the whole of its sidecar.  The summary of
