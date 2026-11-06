@@ -31,7 +31,7 @@ The first block writes settings as markers in a `.sql` file, the second in a [se
 
 ## All settings
 
-Each name links to its section, which gives its values and its rules.  **Written as** lists every place the setting can be written: a key of a [settings file](#settings-files), a property of the attribute, a marker in the **file header** (the part of a `.sql` file before its first `-- name:` line), a marker **inside a query** (under a `-- name:` line), as [the marker index](sql-files.md#marker-index) shows, and, for the one setting of the build, a property of the project.  A place it does not list cannot hold it.
+Each name links to its section, which gives its values and its rules.  **Written as** lists every place the setting can be written: a key of a [settings file](#settings-files), a property of the attribute, a marker in the **file header** (the part of a `.sql` file before its first `-- name:` line), a marker **inside a query** (under a `-- name:` line), as [the marker index](sql-files.md#marker-index) shows, and, for the two settings of the build, a property of the project.  A place it does not list cannot hold it.
 
 ### Settings that work today
 
@@ -54,6 +54,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: the file named for the type in that folder | `Source` on the attribute | Works today |
 | [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `-- collection-type:` in the file header and inside a query | Works today |
 | [Running the tool in the build](#online-build) | `auto`, `true`, `false`.  Default `auto` | `SqlSourceOnline`, a property of the project | Works today |
+| [The build's `.env` file](#setting-env-file) | A path, from the project's folder when it is relative, or `none`.  Default: the `.env` in the project's folder | `SqlSourceEnvFile`, a property of the project | Works today |
 
 A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`, and `NestedClass` and `nested-class`.
 
@@ -933,15 +934,43 @@ Turning the default off turns it off for sidecars too, so list them as well, as 
 
 | Value | The build runs the tool |
 |----|----|
-| `auto`, empty, or not set | When it finds a connection: the environment variable `SQLSOURCE_CONNECTION`, set and not blank, or a file named `.env` in the project's folder or any folder above it.  When the tool then finds no connection for any database with a query to describe, it says the build is offline, and the build goes on with the committed sidecars |
+| `auto`, empty, or not set | When it finds a connection: the environment variable `SQLSOURCE_CONNECTION`, set and not blank, or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](#setting-env-file) names, when it is there.  A `.env` in a folder above the project's is not looked for.  When the tool then finds no connection for any database with a query to describe, it says the build is offline, and the build goes on with the committed sidecars |
 | `true` | Whether it finds a connection or not.  A database with a query to describe and no connection is then [SQLSRC213](diagnostics.md#sqlsrc213), and a tool that cannot be started [SQLSRC025](diagnostics.md#sqlsrc025) |
 | `false` | Never |
 
 - **The value is matched ignoring case** and the white space around it, so ` True ` is `true`.  Any other value, such as `yes`, is [SQLSRC024](diagnostics.md#sqlsrc024), and the build stops.
 - **A build in CI never runs the tool**, whatever the value, so that a job builds from the sidecars that were committed.  A build is in CI when the variable `CI` is `true`, ignoring case, `TF_BUILD` is `True`, or `TEAMCITY_VERSION` or `JENKINS_URL` is set: GitHub Actions, GitLab, Buildkite, Azure Pipelines, TeamCity and Jenkins each set one.  `CI=1` is not recognised.
 - **A connection in a variable of a database's name alone**, such as `SQLSOURCE_CONNECTION_BILLING` with no `.env` file, is not found under `auto`.  Set `SqlSourceOnline` to `true` in your own environment, which MSBuild reads as a property of every project, rather than in the project, so that a machine with no database still builds.
-- **Any `.env` file turns `auto` on**, one that holds only your application's settings too, and one above the root of your repository, which the tool does not read.  The tool then finds no connection and the build goes on offline, and each build starts the tool again while it finds none.  Set `false` to stop that.
+- **The build's `.env` file turns `auto` on whatever it holds**, one that holds only your application's settings too: the build looks only whether it is there.  The tool then finds no connection and the build goes on offline, and each build starts the tool again while it finds none.  Set `false` to stop that, or `SqlSourceEnvFile` to `none`.
+- **A `.env` above the project's folder**, at the root of your solution or repository, or in your home folder, does not turn `auto` on, and the build says nothing of it: it builds from the committed sidecars.  To use such a file, name it with [`SqlSourceEnvFile`](#setting-env-file).
 - **Where it is written.**  In the project file, in a `Directory.Build.props` above it for every project there, on the command line as `-p:SqlSourceOnline=false`, or as a variable of the environment.  It is a property of the build, not a key of a settings file.
+
+<a id="setting-env-file"></a>
+
+## The build's `.env` file
+
+```xml
+<!-- Directory.Build.props, at the root of the repository -->
+<Project>
+    <PropertyGroup>
+        <SqlSourceEnvFile>$(MSBuildThisFileDirectory).env</SqlSourceEnvFile>
+    </PropertyGroup>
+</Project>
+```
+
+`SqlSourceEnvFile` names the [`.env` file](tool.md#env-file) that a build of the project reads its connections from, in place of the `.env` in the project's folder.  The `Directory.Build.props` above gives every project below it the one `.env` beside it, at the root of the repository: `$(MSBuildThisFileDirectory)` is the folder of the file that writes it.
+
+| Value | The build reads |
+|----|----|
+| Empty, or not set | The `.env` in the project's folder, and never one in a folder above it |
+| A path | That file.  A relative path is from the project's folder, so `../.env` is the `.env` of the folder above it |
+| `none` | No `.env` file: the connections come from the environment alone |
+
+- **The value is trimmed**, and `none` is matched ignoring case.  To name a file called `none`, write `./none`.
+- **It decides whether `auto` runs the tool**, as [running the tool in the build](#online-build) says: the file named turns it on when it is there.  A path where there is no file, or a folder, turns nothing on and is no error.  Under `none` only `SQLSOURCE_CONNECTION` in the environment turns `auto` on.
+- **A change to the file** runs the tool again at the next build, as a change to the project's own `.env` does.
+- **It reaches only the build's run.**  A `describe` or `describe --watch` that you run yourself reads the `.env` in the folder of the project or solution it runs on, and `--env-file` names another, as [the `.env` file](tool.md#env-file) says: with the example above, `dotnet sqlsource describe src/App/App.csproj --env-file .env` at the root of the repository reads the file the build reads.
+- **Where it is written.**  In the project file, in a `Directory.Build.props` above it for every project there, on the command line as `-p:SqlSourceEnvFile=none`, or as a variable of the environment.  It is a property of the build, not a key of a settings file.
 
 <a id="settings-files"></a>
 
@@ -983,7 +1012,7 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 
 **Which files are checked.**  The build reads each settings file that the search of some `.sql` file or C# file of the project reaches, whether or not a type claims that `.sql` file, and reports each mistake in it at its file, line and column.  A `sqlsource.json` beyond the first `"root": true` is never read, so it cannot fail a build.  The C# files that the build writes itself, into its output and intermediate folders, reach no settings file, wherever those folders are, except in a build that names the project through a symbolic link while those folders are outside the project's folder and set by a relative path: see [known issues](#known-issues).  Nor do the C# files that a NuGet package adds to your project, as Polyfill does, from the folder where NuGet keeps its packages, so a broken `sqlsource.json` above that folder, in your home folder, say, is not read on their account.  Your own `.sql` and C# files still reach such a file when your project is in a folder below it, unless a `"root": true` stands between them, and its mistakes then fail the build and `sqlsource describe`: put `"root": true` in the settings file of your project's folder, or of your repository's.  A C# file that your project lists itself from another folder still reaches the settings files of its own folder.  A value that is wrong is not set by its file, so a farther settings file, or the default, gives the setting meanwhile.  The `sqlsource` tool reads the same settings files.  It reports the mistakes of [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC018](diagnostics.md#sqlsrc018) as the build does, and a value of `dialect`, `output` or `database` that is not valid, once in a run however many projects reach the file.  The build reports a value that is not valid for every key but `database`, which only the tool reads.
 
-**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The MSBuild properties of SqlSource that a project sets are [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included, [`SqlSourcePublicExceptions`](#public-exceptions), which makes the exceptions of the query methods public, and [`SqlSourceOnline`](#online-build), which says whether the build runs the `sqlsource` tool.
+**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The MSBuild properties of SqlSource that a project sets are [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included, [`SqlSourcePublicExceptions`](#public-exceptions), which makes the exceptions of the query methods public, [`SqlSourceOnline`](#online-build), which says whether the build runs the `sqlsource` tool, and [`SqlSourceEnvFile`](#setting-env-file), which names the `.env` file it reads.
 
 See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [SQLSRC016](diagnostics.md#sqlsrc016), a key that is not known; [SQLSRC017](diagnostics.md#sqlsrc017), a key written twice; [SQLSRC018](diagnostics.md#sqlsrc018), a value of the wrong JSON type; [SQLSRC019](diagnostics.md#sqlsrc019), a value that is not valid; [SQLSRC020](diagnostics.md#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, or a generator parameter given two different states in `generatorParameters`.
 
