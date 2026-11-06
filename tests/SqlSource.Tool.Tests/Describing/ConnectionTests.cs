@@ -28,7 +28,7 @@ public sealed class ConnectionTests
         params (string Name, string Value)[] environment
     ) => Resolve(selected, selected, describable, given, environment);
 
-    // The value at index i of "given" stands at position (2 * i) + 3, as if each followed "describe --connection".
+    // With no .env file.
     private static Connections Resolve(
         string[] planned,
         string[] selected,
@@ -37,7 +37,8 @@ public sealed class ConnectionTests
         params (string Name, string Value)[] environment
     ) => Resolve(planned, selected, describable, given, environment, []);
 
-    // With a .env file at DotEnvPath that holds "file".
+    // With a .env file at DotEnvPath that holds "file".  The value at index i of "given" stands at position
+    // (2 * i) + 3, as if each followed "describe --connection".
     private static Connections Resolve(
         string[] planned,
         string[] selected,
@@ -348,7 +349,8 @@ public sealed class ConnectionTests
         connections.Databases.ShouldBe(["billing"]);
     }
 
-    // A name near a database of the plan, selected or not, is kept; ignoring case, as the databases are.
+    // A name near a database of the plan is kept, ignoring case as the databases are: BILING is near the selected
+    // billing.  UnusedNames_NameThatIsNoSelectedDatabase_IsNoErrorAndIsKept keeps one near an unselected database.
     [Fact]
     public void UnusedNames_NameCloseToAnUnselectedDatabaseOfThePlanIgnoringCase_IsKept()
     {

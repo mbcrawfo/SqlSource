@@ -76,10 +76,9 @@ internal readonly record struct QuerySettings(
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file
     /// that has a setting gives it.  The generator parameters merge per parameter instead: each is on or off as the
-    /// most specific level that names it says, else its default.  The type override, the column types and the library
-    /// types are not among them:
-    /// <see cref="ResolveTypeOverrides" />, <see cref="ResolveColumnTypes" /> and <see cref="ResolveLibraries" /> give
-    /// them.
+    /// most specific level that names it says, else its default.  The type override, the column types, the library
+    /// types and the database are not among them: <see cref="ResolveTypeOverrides" />,
+    /// <see cref="ResolveColumnTypes" />, <see cref="ResolveLibraries" /> and <see cref="ResolveDatabase" /> give them.
     /// </summary>
     public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel file) =>
         new(

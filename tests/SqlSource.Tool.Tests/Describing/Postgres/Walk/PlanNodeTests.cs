@@ -261,7 +261,7 @@ public sealed class PlanNodeTests
         node.NodeType.ShouldBe("Result");
     }
 
-    // Past the limit the text is no plan the walk can use, and nothing is thrown.
+    // Past PlanNode.MaxDepth the text is no plan the walk can use, and nothing is thrown.
     [Fact]
     public void Read_PlanNestedPastTheLimit_IsNull() => PlanNode.Read(Nested(400)).ShouldBeNull();
 

@@ -293,8 +293,7 @@ public sealed class ModelPropertyTypeTests
         run.Sources[ParamsModel].ShouldContain("(" + expected + ");");
     }
 
-    // FindIds, whose @ids is a list of integers, the predicate and the markers given, with the parameter's
-    // nullability as the sidecar says it.
+    // FindIds, whose @ids is a list, with the predicate and the markers given.
     private static SqlFile ListFile(string predicate, string markers) =>
         new(GeneratorHarness.UsersPath, "-- name: FindIds\n" + markers + "SELECT 1 FROM t WHERE " + predicate + ";\n");
 

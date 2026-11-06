@@ -35,9 +35,9 @@ internal sealed class WatchSet
     // project puts that, and never below these.
     private static readonly string[] IgnoredAssetsFolders = ["bin", ".git"];
 
-    // Any change to one of these asks for another evaluation, wherever it is.
     private const string BuildPropsFileName = "Directory.Build.props";
 
+    // Any change to one of these asks for another evaluation, wherever it is.
     private static readonly string[] EvaluationFileNames =
     [
         BuildPropsFileName,
@@ -86,9 +86,9 @@ internal sealed class WatchSet
     /// exists above it in the project's repository, with their folders below; and each other folder that holds a listed
     /// file, or may hold a settings file of one, a <c>.env</c> or a <c>Directory.*</c> file, or is above an assets
     /// file's folder in its repository, alone.  So each folder above one of these, up to the root of its repository,
-    /// is watched too, and sees it deleted or made; outside a repository the folder above each is watched alone.  None
-    /// is below another that is watched with its folders below, and none is there twice.  A folder may not exist, which
-    /// the session skips.
+    /// is watched too, and under the system's events sees it deleted or made, which a poller of a folder alone does
+    /// not; outside a repository the folder above each is watched alone.  None is below another that is watched with
+    /// its folders below, and none is there twice.  A folder may not exist, which the session skips.
     /// </summary>
     public ImmutableArray<(string Folder, bool Recursive)> Folders { get; }
 

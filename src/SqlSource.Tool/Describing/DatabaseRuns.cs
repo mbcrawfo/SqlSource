@@ -26,11 +26,12 @@ namespace SqlSource.Tool.Describing;
 /// <see cref="QueryState.ToDescribe" />: each was described or failed.
 /// </para>
 /// <para>
-/// This is the one place outside <c>Cli</c> that catches every exception: a describer's, which is a bug of the
-/// describer and may hold the connection's value.  It is thrown again as a <see cref="DescriberFaultException" />
-/// without the value, and the run ends.  A description that holds the value, which would be written into a sidecar,
-/// is such a bug too (<see cref="EntrySecretCheck" />), and so is a capture that holds it.  A cancellation is not
-/// caught: a run that was cancelled ends as cancelled, not as <c>SQLSRC200</c>.
+/// This is the one place outside <c>Cli</c> and a pass of <c>WatchSession</c> that catches every exception: a
+/// describer's, which is a bug of the describer and may hold the connection's value.  It is thrown again as a
+/// <see cref="DescriberFaultException" /> without the value, and the run ends, or under <c>--watch</c> the pass.  A
+/// description that holds the value, which would be written into a sidecar, is such a bug too
+/// (<see cref="EntrySecretCheck" />), and so is a capture that holds it.  A cancellation is not caught: a run that
+/// was cancelled ends as cancelled, not as <c>SQLSRC200</c>.
 /// </para>
 /// <para>
 /// A run given a <see cref="RunCapture" />, as <c>diagnose</c>'s is, records its session and keeps what a query's
@@ -101,8 +102,8 @@ internal static class DatabaseRuns
     }
 
     // The first of the four that holds is reported, and the queries fail: no describer, at each query; a variable
-    // that two databases read; no connection; a session that cannot be opened.  The last three once, at the first
-    // query.
+    // that two databases read; no connection, which an offline run does not report; a session that cannot be opened.
+    // The last three once, at the first query.
     private static async Task RunDatabaseAsync(
         PlannedDatabase database,
         ImmutableArray<FileWork> files,

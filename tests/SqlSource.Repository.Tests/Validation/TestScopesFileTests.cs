@@ -31,8 +31,7 @@ public sealed class TestScopesFileTests
     }
 
     // The first match wins, so the order of the lines is part of the meaning: an engine's fixtures and the folders of
-    // its projects come before the broad `none` lines.  The scope is a name, since a public theory cannot take the
-    // internal enum.
+    // its projects come before the broad `none` lines.
     [Theory]
     [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql", nameof(TestScope.Postgres))]
     [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/schema.sql", nameof(TestScope.SqlServer))]

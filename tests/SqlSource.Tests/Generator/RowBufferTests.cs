@@ -296,7 +296,8 @@ public sealed class RowBufferTests
         string id
     )
     {
-        // With no references the compiler cannot read a string argument, so the type takes the file of its name.
+        // Without the runtime's references, as in the first row, the compiler cannot read a string argument, so the
+        // type takes the file of its name.
         var source = MethodRuns.Source.Replace("(Source = \".\")", string.Empty, StringComparison.Ordinal);
         var listUsers = ListUsers with { Path = "/app/Repo/Sample.sql" };
         var run = GeneratorHarness.Run(

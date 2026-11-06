@@ -45,10 +45,9 @@ internal static class SidecarNeeds
     }
 
     /// <summary>
-    /// The needs of every type, one for each file: the union of what each type needs of it, each query with the
-    /// greatest of its outputs, in the ordinal order of the queries' names, so that the value does not depend on the
-    /// order the types come in.  Sorted by <see cref="SqlPath.Comparer" />, so that a file's needs are found with a
-    /// search.
+    /// The needs of every type, one for each file: the union of what each type needs of it, each query once with its
+    /// output, in the ordinal order of the queries' names, so that the value does not depend on the order the types
+    /// come in.  Sorted by <see cref="SqlPath.Comparer" />, so that a file's needs are found with a search.
     /// </summary>
     public static EquatableArray<FileNeeds> Merge(ImmutableArray<FileNeeds> files) =>
         new(

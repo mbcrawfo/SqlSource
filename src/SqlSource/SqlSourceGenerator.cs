@@ -556,8 +556,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Collect()
             .Select(static (converters, _) => ConverterSet.Sort(converters));
 
-        // The edges of the libraries the project references, from the probe without NodaTime's version, which they do
-        // not read, so that a change of the version alone finds none again.
+        // The edges of the libraries the project references, from the probe without the libraries' versions, which they
+        // do not read, so that a change of a version alone finds none again.
         var libraryConverters = typingLibraryProbe
             .Select(static (probe, _) => LibraryConverters.Of(probe))
             .WithTrackingName(TrackingNames.LibraryConverters);

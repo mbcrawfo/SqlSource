@@ -7,8 +7,9 @@ internal enum TypeMappingKind
     Mapped,
 
     /// <summary>
-    /// Npgsql cannot read the type as an object, and only the type override can give it a C# type: a composite, or a
-    /// base type outside <c>pg_catalog</c> that the map does not know.
+    /// The driver cannot read the type as an object, and only the type override can give it a C# type: on PostgreSQL a
+    /// composite, or a base type outside <c>pg_catalog</c> that the map does not know; on SQL Server a type the map
+    /// has no row for, or a CLR type that neither a library nor a CLR row of <c>sys</c> reads.
     /// </summary>
     Unreadable,
 
@@ -29,8 +30,8 @@ internal enum TypeMappingKind
 
     /// <summary>
     /// A type that the tool never writes in a sidecar: <c>record</c>, <c>unknown</c>, <c>void</c>, a kind this version
-    /// does not know, or an array or a domain without its element or base.  Only a sidecar edited by hand, or written
-    /// by a newer tool, has one, and describing the query again mends it.
+    /// does not know, an array or a domain without its element or base, or a SQL Server type without a name.  Only a
+    /// sidecar edited by hand, or written by a newer tool, has one, and describing the query again mends it.
     /// </summary>
     NotWrittenByTheTool,
 

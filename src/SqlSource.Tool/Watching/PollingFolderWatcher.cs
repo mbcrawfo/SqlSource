@@ -8,8 +8,9 @@ namespace SqlSource.Tool.Watching;
 
 /// <summary>
 /// A watch that lists the folder on a timer and compares each listing with the one before, for a file system that
-/// raises no events, as a bind mount into a container often does.  It sees a file created, deleted or rewritten
-/// and a folder created, and none of the finer kinds of the system's events.
+/// raises no events, as a bind mount into a container often does.  It sees a file created, deleted or rewritten, and,
+/// when it watches the folders below, a folder created or deleted; a watch of the folder alone lists no folder in it,
+/// so it sees neither.  It raises none of the finer kinds of the system's events, a rename among them.
 /// </summary>
 internal sealed class PollingFolderWatcher : IDisposable
 {

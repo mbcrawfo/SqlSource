@@ -206,8 +206,9 @@ public sealed class MethodCompileTests
         maybe.ShouldContain(" parameter.TypedValue = parameters.Maybe;\n");
     }
 
-    // SqlClient reads a NULL of vector as SqlVector<float>.Null, so the method checks a not-null one with IsNull.  The
-    // map's text must be the very spelling the method writer looks for.
+    // Queries of every shape, a token, and a parameter of each SQL Server type bound as its type compile on SqlClient
+    // 6.1 and 7.  SqlClient reads a NULL of vector as SqlVector<float>.Null, so the method checks a not-null one with
+    // IsNull; the map's text must be the very spelling the method writer looks for.
     [Theory]
     [InlineData("6.1")]
     [InlineData("7")]

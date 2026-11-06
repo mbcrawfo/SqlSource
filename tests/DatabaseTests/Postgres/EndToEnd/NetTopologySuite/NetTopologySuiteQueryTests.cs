@@ -9,7 +9,7 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd.NetTopologySuite;
 
-// The queries of Queries/NetTopologySuite.sql, whose folder leaves NetTopologySuite on, so that its columns and
+// The queries of Queries/NetTopologySuite.sql, whose folder turns NetTopologySuite back on, so that its columns and
 // parameters of PostGIS take NetTopologySuite's Geometry, read and written through Npgsql.NetTopologySuite on a data
 // source that calls UseNetTopologySuite(): every column of spatial_values written by InsertSpatialValues and read back
 // by GetSpatialValues, in a transaction that is rolled back, and a Point and a Polygon read by a type override.

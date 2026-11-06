@@ -80,7 +80,8 @@ public sealed class ParameterTypeTests
         run.Sources[ParamsModel].ShouldContain("global::App.UserId Author");
     }
 
-    // The marker is over the type override of every level, and leaves the other parameters to it.
+    // The marker is over the type override of the query and of the project's settings file, and leaves the other
+    // parameters to it.
     [Fact]
     public void Run_ParamMarker_WinsOverTheTypeOverride()
     {

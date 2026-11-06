@@ -3,8 +3,9 @@ using System;
 namespace SqlSource.Tool.Watching;
 
 /// <summary>
-/// What <see cref="ToolHost.Watch" /> is asked to watch, and whom it tells.  Both callbacks run on a thread of the
-/// watcher's own, so they return quickly and do not wait for the code that started the watch.
+/// What <see cref="ToolHost.Watch" /> is asked to watch, and whom it tells.  The callbacks run on a thread of the
+/// watcher's own, but for a poller's first listing that fails, which calls <see cref="Failed" /> on the thread that
+/// makes the watch; so they return quickly, and never wait for the code that started the watch.
 /// </summary>
 /// <param name="Folder">The full path of the folder to watch, which exists.</param>
 /// <param name="Recursive">True to watch the folders below it too.</param>

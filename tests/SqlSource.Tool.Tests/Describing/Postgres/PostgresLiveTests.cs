@@ -97,7 +97,7 @@ public sealed class PostgresLiveTests
 
     // An NpgsqlException the call throws, whatever its cause, is the answer's error, made by errorOf.  AnswerAsync has
     // no cancellation filter: it catches by the exception's type alone, and a cancellation that is no NpgsqlException
-    // passes through, as the next test pins.
+    // passes through, as AnswerAsync_CallThatIsCancelled_Throws pins.
     [Fact]
     public async Task AnswerAsync_CallThatThrowsAnNpgsqlException_IsTheFailedAnswer()
     {

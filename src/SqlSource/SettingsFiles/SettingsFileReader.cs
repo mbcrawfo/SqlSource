@@ -98,7 +98,7 @@ internal static class SettingsFileReader
         public SqlDialectChoice? Dialect { get; private set; }
 
         // Reads every member of the top level.  A key seen before is reported and its value skipped, whether or not
-        // it is a key of the table.
+        // it is one of SettingsFileKeys.All.
         public void ReadMembers()
         {
             _ = _tokens.Next();

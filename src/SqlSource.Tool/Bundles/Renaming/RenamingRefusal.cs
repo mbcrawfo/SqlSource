@@ -1,22 +1,25 @@
 namespace SqlSource.Tool.Bundles.Renaming;
 
-/// <summary>The step of the renaming that refused a bundle.</summary>
+/// <summary>
+/// The step of the renaming that refused a bundle, each listed with who refuses by it in
+/// <c>docs/architecture/bundles.md</c>, "Refusals".
+/// </summary>
 internal enum RefusalStep
 {
-    /// <summary>
-    /// The SQL of a request is not the one the pipeline makes from the renamed query (the design's step 8).
-    /// </summary>
+    /// <summary>The SQL of a request is not the one the pipeline makes from the renamed query.</summary>
     RequestSql,
 
-    /// <summary>A plan's string the walk reads does not read (step 9).</summary>
+    /// <summary>A plan's string the walk reads does not read.</summary>
     PlanString,
 
     /// <summary>
-    /// A token that is no replacement, no word of the engine's, no number and no punctuation (step 12).
+    /// A string the renaming cannot rename safely, such as a member with no rule, SQL that does not lex or a position
+    /// it cannot map, or a token of the renamed bundle that is no replacement, no word of the engine's, no number and
+    /// no punctuation.
     /// </summary>
     Token,
 
-    /// <summary>The renamed bundle does not replay to its renamed entry (step 13).</summary>
+    /// <summary>The renamed bundle does not replay to its renamed entry.</summary>
     Replay,
 }
 

@@ -16,7 +16,7 @@ namespace SqlSource.Generation.Methods;
 /// The converters of the type's slice, in the order of the set, of which only those that serve
 /// <paramref name="Target" /> are seen.
 /// </param>
-/// <param name="At">The query's name.</param>
+/// <param name="At">Where the query's name is in its file.</param>
 /// <param name="Problems">The query's problems, which conversions add theirs to, at <paramref name="At" />.</param>
 /// <param name="SqlServerSpatial">
 /// Whether the project references NetTopologySuite and NetTopologySuite.IO.SqlServerBytes, which SQL Server's spatial

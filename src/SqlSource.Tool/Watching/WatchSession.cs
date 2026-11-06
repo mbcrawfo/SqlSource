@@ -364,7 +364,8 @@ internal sealed class WatchSession
     // without a word, so it is marked stale, and the evaluation closes it and watches the folder again when it is back.
     // A folder of either set without a watch created or renamed to: it did not exist, or its watch could not start,
     // when the set was watched.  Each folder above a folder of a set, up to the root of its repository, is a folder of
-    // the set too, so the creation of that folder is the one a watch sees.  Under _gate.
+    // the set too, so the creation of that folder is the one a watch of the system's events sees; a poller of a folder
+    // alone sees no folder made in it.  Under _gate.
     private bool ChangesAWatchedFolder(FileChange change, WatchSet other)
     {
         var removed = change.Kind switch

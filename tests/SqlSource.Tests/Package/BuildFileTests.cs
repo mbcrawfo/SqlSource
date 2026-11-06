@@ -56,7 +56,8 @@ public sealed partial class BuildFileTests
         "OS",
     ];
 
-    // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.
+    // The target that writes the project manifest for the sqlsource tool, which runs it by name, and for the online
+    // build, which runs it through the dependencies of SqlSourceRunOnline.  It hooks nothing.
     private const string ManifestTarget = "SqlSourceWriteManifest";
 
     // The target that stops the build on a compiler older than the generator loads in.
@@ -91,7 +92,7 @@ public sealed partial class BuildFileTests
     // setting of its queries: one value for the project.
     private const string PublicExceptions = "SqlSourcePublicExceptions";
 
-    // The item of that target that holds the NuGet package folders other than the global packages folder.
+    // The item of SqlSourceFindBuildFolders that holds the NuGet package folders other than the global packages folder.
     private const string PackageFolder = "SqlSourcePackageFolder";
 
     private static readonly XDocument Props = Load("SqlSource.props");
@@ -141,10 +142,11 @@ public sealed partial class BuildFileTests
     // before it, when every property of the SDK and of the artifacts layout is set and the references are resolved,
     // and in every build that writes the file, a design-time build too.  The search for settings files and the hash
     // hook it through a property, which SqlSource.AfterSdk.targets empties to run them later: see
-    // Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked.  The target that writes the manifest is the one
-    // that is not of a build, Targets_ManifestTarget_HooksNothing, and the hook for a target that adds .sql files
-    // hooks nothing either, Targets_HookForFilesThatTargetsAdd_RunsBeforeTheSearchAndTheManifest.  Nor do the targets
-    // of the online build, which the hash depends on: Targets_OnlineTargets_HookNothing.
+    // Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked.  The target that writes the manifest hooks
+    // nothing, Targets_ManifestTarget_HooksNothing, and neither do the targets that list the settings files and find
+    // the links, which run only as what the search depends on, nor the hook for a target that adds .sql files,
+    // Targets_HookForFilesThatTargetsAdd_RunsBeforeTheSearchAndTheManifest.  Nor do the targets of the online build,
+    // which the hash depends on: Targets_OnlineTargets_HookNothing.
     [Fact]
     public void Targets_EveryTargetOfABuild_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
     {

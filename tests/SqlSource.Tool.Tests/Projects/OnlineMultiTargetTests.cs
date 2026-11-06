@@ -11,8 +11,8 @@ namespace SqlSource.Tool.Tests.Projects;
 
 // The online build of a project with two frameworks, net8.0 and net10.0, run for real: "dotnet build" of a copy of the
 // fixture OnlineMulti, with no obj, whose one .sql file has no sidecar until the stand-in of the tool creates it.  The
-// tool runs once, for the first framework, however the project is built.  Each test restores and builds once, a few
-// seconds.
+// tool runs once, for the first framework, however the project is built.  Each test restores and builds the copy one
+// to three times, a few seconds each.
 public sealed class OnlineMultiTargetTests : IDisposable
 {
     private static readonly Dictionary<string, string> NoVariables = [];
@@ -255,8 +255,6 @@ public sealed class OnlineMultiTargetTests : IDisposable
         run.Arguments[2].ShouldContain("net8.0");
     }
 
-    // The full paths of the AdditionalFiles items a framework's compiler was given, which the fixture's
-    // Directory.Build.targets writes.
     // An online build of every framework with the stand-in, which must pass.
     private async Task BuildOnlineAsync(params string[] arguments)
     {
@@ -293,6 +291,8 @@ public sealed class OnlineMultiTargetTests : IDisposable
         ];
     }
 
+    // The full paths of the AdditionalFiles items a framework's compiler was given, which the fixture's
+    // Directory.Build.targets writes.
     private string[] CompiledItems(string framework) =>
         File.ReadAllLines(Path.Combine(_folder, "obj", $"compiled.{framework}.txt"));
 

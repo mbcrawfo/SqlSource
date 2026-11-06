@@ -124,8 +124,8 @@ public sealed class BundleQueryFileTests
             );
     }
 
-    // A query of a file of several, one of a file with no name marker, one whose parameters a marker types, makes
-    // nullable and gives a C# type, one with a comment and line ends of CR LF.
+    // A query of a file of several, one of a file with no name marker, and one whose parameters a marker types, makes
+    // nullable and gives a C# type, with a comment and line ends of CR LF.
     [Theory]
     [InlineData(
         "Users.sql",

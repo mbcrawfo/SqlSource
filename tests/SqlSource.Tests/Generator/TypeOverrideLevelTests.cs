@@ -298,8 +298,8 @@ public sealed class TypeOverrideLevelTests
             ]);
     }
 
-    // _int4 and int4[] are one key, so the query's entry replaces the project's file's whichever spelling each has, and
-    // the query's default gives the array back to the base map.
+    // _int4 and int4[] are one key, so the query's int4[] entry replaces the project's file's _int4 one, and the
+    // query's default gives the array back to the base map.
     [Theory]
     [InlineData(
         "-- type-override: int4[] = System.Collections.Generic.List<long>\n",

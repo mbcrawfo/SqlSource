@@ -439,7 +439,8 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         failure.Arguments.ShouldBe(["@p", Query, "int", "nvarchar(100)"]);
     }
 
-    // The plan leaves a DECLAREd variable out of the list, and the server does not report it.
+    // The list is the test's, empty as the plan of a run makes it for a DECLAREd variable, and the server does not
+    // report the variable.
     [Fact]
     public async Task DescribeAsync_DeclaredVariable_IsNoParameter()
     {

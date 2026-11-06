@@ -288,7 +288,7 @@ public sealed class AttributeConflictTests
             .ShouldBe(ids);
     }
 
-    // The other project, compiled with the generator: it holds the attribute and the enums too.
+    // The other project, compiled with the generator: it holds the attributes and the exceptions too.
     private static MetadataReference Other(OutputKind? output, bool compilationReference) =>
         GeneratorHarness
             .CreateProject(
@@ -300,7 +300,7 @@ public sealed class AttributeConflictTests
             .Reference;
 
     // The other project with a CodeGen query on SQL Server whose method calls a conversion of NodaTime's, so that it
-    // holds SqlSource.NodaTimeConversions as well as the attribute and the enums.
+    // holds SqlSource.NodaTimeConversions as well as the attributes and the exceptions.
     private static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) OtherWithConversions(
         bool compilationReference
     )

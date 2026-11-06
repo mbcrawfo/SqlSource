@@ -14,8 +14,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// </summary>
 /// <remarks>
 /// A question the renamed capture does not answer is a request the pipeline made from the renamed query that the
-/// renaming did not make alike, the design's step 8, and is refused at that call.  Any other outcome is refused at
-/// the replay with its first difference.
+/// renaming did not make alike, and is refused at that call.  Any other outcome is refused at the replay with its
+/// first difference.
 /// </remarks>
 internal static class RenamingProof
 {

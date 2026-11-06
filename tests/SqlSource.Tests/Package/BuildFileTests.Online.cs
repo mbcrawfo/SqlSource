@@ -62,13 +62,12 @@ public sealed partial class BuildFileTests
         "MSBuildWarningsNotAsErrors",
     ];
 
-    // The design's expressions, each property as (name, condition, value) in the order it is set: SqlSourceOnline
-    // matched ignoring case and the white space around it, by Equals, since a comparison of a condition reads yes, on
-    // and no as booleans and would take yes for true; CI by the
-    // variables its services set; the connection source by its answer alone; the .env above the project; the first
-    // framework as ProjectEvaluator.FirstFramework of the tool reads it; and the run only outside CI, under true, or
-    // under auto with a connection source.  The package's warning of a tool that cannot start stays a warning under
-    // -warnaserror.  The tool's command is the tests' seam.
+    // The online properties, each as (name, condition, value) in the order it is set: SqlSourceOnline matched
+    // ignoring case and the white space around it, by Equals, since a comparison of a condition reads yes, on and no
+    // as booleans and would take yes for true; CI by the variables its services set; the connection source by its
+    // answer alone; the .env above the project; the first framework as ProjectEvaluator.FirstFramework of the tool
+    // reads it; and the run only outside CI, under true, or under auto with a connection source.  The package's
+    // warning of a tool that cannot start stays a warning under -warnaserror.  The tool's command is the tests' seam.
     [Fact]
     public void Targets_OnlineProperties_AreTheDesignsExpressions() =>
         OnlineProperties(Targets)
@@ -288,10 +287,10 @@ public sealed partial class BuildFileTests
         target.Elements().ShouldBeEmpty();
     }
 
-    // The run's condition is the design's: not BuildingProject, which a configuration that another build calls by
-    // name starts with false.  It depends on the manifest and on the target that writes the files it compares, so
-    // that they are written in the configuration that runs it, wherever it is called from.  It is up to date when
-    // every input is older than the stamp.
+    // The run's condition leaves BuildingProject out, which a configuration that another build calls by name starts
+    // with false.  It depends on the manifest and on the target that writes the files it compares, so that they are
+    // written in the configuration that runs it, wherever it is called from.  It is up to date when every input is
+    // older than the stamp.
     [Fact]
     public void Targets_RunOnline_RunsWhenAnInputIsNewerThanTheStamp()
     {

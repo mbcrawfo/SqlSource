@@ -9,5 +9,6 @@ How SQL Server's part answers each member of the contract: [renaming for SQL Ser
 - **`SqlServerVocabulary.Fold` is the one fold**, of `Fold`, the vocabulary and the engine's rows, upper-invariant by character.  It ignores case whatever the collation, which is [TD-0102](../../../../../docs/tech-debt/TD-0102-sql-server-renaming-folds-ignoring-case.md).
 - **`CopyOf` gives the suffix `_<n>` whatever the raw copy's separator**, since it is what `ParameterCopies` makes from the renamed query ([the copies](../../../../../docs/architecture/bundles.md#the-copies-of-a-reused-parameter)).  A copy it cannot read back, cut or of an ambiguous separator, is [TD-0104](../../../../../docs/tech-debt/TD-0104-sql-server-renaming-cannot-read-back-some-copies.md).
 - **A message keeps only the `@name`s that `SqlServerErrors.NamedIn` reads**, a copy as its parameter, since no decision reads more of it ([the messages](../../../../../docs/architecture/bundles.md#sql-servers-messages)).
+- **Only SQL Server's code goes here**: `tools/test-scopes.txt` scopes the folder to `sqlserver`, so `pre-commit-validation.sh` runs none of PostgreSQL's container tests for a change here; what both engines need goes above.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

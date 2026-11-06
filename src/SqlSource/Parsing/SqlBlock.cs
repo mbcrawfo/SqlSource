@@ -37,8 +37,9 @@ namespace SqlSource.Parsing;
 /// it is, or null.
 /// </param>
 /// <param name="ColumnMarkers">
-/// What the query's <c>-- column:</c> markers say of the nullability of its columns, in marker order, each column
-/// once.  Empty when it has none.
+/// What the query's <c>-- column:</c> markers say of its result's columns, their nullability, their C# type or
+/// <c>-&gt; default</c>, and the JSON opt-in, in marker order.  A column has a second marker only when it says what
+/// the first does not.  Empty when it has none.
 /// </param>
 /// <param name="KeptErrors">
 /// The errors of the scan of <paramref name="KeptSegments" /> for tokens, as offsets into the file's text.  They are

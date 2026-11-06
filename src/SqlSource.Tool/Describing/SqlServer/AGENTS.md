@@ -1,6 +1,7 @@
 # AGENTS.md - src/SqlSource.Tool/Describing/SqlServer
 
 - **`tests/SqlSource.Tool.Tests/SqlServerScript.cs` answers a `SqlServerSession` with no server**, from a capture that the test builds in code, so its tests hold what is asked as well as what is made of the answers ([fixtures](../../../../docs/architecture/sqlserver-describer.md#fixtures)).  What only a server can show is tested in `tests/DatabaseTests/SqlServer/Describer/`.
+- **Only SQL Server's code goes here**: `tools/test-scopes.txt` scopes the folder to `sqlserver`, so `pre-commit-validation.sh` runs none of PostgreSQL's container tests for a change here; what both engines need goes above.
 
 ## What reaches the server
 

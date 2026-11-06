@@ -20,8 +20,7 @@ namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 /// names change, and the replay finds an answer by the request the pipeline makes.  An error's position counts code
 /// points of <see cref="ParameterPlaceholders.PrepareText" />, which move with each renamed name and declared type.
 /// The describer reads a position only as after the head, in the query's SQL, or in an item of the type list, whose
-/// declared parameter it names (<c>PostgresErrors.Prepare</c>), so a position is mapped into the same part: the spike
-/// of phase 10's finding 5.
+/// declared parameter it names (<c>PostgresErrors.Prepare</c>), so a position is mapped into the same part.
 /// </para>
 /// <para>
 /// The renamed SQL and types are made again through <see cref="IRenamingScope.Sql" /> from the originals, as the

@@ -8,8 +8,8 @@ using SqlSource.Tool.Describing.SqlServer.Types;
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
 /// <summary>
-/// The text of <c>operands</c>, which asks the server whether each operand a proof needs is not null, and the reading
-/// of its answer.
+/// The text of <c>operands</c>, which asks the server whether each operand a proof needs is not null and whether its
+/// type is no CLR type, and the reading of its answer.
 /// </summary>
 /// <remarks>
 /// The text is the query's own characters, rearranged: its <c>WITH</c> clause, then <c>SELECT</c> and each operand

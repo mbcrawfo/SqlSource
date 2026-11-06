@@ -37,9 +37,10 @@ namespace SqlSource.Generation.Types;
 /// PostgreSQL, with no <c>SQLSRC279</c> or <c>SQLSRC280</c>.
 /// </param>
 /// <param name="WithoutLibrary">
-/// The type the parameter or column has without the library, set exactly when <paramref name="Library" /> is: what the
-/// type override and the base map give it, for a type that claims the query at an output the library does not apply
-/// to.
+/// The type the parameter or column has without the library, for a type that claims the query at an output the library
+/// does not apply to: what the type override and the base map give it.  Set only when <paramref name="Library" /> is,
+/// and null beside a library's row when the type has no C# type without the library (<c>Unreadable</c> or
+/// <c>NeedsSqlServerTypes</c>), whose failure is the query's <c>WithoutLibraryFailure</c>.
 /// </param>
 /// <param name="ElementIsValueType">
 /// Whether the element of an array's C# type is a value type, without the <c>?</c> of a nullable element: true for

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 
@@ -79,8 +80,8 @@ internal static partial class NullabilityWalk
 
     // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, there
     // is a type for each column, the root prints no Output or its plan holds a set operation, and the root reaches
-    // one.  A root that prints Output must print an entry for each column, and one of another statement's plan is read
-    // for none.
+    // one.  A root that prints Output must print an entry for each column, and one whose Output does not agree with
+    // the row description (OutputFits) is read for none.
     private static IReadOnlyList<long>? SetOperationTypesOf(
         Plans plans,
         IReadOnlyList<SidecarColumn> columns,

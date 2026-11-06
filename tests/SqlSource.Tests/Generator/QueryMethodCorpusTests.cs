@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Shouldly;
-using SqlSource.Testing.Generator;
+using SqlSource.Testing.Generator.Corpus;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;

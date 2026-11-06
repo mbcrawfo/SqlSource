@@ -388,8 +388,8 @@ public sealed class PlanInstancesTests
     public void Find_AntiJoin_SaysItExtendsItsInnerSide() =>
         Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe(NullExtension.Inner);
 
-    // A set operation prints its first branch at the root: an Append under a UNION's Aggregate or under a Sort, and a
-    // SetOp over an Append on 14 or over its two branches as Outer and Inner on 18.
+    // A set operation prints its first branch at the root: an Append under a UNION's Aggregate or under a Sort, a SetOp
+    // over its two branches as Outer and Inner, as 18 plans it, a Recursive Union and a Merge Append.
     [Fact]
     public void HasSetOperation_AppendOrSetOpUnderTheRoot_IsTrue()
     {

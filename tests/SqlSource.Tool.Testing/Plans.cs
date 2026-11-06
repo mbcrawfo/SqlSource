@@ -51,7 +51,7 @@ internal static class Plans
             TestContext.Current.CancellationToken
         );
 
-    // The first query of a file that holds this SQL, in a postgres project of its own.
+    // The first query of a file that holds this SQL, in a project of its own whose settings name the dialect given.
     public static PlannedQuery Query(TempFolder folder, string sql, string dialect = "postgres")
     {
         var project = Postgres(folder);

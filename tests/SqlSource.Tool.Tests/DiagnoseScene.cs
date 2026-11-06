@@ -16,7 +16,7 @@ namespace SqlSource.Tool.Tests;
 // database is a case of the describers' fixtures: every call is answered from its capture, so no server is needed.
 internal sealed class DiagnoseScene : IDisposable
 {
-    // The lines of a renamed bundle that was written, after its two paths.
+    // The line of a renamed bundle that was written, after the lines of its two paths.
     public const string PrivateLine =
         "sqlsource: the mapping holds your own names: keep it private, outside your project's folder, since a build "
         + "may copy a .json file into its output\n";

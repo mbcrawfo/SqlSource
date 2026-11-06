@@ -9,9 +9,10 @@ namespace SqlSource.Settings;
 /// of a query over those of its file's preamble.
 /// </summary>
 /// <remarks>
-/// Every member but the generator parameters is nullable, and null means the source does not say; the generator
-/// parameters say nothing when they are empty.  A source sets the members it has: not every
-/// setting has every source.  <see cref="QuerySettings.Resolve" /> is the one rule that puts the levels together.
+/// Every member but the generator parameters and the type override is nullable, and null means the source does not
+/// say; the generator parameters say nothing when they are empty, and the type override says nothing for an engine
+/// whose slot is null.  A source sets the members it has: not every setting has every source.
+/// <see cref="QuerySettings.Resolve" /> is the one rule that puts the levels together.
 /// </remarks>
 internal sealed record SettingsLevel
 {

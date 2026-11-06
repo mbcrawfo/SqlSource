@@ -540,7 +540,7 @@ public sealed class TokenCheckTests
             .ShouldBe(new RenamingRefusal(RefusalStep.Token, place, token));
     }
 
-    // The check of the calls given, with an empty query.sql.
+    // The check of the calls given, with a query.sql of SELECT 1 alone.
     private static RenamingRefusal? Check(params RenamingCall[] calls)
     {
         var (engine, mapping) = Mapping();

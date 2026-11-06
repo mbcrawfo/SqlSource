@@ -7,7 +7,8 @@ namespace SqlSource.Tool.Describing.Describers;
 /// <summary>
 /// An exception that a describer threw, which is a bug of the describer, as the <c>SQLSRC200</c> to report: with
 /// the connection's value already taken out.  It holds no inner exception, whose message may hold the value.
-/// <c>Cli.RunCommandAsync</c> reports <see cref="Diagnostic" /> and the run ends.
+/// <c>Cli.RunCommandAsync</c> reports <see cref="Diagnostic" /> and the run ends; under <c>--watch</c>,
+/// <c>WatchSession</c> reports it and the pass ends.
 /// </summary>
 /// <remarks>
 /// <para>

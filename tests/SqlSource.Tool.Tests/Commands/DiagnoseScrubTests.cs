@@ -23,7 +23,7 @@ public sealed class DiagnoseScrubTests : IDisposable
 
     public void Dispose() => _scene.Dispose();
 
-    // A raw bundle written, then scrubbed: nothing of the scrub asks a database or MSBuild.
+    // Writes a raw bundle, then makes any question to a database throw, since a scrub asks none.
     private async Task WriteRawAsync()
     {
         var raw = await _scene.DiagnoseAsync("--query", Query, "--out", "raw.zip", "--no-obfuscate");
@@ -51,7 +51,8 @@ public sealed class DiagnoseScrubTests : IDisposable
         replayed.Out.ShouldEndWith(DiagnoseScene.Reproduced);
     }
 
-    // The same kind of bundle as diagnose writes directly: the same files, renamed, with the same outcome.
+    // The same kind of bundle as diagnose writes directly: the same bundle.json, so renamed and with the same outcome,
+    // an expected.json in both or in neither, and the same explain settings.
     [Fact]
     public async Task Diagnose_ScrubOfTheRawBundle_GivesWhatDiagnoseGives()
     {

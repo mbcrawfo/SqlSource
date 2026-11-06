@@ -25,7 +25,6 @@ public sealed class MethodEmitterTests
         source.ShouldNotContain(" GetUser(\n");
     }
 
-    // With no name dropped, both methods of the place are written.
     [Fact]
     public void Emit_NothingDropped_KeepsBoth()
     {
@@ -35,7 +34,6 @@ public sealed class MethodEmitterTests
         source.ShouldContain(" ListUsers(\n");
     }
 
-    // A type whose every method is dropped gets no file.
     [Fact]
     public void Emit_EveryMethodDropped_GivesNoSource() =>
         Emit(new EquatableArray<string>(["GetUser", "ListUsers"])).ShouldBeNull();

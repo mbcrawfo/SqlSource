@@ -15,7 +15,9 @@ namespace SqlSource.Tests.SettingsFiles;
 
 public sealed class SettingsFileReaderTests
 {
-    /// <summary>The example of the settings files design, "The settings file".</summary>
+    /// <summary>
+    /// The example under "The settings file" in docs/superpowers/specs/2026-10-25-settings-files-design.md.
+    /// </summary>
     internal const string DesignsExample = /*lang=json*/
         """
         {

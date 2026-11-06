@@ -24,7 +24,8 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
 
 // The errors, refusals, sessions and columns of the server's own relations that no recorded fixture of SQL Server
 // holds: each case is a fixture's raw bundle with its capture edited by hand, its outcome made by replaying it raw,
-// then renamed by SQL Server's part.
+// then renamed by SQL Server's part.  Beside them, the recorded select-other-database is renamed as it is, for a
+// column of sys under its own name.
 public sealed partial class SqlServerErrorRenamingTests
 {
     private const string Engine = "mssql";

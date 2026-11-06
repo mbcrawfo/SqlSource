@@ -14,11 +14,12 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // What a method does with the arguments given at run time, the transaction, the command's timeout and the token, and
 // with the connection: it opens a closed connection and closes it again, whether it returns or throws, and leaves an
 // open one open, in its transaction.  Each test reads the connection's state after the call.  The queries that wait are
-// Sleep and ListThenSleep of Queries/Methods.sql, and each sleeps for far longer than the test waits for it.
+// Sleep and ListThenSleep of Queries/Methods.sql, and each sleeps 30 seconds, longer than either test needs on a runner
+// that is not stalled (TD-0112).
 [Collection(UsesPostgres.Name)]
 public sealed class RunTimeTests(PostgresDatabases postgres)
 {
-    // Far longer than a test waits: a test that sees the sleep end has failed.
+    // Longer than a test needs: a test that sees the sleep end has failed.
     private const int LongSleep = 30;
 
     // Enough rows to fill the server's send buffer many times over: it sends each buffer as it fills, so the client has

@@ -27,10 +27,10 @@ public static class Cli
     internal const string DebugVariable = "SQLSOURCE_DEBUG";
 
     /// <summary>
-    /// What ends a <c>describe</c> that reported an error other than <c>SQLSRC219</c>, was not cancelled and was
-    /// asked for no log, once, on standard error: there is no hint under each error, and this one line says how to
-    /// get a record of the run.  A test that compares the whole of standard error of such a run ends its text with
-    /// <c>DescribeScene.RunAgain</c>.
+    /// What ends a <c>describe</c> that reported an error other than <c>SQLSRC219</c>, was not cancelled, was asked
+    /// for no log and runs under neither <c>--online</c> nor <c>--watch</c>, once, on standard error: there is no hint
+    /// under each error, and this one line says how to get a record of the run.  A test that compares the whole of
+    /// standard error of such a run ends its text with <c>DescribeScene.RunAgain</c>.
     /// </summary>
     internal const string RunAgainLine = "sqlsource: run again with --log <file> for a record of what the run did";
 
@@ -57,7 +57,8 @@ public static class Cli
     /// <param name="args">The command line, without the name of the program.</param>
     /// <returns>
     /// <c>0</c> on success, <c>1</c> when an error was reported, a wrong command line included, and <c>2</c> when
-    /// <c>--check</c> found a difference and nothing failed.
+    /// <c>describe --check</c> found a difference, or <c>replay</c> an answer that is not the bundle's, and nothing
+    /// failed.
     /// </returns>
     public static int Run(string[] args) => Run(args, ToolHost.Create, Console.Error);
 
@@ -520,7 +521,8 @@ public static class Cli
         // The counts of each selected database, as run.end holds them.
         public LogValue Databases { get; set; } = LogValue.ListOf([]);
 
-        // Whether the line that ends a failed run has a reader: "describe" runs, and no log was asked for.
+        // Whether the line that ends a failed run has a reader: "describe" runs, with no log, not under --online and
+        // not as a watch.
         public bool MayPoint { get; set; }
 
         public bool Cancelled { get; set; }

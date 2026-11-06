@@ -32,8 +32,8 @@ public sealed class QueryMethodWriterTests
     // The type integer, as the entry of a parameter describes it.
     private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
 
-    // GetUser -> one-optional: one parameter, one token, a record of two columns.  RowBufferTests derives
-    // its method from it.
+    // GetUser -> one-optional: one parameter, one token, a record of two columns.  The other tests of the methods'
+    // emitting and planning derive their methods from it.
     internal static readonly QueryMethod GetUser = new(
         "GetUser",
         "GetUser",
@@ -272,7 +272,8 @@ public sealed class QueryMethodWriterTests
         text.Contains("ExecuteNonQueryAsync", StringComparison.Ordinal).ShouldBe(!readsRows);
     }
 
-    // One row exactly: no row and more than one are each an UnexpectedRowCountException, which the summary names.
+    // One row exactly: no row and more than one are each an UnexpectedRowCountException, which the method's
+    // documentation names.
     [Fact]
     public void Append_ShapeOne_ThrowsOnNoRowAndOnMoreThanOne()
     {
@@ -289,7 +290,8 @@ public sealed class QueryMethodWriterTests
         text.ShouldContain("            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n");
     }
 
-    // At most one row: no row is null, and more than one an UnexpectedRowCountException, which the summary names.
+    // At most one row: no row is null, and more than one an UnexpectedRowCountException, which the method's
+    // documentation names.
     [Fact]
     public void Append_ShapeOneOptional_ReturnsNullForNoRowAndThrowsOnMoreThanOne()
     {
@@ -675,7 +677,8 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("global::System.InvalidOperationException");
     }
 
-    // Under array-pool=off the types the buffer serves read their rows as before the buffer.
+    // Under array-pool=off the types the buffer serves read their rows into a List, or an ImmutableArray's builder,
+    // and never into SqlSourceRowBuffer.
     [Theory]
     [InlineData(nameof(CollectionKind.Array), "new global::System.Collections.Generic.List<", "rows.ToArray()")]
     [InlineData(nameof(CollectionKind.IEnumerable), "new global::System.Collections.Generic.List<", "rows.ToArray()")]
@@ -1641,7 +1644,7 @@ public sealed class QueryMethodWriterTests
                     foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
                     {
                         // Every awkward method once by each placement and engine: the engine goes by ones, the
-                        // segments by twos and the placement by eights.
+                        // segments by twos and the placement by fours.
                         var method = GetUser with
                         {
                             Name = "Q" + index++,

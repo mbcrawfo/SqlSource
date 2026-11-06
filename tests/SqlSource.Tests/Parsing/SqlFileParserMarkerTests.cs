@@ -14,7 +14,8 @@ using static SqlSource.Tests.Parsing.ParseOf;
 
 namespace SqlSource.Tests.Parsing;
 
-// The scope and errors of generator parameters, and the output, database, model, type-override and column markers.
+// The scope and errors of generator parameters, and the output, database, model, type-override, library-types,
+// placement and column markers.
 public sealed class SqlFileParserMarkerTests
 {
     [Fact]

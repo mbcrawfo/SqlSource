@@ -81,7 +81,7 @@ public sealed class SecretTests : IDisposable
         _scene.Describer.Opened.ShouldAllBe(request => request.Connection == Secrets.ConnectionWithMarker);
     }
 
-    // The same run with a log: the file holds every error of it, and the marker word nowhere.
+    // The same run with a log: the file holds the describer's error, and the marker word nowhere.
     [Fact]
     public async Task Run_ValueOnTheCommandLineAndEveryErrorWithLog_IsNeverLogged()
     {

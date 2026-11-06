@@ -9,7 +9,7 @@ using Xunit;
 namespace SqlSource.DatabaseTests.Postgres.Describer;
 
 // The check of the tool's lexer against Npgsql, with a real driver and a real server.  Every describe of
-// ParameterTests and of ColumnTests runs the check too, so each of their cases is one that passes it.
+// ParameterTests and of ColumnTests that succeeds runs the check too, so each of those cases is one that passes it.
 [Collection(UsesPostgres.Name)]
 public sealed class NpgsqlCheckTests(PostgresDatabases postgres)
 {

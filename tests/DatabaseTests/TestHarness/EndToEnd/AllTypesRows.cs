@@ -11,13 +11,13 @@ using SqlSource.Testing;
 
 namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
-// The two rows of all_types that the seed of the end-to-end database "app" holds, as a model of the table read through
-// Dapper has them: row 1 with a value in every column, row 2 with NULL in every column but id.  A row is read by
-// reflection, so that every project that reads the table shares the expectations, whatever driver it runs.  Each
-// expectation is the value of a property, by its name, for the property's type: a date is a DateOnly on Npgsql 10 and a
-// DateTime on Npgsql 8.  This library cannot reference Npgsql, so a range is compared by its properties through
-// reflection, and any other value of NpgsqlTypes by its text under the invariant culture, as is a cidr, which is an
-// NpgsqlCidr on Npgsql 8.
+// The two rows of all_types that the seed of the end-to-end database "app" holds, as the generated model of the table
+// has them, read through Dapper or a generated method: row 1 with a value in every column, row 2 with NULL in every
+// column but id.  A row is read by reflection, so that every project that reads the table shares the expectations,
+// whatever driver it runs.  Each expectation is the value of a property, by its name, for the property's type: a date
+// is a DateOnly on Npgsql 10 and a DateTime on Npgsql 8.  This library cannot reference Npgsql, so a range is compared
+// by its properties through reflection, and any other value of NpgsqlTypes by its text under the invariant culture, as
+// is a cidr, which is an NpgsqlCidr on Npgsql 8.
 internal static class AllTypesRows
 {
     public const int FullRowId = 1;

@@ -19,8 +19,8 @@ namespace SqlSource.Generation;
 /// The shape the name marker gives, or null when it gives none, which the query's method returns.
 /// </param>
 /// <param name="Segments">
-/// The SQL without comments, split into literal text and tokens.  Never empty.  Without a token it is one literal
-/// segment.
+/// The SQL without comments, split into literal text, tokens and the uses of its lists.  Never empty.  Without a token
+/// or a list it is one literal segment.
 /// </param>
 /// <param name="KeptSegments">
 /// The SQL with its comments and blank lines, or null when that form was not built: because nothing can ask for it,

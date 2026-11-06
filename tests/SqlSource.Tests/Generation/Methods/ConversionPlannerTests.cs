@@ -752,7 +752,7 @@ public sealed class ConversionPlannerTests
         );
     }
 
-    // A class on a string that holds no JSON goes to the driver, as 8.2 has it.
+    // A class on a string that holds no JSON goes to the driver, as a foreign type with no converters does.
     [Fact]
     public void Plan_ClassOnAStringThatHoldsNoJson_GoesToTheDriver()
     {
@@ -782,7 +782,7 @@ public sealed class ConversionPlannerTests
         blocked.ShouldBeFalse();
     }
 
-    // A class whose converters are of another type keeps 8.2's rule, SQLSRC279, with no serializer.
+    // A class whose converters are of another type is SQLSRC279, as any foreign type's would be, with no serializer.
     [Fact]
     public void Plan_ClassOnJsonWithConvertersOfAnotherType_ReportsSqlsrc279()
     {
@@ -840,7 +840,7 @@ public sealed class ConversionPlannerTests
         blocked.ShouldBeFalse();
     }
 
-    // Without NetTopologySuite.IO.SqlServerBytes the path is not taken: the type goes to the driver, as before.
+    // Without NetTopologySuite.IO.SqlServerBytes the path is not taken: the type goes to the driver.
     [Fact]
     public void Plan_SpatialWithoutSqlServerBytes_IsTheDriver()
     {
@@ -859,7 +859,7 @@ public sealed class ConversionPlannerTests
     }
 
     // An override to Microsoft.SqlServer.Types's type is no geometry of NetTopologySuite's, and is read and bound as
-    // the driver does, as before.
+    // the driver does.
     [Fact]
     public void Plan_OverrideToSqlGeography_IsUnchanged()
     {
@@ -1038,7 +1038,7 @@ public sealed class ConversionPlannerTests
             new DatabaseType(databaseText, databaseIsValueType, elementIsValueType)
         );
 
-    // A type that a marker chose, over a database type that holds JSON.
+    // A type that an override chose, over a database type that holds JSON.
     private static PropertyType HoldingJson(string text, bool isValueType, string key, string databaseText) =>
         Overridden(text, isValueType, key, databaseText, false) with
         {

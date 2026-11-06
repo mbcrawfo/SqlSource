@@ -12,9 +12,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// </summary>
 /// <remarks>
 /// A word, quoted name or parameter that <see cref="IEngineRenaming.IsEngineWord" /> keeps stays verbatim wherever it
-/// stands, as the design's step 2 says of a user's name spelled as the engine's word.  A refusal is reported and the
-/// renaming goes on, so that every refusal of a text is reported; the text of a renaming that refused is not to be
-/// used.
+/// stands, a user's name spelled as the engine's word too.  A refusal is reported and the renaming goes on, so that
+/// every refusal of a text is reported; the text of a renaming that refused is not to be used.
 /// </remarks>
 internal sealed partial class SqlRenamer(
     IEngineRenaming engine,

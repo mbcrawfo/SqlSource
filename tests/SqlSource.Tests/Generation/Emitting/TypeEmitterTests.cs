@@ -804,8 +804,8 @@ public sealed class TypeEmitterTests
         Emit(OutputKind.Sql, TestModels.Type(), project, File("Users.sql", TokenQuery("ListFrom", parameter)))
             .Source.ShouldNotBeNull();
 
-    // A.sql and B.sql, whose GetUser has an error in its kept form, under levels whose nearer one keeps comments or
-    // turns them off.
+    // A.sql and B.sql, whose GetUser has an error in its kept form, with B.sql's level keeping comments or turning
+    // them off and A.sql's saying the opposite.
     private static TypeOutput EmitWithAnErrorInTheKeptFormOfB(bool keepComments)
     {
         var keep = TestModels.ParametersOn(GeneratorParameters.KeepComments);

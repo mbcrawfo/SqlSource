@@ -11,9 +11,9 @@ namespace SqlSource.Tool.Planning;
 /// <remarks>
 /// The file is read once, the first time it is asked for, and every later question gets that read.  A file that
 /// cannot be read has no text, and the generator reads that as an empty file.  A <c>.sql</c> file that the compiler
-/// reads in its fallback encoding is the planner's <c>SQLSRC271</c>: on Windows the compiler reads it in the system's
-/// code page, so its hashes are not the tool's, and elsewhere both read its characters outside ASCII as replacement
-/// characters.
+/// reads in its fallback encoding, and that has a parse error or a query that needs an entry, is the planner's
+/// <c>SQLSRC271</c>: on Windows the compiler reads it in the system's code page, so its hashes are not the tool's, and
+/// elsewhere both read its characters outside ASCII as replacement characters.
 /// </remarks>
 internal sealed class SqlFileText(string path) : AdditionalText
 {

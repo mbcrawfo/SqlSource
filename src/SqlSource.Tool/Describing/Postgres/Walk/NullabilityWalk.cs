@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 
@@ -151,9 +152,9 @@ internal static partial class NullabilityWalk
             return Unusable(reason, root, instances, columns);
         }
 
-        // A plan that may be another statement's is read for no expression.  A gated query's columns with an origin are
-        // still walked, since column aliases print a column under another name, and a query that is not gated has
-        // nothing else to read.
+        // A plan whose root's Output does not agree with the row description (OutputFits) is read for no expression.  A
+        // gated query's columns with an origin are still walked, since column aliases print a column under another
+        // name, and a query that is not gated has nothing else to read.
         var fits = OutputFits(entries, origins, instances);
         if (!fits && !scope.Gated)
         {

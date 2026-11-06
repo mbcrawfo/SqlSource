@@ -8,11 +8,12 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// <summary>
 /// The names of the locals of a query's method and of its lambdas' parameters, none of which an argument has, and of
 /// the connection and the transaction the method runs its query on.  The locals that read rows are named only for a
-/// method that reads them, whose output is given, the value of a converted parameter only for a method that has one,
-/// the element of an array and its value only for a method that converts one by element, the iterator only for a
-/// method that streams, the flag of a row being yielded only for one whose <see cref="ExecutionCapabilities" /> drain
-/// when its loop is left at a row, the exception its catch takes only for one whose capabilities check for a rollback
-/// at its read, and the names of its lists only for a method that has one.
+/// method that reads them, whose output is given, the value of a converted parameter, or of an array its property
+/// holds as any sequence, only for a method that has one, the element of an array and its value only for a method that
+/// converts one by element, the iterator only for a method that streams, the flag of a row being yielded only for one
+/// whose <see cref="ExecutionCapabilities" /> drain when its loop is left at a row, the exception its catch takes only
+/// for one whose capabilities check for a rollback at its read, and the names of its lists only for a method that has
+/// one.
 /// </summary>
 internal sealed class QueryMethodLocals
 {
@@ -87,9 +88,10 @@ internal sealed class QueryMethodLocals
 
     public string Parameter { get; }
 
-    // The pattern variable that holds the value of a converted parameter in its binding, which is a block of its
-    // own, so that one name serves every parameter; and the parameter of the static lambda that converts an
-    // array's element, and the element that is not null, which no other lambda's parameter has.
+    // The pattern variable that holds the value of a converted parameter, or of an array that its property holds as
+    // any sequence, in its binding, which is a block of its own, so that one name serves every parameter; and the
+    // parameter of the static lambda that converts an array's element, and the element that is not null, which no
+    // other lambda's parameter has.
     public ConversionNames ConversionNames { get; }
 
     public string Reader { get; }

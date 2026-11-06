@@ -14,8 +14,8 @@ namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 /// </summary>
 /// <remarks>
 /// A decision reads a message only as one of the four constant texts the tool writes into an answer and compares, and
-/// for the first <c>$n</c> of a <c>42P18</c> or <c>42P08</c>, the parameter it names (the spike of phase 10's finding
-/// 5).  So a message keeps that much and nothing of the server's text, which may quote the user's names and values.
+/// for the first <c>$n</c> of a <c>42P18</c> or <c>42P08</c>, the parameter it names.  So a message keeps that much and
+/// nothing of the server's text, which may quote the user's names and values.
 /// </remarks>
 internal static class PostgresOwnStrings
 {

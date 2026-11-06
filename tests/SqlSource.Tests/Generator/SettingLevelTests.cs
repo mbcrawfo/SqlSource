@@ -77,10 +77,8 @@ public sealed class SettingLevelTests
         }
     }
 
-    // Each level with each output.  The project's file is the least specific level, and codegen is both the default and
-    // the output MethodRuns gives the project, so a project's file of codegen would decide nothing: that row is left
-    // out.
-    // Every level below the project's file.
+    // Every level below the project's file.  Codegen is both the default and the output MethodRuns gives the project,
+    // so a project's file of codegen would decide nothing.
     public static TheoryData<SettingLevel> LevelsBelowTheProjectFile =>
         [SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
 

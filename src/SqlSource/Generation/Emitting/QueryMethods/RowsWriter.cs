@@ -218,7 +218,8 @@ internal static class RowsWriter
             .Append(SymbolDisplay.FormatLiteral(context.Method.QueryName, quote: true))
             .Append(moreThanOne ? ", true);\n" : ", false);\n");
 
-    // The type the task gives, or null for a task that gives nothing.
+    // The type the task gives, or for a streaming method the IAsyncEnumerable it returns; null for a task that gives
+    // nothing.
     internal static string? GetResultType(in QueryMethodContext context) =>
         context.Method.Shape switch
         {

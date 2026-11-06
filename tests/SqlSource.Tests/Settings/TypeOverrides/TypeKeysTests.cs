@@ -47,7 +47,8 @@ public sealed class TypeKeysTests
     public void TryNormalizePostgres_CatalogNameOfAnArray_IsItsElementsKeyWithBrackets(string key, string expected) =>
         ShouldNormalize(key, expected);
 
-    // What is left once the system schema is taken off is not checked, so a type the map does not know can be named.
+    // A key qualified by a user's schema is kept as written and not checked, and neither is what is left once the
+    // system schema is taken off, so a type the map does not know can be named.
     [Theory]
     [InlineData("pg_catalog.int4", "int4")]
     [InlineData("PG_CATALOG.int4[]", "int4[]")]

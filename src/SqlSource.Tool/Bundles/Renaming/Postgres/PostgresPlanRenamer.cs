@@ -9,12 +9,13 @@ using System.Text.Json.Nodes;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
+using SqlSource.Tool.Describing.Postgres.Walk.Expressions;
 
 namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 
 /// <summary>
 /// The plan of an <c>explain</c> call, the text of <c>EXPLAIN (VERBOSE, FORMAT JSON)</c>, renamed key by key: each key
-/// of <see cref="PlanKeys" /> by its kind, and every other key dropped, at any depth (the design's steps 1 and 9).
+/// of <see cref="PlanKeys" /> by its kind, and every other key dropped, at any depth.
 /// </summary>
 /// <remarks>
 /// <para>
