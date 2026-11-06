@@ -75,6 +75,7 @@ public sealed class WalkTests(PostgresDatabases postgres)
     [InlineData("(o.id IN @ids) < true")]
     [InlineData("(o.id IN @ids)::int = 0")]
     [InlineData("ARRAY[u.id, 0] && ARRAY[u.id, 1] AND (o.id IN @ids) IS FALSE")]
+    [InlineData("\"booleq\"(o.id IN @ids, false)")]
     public async Task DescribeAsync_LeftJoinThatAListsTestMakesInner_IsNullableThroughout(string condition)
     {
         var description = await Sessions.ShouldDescribeAsync(

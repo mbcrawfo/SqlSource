@@ -88,6 +88,9 @@ internal static partial class SqlListUses
             "INSERT",
         ];
 
+        // Words that start a statement, which make a frame inside the output a subquery, whose own output is a value.
+        private static readonly string[] Statements = ["SELECT", "VALUES", "INSERT", "UPDATE", "DELETE"];
+
         // Words that end an operand where no CASE is open: THEN and ELSE of a MERGE, and the END of a block.
         private static readonly string[] Ends = ["THEN", "ELSE", "END"];
 
@@ -176,7 +179,12 @@ internal static partial class SqlListUses
             {
                 EndOperand(top);
             }
-            else if (cursor.IsWord("WHERE") || cursor.IsWord("ON") || cursor.IsWord("HAVING") || cursor.IsWord("WHEN"))
+            else if (
+                cursor.IsWord("WHERE")
+                || (cursor.IsWord("ON") && before != Before.Distinct)
+                || cursor.IsWord("HAVING")
+                || cursor.IsWord("WHEN")
+            )
             {
                 EndOperand(top);
                 top.Context = Context.Filter;
@@ -197,7 +205,7 @@ internal static partial class SqlListUses
             else if (cursor.IsAnyWord(Ends) || IsClause(cursor, before))
             {
                 EndOperand(top);
-                if (top.Kind != FrameKind.Outermost)
+                if (top.Kind != FrameKind.Outermost && cursor.IsAnyWord(Statements))
                 {
                     top.InOutput = false;
                 }
@@ -257,8 +265,7 @@ internal static partial class SqlListUses
             }
         }
 
-        // Anything else that is not white space: a quoted region, or a character such as "." or ":".  A ";" ends the
-        // statement.
+        // Anything else that is not white space: a character such as "." or ":".  A ";" ends the statement.
         public void Other(Cursor cursor)
         {
             _before = cursor.IsWord(".") ? Before.Dot : Before.Other;
@@ -269,6 +276,14 @@ internal static partial class SqlListUses
                 return;
             }
 
+            MakeUnclean(Top);
+        }
+
+        // A quoted region.  One before "(" is a name, "f"(, so the parenthesis is a call's.
+        public void Quoted()
+        {
+            _before = Before.Other;
+            _groupFollows = false;
             MakeUnclean(Top);
         }
 
@@ -322,13 +337,13 @@ internal static partial class SqlListUses
             return cursor.IsAnyWord(Clauses);
         }
 
-        // A frame opened inside the output of the outermost statement is output too, until a clause word in it, a
-        // subquery's SELECT, makes it a value.
+        // A frame opened inside the output of the outermost statement is output too, until a word that starts a
+        // statement in it, a subquery's SELECT, makes it a value.
         private void Push(FrameKind kind, Context context)
         {
             var top = Top;
             MakeUnclean(top);
-            var inOutput = top.Context == Context.Output;
+            var inOutput = SettlesAsOutput(top);
             _frames.Add(new Frame(kind, inOutput ? Context.Output : context, inOutput));
             _before = Before.Other;
         }
@@ -354,6 +369,11 @@ internal static partial class SqlListUses
             }
         }
 
+        // Whether a frame's operands now reach only the outermost output: the outermost level in its output, or a frame
+        // opened inside it.
+        private static bool SettlesAsOutput(Frame frame) =>
+            frame.Kind == FrameKind.Outermost ? frame.Context == Context.Output : frame.InOutput;
+
         private static Context AfterClause(Frame frame) => frame.InOutput ? Context.Output : Context.Value;
 
         // Anything after a list's parameter applies to its truth, so it makes the operand of a list a value.
@@ -378,17 +398,20 @@ internal static partial class SqlListUses
         }
 
         // Settles the lists of the operand that ends here by what the frame's operands stand in.
+        // A frame inside the outermost output settles every list as output, whatever its context: its values, a CASE's
+        // result or an aggregate's FILTER, reach no filter of the query.
         private void EndOperand(Frame frame)
         {
             if (frame.Pending is { Count: > 0 } pending)
             {
+                var context = SettlesAsOutput(frame) ? Context.Output : frame.Context;
                 foreach (var index in pending)
                 {
-                    if (frame.Context == Context.Group && frame.Clean)
+                    if (context == Context.Group && frame.Clean)
                     {
                         (frame.Carried ??= []).Add(index);
                     }
-                    else if (frame.Context == Context.Value || (!frame.Clean && frame.Context != Context.Output))
+                    else if (context == Context.Value || (!frame.Clean && context != Context.Output))
                     {
                         uses[index] = SqlParameterUse.NegatedList;
                     }

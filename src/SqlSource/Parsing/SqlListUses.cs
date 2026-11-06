@@ -68,6 +68,9 @@ internal static partial class SqlListUses
         // A run of operator characters, such as "=" or "->>".
         Operator,
 
+        // A quoted region.
+        Quoted,
+
         // Anything else that is not white space: a quoted region, or a character that is not a name character.
         Other,
     }
@@ -193,6 +196,10 @@ internal static partial class SqlListUses
             {
                 conditions.Other(cursor);
             }
+            else if (item == Item.Quoted)
+            {
+                conditions.Quoted();
+            }
 
             afterIn = false;
             afterIs = false;
@@ -288,7 +295,7 @@ internal static partial class SqlListUses
                     if (lexeme.Kind == SqlLexemeKind.Quoted)
                     {
                         _word = default;
-                        return Item.Other;
+                        return Item.Quoted;
                     }
 
                     // A comment or a hint is passed over as white space.
