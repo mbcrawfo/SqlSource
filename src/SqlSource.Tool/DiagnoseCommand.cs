@@ -39,8 +39,8 @@ internal static class DiagnoseCommand
     public static Command Create()
     {
         // The rules of DescribeCommand.Create hold: a flag has Arity = ArgumentArity.Zero, an option that takes a
-        // value takes exactly one, and one that may be repeated takes OneOrMore.  --project, --connection, --verbose
-        // and --log are describe's, with their names and their rules.
+        // value takes exactly one, and one that may be repeated takes OneOrMore.  --project, --connection, --verbose,
+        // --log and --env-file are describe's, with their names and their rules.
         var path = new Argument<string>(PathArgument)
         {
             Description =
@@ -106,6 +106,15 @@ internal static class DiagnoseCommand
             Arity = ArgumentArity.ExactlyOne,
         };
 
+        var envFile = new Option<string>(DescribeCommand.EnvFileOption)
+        {
+            Description =
+                "Read the connections from this .env file instead of the one in the folder of the solution or "
+                + "project; 'none' reads none.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
         var scrub = new Option<string>(ScrubOption)
         {
             Description =
@@ -128,6 +137,7 @@ internal static class DiagnoseCommand
             noObfuscate,
             verbose,
             log,
+            envFile,
             scrub,
         };
     }
@@ -178,8 +188,8 @@ internal static class DiagnoseCommand
     /// <c>--scrub</c> takes nothing but <c>--out</c>.  A value of <c>--query</c> is a file, a colon and a name, the
     /// colon the last one so that a Windows path reads, and its file is a <c>.sql</c> path.  The argument is the unit,
     /// of which there is one, and never a <c>.sql</c> path, which <c>--query</c> names.  A value of <c>--out</c> or
-    /// <c>--log</c> is held to <c>--log</c>'s rule, and one of <c>--connection</c>, and an argument beside one, to
-    /// <c>describe</c>'s.
+    /// <c>--log</c> is held to <c>--log</c>'s rule, and one of <c>--env-file</c>, <c>--connection</c>, and an
+    /// argument beside one, to <c>describe</c>'s.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -248,6 +258,7 @@ internal static class DiagnoseCommand
             QueryOption => ProblemOfQuery(value),
             OutOption => DescribeCommand.ProblemOfPath(value, OutOption, "a bundle's path", isOnline: false),
             DescribeCommand.LogOption => DescribeCommand.ProblemOfLogPath(value, isOnline: false),
+            DescribeCommand.EnvFileOption => DescribeCommand.ProblemOfEnvFile(value, isOnline: false),
             DescribeCommand.ConnectionOption => DescribeCommand.ProblemOfConnection(value, connections),
             _ => null,
         };
@@ -267,8 +278,8 @@ internal static class DiagnoseCommand
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--connection</c>,
-    /// <c>--log</c>, <c>--query</c>, <c>--out</c> and <c>--scrub</c> the same values, in the same order.  True for a
-    /// command other than <c>diagnose</c>.
+    /// <c>--log</c>, <c>--env-file</c>, <c>--query</c>, <c>--out</c> and <c>--scrub</c> the same values, in the same
+    /// order.  True for a command other than <c>diagnose</c>.
     /// </summary>
     public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
         usage.Command.Name != Name
@@ -276,6 +287,7 @@ internal static class DiagnoseCommand
             DescribeCommand.ReadsAs(usage, parsed, DescribeCommand.ProjectOption)
             && DescribeCommand.ReadsAs(usage, parsed, DescribeCommand.ConnectionOption)
             && DescribeCommand.ReadsAsOne(usage, parsed, DescribeCommand.LogOption)
+            && DescribeCommand.ReadsAsOne(usage, parsed, DescribeCommand.EnvFileOption)
             && DescribeCommand.ReadsAsOne(usage, parsed, QueryOption)
             && DescribeCommand.ReadsAsOne(usage, parsed, OutOption)
             && DescribeCommand.ReadsAsOne(usage, parsed, ScrubOption)

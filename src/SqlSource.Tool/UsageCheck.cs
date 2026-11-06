@@ -20,11 +20,11 @@ namespace SqlSource.Tool;
 /// <para>
 /// It and System.CommandLine must read a command line the same way: <c>Cli</c> runs nothing unless System.CommandLine
 /// found the same command and arguments (<c>Usage.IsReadTheSameBy</c>), and gave <c>--project</c>,
-/// <c>--database</c>, <c>--connection</c>, <c>--log</c>, <c>--manifest</c> and <c>--online</c> the same values in the
-/// same order (<c>DescribeCommand.ReadsValuesAs</c>, <c>ReplayCommand.ReadsValuesAs</c> for the <c>--log</c> of
-/// <c>replay</c>, and <c>DiagnoseCommand.ReadsValuesAs</c> for the options of <c>diagnose</c>, <c>--query</c>,
-/// <c>--out</c> and <c>--scrub</c> among them).  A token that one takes for the value of an option and the other for
-/// the path is printed as a path: what is left of that risk is
+/// <c>--database</c>, <c>--connection</c>, <c>--log</c>, <c>--env-file</c>, <c>--manifest</c> and <c>--online</c> the
+/// same values in the same order (<c>DescribeCommand.ReadsValuesAs</c>, <c>ReplayCommand.ReadsValuesAs</c> for the
+/// <c>--log</c> of <c>replay</c>, and <c>DiagnoseCommand.ReadsValuesAs</c> for the options of <c>diagnose</c>,
+/// <c>--query</c>, <c>--out</c> and <c>--scrub</c> among them).  A token that one takes for the value of an option and
+/// the other for the path is printed as a path: what is left of that risk is
 /// <c>docs/tech-debt/TD-0023-path-without-an-equals-sign-is-printed-as-given.md</c>.
 /// </para>
 /// <para>

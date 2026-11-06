@@ -14,7 +14,6 @@ using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
@@ -320,7 +319,7 @@ internal static class DiagnoseRun
             selected,
             DescribeCommand.ConnectionsOf(usage),
             DescribeCommand.UnitFolderOf(target.Unit),
-            DotEnvSearch.FileOf(option: null, DescribeCommand.UnitFolderOf(target.Unit), host.WorkingDirectory),
+            DescribeCommand.EnvFileOf(usage, DescribeCommand.UnitFolderOf(target.Unit), host),
             host,
             reporter
         );

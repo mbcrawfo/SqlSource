@@ -271,12 +271,16 @@ public sealed class UsageCheckTests
             "--verbose",
             "--log",
             "--log=L",
+            "--env-file",
+            "--env-file=none",
             "--",
             "V",
             "W",
         ];
         var root = Root();
         root.Add(new Option<string>("--log") { Arity = ArgumentArity.ExactlyOne, Recursive = true });
+        root.Subcommands.Single(static command => command.Name == "describe")
+            .Add(new Option<string>("--env-file") { Arity = ArgumentArity.ExactlyOne });
         var disagreements = new List<string>();
 
         foreach (var args in Sequences(vocabulary, 4))
@@ -390,6 +394,8 @@ public sealed class UsageCheckTests
             "--out=O",
             "--scrub",
             "--no-obfuscate",
+            "--env-file",
+            "--env-file=none",
         ];
         var root = Cli.BuildCommands();
         var disagreements = new List<string>();
@@ -411,7 +417,7 @@ public sealed class UsageCheckTests
 
             // The command reads the values of its options from what UsageCheck read, and System.CommandLine gives the
             // log's path, so the two must give --project, --database, --connection, --log, --manifest, --online,
-            // --query, --out and --scrub the same values too.
+            // --env-file, --query, --out and --scrub the same values too.
             if (
                 !usage.IsReadTheSameBy(parsed)
                 || !DescribeCommand.ReadsValuesAs(usage, parsed)
@@ -608,6 +614,70 @@ public sealed class UsageCheckTests
             .ShouldBe([
                 "sqlsource: the value of option '--log' at position 5 holds '=' or ';', which a log's path may not",
             ]);
+
+    // System.CommandLine's own message for a second value repeats it.
+    [Theory]
+    [InlineData("describe", "--env-file", "a.env", "--env-file=" + Secrets.Word)]
+    [InlineData("diagnose", "--env-file", "a.env", "--env-file", Secrets.Word)]
+    public void Check_EnvFileGivenTwice_IsNamedAndItsValueIsNot(params string[] args) =>
+        UsageCheck
+            .Check(Cli.BuildCommands(), args)
+            .Messages.ShouldBe(["sqlsource: option '--env-file' is given more than once"]);
+
+    [Theory]
+    [InlineData(3, "describe", "--env-file", "")]
+    [InlineData(2, "describe", "--env-file= ")]
+    public void CheckUsage_EnvFileThatIsNoPath_IsReportedByItsPosition(int position, params string[] args) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([$"sqlsource: the value of option '--env-file' at position {position} is not a path"]);
+
+    [Theory]
+    [InlineData(3, "describe", "--env-file", "a=" + Secrets.Word + ".env")]
+    [InlineData(2, "describe", "--env-file=a;" + Secrets.Word + ".env")]
+    [InlineData(5, "describe", "--manifest", "m", "--env-file", "a;" + Secrets.Word + ".env")]
+    public void CheckUsage_EnvFileWithAnEqualsSignOrASemicolon_IsNamedByItsPosition(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([
+                $"sqlsource: the value of option '--env-file' at position {position} holds '=' or ';', which a .env "
+                    + "file's path may not",
+            ]);
+
+    // The last two are the build's, whose paths may hold "=" or ";", as a project's name may.
+    [Theory]
+    [InlineData("describe", "--env-file", "none")]
+    [InlineData("describe", "--env-file", "./none", "--watch")]
+    [InlineData("describe", "--manifest", "m", "--env-file", "/work/.env")]
+    [InlineData("describe", "--manifest", "m", "--online", "auto", "--env-file", "obj/a;b/.env")]
+    [InlineData("describe", "--online", "true", "--env-file=x=y/.env", "--manifest", "m")]
+    public void CheckUsage_EnvFile_GivesNoLine(params string[] args)
+    {
+        var usage = UsageCheck.Check(Cli.BuildCommands(), args);
+
+        usage.Messages.ShouldBeEmpty();
+        DescribeCommand.CheckUsage(usage).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadsValuesAs_EnvFileReadAsAnotherValue_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        var usage = UsageCheck.Check(root, ["describe", "--env-file", "a.env"]);
+
+        DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--env-file", "a.env"])).ShouldBeTrue();
+        DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--env-file", "b.env"])).ShouldBeFalse();
+        DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe"])).ShouldBeFalse();
+
+        string[] args = ["diagnose", "--query", "Q.sql:N", "--out", "r.zip", "--env-file", "a.env"];
+        DiagnoseCommand.ReadsValuesAs(UsageCheck.Check(root, args), root.Parse(args)).ShouldBeTrue();
+        DiagnoseCommand
+            .ReadsValuesAs(UsageCheck.Check(root, args), root.Parse([.. args[..^1], "b.env"]))
+            .ShouldBeFalse();
+    }
 
     [Fact]
     public void ReadsValuesAs_ManifestAndOnlineReadAsOtherValues_IsFalse()

@@ -73,11 +73,13 @@ internal static class DescribeErrors
         var notRead = DotEnvSearch.NotRead(environment.UnitFolder, environment.FilePath, projectFolders, readTextFile);
         if (!notRead.IsEmpty)
         {
+            // Under "none" the help has said already that the run reads no file.
             _ = help.Append(".  The run did not read ").Append(InWords(notRead));
             _ = lookedFor is not null
-                ? help.Append(": it reads ").Append(lookedFor).Append(" alone")
-                : help.Append(": it reads no .env file");
-            _ = help.Append(", and --env-file, or SqlSourceEnvFile in a build, names another");
+                ? help.Append(": it reads ")
+                    .Append(lookedFor)
+                    .Append(" alone, and --env-file, or SqlSourceEnvFile in a build, names another")
+                : help.Append(": --env-file, or SqlSourceEnvFile in a build, names a file to read");
         }
 
         return ToolDiagnostic

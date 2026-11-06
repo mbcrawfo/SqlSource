@@ -112,8 +112,8 @@ public sealed class DatabaseRunsTests : IDisposable
             .Error.ToString()
             .ShouldContain(
                 "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
-                    + $"environment.  The run reads no .env file.  The run did not read {libEnv}: it reads no .env "
-                    + "file, and --env-file, or SqlSourceEnvFile in a build, names another\n"
+                    + $"environment.  The run reads no .env file.  The run did not read {libEnv}: --env-file, or "
+                    + "SqlSourceEnvFile in a build, names a file to read\n"
             );
     }
 

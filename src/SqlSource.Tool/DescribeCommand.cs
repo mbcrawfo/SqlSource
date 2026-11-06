@@ -45,6 +45,8 @@ internal static class DescribeCommand
 
     internal const string LogOption = "--log";
 
+    internal const string EnvFileOption = "--env-file";
+
     internal const string ManifestOption = "--manifest";
 
     internal const string OnlineOption = "--online";
@@ -136,6 +138,15 @@ internal static class DescribeCommand
             Arity = ArgumentArity.ExactlyOne,
         };
 
+        var envFile = new Option<string>(EnvFileOption)
+        {
+            Description =
+                "Read the connections from this .env file instead of the one in the folder of the solution or "
+                + "project; 'none' reads none.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
         // The two options of the build that calls the tool.  Each takes exactly one value, given once.
         var manifest = new Option<string>(ManifestOption)
         {
@@ -172,6 +183,7 @@ internal static class DescribeCommand
             check,
             verbose,
             log,
+            envFile,
             manifest,
             online,
             watch,
@@ -299,6 +311,13 @@ internal static class DescribeCommand
                     messages.Add(problem);
                 }
             }
+            else if (value.Option.Name == EnvFileOption)
+            {
+                if (ProblemOfEnvFile(value, isOnline) is { } problem)
+                {
+                    messages.Add(problem);
+                }
+            }
             else if (value.Option.Name == ConnectionOption && ProblemOfConnection(value, connections) is { } problem)
             {
                 messages.Add(problem);
@@ -404,8 +423,17 @@ internal static class DescribeCommand
         ProblemOfPath(log, LogOption, "a log's path", isOnline);
 
     /// <summary>
-    /// What is wrong with the value of an option that is a path the run writes, as a whole line, or null: it is no
-    /// path, or, without <c>--online</c>, it holds <c>=</c> or <c>;</c>.
+    /// What is wrong with a value of <c>--env-file</c> as a path, as a whole line, or null, by the rule of
+    /// <c>--log</c>.  <c>diagnose</c> holds its <c>--env-file</c> to the same rule.
+    /// </summary>
+    /// <param name="envFile">The value of <c>--env-file</c>.</param>
+    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
+    internal static string? ProblemOfEnvFile(UsageValue envFile, bool isOnline) =>
+        ProblemOfPath(envFile, EnvFileOption, "a .env file's path", isOnline);
+
+    /// <summary>
+    /// What is wrong with the value of an option that is a path, as a whole line, or null: it is no path, or, without
+    /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.
     /// </summary>
     /// <param name="value">The value.</param>
     /// <param name="option">The option's name.</param>
@@ -526,8 +554,8 @@ internal static class DescribeCommand
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
-    /// <c>--connection</c>, <c>--log</c>, <c>--manifest</c> and <c>--online</c> the same values, in the same order.
-    /// True for a command other than <c>describe</c>.
+    /// <c>--connection</c>, <c>--log</c>, <c>--env-file</c>, <c>--manifest</c> and <c>--online</c> the same values, in
+    /// the same order.  True for a command other than <c>describe</c>.
     /// </summary>
     /// <remarks>
     /// The run reads these values from <see cref="Usage" />, and the log's <c>arguments</c> is redacted from it,
@@ -542,6 +570,7 @@ internal static class DescribeCommand
             && ReadsAs(usage, parsed, DatabaseOption)
             && ReadsAs(usage, parsed, ConnectionOption)
             && ReadsAsOne(usage, parsed, LogOption)
+            && ReadsAsOne(usage, parsed, EnvFileOption)
             && ReadsAsOne(usage, parsed, ManifestOption)
             && ReadsAsOne(usage, parsed, OnlineOption)
         );
@@ -582,8 +611,25 @@ internal static class DescribeCommand
             ConnectionsOf(usage),
             plan.Filters.Databases,
             UnitFolderOf(unit),
-            DotEnvSearch.FileOf(option: null, UnitFolderOf(unit), host.WorkingDirectory),
+            EnvFileOf(usage, UnitFolderOf(unit), host),
             OnlineOf(usage)
+        );
+
+    /// <summary>
+    /// The full path of the <c>.env</c> file a run reads, or null when it reads none: the one <c>--env-file</c>
+    /// names, or the one in <paramref name="unitFolder" /> when it names none.  <c>describe</c>, each pass of a watch
+    /// and <c>diagnose</c> read it here.
+    /// </summary>
+    /// <param name="usage">
+    /// The command line, whose <c>--env-file</c> <see cref="CheckUsage" /> has held to a path.
+    /// </param>
+    /// <param name="unitFolder">The folder of the run's unit.</param>
+    /// <param name="host">The working folder, which a relative path is from.</param>
+    internal static string? EnvFileOf(Usage usage, string unitFolder, ToolHost host) =>
+        DotEnvSearch.FileOf(
+            ValuesOf(usage, EnvFileOption) is [{ } value] ? value.Text : null,
+            unitFolder,
+            host.WorkingDirectory
         );
 
     /// <summary>

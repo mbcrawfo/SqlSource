@@ -18,8 +18,8 @@
 
 ## Global Constraints
 
-- Spellings: tool option `--env-file <path>`; build property `SqlSourceEnvFile`; the word `none`, matched ignoring case and the white space around it, turns `.env` off.  (Owner Q3; recommended, pending.)
-- Default folder: the unit's (the solution's or project's folder; for `--manifest`, the project's).  (Owner Q1; recommended, pending.)  If the owner picks the working folder, only the `defaultFolder` argument of `DotEnvSearch.FileOf`'s callers changes.
+- Spellings: tool option `--env-file <path>`; build property `SqlSourceEnvFile`; the word `none`, matched ignoring case and the white space around it, turns `.env` off.  (Owner-confirmed.)
+- Default folder: the unit's (the solution's or project's folder; for `--manifest`, the project's).  (Owner-confirmed over the working folder.)
 - A named file that does not exist, or is a folder, is no file: not an error.  (Q3.)
 - A relative `--env-file` is from the working folder; a relative `SqlSourceEnvFile` from the project's folder.
 - The build never reads the file's text.  The environment wins over the file, variable by variable.

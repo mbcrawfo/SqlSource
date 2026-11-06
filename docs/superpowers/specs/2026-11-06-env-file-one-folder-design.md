@@ -8,7 +8,7 @@ Today the build checks for a `.env` in the project's folder and every folder abo
 
 ## The folder
 
-The folder is the unit's: the folder of the solution or project the run is on (owner's answer to Q1, recommended; pending).  The build's unit is each project, so the build checks the project's folder, and a run from a manifest, which is the build's, has the project as its unit: the two agree by construction.
+The folder is the unit's: the folder of the solution or project the run is on (the owner chose it over the working folder).  The build's unit is each project, so the build checks the project's folder, and a run from a manifest, which is the build's, has the project as its unit: the two agree by construction.
 
 | Layout | Hand-run `describe` | Build under `auto` |
 |----|----|----|
@@ -23,13 +23,13 @@ Nothing looks above the unit's folder for a `.env` or for a `.git` to bound a se
 - **Tool:** `--env-file <path>` on `describe` (with `--watch` and `--online` too) and `diagnose`, given at most once.  A relative path is from the working folder.  `none`, ignoring case, reads no `.env`; `./none` names a file.  A blank value is a usage error.
 - **Build:** the property `SqlSourceEnvFile`, trimmed.  A relative path is from the project's folder, so `$(MSBuildThisFileDirectory).env` in a `Directory.Build.props` names one file for every project below it.  `none`, ignoring case, turns `.env` off.  Empty or not set: the project's folder.
 - **The build passes it on**: `--env-file "<full path>"`, or `--env-file none`, only when the property is set, so a default build's command line is unchanged.
-- **A named file that does not exist is no file**, as a missing `.env` is today: under `auto` the build does not go online, and the tool reads nothing.  SQLSRC213's `help:` line names the path, so a misspelt one is seen.  So a committed `SqlSourceEnvFile` does not break the build of a teammate who has no `.env` (Q3, recommended; pending).
+- **A named file that does not exist is no file**, as a missing `.env` is today: under `auto` the build does not go online, and the tool reads nothing.  SQLSRC213's `help:` line names the path, so a misspelt one is seen.  So a committed `SqlSourceEnvFile` does not break the build of a teammate who has no `.env`.
 - **A folder at the path is no file**, in both, as a folder named `.env` is passed over today; the build tests `System.IO.File.Exists`, not `Exists()`, which is true of a folder.
 - The environment still wins over the file, variable by variable.
 
 ## What a user with a `.env` above the unit sees
 
-Silence in the build: `auto` does not go online, as with no `.env`.  In the tool, a database with no connection is SQLSRC213, whose `help:` line names the file the run looked for and says it reads only that one, and that `--env-file` or `SqlSourceEnvFile` names another (Q2, recommended; pending).  No upward look of any kind, so no warning on every build of a machine with `~/.env`.
+Silence in the build: `auto` does not go online, as with no `.env`.  In the tool, a database with no connection is SQLSRC213, whose `help:` line names the file the run looked for and says it reads only that one, and that `--env-file` or `SqlSourceEnvFile` names another.  No upward look of any kind, so no warning on every build of a machine with `~/.env`.
 
 ## Changes
 
