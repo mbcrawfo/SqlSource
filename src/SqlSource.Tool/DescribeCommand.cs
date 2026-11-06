@@ -734,6 +734,7 @@ internal static class DescribeCommand
                 host.WorkingDirectory
             ),
             IsOnline(usage),
+            elsewhereIsLogged: false,
             host,
             reporter,
             cancellationToken
@@ -750,6 +751,11 @@ internal static class DescribeCommand
     /// <param name="isOnline">
     /// Whether the run is the build's, under <c>--online</c>, which only counts and logs what the compiler reports too.
     /// </param>
+    /// <param name="elsewhereIsLogged">
+    /// Whether an error at a claimed <c>.sql</c> file that no file filter names is only counted and logged, as
+    /// <c>diagnose</c> reports one: it cannot change the one query of that run, and <c>describe</c> prints it.  An
+    /// error at a named file, at a settings file or a C# file, or at no file, is written whatever this says.
+    /// </param>
     /// <param name="host">Standard output.</param>
     /// <param name="reporter">Where the errors go, with the run's trace.</param>
     /// <param name="cancellationToken">Ends the plan.</param>
@@ -758,6 +764,7 @@ internal static class DescribeCommand
         ImmutableArray<ProjectManifest> manifests,
         RunFilters filters,
         bool isOnline,
+        bool elsewhereIsLogged,
         ToolHost host,
         Reporter reporter,
         CancellationToken cancellationToken
@@ -788,10 +795,12 @@ internal static class DescribeCommand
         // The build's compiler reports most of these too, at the same place, and the build lists the errors of both.
         // So under --online they are counted and logged and their lines are left out: the plan holds back the same
         // files and the run deletes nothing, as after any error, and the run exits 0 with its summary, since an exit
-        // code of 1 with no error line would be a tool that failed.
+        // code of 1 with no error line would be a tool that failed.  diagnose does the same with an error at another
+        // .sql file, so that the bundle it writes is not beside an exit code of 1.
+        var elsewhere = elsewhereIsLogged ? FilesNotNamed(result.Plan) : null;
         foreach (var error in result.Errors)
         {
-            if (isOnline && IsReportedByTheCompiler(error))
+            if ((isOnline && IsReportedByTheCompiler(error)) || (elsewhere is not null && IsAtOneOf(error, elsewhere)))
             {
                 reporter.ReportWithoutWriting(error);
             }
@@ -803,6 +812,24 @@ internal static class DescribeCommand
 
         return result.Plan;
     }
+
+    // The normalised paths of the planned files that no file filter names.
+    private static HashSet<string> FilesNotNamed(RunPlan plan)
+    {
+        var named = new HashSet<string>(
+            plan.Filters.Files.Select(static filter => filter.NormalizedPath).OfType<string>(),
+            SqlPath.Comparer
+        );
+        return new HashSet<string>(
+            plan.Files.Select(static file => file.NormalizedPath).Where(path => !named.Contains(path)),
+            SqlPath.Comparer
+        );
+    }
+
+    // Whether the error is at one of the files, by its normalised path: the planner gives a file's error at the path
+    // it read, or at the normalised path the generator's reader was given.
+    private static bool IsAtOneOf(ToolDiagnostic error, HashSet<string> normalizedPaths) =>
+        error.Path is { } path && SqlPath.Normalize(path) is { } normalized && normalizedPaths.Contains(normalized);
 
     // The generator reports every SqlDiagnostics descriptor the planner finds, from the same code, and two of the
     // tool's own that SidecarChecker reports where the tool does (GeneratorParityTests compares them).  An error of one

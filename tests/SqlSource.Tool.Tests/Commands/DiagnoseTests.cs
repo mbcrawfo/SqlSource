@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -147,6 +148,79 @@ public sealed class DiagnoseTests : IDisposable
         query.ShouldContain("-- name: GetEverything\n");
         query.ShouldNotContain("First");
         query.ShouldNotContain("Last");
+    }
+
+    // An error of the plan at another .sql file of the project cannot change the query: the bundle is written, the run
+    // exits 0 and prints no error, and the error is in the log, as describe prints it.  One row for each error the plan
+    // gives at a claimed file.  Wrong.sql comes after Users.sql, so the database has the query's dialect and SQLSRC211
+    // is at Wrong.sql.
+    [Theory]
+    [InlineData("SQLSRC101", "-- name: Other\nSELECT 'open\n", false)]
+    [InlineData("SQLSRC103", "-- name: 1bad\nSELECT 1;\n", false)]
+    [InlineData("SQLSRC209", "-- dialect: ansi\n-- name: Other\nSELECT 1;\n", false)]
+    [InlineData("SQLSRC210", "-- name: Other\nSELECT 1 FROM {{t}};\n", false)]
+    [InlineData("SQLSRC211", "-- dialect: mssql\n-- database: postgres\n-- name: Other\nSELECT 1;\n", false)]
+    [InlineData("SQLSRC271", "-- name: Other\nSELECT 'caf\u00e9';\n", true)]
+    public async Task Diagnose_AnotherFileWithAnErrorOfThePlan_WritesTheBundleAndLogsTheError(
+        string id,
+        string text,
+        bool latin1
+    )
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+        var wrong = latin1
+            ? _scene.Project.AddSqlBytes("Wrong.sql", Encoding.Latin1.GetBytes(text))
+            : _scene.Project.AddSql("Wrong.sql", text);
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip", "--log", "run.log");
+
+        result.ShouldBe(new CliResult(0, _scene.Written("report.zip"), ""));
+        BundleReplays.Read(_scene.PathOf("report.zip")).Info.ShouldNotBeNull().Renamed.ShouldBeTrue();
+        var logged = LogReader.Events(_scene.PathOf("run.log"), "diagnostic").ShouldHaveSingleItem();
+        logged.GetProperty("id").GetString().ShouldBe(id);
+        logged.GetProperty("path").GetString().ShouldBe(wrong);
+    }
+
+    // An error at the query's own file can change the query: it is printed, and the run stops.
+    [Fact]
+    public async Task Diagnose_AnErrorOfThePlanAtTheQuerysFile_IsPrintedAndWritesNoBundle()
+    {
+        var fixture = _scene.Case(Plain);
+        var path = _scene.AddCase(fixture, fixture.Query + "\n-- name: 1bad\nSELECT 1;\n");
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith($"{path}(");
+        result.Error.ShouldContain(": error SQLSRC103: ");
+        File.Exists(_scene.PathOf("report.zip")).ShouldBeFalse();
+    }
+
+    // An error that is not at another .sql file, as one at another query of the query's own file or at a settings
+    // file, is printed, and the exit code is 1 beside the bundle.
+    [Theory]
+    [InlineData("SQLSRC210", "Users.sql")]
+    [InlineData("SQLSRC016", "sqlsource.json")]
+    public async Task Diagnose_AnErrorOfThePlanElsewhere_IsPrintedBesideTheBundle(string id, string at)
+    {
+        var fixture = _scene.Case(Plain);
+        if (at == DiagnoseScene.File)
+        {
+            _ = _scene.AddCase(fixture, fixture.Query + "\n-- name: Other\nSELECT 1 FROM {{t}};\n");
+        }
+        else
+        {
+            _ = _scene.AddCase(fixture);
+            _scene.Project.Settings["nonsense"] = "x";
+        }
+
+        var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBe(_scene.Written("report.zip"));
+        result.Error.ShouldStartWith(_scene.PathOf(at) + "(");
+        result.Error.ShouldContain($": error {id}: ");
     }
 
     // A name is compared exactly, as the generator compares them.

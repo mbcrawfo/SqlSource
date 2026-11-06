@@ -34,7 +34,7 @@ namespace SqlSource.Tool.Reporting;
 /// An error may be <see cref="ReportWithoutWriting">reported without being written</see>, as the build's run does for
 /// an error that the compiler reports too: it has every effect of an error but its line, so the run deletes nothing
 /// after it, and the exit code does not count it, since a build reads a non-zero exit code with no error line as a
-/// tool that failed.
+/// tool that failed.  <c>diagnose</c> reports so an error of the plan at another <c>.sql</c> file than its query's.
 /// </para>
 /// </remarks>
 /// <param name="error">Where the errors are written.</param>

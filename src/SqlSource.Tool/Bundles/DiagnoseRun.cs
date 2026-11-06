@@ -207,7 +207,7 @@ internal static class DiagnoseRun
     }
 
     // The plan with the query's file as its one filter, and the query of the file it names, or null when the plan or
-    // the file has an error, which is reported.
+    // the file has an error, which is reported.  An error of the plan at another .sql file is logged and not written.
     private static async Task<PlannedTarget?> PlanAsync(
         Usage usage,
         DiagnoseCommand.QueryName query,
@@ -231,6 +231,7 @@ internal static class DiagnoseRun
                 manifests,
                 filters,
                 isOnline: false,
+                elsewhereIsLogged: true,
                 host,
                 reporter,
                 cancellationToken
