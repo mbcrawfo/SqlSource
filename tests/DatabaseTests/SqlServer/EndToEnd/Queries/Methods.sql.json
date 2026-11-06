@@ -1127,6 +1127,35 @@
         }
       ]
     },
+    "ListFailingBeforeTheRowsThenFailConversion": {
+      "hash": "d1e6c5a9a2f1063f313e1aa2d2c911f22d94788dd423b19120ac3e9e4a8edeef",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "RunThenRaise": {
       "hash": "38dfcf69d060a6bc691720d9606180093675cae644d141a9faf0563ead0ee7f6",
       "toolVersion": "0.1.0",

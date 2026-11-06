@@ -531,6 +531,29 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
         await session.ShouldHaveRolledBackAsync(token);
     }
 
+    // What is observed, on 2025 and on 2017: the divide by zero is raised before the first result set, so
+    // ExecuteReaderAsync throws it and no reader is left to read the rest.  The failed conversion after the rows rolls
+    // back the transaction, and with so few rows SqlClient's exception lists the divide by zero alone.  The method has
+    // no way to tell that from a divide by zero that rolled the transaction back itself, so it throws it as it is, and
+    // the caller learns of the rollback only from the transaction's Connection, as the manual's known issue says.
+    [Fact]
+    public async Task ListFailingBeforeTheRowsThenFailConversion_InATransaction_ThrowsTheDivideByZeroAndRollsBack()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session.Connection.ListFailingBeforeTheRowsThenFailConversion(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.Number.ShouldBe(DivideByZero);
+        thrown.Errors.Count.ShouldBe(1);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
     // A method of one reads the results after its second read, so the THROW after the row is thrown, as by many.
     [Fact]
     public async Task GetThenRaise_ErrorAfterTheRow_ThrowsTheError()

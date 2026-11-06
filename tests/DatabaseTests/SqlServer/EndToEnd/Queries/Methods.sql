@@ -184,6 +184,18 @@ FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
 
+-- name: ListFailingBeforeTheRowsThenFailConversion
+-- summary: A divide by zero before three rows of constants, and then a conversion that fails.
+-- The divide by zero is raised before the first result set, so the method's ExecuteReaderAsync throws it, and the
+-- failed conversion rolls back a transaction with XACT_ABORT off.  The rows are few, so SqlClient's error lists the
+-- divide by zero alone: its test pins that the method throws it as it is, with nothing to say the transaction is gone.
+DECLARE @zero int = 0;
+DECLARE @quotient int = 1 / @zero;
+SELECT id
+FROM (VALUES (1), (2), (3)) AS numbers (id)
+ORDER BY id;
+SELECT CAST('x' AS int);
+
 -- name: RunThenRaise -> none
 -- summary: The accounts, a mark on the session, and then an error, which a method that reads no rows reports.
 SELECT id, name
