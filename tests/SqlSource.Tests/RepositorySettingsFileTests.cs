@@ -1,8 +1,8 @@
 using System.IO;
 using Shouldly;
+using SqlSource.Repository;
 using SqlSource.Settings;
 using SqlSource.SettingsFiles;
-using SqlSource.Testing;
 using Xunit;
 
 namespace SqlSource.Tests;

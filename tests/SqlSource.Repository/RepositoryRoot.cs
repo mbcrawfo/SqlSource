@@ -4,12 +4,12 @@ using System.IO;
 using System.Reflection;
 using IOPath = System.IO.Path;
 
-namespace SqlSource.Testing;
+namespace SqlSource.Repository;
 
 // The folder of the repository, found from the assembly that runs: the one that holds SqlSource.slnx.  For a test
 // that reads the repository itself and not its output folder.  Every such read goes through Path, which refuses a
 // container project a file whose scope in tools/test-scopes.txt would let a change to it skip that project.
-internal static class RepositoryRoot
+public static class RepositoryRoot
 {
     private const string Solution = "SqlSource.slnx";
     private const string ScopesFileName = "tools/test-scopes.txt";
@@ -51,7 +51,12 @@ internal static class RepositoryRoot
         }
         else
         {
-            Check(project, relative == "." ? "" : relative + "/", scopes, FilesBelow(full));
+            Check(
+                project,
+                relative == "." ? "" : relative + IOPath.AltDirectorySeparatorChar,
+                scopes,
+                FilesBelow(full)
+            );
         }
 
         return full;

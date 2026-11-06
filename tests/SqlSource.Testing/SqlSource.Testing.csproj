@@ -64,5 +64,6 @@
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference Include="../SqlSource.Repository/SqlSource.Repository.csproj" />
     </ItemGroup>
 </Project>

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.IO;
 using SqlSource.DatabaseTests.TestHarness;
+using SqlSource.Repository;
 using SqlSource.Snapshot;
-using SqlSource.Testing;
 
 namespace SqlSource.Tool.Testing.Realistic;
 

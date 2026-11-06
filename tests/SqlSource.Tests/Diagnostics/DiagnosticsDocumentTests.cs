@@ -8,7 +8,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;

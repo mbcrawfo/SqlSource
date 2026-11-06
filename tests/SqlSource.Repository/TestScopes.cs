@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace SqlSource.Testing;
+namespace SqlSource.Repository;
 
 // Which database test projects a change to a path can affect.  None runs neither pair of container projects, and Both
 // runs both.
-internal enum TestScope
+public enum TestScope
 {
     None,
     Postgres,
@@ -23,7 +23,7 @@ internal enum TestScope
 // brackets, `\`, the parentheses, `!`, `+` and `@` are refused, since bash would read them as glob characters, escapes
 // or, from bash 4.1, extended glob operators, and the two readers would disagree.  The `project` lines name the
 // container projects and the engine each needs.
-internal sealed class TestScopes
+public sealed class TestScopes
 {
     // The prefix of every database project's assembly name: tests/DatabaseTests/Directory.Build.props gives each
     // project of that folder its assembly name from its project file's name under this prefix, and a project line
@@ -109,14 +109,15 @@ internal sealed class TestScopes
     public bool Runs(string project, TestScope scope) =>
         scope == TestScope.Both || !_projects.TryGetValue(project, out var engine) || scope == engine;
 
-    // \z and not $, which also matches before a final newline.
+    // \z and not $, which also matches before a final newline.  The patterns hold no group or backreference, so the
+    // engine that never backtracks reads them the same, in a time that grows only with the path.
     private static Regex Matcher(string pattern) =>
         Matchers.GetOrAdd(
             pattern,
             static pattern =>
                 new(
                     "^" + Regex.Escape(pattern).Replace("\\*", ".*", StringComparison.Ordinal) + "\\z",
-                    RegexOptions.Singleline
+                    RegexOptions.Singleline | RegexOptions.NonBacktracking
                 )
         );
 

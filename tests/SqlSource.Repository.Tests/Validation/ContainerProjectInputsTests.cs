@@ -2,10 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 using Shouldly;
-using SqlSource.Testing;
 using Xunit;
 
-namespace SqlSource.Tests.Validation;
+namespace SqlSource.Repository.Tests.Validation;
 
 // pre-commit-validation.sh skips a container project when no changed path can affect it, so a file that such a
 // project includes at build time must never be one of the paths the scopes would let it skip.

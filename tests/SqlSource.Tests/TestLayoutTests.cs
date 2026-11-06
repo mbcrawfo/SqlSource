@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using Xunit;
 
 namespace SqlSource.Tests;
@@ -96,7 +96,10 @@ public sealed class TestLayoutTests
             );
         Includes(project, "ProjectReference")
             .Select(Path.GetFileName)
-            .ShouldBe(["SqlSource.csproj", "SqlSource.Testing.csproj"], ignoreOrder: true);
+            .ShouldBe(
+                ["SqlSource.csproj", "SqlSource.Repository.csproj", "SqlSource.Testing.csproj"],
+                ignoreOrder: true
+            );
     }
 
     // SqlSource.Testing is referenced by RoslynFloor, so it brings no Testcontainers, which the harness carries for it.

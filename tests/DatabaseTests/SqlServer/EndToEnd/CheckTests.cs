@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.DatabaseTests.SqlServer.Realistic;
 using SqlSource.DatabaseTests.TestHarness.EndToEnd;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;

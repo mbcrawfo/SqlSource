@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using Xunit;
 
 namespace SqlSource.Tests.Documentation;

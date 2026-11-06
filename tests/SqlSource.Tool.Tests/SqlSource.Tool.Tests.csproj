@@ -44,6 +44,7 @@
     <Import Project="../Fixtures.props" />
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference Include="../SqlSource.Repository/SqlSource.Repository.csproj" />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
         <ProjectReference Include="../DatabaseTests/TestHarness/TestHarness.csproj" />
         <ProjectReference Include="../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />

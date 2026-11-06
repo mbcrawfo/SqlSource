@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Watching;
 using Xunit;

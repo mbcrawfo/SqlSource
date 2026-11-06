@@ -17,8 +17,8 @@
 
 ## References
 
-- **`Postgres.Npgsql8` and `SqlServer.SqlClient61` reference `src/SqlSource`, `tests/SqlSource.Testing` and `TestHarness` alone**, since they pin the oldest supported driver: a reference to the tool, to `tests/SqlSource.Tool.Testing` or to the engine's describer project is a package downgrade.
-- **`TestHarness` references `src/SqlSource` and `tests/SqlSource.Testing` alone**, with no driver, no Dapper and nothing of the tool, so every project here, the driver-floor ones included, references it; a helper that needs a driver stays in the project.
+- **`Postgres.Npgsql8` and `SqlServer.SqlClient61` reference `src/SqlSource`, `tests/SqlSource.Repository` and `TestHarness` alone**, since they pin the oldest supported driver: a reference to the tool, to `tests/SqlSource.Tool.Testing` or to the engine's describer project is a package downgrade.
+- **`TestHarness` references `src/SqlSource`, `tests/SqlSource.Repository` and `tests/SqlSource.Testing` alone**, with no driver, no Dapper and nothing of the tool, so every project here, the driver-floor ones included, references it; a helper that needs a driver stays in the project.
 - **`Postgres` and `SqlServer` reference `tests/SqlSource.Tool.Testing` too**, for the describer, fixture and realistic-corpus helpers, and are the two projects the tool's fixtures and corpora are recorded through.
 - **`QueryMethodAllocation` references `src/SqlSource`, `TestHarness`, the current Npgsql and Microsoft.Data.SqlClient, and NodaTime**, and nothing of the tool, and links its queries from the two describer projects.
 
