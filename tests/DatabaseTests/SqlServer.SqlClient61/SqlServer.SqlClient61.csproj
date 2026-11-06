@@ -106,10 +106,10 @@
         <!--
             NetTopologySuite at 2.5.0 and its reader and writer of SQL Server's bytes at 2.1.0, the oldest versions that
             SqlSource supports, for the queries of EndToEnd/NetTopologySuite/: central pinning would otherwise give
-            NetTopologySuite the end-to-end project's version.
+            them the end-to-end project's versions.
         -->
         <PackageReference Include="NetTopologySuite" VersionOverride="2.5.0" />
-        <PackageReference Include="NetTopologySuite.IO.SqlServerBytes" />
+        <PackageReference Include="NetTopologySuite.IO.SqlServerBytes" VersionOverride="2.1.0" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
