@@ -224,6 +224,33 @@ public sealed class WatchChangeTests : IAsyncDisposable
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
+    // A file that --env-file names in a folder whose other changes are the build's is watched all the same.
+    [Theory]
+    [InlineData("obj/local.env")]
+    [InlineData(".git/sqlsource.env")]
+    public async Task Watch_EnvFileNamedByTheOptionUnderAnIgnoredFolder_TheNextPassUsesItsValue(string relative)
+    {
+        _ = _watch.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
+        var envFile = _watch.Run.Folder.WriteFile(relative, "SQLSOURCE_CONNECTION_POSTGRES=Host=first\n");
+        await _watch.StartAsync("--env-file", relative);
+        _watch
+            .Watcher.Open.Select(request => (request.Folder, request.Recursive))
+            .ShouldContain((Path.GetDirectoryName(envFile)!, false));
+        var manifestRuns = _watch.ManifestRuns;
+        await File.WriteAllTextAsync(
+            envFile,
+            "SQLSOURCE_CONNECTION_POSTGRES=Host=second\n",
+            TestContext.Current.CancellationToken
+        );
+        await File.WriteAllTextAsync(_users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
+
+        await _watch.ChangeAsync(Changed(envFile));
+
+        _watch.Describer.Opened.Select(request => request.Connection).ShouldBe(["Host=first", "Host=second"]);
+        _watch.ManifestRuns.ShouldBe(manifestRuns);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     // How JetBrains' editors save: the file is moved aside, a new one moved into its place, and the old one deleted.
     [Fact]
     public async Task Watch_SaveByRenameOverAListedFile_RunsNoManifestTarget()

@@ -55,6 +55,10 @@ internal sealed class WatchSet
     private readonly HashSet<string> _settingsFolders = [with(Comparer)];
     private readonly string? _envFile;
 
+    // The folders whose parts IsIgnored reads: those of the set without the run's .env file, so that a folder watched
+    // for that file alone lets nothing else through.
+    private readonly ImmutableArray<(string Folder, bool Recursive)> _foldersWithoutEnv;
+
     private WatchSet(string unitPath, string unitFolder, string? envFile, FoundProjects found)
     {
         var manifests = found.Manifests;
@@ -76,7 +80,8 @@ internal sealed class WatchSet
             _settingsFolders.UnionWith(RepositoryFolders.FoldersOf(folder));
         }
 
-        Folders = FoldersOf(unitFolder, envFile, found, _settingsFolders);
+        _foldersWithoutEnv = FoldersOf(unitFolder, envFile: null, found, _settingsFolders);
+        Folders = envFile is null ? _foldersWithoutEnv : FoldersOf(unitFolder, envFile, found, _settingsFolders);
     }
 
     /// <summary>
@@ -87,8 +92,9 @@ internal sealed class WatchSet
     /// the unit's folder or an assets file's folder in its repository, alone.  So each folder above one of these, up to
     /// the root of its repository, is watched too, and under the system's events sees it deleted or made, which a
     /// poller of a folder alone does not; outside a repository the folder above each is watched alone.  None is below
-    /// another that is watched with its folders below, and none is there twice.  A folder may not exist, which the
-    /// session skips.
+    /// another that is watched with its folders below, but the folder of the run's <c>.env</c> file when it is below a
+    /// <c>bin</c>, <c>obj</c> or <c>.git</c> folder of one, which a poller does not list; and none is there twice.  A
+    /// folder may not exist, which the session skips.
     /// </summary>
     public ImmutableArray<(string Folder, bool Recursive)> Folders { get; }
 
@@ -97,8 +103,8 @@ internal sealed class WatchSet
     /// <paramref name="unitFolder" />, the full path of the <c>.env</c> file its run reads, or null when it reads none,
     /// and what an evaluation of it found: the projects it runs, the manifests of those that use SqlSource, and the
     /// assets files of their restores.  A project without a manifest is watched too, so that its restore, or the
-    /// package added to it, starts a pass.  A change to <paramref name="envFile" /> asks for a pass, and one to any
-    /// other <c>.env</c> asks nothing, since the run reads no other.
+    /// package added to it, starts a pass.  A change to <paramref name="envFile" /> asks for a pass wherever it is, a
+    /// folder that is ignored included, and one to any other <c>.env</c> asks nothing, since the run reads no other.
     /// </summary>
     public static WatchSet Of(string unitPath, string unitFolder, string? envFile, FoundProjects found) =>
         new(unitPath, unitFolder, envFile, found);
@@ -155,7 +161,9 @@ internal sealed class WatchSet
 
     private WatchEffect EffectOf(string path, bool isFolder, Side side)
     {
-        if (IsIgnored(path))
+        // The run's .env file is the user's, whichever folder they put it in.
+        var envFile = !isFolder && Comparer.Equals(path, _envFile);
+        if (!envFile && IsIgnored(path))
         {
             return WatchEffect.None;
         }
@@ -176,7 +184,7 @@ internal sealed class WatchSet
             return WatchEffect.Evaluate;
         }
 
-        return !isFolder && Comparer.Equals(path, _envFile) ? WatchEffect.Describe : WatchEffect.None;
+        return envFile ? WatchEffect.Describe : WatchEffect.None;
     }
 
     private bool IsEvaluationFile(string path, string name) =>
@@ -213,7 +221,8 @@ internal sealed class WatchSet
     // Sidecars and the temporary files the sidecar store makes are the tool's own writes.  Everything in bin, obj and
     // .git is the build's, or the repository's, except the one file that a restore writes, at any depth below obj, as
     // an artifacts layout or a custom MSBuildProjectExtensionsPath puts it.  Only the parts of the path below the
-    // nearest watched folder count, so that a folder named bin above the project is not one.
+    // nearest watched folder count, so that a folder named bin above the project is not one; a folder watched for the
+    // run's .env file alone does not count.
     private bool IsIgnored(string path)
     {
         var name = Path.GetFileName(path);
@@ -239,7 +248,7 @@ internal sealed class WatchSet
 
     private string[] PartsBelowWatched(string path)
     {
-        var watched = Folders
+        var watched = _foldersWithoutEnv
             .Where(entry => Comparer.Equals(entry.Folder, path) || IsBelow(path, entry.Folder))
             .Select(entry => entry.Folder)
             .OrderByDescending(folder => folder.Length)
@@ -309,6 +318,13 @@ internal sealed class WatchSet
             others.Add(folder);
         }
 
+        // A poller of a folder with its folders below lists nothing below a bin, obj or .git folder of it but an assets
+        // file, so the folder of the run's .env file there is watched alone too.
+        if (envFile is not null && IsBelowAnIgnoredFolderOf(FolderOf(envFile), roots))
+        {
+            others.Add(FolderOf(envFile));
+        }
+
         // Outside a repository no folder above one of these is in the list, so the folder above each is watched alone
         // too, so that its deletion and its making again are seen: on Linux a watch says nothing when its folder goes.
         others.AddRange([
@@ -376,6 +392,18 @@ internal sealed class WatchSet
 
         return null;
     }
+
+    private static bool IsBelowAnIgnoredFolderOf(string folder, List<string> roots) =>
+        roots
+            .Where(root => IsBelow(folder, root))
+            .Any(root =>
+                folder[root.Length..]
+                    .Split(
+                        [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                        StringSplitOptions.RemoveEmptyEntries
+                    )
+                    .Any(part => IgnoredFolders.Contains(part, Comparer))
+            );
 
     private static bool IsAtOrBelowAny(string path, List<string> folders) =>
         folders.Any(folder => Comparer.Equals(folder, path) || IsBelow(path, folder));

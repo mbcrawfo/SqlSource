@@ -218,6 +218,31 @@ public sealed class WatchSetTests
         set.Classify(Changed(P("config/.env"))).ShouldBe(WatchEffect.None);
     }
 
+    // The file wins over the folders whose changes are the build's or the repository's, and over the sidecar's names;
+    // every other file there is still ignored.
+    [Theory]
+    [InlineData("App/obj/local.env")]
+    [InlineData("App/obj/x/local.env")]
+    [InlineData("App/.git/sqlsource.env")]
+    [InlineData("App/bin/dev.env")]
+    [InlineData("App/Queries/local.sql.json")]
+    public void Classify_NamedEnvFileUnderAnIgnoredFolder_Describes(string path)
+    {
+        var envFile = P(path);
+        var set = AppSetWithEnv(envFile);
+        var beside = Path.Combine(Path.GetDirectoryName(envFile)!, "Other.cs");
+
+        ShouldBeForEveryKind(set, envFile, WatchEffect.Describe);
+        set.Classify(Created(P("App/obj/Other.cs"))).ShouldBe(WatchEffect.None);
+        set.Classify(Created(P("App/bin/Other.csproj"))).ShouldBe(WatchEffect.None);
+        set.Classify(Changed(P(".git/index"))).ShouldBe(WatchEffect.None);
+        if (!path.EndsWith(".sql.json", StringComparison.Ordinal))
+        {
+            set.Classify(Created(beside)).ShouldBe(WatchEffect.None);
+            set.Classify(Changed(beside)).ShouldBe(WatchEffect.None);
+        }
+    }
+
     // --env-file none: the run reads no file, so no .env asks for a pass.
     [Fact]
     public void Classify_AnyEnvUnderNone_DoesNothing()
@@ -488,6 +513,35 @@ public sealed class WatchSetTests
 
         set.Folders.ShouldBe([(app, true), (config, false), (repo, false), (src, false)], ignoreOrder: true);
         set.Classify(Changed(Path.Combine(config, "dev.env"))).ShouldBe(WatchEffect.Describe);
+    }
+
+    // A poller of the unit's folder lists nothing below bin, obj or .git but an assets file, so the folder of a file
+    // there is watched alone too.  A .git folder in the unit's folder would make it a repository's root, which
+    // WatchChangeTests covers.
+    [Theory]
+    [InlineData("w/App/obj", "w/App/obj")]
+    [InlineData("w/App/obj/x", "w/App/obj/x")]
+    [InlineData("w/App/bin", "w/App/bin")]
+    [InlineData("w/App/Queries", null)]
+    public void Folders_NamedEnvFileUnderAnIgnoredFolderOfTheUnit_WatchesItsFolderAlone(string envFolder, string? alone)
+    {
+        using var temp = new TempFolder();
+        var app = temp.CreateFolder("w/App");
+        var project = Path.Combine(app, "App.csproj");
+        var set = WithEnv(
+            Path.Combine(temp.PathOf(envFolder), "local.env"),
+            project,
+            app,
+            [project],
+            [Manifest(project, [Path.Combine(app, "Users.sql")], [], [])]
+        );
+
+        set.Folders.ShouldBe(
+            alone is null
+                ? [(temp.PathOf("w"), false), (app, true)]
+                : [(temp.PathOf("w"), false), (app, true), (temp.PathOf(alone), false)],
+            ignoreOrder: true
+        );
     }
 
     [Fact]
