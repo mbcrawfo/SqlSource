@@ -43,7 +43,7 @@ public sealed partial class SqlServerErrorRenamingTests
     // The members of a column's row that name its source.
     private static readonly string[] SourceMembers = ["sourceDatabase", "sourceSchema", "sourceTable", "sourceColumn"];
 
-    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer).ShouldNotBeNull();
+    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer);
 
     [Fact]
     public async Task RenameAsync_UndeclaredParameterError_NamesTheRenamedParameter()

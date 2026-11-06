@@ -20,7 +20,7 @@ public sealed class SqlServerFixtureRenamingTests
 {
     private const string Engine = "mssql";
 
-    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer).ShouldNotBeNull();
+    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer);
 
     public static IEnumerable<TheoryDataRow<string>> Cases =>
         FixtureCases.Of(Engine).Select(static found => new TheoryDataRow<string>(found.Name));

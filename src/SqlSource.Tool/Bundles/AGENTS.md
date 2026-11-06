@@ -11,6 +11,10 @@ How a bundle, `replay` and the renaming work: [`bundles.md`](../../../docs/archi
 - **Every text `replay` prints from a bundle goes through `BundleText.cs`**, an error's through `BundleErrors.cs`, unless a JSON writer wrote it: a bundle may come from anyone, and a control character in it would reach the terminal ([why](../../../docs/architecture/bundles.md#what-it-prints)).
 - **A line of `explain-settings.txt` is checked against `PlannerSettings` before a describer is made**, in `BundleDescribers.cs`, so a bad line is `SQLSRC288` and never the describer's exception.
 
+## The raw bundle
+
+- **`BundleQueryFile.cs` writes only the markers that `Renaming/SqlRenamer.QueryFile.cs` renames, and carries every setting that changes what `BundleReplay.Plan` gives**: a marker the renamer does not hold refuses every bundle, and a setting dropped makes `query.sql` plan another query than the one described ([why](../../../docs/architecture/bundles.md#the-raw-bundle-of-a-described-query)).
+
 ## The renaming
 
 - **`Renaming/IEngineRenaming.cs`'s shape is fixed by its contract in [`bundles.md`](../../../docs/architecture/bundles.md#the-engines-contract)**, which PostgreSQL's part and SQL Server's are built against.  It changes only by the agreement of both engines' parts, and its contract changes with it.

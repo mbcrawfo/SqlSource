@@ -21,7 +21,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Renaming;
 [Collection(UsesSqlServer.Name)]
 public sealed class RealisticRenamingTests(SqlServerDatabases sqlServer)
 {
-    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer).ShouldNotBeNull();
+    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer);
 
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]

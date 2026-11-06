@@ -60,7 +60,8 @@ internal sealed partial class SqlRenamer
             _into.ReplaceTo(comment.Span.End, head + renamed + text[marker.ValueSpan.End..comment.Span.End]);
         }
 
-        // A marker that a bundle's query.sql never holds, since 10.4 writes none: refused, named by its word.
+        // A marker that a bundle's query.sql never holds, since BundleQueryFile writes none: refused, named by its
+        // word.
         private string Unheld(SqlMarker marker)
         {
             Refuse("-- " + SqlMarkerReader.WordOf(marker.Kind) + ":");
