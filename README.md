@@ -190,11 +190,9 @@ More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/setti
 
 ## FAQ
 
-### I want my query methods to have `Async` names
+### I want my query methods to have `Async` names, to be public, or to be on the type
 
-Add the generator parameter `async-method-suffix`: `"generatorParameters": ["async-method-suffix"]` in the `sqlsource.json` beside your project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one folder, file or query.  A file's or a query's own `-- generator:` line adds to the project's list, so the suffix stays unless that line says `async-method-suffix=off` or `default`.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
-
-### I want my query methods to be public, or on the type
+For `Async` names, add the generator parameter `async-method-suffix`: `"generatorParameters": ["async-method-suffix"]` in the `sqlsource.json` beside your project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one folder, file or query.  A file's or a query's own `-- generator:` line adds to the project's list, so the suffix stays unless that line says `async-method-suffix=off` or `default`.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
 
 By default a query method is an `internal` extension method of `DbConnection`, so a library's methods stay out of the code of the projects that use it.  Write `-- visibility: public` in a `.sql` file, or `"visibility": "public"` in a `sqlsource.json`, for public extension methods of a public type.  Write `-- member-location: class` for static methods of the type itself, called as `UserRepository.GetUser(connection, ...)`.  A setting for a whole file or folder reaches its `sql` and `models` queries too, where some values do not fit.  See [where the members go](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-member-location).
 
