@@ -96,8 +96,8 @@ internal static class PostgresErrors
     private const string DuplicatePreparedStatement = "42P05";
     private const string ProtocolViolation = "08P01";
     public const string InvalidSqlStatementName = "26000";
-    private const string IndeterminateDatatype = "42P18";
-    private const string AmbiguousParameter = "42P08";
+    public const string IndeterminateDatatype = "42P18";
+    public const string AmbiguousParameter = "42P08";
     private const string UndefinedFunction = "42883";
     private const string DatatypeMismatch = "42804";
     private const string AmbiguousFunction = "42725";

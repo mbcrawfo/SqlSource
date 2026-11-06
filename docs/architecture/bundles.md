@@ -1,6 +1,6 @@
 # Bundles and replay
 
-How `src/SqlSource.Tool/Bundles/` reads and writes a bug-report [bundle](README.md#bundle), how `sqlsource replay` runs the pipeline from one with no database, and how `Bundles/Renaming/` renames a raw bundle so that it may be posted: the steps that are the same for every engine, and the contract that an engine's part of the renaming implements.  What a user runs and sees is in the manual's [checking a bundle with `replay`](../manual/tool.md#replay), and the errors in [`SQLSRC288`](../manual/diagnostics.md#sqlsrc288) to [`SQLSRC291`](../manual/diagnostics.md#sqlsrc291).  The decisions behind it are the [phase 10 design](../superpowers/specs/2026-11-04-query-generation-phase-10-bug-reports-design.md) and its [spike](../superpowers/specs/2026-11-05-query-generation-phase-10-spike.md).
+How `src/SqlSource.Tool/Bundles/` reads and writes a bug-report [bundle](README.md#bundle), how `sqlsource replay` runs the pipeline from one with no database, and how `Bundles/Renaming/` renames a raw bundle so that it may be posted: the steps that are the same for every engine, the contract that an engine's part of the renaming implements, and PostgreSQL's part.  What a user runs and sees is in the manual's [checking a bundle with `replay`](../manual/tool.md#replay), and the errors in [`SQLSRC288`](../manual/diagnostics.md#sqlsrc288) to [`SQLSRC291`](../manual/diagnostics.md#sqlsrc291).  The decisions behind it are the [phase 10 design](../superpowers/specs/2026-11-04-query-generation-phase-10-bug-reports-design.md) and its [spike](../superpowers/specs/2026-11-05-query-generation-phase-10-spike.md).
 
 ## The bundle
 
@@ -75,7 +75,7 @@ Every error goes through the reporter, and the action returns `0`, so `Cli.ExitC
 
 ## Renaming
 
-[`BundleRenamer.RenameAsync`](../../src/SqlSource.Tool/Bundles/Renaming/BundleRenamer.cs) takes a raw bundle, the engine's part of the renaming, the bundle's describer as `BundleDescribers.For` makes it, and a [`RenamingKey`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingKey.cs), and gives a [`RenamedBundle`](../../src/SqlSource.Tool/Bundles/Renaming/RenamedBundle.cs), the bundle and its mapping, or the [`RenamingRefusal`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingRefusal.cs) that says why it cannot be renamed safely.  It reads no file: the caller reads the raw bundle and writes what it gives, `MappingFile.Write` writing the mapping.  It throws `ArgumentException` for a bundle with no `bundle.json`, one renamed already, one whose capture does not read or is of another engine than the part's, and one whose `expected.json` is no sidecar of one entry, which a caller has replayed first.  No command calls it; its tests do, with [`FakeEngineRenaming`](../../tests/SqlSource.Tool.Tests/FakeEngineRenaming.cs) and the raw bundle of [`RenamingBundles`](../../tests/SqlSource.Tool.Tests/RenamingBundles.cs).
+[`BundleRenamer.RenameAsync`](../../src/SqlSource.Tool/Bundles/Renaming/BundleRenamer.cs) takes a raw bundle, the engine's part of the renaming, the bundle's describer as `BundleDescribers.For` makes it, and a [`RenamingKey`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingKey.cs), and gives a [`RenamedBundle`](../../src/SqlSource.Tool/Bundles/Renaming/RenamedBundle.cs), the bundle and its mapping, or the [`RenamingRefusal`](../../src/SqlSource.Tool/Bundles/Renaming/RenamingRefusal.cs) that says why it cannot be renamed safely.  It reads no file: the caller reads the raw bundle and writes what it gives, `MappingFile.Write` writing the mapping.  It throws `ArgumentException` for a bundle with no `bundle.json`, one renamed already, one whose capture does not read or is of another engine than the part's, and one whose `expected.json` is no sidecar of one entry, which a caller has replayed first.  No command calls it; its tests do, with [`FakeEngineRenaming`](../../tests/SqlSource.Tool.Tests/FakeEngineRenaming.cs) and the raw bundle of [`RenamingBundles`](../../tests/SqlSource.Tool.Tests/RenamingBundles.cs), and [PostgreSQL's](#the-tests-of-postgresqls-part) with its part.
 
 Everything an engine decides is behind [`IEngineRenaming`](../../src/SqlSource.Tool/Bundles/Renaming/IEngineRenaming.cs), which [`EngineRenamings.For`](../../src/SqlSource.Tool/Bundles/Renaming/EngineRenamings.cs) gives for a `DatabaseEngine`.  The neutral part never names an engine.
 
@@ -172,13 +172,88 @@ The design asks that the SQL of each request made from the renamed query equal t
 
 ### `EngineRenamings.For`
 
-`EngineRenamings.For` is a switch over `DatabaseEngine`, each arm on a line of its own, and the one place that names an engine's part.  Both arms give null, the arm of `PostgreSql` marked `// Built by 10.2.` and that of `SqlServer` `// Built by 10.3.`, and null means a bundle of that engine cannot be renamed.
+`EngineRenamings.For` is a switch over `DatabaseEngine`, each arm on a line of its own, and the one place that names an engine's part.  The arm of `PostgreSql` gives `PostgresRenaming.Instance`, and that of `SqlServer` gives null, marked `// Built by 10.3.`: null means a bundle of that engine cannot be renamed.
+
+## Renaming for PostgreSQL
+
+[`PostgresRenaming`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresRenaming.cs) is PostgreSQL's part, one instance that holds nothing of a bundle.  It decides nothing itself: it gives each member to the file of its concern in [`Bundles/Renaming/Postgres/`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/), and an `Own` member by its method and path.  What each call asks and what its records hold is [the calls and their records](postgres-describer.md#the-calls-and-their-records); which members the pipeline reads, and why each is safe to rename as it is, are the [spike](../superpowers/specs/2026-11-05-query-generation-phase-10-spike.md)'s findings 1 and 5.
+
+| Member | PostgreSQL's answer | In |
+|----|----|----|
+| `Dialect` | `SqlDialect.PostgreSql` | `PostgresRenaming` |
+| `IsWordStart`, `IsWordPart`, `Fold`, `IsEngineWord` | [The words](#postgresqls-words) | `PostgresWords`, `PostgresPlannerNames` |
+| `RuleOf`, `IsEngineRow` | [The members and the engine's rows](#postgresqls-members-and-rows) | `PostgresFieldRules` |
+| `CopyOf` | Always null: the pipeline makes no copy of a parameter, so a parameter's name that is not the query's is renamed as a name of its own | `PostgresRenaming` |
+| `Register` | The name keys of an `explain` call's plan ([the plan](#postgresqls-plans)); nothing for any other call | `PostgresPlanRenamer` |
+| `RenameOwn`, `WordsOf` | `open`'s setting values and every error's message ([settings and messages](#postgresqls-settings-and-messages)), and `explain`'s plan ([the plan](#postgresqls-plans)) | `PostgresOwnStrings`, `PostgresPlanRenamer` |
+| `Derive` | The order of `relations` and `partitions`, and the position of `prepare`'s error ([what the pipeline makes](#what-postgresqls-pipeline-makes)) | `PostgresDerivations` |
+
+### PostgreSQL's words
+
+[`PostgresWords`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresWords.cs) gives the word rule of `PostgresIdentifiers`, the describer's and the server's lexer's: a word starts with an ASCII letter, `_` or any character above `\u007F`, and goes on with those, an ASCII digit and `$`.  `Fold` keeps a quoted spelling as it is and lower-cases `A` to `Z` alone in an unquoted one, as the server folds an identifier in a UTF-8 database, so a letter outside ASCII keeps its case.
+
+`IsEngineWord` folds the spelling and keeps it when it is a word of the vocabulary, one of the schemas `pg_catalog`, `information_schema`, `pg_toast` and `public`, or a name the planner makes.  A user's name spelled as one of them is kept too, as the contract asks: a table named `tables` or `columns`, both types of `information_schema`, stays as it is.
+
+The vocabulary is [`postgres-vocabulary.txt`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/postgres-vocabulary.txt), embedded in the tool and read once into `PostgresWords.Vocabulary`: one word a line, after a header whose lines start with `# `, `PostgresWords.HeaderMark`, since an operator such as `#>>` starts with `#` alone.  It holds the words of `pg_get_keywords()`, folded as a user writes one, and the names of `pg_catalog`'s functions, operators and types, of `information_schema`'s types and of `pg_class`'s system columns, each as the catalog holds it, as a quoted name folds.  So `RI_FKey_check_ins` keeps its case, and the unquoted spelling of it, which the server folds to a name that is no function, is renamed.  A relation of `pg_catalog`, such as `pg_class`, is in it as the name of its row type.  The list is the union of the words of the floor image, `postgres:14.24`, and of the default image, since a word that only one of them knows is still the engine's word in a bundle from its server.  `VocabularyTests` of `tests/DatabaseTests/Postgres` makes it and checks it, never a hand, as [the renaming's vocabulary](../../tests/DatabaseTests/Postgres/README.md#the-renamings-vocabulary) explains; it is the one thing recorded on a floor image, as root `AGENTS.md` rule 5 says.
+
+[`PostgresPlannerNames`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresPlannerNames.cs) holds the names the parser and the planner make up and a plan prints, which the spike found in the source of 14 to 18 and in their plans: whole forms, such as `*SELECT*`, `*VALUES*`, `subplan`, `unnamed_subquery`, `excluded`, `old` and `new`, and a text and a number, `*SELECT* <n>`, `*VALUES*_<n>`, `column<n>`, `col<n>` and `w<n>`.  A form in upper case is compared as printed, since a plan quotes it.  They are no name of the user's, so they are kept; a user's `w1` or `column1` differs from the planner's only by its place, and is kept as any engine word is.
+
+### PostgreSQL's members and rows
+
+[`PostgresFieldRules`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresFieldRules.cs) is the table of `RuleOf`, read from its `Build`: each line is a call's name from `PostgresCallNames`, a member's path from the call as `CaptureJson.Options` names it, and the member's rule.  A loop over several calls gives the members they share, the tables of `tables` and `relations` and the error of every call.  The members of the entry's PostgreSQL type, `TypeMembers`, are found under `parameters[].type.` and `columns[].type.`, at any depth of `element.`, `base.` and `subtype.`.  Every string member the pipeline reads has a rule; what is dropped is what nothing reads: an error's `detail` and `hint`, its `position` but for `prepare`'s, and the whole error of `deallocate`, `partitions` and `relations`.  A number or a boolean with no rule is kept, as for every engine.
+
+`IsEngineRow` reads the row's `nspname`, or its `schema` when it has none, and says the row is the engine's when that is `pg_catalog` or `information_schema`, whatever the call or path.  So a type of `pg_catalog` in `types`, or a table of `information_schema` that `tables` answers, keeps its name.  A row of `public` is the user's, and the name `public` is kept by `IsEngineWord` alone.  A column's row in `tables` holds no schema, so a column of a relation of `pg_catalog` is renamed, unless it is a word of the vocabulary: the name is not the user's and is renamed alike wherever it is, so no decision changes.
+
+### PostgreSQL's settings and messages
+
+[`PostgresOwnStrings`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresOwnStrings.cs) renames the two kinds of the engine's own text that are no SQL.
+
+- **A setting of `open`**, by the `name` beside its value.  `search_path` is read by `PostgresSearchPath` and written again with `, ` between its schemas, each renamed as a `Schema` name but `$user`, `public`, `pg_catalog` and an empty one, a quoted one written back quoted.  The value of every other setting that `PostgresLive.SettingNames` lists, `plan_cache_mode` and `standard_conforming_strings`, is the server's closed word and kept.  A setting of any other name, and a `search_path` that does not read, are refused, `RefusalStep.Token` at the value.
+- **An error's message**, of any call, and `check`'s `driverError.message`.  The describer matches an error by its SQLSTATE alone and reads a message only as one of the four texts the tool itself writes into an answer, `ConnectionErrors.MultiplexingRefused` and `UnreadableTypes`, `PostgresLive.StatementNotListed` and `TransactionRefused`, and for the parameter that a `42P18` or `42P08` names by its first `$n`.  So a message is written back as the tool's text alone: one of the four kept, `parameter $<n>` for such an error, and else the empty string, which `driverError.message` always is.  None of the server's text is kept, since it may quote the user's names and values.
+
+`WordsOf` gives the token check a renamed schema of `search_path` but the engine's, nothing of a kept setting's value or of a message the tool wrote, and the value whole for anything else, which the check then refuses.
+
+### PostgreSQL's plans
+
+[`PostgresPlanRenamer`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresPlanRenamer.cs) renames `answer.plan`, the text of `EXPLAIN (VERBOSE, FORMAT JSON)`, key by key, and writes it again indented with `\n` line ends.  The keys it keeps are the keys the walk reads, the constants of `PlanKeys`, each with its kind in `Kinds`; every other key is dropped at any depth, so that a key no corpus held is dropped too.
+
+| Kind | Keys | What it keeps |
+|----|----|----|
+| Structure | `Plan`, `Plans` | The nodes, each renamed |
+| Fixed | `Node Type`, `Join Type`, `Parent Relationship`, `Strategy`, `Command` | The planner's closed word |
+| Count | `Subplans Removed` | The number; a string is refused |
+| Presence | `Grouping Sets` | One empty object for each element, since the walk reads only that it is there |
+| Name | `Alias`, `Relation Name`, `Schema`, `CTE Name` | One raw name, renamed as a catalog holds it, quoted, so that the same spelling quoted in `Output` has the same replacement: an `Alias` or a `CTE Name` an `Alias` name, a `Relation Name` a `Table` and a `Schema` a `Schema` |
+| Subplan | `Subplan Name` | `CTE <name>`, its name renamed as an `Alias`; any other as an expression |
+| Expression | `Output`, `Filter`, `Group Key` | Each string read by the walk's `PlanTokens`: a word or a quoted name renamed as a name, a function's where `(` follows, a string as the mapping's literal, a number and punctuation kept, and any other token kept only when it holds no letter, digit or `_` |
+
+A plan that is no JSON array of objects with a `Plan`, a node that is no object, an object or an array where a key holds a text, a string of an expression key that `PlanTokens` cannot read and a token of no kind it renames are refused, `RefusalStep.PlanString`, at the plan's place.  `Register` registers each name key in its class before the query is renamed, so that a name a plan is the first to hold takes its key's class.
+
+The planner prints a partition's scan, or a child's of an inherited table, under its parent's alias and a number, `orders_1`, which the query does not hold, and `PlanPartitions` finds the members of an `Append` by that alias; renamed as a name of its own, the members would lose their alias and the entry would change.  So an `Alias` of the form `<alias>_<n>` is not registered, and is decided when the plan is renamed, by which time the query and the catalog have mapped their names.  The members of an `Append` or a `Merge Append` that `PlanPartitions.ShapeOf` reads as one prefix are decided by that structure, since a partition may be named as its scan, `orders_1` of `orders`, which the catalog's answers and the member's `Relation Name` map as a table: a member's `Alias`, and the same spelling wherever it qualifies a column in the plan's expressions, a word or a quoted name that a `.` directly follows and none directly precedes, as `PlanPartitions.WithoutAlias` reads one, is the stem's replacement and the planner's `_<n>`, `t_1234abcd_1`, when the mapping holds the stem or the stem is the engine's word, whatever the mapping holds of the spelling.  The `Relation Name` keeps the table's own replacement, and the members of the renamed plan share one prefix again.  Every name a plan prints is unique within it, so the spelling names that member wherever it qualifies a column; each plan of an answer is read on its own.  Any other `<alias>_<n>`, outside such an `Append`, keeps the mapping's own replacement when the mapping holds it, and is the stem's replacement and `_<n>` when the mapping holds its stem or the stem is the engine's word.  The token check is given the stem of `<stem>_<n>` when the stem is shaped as a replacement, a lower-case letter, `_` and eight or more lower-case hex digits, and the planner's `_<n>` is then its fixed text.  The stem of a child of an engine's word stays as it is, so `name_1` reaches the check whole, and is refused, since neither the renaming nor the check can tell the planner's suffix from a user's name.
+
+`WordsOf` gives nothing of a fixed key or a count, a name as `"<name>"`, a CTE's `Subplan Name` as its name so, and an expression's tokens, a word, a quoted name and a string as written and every other a character at a time, and gives every string of a key it does not read whole, the key too.
+
+### What PostgreSQL's pipeline makes
+
+[`PostgresDerivations`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresDerivations.cs) makes again two things the pipeline makes by its own rule, which a renaming token by token would not.
+
+- **The order of `relations` and `partitions`.**  The describer asks its relations in schema and name order, `PlanRelations.InOrder`, which renamed names change, and the replay finds an answer by its request, so each request's relations are sorted again by their renamed names.
+- **The position of `prepare`'s error**, a count of code points into `PREPARE <statement> (<types>) AS <sql>`, which moves with each renamed name and declared type.  The describer reads a position only as in the query's SQL or in an item of the type list, whose declared parameter it names, so a position is mapped within its part: in the SQL through `RenamedText.MapPosition`, after the renamed head; in an item of the list through the item's renamed type, a position in the separator after an item, or after the last, being clamped to the item's last code point so that it stays in the same item; in `PREPARE <statement> (`, which the renaming does not change, kept.  The renamed SQL and types are made again through `IRenamingScope.Sql` from the originals, and a position is refused, `RefusalStep.Token` at `answer.error.position` with no token, when that text is not the renamed member or the position is outside it.
+
+A request or an answer that does not read as its record is left alone, and the proof's replay then refuses it.
+
+### The tests of PostgreSQL's part
+
+Each file of the folder has its tests in `tests/SqlSource.Tool.Tests/Bundles/Renaming/Postgres/`, which test a member alone with `FakeRenamingScope` of `tests/SqlSource.Tool.Tests`.  `PostgresFieldRulesTests` fails when a string member of a record of `PostgresCalls.cs` has no rule, or a rule names no member, and `PostgresPlanRenamerTests` when a key of `PlanKeys.All` has no kind.  The rest rename whole bundles, through `PostgresRenamings.cs` and the helpers of `tests/SqlSource.Tool.Testing/Bundles/` ([the libraries](../../tests/README.md#the-projects)):
+
+- `PostgresFixtureRenamingTests` renames every case of the describer's fixtures with no database: each replays with the original's provenance, `BundleLeaks` finds no name or literal of the fixtures' `schema.sql` or of the case's query in it, and two keys give no replacement in common.  Its list of the cases that must be refused is empty.
+- `PostgresRefusalTests` builds bundles by hand from the fixtures: what is refused and at what place, and the server's errors renamed, whose bundle replays to the original's failure and holds none of the server's text.
+- `PostgresClassificationTests` finds, without asking the renaming, each word of a fixture's plans that neither the query, the schema nor a catalog answer holds, which is the engine's or the planner's, and fails when the renamed plan does not keep it.
+- On a container, `Renaming/RealisticRenamingTests` of `tests/DatabaseTests/Postgres` renames the realistic corpus as captured live, which CI runs on the floor and default images, `Renaming/PartitionRenamingTests` renames a bundle whose `Append`'s members are partitions named as the planner names their scans, under a `LEFT JOIN`, and proves it replays, and `Renaming/VocabularyTests` checks the vocabulary: [the realistic corpus renamed](../../tests/DatabaseTests/Postgres/README.md#the-realistic-corpus-renamed).
+
+`BundleLeaks` lexes the sources as PostgreSQL, and seeks a name as a whole word, an unquoted one ignoring case and a quoted one as written, so that `"Order"` is sought though its fold is a keyword and `ORDER BY` is not it, and a literal of four characters or more as a substring, or as a whole word when it is one; it does not seek the engine's words, asked of a name with whether the source quotes it, or a shorter literal, and does not seek in the names of members, a call's `method`, the sidecar's header or a string of one character outside a plan, such as a `relkind`, which a one-letter alias would match.
 
 ## Not built yet
-
-### Renaming for PostgreSQL
-
-> **Not built yet.**  How PostgreSQL's part of the renaming answers each member of `IEngineRenaming`.  Delivered by sub-phase 10.2 of phase 10 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 
 ### Renaming for SQL Server
 

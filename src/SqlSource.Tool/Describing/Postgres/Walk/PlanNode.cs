@@ -61,8 +61,11 @@ internal sealed record PlanNode(
     IReadOnlyList<PlanNode> Plans
 )
 {
-    // Each node is two levels of the text, and the reader's own limit of 64 would refuse a plan of thirty.
-    private const int MaxDepth = 512;
+    /// <summary>
+    /// The depth of JSON a plan's text is read to.  Each node is two levels of the text, and the reader's own limit of
+    /// 64 would refuse a plan of thirty.
+    /// </summary>
+    public const int MaxDepth = 512;
 
     /// <summary>
     /// The root of the plan a <c>Subquery Scan</c> scans, its one child whose <c>Parent Relationship</c> is
@@ -144,7 +147,7 @@ internal sealed record PlanNode(
                 root.ValueKind == JsonValueKind.Array
                 && root.GetArrayLength() == 1
                 && root[0].ValueKind == JsonValueKind.Object
-                && root[0].TryGetProperty("Plan", out var plan)
+                && root[0].TryGetProperty(PlanKeys.Plan, out var plan)
                 ? NodeOf(plan)
                 : null;
         }
@@ -158,19 +161,19 @@ internal sealed record PlanNode(
     {
         if (
             element.ValueKind != JsonValueKind.Object
-            || !TryText(element, "Node Type", out var nodeType)
+            || !TryText(element, PlanKeys.NodeType, out var nodeType)
             || nodeType is null
-            || !TryText(element, "Join Type", out var joinType)
-            || !TryText(element, "Parent Relationship", out var relationship)
-            || !TryTexts(element, "Output", out var output)
-            || !TryText(element, "Alias", out var alias)
-            || !TryText(element, "Relation Name", out var relation)
-            || !TryText(element, "Schema", out var schema)
-            || !TryText(element, "Subplan Name", out var subplan)
-            || !TryText(element, "CTE Name", out var cte)
-            || !TryText(element, nameof(Command), out var command)
-            || !TryText(element, nameof(Strategy), out var strategy)
-            || !TryCount(element, "Subplans Removed", out var removed)
+            || !TryText(element, PlanKeys.JoinType, out var joinType)
+            || !TryText(element, PlanKeys.ParentRelationship, out var relationship)
+            || !TryTexts(element, PlanKeys.Output, out var output)
+            || !TryText(element, PlanKeys.Alias, out var alias)
+            || !TryText(element, PlanKeys.RelationName, out var relation)
+            || !TryText(element, PlanKeys.Schema, out var schema)
+            || !TryText(element, PlanKeys.SubplanName, out var subplan)
+            || !TryText(element, PlanKeys.CteName, out var cte)
+            || !TryText(element, PlanKeys.Command, out var command)
+            || !TryText(element, PlanKeys.Strategy, out var strategy)
+            || !TryCount(element, PlanKeys.SubplansRemoved, out var removed)
             || !TryNodes(element, out var plans)
         )
         {
@@ -188,12 +191,12 @@ internal sealed record PlanNode(
             subplan,
             cte,
             command,
-            element.TryGetProperty("Grouping Sets", out _),
+            element.TryGetProperty(PlanKeys.GroupingSets, out _),
             strategy,
-            element.TryGetProperty("Group Key", out var key)
+            element.TryGetProperty(PlanKeys.GroupKey, out var key)
                 && key.ValueKind == JsonValueKind.Array
                 && key.GetArrayLength() > 0,
-            element.TryGetProperty("Filter", out _),
+            element.TryGetProperty(PlanKeys.Filter, out _),
             removed,
             plans
         );
@@ -253,11 +256,11 @@ internal sealed record PlanNode(
         return true;
     }
 
-    // False when "Plans" holds what is no array of nodes.  A node without the key has no child.
+    // False when Plans holds what is no array of nodes.  A node without the key has no child.
     private static bool TryNodes(JsonElement element, out IReadOnlyList<PlanNode> nodes)
     {
         nodes = [];
-        if (!element.TryGetProperty(nameof(Plans), out var value))
+        if (!element.TryGetProperty(PlanKeys.Plans, out var value))
         {
             return true;
         }

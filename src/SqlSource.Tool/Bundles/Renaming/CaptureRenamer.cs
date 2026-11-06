@@ -21,11 +21,13 @@ internal static class CaptureRenamer
     public const string Answer = "answer";
 
     /// <summary>A call as a refusal names it: <c>capture.json call &lt;n&gt; '&lt;method&gt;'</c>.</summary>
-    public static string PlaceOf(RenamingCall call) =>
-        $"{BundleFiles.Capture} call {call.Index.ToString(CultureInfo.InvariantCulture)} '{call.Method}'";
+    public static string PlaceOf(RenamingCall call) => PlaceOf(call.Index, call.Method);
 
     /// <summary>A member of a call as a refusal names it, by its path from the call.</summary>
     public static string PlaceOf(RenamingCall call, string path) => PlaceOf(call) + " " + path;
+
+    /// <summary>A member of a call as a refusal names it, as an engine's part is given it.</summary>
+    public static string PlaceOf(RenamingField field) => PlaceOf(field.Call, field.Method) + " " + field.Path;
 
     /// <summary>The calls of a capture, each as captured and as a copy to rename.</summary>
     public static IReadOnlyList<RenamingCall> CallsOf(DescribeCapture capture) =>
@@ -123,6 +125,9 @@ internal static class CaptureRenamer
         var engineRow = rule.Kind == FieldRuleKind.Name && IsEngineRow(engine, call.Method, found);
         return run.Field(rule, field, engineRow, place);
     }
+
+    private static string PlaceOf(int index, string method) =>
+        $"{BundleFiles.Capture} call {index.ToString(CultureInfo.InvariantCulture)} '{method}'";
 
     private static bool IsEngineRow(IEngineRenaming engine, string method, JsonString found) =>
         found.Row is { } row && engine.IsEngineRow(method, found.RowPath, row);

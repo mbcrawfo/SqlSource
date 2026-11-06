@@ -32,7 +32,8 @@ internal static class ParameterPlaceholders
     /// <summary>The item of the type list for a parameter with no declared type: the server infers it.</summary>
     public const string Unknown = "unknown";
 
-    private const string Separator = ", ";
+    /// <summary>What stands between two items of the type list.</summary>
+    public const string Separator = ", ";
 
     /// <summary>
     /// The SQL with <c>$</c> and the one-based ordinal of its name in the list for each parameter, and without its
@@ -158,9 +159,11 @@ internal static class ParameterPlaceholders
     private static string Head(string statement, IReadOnlyList<string> types) =>
         types.Count == 0 ? $"PREPARE {statement} AS " : $"{Opening(statement)}{string.Join(Separator, types)}\n) AS ";
 
-    private static string Opening(string statement) => $"PREPARE {statement} (";
+    /// <summary>What <see cref="PrepareText" /> holds before the first item of a type list.</summary>
+    public static string Opening(string statement) => $"PREPARE {statement} (";
 
-    private static int Characters(string text) => text.EnumerateRunes().Count();
+    /// <summary>How many characters a text holds, counted as the server counts a position.</summary>
+    public static int Characters(string text) => text.EnumerateRunes().Count();
 
     private static string OrdinalOf(ReadOnlySpan<char> name, EquatableArray<SqlQueryParameter> parameters)
     {
