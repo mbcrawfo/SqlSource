@@ -1,7 +1,10 @@
+using System;
 using System.Data.Common;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
+using SqlSource.Repository;
 using SqlSource.Testing;
 
 namespace SqlSource.DatabaseTests.TestHarness;
@@ -22,9 +25,16 @@ public abstract class PostgisContainer(DbProviderFactory factory, string postgre
         $"sqlsource-postgis:{EngineImage.TagOf(postgresImage)}-{Package.Split('+')[0]}";
 
     // Builds the image through Docker, which reuses its cached layers.  It is never removed: WithCleanUp(false) keeps
-    // Testcontainers' reaper from it, and the image is not disposed, which would delete it.
+    // Testcontainers' reaper from it, and the image is not disposed, which would delete it.  Testcontainers writes the
+    // build's context to a tar in the temp folder named after the image, so two test projects that build one image at
+    // once write and delete the same file; a lock file held for the build makes the second wait, and then reuse the
+    // first's layers.
     protected override async Task PrepareImageAsync(CancellationToken token)
     {
+        await using var buildLock = await LockBuildsAsync(
+            Path.Combine(Path.GetTempPath(), "sqlsource-postgis-build.lock"),
+            BuildPatience
+        );
         var image = new ImageFromDockerfileBuilder()
             .WithDockerfileDirectory(RepositoryRoot.Path("tests", "DatabaseTests", "TestHarness", "Postgis"))
             .WithDockerfile("Dockerfile")
@@ -35,5 +45,53 @@ public abstract class PostgisContainer(DbProviderFactory factory, string postgre
             .WithCleanUp(false)
             .Build();
         await image.CreateAsync(token);
+    }
+
+    // How long a build waits for another test process's build of the image to let go of the lock.  A build on a cold
+    // cache pulls the postgres image and PostGIS's packages, a few minutes on CI's runner, so fifteen minutes, as long
+    // as a CI job that runs the tests may take, outlasts any build that is still going and ends one that hangs.
+    private static readonly TimeSpan BuildPatience = TimeSpan.FromMinutes(15);
+
+    // FileShare.None locks the file against every other process, and every other handle of this one, until it is
+    // disposed.  The file is left in place, since deleting it would let a waiting build lock a new file beside it.
+    internal static async Task<FileStream> LockBuildsAsync(string path, TimeSpan patience)
+    {
+        FileStream? held = null;
+        await Eventually.TrueAsync(
+            () =>
+            {
+                held = TryLock(path);
+                return Task.FromResult(held is not null);
+            },
+            $"Another build of the PostGIS image held {path} for longer than {patience}.",
+            patience
+        );
+        return held ?? throw new InvalidOperationException("The wait for the lock ended without it.");
+    }
+
+    // The lock, or null when another handle holds it.
+    private static FileStream? TryLock(string path)
+    {
+        try
+        {
+            return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        catch (IOException exception) when (IsHeldByAnother(exception))
+        {
+            return null;
+        }
+    }
+
+    // Only a lock that another handle holds is waited for; any other error fails the build at once.  On Unix .NET gives
+    // that sharing violation as a plain IOException whose HResult is EWOULDBLOCK's errno, 35 on macOS and 11 on Linux;
+    // on Windows it is ERROR_SHARING_VIOLATION as an HRESULT.
+    private static bool IsHeldByAnother(IOException exception)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return exception.HResult == unchecked((int)0x80070020);
+        }
+
+        return exception.HResult == (OperatingSystem.IsMacOS() ? 35 : 11);
     }
 }

@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Testing;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 

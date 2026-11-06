@@ -28,6 +28,8 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData("-- generator: token-validation=off", 2, 0)]
     [InlineData("-- generator: array-pool=OFF table-models=off", 80, 0)]
     [InlineData("-- generator: array-pool", 64, 64)]
+    [InlineData("-- generator: list-padding=off", 128, 0)]
+    [InlineData("-- generator: LIST-PADDING", 128, 128)]
     [InlineData("-- generator: KEEP-COMMENTS Token-Validation=OFF", 3, 1)]
     [InlineData("-- generator: sort-input sort-output table-models=off async-method-suffix", 60, 44)]
     [InlineData("-- generator: keep-comments=off sort-input", 5, 4)]
@@ -103,6 +105,7 @@ public sealed class SqlGeneratorParameterScopeTests
     [Theory]
     [InlineData("keep-comment")]
     [InlineData("no-arraypool")]
+    [InlineData("listpadding")]
     // The words that turned the three options off before they were named for what they do.
     [InlineData("no-token-validation")]
     [InlineData("no-table-models")]

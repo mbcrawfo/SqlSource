@@ -1,5 +1,5 @@
 using System.IO;
-using SqlSource.Testing;
+using SqlSource.Repository;
 
 namespace SqlSource.DatabaseTests.TestHarness;
 

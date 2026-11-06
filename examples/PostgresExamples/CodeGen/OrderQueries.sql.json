@@ -232,6 +232,100 @@
           "computed": null
         }
       ]
+    },
+    "ListOrdersByStatuses": {
+      "hash": "913df26c1983fdac07329b61d7b5099d5bc05fae8c7eb8030fc1615225ac8277",
+      "engine": "postgres",
+      "database": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "statuses",
+          "ordinal": 0,
+          "type": {
+            "name": "public.order_status",
+            "bindName": "public.order_status",
+            "kind": "enum",
+            "schema": "public",
+            "internalName": "order_status",
+            "labels": [
+              "pending",
+              "shipped",
+              "cancelled"
+            ]
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "status",
+          "type": {
+            "name": "public.order_status",
+            "kind": "enum",
+            "schema": "public",
+            "internalName": "order_status",
+            "labels": [
+              "pending",
+              "shipped",
+              "cancelled"
+            ]
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "orders",
+            "column": "status"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "placed_at",
+          "type": {
+            "name": "timestamp with time zone",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "timestamptz"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "orders",
+            "column": "placed_at"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

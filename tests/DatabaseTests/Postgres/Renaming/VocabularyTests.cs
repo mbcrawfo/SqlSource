@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using SqlSource.Tool.Bundles.Renaming.Postgres;
 using Xunit;
 

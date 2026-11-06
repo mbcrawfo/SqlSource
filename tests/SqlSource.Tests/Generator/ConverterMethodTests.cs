@@ -786,7 +786,8 @@ public sealed class ConverterMethodTests
             "parameter.TypedValue = parameters.Email is { } value ? global::App.Conversions.FromEmail(value) : null;\n"
         );
         methods.ShouldContain(
-            "value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, "
+            "value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
                 + "static element => global::App.Conversions.FromUserId(element))"
         );
     }

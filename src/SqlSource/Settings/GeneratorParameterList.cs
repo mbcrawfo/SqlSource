@@ -36,11 +36,15 @@ internal static class GeneratorParameterList
         | GeneratorParameters.SortOutput
         | GeneratorParameters.TableModels
         | GeneratorParameters.AsyncMethodSuffix
-        | GeneratorParameters.ArrayPool;
+        | GeneratorParameters.ArrayPool
+        | GeneratorParameters.ListPadding;
 
     /// <summary>The parameters that are on when no level says otherwise.</summary>
     public const GeneratorParameters Defaults =
-        GeneratorParameters.TokenValidation | GeneratorParameters.TableModels | GeneratorParameters.ArrayPool;
+        GeneratorParameters.TokenValidation
+        | GeneratorParameters.TableModels
+        | GeneratorParameters.ArrayPool
+        | GeneratorParameters.ListPadding;
 
     /// <summary>
     /// Each name of a parameter, with the parameter.  The schema of a settings file repeats them in its list and its
@@ -55,6 +59,7 @@ internal static class GeneratorParameterList
         ("table-models", GeneratorParameters.TableModels),
         ("async-method-suffix", GeneratorParameters.AsyncMethodSuffix),
         ("array-pool", GeneratorParameters.ArrayPool),
+        ("list-padding", GeneratorParameters.ListPadding),
     ];
 
     private static readonly GeneratorParameterState[] States =

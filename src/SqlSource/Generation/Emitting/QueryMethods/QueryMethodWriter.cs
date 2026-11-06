@@ -79,15 +79,18 @@ internal static class QueryMethodWriter
         if (!streams)
         {
             CommandWriter.AppendBody(in context, bodyIndent);
+            ListWriter.AppendHelpers(in context, bodyIndent);
             AppendEnd(builder, indent);
             return;
         }
 
         // The checks run when the method is called, and the rest when the loop asks for the first row.  The iterator
-        // captures nothing: it takes every argument by the same name, so the body is written as in any other method.
+        // takes every argument by the same name, so the body is written as in any other method, and captures nothing
+        // but the locals that the checks count lists into.
         HeaderWriter.AppendIteratorCall(in context, bodyIndent);
         CommandWriter.AppendBody(in context, blockIndent);
         AppendEnd(builder, bodyIndent);
+        ListWriter.AppendHelpers(in context, bodyIndent);
         AppendEnd(builder, indent);
     }
 

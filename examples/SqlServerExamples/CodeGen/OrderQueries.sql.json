@@ -229,6 +229,89 @@
           "computed": false
         }
       ]
+    },
+    "ListOrdersByStatuses": {
+      "hash": "8bdc5fcb4568481663449a2cfee15e15d0883fe4ceef156c70b272e07cb019ba",
+      "engine": "mssql",
+      "database": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "statuses",
+          "ordinal": 0,
+          "type": {
+            "name": "varchar(20)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "status",
+          "type": {
+            "name": "varchar(20)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "status"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "placed_at",
+          "type": {
+            "name": "datetime2(7)",
+            "maxLength": 8,
+            "precision": 27,
+            "scale": 7
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "placed_at"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

@@ -251,7 +251,7 @@ internal static class DatabaseRuns
             var planned = query.Planned;
             var describe = new DescribeRequest(
                 planned.Query.Name,
-                SampleSql.Build(planned.Query),
+                SampleSql.Build(planned.Query, database.Dialect),
                 planned.Query.Parameters
             );
             var started = run.Time.GetTimestamp();

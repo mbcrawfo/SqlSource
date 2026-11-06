@@ -86,12 +86,14 @@ public sealed class ConverterArrayTests
     [Theory]
     [InlineData(
         Struct,
-        "global::System.Array.ConvertAll<global::App.Email, string>(value, "
+        "global::System.Array.ConvertAll<global::App.Email, string>(value as global::App.Email[] ?? "
+            + "global::System.Linq.Enumerable.ToArray(value), "
             + "static element => global::App.Email.ToDatabase(element))"
     )]
     [InlineData(
         Class,
-        "global::System.Array.ConvertAll<global::App.Email?, string?>(value, "
+        "global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? "
+            + "global::System.Linq.Enumerable.ToArray(value), "
             + "static element => element is { } item ? global::App.Email.ToDatabase(item) : null)"
     )]
     public void Run_ArrayParameter_ConvertsEachElement(string kind, string converted)
@@ -158,11 +160,12 @@ public sealed class ConverterArrayTests
     }
 
     // An override of the array to one of a nullable element, UserId?[], converts by the edges of UserId, and a NULL
-    // element stays null, the converter not called for it, either way.  System.Nullable<UserId>[] is the same type.
+    // element stays null, the converter not called for it, either way.  System.Nullable<UserId>[] is the same type,
+    // which the copy of a sequence into an array writes as written.
     [Theory]
-    [InlineData("App.UserId?[]")]
-    [InlineData("System.Nullable<App.UserId>[]")]
-    public void Run_ArrayOverrideOfANullableValueElement_KeepsANullElement(string written)
+    [InlineData("App.UserId?[]", "global::App.UserId?[]")]
+    [InlineData("System.Nullable<App.UserId>[]", "global::System.Nullable<global::App.UserId>[]")]
+    public void Run_ArrayOverrideOfANullableValueElement_KeepsANullElement(string written, string array)
     {
         var userIds = ArrayOf(
             TestSidecars.Postgres(
@@ -196,7 +199,10 @@ public sealed class ConverterArrayTests
         );
         methods.ShouldContain(
             "parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<"
-                + "global::App.UserId?, long?>(value, static element => element is { } item ? "
+                + "global::App.UserId?, long?>(value as "
+                + array
+                + " ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? "
                 + "global::App.Conversions.FromUserId(item) : null) : null;\n"
         );
     }
@@ -232,7 +238,8 @@ public sealed class ConverterArrayTests
                 + "throw new global::System.InvalidCastException(\"Column 'ids' holds a null element.\")))"
         );
         methods.ShouldContain(
-            "value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, "
+            "value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
                 + "static element => global::App.Conversions.FromUserId(element))"
         );
     }

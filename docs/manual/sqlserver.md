@@ -387,7 +387,7 @@ A described SQL Server query gets the [models](generator.md#models) that every d
 
 - **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Microsoft.Data.SqlClient that the project references, or [NodaTime's](#nodatime), [NetTopologySuite's](#nettopologysuite) or [System.Text.Json's](#json) for a query whose output is `codegen` where the library types turn that library on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint`, `placed_at` a `datetime2` and `status` an `nvarchar(20)`, all `NOT NULL`: `@since` takes the type of `placed_at`, and `@status` that of `status`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A [`-- column:` marker](generator.md#column-marker) can say otherwise, and so can a column's alias with `!` or `?`.
-- **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since SQL Server does not say whether a parameter can be null.  A marker with `null` and no type leaves the type to SQL Server.
+- **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, or, for a [list parameter](parameters-and-tokens.md#list-parameters), when the query tests the list for null, as `@ids IS NULL` does, since SQL Server does not say whether a parameter can be null.  A marker with `null` and no type leaves the type to SQL Server.
 - **A column with no name**, as an expression or a literal without an alias, is [SQLSRC266](diagnostics.md#sqlsrc266) when the tool describes the query.  Give it an alias.
 - **A query whose rows are a whole table** gets a model named after the table, with the table's schema before its name unless the schema is `dbo`: `dbo.customers` gives `CustomersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](generator.md#table-models).
 - **A query that returns several result sets** gets an output model of the first alone: see [what can be described](#what-can-be-described).
@@ -431,6 +431,35 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **A parameter of a [NetTopologySuite](#nettopologysuite) type** is sent as its `geography` or `geometry`, with the value's SRID, and a null as a `NULL` of it.
 - **`hierarchyid`, `geography`, `geometry` and a CLR type of your own assembly**, given a C# type by a [type override](settings.md#setting-type-overrides), such as `Microsoft.SqlServer.Types.SqlGeography`, are sent as their SQL Server type, and a null as a `NULL` of it.  A CLR type is named by its schema: `Money` of the schema `dbo` is sent as `dbo.Money`.
 - **A type of a newer SQL Server**, which only a type override gives a C# type too, is sent by its value, and Microsoft.Data.SqlClient chooses its type from it.
+- **A [list parameter](#list-parameters)** sends each of its values as a parameter of the values' type, as above.
+
+<a id="list-parameters"></a>
+
+### Lists
+
+```sql mssql
+-- name: ListOrdersByIds
+SELECT id, placed_at FROM dbo.orders WHERE id IN @ids;
+```
+
+SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, is how a query method sends a list of values.  Above, `ListOrdersByIdsParams.Ids` is an `IEnumerable<int>`, and each of its values is sent as an `int`, the type of `id`, as [any parameter](#method-parameters) of that type is.  A list's test for null, `@ids IS NULL`, is sent as a `bit` of the list's name.
+
+- **A query sends at most 2,098 parameters.**  SQL Server takes 2,100 parameters in one request, and Microsoft.Data.SqlClient uses two of them to send a query with parameters.  Each value of each list counts, and so does every other parameter of the query: a method whose query would send more throws `ArgumentException`, as [the limit](parameters-and-tokens.md#list-limit) says, and leaves out the [padding](parameters-and-tokens.md#list-padding) of a query that padding alone would take past it.
+- **For more values than that, send them as one JSON array** in an `nvarchar(max)` parameter, and read it with `OPENJSON`, in a database whose compatibility level is 130 or later:
+
+  ```sql mssql
+  -- name: ListOrdersByIdArray
+  -- param: @ids nvarchar(max)
+  SELECT id, placed_at FROM dbo.orders
+  WHERE id IN (SELECT CAST(value AS int) FROM OPENJSON(@ids));
+  ```
+
+  ```csharp
+  var orders = await connection.ListOrdersByIdArray(new ListOrdersByIdArrayParams(JsonSerializer.Serialize(ids)));
+  ```
+
+  The query sends one parameter whatever the count, and has one form, so SQL Server keeps one plan of it.  The marker is needed: SQL Server cannot tell the type of `@ids` from `OPENJSON(@ids)` alone.
+- **A table-valued parameter** does the same through a table type of your database, but a query method cannot send one.  Give such a query `-- output: sql`, and send its parameter with your own code.
 
 <a id="method-results"></a>
 
@@ -486,5 +515,17 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **A `rowcount` method returns `-1` once `SET NOCOUNT ON` has run on the connection's session.**  See [the generator's known issues](generator.md#known-issues).
 
 - **A query method fails on a connection that wraps a `SqlConnection` and creates parameters of its own.**  Give the method the `SqlConnection` inside: see [the generator's known issues](generator.md#known-issues).
+
+- **On SQL Server, a list inside an aggregate, a `GROUP BY` expression or an `OUTPUT` clause fails when it is empty or null.**  A query such as `SELECT SUM(CASE WHEN status IN @statuses THEN 1 ELSE 0 END) AS matching FROM dbo.accounts` runs for every list that holds a value, and throws `SqlException` when the list is empty or null: "Cannot perform an aggregate function on an expression containing an aggregate or a subquery." (130), or the error of a `GROUP BY` (144) or of an `OUTPUT` clause (10705).  The build and describing succeed.  Test the list in a `WITH` query, or a subquery in `FROM`, and aggregate its result, which runs for an empty list too:
+
+  ```sql mssql
+  -- name: CountAccountsWithStatuses
+  WITH tested AS (
+      SELECT CASE WHEN status IN @statuses THEN 1 ELSE 0 END AS hit
+      FROM dbo.accounts
+  )
+  SELECT SUM(hit) AS matching
+  FROM tested;
+  ```
 
 - **A `-- param:` type whose name holds an accent written as a separate combining mark, a letter number such as `Ⅰ`, or an invisible formatting character after its first character** is refused as [SQLSRC228](diagnostics.md#sqlsrc228), "it is not written as a type name", though SQL Server accepts the name.  Write that part of the name in brackets, as in `-- param: @p dbo.[PartⅠ]`, or write an accented letter as one character.

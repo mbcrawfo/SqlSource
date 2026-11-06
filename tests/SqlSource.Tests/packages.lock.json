@@ -352,6 +352,7 @@
         "dependencies": {
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",
+          "SqlSource.Repository": "[0.1.0-dev, )",
           "SqlSource.Testing": "[0.1.0-dev, )",
           "Testcontainers.MsSql": "[4.16.0, )",
           "Testcontainers.PostgreSql": "[4.16.0, )",
@@ -359,12 +360,16 @@
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
       },
+      "sqlsource.repository": {
+        "type": "Project"
+      },
       "sqlsource.testing": {
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",
+          "SqlSource.Repository": "[0.1.0-dev, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
       },

@@ -3,6 +3,7 @@ using System.Text;
 using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
+using SqlSource.Generation.Models;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
@@ -234,6 +235,124 @@ public sealed class PostgresParameterBinderTests
         written.ShouldContain("    p0.TypedValue = parameters.Ids is { } v1 ? " + converted + " : null;\n");
     }
 
+    // An array sent from any sequence is bound as an IList of its element, under the array's own name: a value that is
+    // an IList already is bound as it is, and any other sequence is copied once into an array.
+    [Theory]
+    [InlineData("int[]", "int")]
+    [InlineData("int?[]", "int?")]
+    [InlineData("string[]", "string")]
+    public void Append_PostgresArraySequence_BindsAnIListOfTheElement(string typeText, string element)
+    {
+        var written = Write(
+            new MethodParameter(
+                "ids",
+                "Ids",
+                typeText,
+                false,
+                false,
+                Described: IntArray,
+                Sequence: ParameterSequence.Array
+            )
+        );
+
+        written.ShouldBe(
+            "    var p0 = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<"
+                + element
+                + ">>();\n"
+                + "    p0.ParameterName = \"ids\";\n"
+                + "    p0.DataTypeName = \"pg_catalog._int4\";\n"
+                + "    p0.TypedValue = parameters.Ids is { } value ? value as global::System.Collections.Generic.IList<"
+                + element
+                + "> ?? global::System.Linq.Enumerable.ToArray(value) : null;\n"
+                + "    command.Parameters.Add(p0);\n"
+        );
+    }
+
+    // Array.ConvertAll takes an array, so a sequence that is none is copied into one first, and the converted array is
+    // bound as an IList of the database's element.
+    [Theory]
+    [InlineData("global::App.Id", "long[]", true, true, "long", "global::App.Id, long", "")]
+    [InlineData("global::App.Id", "string[]", false, false, "string?", "global::App.Id?, string?", "i1")]
+    [InlineData("global::App.Id?", "long[]", true, true, "long?", "global::App.Id?, long?", "i1")]
+    public void Append_PostgresArraySequenceByElement_ConvertsAfterMaterialising(
+        string elementText,
+        string databaseText,
+        bool databaseIsValueType,
+        bool elementIsValueType,
+        string bound,
+        string typeArguments,
+        string item
+    )
+    {
+        var write = new Conversion(
+            "global::App.Ids.ToDatabase",
+            databaseText,
+            databaseIsValueType,
+            true,
+            elementText,
+            elementIsValueType
+        );
+        var convert =
+            item.Length == 0
+                ? "global::App.Ids.ToDatabase(e1)"
+                : "e1 is { } " + item + " ? global::App.Ids.ToDatabase(" + item + ") : null";
+
+        var written = Write(
+            new MethodParameter(
+                "ids",
+                "Ids",
+                elementText + "[]",
+                false,
+                false,
+                write,
+                Sequence: ParameterSequence.Array
+            ),
+            "v1"
+        );
+
+        written.ShouldContain(
+            "    var p0 = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<"
+                + bound
+                + ">>();\n"
+        );
+        written.ShouldContain(
+            "    p0.TypedValue = parameters.Ids is { } v1 ? global::System.Array.ConvertAll<"
+                + typeArguments
+                + ">(v1 as "
+                + elementText
+                + "[] ?? global::System.Linq.Enumerable.ToArray(v1), static e1 => "
+                + convert
+                + ") : null;\n"
+        );
+    }
+
+    // A converter of the whole array takes an array, so a sequence that is none is copied into one first, and what it
+    // returns is bound as it is.
+    [Fact]
+    public void Append_PostgresArraySequenceConvertedWhole_ConvertsTheCopiedArray()
+    {
+        var write = new Conversion("global::App.Ids.ToDatabase", "long[]", false, false, null, false);
+
+        var written = Write(
+            new MethodParameter(
+                "ids",
+                "Ids",
+                "global::App.Id[]",
+                false,
+                true,
+                write,
+                Sequence: ParameterSequence.Array
+            ),
+            "v1"
+        );
+
+        written.ShouldContain("    var p0 = new global::Npgsql.NpgsqlParameter<long[]>();\n");
+        written.ShouldContain(
+            "    p0.TypedValue = parameters.Ids is { } v1 ? global::App.Ids.ToDatabase(v1 as global::App.Id[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(v1)) : null;\n"
+        );
+    }
+
     // The domain public.email over text.
     private static readonly PostgresType Email = TestSidecars.Postgres(
         name: "email",
@@ -250,6 +369,15 @@ public sealed class PostgresParameterBinderTests
         schema: "public",
         internalName: "work_email",
         baseType: Email
+    );
+
+    // The array integer[], as the entry of a parameter describes it.
+    private static readonly PostgresType IntArray = TestSidecars.Postgres(
+        name: "integer[]",
+        kind: SidecarValues.Kind.Array,
+        internalName: "_int4",
+        element: TestSidecars.Postgres(),
+        bindName: "integer[]"
     );
 
     // A parameter's type as the sidecar describes it, int4 bound by the name.

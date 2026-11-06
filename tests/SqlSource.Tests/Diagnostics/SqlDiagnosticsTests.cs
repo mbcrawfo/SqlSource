@@ -72,9 +72,13 @@ public sealed class SqlDiagnosticsTests
         }
     }
 
+    // The parser's ids follow the order of its kinds, from SQLSRC101.  SQLSRC122 to SQLSRC125 are placement errors,
+    // which the build reports for the type that claims a file, so the kinds after the first twenty-one go on from
+    // SQLSRC126.
     [Fact]
     public void ForParseError_EveryKind_HasItsOwnDescriptorInTheFileRange()
     {
+        const int BeforeThePlacementErrors = 21;
         var kinds = Enum.GetValues<SqlParseErrorKind>();
 
         var descriptors = kinds.Select(SqlDiagnostics.ForParseError).ToArray();
@@ -82,7 +86,10 @@ public sealed class SqlDiagnosticsTests
         descriptors.Distinct().Count().ShouldBe(kinds.Length);
         descriptors
             .Select(descriptor => descriptor.Id)
-            .ShouldBe(kinds.Select((_, index) => string.Create(CultureInfo.InvariantCulture, $"SQLSRC{101 + index}")));
+            .ShouldBe(kinds.Select((_, index) => string.Create(CultureInfo.InvariantCulture, $"SQLSRC{IdOf(index)}")));
+
+        static int IdOf(int index) =>
+            index < BeforeThePlacementErrors ? 101 + index : 126 + index - BeforeThePlacementErrors;
     }
 
     [Fact]
@@ -112,6 +119,18 @@ public sealed class SqlDiagnosticsTests
                 "The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose "
                     + "server collation is case-sensitive reads '@id' as another variable, which the query does not "
                     + "declare.  Write it '@Id' throughout the query."
+            );
+
+    [Fact]
+    public void ForParseError_ListParameterMisused_IsSqlsrc126() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.ListParameterMisused).Id.ShouldBe("SQLSRC126");
+
+    [Fact]
+    public void ListParameterMisused_Message_HoldsTheParameterAndTheReason() =>
+        Format(SqlDiagnostics.ListParameterMisused, "@ids", "is used here as one value")
+            .ShouldBe(
+                "The parameter '@ids' is a list, written after IN, and is used here as one value.  A list can stand "
+                    + "after IN or NOT IN, or before IS NULL or IS NOT NULL."
             );
 
     [Fact]

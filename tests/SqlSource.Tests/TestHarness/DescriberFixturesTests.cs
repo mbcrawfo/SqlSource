@@ -1,7 +1,7 @@
 using System.IO;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using Xunit;
 
 namespace SqlSource.Tests.TestHarness;

@@ -48,9 +48,9 @@ internal sealed class RealisticDescribe(RealisticCorpus corpus, string database,
     // The request of the case's one query as a run plans it.
     public static DescribeRequest RequestOf(RealisticCase found)
     {
-        var (planned, _) = FixtureReplay.Plan(found.AsFixture, TestContext.Current.CancellationToken);
+        var (planned, dialect) = FixtureReplay.Plan(found.AsFixture, TestContext.Current.CancellationToken);
         var query = planned.Query;
-        return new DescribeRequest(query.Name, SampleSql.Build(query), query.Parameters);
+        return new DescribeRequest(query.Name, SampleSql.Build(query, dialect), query.Parameters);
     }
 
     // The entry that a run writes for the case's one query from its description, as tools/describe-end-to-end.sh

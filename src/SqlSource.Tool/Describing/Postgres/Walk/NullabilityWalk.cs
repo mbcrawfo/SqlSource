@@ -65,13 +65,20 @@ internal sealed record WalkOutcome(
 /// and <c>pg_catalog</c> holds none of that is not built in, or null for none: a name it was not asked, and every
 /// name of a call that failed, is held elsewhere.
 /// </param>
+/// <param name="DistrustsJoinReduction">
+/// Whether no join of the plan is trusted to keep a side that the query's text may null-extend: a gated query that
+/// negates a list, <c>o.id NOT IN @ids</c>.  The list is described as one value, which the planner reads as the strict
+/// <c>o.id &lt;&gt; $1</c> and so makes a <c>LEFT JOIN</c> inner, while an empty list, as the query runs, keeps the
+/// rows whose <c>o.id</c> is <c>NULL</c>.  Every join but a semi join is then read as extending both of its sides.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
     bool CatalogFunctionsFirst,
     IReadOnlyDictionary<long, PostgresTableRow> Tables,
     IReadOnlyList<long> ColumnTypes,
-    CatalogNames? CatalogAlone = null
+    CatalogNames? CatalogAlone = null,
+    bool DistrustsJoinReduction = false
 );
 
 /// <summary>

@@ -8,11 +8,13 @@ See [query methods](../../../../../docs/architecture/generator.md#query-methods)
 
 ## Engines in a query method
 
-- **A phase file asks a flag of `ExecutionCapabilities`, never the engine, which `CommandWriter.cs` names only for `ParameterBinder.For`.**  The flags come from the one switch in `ExecutionCapabilityRules.cs`, run in the output step and never cached, and the statements and `<exception>` documentation they turn on are in `ExecutionCapabilityWriter.cs`.  See [query methods](../../../../../docs/architecture/generator.md#query-methods).
+- **A phase file asks a flag of `ExecutionCapabilities`, never the engine, which `CommandWriter.cs` names only for `ParameterBinder.For`, and `ListWriter.cs` only for the limit of parameters, `LimitOf`.**  The flags come from the one switch in `ExecutionCapabilityRules.cs`, run in the output step and never cached, and the statements and `<exception>` documentation they turn on are in `ExecutionCapabilityWriter.cs`.  See [query methods](../../../../../docs/architecture/generator.md#query-methods).
 
 ## Locals
 
 - **A local, pattern variable or lambda's parameter of a query's method takes its name from `LocalNames` in `LocalNames.cs`, held by `QueryMethodLocals` of `QueryMethodLocals.cs`.**  A name a token could hide gets a row in `Run_TokenWithAnAwkwardName_Compiles` and `Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles` of `tests/SqlSource.Tests/Generator/GeneratedSourceMethodTests.cs`, and in their `_CompilesOnTheNewestCSharp` siblings in `tests/SqlSource.Tests/Generation/Emitting/MethodWriterTests.cs`.
+
+- **The parameters and locals of a static local function, as `ListWriter.AppendHelpers` writes them, keep fixed names and need no row.**  C# lets them hide any argument or local of the method, so no token can hide them.
 
 ## A new kind of method
 

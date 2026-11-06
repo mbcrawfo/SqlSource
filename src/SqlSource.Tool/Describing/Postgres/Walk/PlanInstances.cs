@@ -144,16 +144,19 @@ internal sealed class PlanInstances
     private readonly PlanNode _tree;
     private readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> _partitions;
     private readonly string? _target;
+    private readonly bool _distrustsJoinReduction;
     private bool _targetScanSeen;
 
     private PlanInstances(
         PlanNode root,
         PlanNode tree,
-        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> partitions
+        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> partitions,
+        bool distrustsJoinReduction
     )
     {
         _tree = tree;
         _partitions = partitions;
+        _distrustsJoinReduction = distrustsJoinReduction;
         _target = root.NodeType == PlanNodeTypes.ModifyTable ? root.Alias : null;
         Visit(root, 0, extended: false);
         BareAlias = BareAliasOf(root);
@@ -189,11 +192,16 @@ internal sealed class PlanInstances
     /// <param name="root">The root of the plan whose instances are found.</param>
     /// <param name="tree">The root of the whole plan, where the <c>InitPlan</c> of a CTE is looked for.</param>
     /// <param name="partitions">The answer of <c>partitions</c>, by relation; empty when it was not asked.</param>
+    /// <param name="distrustsJoinReduction">
+    /// Whether every join but a semi join is read as extending both of its sides, since the planner may have made it
+    /// inner, left or right on a condition that the query, as it runs, does not keep (<see cref="WalkScope" />).
+    /// </param>
     public static PlanInstances Find(
         PlanNode root,
         PlanNode tree,
-        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> partitions
-    ) => new(root, tree, partitions);
+        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> partitions,
+        bool distrustsJoinReduction = false
+    ) => new(root, tree, partitions, distrustsJoinReduction);
 
     /// <summary>Whether the node scans one relation, a foreign table's included.</summary>
     public static bool ScansARelation(PlanNode node) => RelationScans.Contains(node.NodeType);
@@ -201,7 +209,7 @@ internal sealed class PlanInstances
     /// <summary>
     /// Whether a join at the node or under it, through <c>Outer</c> and <c>Inner</c> children, null-extends a side.
     /// </summary>
-    public static bool ExtendsUnder(PlanNode node) =>
+    public bool ExtendsUnder(PlanNode node) =>
         ExtendsOf(node) != NullExtension.None || node.JoinChildren.Any(ExtendsUnder);
 
     /// <summary>Whether the alias names an instance, and which.</summary>
@@ -228,14 +236,22 @@ internal sealed class PlanInstances
 
     // Which side a join extends, None for a node that is no join, and null for a join type that is not known.  An
     // anti join extends too: the planner makes one of a LEFT JOIN b ... WHERE b.x IS NULL and returns b's columns NULL.
-    private static NullExtension? ExtendsOf(PlanNode node) =>
+    // Where join reduction is distrusted, every join but a semi join extends both sides: an inner join may be an outer
+    // one reduced, a left or a right join a full one, and an anti join is made of a left join.
+    private NullExtension? ExtendsOf(PlanNode node) =>
         node.JoinType switch
         {
             null => NullExtension.None,
+            PlanJoinTypes.Semi or PlanJoinTypes.RightSemi => NullExtension.None,
+            PlanJoinTypes.Full => NullExtension.Both,
+            PlanJoinTypes.Inner
+            or PlanJoinTypes.Left
+            or PlanJoinTypes.Anti
+            or PlanJoinTypes.Right
+            or PlanJoinTypes.RightAnti when _distrustsJoinReduction => NullExtension.Both,
             PlanJoinTypes.Left or PlanJoinTypes.Anti => NullExtension.Inner,
             PlanJoinTypes.Right or PlanJoinTypes.RightAnti => NullExtension.Outer,
-            PlanJoinTypes.Full => NullExtension.Both,
-            PlanJoinTypes.Inner or PlanJoinTypes.Semi or PlanJoinTypes.RightSemi => NullExtension.None,
+            PlanJoinTypes.Inner => NullExtension.None,
             _ => null,
         };
 

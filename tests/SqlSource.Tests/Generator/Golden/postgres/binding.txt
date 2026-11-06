@@ -20,7 +20,7 @@ namespace App
     /// </summary>
     /// <param name="Arg">The parameter <c>arg</c>, <c>work_email[]</c>.</param>
     /// <param name="MaybeArg">The parameter <c>maybe_arg</c>, <c>work_email[]</c>.</param>
-    public sealed record BindArrayOfADomainOverADomainParams(string[] Arg, string[]? MaybeArg);
+    public sealed record BindArrayOfADomainOverADomainParams(global::System.Collections.Generic.IEnumerable<string> Arg, global::System.Collections.Generic.IEnumerable<string>? MaybeArg);
 }
 
 ==== File: App.BindArrayOfADotInTheSchemaParams-Model.g.cs
@@ -34,7 +34,7 @@ namespace App
     /// </summary>
     /// <param name="Arg">The parameter <c>arg</c>, <c>"my.schema".t[]</c>.</param>
     /// <param name="MaybeArg">The parameter <c>maybe_arg</c>, <c>"my.schema".t[]</c>.</param>
-    public sealed record BindArrayOfADotInTheSchemaParams(string[] Arg, string[]? MaybeArg);
+    public sealed record BindArrayOfADotInTheSchemaParams(global::System.Collections.Generic.IEnumerable<string> Arg, global::System.Collections.Generic.IEnumerable<string>? MaybeArg);
 }
 
 ==== File: App.BindArrayOfAnUnknownKindParams-Model.g.cs
@@ -48,7 +48,7 @@ namespace App
     /// </summary>
     /// <param name="Arg">The parameter <c>arg</c>, <c>thing[]</c>.</param>
     /// <param name="MaybeArg">The parameter <c>maybe_arg</c>, <c>thing[]</c>.</param>
-    public sealed record BindArrayOfAnUnknownKindParams(string[] Arg, string[]? MaybeArg);
+    public sealed record BindArrayOfAnUnknownKindParams(global::System.Collections.Generic.IEnumerable<string> Arg, global::System.Collections.Generic.IEnumerable<string>? MaybeArg);
 }
 
 ==== File: App.BindArrayParams-Model.g.cs
@@ -62,7 +62,7 @@ namespace App
     /// </summary>
     /// <param name="Arg">The parameter <c>arg</c>, <c>integer[]</c>.</param>
     /// <param name="MaybeArg">The parameter <c>maybe_arg</c>, <c>integer[]</c>.</param>
-    public sealed record BindArrayParams(int[] Arg, int[]? MaybeArg);
+    public sealed record BindArrayParams(global::System.Collections.Generic.IEnumerable<int> Arg, global::System.Collections.Generic.IEnumerable<int>? MaybeArg);
 }
 
 ==== File: App.BindBaseParams-Model.g.cs
@@ -368,18 +368,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<int[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<int>>();
                     parameter.ParameterName = "arg";
                     parameter.DataTypeName = "pg_catalog._int4";
-                    parameter.TypedValue = parameters.Arg;
+                    parameter.TypedValue = parameters.Arg is { } value ? value as global::System.Collections.Generic.IList<int> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<int[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<int>>();
                     parameter.ParameterName = "maybe_arg";
                     parameter.DataTypeName = "pg_catalog._int4";
-                    parameter.TypedValue = parameters.MaybeArg;
+                    parameter.TypedValue = parameters.MaybeArg is { } value ? value as global::System.Collections.Generic.IList<int> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -910,18 +910,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string>>();
                     parameter.ParameterName = "arg";
                     parameter.DataTypeName = "text[]";
-                    parameter.TypedValue = parameters.Arg;
+                    parameter.TypedValue = parameters.Arg is { } value ? value as global::System.Collections.Generic.IList<string> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string>>();
                     parameter.ParameterName = "maybe_arg";
                     parameter.DataTypeName = "text[]";
-                    parameter.TypedValue = parameters.MaybeArg;
+                    parameter.TypedValue = parameters.MaybeArg is { } value ? value as global::System.Collections.Generic.IList<string> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -1046,18 +1046,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string>>();
                     parameter.ParameterName = "arg";
                     parameter.DataTypeName = "\"my.schema\".t[]";
-                    parameter.TypedValue = parameters.Arg;
+                    parameter.TypedValue = parameters.Arg is { } value ? value as global::System.Collections.Generic.IList<string> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string>>();
                     parameter.ParameterName = "maybe_arg";
                     parameter.DataTypeName = "\"my.schema\".t[]";
-                    parameter.TypedValue = parameters.MaybeArg;
+                    parameter.TypedValue = parameters.MaybeArg is { } value ? value as global::System.Collections.Generic.IList<string> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -1318,18 +1318,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string>>();
                     parameter.ParameterName = "arg";
                     parameter.DataTypeName = "public._thing";
-                    parameter.TypedValue = parameters.Arg;
+                    parameter.TypedValue = parameters.Arg is { } value ? value as global::System.Collections.Generic.IList<string> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string>>();
                     parameter.ParameterName = "maybe_arg";
                     parameter.DataTypeName = "public._thing";
-                    parameter.TypedValue = parameters.MaybeArg;
+                    parameter.TypedValue = parameters.MaybeArg is { } value ? value as global::System.Collections.Generic.IList<string> ?? global::System.Linq.Enumerable.ToArray(value) : null;
                     command.Parameters.Add(parameter);
                 }
 

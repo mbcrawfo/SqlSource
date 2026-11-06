@@ -278,10 +278,22 @@ public sealed class ConverterCompileTests
                 + "global::System.Array.ConvertAll<int?, global::App.Level>(reader.GetFieldValue<int?[]>(9), "
         );
         methods.ShouldContain("global::App.Tags.FromDatabase(reader.GetFieldValue<string[]>(10))");
-        methods.ShouldContain("value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, ");
-        methods.ShouldContain("value ? global::System.Array.ConvertAll<global::App.Email, string>(value, ");
-        methods.ShouldContain("value ? global::System.Array.ConvertAll<global::App.Name?, string?>(value, ");
-        methods.ShouldContain("value ? global::System.Array.ConvertAll<global::App.Level?, int?>(value, ");
+        methods.ShouldContain(
+            "value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
+        );
+        methods.ShouldContain(
+            "value ? global::System.Array.ConvertAll<global::App.Email, string>(value as global::App.Email[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
+        );
+        methods.ShouldContain(
+            "value ? global::System.Array.ConvertAll<global::App.Name?, string?>(value as global::App.Name[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
+        );
+        methods.ShouldContain(
+            "value ? global::System.Array.ConvertAll<global::App.Level?, int?>(value as global::App.Level[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
+        );
         methods.ShouldContain("parameters.Tags is { } value ? global::App.Tags.ToDatabase(value) : null");
         methods.ShouldContain(
             "global::System.Array.ConvertAll<long?, global::App.UserId?>(reader.GetFieldValue<long?[]>(11), "
@@ -290,8 +302,14 @@ public sealed class ConverterCompileTests
             "reader.IsDBNull(12) ? default(global::App.Name?[]?) : "
                 + "global::System.Array.ConvertAll<string, global::App.Name?>(reader.GetFieldValue<string[]>(12), "
         );
-        methods.ShouldContain("value ? global::System.Array.ConvertAll<global::App.UserId?, long?>(value, ");
-        methods.ShouldContain("value ? global::System.Array.ConvertAll<global::App.Name?, string?>(value, ");
+        methods.ShouldContain(
+            "value ? global::System.Array.ConvertAll<global::App.UserId?, long?>(value as global::App.UserId?[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
+        );
+        methods.ShouldContain(
+            "value ? global::System.Array.ConvertAll<global::App.Name?, string?>(value as global::App.Name?[] ?? "
+                + "global::System.Linq.Enumerable.ToArray(value), "
+        );
     }
 
     private static void RunOnSqlClient(MetadataReference reference)

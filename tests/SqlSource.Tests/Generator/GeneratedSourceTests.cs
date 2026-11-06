@@ -282,6 +282,52 @@ public sealed class GeneratedSourceTests
             );
     }
 
+    // A list's uses are segments of their own, and a constant writes them as the SQL wrote them.
+    [Fact]
+    public void Constant_QueryWithAList_IsTheSqlAsWritten()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile(
+                GeneratorHarness.UsersPath,
+                "-- name: ListByIds\n-- output: sql\nSELECT id FROM users WHERE (@ids IS NULL OR id IN @ids);\n"
+            )
+        );
+
+        run.ShouldBeClean();
+        var file = run.Sources[GeneratorHarness.SampleFile];
+        file.ShouldContain(
+            "        /// SELECT id FROM users WHERE (@ids IS NULL OR id IN @ids);\n"
+                + "        /// </code>\n"
+                + "        /// </remarks>\n"
+                + "        public const string ListByIds = "
+                + "\"SELECT id FROM users WHERE (@ids IS NULL OR id IN @ids);\";\n"
+        );
+    }
+
+    // A query that keeps its comments has its list's uses split in the kept form too, and its constant is that form
+    // exactly as written.
+    [Fact]
+    public void Constant_QueryWithAListThatKeepsComments_IsTheKeptSqlAsWritten()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile(
+                GeneratorHarness.UsersPath,
+                "-- name: ListByIds\n-- output: sql\n-- generator: keep-comments\n"
+                    + "SELECT id FROM users WHERE id IN /* c */ @ids;\n"
+            )
+        );
+
+        run.ShouldBeClean();
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain(
+                "        public const string ListByIds = \"SELECT id FROM users WHERE id IN /* c */ @ids;\";\n"
+            );
+    }
+
     // CS8981 is reported from warning level 7 on, so it shows that the harness compiles at the highest level.
     [Fact]
     public void CreateCompilation_LowercaseTypeName_ReportsCS8981()

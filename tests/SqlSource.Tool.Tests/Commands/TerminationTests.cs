@@ -5,6 +5,7 @@ using System.IO;
 using System.Security;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;

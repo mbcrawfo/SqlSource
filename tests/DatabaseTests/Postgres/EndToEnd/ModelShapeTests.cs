@@ -450,9 +450,11 @@ public sealed class ModelShapeTests
 
         // A parameter for each column that the query writes, in its order, with the column's type, and none can be
         // null, since no -- param: marker says null.  It writes every column but those whose parameter Dapper cannot
-        // send.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
+        // send.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.  An array
+        // parameter is an IEnumerable<T> of its element in the method's model and an array in the Dapper copy's, and
+        // bytea and a multirange are no sequences.
         var columns = TypedPropertiesOf(typeof(AllTypesDto));
-        var expected = columns
+        var written = columns
             .Where(static column => !AllTypesQueryTests.WriteSideLeftOut.ContainsKey(column.Name))
             .Select(column =>
                 (
@@ -462,8 +464,21 @@ public sealed class ModelShapeTests
                         : Nullable.GetUnderlyingType(column.Type) ?? column.Type,
                     false
                 )
+            )
+            .ToArray();
+        TypedPropertiesOf(typeof(InsertAllTypesForDapperArgs)).ShouldBe(written);
+        TypedPropertiesOf(typeof(InsertAllTypesArgs))
+            .ShouldBe(
+                written.Select(static parameter =>
+                    parameter.Name is "Int4ArrayValue" or "TextArrayValue" or "DateArrayValue"
+                        ? (
+                            parameter.Name,
+                            typeof(IEnumerable<>).MakeGenericType(parameter.Item2.GetElementType()!),
+                            false
+                        )
+                        : parameter
+                )
             );
-        TypedPropertiesOf(typeof(InsertAllTypesArgs)).ShouldBe(expected);
         TypedPropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(39);
     }
 
@@ -474,9 +489,22 @@ public sealed class ModelShapeTests
         ShapeOf(typeof(InsertEveryTypeArgs)).ShouldBe(ModelShape.Record);
 
         // A parameter for each column, in its order, with the column's type, and each but the id can be null, as its
-        // -- param: marker says.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
+        // -- param: marker says.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool,
+        // and an array parameter is an IEnumerable<T> of its element, where bytea, int2vector, oidvector and a
+        // multirange are no sequences.
         var expected = TypedPropertiesOf(typeof(AllTypesDto))
-            .Select(static column => column.Name == "Bit1Value" ? (column.Name, typeof(BitArray), true) : column);
+            .Select(static column =>
+                column.Name switch
+                {
+                    "Bit1Value" => (column.Name, typeof(BitArray), true),
+                    _ when column.Name.EndsWith("ArrayValue", StringComparison.Ordinal) => (
+                        column.Name,
+                        typeof(IEnumerable<>).MakeGenericType(column.Type.GetElementType()!),
+                        true
+                    ),
+                    _ => column,
+                }
+            );
         TypedPropertiesOf(typeof(InsertEveryTypeArgs)).ShouldBe(expected);
     }
 

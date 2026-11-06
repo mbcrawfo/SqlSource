@@ -40,11 +40,13 @@ public sealed class JsonQueryTests(PostgresDatabases postgres)
         read.Id.ShouldBe(row.Id);
         ShouldBeSame(read.Element, row.Element, nameof(read.Element));
         ShouldBeSame(read.ElementJson, row.ElementJson, nameof(read.ElementJson));
+        // The input model holds the array as any sequence.
         var elements = read.Elements.ShouldNotBeNull();
-        elements.Length.ShouldBe(row.Elements!.Length);
+        var written = row.Elements.ShouldNotBeNull().ToArray();
+        elements.Length.ShouldBe(written.Length);
         for (var i = 0; i < elements.Length; i++)
         {
-            ShouldBeSame(elements[i], row.Elements[i], nameof(read.Elements));
+            ShouldBeSame(elements[i], written[i], nameof(read.Elements));
         }
 
         ShouldBeSame(readDocument.ShouldNotBeNull().RootElement, document.RootElement, nameof(read.Document));
@@ -235,7 +237,15 @@ public sealed class JsonQueryTests(PostgresDatabases postgres)
         ];
 
         ModelReflection.TypedPropertiesOf(typeof(JsonValuesDto)).ShouldBe(properties);
-        ModelReflection.TypedPropertiesOf(typeof(InsertJsonValuesArgs)).ShouldBe(properties);
+
+        // The input model holds the jsonb[] as any sequence; a C# type a marker or a column type gives is as written.
+        ModelReflection
+            .TypedPropertiesOf(typeof(InsertJsonValuesArgs))
+            .ShouldBe(
+                properties.Select(static property =>
+                    property.Name == "Elements" ? (property.Name, typeof(IEnumerable<JsonElement>), true) : property
+                )
+            );
         ModelReflection
             .TypedPropertiesOf(typeof(GetRequiredJsonDto))
             .ShouldBe([("Meta", typeof(OrderMetadata), false), ("Node", typeof(JsonNode), false)]);

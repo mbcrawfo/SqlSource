@@ -10,6 +10,7 @@ using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;

@@ -61,6 +61,7 @@ internal static class HeaderWriter
             XmlDocWriter.AppendException(builder, indent, ExceptionCref, "The query returned more than one row.");
         }
 
+        ListWriter.AppendDocumentation(in context, indent);
         ExecutionCapabilityWriter.AppendDocumentation(in context, indent);
     }
 
@@ -93,7 +94,7 @@ internal static class HeaderWriter
         };
 
     // The receiver and the input are refused when null, and under validate-tokens each token's text when it is null
-    // or white space.
+    // or white space; then each list is read and counted, and the number of parameters checked against the limit.
     internal static void AppendChecks(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
@@ -115,6 +116,8 @@ internal static class HeaderWriter
                 _ = builder.Append(");\n");
             }
         }
+
+        ListCountWriter.AppendCounts(in context, indent);
     }
 
     // A streaming method's return of a call to its iterator, then the iterator's signature and the brace that opens
@@ -129,7 +132,7 @@ internal static class HeaderWriter
         _ = builder
             .Append(");\n\n")
             .Append(indent)
-            .Append(AsyncSpelling.IteratorModifiers)
+            .Append(AsyncSpelling.IteratorModifiersOf(captures: locals.Lists is not null))
             .Append(RowsWriter.GetResultType(in context))
             .Append(' ')
             .Append(locals.Iterator)

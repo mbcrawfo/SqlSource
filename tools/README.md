@@ -89,7 +89,7 @@ A line is `<scope> <pattern>`:
 - The pairs that run are the union over every changed path.  A change to the file itself runs both.
 - A `project <postgres|sqlserver> <path>` line names a container project's `.csproj` and the engine that runs it.  The four container projects are the only ones listed, and every other test project always runs.
 
-To change it, edit the file and run the tests; `tests/SqlSource.Tests/Validation/` checks:
+To change it, edit the file and run the tests; `tests/SqlSource.Repository.Tests/Validation/` checks:
 
 - Every line parses and every pattern matches at least one file of the repository, so a renamed folder cannot leave a dead line behind (`TestScopesFileTests`).
 - Every file that a container project includes from outside its own folder, a linked file, a referenced project or an import, has a scope that runs that project (`ContainerProjectInputsTests`).  The check reads the project's `.csproj`, every `Directory.Build.props` and `Directory.Build.targets` from its folder up to the root, and every project under `tests/` that it references, directly or not, with the `Directory.Build` files above that project, and every file under `tests/` that an import of any of those names, `tests/Fixtures.props` among them.  A project that links a file whose scope is `none` or the other engine's fails there.

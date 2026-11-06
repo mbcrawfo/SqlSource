@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Testing;
@@ -34,6 +35,18 @@ internal static class DescribeRequests
         }
 
         return Listed(sql, [.. parameters]);
+    }
+
+    // A request as a run makes it from the SQL of a file: the query is planned in a project of the dialect, and its
+    // sample SQL and parameters are those a run sends, so that a list's stand-in is the one the tool writes.
+    public static DescribeRequest Planned(string dialect, string sql)
+    {
+        using var folder = new TempFolder();
+        var query = Plans.Query(folder, "-- name: " + Query + "\n" + sql + ";\n", dialect).Query;
+        var read = SqlDialectName.TryParse(dialect, out var choice)
+            ? choice.Dialect
+            : throw new ArgumentException($"'{dialect}' is no dialect.", nameof(dialect));
+        return new DescribeRequest(query.Name, SampleSql.Build(query, read), query.Parameters);
     }
 
     // A request whose parameters are those the test gives, in its order, whatever the SQL holds.

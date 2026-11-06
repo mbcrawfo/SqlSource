@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Tokens;
 using Xunit;
 
 namespace SqlSource.Tests.Parsing;
@@ -111,6 +112,29 @@ public sealed class SqlQueryHashTests
     public void Hash_IgnoresALibraryTypesMarker() =>
         Hash("-- library-types: nodatime=on\n-- name: Q\n-- library-types: nodatime=off\nSELECT 1;\n")
             .ShouldBe(Hash(Simple));
+
+    // A list's uses are segments of their own, and are hashed as the text they were, so a list adds nothing to the
+    // hash's input.
+    [Fact]
+    public void Hash_QueryWithAList_IsTheHashOfItsText()
+    {
+        const string Sql = "SELECT id FROM t WHERE (@ids IS NULL OR id IN @ids) AND a = @a;";
+        var result = SqlFileParser.Parse("-- name: Q\n" + Sql + "\n", "Query.sql", SqlDialect.PostgreSql);
+        result.Errors.ShouldBeEmpty();
+        var block = result.Blocks.ShouldHaveSingleItem();
+        block.Segments.Count.ShouldBeGreaterThan(1);
+
+        SqlQueryHash
+            .Compute(result.Dialect, block.Segments, block.Tokens, block.Parameters)
+            .ShouldBe(
+                SqlQueryHash.Compute(
+                    result.Dialect,
+                    new EquatableArray<SqlSegment>([new SqlSegment(SqlSegmentKind.Literal, Sql)]),
+                    block.Tokens,
+                    block.Parameters
+                )
+            );
+    }
 
     [Fact]
     public void Compute_AnyQuery_IsSixtyFourLowerCaseHexCharacters() => Hash(Simple).ShouldMatch("^[0-9a-f]{64}$");

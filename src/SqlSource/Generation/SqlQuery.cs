@@ -78,4 +78,10 @@ internal sealed record SqlQuery(
     /// query has the marker of the whole file.
     /// </summary>
     public LocationInfo? VisibilityMarker { get; init; }
+
+    /// <summary>
+    /// The names the query's SQL declares as local variables, as written, without their prefix, which are none of its
+    /// <see cref="Parameters" /> and which no parameter its method sends may take.  Empty when it declares none.
+    /// </summary>
+    public EquatableArray<string> DeclaredVariables { get; init; }
 }

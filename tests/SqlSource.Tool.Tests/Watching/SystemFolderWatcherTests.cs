@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;

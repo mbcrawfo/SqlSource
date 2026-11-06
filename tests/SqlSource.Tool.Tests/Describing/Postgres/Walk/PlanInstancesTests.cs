@@ -52,6 +52,41 @@ public sealed class PlanInstancesTests
         ExtendedIn(instances, "b").ShouldBe(inner);
     }
 
+    // Where join reduction is distrusted, as in a query that negates a list, a join the planner made inner, left or
+    // right may have been an outer one, or a full one, in the text: every join but a semi join extends both sides.
+    [Theory]
+    [InlineData("Inner", true, true)]
+    [InlineData("Left", true, true)]
+    [InlineData("Right", true, true)]
+    [InlineData("Full", true, true)]
+    [InlineData("Semi", false, false)]
+    [InlineData("Anti", true, true)]
+    [InlineData("Right Semi", false, false)]
+    [InlineData("Right Anti", true, true)]
+    public void Find_JoinOfTwoScansWhereReductionIsDistrusted_ExtendsBothSidesButOfASemiJoin(
+        string joinType,
+        bool outer,
+        bool inner
+    )
+    {
+        var plan = Join(joinType, Scan("a"), Scan("b"));
+        var instances = PlanInstances.Find(plan, plan, PlanInstances.NoPartitions, distrustsJoinReduction: true);
+
+        instances.Reason.ShouldBeNull();
+        ExtendedIn(instances, "a").ShouldBe(outer);
+        ExtendedIn(instances, "b").ShouldBe(inner);
+    }
+
+    // A plan without a join extends nothing, whatever is distrusted.
+    [Fact]
+    public void Find_ScanWhereReductionIsDistrusted_IsNotExtended()
+    {
+        var plan = Over("Sort", Scan("a"));
+
+        ExtendedIn(PlanInstances.Find(plan, plan, PlanInstances.NoPartitions, distrustsJoinReduction: true), "a")
+            .ShouldBeFalse();
+    }
+
     // A LEFT JOIN the planner swapped is a Right join with the sides swapped: the rule gives the same answer.
     [Fact]
     public void Find_SwappedLeftJoin_ExtendsTheOuterChild()
@@ -401,8 +436,15 @@ public sealed class PlanInstancesTests
     [Fact]
     public void ExtendsUnder_JoinThatExtendsUnderTheNode_IsTrue()
     {
-        PlanInstances.ExtendsUnder(Over("Sort", Join("Left", Scan("a"), Scan("b")))).ShouldBeTrue();
-        PlanInstances.ExtendsUnder(Over("Sort", Join("Inner", Scan("a"), Scan("b")))).ShouldBeFalse();
+        var left = Over("Sort", Join("Left", Scan("a"), Scan("b")));
+        var inner = Over("Sort", Join("Inner", Scan("a"), Scan("b")));
+
+        Find(left).ExtendsUnder(left).ShouldBeTrue();
+        Find(inner).ExtendsUnder(inner).ShouldBeFalse();
+        PlanInstances
+            .Find(inner, inner, PlanInstances.NoPartitions, distrustsJoinReduction: true)
+            .ExtendsUnder(inner)
+            .ShouldBeTrue();
     }
 
     // An instance is under the child its scan is reached from through Outer and Inner children, the child itself

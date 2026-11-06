@@ -52,9 +52,10 @@ internal static class Plans
         );
 
     // The first query of a file that holds this SQL, in a postgres project of its own.
-    public static PlannedQuery Query(TempFolder folder, string sql)
+    public static PlannedQuery Query(TempFolder folder, string sql, string dialect = "postgres")
     {
         var project = Postgres(folder);
+        project.Settings["dialect"] = dialect;
         _ = project.AddSql("Q.sql", sql);
         return Of(project).Files[0].Queries[0];
     }

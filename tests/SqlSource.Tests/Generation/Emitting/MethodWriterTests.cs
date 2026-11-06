@@ -335,6 +335,24 @@ public sealed class MethodWriterTests
     [InlineData("item")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("list0")]
+    [InlineData("count0")]
+    [InlineData("size0")]
+    [InlineData("padded0")]
+    [InlineData("total")]
+    [InlineData("index")]
+    [InlineData("end")]
+    [InlineData("written")]
+    [InlineData("CountOf")]
+    [InlineData("PaddedSize")]
+    [InlineData("DigitsUpTo")]
+    [InlineData("TElement")]
+    [InlineData("values")]
+    [InlineData("collection")]
+    [InlineData("array")]
+    [InlineData("size")]
+    [InlineData("digits")]
+    [InlineData("power")]
     public void Run_TokenWithAnAwkwardName_CompilesOnTheNewestCSharp(string name)
     {
         var source = """
@@ -417,6 +435,24 @@ public sealed class MethodWriterTests
     [InlineData("yield")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("list0")]
+    [InlineData("count0")]
+    [InlineData("size0")]
+    [InlineData("padded0")]
+    [InlineData("total")]
+    [InlineData("index")]
+    [InlineData("end")]
+    [InlineData("written")]
+    [InlineData("CountOf")]
+    [InlineData("PaddedSize")]
+    [InlineData("DigitsUpTo")]
+    [InlineData("TElement")]
+    [InlineData("values")]
+    [InlineData("collection")]
+    [InlineData("array")]
+    [InlineData("size")]
+    [InlineData("digits")]
+    [InlineData("power")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
@@ -434,6 +470,9 @@ public sealed class MethodWriterTests
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
         methods.ShouldNotContain("static " + name + " =>");
         methods.ShouldNotContain("is { } " + name + " ?");
+        // A list's local takes the name list0 unless a token has it, and then list01.
+        methods.ShouldContain(name == "list0" ? "var list01 = parameters.Members;" : "var list0 = parameters.Members;");
+        methods.ShouldContain(".ParameterName = \"members_\" + ");
 
         var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.Latest);
 

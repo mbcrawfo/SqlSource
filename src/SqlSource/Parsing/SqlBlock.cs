@@ -72,4 +72,11 @@ internal sealed record SqlBlock(
     /// file is one query has the marker of the whole file.
     /// </summary>
     public TextSpan? VisibilityMarker { get; init; }
+
+    /// <summary>
+    /// The names the query's SQL declares as local variables, as written, without their prefix, in order, which are
+    /// none of its <see cref="Parameters" />.  A name may be here twice.  Empty when the dialect has none or the query
+    /// declares none.
+    /// </summary>
+    public EquatableArray<string> DeclaredVariables { get; init; }
 }

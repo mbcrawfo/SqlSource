@@ -268,14 +268,14 @@ internal static class ModelCollector
                     + "' there";
             }
 
-            if (!string.Equals(mine.Type.Text, theirs.Type.Text, StringComparison.Ordinal))
+            if (!string.Equals(mine.DeclaredType, theirs.DeclaredType, StringComparison.Ordinal))
             {
                 return "the property '"
                     + mine.Name
                     + "' is '"
-                    + ClrTypeName.AsWritten(mine.Type.Text)
+                    + ClrTypeName.AsWritten(mine.DeclaredType)
                     + "' here and '"
-                    + ClrTypeName.AsWritten(theirs.Type.Text)
+                    + ClrTypeName.AsWritten(theirs.DeclaredType)
                     + "' there";
             }
 

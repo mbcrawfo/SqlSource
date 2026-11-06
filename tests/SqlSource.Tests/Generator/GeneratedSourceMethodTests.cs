@@ -203,6 +203,24 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("item")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("list0")]
+    [InlineData("count0")]
+    [InlineData("size0")]
+    [InlineData("padded0")]
+    [InlineData("total")]
+    [InlineData("index")]
+    [InlineData("end")]
+    [InlineData("written")]
+    [InlineData("CountOf")]
+    [InlineData("PaddedSize")]
+    [InlineData("DigitsUpTo")]
+    [InlineData("TElement")]
+    [InlineData("values")]
+    [InlineData("collection")]
+    [InlineData("array")]
+    [InlineData("size")]
+    [InlineData("digits")]
+    [InlineData("power")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.RunInNestedClass(
@@ -282,6 +300,24 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("yield")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("list0")]
+    [InlineData("count0")]
+    [InlineData("size0")]
+    [InlineData("padded0")]
+    [InlineData("total")]
+    [InlineData("index")]
+    [InlineData("end")]
+    [InlineData("written")]
+    [InlineData("CountOf")]
+    [InlineData("PaddedSize")]
+    [InlineData("DigitsUpTo")]
+    [InlineData("TElement")]
+    [InlineData("values")]
+    [InlineData("collection")]
+    [InlineData("array")]
+    [InlineData("size")]
+    [InlineData("digits")]
+    [InlineData("power")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
@@ -299,6 +335,9 @@ public sealed class GeneratedSourceMethodTests
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
         methods.ShouldNotContain("static " + name + " =>");
         methods.ShouldNotContain("is { } " + name + " ?");
+        // A list's local takes the name list0 unless a token has it, and then list01.
+        methods.ShouldContain(name == "list0" ? "var list01 = parameters.Members;" : "var list0 = parameters.Members;");
+        methods.ShouldContain(".ParameterName = \"members_\" + ");
 
         var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.CSharp12);
 
@@ -314,6 +353,81 @@ public sealed class GeneratedSourceMethodTests
                 name == "exception"
                     ? "catch (global::System.Exception exception1) when (transaction is not null && exception1 is not"
                     : "catch (global::System.Exception exception) when (transaction is not null && exception is not"
+            );
+    }
+
+    // A list's use is a segment of its own, and the token method of a type writes it as the SQL wrote it, in the
+    // literal around it.
+    [Fact]
+    public void TokenMethod_QueryWithAListAndAToken_KeepsTheListAsWritten()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListByIds\n-- output: models\nSELECT id FROM users WHERE id IN @ids ORDER BY {{order:id}}\n"
+        );
+        var run = ModelRuns.Run(
+            file,
+            ModelRuns.Entry(file, "ListByIds", [ModelRuns.Parameter("ids")], [ModelRuns.Column("id")])
+        );
+
+        run.ShouldBeClean();
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain(
+                """
+                        /// <code>
+                        /// SELECT id FROM users WHERE id IN @ids ORDER BY {{order}}
+                        /// </code>
+                        /// </remarks>
+                        /// <param name="order">The text that replaces <c>{{order}}</c>.</param>
+                        /// <returns>The SQL with each token replaced by its argument.</returns>
+                        public static string ListByIds(string order)
+                        {
+                            global::System.ArgumentException.ThrowIfNullOrWhiteSpace(order);
+                            return string.Create(
+                                checked(47 + order.Length),
+                                order,
+                                static (span, state) =>
+                                {
+                                    "SELECT id FROM users WHERE id IN @ids ORDER BY ".CopyTo(span);
+                                    span = span.Slice(47);
+                                    state.CopyTo(span);
+                                }
+                            );
+                        }
+
+                """
+            );
+    }
+
+    // The kept form's list use is split at the kept form's places, and its token method keeps the comment before it in
+    // the literal around it.
+    [Fact]
+    public void TokenMethod_QueryWithAListThatKeepsComments_KeepsTheCommentAndTheList()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListByIds\n-- output: models\n-- generator: keep-comments\n"
+                + "SELECT id FROM users WHERE id IN /* c */ @ids ORDER BY {{order:id}}\n"
+        );
+        var run = ModelRuns.Run(
+            file,
+            ModelRuns.Entry(file, "ListByIds", [ModelRuns.Parameter("ids")], [ModelRuns.Column("id")])
+        );
+
+        run.ShouldBeClean();
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain(
+                """
+                                checked(55 + order.Length),
+                                order,
+                                static (span, state) =>
+                                {
+                                    "SELECT id FROM users WHERE id IN /* c */ @ids ORDER BY ".CopyTo(span);
+                                    span = span.Slice(55);
+                                    state.CopyTo(span);
+                                }
+
+                """
             );
     }
 

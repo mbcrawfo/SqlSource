@@ -55,14 +55,13 @@
         <InternalsVisibleTo Include="SqlSource.Tests" />
         <InternalsVisibleTo Include="SqlSource.Tests.RoslynFloor" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
-        <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres.Npgsql8" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
-        <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer.SqlClient61" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.TestHarness" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference Include="../SqlSource.Repository/SqlSource.Repository.csproj" />
     </ItemGroup>
 </Project>

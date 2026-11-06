@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 

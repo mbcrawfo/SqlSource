@@ -114,10 +114,10 @@ internal static class MethodRuns
         }
         """;
 
-    // Three queries whose token has the name, beside a parameter that can be null and an array, each bound through a
-    // converter: Probe reads many rows, ProbeOne one and ProbeStream streams its rows, each into a model of a column
-    // read through a converter and an array read through it element by element, so that the token sits beside every
-    // local and every lambda's parameter a method can have.
+    // Three queries whose token has the name, beside a parameter that can be null, an array and a list with a null
+    // test, each bound through a converter: Probe reads many rows, ProbeOne one and ProbeStream streams its rows, each
+    // into a model of a column read through a converter and an array read through it element by element, so that the
+    // token sits beside every local, local function and lambda's parameter a method can have.
     public static GeneratorRun RunTokenNamed(string token, LanguageVersion languageVersion)
     {
         var body =
@@ -125,7 +125,7 @@ internal static class MethodRuns
             + token
             + ":users}}\nSELECT id, ids FROM {{"
             + token
-            + "}} WHERE id = @id OR id = ANY(@ids);\n";
+            + "}} WHERE id = @id OR id = ANY(@ids) OR (@members IS NULL OR id IN @members);\n";
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
             "-- type-override: int4=App.UserId\n-- name: Probe\n"
@@ -140,6 +140,7 @@ internal static class MethodRuns
         [
             ModelRuns.Parameter("id", nullable: true),
             ModelRuns.Parameter("ids", ids, nullable: false),
+            ModelRuns.Parameter("members"),
         ];
         SidecarColumn[] columns = [ModelRuns.Column("id"), ModelRuns.Column("ids", ids)];
         return Run(

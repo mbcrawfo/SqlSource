@@ -1,8 +1,8 @@
 using System.IO;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
+using SqlSource.Repository;
 using SqlSource.Snapshot;
-using SqlSource.Testing;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using NodaTime;
 using Npgsql;
@@ -197,7 +199,17 @@ public sealed class NodaTimeQueryTests(PostgresDatabases postgres)
         ];
 
         ModelReflection.TypedPropertiesOf(typeof(NodaValuesDto)).ShouldBe(properties);
-        ModelReflection.TypedPropertiesOf(typeof(InsertNodaValuesArgs)).ShouldBe(properties);
+
+        // The input model holds each array as any sequence, and a multirange, an array of the C# alone, as an array.
+        ModelReflection
+            .TypedPropertiesOf(typeof(InsertNodaValuesArgs))
+            .ShouldBe(
+                properties.Select(static property =>
+                    property.Name.EndsWith("ArrayValue", StringComparison.Ordinal)
+                        ? (property.Name, typeof(IEnumerable<>).MakeGenericType(property.Type.GetElementType()!), true)
+                        : property
+                )
+            );
     }
 
     // The plain data source of "app", which never calls UseNodaTime(): Npgsql reads timestamptz as a DateTime, and

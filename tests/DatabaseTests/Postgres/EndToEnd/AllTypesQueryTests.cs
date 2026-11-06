@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -16,9 +18,9 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // The type map through the generated methods and through Dapper.  The read side: both rows of all_types into
 // AllTypesDto, every column of each, by AllTypesQueries' method and by the constant of its copy ListAllTypesForDapper
 // through Dapper.  The write side of InsertAllTypes: a row inserted with InsertAllTypesArgs, built from the values of
-// row 1, and read back by RETURNING, for every type that Dapper can send, by its method and by its constant through
-// Dapper.  Each insert runs in a transaction that is rolled back.  EveryTypeTests writes every column through
-// InsertEveryType's method.
+// row 1, and read back by RETURNING, for every type that Dapper can send, by its method, and with
+// InsertAllTypesForDapperArgs, whose arrays are arrays, by the constant of its copy through Dapper.  Each insert runs
+// in a transaction that is rolled back.  EveryTypeTests writes every column through InsertEveryType's method.
 [Collection(UsesPostgres.Name)]
 public sealed class AllTypesQueryTests(PostgresDatabases postgres)
 {
@@ -164,7 +166,7 @@ public sealed class AllTypesQueryTests(PostgresDatabases postgres)
 
             var row = await connection.QuerySingleAsync<AllTypesDto>(
                 AllTypesQueries.InsertAllTypesForDapper,
-                AllTypesRows.ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
+                AllTypesRows.ArgsFrom<InsertAllTypesForDapperArgs>(full, InsertedId),
                 transaction
             );
 
@@ -246,4 +248,129 @@ public sealed class AllTypesQueryTests(PostgresDatabases postgres)
         Justification = "The theory makes it by reflection."
     )]
     private sealed record ColumnArgs<T>(int Id, T Value);
+
+    // A sequence of each kind for int4_array_value: an array, a List<int>, an ImmutableArray<int> (an IList<int>) and a
+    // HashSet<int> and a lazy sequence, which are copied once.
+    private static IEnumerable<int> SequenceOf(string kind) =>
+        kind switch
+        {
+            "Array" => (int[])[1, 2, 3],
+            "List" => (List<int>)[1, 2, 3],
+            "ImmutableArray" => (ImmutableArray<int>)[1, 2, 3],
+            "HashSet" => (HashSet<int>)[3, 1, 2],
+            "Lazy" => Enumerable.Range(1, 3).Select(static x => x),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+        };
+
+    [Theory]
+    [InlineData("Array", true)]
+    [InlineData("List", true)]
+    [InlineData("ImmutableArray", true)]
+    [InlineData("HashSet", false)]
+    [InlineData("Lazy", true)]
+    public async Task Int4Array_EachKindOfSequence_RoundTrips(string kind, bool ordered)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+
+        var row = await InsertWith(
+            connection,
+            transaction,
+            args => args with { Int4ArrayValue = SequenceOf(kind) },
+            token
+        );
+        await transaction.RollbackAsync(token);
+
+        // The set's order is the set's, so the elements are compared without it.
+        row.Int4ArrayValue.ShouldNotBeNull().OrderBy(static x => x).ShouldBe([1, 2, 3]);
+        if (ordered)
+        {
+            row.Int4ArrayValue.ShouldBe([1, 2, 3]);
+        }
+    }
+
+    [Fact]
+    public async Task Int4Array_LazySequence_IsEnumeratedOnce()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var sequence = new CountingSequence([4, 5, 6]);
+
+        var row = await InsertWith(connection, transaction, args => args with { Int4ArrayValue = sequence }, token);
+        await transaction.RollbackAsync(token);
+
+        sequence.Enumerations.ShouldBe(1);
+        row.Int4ArrayValue.ShouldBe([4, 5, 6]);
+    }
+
+    [Fact]
+    public async Task Int4Array_Null_IsNull()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+
+        var row = await InsertWith(connection, transaction, static args => args with { Int4ArrayValue = null }, token);
+        await transaction.RollbackAsync(token);
+
+        row.Int4ArrayValue.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task TextArray_HashSet_RoundTrips()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+
+        var row = await InsertWith(
+            connection,
+            transaction,
+            static args => args with { TextArrayValue = (HashSet<string>)["b c", "a", "Zoë"] },
+            token
+        );
+        await transaction.RollbackAsync(token);
+
+        row.TextArrayValue.ShouldNotBeNull()
+            .OrderBy(static x => x, StringComparer.Ordinal)
+            .ShouldBe(["Zoë", "a", "b c"]);
+    }
+
+    // InsertEveryType with the values of row 1 and one change, on the open transaction.
+    private static async Task<AllTypesDto> InsertWith(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Func<InsertEveryTypeArgs, InsertEveryTypeArgs> change,
+        System.Threading.CancellationToken token
+    )
+    {
+        var full = (await connection.ListAllTypes(transaction, cancellationToken: token)).Single(static row =>
+            row.Id == AllTypesRows.FullRowId
+        );
+        var rows = await connection.InsertEveryType(
+            change(AllTypesRows.ArgsFrom<InsertEveryTypeArgs>(full, InsertedId)),
+            transaction,
+            cancellationToken: token
+        );
+        return rows.ShouldHaveSingleItem();
+    }
+
+    private sealed class CountingSequence(int[] items) : IEnumerable<int>
+    {
+        public int Enumerations { get; private set; }
+
+        public IEnumerator<int> GetEnumerator()
+        {
+            Enumerations++;
+            return ((IEnumerable<int>)items).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }

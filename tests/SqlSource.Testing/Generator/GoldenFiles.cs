@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Shouldly;
+using SqlSource.Repository;
 
 namespace SqlSource.Testing.Generator;
 

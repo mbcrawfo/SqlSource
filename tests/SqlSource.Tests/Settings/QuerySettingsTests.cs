@@ -26,11 +26,15 @@ public sealed class QuerySettingsTests
         var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
 
         settings.Parameters.ShouldBe(
-            GeneratorParameters.TokenValidation | GeneratorParameters.TableModels | GeneratorParameters.ArrayPool
+            GeneratorParameters.TokenValidation
+                | GeneratorParameters.TableModels
+                | GeneratorParameters.ArrayPool
+                | GeneratorParameters.ListPadding
         );
         settings.KeepComments.ShouldBeFalse();
         settings.ValidateTokens.ShouldBeTrue();
         settings.UseArrayPool.ShouldBeTrue();
+        settings.PadsLists.ShouldBeTrue();
     }
 
     [Fact]
@@ -73,6 +77,16 @@ public sealed class QuerySettingsTests
         QuerySettings
             .Resolve(Turn(GeneratorParameters.ArrayPool, GeneratorParameterState.Off), Keep)
             .UseArrayPool.ShouldBeFalse();
+
+    [Fact]
+    public void Resolve_WithoutListPadding_PadsLists() =>
+        QuerySettings.Resolve(new SettingsLevel(), Keep).PadsLists.ShouldBeTrue();
+
+    [Fact]
+    public void Resolve_ListPaddingOff_TurnsPaddingOff() =>
+        QuerySettings
+            .Resolve(Turn(GeneratorParameters.ListPadding, GeneratorParameterState.Off), Keep)
+            .PadsLists.ShouldBeFalse();
 
     [Fact]
     public void Over_EachMember_ComesFromThisLevelWhenItHasOne()

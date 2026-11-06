@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;

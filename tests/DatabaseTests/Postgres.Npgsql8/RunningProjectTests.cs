@@ -1,5 +1,5 @@
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.Repository;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.Npgsql8;

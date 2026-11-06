@@ -50,7 +50,7 @@ namespace App
     /// <param name="Ids">The parameter <c>ids</c>, <c>bigint[]</c>.</param>
     /// <param name="MaybeIds">The parameter <c>maybe_ids</c>, <c>bigint[]</c>.</param>
     /// <param name="OptionalIds">The parameter <c>optional_ids</c>, <c>bigint[]</c>.</param>
-    public sealed record FindTeamParams(global::App.Email[] Emails, global::App.Email[]? MaybeEmails, global::App.Values.Email[] ValueEmails, global::App.UserId[] Ids, global::App.UserId[]? MaybeIds, global::App.UserId?[] OptionalIds);
+    public sealed record FindTeamParams(global::System.Collections.Generic.IEnumerable<global::App.Email> Emails, global::System.Collections.Generic.IEnumerable<global::App.Email>? MaybeEmails, global::App.Values.Email[] ValueEmails, global::System.Collections.Generic.IEnumerable<global::App.UserId> Ids, global::System.Collections.Generic.IEnumerable<global::App.UserId>? MaybeIds, global::App.UserId?[] OptionalIds);
 }
 
 ==== File: App.GetTeamDto-Model.g.cs
@@ -94,7 +94,7 @@ namespace App
     /// <param name="Ids">The parameter <c>ids</c>, <c>bigint[]</c>.</param>
     /// <param name="MaybeIds">The parameter <c>maybe_ids</c>, <c>bigint[]</c>.</param>
     /// <param name="OptionalIds">The parameter <c>optional_ids</c>, <c>bigint[]</c>.</param>
-    public sealed record GetTeamParams(global::App.Email[] Emails, global::App.Email[]? MaybeEmails, global::App.Values.Email[] ValueEmails, global::App.UserId[] Ids, global::App.UserId[]? MaybeIds, global::App.UserId?[] OptionalIds);
+    public sealed record GetTeamParams(global::System.Collections.Generic.IEnumerable<global::App.Email> Emails, global::System.Collections.Generic.IEnumerable<global::App.Email>? MaybeEmails, global::App.Values.Email[] ValueEmails, global::System.Collections.Generic.IEnumerable<global::App.UserId> Ids, global::System.Collections.Generic.IEnumerable<global::App.UserId>? MaybeIds, global::App.UserId?[] OptionalIds);
 }
 
 ==== File: App.ListTeamClassesDto-Model.g.cs
@@ -155,7 +155,7 @@ namespace App
     /// <param name="Ids">The parameter <c>ids</c>, <c>bigint[]</c>.</param>
     /// <param name="MaybeIds">The parameter <c>maybe_ids</c>, <c>bigint[]</c>.</param>
     /// <param name="OptionalIds">The parameter <c>optional_ids</c>, <c>bigint[]</c>.</param>
-    public sealed record ListTeamClassesParams(global::App.Email[] Emails, global::App.Email[]? MaybeEmails, global::App.Values.Email[] ValueEmails, global::App.UserId[] Ids, global::App.UserId[]? MaybeIds, global::App.UserId?[] OptionalIds);
+    public sealed record ListTeamClassesParams(global::System.Collections.Generic.IEnumerable<global::App.Email> Emails, global::System.Collections.Generic.IEnumerable<global::App.Email>? MaybeEmails, global::App.Values.Email[] ValueEmails, global::System.Collections.Generic.IEnumerable<global::App.UserId> Ids, global::System.Collections.Generic.IEnumerable<global::App.UserId>? MaybeIds, global::App.UserId?[] OptionalIds);
 }
 
 ==== File: App.ListTeamsDto-Model.g.cs
@@ -199,7 +199,7 @@ namespace App
     /// <param name="Ids">The parameter <c>ids</c>, <c>bigint[]</c>.</param>
     /// <param name="MaybeIds">The parameter <c>maybe_ids</c>, <c>bigint[]</c>.</param>
     /// <param name="OptionalIds">The parameter <c>optional_ids</c>, <c>bigint[]</c>.</param>
-    public sealed record ListTeamsParams(global::App.Email[] Emails, global::App.Email[]? MaybeEmails, global::App.Values.Email[] ValueEmails, global::App.UserId[] Ids, global::App.UserId[]? MaybeIds, global::App.UserId?[] OptionalIds);
+    public sealed record ListTeamsParams(global::System.Collections.Generic.IEnumerable<global::App.Email> Emails, global::System.Collections.Generic.IEnumerable<global::App.Email>? MaybeEmails, global::App.Values.Email[] ValueEmails, global::System.Collections.Generic.IEnumerable<global::App.UserId> Ids, global::System.Collections.Generic.IEnumerable<global::App.UserId>? MaybeIds, global::App.UserId?[] OptionalIds);
 }
 
 ==== File: App.Sample-Methods.g.cs
@@ -257,18 +257,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "maybe_emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -281,18 +281,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "maybe_ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -368,18 +368,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "maybe_emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -392,18 +392,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "maybe_ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -484,18 +484,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "maybe_emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -508,18 +508,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "maybe_ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -609,18 +609,18 @@ namespace App
                     }
 
                     {
-                        var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                        var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                         parameter.ParameterName = "emails";
                         parameter.DataTypeName = "public._email";
-                        parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                        parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                         command.Parameters.Add(parameter);
                     }
 
                     {
-                        var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                        var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                         parameter.ParameterName = "maybe_emails";
                         parameter.DataTypeName = "public._email";
-                        parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                        parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                         command.Parameters.Add(parameter);
                     }
 
@@ -633,18 +633,18 @@ namespace App
                     }
 
                     {
-                        var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                        var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                         parameter.ParameterName = "ids";
                         parameter.DataTypeName = "pg_catalog._int8";
-                        parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                        parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                         command.Parameters.Add(parameter);
                     }
 
                     {
-                        var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                        var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                         parameter.ParameterName = "maybe_ids";
                         parameter.DataTypeName = "pg_catalog._int8";
-                        parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                        parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                         command.Parameters.Add(parameter);
                     }
 
@@ -717,18 +717,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.Emails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<string?[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<string?>>();
                     parameter.ParameterName = "maybe_emails";
                     parameter.DataTypeName = "public._email";
-                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value, static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
+                    parameter.TypedValue = parameters.MaybeEmails is { } value ? global::System.Array.ConvertAll<global::App.Email?, string?>(value as global::App.Email[] ?? global::System.Linq.Enumerable.ToArray(value), static element => element is { } item ? global::App.Email.ToDatabase(item) : null) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -741,18 +741,18 @@ namespace App
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
                 {
-                    var parameter = new global::Npgsql.NpgsqlParameter<long[]>();
+                    var parameter = new global::Npgsql.NpgsqlParameter<global::System.Collections.Generic.IList<long>>();
                     parameter.ParameterName = "maybe_ids";
                     parameter.DataTypeName = "pg_catalog._int8";
-                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, static element => global::App.Conversions.FromUserId(element)) : null;
+                    parameter.TypedValue = parameters.MaybeIds is { } value ? global::System.Array.ConvertAll<global::App.UserId, long>(value as global::App.UserId[] ?? global::System.Linq.Enumerable.ToArray(value), static element => global::App.Conversions.FromUserId(element)) : null;
                     command.Parameters.Add(parameter);
                 }
 
@@ -839,7 +839,7 @@ namespace App
     /// <param name="Ids">The parameter <c>ids</c>, <c>bigint[]</c>.</param>
     /// <param name="MaybeIds">The parameter <c>maybe_ids</c>, <c>bigint[]</c>.</param>
     /// <param name="OptionalIds">The parameter <c>optional_ids</c>, <c>bigint[]</c>.</param>
-    public sealed record StreamTeamsParams(global::App.Email[] Emails, global::App.Email[]? MaybeEmails, global::App.Values.Email[] ValueEmails, global::App.UserId[] Ids, global::App.UserId[]? MaybeIds, global::App.UserId?[] OptionalIds);
+    public sealed record StreamTeamsParams(global::System.Collections.Generic.IEnumerable<global::App.Email> Emails, global::System.Collections.Generic.IEnumerable<global::App.Email>? MaybeEmails, global::App.Values.Email[] ValueEmails, global::System.Collections.Generic.IEnumerable<global::App.UserId> Ids, global::System.Collections.Generic.IEnumerable<global::App.UserId>? MaybeIds, global::App.UserId?[] OptionalIds);
 }
 
 ==== File: SqlSource-EmbeddedAttribute.g.cs

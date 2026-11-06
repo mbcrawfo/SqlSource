@@ -79,6 +79,7 @@ internal sealed class SqlDialectRules
             Dialect = SqlDialect.SqlServer,
             NestedComments = true,
             DeclaredVariables = true,
+            NamesHoldAtAndHash = true,
         };
 
     public static SqlDialectRules PostgreSql { get; } =
@@ -194,6 +195,20 @@ internal sealed class SqlDialectRules
 
         return family;
     }
+
+    // Whether a name may hold "@" and "#", and of the characters above U+007F only letters and digits, as T-SQL reads
+    // one.  Otherwise every character above U+007F is read as a letter, as PostgreSQL and MySQL do.
+    private bool NamesHoldAtAndHash { get; init; }
+
+    /// <summary>
+    /// True for a character that can be part of a name in this dialect: as
+    /// <see cref="QuoteReader.IsNameCharacterOfSqlServer" /> reads it under SQL Server, and as
+    /// <see cref="QuoteReader.IsNameCharacterOfPostgreSql" /> does under every other dialect.
+    /// </summary>
+    public bool IsNameCharacter(char value) =>
+        NamesHoldAtAndHash
+            ? QuoteReader.IsNameCharacterOfSqlServer(value)
+            : QuoteReader.IsNameCharacterOfPostgreSql(value);
 
     /// <summary>
     /// The offset of the first character from <paramref name="start" /> on that can start a comment, a parameter or a

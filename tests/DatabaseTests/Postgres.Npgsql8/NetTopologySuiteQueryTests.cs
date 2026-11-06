@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NetTopologySuite.Geometries;
@@ -195,6 +196,37 @@ public sealed class NetTopologySuiteQueryTests(GisContainer gis)
         polygon.PolygonValue.ShouldBeNull();
     }
 
+    // A sequence that is no IList, from LINQ, as the array parameter: it is copied once on its way to the server, and
+    // the elements come back as they were, a NULL one and its SRID included.
+    [Fact]
+    public async Task GeometryArray_LazySequence_RoundTrips()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NetTopologySuiteSource();
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var row = Nulls(103) with
+        {
+            GeometryArrayValue = Enumerable
+                .Range(1, 2)
+                .Select(static x => x == 1 ? Wgs84.CreatePoint(new Coordinate(x, x)) : null!)
+                .Where(static _ => true),
+        };
+
+        _ = await connection.InsertSpatialValues(row, transaction, cancellationToken: token);
+        var read = await connection.GetSpatialValues(
+            new GetSpatialValuesArgs(103),
+            transaction,
+            cancellationToken: token
+        );
+        await transaction.RollbackAsync(token);
+
+        read.GeometryArrayValue.ShouldNotBeNull()
+            .Cast<object?>()
+            .ShouldBe([Wgs84.CreatePoint(new Coordinate(1, 1)), null]);
+        SridsOf(read).ShouldBe([("GeometryArrayValue", 0, 4326), ("GeometryArrayValue", 1, null)]);
+    }
+
     [Fact]
     public void MethodTypes_AreGeometries()
     {
@@ -210,7 +242,17 @@ public sealed class NetTopologySuiteQueryTests(GisContainer gis)
         ];
 
         ModelReflection.TypedPropertiesOf(typeof(SpatialValuesDto)).ShouldBe(properties);
-        ModelReflection.TypedPropertiesOf(typeof(InsertSpatialValuesArgs)).ShouldBe(properties);
+
+        // The input model holds an array as any sequence.
+        ModelReflection
+            .TypedPropertiesOf(typeof(InsertSpatialValuesArgs))
+            .ShouldBe(
+                properties.Select(static property =>
+                    property.Type == typeof(Geometry[])
+                        ? (property.Name, typeof(IEnumerable<Geometry>), true)
+                        : property
+                )
+            );
         ModelReflection.TypedPropertiesOf(typeof(GetPointValueDto)).ShouldBe([("PointValue", typeof(Point), true)]);
         ModelReflection
             .TypedPropertiesOf(typeof(GetPolygonValueDto))
@@ -218,7 +260,8 @@ public sealed class NetTopologySuiteQueryTests(GisContainer gis)
     }
 
     // The SRID of each geometry of a row or of its arguments, by the name of its property and the index of an array's
-    // element, -1 for a value of its own, since Equals does not compare it.  A NULL element has none.
+    // element, or of any sequence's that the arguments hold, -1 for a value of its own, since Equals does not compare
+    // it.  A NULL element has none.
     private static (string Property, int Index, int? Srid)[] SridsOf(object model) =>
         [
             .. ModelReflection
@@ -227,7 +270,9 @@ public sealed class NetTopologySuiteQueryTests(GisContainer gis)
                     property.GetValue(model) switch
                     {
                         Geometry geometry => [(property.Name, -1, geometry.SRID)],
-                        Geometry[] array => array.Select((element, index) => (property.Name, index, element?.SRID)),
+                        IEnumerable<Geometry?> elements => elements.Select(
+                            (element, index) => (property.Name, index, element?.SRID)
+                        ),
                         _ => [],
                     }
                 ),

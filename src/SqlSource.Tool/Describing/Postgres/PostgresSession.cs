@@ -273,7 +273,8 @@ internal sealed partial class PostgresSession : DescriberSession
                     OuterJoinGate.NamesOldOrNew(request.Sql),
                     PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
                     tables.Value,
-                    ColumnTypes: [.. columns.Select(static column => column.TypeOid)]
+                    ColumnTypes: [.. columns.Select(static column => column.TypeOid)],
+                    DistrustsJoinReduction: gated && request.Parameters.Any(static parameter => parameter.HasNegatedUse)
                 ),
                 cancellationToken
             );
@@ -334,7 +335,7 @@ internal sealed partial class PostgresSession : DescriberSession
         else if (answer.Plan is { } text && PlanNode.Read(text) is { } root)
         {
             var partitions = await PartitionsOfAsync(request, root, cancellationToken);
-            var cache = new PlanInstancesCache(root, partitions);
+            var cache = new PlanInstancesCache(root, partitions, scope.DistrustsJoinReduction);
             var relations = await RelationsOfAsync(request, root, origins, scope.Tables, cancellationToken);
             var alone = await OverloadsOfAsync(request, root, origins, scope, cancellationToken);
             outcome = NullabilityWalk.Run(
