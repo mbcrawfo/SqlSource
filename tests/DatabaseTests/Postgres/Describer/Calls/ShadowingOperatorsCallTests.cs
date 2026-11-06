@@ -7,7 +7,7 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.Postgres.Describer;
+namespace SqlSource.DatabaseTests.Postgres.Describer.Calls;
 
 // Each catalog call against a real server, on a connection whose search_path puts a schema of operators that answer
 // false, on the argument types of the calls' comparisons, before pg_catalog: the operators of its SQL are the

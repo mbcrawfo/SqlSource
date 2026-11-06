@@ -6,7 +6,7 @@ using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.Postgres.Describer;
+namespace SqlSource.DatabaseTests.Postgres.Describer.Calls;
 
 // "columns", "types" and "spellings" against a real server, for what they say of a type modifier.
 [Collection(UsesPostgres.Name)]

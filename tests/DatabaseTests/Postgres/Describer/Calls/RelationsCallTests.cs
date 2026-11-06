@@ -5,7 +5,7 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.Postgres.Describer;
+namespace SqlSource.DatabaseTests.Postgres.Describer.Calls;
 
 // "relations" against a real server: a row for each relation that exists, in the shape "tables" answers.
 [Collection(UsesPostgres.Name)]

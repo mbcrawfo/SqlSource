@@ -6,7 +6,7 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.Postgres.Describer;
+namespace SqlSource.DatabaseTests.Postgres.Describer.Calls;
 
 // Each catalog call against a real server, on a connection whose search_path puts domains named like the built-in
 // types text, oid and int4 before pg_catalog: the casts and functions of its SQL are the catalog's, so it answers as

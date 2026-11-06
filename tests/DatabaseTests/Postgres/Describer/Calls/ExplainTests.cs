@@ -6,7 +6,7 @@ using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.Postgres.Describer;
+namespace SqlSource.DatabaseTests.Postgres.Describer.Calls;
 
 // "explain" against a real server: the plan is a generic one that PlanNode reads, and the call leaves the describe's
 // transaction as it found it.

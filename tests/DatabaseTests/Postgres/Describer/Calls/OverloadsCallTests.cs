@@ -4,7 +4,7 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.Postgres.Describer;
+namespace SqlSource.DatabaseTests.Postgres.Describer.Calls;
 
 // "overloads" against a real server: which of the names asked for a schema other than pg_catalog holds, or
 // pg_catalog holds as an object that is not built in.
