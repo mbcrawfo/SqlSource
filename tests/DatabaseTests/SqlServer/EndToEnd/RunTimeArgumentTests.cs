@@ -92,16 +92,21 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
         );
     }
 
-    // The method's update of bob waits on the row's lock until the command timeout ends it.
+    // The method's update of bob waits on the row's lock until the command timeout ends it.  The connection has no
+    // command timeout of its own, so only the call's ends the wait, and it is disposed after the lock, so that a call
+    // that outlasts the wait ends before its connection does.
     [Fact]
     public async Task TouchAccount_RowLockedPastACommandTimeoutOfOneSecond_ThrowsTheTimeout()
     {
         var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.AppWithoutCommandTimeout(sqlServer);
         await using var lockOfBob = await LockOfBob.TakeAsync(sqlServer, token);
-        await using var connection = EndToEndSources.App(sqlServer);
 
         var thrown = await Should.ThrowAsync<SqlException>(() =>
-            connection.TouchAccount(new TouchAccountArgs(2), commandTimeout: 1, cancellationToken: token)
+            Eventually.WithinAsync(
+                connection.TouchAccount(new TouchAccountArgs(2), commandTimeout: 1, cancellationToken: token),
+                "The update outlasted its command timeout of one second."
+            )
         );
 
         thrown.Number.ShouldBe(-2);
@@ -113,7 +118,7 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
     [Fact]
     public async Task TouchAccount_TokenCancelledWhileItWaitsOnALock_ThrowsSqlException()
     {
-        await using var connection = EndToEndSources.App(sqlServer);
+        await using var connection = EndToEndSources.AppWithoutCommandTimeout(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         await CancelledWhileItRunsAsync(connection, null);
@@ -186,7 +191,7 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
     [InlineData(Outcome.IsCancelled)]
     public async Task OpenConnection_AfterTheMethod_IsLeftOpen(Outcome outcome)
     {
-        await using var connection = EndToEndSources.App(sqlServer);
+        await using var connection = EndToEndSources.AppWithoutCommandTimeout(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         await CallAsync(connection, outcome, null);
@@ -201,7 +206,7 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
     [InlineData(Outcome.IsCancelled)]
     public async Task OpenConnectionInATransaction_AfterTheMethod_IsLeftOpenInTheTransaction(Outcome outcome)
     {
-        await using var connection = EndToEndSources.App(sqlServer);
+        await using var connection = EndToEndSources.AppWithoutCommandTimeout(sqlServer);
         var token = TestContext.Current.CancellationToken;
         await connection.OpenAsync(token);
         await using var transaction = await connection.BeginTransactionAsync(token);
@@ -218,12 +223,14 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
 
     // A connection of "app" whose ApplicationName no other connection has: the server shows it as the program_name of
     // the session that the connection opens, which is how a test finds a session opened by the method itself, whose
-    // ServerProcessId it cannot read before the call.  Each has a pool of its own, which no other test is given.
+    // ServerProcessId it cannot read before the call.  Each has a pool of its own, which no other test is given.  It
+    // has no command timeout, as EndToEndSources.AppWithoutCommandTimeout, since its call may wait on LockOfBob.
     private SqlConnection OfItsOwnPool() =>
         new(
             new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase))
             {
                 ApplicationName = $"{nameof(RunTimeArgumentTests)}-{Guid.NewGuid():N}",
+                CommandTimeout = 0,
             }.ConnectionString
         );
 
@@ -232,20 +239,25 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
     // SqlClient's exception.  It is an update, which waits before the command answers: a SELECT sends its columns
     // first, and waits in the read of its first row, whose cancel is a TaskCanceledException.  An open connection's
     // session is its ServerProcessId; a closed one, which the method opens, is of its own pool, and its session is the
-    // one of its program_name.
+    // one of its program_name.  The connection has no command timeout, so only the cancel ends the wait, and the call
+    // is awaited through Eventually.WithinAsync, so that a call that ignores the token fails the test at the patience.
     private async Task CancelledWhileItRunsAsync(SqlConnection connection, DbTransaction? transaction)
     {
         var token = TestContext.Current.CancellationToken;
+        new SqlConnectionStringBuilder(connection.ConnectionString).CommandTimeout.ShouldBe(0);
         var session =
             connection.State == ConnectionState.Open
                 ? string.Create(CultureInfo.InvariantCulture, $"s.session_id = {connection.ServerProcessId}")
                 : $"s.program_name = N'{new SqlConnectionStringBuilder(connection.ConnectionString).ApplicationName}'";
         await using var lockOfBob = await LockOfBob.TakeAsync(sqlServer, token);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
-        var call = connection.TouchAccount(
-            new TouchAccountArgs(2),
-            transaction: transaction,
-            cancellationToken: cancellation.Token
+        var call = Eventually.WithinAsync(
+            connection.TouchAccount(
+                new TouchAccountArgs(2),
+                transaction: transaction,
+                cancellationToken: cancellation.Token
+            ),
+            "The update outlasted the cancellation of its token."
         );
         bool endedFirst;
         try

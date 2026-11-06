@@ -26,6 +26,16 @@ internal static class EndToEndSources
         return builder.Build();
     }
 
+    // "app" as App sets it up, with no command timeout in place of Npgsql's default of 30 seconds, for a test whose
+    // command waits on a lock until the test acts: only the call's own commandTimeout or token ends that wait.
+    public static NpgsqlDataSource AppWithoutCommandTimeout(PostgresDatabases postgres)
+    {
+        var builder = new NpgsqlDataSourceBuilder(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
+        builder.ConnectionStringBuilder.CommandTimeout = 0;
+        _ = builder.MapEnum<NoteKind>();
+        return builder.Build();
+    }
+
     // "app" as App sets it up, with Npgsql.NodaTime's plugin, which reads and writes the NodaTime types of the queries
     // of NodaTime/, whose folder turns the library back on: a data source the application builds for those methods.
     public static NpgsqlDataSource AppWithNodaTime(PostgresDatabases postgres)

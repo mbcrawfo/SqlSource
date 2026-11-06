@@ -52,7 +52,6 @@ Next id: `TD-0114`
 | [TD-0108](TD-0108-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-11-06 | Medium | Duplicated logic and uneven conventions in `src/`, most in the bug-report bundles: the renaming copies readings of the describer and the generator, the two engines' rule tables are spelled and pinned differently, and the commands and the run's context are copied by hand |
 | [TD-0109](TD-0109-duplicated-arrangements-and-uneven-conventions-in-tests.md) | Open | 2026-11-06 | Medium | Duplicated arrangements and uneven conventions in `tests/`, most in the bundle and renaming tests, and 22 tests whose comment said more than their assertions check |
 | [TD-0110](TD-0110-a-poller-of-a-folder-alone-sees-no-folder-made-in-it.md) | Open | 2026-11-06 | Low | Under `DOTNET_USE_POLLING_FILE_WATCHER`, a watch of a folder alone sees no folder made or deleted in it, so `describe --watch` misses a new folder outside the folders it watches with their folders below, and reports the deletion of such a folder as `SQLSRC287` |
-| [TD-0112](TD-0112-two-postgresql-run-time-tests-race-a-sleep.md) | Open | 2026-11-06 | Low | Two PostgreSQL run-time tests hold their command with a 30-second `pg_sleep`, which a stalled runner can outlast |
 
 ## Columns
 
