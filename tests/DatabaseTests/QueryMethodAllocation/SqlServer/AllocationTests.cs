@@ -660,6 +660,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 // The array behind the IReadOnlyList.
                 return rows.ToArray();
             }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("SearchAccounts", exception);
+                }
+
+                throw;
+            }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
@@ -761,6 +792,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 return rows.ToArray();
 #pragma warning restore IDE0305
             }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("SearchAccountsUnpooled", exception);
+                }
+
+                throw;
+            }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
@@ -846,6 +908,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 }
 
                 return rows.ToList();
+            }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersAsList", exception);
+                }
+
+                throw;
             }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
@@ -933,6 +1026,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 
                 return rows.ToImmutableArray();
             }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersAsImmutableArray", exception);
+                }
+
+                throw;
+            }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
@@ -1018,6 +1142,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 }
 
                 return rows;
+            }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersNoPoolAsList", exception);
+                }
+
+                throw;
             }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
@@ -1105,6 +1260,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 }
 
                 return rows.DrainToImmutable();
+            }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersNoPoolAsImmutableArray", exception);
+                }
+
+                throw;
             }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
@@ -1195,6 +1381,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 return rows.ToArray();
 #pragma warning restore IDE0305
             }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersAsArray", exception);
+                }
+
+                throw;
+            }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
@@ -1272,8 +1489,53 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                         var atRow = false;
                         try
                         {
-                            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                            while (true)
                             {
+                                // The generated method's read, in a try of its own as a yield return allows no catch.
+                                bool hasRow;
+                                try
+                                {
+                                    hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                                }
+                                catch (DbException exception) when (transaction is not null)
+                                {
+                                    // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                                    // later error rolled the transaction back.
+                                    var raisedLater = false;
+                                    try
+                                    {
+                                        while (
+                                            await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false)
+                                        )
+                                        {
+                                            // The generated method's drain, without the token.
+                                        }
+                                    }
+                                    catch (DbException)
+                                    {
+                                        raisedLater = true;
+                                    }
+#pragma warning disable CA1031, RCS1075
+                                    catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                                    {
+                                        // Empty as the generated method's is: it throws its first error, never the drain's.
+                                    }
+
+                                    await reader.DisposeAsync().ConfigureAwait(false);
+                                    if (raisedLater && transaction.Connection is null)
+                                    {
+                                        throw new TransactionRolledBackException("StreamAccounts", exception);
+                                    }
+
+                                    throw;
+                                }
+
+                                if (!hasRow)
+                                {
+                                    break;
+                                }
+
                                 CollectedAccount row;
                                 try
                                 {
@@ -1310,19 +1572,91 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                                 atRow = false;
                             }
 
-                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            try
                             {
-                                // The generated method's drain, after the last row.
+                                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                                {
+                                    // The generated method's drain, after the last row.
+                                }
+                            }
+                            catch (DbException exception) when (transaction is not null)
+                            {
+                                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                                // later error rolled the transaction back.
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                        // The generated method's drain, without the token.
+                                    }
+                                }
+                                catch (DbException)
+                                {
+                                    raisedLater = true;
+                                }
+#pragma warning disable CA1031, RCS1075
+                                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                                {
+                                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new TransactionRolledBackException("StreamAccounts", exception);
+                                }
+
+                                throw;
                             }
                         }
                         finally
                         {
                             if (atRow)
                             {
-                                while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                                try
                                 {
-                                    // The generated method's drain, when the loop was left at a row, without the token.
+                                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                        // The generated method's drain, when the loop was left at a row, without the token.
+                                    }
                                 }
+#pragma warning disable CA2219
+                                catch (DbException exception) when (transaction is not null)
+                                {
+                                    // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                                    // later error rolled the transaction back.
+                                    var raisedLater = false;
+                                    try
+                                    {
+                                        while (
+                                            await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false)
+                                        )
+                                        {
+                                            // The generated method's drain, without the token.
+                                        }
+                                    }
+                                    catch (DbException)
+                                    {
+                                        raisedLater = true;
+                                    }
+#pragma warning disable CA1031, RCS1075
+                                    catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                                    {
+                                        // Empty as the generated method's is: it throws its first error, never the drain's.
+                                    }
+
+                                    await reader.DisposeAsync().ConfigureAwait(false);
+                                    if (raisedLater && transaction.Connection is null)
+                                    {
+                                        throw new TransactionRolledBackException("StreamAccounts", exception);
+                                    }
+
+                                    throw;
+                                }
+#pragma warning restore CA2219
                             }
                         }
                     }
@@ -1525,6 +1859,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 }
 
                 return row;
+            }
+            catch (DbException exception) when (transaction is not null)
+            {
+                // The generated method's check after a database error: the rest of the batch is read, to see whether a
+                // later error rolled the transaction back.
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
+                    {
+                        // The generated method's drain, without the token.
+                    }
+                }
+                catch (DbException)
+                {
+                    raisedLater = true;
+                }
+#pragma warning disable CA1031, RCS1075
+                catch (Exception)
+#pragma warning restore CA1031, RCS1075
+                {
+                    // Empty as the generated method's is: it throws its first error, never the drain's.
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("GetNodaValues", exception);
+                }
+
+                throw;
             }
             catch (Exception exception)
                 when (transaction is not null && exception is not (DbException or OperationCanceledException))
