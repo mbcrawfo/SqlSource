@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,18 +14,22 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // What a method does with the arguments given at run time, the transaction, the command's timeout and the token, and
 // with the connection: it opens a closed connection and closes it again, whether it returns or throws, and leaves an
-// open one open, in its transaction.  Each test reads the connection's state after the call.  The queries that wait are
-// Sleep and ListThenSleep of Queries/Methods.sql, and each sleeps 30 seconds, longer than either test needs on a runner
-// that is not stalled (TD-0112).
+// open one open, in its transaction.  Each test reads the connection's state after the call.  A command that must
+// still be running when the test acts waits on a lock that a second connection holds until the test ends, never on a
+// timer, which a stalled runner can outlast: TouchAccount on a row held FOR UPDATE, and ListThenWait of
+// Queries/Methods.sql on an advisory lock before its last row.
 [Collection(UsesPostgres.Name)]
 public sealed class RunTimeTests(PostgresDatabases postgres)
 {
-    // Longer than a test needs: a test that sees the sleep end has failed.
-    private const int LongSleep = 30;
-
     // Enough rows to fill the server's send buffer many times over: it sends each buffer as it fills, so the client has
-    // received every row but those of the last, unfilled buffer when the last row sleeps, on 14 as on 18.
-    private const int RowsBeforeTheSleep = 10_000;
+    // received every row but those of the last, unfilled buffer when the last row waits, on 14 as on 18.
+    private const int RowsBeforeTheWait = 10_000;
+
+    // The advisory lock that ListThenWait's last row waits for.  No other test takes an advisory lock.
+    private const long LastRowLock = 112;
+
+    // The account whose row the timeout test holds, as SQL Server's twin holds bob's.
+    private const int LockedAccountId = 2;
 
     // The id of the copy of all_types' row of NULLs that a refused insert would have written.
     private const int RefusedRowId = 5;
@@ -49,16 +54,24 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
         (await XminOfAsync(connection, null, 1, token)).ShouldBe(before);
     }
 
-    // Npgsql cancels the command when its timeout passes, and throws.
+    // The update waits on the row's lock, which outlasts the test, and Npgsql cancels the command when its timeout
+    // passes, and throws.
     [Fact]
-    public async Task Sleep_CommandTimeoutShorterThanTheSleep_Throws()
+    public async Task TouchAccount_RowLockedPastACommandTimeoutOfOneSecond_Throws()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
+        await using var holder = await source.OpenConnectionAsync(token);
+        await using var rowLock = await HoldAsync(
+            holder,
+            "SELECT 1 FROM accounts WHERE id = $1 FOR UPDATE",
+            LockedAccountId,
+            token
+        );
         await using var connection = source.CreateConnection();
 
         var exception = await Should.ThrowAsync<NpgsqlException>(() =>
-            connection.Sleep(new SleepArgs(LongSleep), commandTimeout: 1, cancellationToken: token)
+            connection.TouchAccount(new TouchAccountArgs(LockedAccountId), commandTimeout: 1, cancellationToken: token)
         );
 
         _ = exception.InnerException.ShouldBeOfType<TimeoutException>();
@@ -66,44 +79,45 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Sleep_TokenCancelledBeforeTheCall_ThrowsOperationCanceled()
+    public async Task TouchAccount_TokenCancelledBeforeTheCall_ThrowsOperationCanceled()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = source.CreateConnection();
 
         _ = await Should.ThrowAsync<OperationCanceledException>(() =>
-            connection.Sleep(new SleepArgs(LongSleep), cancellationToken: new CancellationToken(canceled: true))
+            connection.TouchAccount(new TouchAccountArgs(1), cancellationToken: new CancellationToken(canceled: true))
         );
 
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
-    // The token is cancelled once the server sleeps before the last row, when the method has read most of the rows
-    // before it and waits in the read for the next.
+    // The token is cancelled once the server waits on the lock before the last row, when the method has read most of
+    // the rows before it and waits in the read for the next.  The lock is released only after the call has ended.
     [Fact]
-    public async Task ListThenSleep_TokenCancelledDuringTheRead_ThrowsOperationCanceled()
+    public async Task ListThenWait_TokenCancelledDuringTheRead_ThrowsOperationCanceled()
     {
         var token = TestContext.Current.CancellationToken;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(token);
         await using var source = EndToEndSources.App(postgres);
-        await using var watch = EndToEndSources.App(postgres);
+        await using var holder = await source.OpenConnectionAsync(token);
+        await using var lastRowLock = await HoldAsync(holder, "SELECT pg_advisory_xact_lock($1)", LastRowLock, token);
         await using var connection = source.CreateConnection();
 
         _ = await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
-            // The wait cancels the token however it ends, so a wait that fails leaves no sleep running, and the call
-            // is awaited on every path.
-            var cancelOnceSleeping = CancelOnceSleepingAsync(watch, cancel, token);
+            // The wait cancels the token however it ends, so a wait that fails leaves no call waiting on the lock,
+            // and the call is awaited on every path.
+            var cancelOnceWaiting = CancelOnceWaitingAsync(source, holder.ProcessID, cancel, token);
             try
             {
-                _ = await connection.ListThenSleep(
-                    new ListThenSleepArgs(RowsBeforeTheSleep, LongSleep),
+                _ = await connection.ListThenWait(
+                    new ListThenWaitArgs(RowsBeforeTheWait, LastRowLock),
                     cancellationToken: cancel.Token
                 );
             }
             finally
             {
-                await cancelOnceSleeping;
+                await cancelOnceWaiting;
             }
         });
 
@@ -221,9 +235,10 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
             }
         );
 
-    // Cancels once ListThenSleep sleeps before its last row, or once the wait for it fails.
-    private static async Task CancelOnceSleepingAsync(
+    // Cancels once ListThenWait waits on the holder's lock before its last row, or once the wait for it fails.
+    private static async Task CancelOnceWaitingAsync(
         NpgsqlDataSource watch,
+        int holder,
         CancellationTokenSource cancel,
         CancellationToken token
     )
@@ -231,8 +246,8 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
         try
         {
             await Eventually.TrueAsync(
-                async () => await IsSleepingBeforeTheLastRowAsync(watch, token),
-                "the query never reached the sleep before its last row"
+                async () => await IsBlockedByAsync(watch, holder, token),
+                "the query never waited on the lock before its last row"
             );
         }
         finally
@@ -285,18 +300,47 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
         return (string)(await command.ExecuteScalarAsync(token))!;
     }
 
-    // Whether a backend of "app" is in ListThenSleep's sleep, which it reaches only after the rows before the last.
-    // The tests of the collection run one at a time, so no other backend runs the query.
-    private static async Task<bool> IsSleepingBeforeTheLastRowAsync(NpgsqlDataSource watch, CancellationToken token)
+    // Begins a transaction on the holder's connection and runs the statement that takes its lock, with the argument as
+    // its $1, and the transaction's disposal, a rollback, releases the lock.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The SQL is the test's own constants."
+    )]
+    private static async Task<NpgsqlTransaction> HoldAsync(
+        NpgsqlConnection holder,
+        string statement,
+        long argument,
+        CancellationToken token
+    )
+    {
+        var transaction = await holder.BeginTransactionAsync(token);
+        try
+        {
+            await using var command = new NpgsqlCommand(statement, holder, transaction);
+            _ = command.Parameters.Add(new NpgsqlParameter<long> { TypedValue = argument });
+            _ = await command.ExecuteNonQueryAsync(token);
+            return transaction;
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
+    }
+
+    // Whether a backend waits on a lock that the holder's backend holds: ListThenWait's, which reaches the lock only
+    // after the rows before its last.
+    private static async Task<bool> IsBlockedByAsync(NpgsqlDataSource watch, int holder, CancellationToken token)
     {
         await using var command = watch.CreateCommand(
             """
             SELECT count(*) > 0
             FROM pg_catalog.pg_stat_activity
-            WHERE datname = $1 AND wait_event = 'PgSleep' AND query LIKE '%generate_series%'
+            WHERE wait_event_type = 'Lock' AND $1 = ANY (pg_catalog.pg_blocking_pids(pid))
             """
         );
-        _ = command.Parameters.Add(new NpgsqlParameter<string> { TypedValue = PostgresDatabases.AppDatabase });
+        _ = command.Parameters.Add(new NpgsqlParameter<int> { TypedValue = holder });
         return (bool)(await command.ExecuteScalarAsync(token))!;
     }
 }
