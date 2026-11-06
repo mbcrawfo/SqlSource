@@ -549,15 +549,11 @@ public sealed class QueryMethodWriterTests
         Write(SqlServerGetUser with { Shape = Enum.Parse<ResultShape>(shapeName), Collection = CollectionKind.Array })
             .ShouldContain(RolledBackAfterDatabaseErrorDocumentation);
 
-    // A SQL Server stream says when it throws the exception of a rolled-back transaction after its own exception.
+    // A SQL Server stream says when it throws the exception of a rolled-back transaction, after its own exception or
+    // the database's error, as a method that reads into a collection does.
     [Fact]
     public void Append_SqlServerStreams_DocumentsTheRolledBackTransaction() =>
-        Write(SqlServerStream)
-            .ShouldContain(
-                "/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">"
-                    + "The query threw an exception of its own, its inner exception, and an error that the rest of "
-                    + "the query raised rolled back the transaction.</exception>\n"
-            );
+        Write(SqlServerStream).ShouldContain(RolledBackAfterDatabaseErrorDocumentation);
 
     // A PostgreSQL query is one statement, so no error is read after the method's own exception.
     [Theory]
@@ -1346,7 +1342,7 @@ public sealed class QueryMethodWriterTests
                 "                    atRow = false;\n"
                     + "                }\n"
                     + "\n"
-                    + Drain("                ")
+                    + CheckedDrain("                ")
                     + "            }\n"
                     + "            finally\n"
             );
@@ -1368,8 +1364,7 @@ public sealed class QueryMethodWriterTests
                     + "            var atRow = false;\n"
                     + "            try\n"
                     + "            {\n"
-                    + "                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
-                    + "                {\n"
+                    + CheckedRead("                ")
                     + "                    global::App.GetUserDto row;\n"
                     + "                    try\n"
                     + "                    {\n"
@@ -1392,13 +1387,13 @@ public sealed class QueryMethodWriterTests
                     + "                    atRow = false;\n"
                     + "                }\n"
                     + "\n"
-                    + Drain("                ")
+                    + CheckedDrain("                ")
                     + "            }\n"
                     + "            finally\n"
                     + "            {\n"
                     + "                if (atRow)\n"
                     + "                {\n"
-                    + Drain("                    ", "global::System.Threading.CancellationToken.None")
+                    + CheckedDrain("                    ", "global::System.Threading.CancellationToken.None")
                     + "                }\n"
                     + "            }\n"
                     + "        }\n"
@@ -1414,8 +1409,14 @@ public sealed class QueryMethodWriterTests
     public void Append_SqlServerStreams_ChecksTheTransactionWhenARowFails() =>
         Write(SqlServerStream with { Output = VectorOutput(isNullable: false) })
             .ShouldContain(
-                "                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
-                    + "                {\n"
+                "                    }\n"
+                    + DatabaseErrorCheck("                    ")
+                    + "\n"
+                    + "                    if (!hasRow)\n"
+                    + "                    {\n"
+                    + "                        break;\n"
+                    + "                    }\n"
+                    + "\n"
                     + "                    global::App.GetUserDto row;\n"
                     + "                    try\n"
                     + "                    {\n"
@@ -1576,6 +1577,35 @@ public sealed class QueryMethodWriterTests
         text.ShouldContain("if (atRow1)\n");
     }
 
+    // C# allows no catch on a try that holds a yield return, so an engine that checks for a rollback after a database
+    // error alone reads each row in a try of its own, whose catch takes the database's error, and leaves the loop when
+    // the read finds no row; the row is yielded as it is built, with no flag and no catch of the method's own.
+    [Fact]
+    public void Append_StreamsCheckingRollbackAfterDatabaseErrorAlone_ReadsEachRowInATry()
+    {
+        var text = WriteWith(Stream, ExecutionCapabilities.ChecksRollbackAfterDatabaseError);
+
+        text.ShouldContain(RolledBackAfterDatabaseErrorDocumentation);
+        text.ShouldNotContain(CompletedTransactionDocumentation);
+
+        text.ShouldContain(CheckedRead("            ") + "                yield return new global::App.GetUserDto(");
+        text.ShouldNotContain("atRow");
+        text.ShouldNotContain("is not (global::System.Data.Common.DbException");
+        text.ShouldNotContain("NextResultAsync(cancellationToken)");
+        ShouldBalanceItsBraces(text);
+    }
+
+    // A token named as the local of a read renames the local, which no argument may hide.
+    [Fact]
+    public void Append_SqlServerStreamsTokenNamedHasRow_RenamesTheLocal() =>
+        Write(
+                SqlServerStream with
+                {
+                    Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("hasRow")),
+                }
+            )
+            .ShouldContain(CheckedRead("                ", hasRow: "hasRow1"));
+
     [Fact]
     public void Append_IAsyncEnumerableNotNullVectorColumn_ChecksBeforeYielding() =>
         Write(Stream with { Output = VectorOutput(isNullable: false) })
@@ -1665,6 +1695,7 @@ public sealed class QueryMethodWriterTests
             Token("atRow"),
             Token("exception"),
             Token("raisedLater"),
+            Token("hasRow"),
             Token("yield")
         );
         var withVector = GetUser.Output! with
@@ -1816,7 +1847,48 @@ public sealed class QueryMethodWriterTests
         + indent
         + "}\n";
 
-    // The catch of a database's error by a SQL Server method of GetUser that reads rows into a collection or one row,
+    // The start of the loop of a stream of GetUser that checks after a database error, at the loop's indent, up to the
+    // blank line before the row: the read in a try of its own, whose catch takes the database's error, and the exit
+    // when it finds no row, with the name of the read's local unless another is given.
+    private static string CheckedRead(string indent, string hasRow = "hasRow") =>
+        indent
+        + "while (true)\n"
+        + indent
+        + "{\n"
+        + indent
+        + "    bool "
+        + hasRow
+        + ";\n"
+        + indent
+        + "    try\n"
+        + indent
+        + "    {\n"
+        + indent
+        + "        "
+        + hasRow
+        + " = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);\n"
+        + indent
+        + "    }\n"
+        + DatabaseErrorCheck(indent + "    ")
+        + "\n"
+        + indent
+        + "    if (!"
+        + hasRow
+        + ")\n"
+        + indent
+        + "    {\n"
+        + indent
+        + "        break;\n"
+        + indent
+        + "    }\n"
+        + "\n";
+
+    // The drain of a stream of GetUser that checks after a database error, at an indent, in a try whose catch takes the
+    // database's error, with the method's token unless another is given.
+    private static string CheckedDrain(string indent, string token = "cancellationToken") =>
+        indent + "try\n" + indent + "{\n" + Drain(indent + "    ", token) + indent + "}\n" + DatabaseErrorCheck(indent);
+
+    // The catch of a database's error by a SQL Server method of GetUser that reads rows, buffered or streamed,
     // at an indent, with the names of the exception and of the flag unless others are given.
     private static string DatabaseErrorCheck(
         string indent,

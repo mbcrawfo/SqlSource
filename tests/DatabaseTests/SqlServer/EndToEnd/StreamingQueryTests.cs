@@ -24,7 +24,9 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // caller's transaction, and with it off CAST('x' AS int) after the rows does too, where a THROW, a divide by zero or
 // an overflow leaves it to commit.  When a row throws an exception of the iterator's own, the reader's disposal drops
 // such an error, and the iterator throws TransactionRolledBackException when it rolled the transaction back.  A
-// transaction that has completed is refused at the first MoveNextAsync.
+// database error at a row or from a drain, in a transaction, reads the rest of the batch, and the iterator throws
+// TransactionRolledBackException, with the database's error inside, when a later error there rolled the transaction
+// back.  A transaction that has completed is refused at the first MoveNextAsync.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 {
@@ -864,6 +866,97 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
         );
 
         thrown.Number.ShouldBe(ArithmeticOverflow);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // The read of the second row throws the divide by zero, the database's error, which with XACT_ABORT off leaves the
+    // transaction open, and the iterator reads the rest of the batch, whose failed conversion rolls it back: the first
+    // row is handed to the loop, and then the loop throws the rollback, with the divide by zero inside it.
+    [Fact]
+    public async Task StreamFailingAtSecondThenFailConversion_InATransaction_YieldsTheFirstRowThenThrowsTheRollback()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        var rows = new List<StreamFailingAtSecondThenFailConversionDto>();
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(async () =>
+        {
+            await foreach (
+                var row in session.Connection.StreamFailingAtSecondThenFailConversion(
+                    transaction: session.Transaction,
+                    cancellationToken: token
+                )
+            )
+            {
+                rows.Add(row);
+            }
+        });
+
+        rows.ShouldBe([new StreamFailingAtSecondThenFailConversionDto(1, -10)]);
+        thrown.QueryName.ShouldBe("StreamFailingAtSecondThenFailConversion");
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(DivideByZero);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // A break at the first row disposes the stream at that row, and the drain of the rest of the batch throws the
+    // divide by zero of the second; the iterator reads on, and the failed conversion rolls back the transaction, so the
+    // break throws the rollback, with the divide by zero inside it.
+    [Fact]
+    public async Task StreamFailingAtSecondThenFailConversion_BreakAtTheFirstRowInATransaction_ThrowsTheRollback()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        var rows = new List<StreamFailingAtSecondThenFailConversionDto>();
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(async () =>
+        {
+            await foreach (
+                var row in session.Connection.StreamFailingAtSecondThenFailConversion(
+                    transaction: session.Transaction,
+                    cancellationToken: token
+                )
+            )
+            {
+                rows.Add(row);
+                if (rows.Count == 1)
+                {
+                    break;
+                }
+            }
+        });
+
+        rows.ShouldBe([new StreamFailingAtSecondThenFailConversionDto(1, -10)]);
+        thrown.QueryName.ShouldBe("StreamFailingAtSecondThenFailConversion");
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(DivideByZero);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // The drain after the loop throws the overflow, a database error after the rows, and the iterator reads on, to the
+    // failed conversion, which rolls back the transaction with XACT_ABORT off: every row is handed to the loop, and
+    // then the loop throws the rollback, with the overflow inside it.
+    [Fact]
+    public async Task StreamThenOverflowThenFailConversion_InATransaction_ThrowsTheRollbackAfterTheRows()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        var rows = new List<CollectedAccount>();
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(async () =>
+        {
+            await foreach (
+                var row in session.Connection.StreamThenOverflowThenFailConversion(
+                    transaction: session.Transaction,
+                    cancellationToken: token
+                )
+            )
+            {
+                rows.Add(row);
+            }
+        });
+
+        rows.ShouldBe(Accounts);
+        thrown.QueryName.ShouldBe("StreamThenOverflowThenFailConversion");
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(ArithmeticOverflow);
         await session.ShouldHaveRolledBackAsync(token);
     }
 

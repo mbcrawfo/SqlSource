@@ -13,8 +13,8 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// converts one by element, the iterator only for a method that streams, the flag of a row being yielded only for one
 /// whose <see cref="ExecutionCapabilities" /> drain when its loop is left at a row, the exception its catch takes only
 /// for one whose capabilities check for a rollback at its read or after a database error, the flag of a later error
-/// only for one whose capabilities check after a database error, and the names of its lists only for a method that
-/// has one.
+/// only for one whose capabilities check after a database error, the result of a read only for one of those that
+/// streams, and the names of its lists only for a method that has one.
 /// </summary>
 internal sealed class QueryMethodLocals
 {
@@ -74,6 +74,10 @@ internal sealed class QueryMethodLocals
         RaisedLater = capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError)
             ? names.Take("raisedLater")
             : string.Empty;
+        HasRow =
+            streams && capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError)
+                ? names.Take("hasRow")
+                : string.Empty;
         Lists = ListLocals.Of(input, names);
     }
 
@@ -126,6 +130,10 @@ internal sealed class QueryMethodLocals
 
     // The flag that is true when the rest of the batch, read after a database error, raised an error of its own.
     public string RaisedLater { get; }
+
+    // The result of a streamed read, which the read assigns in a try of its own, as the loop cannot read in its
+    // condition when a catch is to follow the read.
+    public string HasRow { get; }
 
     // The names of what the method declares for its lists, or null when it has none.
     public ListLocals? Lists { get; }

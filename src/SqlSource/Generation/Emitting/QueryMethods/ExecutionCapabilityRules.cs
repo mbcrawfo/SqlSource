@@ -39,8 +39,9 @@ internal static class ExecutionCapabilityRules
     /// </para>
     /// <para>
     /// SQL Server, <see cref="ExecutionCapabilities.ChecksRollbackAfterDatabaseError" />, on a method that reads rows:
-    /// a database error at a row, or one that the drain before a return throws, leaves the rest of the batch unread,
-    /// and a later error there can roll the transaction back.  The transaction's <c>Connection</c> is still set when
+    /// a database error at a row, or one that a drain of the later results throws, before a return, after a stream's
+    /// loop or at its early exit, leaves the rest of the batch unread, and a later error there can roll the
+    /// transaction back.  The transaction's <c>Connection</c> is still set when
     /// the read throws, even when that error itself rolled it back, so a catch reads the rest of the batch, disposes
     /// the reader, and reports the rollback only when a later error was raised and the <c>Connection</c> is then
     /// null; otherwise the database's error is thrown as it is.

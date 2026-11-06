@@ -40,8 +40,7 @@ internal static class ExecutionCapabilityWriter
             );
         }
 
-        // A streaming method does not check after a database error yet, so it documents its own exception alone.
-        if (capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError) && !context.Streams)
+        if (capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError))
         {
             XmlDocWriter.AppendException(
                 builder,
@@ -150,7 +149,8 @@ internal static class ExecutionCapabilityWriter
     }
 
     /// <summary>
-    /// Appends the catch of a read, for the database's error, which comes before <see cref="AppendRollbackCheck" />'s.
+    /// Appends the catch of a read or a drain, for the database's error, which comes before
+    /// <see cref="AppendRollbackCheck" />'s when a <c>try</c> has both.
     /// With a transaction given, it reads the rest of the batch without the caller's token, as the reader's disposal
     /// would, and notes whether an error was raised there; any other exception of that read, such as a cancellation,
     /// is dropped, as the disposal would drop it.  It then disposes the reader, and when a later error was raised and
@@ -232,13 +232,15 @@ internal static class ExecutionCapabilityWriter
     }
 
     /// <summary>
-    /// Appends the drain after a streamed read loop, after a blank line, with the caller's token, as each read takes.
+    /// Appends the drain after a streamed read loop, after a blank line, with the caller's token, as each read takes,
+    /// in a <c>try</c> whose <see cref="AppendDatabaseErrorCheck" /> follows it when the capabilities have
+    /// <see cref="ExecutionCapabilities.ChecksRollbackAfterDatabaseError" />.
     /// <see cref="ExecutionCapabilities.DrainsLaterResults" /> turns it on.
     /// </summary>
     public static void AppendDrainAfterLoop(in QueryMethodContext context, string indent)
     {
         _ = context.Builder.Append('\n');
-        AppendDrainLoop(in context, indent, MethodArguments.CancellationToken);
+        AppendCheckedDrain(in context, indent, MethodArguments.CancellationToken);
     }
 
     /// <summary>
@@ -276,9 +278,10 @@ internal static class ExecutionCapabilityWriter
 
     /// <summary>
     /// Appends the end of the <c>try</c> that <see cref="AppendLeftAtARowStart" /> opened, and its <c>finally</c>,
-    /// which drains when the flag is set.  The drain takes no token, as the reader's disposal would read the rest: a
-    /// token the caller cancelled before an early exit neither throws nor cancels the command, and the drain throws
-    /// only what the database raises.
+    /// which drains when the flag is set, in a <c>try</c> whose <see cref="AppendDatabaseErrorCheck" /> follows it when
+    /// the capabilities have <see cref="ExecutionCapabilities.ChecksRollbackAfterDatabaseError" />.  The drain takes no
+    /// token, as the reader's disposal would read the rest: a token the caller cancelled before an early exit neither
+    /// throws nor cancels the command, and the drain throws only what the database raises.
     /// </summary>
     /// <param name="context">The method being written.</param>
     /// <param name="indent">The indent of the <c>try</c>.</param>
@@ -294,9 +297,26 @@ internal static class ExecutionCapabilityWriter
         var builder = context.Builder;
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
         QueryMethodWriter.AppendIf(builder, loopIndent, context.Locals.AtRow);
-        AppendDrainLoop(in context, innerIndent, NoCancellation);
+        AppendCheckedDrain(in context, innerIndent, NoCancellation);
         QueryMethodWriter.AppendEnd(builder, loopIndent);
         QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    // The drain loop with the token given, in a try followed by the catch of the database's error when the
+    // capabilities check after one.
+    private static void AppendCheckedDrain(in QueryMethodContext context, string indent, string token)
+    {
+        if (!context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError))
+        {
+            AppendDrainLoop(in context, indent, token);
+            return;
+        }
+
+        var builder = context.Builder;
+        _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
+        AppendDrainLoop(in context, GeneratedText.Deeper(indent), token);
+        QueryMethodWriter.AppendEnd(builder, indent);
+        AppendDatabaseErrorCheck(in context, indent);
     }
 
     // The loop that reads the results after the rows and does nothing with them, with the token given.
