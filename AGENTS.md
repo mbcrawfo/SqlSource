@@ -57,6 +57,10 @@
    - After that, run it again the same way before every push, on the branch exactly as it will be pushed.
    - A review covers only the commits it saw: a commit made after a clean review needs another one.
 
+## Package versions
+
+1. **A comment in `Directory.Packages.props` holds only what someone changing that pin must know and could not learn elsewhere.**  That is a coupling no test enforces, why a transitive or unreferenced pin exists and when to remove it, or a licence decision.  Never say what a package is or who uses it, or repeat a test, a project file, an AGENTS.md or the docs.
+
 ## Reviewing maintainability
 
 A periodic review of the code's folder growth, comments and duplicated patterns follows the skill in `.claude/skills/reviewing-maintainability/`, which says what is fixed in the review's pull request and what is recorded in `docs/tech-debt`.
