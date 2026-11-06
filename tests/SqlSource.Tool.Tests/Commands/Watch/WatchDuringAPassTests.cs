@@ -10,7 +10,7 @@ using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Commands;
+namespace SqlSource.Tool.Tests.Commands.Watch;
 
 // A change made while a pass of "describe --watch" runs, the first included and while it evaluates the projects too,
 // gives exactly one more pass, and an evaluation opens the watches of its folders before the pass reads a file.

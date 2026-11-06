@@ -22,7 +22,7 @@ Low: a rare failure on a stalled runner, which a rerun passes.
 
 ## Proposed fix
 
-Pass `new TestClock()` of `tests/SqlSource.Tool.Testing` in the class's `Scene.Start`, as `Commands/WatchFolderTests.cs` already does with this watcher, delete `StillClock`, and say again in the class comment that the timer never fires.
+Pass `new TestClock()` of `tests/SqlSource.Tool.Testing` in the class's `Scene.Start`, as `Commands/Watch/WatchFolderTests.cs` already does with this watcher, delete `StillClock`, and say again in the class comment that the timer never fires.
 
 ## Trigger
 

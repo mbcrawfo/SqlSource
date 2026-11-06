@@ -7,7 +7,7 @@ using SqlSource.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Commands;
+namespace SqlSource.Tool.Tests.Commands.Watch;
 
 // What a change asks of a "describe --watch": a pass on the projects it already read, or a pass that runs their
 // manifest targets again first, which a test sees as one more manifest run.

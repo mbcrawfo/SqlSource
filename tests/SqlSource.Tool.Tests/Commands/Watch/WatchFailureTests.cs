@@ -7,7 +7,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Watching;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Commands;
+namespace SqlSource.Tool.Tests.Commands.Watch;
 
 // A watcher that fails in a "describe --watch", and the variable that makes the watch poll.
 public sealed class WatchFailureTests : IAsyncDisposable

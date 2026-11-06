@@ -10,7 +10,7 @@ using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Commands;
+namespace SqlSource.Tool.Tests.Commands.Watch;
 
 // "describe --watch": a pass, then a pass after each change that asks for one, with the options of the command line in
 // each.  The changes come from a FakeFolderWatcher, and the time from the scene's clock.

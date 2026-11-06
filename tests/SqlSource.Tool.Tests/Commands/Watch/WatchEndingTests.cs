@@ -9,7 +9,7 @@ using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Commands;
+namespace SqlSource.Tool.Tests.Commands.Watch;
 
 // What ends a "describe --watch", and what does not: an error is reported in its pass and the watch goes on, a unit
 // that cannot be found ends it before its first pass, and only a stop ends it after that, with 0.

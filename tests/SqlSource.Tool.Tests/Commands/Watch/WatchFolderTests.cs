@@ -9,7 +9,7 @@ using SqlSource.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Commands;
+namespace SqlSource.Tool.Tests.Commands.Watch;
 
 // A folder of the watched set that goes, comes back, appears late or cannot be watched: the next evaluation watches it
 // again once it is there, and a folder that stays gone asks for no pass after the first.  The project is in App, in a
