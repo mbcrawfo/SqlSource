@@ -8,8 +8,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Watching;
 
-// Each test lists the folder itself with Poll and never waits for the timer, though the timer is the system's and
-// polls too, every Interval.
+// Each test lists the folder itself with Poll.  The watcher's timer is TestClock's, which fires only when a test
+// advances the clock, and none does, so no other listing lands between two steps of a test's change.
 public sealed class PollingFolderWatcherTests
 {
     [Fact]
@@ -198,10 +198,6 @@ public sealed class PollingFolderWatcherTests
         _ = Directory.CreateDirectory(scene.Folder.Path);
     }
 
-    // A clock that leaves its timers to the system's: the watcher's timer is real and polls every Interval beside the
-    // test's own polls.
-    private sealed class StillClock : TimeProvider { }
-
     private sealed class Scene : IDisposable
     {
         public TempFolder Folder { get; } = new();
@@ -213,7 +209,7 @@ public sealed class PollingFolderWatcherTests
         public PollingFolderWatcher Start(bool recursive = true) =>
             new(
                 new WatchRequest(Folder.Path, recursive, Poll: true, Seen.Add, Failures.Add),
-                new StillClock(),
+                new TestClock(),
                 PollingFolderWatcher.Interval
             );
 
