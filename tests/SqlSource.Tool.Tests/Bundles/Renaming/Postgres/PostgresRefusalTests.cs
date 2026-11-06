@@ -170,6 +170,23 @@ public sealed class PostgresRefusalTests
         );
     }
 
+    // Only _<digits> is the planner's suffix: a plan's word of a mapped name and a letter suffix, users_secretword, is
+    // a name of its own, renamed whole, and the bundle is renamed.
+    [Fact]
+    public async Task RenameAsync_PlanWordWithAMappedStemAndALetterSuffix_KeepsNoneOfIt()
+    {
+        var raw = Edited(
+            Planned,
+            calls => EditPlan(calls[ExplainCall]!, plan => plan[PlanKeys.Filter] = "(users_secretword.id > 0)")
+        );
+
+        var renamed = await PostgresRenamings.RenamedAsync(raw);
+
+        RenamingBundles
+            .FilesOf(renamed.Bundle)
+            .ShouldNotContain(file => file.Contains("secretword", StringComparison.OrdinalIgnoreCase));
+    }
+
     // The raw bundle of a case whose calls are edited, with the case's entry.
     private static Bundle Edited(string name, Action<JsonArray> edit)
     {

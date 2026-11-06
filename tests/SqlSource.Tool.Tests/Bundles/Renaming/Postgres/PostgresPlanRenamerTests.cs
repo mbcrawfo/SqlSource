@@ -224,6 +224,29 @@ public sealed class PostgresPlanRenamerTests
         Texts(root["Output"]).ShouldBe(["a_stray_2.a_id"]);
     }
 
+    // Only _<digits> is the planner's suffix: users_archive, and users_note that no alias names, are names of their
+    // own though users is mapped, so that no part of them is kept.
+    [Fact]
+    public void Rename_ChildWithALetterSuffix_IsItsOwnName()
+    {
+        var scope = Scope();
+        _ = scope.Name("users", quoted: true, NameClass.Table);
+        var node = new JsonObject
+        {
+            ["Node Type"] = "Seq Scan",
+            ["Alias"] = "users_archive",
+            ["Output"] = new JsonArray("users_archive.id"),
+            ["Filter"] = "(users_note.id > 0)",
+        };
+
+        var root = Root(Rename(node, scope));
+
+        scope.Refusals.ShouldBeEmpty();
+        Text(root["Alias"]).ShouldBe("a_users_archive");
+        Texts(root["Output"]).ShouldBe(["a_users_archive.a_id"]);
+        Text(root["Filter"]).ShouldBe("(a_users_note.a_id > 0)");
+    }
+
     // A table named as an engine word keeps its word, and its partitions' alias with it: the token check refuses
     // that alias (WordsOf_ChildOfAnEngineWord_IsWhole).
     [Fact]
@@ -426,6 +449,19 @@ public sealed class PostgresPlanRenamerTests
         scope.IsMapped("items_1", quoted: true).ShouldBeFalse();
     }
 
+    [Fact]
+    public void Register_ChildWithALetterSuffix_IsRegistered()
+    {
+        var scope = Scope();
+        _ = scope.Name("users", quoted: true, NameClass.Table);
+        var node = new JsonObject { ["Node Type"] = "Seq Scan", ["Alias"] = "users_archive" };
+
+        PostgresPlanRenamer.Register(CallOf(PlanOf(node)), scope);
+
+        scope.Refusals.ShouldBeEmpty();
+        scope.IsMapped("users_archive", quoted: true).ShouldBeTrue();
+    }
+
     [Theory]
     [InlineData("not json")]
     [InlineData( /*lang=json,strict*/
@@ -515,6 +551,29 @@ public sealed class PostgresPlanRenamerTests
         PostgresPlanRenamer
             .WordsOf(FieldOf(PlanOf(node)))
             .ShouldBe(["\"t_1234abcd\"", "t_1234abcd", ".", "c_0011aabb", "\"t_1234abcd\"", ".", "c_0011aabb"]);
+    }
+
+    [Fact]
+    public void WordsOf_ReplacementWithALetterSuffix_IsWhole()
+    {
+        var node = new JsonObject
+        {
+            ["Node Type"] = "Seq Scan",
+            ["Alias"] = "t_1234abcd_archive",
+            ["Output"] = new JsonArray("t_1234abcd_archive.c_0011aabb", "\"t_1234abcd_archive\".c_0011aabb"),
+        };
+
+        PostgresPlanRenamer
+            .WordsOf(FieldOf(PlanOf(node)))
+            .ShouldBe([
+                "\"t_1234abcd_archive\"",
+                "t_1234abcd_archive",
+                ".",
+                "c_0011aabb",
+                "\"t_1234abcd_archive\"",
+                ".",
+                "c_0011aabb",
+            ]);
     }
 
     [Fact]
