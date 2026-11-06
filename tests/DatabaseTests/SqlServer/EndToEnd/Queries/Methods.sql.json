@@ -981,8 +981,9 @@
     },
     "ListFailingAtSecondThenOverflow": {
       "hash": "add028c0cd30efc1a995fd00eeefe16efb1c4f843796304526be7bb6c5303e7e",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1028,8 +1029,9 @@
     },
     "ListThenOverflowThenFailConversion": {
       "hash": "3dcfed98557a32d02d4865547775797c86d5ae54ef7fb533df5eda711e1c155f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -1079,8 +1081,9 @@
     },
     "GetFailingAtSecondThenFailConversion": {
       "hash": "fe88a2bd243221c4d7fd5cfc4dace4dbb11bca37a950e9869165a11c7094cd7d",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,

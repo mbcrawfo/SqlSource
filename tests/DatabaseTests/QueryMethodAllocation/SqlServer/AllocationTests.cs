@@ -1499,8 +1499,8 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                                 }
                                 catch (DbException exception) when (transaction is not null)
                                 {
-                                    // The generated method's check after a database error: the rest of the batch is read, to see whether a
-                                    // later error rolled the transaction back.
+                                    // The generated method's check after a database error: the rest of the batch is
+                                    // read, to see whether a later error rolled the transaction back.
                                     var raisedLater = false;
                                     try
                                     {
@@ -1519,7 +1519,8 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                                     catch (Exception)
 #pragma warning restore CA1031, RCS1075
                                     {
-                                        // Empty as the generated method's is: it throws its first error, never the drain's.
+                                        // Empty as the generated method's is: it throws its first error, never the
+                                        // drain's.
                                     }
 
                                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -1581,8 +1582,8 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                             }
                             catch (DbException exception) when (transaction is not null)
                             {
-                                // The generated method's check after a database error: the rest of the batch is read, to see whether a
-                                // later error rolled the transaction back.
+                                // The generated method's check after a database error: the rest of the batch is read,
+                                // to see whether a later error rolled the transaction back.
                                 var raisedLater = false;
                                 try
                                 {
@@ -1619,14 +1620,15 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                                 {
                                     while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
                                     {
-                                        // The generated method's drain, when the loop was left at a row, without the token.
+                                        // The generated method's drain, when the loop was left at a row, without the
+                                        // token.
                                     }
                                 }
 #pragma warning disable CA2219
                                 catch (DbException exception) when (transaction is not null)
                                 {
-                                    // The generated method's check after a database error: the rest of the batch is read, to see whether a
-                                    // later error rolled the transaction back.
+                                    // The generated method's check after a database error: the rest of the batch is
+                                    // read, to see whether a later error rolled the transaction back.
                                     var raisedLater = false;
                                     try
                                     {
@@ -1645,7 +1647,8 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                                     catch (Exception)
 #pragma warning restore CA1031, RCS1075
                                     {
-                                        // Empty as the generated method's is: it throws its first error, never the drain's.
+                                        // Empty as the generated method's is: it throws its first error, never the
+                                        // drain's.
                                     }
 
                                     await reader.DisposeAsync().ConfigureAwait(false);

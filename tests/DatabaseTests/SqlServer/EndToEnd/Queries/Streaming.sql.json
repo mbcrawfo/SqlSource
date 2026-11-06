@@ -502,8 +502,9 @@
     },
     "StreamFailingAtSecondThenFailConversion": {
       "hash": "7beab156e09f7f4fb1efb24848f2b77c647285862e6d8fe179ac32144a4cfd95",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
@@ -549,8 +550,9 @@
     },
     "StreamThenOverflowThenFailConversion": {
       "hash": "3dcfed98557a32d02d4865547775797c86d5ae54ef7fb533df5eda711e1c155f",
-      "engine": "mssql",
+      "toolVersion": "0.1.0",
       "database": "app",
+      "engine": "mssql",
       "serverVersion": "17.0.5015.4",
       "resultKind": "rows",
       "matchesTable": null,
