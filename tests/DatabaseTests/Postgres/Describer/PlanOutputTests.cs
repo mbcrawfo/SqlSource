@@ -349,6 +349,26 @@ public sealed class PlanOutputTests(PostgresDatabases postgres)
         plans.Single().Output.ShouldBe(["o.id", "o.user_id"]);
     }
 
+    // A test of a parameter, and of the stand-in of a list's null test, prints the value the plan computes elsewhere:
+    // $1 for the parameter, and the InitPlan's value as $0 on 14 and as (InitPlan 1).col1 on 18.  Each is a test, which
+    // the recogniser reads as never null whatever its operand.
+    [Fact]
+    public async Task Explain_TestOfAParameterOrAnInitPlan_PrintsTheValueAsItsOperand()
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var root = await ExplainExecuteAsync(
+            "SELECT u.id, ((SELECT NULL) IS NULL) AS t, ($1 IS NOT NULL) AS p FROM users u",
+            "integer",
+            pruning: false
+        );
+
+        var output = root.Output.ShouldNotBeNull();
+        output[1].ShouldBe(postgres.Major == 14 ? "($0 IS NULL)" : "((InitPlan 1).col1 IS NULL)");
+        output[2].ShouldBe("($1 IS NOT NULL)");
+        PlanExpression.NullableOf(output[1], new ExpressionContext(true, static _ => null)).ShouldBe(false);
+        PlanExpression.NullableOf(output[2], new ExpressionContext(true, static _ => null)).ShouldBe(false);
+    }
+
     // A list's null test is described as (SELECT NULL), which the planner runs as an InitPlan and does not fold, so the
     // condition beside it is no strict filter on the optional side, and the join stays outer.  The InitPlan is another
     // plan to the walk, and none of its nodes is an instance of the join's.

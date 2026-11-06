@@ -100,6 +100,38 @@ public sealed class WalkTests(PostgresDatabases postgres)
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NullableOuterJoin]);
     }
 
+    // A list's null test selected as a column is a test, never null: its stand-in prints as $0 on 14 to 16 and as
+    // (InitPlan 1).col1 on 17 and later, a value the plan computes elsewhere.
+    [Fact]
+    public async Task DescribeAsync_ListsNullTestAsAColumn_IsNotNull()
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id, (@ids IS NULL) AS unfiltered FROM users u WHERE (@ids IS NULL OR u.id IN @ids)"
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NotNullExpression]);
+    }
+
+    // So is the test of an ordinary parameter, cast or not, which prints as $1.
+    [Theory]
+    [InlineData("(@p IS NULL)")]
+    [InlineData("(@p::int IS NOT NULL)")]
+    public async Task DescribeAsync_ParametersNullTestAsAColumn_IsNotNull(string test)
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Of("SELECT u.id, " + test + " AS x FROM users u", ("p", "int"))
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NotNullExpression]);
+    }
+
     // A list that is not negated keeps what it proved: an empty list matches no row, as NULL does.
     [Fact]
     public async Task DescribeAsync_LeftJoinThatAListMakesInner_IsNotNullThroughout()
