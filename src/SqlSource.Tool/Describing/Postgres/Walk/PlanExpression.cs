@@ -546,7 +546,8 @@ internal static partial class PlanExpression
             || (Is(at, Kind.Other) && Text(at).StartsWith('$'));
 
         // Inside one pair of parentheses: x IS NULL, x IS NOT NULL, x IS DISTINCT FROM y, or NOT of the last in a
-        // pair of its own.  Each operand is one primary with an optional cast.
+        // pair of its own.  Each operand is one primary, or a parameter or an InitPlan's value (IsOperand), with an
+        // optional cast.
         private bool IsTest(int from, int to)
         {
             if (to - from >= 2 && IsWord(from, "NOT") && IsGroup(from + 1, to))
