@@ -23,7 +23,7 @@ Each page is in this folder.
 | `src/SqlSource/Polyfills` | None | It holds the types that `netstandard2.0` lacks, and no design |
 | `src/SqlSource/build` | `msbuild-and-manifest.md` | `## What the props and targets do`, `## The manifest`, `## Known limits` |
 | `src/SqlSource/buildMultiTargeting` | `msbuild-and-manifest.md` | `### The online build`, under `## What the props and targets do` |
-| `src/SqlSource.Tool`, its root | `tool.md`, `bundles.md` | `## The command line`, `## A describe run`, `## Build integration options`; `## replay` of `bundles.md` for `ReplayCommand` |
+| `src/SqlSource.Tool`, its root | `tool.md`, `bundles.md` | `## The command line`, `## A describe run`, `## Build integration options`; `## replay` of `bundles.md` for `ReplayCommand`, and `## diagnose` for `DiagnoseCommand` |
 | `src/SqlSource.Tool/Projects` | `tool.md` | `## A describe run`, `## Folders`; the manifest's reader in `msbuild-and-manifest.md`, `## The manifest` |
 | `src/SqlSource.Tool/Planning` | `tool.md` | `## A describe run`, `## Folders` |
 | `src/SqlSource.Tool/Processes` | `tool.md` | `## Folders` |
@@ -31,12 +31,12 @@ Each page is in this folder.
 | `src/SqlSource.Tool/Describing`, its root | `tool.md` | `## A describe run`, `## Build integration options`, `## Folders` |
 | `src/SqlSource.Tool/Logging` and `src/SqlSource.Tool/Reporting` | `tool.md` | `## Logging and reporting` |
 | `src/SqlSource.Tool/Watching` | `tool.md` | `## Watch mode`, `## Folders` |
-| `src/SqlSource.Tool/Bundles` | `bundles.md` | `## The bundle`, `## replay` |
+| `src/SqlSource.Tool/Bundles` | `bundles.md` | `## The bundle`, `## replay`, `## diagnose` |
 | `src/SqlSource.Tool/Bundles/Renaming` | `bundles.md` | `## Renaming`, `## The engine's contract`; `## Renaming for PostgreSQL` and `## Renaming for SQL Server` for `EngineRenamings`, which gives each engine's part |
 | `src/SqlSource.Tool/Bundles/Renaming/Postgres` | `bundles.md` | `## Renaming for PostgreSQL` |
 | `src/SqlSource.Tool/Bundles/Renaming/SqlServer` | `bundles.md` | `## Renaming for SQL Server` |
 | `src/SqlSource.Tool/Describing/Describers` | `postgres-describer.md` | `## The describer contract` |
-| `src/SqlSource.Tool/Describing/Capture` | `postgres-describer.md` | `## Capture and replay` |
+| `src/SqlSource.Tool/Describing/Capture` | `postgres-describer.md`, `tool.md` | `## Capture and replay`; `### Describing` of `tool.md` for `RunCapture` |
 | `src/SqlSource.Tool/Describing/Postgres`, with `Columns/`, `Statements/` and `Types/` | `postgres-describer.md`, `postgres-nullability.md` | `## One describe, step by step`, `## Building parameters and columns`, `## Matching a table`, `## Errors`, `## Why a query cannot run a statement`; `## Nullability` in `postgres-nullability.md` |
 | `src/SqlSource.Tool/Describing/Postgres/Walk` | `postgres-nullability.md` | `## The plan walk` |
 | `src/SqlSource.Tool/Describing/SqlServer`, with `Columns/`, `Statements/` and `Types/` | `sqlserver-describer.md` | Every section |

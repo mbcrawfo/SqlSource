@@ -11,7 +11,7 @@ The generator writes a constant or a token method for every query whose output i
 
 The generator builds the [models](generator.md#models) of each described query from the sidecars that the tool writes, and the [method](generator.md#query-methods) that runs a query whose output is `codegen`.
 
-This page has two parts: [the workflow](#install-the-tool), from installing the tool and running it in the build to checking the sidecars in CI, and [the command reference](#command-reference).  The tool's `replay` command checks a bug-report bundle that someone gave you, with no database: see [checking a bundle with `replay`](#replay).
+This page has two parts: [the workflow](#install-the-tool), from installing the tool and running it in the build to checking the sidecars in CI and reporting a model that is wrong, and [the command reference](#command-reference).  The tool's `diagnose` command makes a bug-report bundle of one query that you can attach to an issue, and its `replay` command checks a bundle with no database: see [reporting a wrong model](#report-a-bug) and [checking a bundle with `replay`](#replay).
 
 <a id="install-the-tool"></a>
 
@@ -364,6 +364,73 @@ reports (postgres): no connection, 5 skipped
 
 Under `--check` the counts are `same`, `differ` and `failed`.  A name given to `--database` that no query of the run has gets a line of zeros, so that a misspelt name is seen.  The line names it when it is close to a database of the run, in the spelling you gave, and otherwise says `--database at position <n>`, with the position of the value on the command line, since a value typed after `--database` by mistake may be a secret.  A run on a solution in which no project uses SqlSource prints `sqlsource: no project of '<path>' uses SqlSource` and no summary.
 
+<a id="report-a-bug"></a>
+
+## Reporting a wrong model
+
+```console
+$ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip
+sqlsource: bundle '/work/report.zip' written
+sqlsource: mapping '/work/report.zip.mapping.json' written
+sqlsource: the mapping holds your own names: keep it private, outside your project's folder, since a build may copy a .json file into its output
+```
+
+When a query gets a model, a type or a nullability that is wrong for what your database returns, or the tool refuses a query that your database runs, `diagnose` makes a bug report of that one query: a zip file, the bundle, which a maintainer runs SqlSource on with no database and no schema of yours.  Your names and strings in it are renamed first, as [what is renamed](#bundle-contents) says, so you can attach it to a [bug report on GitHub](https://github.com/mbcrawfo/SqlSource/issues/new?template=bug-report.yml).
+
+- **Run it where you run `describe`**, with the same project or solution, `--project`, connections, `.env` file, `--verbose` and `--log`.  It describes the one query again against your database, whether or not its sidecar is current, and writes no sidecar.  `--query` names the `.sql` file, a colon and the query's name as its `-- name:` line gives it, letter for letter ([SQLSRC292](diagnostics.md#sqlsrc292)).
+- **`--out` is required**: the path of the zip.  The mapping is written beside it, with `.mapping.json` added to its name, and a file at either path is overwritten.  Give a path outside your project's folder, such as `../report.zip`, since a build may copy a `.json` file of the project's folder, such as the mapping, into its output.  A path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx` is refused before anything is described ([SQLSRC218](diagnostics.md#sqlsrc218)).
+- **A query that the tool refuses makes a bundle too**, which holds the error.  The run prints `sqlsource: the query was refused: SQLSRC226`, with the error's id, before the bundle's line, and exits with `0`.  The error itself is not printed again, since `describe` showed it to you.
+- **A database that cannot be opened makes no bundle.**  Its error is printed as `describe` prints it, and the exit code is `1`.
+
+Attach the zip to the issue, and keep the mapping to yourself: it lists each new name beside the name of yours it stands for, so that you can read what a maintainer finds in your own names.  To see what the maintainer will see, run [`replay`](#replay) on the zip: it says `reproduced`, and its lines name the new names.
+
+<a id="bundle-contents"></a>
+
+### What is renamed before you share it
+
+A bundle holds the one query, as a `.sql` file of its own with its dialect and logical database written in it, what your database answered when the tool described the query, what SqlSource made of that answer, or the error that refused the query, and the versions of `sqlsource`, of the server and its driver, of .NET and of the operating system.  It holds none of your other queries, your settings files, your code, your connection string or a log.  The markers that change no description, such as `-- summary:`, `-- column:` and `-- output:`, are left out of its `.sql` file, and a `-- param:` line keeps its query parameter's type and nullability and leaves out its C# type.
+
+- **Every name of yours gets a new name**: the schemas, tables, views, columns, aliases, functions, types and indexes of your database, its name, the logical database, the query's own name, its query parameters and its tokens.  A new name is a prefix for what it names and eight hexadecimal digits or more, `t_4f0a9c21` for a table, and a spelling has the same new name throughout the bundle.
+- **Every string literal gets a new one**, of the same form: `'active'` becomes `'l_9b3e07d4'`, and an enum's label is renamed as the literal of the same spelling, so the two still match.  A comment is left empty.
+- **A server's error keeps only its code**, the SQLSTATE or SQL Server's error number, and the query parameters it names, renamed.  Its message, which can quote your names and values, is left out.
+- **Each run picks its new names at random**, so two bundles of one schema share no new name, and no one can check a guess at what a new name stands for.
+- **Numbers are kept**, since a number in a query is as often a length, a precision or a `LIMIT` as a value, and another number could change what the database decides.
+- **A name of yours that is spelled as a keyword or a word of the database's own is kept**, wherever it stands: a column `name`, `date`, `count`, `type` or `value`, or an alias `old`, `new` or `left`.  SqlSource cannot tell such a name from the database's word, and renaming it would make many everyday queries impossible to rename.  The database's own names stay too: `pg_catalog`, `public`, `sys` and `dbo`, and its built-in functions, operators and types, as does a logical database named for its dialect, `postgres` or `mssql`.
+
+Before it writes the bundle, `diagnose` checks that every word in it is a new name, a word of the database's, a number or punctuation, and runs the query from the renamed bundle, as `replay` does, to see that it gives the answer your database gave.  So a bundle it writes holds no name, literal or value of yours but those kept above, and shows the problem as you saw it.  If a number in your query is a value you may not share, such as an account number written into its SQL, take the private route below instead.
+
+<a id="raw-bundle"></a>
+
+### When a bundle cannot be made safe
+
+```console
+$ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip
+/work/report.zip : error SQLSRC293: The bundle cannot be made safe to post: a word is not one of the new names, at query.sql, found ssn_hash
+    help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it
+    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc293
+```
+
+`diagnose` writes nothing rather than a bundle it cannot make safe: one that would still hold a text of yours ([SQLSRC293](diagnostics.md#sqlsrc293)), or whose renamed copy no longer gives your query's answer ([SQLSRC294](diagnostics.md#sqlsrc294)).  The line names what it found, which is yours, such as a name of your schema: do not paste it into an issue.
+
+Take the private route instead.  Run the same command with `--no-obfuscate`, which writes a raw bundle, with your names and SQL as they are, what the server said in full, and no mapping:
+
+```console
+$ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip --no-obfuscate
+sqlsource: raw bundle '/work/report.zip' written
+sqlsource: this bundle holds your own names and SQL, and must not be posted: open an issue that says a raw bundle is ready, without attaching it, and a maintainer will say how to send it
+```
+
+Keep the raw bundle, and open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it.
+
+`--scrub` renames a raw bundle later, with no database, no project and no connection, by the same steps and checks as `diagnose` without `--no-obfuscate`, and writes the renamed bundle and its mapping at `--out`.  It takes no other option.  A bundle that is renamed already is refused ([SQLSRC295](diagnostics.md#sqlsrc295)).
+
+```console
+$ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
+sqlsource: bundle '/work/report-renamed.zip' written
+sqlsource: mapping '/work/report-renamed.zip.mapping.json' written
+sqlsource: the mapping holds your own names: keep it private, outside your project's folder, since a build may copy a .json file into its output
+```
+
 <a id="command-reference"></a>
 
 ## Command reference
@@ -373,10 +440,14 @@ dotnet sqlsource describe [<path>...] [--project <path>]... [--database <name>].
                           [--connection <name>=<connection string>]...
                           [--force | --check] [--verbose] [--log <path>]
                           [--watch]
+dotnet sqlsource diagnose --query <file>:<name> [<path>] [--project <path>]...
+                          [--connection <name>=<connection string>]...
+                          --out <path> [--no-obfuscate] [--verbose] [--log <path>]
+dotnet sqlsource diagnose --scrub <bundle> --out <path>
 dotnet sqlsource replay <bundle> [--verbose] [--log <path>]
 ```
 
-`dotnet sqlsource --help`, `dotnet sqlsource describe --help` and `dotnet sqlsource replay --help` print the options, and `dotnet sqlsource --version` the version of the tool.  The arguments and options below are those of `describe`; `replay` is in [checking a bundle with `replay`](#replay).
+`dotnet sqlsource --help`, and `--help` after a command, such as `dotnet sqlsource diagnose --help`, print the options, and `dotnet sqlsource --version` the version of the tool.  The arguments and options below are those of `describe`; `diagnose` is in [making a bundle with `diagnose`](#diagnose), and `replay` in [checking a bundle with `replay`](#replay).
 
 <a id="arguments"></a>
 
@@ -433,8 +504,8 @@ A connection or log variable that is empty or holds only white space is not set.
 
 | Code | When |
 |----|----|
-| `0` | The run reported no error; or a `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP`, whatever its passes reported |
-| `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; or a run without `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
+| `0` | The run reported no error; a `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP`, whatever its passes reported; or `diagnose` wrote its bundle, of a query that was refused too |
+| `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; `diagnose` wrote no bundle, or wrote the bundle and not its mapping; or a run without `--watch` was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
 | `2` | `--check` found a sidecar out of date, and nothing else went wrong; or `replay` gave another answer than the bundle's |
 
 A run that is stopped writes no further sidecar.  A second Ctrl+C ends the process at once.
@@ -465,13 +536,13 @@ postgres (postgres): 1 described, 0 skipped, 0 failed
 $ dotnet sqlsource describe --log sqlsource.log
 ```
 
-`--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file, one JSON object on each line.  It is what to attach to an issue when the tool does something you did not expect.
+`--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file, one JSON object on each line.  It is your own record of what the run did, with your names, your SQL and what your server said in it: never attach it to an issue, and send it privately when a maintainer asks for it.  What an issue attaches is a bundle, in which your names and strings are renamed: see [reporting a wrong model](#report-a-bug).
 
 - **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).  It refuses a `--log` path that holds `=` or `;` too, which is more likely a connection string typed in the wrong place than a path; a path from `SQLSOURCE_LOG` is not held to that.
 - **A `--watch` writes one file from its start until it is stopped**, with every pass in it and where each begins and ends.
-- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it, nor does a `--watch`, nor `replay`, nor the run of a build, which is given no `--log`: see [running in the build](#running-in-the-build) for its logs.
+- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it, nor does a `--watch`, nor `diagnose` or `replay`, nor the run of a build, which is given no `--log`: see [running in the build](#running-in-the-build) for its logs.
 
-**Read a log before you share it.**  The tool writes each connection value as `***` wherever it finds it whole: the value of each `--connection` on the command line, and the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message, as written, with the spaces at its ends trimmed, or as the driver writes it again.  It writes each password of a connection string as `***` too, where it stands apart from other letters, digits and underscores and is at least four characters long, and so the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file when the connection string gives none.  In the record of your command line, every value of `--database` and `--connection` is written `***`.  A value typed where a path goes (the path of `describe`, a `.sql` path or a `--project` value) is written `***` too when it holds `=` or `;`, as a connection string does.  A value typed there or after `--log` with neither, such as a password typed alone, can appear as written, and so can a password shorter than four characters, and one that is the name of its logical database or of its dialect, such as `postgres` ([known issues](#known-issues)): search the log for your password before you share it.  The log also holds:
+**Read a log before you send it.**  The tool writes each connection value as `***` wherever it finds it whole: the value of each `--connection` on the command line, and the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message, as written, with the spaces at its ends trimmed, or as the driver writes it again.  It writes each password of a connection string as `***` too, where it stands apart from other letters, digits and underscores and is at least four characters long, and so the password that the PostgreSQL driver reads from `PGPASSWORD` or a password file when the connection string gives none.  In the record of your command line, every value of `--database` and `--connection` is written `***`.  A value typed where a path goes (the path of `describe`, a `.sql` path or a `--project` value) is written `***` too when it holds `=` or `;`, as a connection string does.  A value typed there or after `--log` with neither, such as a password typed alone, can appear as written, and so can a password shorter than four characters, and one that is the name of its logical database or of its dialect, such as `postgres` ([known issues](#known-issues)): search the log for your password before you share it.  The log also holds:
 
 - the version of the tool, of .NET and of the operating system, and the rest of your command line;
 - the paths of your projects and files, and the names of your queries and databases;
@@ -488,6 +559,28 @@ $ dotnet sqlsource describe --log sqlsource.log
 - **The same version as the `SqlSource` package** of your projects ([SQLSRC206](diagnostics.md#sqlsrc206)).
 - **A database the tool can reach**, of a version it supports, for each logical database with a query to describe.  See [PostgreSQL](postgresql.md#connecting) and [SQL Server](sqlserver.md#connecting).
 
+<a id="diagnose"></a>
+
+### Making a bundle with `diagnose`
+
+```console
+$ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip
+$ dotnet sqlsource diagnose App.slnx --project src/App/App.csproj --query src/App/Queries/Users.sql:GetUser --out ../report.zip
+$ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
+```
+
+`diagnose` writes the bug-report bundle of one query: see [reporting a wrong model](#report-a-bug) for what it holds and what it prints.
+
+| Option | What it does |
+|----|----|
+| `--query <file>:<name>` | The query to report: its `.sql` file, which a type of the run must claim ([SQLSRC212](diagnostics.md#sqlsrc212)), a colon, and its name as its `-- name:` line gives it ([SQLSRC292](diagnostics.md#sqlsrc292)).  The last colon ends the file, so `C:\App\Queries\Users.sql:GetUser` reads.  A relative path is taken from the current folder |
+| `--out <path>` | Required, with `--scrub` too.  Where to write the bundle, a zip; its mapping is written beside it, with `.mapping.json` added to its name.  A file there is overwritten, and a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, or holds `=` or `;`, is refused |
+| `--no-obfuscate` | Writes a raw bundle, with your names and SQL as they are, and no mapping: see [when a bundle cannot be made safe](#raw-bundle) |
+| `--scrub <bundle>` | Renames a raw bundle, with no database, no project and no connection, and writes it and its mapping at `--out`.  It takes no other option.  A bundle renamed already is [SQLSRC295](diagnostics.md#sqlsrc295), and one that cannot be read is an error as for [`replay`](#replay) |
+| `<path>`, `--project`, `--connection`, `--verbose`, `--log` | As for `describe`: see [arguments](#arguments) and [options](#options).  `<path>` names the project or solution alone, since `--query` names the one `.sql` file |
+
+It has none of `describe`'s other options.  Its connections come from the same places as `describe`'s ([connections](#connections)), and `SQLSOURCE_CONNECTION` gives the connection of the query's logical database even in a run with several, since `diagnose` describes one query.  The exit code is `0` when it wrote the bundle, a refused query's included, and its mapping unless the bundle is raw, and `1` otherwise.
+
 <a id="replay"></a>
 
 ### Checking a bundle with `replay`
@@ -498,7 +591,7 @@ sqlsource: mssql.table-match: query="UsersWithOrders" tableMatch="several-tables
 sqlsource: reproduced: the pipeline gives this answer
 ```
 
-A bug-report bundle holds one query, what its database answered when the query was described, and what SqlSource made of it.  `replay` runs the query through SqlSource again from the bundle alone, and says whether it gives the same answer.  Give it the zip file, or the folder you unzipped it into.  It needs no database, no connection, no project and no `.env` file, and none of the [requirements](#requirements) above but .NET 8 or later, so you can check a bundle that someone gave you on any machine with the tool.
+A bug-report bundle holds one query, what its database answered when the query was described, and what SqlSource made of it.  `replay` runs the query through SqlSource again from the bundle alone, and says whether it gives the same answer.  Give it the zip file, or the folder you unzipped it into.  It needs no database, no connection, no project and no `.env` file, and none of the [requirements](#requirements) above but .NET 8 or later, so you can check a bundle that someone gave you on any machine with the tool.  Run it on a bundle that [`diagnose`](#report-a-bug) made for you, too, before you attach it: it shows what a maintainer will see.  The lines of a renamed bundle give its new names, which its mapping turns back into yours.
 
 Before its outcome, it prints a line for each decision it made about the query's columns and the table its rows match, each starting with `sqlsource:` and the name of the bundle's database engine.  With `--verbose` it prints a line for everything else it did too.  `--log <path>`, or `SQLSOURCE_LOG`, writes a record of the replay to a file, with the same rules as for `describe` ([logs](#logs)).  These are its only options.
 
@@ -518,7 +611,7 @@ It ends with one of three outcomes:
 
 A bundle of a query that SqlSource refused holds the error and the step it was reported at.  `reproduced` then means that this version refuses the query with the same error at the same step, and a difference reads `expected SQLSRC231, replayed SQLSRC226 at describe parameters`.  Columns are counted from 0, so `columns[2]` is the third.
 
-A bundle that holds its maker's own names and SQL, as one sent to you privately does, says so first, with `sqlsource: this bundle is not renamed, and must not be posted`.  Keep it to yourself: never attach it to an issue or post it anywhere.
+A bundle that holds its maker's own names and SQL, as a raw bundle of yours or one sent to you privately does, says so first, with `sqlsource: this bundle is not renamed, and must not be posted`.  Never attach it to an issue or post it anywhere: a raw bundle of yours goes to a maintainer by [the private route](#raw-bundle), and one sent to you stays with you.
 
 A control character in a text that `replay` prints from a bundle, such as the escape that starts a sequence a terminal would act on, or a line break, is printed as its code, so that a bundle from someone else cannot change what your terminal shows: `\u001B` for the escape and `\u000A` for a line break in a message, and inside a quoted value as JSON writes it, `\n` for a line break and `\t` for a tab.  A tab outside a quoted value is printed as it is.
 
@@ -536,4 +629,5 @@ A bundle that cannot be read or replayed is an error, from [SQLSRC288](diagnosti
 - **In Visual Studio and VS Code, the recipes that start `describe --watch` and what the editor shows after a pass have not been checked.**  If the models and methods do not change after the watch writes a sidecar, save any file or build.
 - **A few changes to folders far from your project start no pass of `describe --watch`.**  A folder deleted and made again where the watch was not looking one level above it, such as your repository's own folder on Linux, or, outside a git repository, a folder deleted together with the folder above it, is not seen, and later saves in it start no pass.  A first `dotnet restore` into an `artifacts` folder that does not exist yet and lies above your repository's folder, or outside a repository above the folder of your nearest `Directory.Build.props`, or above your project's folder when there is none, starts no pass either.  Outside a git repository the watch also looks at the folder one level above each folder it covers, such as the folder above your project's folder, so a project or solution file saved there starts a pass that changes nothing.  Stop the watch and start it again after such a change, or work inside a git repository.
 - **A merge can keep an entry that an older tool wrote, without a warning.**  When one branch updates the tool and another changes a query with the older tool, git can merge their sidecar without a conflict, and neither the build nor `describe` says that the entry of that query was written by the older tool.  After a merge that brings a tool update together with work described with the older tool, whichever branch you are on, run `dotnet sqlsource describe --force`: see [sidecars in git](#sidecars-in-git).
+- **A SQL Server query that spells a name in another case than its table or column does can often not be renamed.**  A query that writes `EMAIL` for the column `email` is refused by `diagnose` with [SQLSRC294](diagnostics.md#sqlsrc294), since its renamed bundle gives another answer.  Spell the names in the query as the table and its columns are declared and run `diagnose` again, if the problem stays when you do; or make a raw bundle with `--no-obfuscate` and send it by [the private route](#raw-bundle).  In a database whose collation tells case apart, two names that differ by case alone, such as `Users` and `users`, get one new name in the bundle.
 - **A short password, or a connection string typed in the wrong place, can appear in the output or a log.**  The tool writes a connection value as `***` where it finds the whole value, and each password of it, or of `PGPASSWORD` or a PostgreSQL password file, where it stands apart from other letters, digits and underscores.  A password shorter than four characters is not hidden, nor is one that is the name of its logical database or of its dialect, such as `postgres`, words that the tool prints anyway.  A password that is hidden hides each word of a message that equals it, such as a column named like it, and every password of a PostgreSQL password file that the tool reads is hidden so, not only the one the connection uses.  A password file that is a pipe, such as `PGPASSFILE=<(...)` in a shell, is left for the driver to read, and its password is not hidden.  An error of SQL Server about a query can name the login, such as one for a database that the login may not open, and it is printed and logged as the server wrote it.  A connection string typed where a path or a `--project` goes, or after `--database` or `--connection` without its `name=`, is not printed.  In the log, every value of `--database` and `--connection` is written `***`, and so is a path, a `--project` value included, that holds `=` or `;`; a `--log` path that holds either is refused.  A secret with neither, typed alone where a path, a `--project` value or a `--log` path goes, is printed as a path and logged as typed.  Give each connection as `--connection <name>="..."` or in its variable, and search what you share, a log above all, for your password first.

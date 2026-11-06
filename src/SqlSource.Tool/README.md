@@ -37,4 +37,14 @@ $ dotnet sqlsource describe --watch
 
 On a machine with that `.env` file, or `SQLSOURCE_CONNECTION` in the environment, `dotnet build` runs `describe` itself before it compiles, and reports a query the database rejects as a build error at the query; a build in CI never does: see [running in the build](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#running-in-the-build).
 
+To report a query whose model is wrong, two more commands:
+
+```console
+$ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip
+$ dotnet sqlsource replay ../report.zip
+```
+
+- `diagnose` describes the one query again and writes a bug-report bundle of it, a zip with your names and strings renamed, to attach to an issue, and beside it a mapping of the new names, which you keep to yourself: see [reporting a wrong model](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#report-a-bug).
+- `replay` runs SqlSource from a bundle with no database, and says whether it gives the bundle's answer: see [checking a bundle with `replay`](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#replay).
+
 [The tool's manual page](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md) has the whole workflow, every option and the exit codes.  [The SqlSource readme](https://github.com/mbcrawfo/SqlSource/blob/main/README.md) says what SqlSource does and how to start.

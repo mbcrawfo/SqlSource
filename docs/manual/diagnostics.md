@@ -1556,7 +1556,7 @@ See: [Describing again](tool.md#describing-again)
 
 **File could not be changed**
 
-The tool could not write a sidecar, or could not delete one that its `.sql` file no longer needs, or could not read such a one to see that it may be deleted, or could not write the log of `--log` or `SQLSOURCE_LOG`.  The message says which, and ends with the reason the operating system gave.
+The tool could not write a sidecar, or could not delete one that its `.sql` file no longer needs, or could not read such a one to see that it may be deleted, or could not write the log of `--log` or `SQLSOURCE_LOG`, or the bundle of `diagnose` or its mapping.  The message says which, and ends with the reason the operating system gave.
 
 ```console
 /work/App/Queries/Users.sql.json : error SQLSRC218: '/work/App/Queries/Users.sql.json' could not be written: Access to the path '/work/App/Queries/Users.sql.json' is denied.
@@ -1576,7 +1576,12 @@ For a log:
 - **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars, the error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
 - **The log of a build whose path holds `=` or `;`**, which the name of a project can give it, is named by its position on the command line, as `The path at position 7 could not be written: the system would not write it`, since the operating system's reason would quote the path.
 
-See: [Logs](tool.md#logs)
+For a bundle of `diagnose`:
+
+- **The path of `--out` ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a bundle is not written over a .sql file, a sidecar, a project or a solution`, before it describes anything, and touches nothing.  Give the bundle a name of its own, such as `report.zip`.
+- **The bundle or its mapping cannot be written**, because its folder is not there, it is a folder, or the system will not let the tool write it.  The query has been described by then, and nothing is written past the file that failed: when the mapping fails, the bundle is written and its line printed, and the error is at the mapping.  The exit code is 1.  Run the command again with an `--out` in a folder that exists and can be written.
+
+See: [Logs](tool.md#logs), [making a bundle with `diagnose`](tool.md#diagnose)
 
 ## SQLSRC219
 
@@ -3202,6 +3207,8 @@ See: [Checking a bundle with `replay`](tool.md#replay)
 
 Copy the name from the query's `-- name:` line, letter for letter.  A query whose output is `sql` gets no description to report: if its generated code is wrong, open an issue that shows the query and the code you got.
 
+See: [Making a bundle with `diagnose`](tool.md#diagnose)
+
 ## SQLSRC293
 
 **Bundle cannot be made safe to post**
@@ -3217,6 +3224,8 @@ The text found is yours, such as a name of your schema, so do not paste this err
 
 Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
 
+See: [When a bundle cannot be made safe](tool.md#raw-bundle)
+
 ## SQLSRC294
 
 **Renamed bundle does not reproduce the query's answer**
@@ -3229,6 +3238,8 @@ Make a raw bundle instead, by running the same command with `--no-obfuscate`.  I
 ```
 
 Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
+
+See: [When a bundle cannot be made safe](tool.md#raw-bundle), [known issues](tool.md#known-issues)
 
 ## SQLSRC295
 
@@ -3244,3 +3255,5 @@ Make a raw bundle instead, by running the same command with `--no-obfuscate`.  I
 ```
 
 A bundle that is renamed already can be posted as it is, with the mapping that was written beside it kept to yourself.  For the other reason, make the raw bundle again with `diagnose --no-obfuscate`, and give `--scrub` that one.
+
+See: [When a bundle cannot be made safe](tool.md#raw-bundle)

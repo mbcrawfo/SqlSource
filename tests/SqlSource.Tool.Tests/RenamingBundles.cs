@@ -14,7 +14,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests;
 
 // The raw bundles of the renaming's tests: a query that FakeDescriber describes, captured through a capturing exchange
-// as diagnose will capture one, with its expected.json made by FixtureReplay's steps.  The server has a setting whose
+// as diagnose captures one, with its expected.json made by FixtureReplay's steps.  The server has a setting whose
 // value holds a schema of the user's.
 internal static class RenamingBundles
 {

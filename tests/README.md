@@ -178,7 +178,7 @@ The tool's tests alone replay a case, without a database: `BundleCases.cs`, at t
 To make a case of a bug report's bundle:
 
 1. Unzip it into `tests/SqlSource.Tool.Tests/Fixtures/Bundles/<engine>/<case>/`, naming the case for what it shows.
-2. Keep its `bundle.json`, and never add the `.mapping.json` file of a renamed bundle: a case is replayed from the files alone.
+2. Keep its `bundle.json`, and never add the `.mapping.json` file of a renamed bundle: a case is replayed from the files alone.  Never commit a raw bundle, one sent privately, whose `bundle.json` says `"renamed": false`: rename it first with `dotnet sqlsource diagnose --scrub <bundle> --out <zip>`, and make the case of the zip it writes; one that `--scrub` refuses cannot become a case.
 3. Run `dotnet test --project tests/SqlSource.Tool.Tests -- --filter-class "*BundleCasesTests"`.  The case must give what its `bundle.json` and `expected.json` say.
 
 ## Fixture projects

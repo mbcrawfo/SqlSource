@@ -15,7 +15,7 @@ Either way the renamed request names a copy that the renamed capture does not an
 
 ## Impact
 
-Low.  Such a bundle cannot be renamed, and must be sent raw and privately, as with [TD-0102](TD-0102-sql-server-renaming-folds-ignoring-case.md).  No user sees it yet: no command renames a bundle until `diagnose`.
+Low.  Such a bundle cannot be renamed, and must be sent raw and privately, as with [TD-0102](TD-0102-sql-server-renaming-folds-ignoring-case.md).  `diagnose` refuses such a bundle with `SQLSRC293`, whose help gives the private route.  The manual has no known issue of it, since few queries have either parameter.
 
 ## Proposed fix
 
