@@ -72,8 +72,8 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     /// <summary>
     /// A column of a result set whose source is of <c>sys</c>, of <c>INFORMATION_SCHEMA</c> or of the system resource,
-    /// <c>mssqlsystemresource</c>, under its source column's own name, or the request of <c>table</c> of a relation of
-    /// <c>sys</c> or <c>INFORMATION_SCHEMA</c>.
+    /// <c>mssqlsystemresource</c>, of the server itself and under its source column's own name, or the request of
+    /// <c>table</c> of a relation of <c>sys</c> or <c>INFORMATION_SCHEMA</c>.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -84,8 +84,9 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     /// A row's <c>name</c> is the column's alias, which is the user's, and the renaming keeps every name of a row of
     /// the engine's, an alias too, and every spelling of it in the bundle.  So a column of the server's is the
     /// engine's only when its name, without a nullability mark and folded, is its <c>sourceColumn</c> folded, is the
-    /// ASCII digits of the tool's <c>AS [n]</c>, or is null.  A column under an alias is renamed whole, which is safe,
-    /// since a renamed object of <c>sys</c> still replays.
+    /// ASCII digits of the tool's <c>AS [n]</c>, or is null.  A row's <c>sourceServer</c> is the name of a linked
+    /// server, which is the user's too, so a column read through one is not the engine's either.  Such a column is
+    /// renamed whole, which is safe, since a renamed object of <c>sys</c> still replays.
     /// </para>
     /// </remarks>
     public bool IsEngineRow(string method, string path, JsonObject row)
@@ -98,6 +99,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
         return path switch
         {
             "answer.rows[]" => (IsSystemSchema(row, "sourceSchema") || IsSystemResource(row, "sourceDatabase"))
+                && row["sourceServer"] is null
                 && IsUnaliased(row),
             CaptureRenamer.Request => method == SqlServerCallNames.Table && IsSystemSchema(row, "schema"),
             _ => false,

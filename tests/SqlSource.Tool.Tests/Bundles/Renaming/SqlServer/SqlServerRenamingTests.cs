@@ -177,6 +177,26 @@ public sealed class SqlServerRenamingTests
         Engine.IsEngineRow("columns", "answer.rows[]", row).ShouldBeFalse(name);
     }
 
+    // A column of sys read through a linked server is the user's: the linked server's name is the user's, which the
+    // renaming would keep with the row's other names.
+    [Theory]
+    [InlineData("columns")]
+    [InlineData("operands")]
+    [InlineData("table")]
+    public void IsEngineRow_AColumnOfTheServersThroughALinkedServer_IsFalse(string method)
+    {
+        var row = new JsonObject
+        {
+            ["name"] = "database_id",
+            ["sourceServer"] = "acme_link",
+            ["sourceDatabase"] = "mssqlsystemresource",
+            ["sourceSchema"] = "sys",
+            ["sourceTable"] = "databases",
+            ["sourceColumn"] = "database_id",
+        };
+        Engine.IsEngineRow(method, "answer.rows[]", row).ShouldBeFalse();
+    }
+
     // A user's tables can be in a system database, as they are when a connection string names master, so a row's
     // database alone does not make it the engine's.
     [Theory]

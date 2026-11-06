@@ -233,6 +233,40 @@ public sealed partial class SqlServerErrorRenamingTests
             .ShouldBeEmpty();
     }
 
+    // A column of sys read through a linked server is no row of the engine's: the linked server's name is the user's,
+    // and is renamed with the rest of the row.
+    [Fact]
+    public async Task RenameAsync_AColumnOfTheServersThroughALinkedServer_IsRenamed()
+    {
+        const string Server = "acme_link";
+        const string Sql =
+            "SELECT j.job_id, d.database_id\nFROM msdb.dbo.sysjobs AS j\nCROSS JOIN "
+            + Server
+            + ".master.sys.databases AS d;";
+        var raw = await EditedAsync(
+            OtherDatabase,
+            capture =>
+            {
+                WithSql(capture, Sql);
+                var row = CallOf(capture, Columns)["answer"]!["rows"]!
+                    .AsArray()
+                    .Single(static row => row!["sourceSchema"]?.GetValue<string>() == "sys")!;
+                row["sourceServer"] = Server;
+            },
+            query => WithBody(query, Sql)
+        );
+        raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
+
+        var renamed = await RenamedAsync(raw);
+
+        renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
+        BundleLeaks
+            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+            .ShouldBeEmpty();
+        renamed.Bundle.Query.ShouldNotContain(Server, Case.Insensitive);
+        renamed.Bundle.Capture.ShouldNotContain(Server, Case.Insensitive);
+    }
+
     // A column of the server's under its own name, or under the tool's AS [1] of operands, is a row of the engine's,
     // whose names are kept.
     [Theory]
