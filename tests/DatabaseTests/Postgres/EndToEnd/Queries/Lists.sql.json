@@ -728,6 +728,71 @@
           "computed": false
         }
       ]
+    },
+    "ListAccountNotesOptional": {
+      "hash": "2bea98b8882816d70495d532d8caabef5a3d7988153475016f7269c6e87d924b",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "several-tables",
+      "parameters": [
+        {
+          "name": "accountIds",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": true,
+          "nullableSource": "outer-join",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

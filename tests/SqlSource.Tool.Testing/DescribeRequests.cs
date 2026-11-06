@@ -43,7 +43,10 @@ internal static class DescribeRequests
     {
         using var folder = new TempFolder();
         var query = Plans.Query(folder, "-- name: " + Query + "\n" + sql + ";\n", dialect).Query;
-        return new DescribeRequest(query.Name, SampleSql.Build(query), query.Parameters);
+        var read = SqlDialectName.TryParse(dialect, out var choice)
+            ? choice.Dialect
+            : throw new ArgumentException($"'{dialect}' is no dialect.", nameof(dialect));
+        return new DescribeRequest(query.Name, SampleSql.Build(query, read), query.Parameters);
     }
 
     // A request whose parameters are those the test gives, in its order, whatever the SQL holds.

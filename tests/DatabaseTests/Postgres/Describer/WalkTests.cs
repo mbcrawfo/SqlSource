@@ -81,6 +81,25 @@ public sealed class WalkTests(PostgresDatabases postgres)
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NotNullCatalog]);
     }
 
+    // A list's null test is a condition on a parameter that the server must not fold: as NULL IS NOT NULL it would
+    // make the condition o.total > 0 alone, strict, and the join inner, while the running query, given a list, keeps
+    // the rows with no order.  The stand-in (SELECT NULL) keeps the join outer.
+    [Fact]
+    public async Task DescribeAsync_LeftJoinBesideAListsNullTest_KeepsTheJoinOuter()
+    {
+        var description = await Sessions.ShouldDescribeAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Planned(
+                "postgres",
+                "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id "
+                    + "WHERE (@ids IS NOT NULL OR o.total > 0) AND (@ids IS NULL OR u.id IN @ids)"
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NullableOuterJoin]);
+    }
+
     // A list that is not negated keeps what it proved: an empty list matches no row, as NULL does.
     [Fact]
     public async Task DescribeAsync_LeftJoinThatAListMakesInner_IsNotNullThroughout()

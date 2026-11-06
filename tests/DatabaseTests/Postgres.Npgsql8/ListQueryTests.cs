@@ -154,6 +154,41 @@ public sealed class ListQueryTests(AppContainer app)
         rows.ShouldBe([new ListAccountNotesExceptDto(1, "alice", "Sent the quote.")]);
     }
 
+    // A list beside its null test keeps the LEFT JOIN outer: (@accountIds IS NOT NULL OR n.id > 0) is no filter of the
+    // notes when a list is given, so carol, who has none, is read with a NULL body.
+    [Fact]
+    public async Task NotesOptional_AccountWithoutANote_ReadsItsNullBody()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesOptional(
+            new ListAccountNotesOptionalArgs([2, 3]),
+            cancellationToken: token
+        );
+
+        rows.ShouldBe([
+            new ListAccountNotesOptionalDto(2, "Closed the account on site."),
+            new ListAccountNotesOptionalDto(3, null),
+        ]);
+    }
+
+    [Fact]
+    public async Task NotesOptional_Null_ReadsTheNotesAlone()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesOptional(
+            new ListAccountNotesOptionalArgs(null),
+            cancellationToken: token
+        );
+
+        rows.Select(static row => row.Id).ShouldBe([1, 1, 2]);
+    }
+
     [Fact]
     public async Task Optional_Null_FindsEveryRow()
     {

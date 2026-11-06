@@ -10,9 +10,9 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // The queries of Queries/Lists.sql, run on the seed of "app" through the methods that ListQueries gets, each of which
 // sends a parameter for each value of a list: every kind of collection, the counts on each side of the padded sizes,
-// an empty list and a null one, two lists, a list used twice, a list after NOT IN beside a LEFT JOIN, a list sent at
-// its own count, and the counts at PostgreSQL's limit of 65535 parameters and past it, which the method refuses before
-// it sends.  The lists of the limit are of ids that no account has, around the seed's own.
+// an empty list and a null one, two lists, a list used twice, a list after NOT IN and one beside its null test by a
+// LEFT JOIN, a list sent at its own count, and the counts at PostgreSQL's limit of 65535 parameters and past it, which
+// the method refuses before it sends.  The lists of the limit are of ids that no account has, around the seed's own.
 [Collection(UsesPostgres.Name)]
 public sealed class ListQueryTests(PostgresDatabases postgres)
 {
@@ -151,6 +151,41 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
         );
 
         rows.ShouldBe([new ListAccountNotesExceptDto(1, "alice", "Sent the quote.")]);
+    }
+
+    // A list beside its null test keeps the LEFT JOIN outer: (@accountIds IS NOT NULL OR n.id > 0) is no filter of the
+    // notes when a list is given, so carol, who has none, is read with a NULL body.
+    [Fact]
+    public async Task NotesOptional_AccountWithoutANote_ReadsItsNullBody()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesOptional(
+            new ListAccountNotesOptionalArgs([2, 3]),
+            cancellationToken: token
+        );
+
+        rows.ShouldBe([
+            new ListAccountNotesOptionalDto(2, "Closed the account on site."),
+            new ListAccountNotesOptionalDto(3, null),
+        ]);
+    }
+
+    [Fact]
+    public async Task NotesOptional_Null_ReadsTheNotesAlone()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesOptional(
+            new ListAccountNotesOptionalArgs(null),
+            cancellationToken: token
+        );
+
+        rows.Select(static row => row.Id).ShouldBe([1, 1, 2]);
     }
 
     [Fact]

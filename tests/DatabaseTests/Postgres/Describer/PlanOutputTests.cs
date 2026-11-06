@@ -349,6 +349,28 @@ public sealed class PlanOutputTests(PostgresDatabases postgres)
         plans.Single().Output.ShouldBe(["o.id", "o.user_id"]);
     }
 
+    // A list's null test is described as (SELECT NULL), which the planner runs as an InitPlan and does not fold, so the
+    // condition beside it is no strict filter on the optional side, and the join stays outer.  The InitPlan is another
+    // plan to the walk, and none of its nodes is an instance of the join's.
+    [Fact]
+    public async Task Explain_ListNullTestStandIn_KeepsTheOuterJoinBesideAnInitPlan()
+    {
+        var root = await ExplainExecuteAsync(
+            "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id "
+                + "WHERE ((SELECT NULL) IS NOT NULL OR o.total > 0) AND ((SELECT NULL) IS NULL OR u.id IN ($1))",
+            "integer",
+            pruning: false
+        );
+
+        Followed(root)
+            .Select(static node => node.JoinType)
+            .OfType<string>()
+            .ShouldHaveSingleItem()
+            .ShouldBeOneOf("Left", "Right");
+        All(root).ShouldContain(static node => node.ParentRelationship == "InitPlan");
+        PlanInstances.Find(root, root, PlanInstances.NoPartitions).Reason.ShouldBeNull();
+    }
+
     // The NULL of a parameter prunes every partition when the executor starts, and EXPLAIN shows the Append with no
     // member.  Without partition pruning every member shows, each under the table's alias and a number, with the same
     // Output but for the alias, and the nodes above print the table's alias.

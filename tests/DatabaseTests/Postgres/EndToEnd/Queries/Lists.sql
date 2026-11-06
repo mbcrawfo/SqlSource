@@ -68,3 +68,12 @@ FROM accounts a
 LEFT JOIN notes n ON n.account_id = a.id
 WHERE n.id NOT IN @noteIds
 ORDER BY a.id, n.id;
+
+-- name: ListAccountNotesOptional
+-- summary: The accounts whose ids are in a list, each with the body of each of its notes, or, when the list is null,
+-- summary: the notes alone.  A list that holds an account without a note gives its row, with a NULL body.
+SELECT a.id, n.body
+FROM accounts a
+LEFT JOIN notes n ON n.account_id = a.id
+WHERE (@accountIds IS NOT NULL OR n.id > 0) AND (@accountIds IS NULL OR a.id IN @accountIds)
+ORDER BY a.id, n.id;
