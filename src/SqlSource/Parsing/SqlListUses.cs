@@ -126,7 +126,7 @@ internal static partial class SqlListUses
         // Whether a NOT is open at the depth of the cursor, and whether one is open at a depth that holds it.
         var notHere = false;
         var notAbove = false;
-        var conditions = new Conditions(uses);
+        var conditions = new Conditions(uses, count);
         var cursor = new Cursor(text, lexemes, start, end, rules);
         for (var item = cursor.Next(); item != Item.End; item = cursor.Next())
         {
@@ -207,6 +207,7 @@ internal static partial class SqlListUses
         }
 
         conditions.End();
+        conditions.Return();
         return hasList ? uses.MoveToImmutable() : ImmutableArray<SqlParameterUse>.Empty;
     }
 
@@ -264,6 +265,9 @@ internal static partial class SqlListUses
         // Whether the word the cursor last met is the given one, ignoring case.
         public readonly bool IsWord(string word) =>
             text.AsSpan(_word.Start, _word.Length).Equals(word.AsSpan(), StringComparison.OrdinalIgnoreCase);
+
+        // The word, or the run of operator characters or the character, the cursor last met.
+        public readonly ReadOnlySpan<char> Word => text.AsSpan(_word.Start, _word.Length);
 
         // Whether the word the cursor last met is one of the given ones, ignoring case.
         public readonly bool IsAnyWord(string[] words)

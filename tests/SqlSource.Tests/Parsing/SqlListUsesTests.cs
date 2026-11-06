@@ -239,6 +239,23 @@ public sealed class SqlListUsesTests
         (GC.GetAllocatedBytesForCurrentThread() - before).ShouldBe(0);
     }
 
+    // The reading of conditions keeps its frames and the state of each use in arrays rented from the pool, so a query
+    // of ten frames, more than the first array holds, allocates what a flat one does with as many parameters and as
+    // deep parentheses, which the reading of NOT keeps in a list of its own.
+    [Fact]
+    public void Find_QueryOfManyFrames_AllocatesWhatAFlatOneDoes()
+    {
+        const string Flat = "SELECT (a) FROM t WHERE ((a IN @a)) AND b IN @b AND c IN @b";
+        const string Nested =
+            "SELECT CASE WHEN a THEN CASE WHEN a THEN CASE WHEN a THEN "
+            + "CASE WHEN a THEN CASE WHEN a THEN CASE WHEN a THEN "
+            + "ARRAY[ARRAY[ARRAY[(x IN @a)::int]]] END END END END END END "
+            + "FROM t WHERE ((b IN @b) IS FALSE) AND c IN @b";
+        var rules = SqlDialectRules.PostgreSql;
+
+        Allocated(Nested, rules).ShouldBe(Allocated(Flat, rules));
+    }
+
     [Theory]
     [InlineData(nameof(SqlDialect.Ansi))]
     [InlineData(nameof(SqlDialect.SqlServer))]
@@ -255,5 +272,24 @@ public sealed class SqlListUsesTests
         var lexemes = SqlLexer.Lex(Sql, rules).Lexemes;
 
         SqlListUses.Find(Sql, lexemes, 0, lexemes.Count, rules).ShouldBe([SqlParameterUse.List]);
+    }
+
+    private static long Allocated(string sql, SqlDialectRules rules)
+    {
+        var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
+
+        // The first calls pay for one-off work, and fill the pool.
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 }
