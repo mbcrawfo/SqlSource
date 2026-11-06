@@ -76,5 +76,47 @@ public sealed class BundleLeaksTests
             )
             .ShouldBeEmpty();
 
+    [Fact]
+    public void Of_LiteralThatIsAWordInsideAnotherWord_IsNoLeak() =>
+        BundleLeaks
+            .Of(
+                BundleOf(
+                    "SELECT a_1 FROM t_2",
+                    /*lang=json,strict*/
+                    """{"calls": [{"answer": {"name": "active_since"}}]}"""
+                ),
+                [Source],
+                IsEngineWord
+            )
+            .ShouldBeEmpty();
+
+    [Fact]
+    public void Of_LiteralThatIsTheMethodOfACall_IsNoLeak() =>
+        BundleLeaks
+            .Of(
+                BundleOf(
+                    "SELECT a_1 FROM t_2",
+                    /*lang=json,strict*/
+                    """{"calls": [{"method": "active", "request": {}, "answer": {}}]}"""
+                ),
+                [Source],
+                IsEngineWord
+            )
+            .ShouldBeEmpty();
+
+    [Fact]
+    public void Of_LiteralOfSeveralWords_IsSoughtAsASubstring() =>
+        BundleLeaks
+            .Of(
+                BundleOf(
+                    "SELECT a_1 FROM t_2",
+                    /*lang=json,strict*/
+                    """{"calls": [{"answer": {"message": "x_on holdout"}}]}"""
+                ),
+                ["SELECT 'on hold' AS l;"],
+                IsEngineWord
+            )
+            .ShouldBe(["literal 'on hold' in capture.json"]);
+
     private static Bundle BundleOf(string query, string capture) => new(null, query, capture, null, []);
 }

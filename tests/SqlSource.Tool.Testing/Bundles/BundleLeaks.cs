@@ -11,8 +11,9 @@ namespace SqlSource.Tool.Testing.Bundles;
 
 // What of a schema's and a query's text a renamed bundle still holds, found without asking the renaming: every name
 // and literal of the sources, lexed as PostgreSQL, but the engine's words, sought in each file of the bundle.  A name
-// is sought as a whole word, case-insensitively, and a literal of four characters or more as a substring.  After the
-// leak search of phase 10's spike (f51ac107).
+// is sought as a whole word, case-insensitively, and a literal of four characters or more as a substring, or as a
+// whole word when it is one, since a word that holds it, such as the setting standard_conforming_strings, is another
+// word.  After the leak search of phase 10's spike (f51ac107).
 internal static class BundleLeaks
 {
     // A shorter literal is too common a substring to be sought.
@@ -20,6 +21,10 @@ internal static class BundleLeaks
 
     private const string NameMarker = "-- name:";
     private const string ParamMarker = "-- param:";
+
+    // The capture's list of calls and the member of a call that names it.
+    private const string CallsMember = "calls";
+    private const string MethodMember = "method";
 
     // The leaks found, each as "name <name> in <file>" or "literal '<literal>' in <file>"; empty when none.
     public static IReadOnlyList<string> Of(Bundle renamed, IEnumerable<string> sources, Func<string, bool> isEngineWord)
@@ -36,11 +41,13 @@ internal static class BundleLeaks
 
         var texts = TextsOf(renamed).ToList();
         var words = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var exactWords = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (file, text) in texts)
         {
             foreach (var word in WordsOf(text))
             {
                 _ = words.TryAdd(word, file);
+                _ = exactWords.TryAdd(word, file);
             }
         }
 
@@ -58,7 +65,10 @@ internal static class BundleLeaks
 
         foreach (var literal in literals.Order(StringComparer.Ordinal))
         {
-            if (texts.FirstOrDefault(text => text.Text.Contains(literal, StringComparison.Ordinal)).File is { } found)
+            var found = IsOneWord(literal)
+                ? exactWords.GetValueOrDefault(literal)
+                : texts.FirstOrDefault(text => text.Text.Contains(literal, StringComparison.Ordinal)).File;
+            if (found is not null)
             {
                 leaks.Add($"literal '{literal}' in {found}");
             }
@@ -127,8 +137,9 @@ internal static class BundleLeaks
 
     // Where a name could be left, by file: query.sql and explain-settings.txt whole, and every string of the JSON
     // files, a string that is JSON itself, a plan, read the same way, with the names of the sidecar's entries.  Not
-    // sought: the members' names, which are the formats'; the sidecar's header, which is the tool's text; and a string
-    // of one character outside a plan, a closed code such as a relkind that a one-letter alias would match.
+    // sought: the members' names, which are the formats'; the method of each call of the capture, such as open, which
+    // is the format's name of the call; the sidecar's header, which is the tool's text; and a string of one character
+    // outside a plan, a closed code such as a relkind that a one-letter alias would match.
     private static IEnumerable<(string File, string Text)> TextsOf(Bundle bundle)
     {
         yield return (BundleFiles.Query, bundle.Query);
@@ -141,7 +152,7 @@ internal static class BundleLeaks
             }
         }
 
-        foreach (var text in StringsOf(JsonNode.Parse(bundle.Capture), embedded: false))
+        foreach (var text in StringsOf(WithoutMethods(JsonNode.Parse(bundle.Capture)), embedded: false))
         {
             yield return (BundleFiles.Capture, text);
         }
@@ -190,6 +201,20 @@ internal static class BundleLeaks
             default:
                 return [];
         }
+    }
+
+    // The capture with no member "method" in its calls.
+    private static JsonNode? WithoutMethods(JsonNode? capture)
+    {
+        if (capture?[CallsMember] is JsonArray calls)
+        {
+            foreach (var call in calls.OfType<JsonObject>())
+            {
+                _ = call.Remove(MethodMember);
+            }
+        }
+
+        return capture;
     }
 
     // A string that is a JSON array or object, as explain's plan is.
