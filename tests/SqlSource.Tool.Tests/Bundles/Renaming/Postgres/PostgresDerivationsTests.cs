@@ -97,6 +97,51 @@ public sealed class PostgresDerivationsTests
         scope.Refusals.ShouldBeEmpty();
     }
 
+    // At the "," and at the " " of the separator after "mytype", which "PREPARE sqlsource_1 (" and "mytype" end at
+    // 27: each is clamped to the item's last code point, in the word "mytype", whose position is the start of
+    // "y_mytype".
+    [Theory]
+    [InlineData(28)]
+    [InlineData(29)]
+    public void Derive_PrepareErrorInTheSeparator_StaysInTheItemBefore(int at)
+    {
+        string[] types = ["mytype", "othertype"];
+        var scope = Scope();
+
+        var call = PrepareCall("SELECT $1, $2", types, at, scope);
+        PostgresDerivations.Derive(call, scope);
+
+        var renamed = RenamedRequest(call);
+        var position = PositionOf(call);
+        scope.Refusals.ShouldBeEmpty();
+        ParameterPlaceholders.TypeAt(Statement, renamed.Types, position).ShouldBe(0);
+        position.ShouldBe(22);
+    }
+
+    // On the "\n", the ")", the "A" of "AS" and the " " before the SQL, which is the head's last code point: each is
+    // clamped to the last item's last code point, in the word "othertype", whose position is the start of
+    // "y_othertype".
+    [Theory]
+    [InlineData(5)]
+    [InlineData(4)]
+    [InlineData(2)]
+    [InlineData(0)]
+    public void Derive_PrepareErrorAfterTheLastItem_StaysInIt(int beforeTheSql)
+    {
+        string[] types = ["mytype", "othertype"];
+        var scope = Scope();
+        var head = ParameterPlaceholders.HeadLength(Statement, types);
+
+        var call = PrepareCall("SELECT $1, $2", types, head - beforeTheSql, scope);
+        PostgresDerivations.Derive(call, scope);
+
+        var renamed = RenamedRequest(call);
+        var position = PositionOf(call);
+        scope.Refusals.ShouldBeEmpty();
+        ParameterPlaceholders.TypeAt(Statement, renamed.Types, position).ShouldBe(1);
+        position.ShouldBe(32);
+    }
+
     [Fact]
     public void Derive_PrepareErrorBeforeTheList_IsKept()
     {
