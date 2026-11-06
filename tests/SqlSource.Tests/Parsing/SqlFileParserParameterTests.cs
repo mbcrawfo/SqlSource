@@ -653,13 +653,15 @@ public sealed class SqlFileParserParameterTests
     private static SqlParseError ListMisused(TextSpan span, string parameter, string reason) =>
         SqlParseError.Create(SqlParseErrorKind.ListParameterMisused, span, parameter, reason);
 
-    // A list that a NOT negates in any of its uses says so, for PostgreSQL's describer.
+    // A list that a NOT negates, or whose truth is used as a value, in any of its uses says so, for PostgreSQL's
+    // describer.
     [Theory]
     [InlineData("SELECT id FROM t WHERE a = @a AND id IN @ids", false)]
     [InlineData("SELECT id FROM t WHERE a = @a AND id NOT IN @ids", true)]
     [InlineData("SELECT id FROM t WHERE a = @a AND (id in @ids OR parent_id IN /* any */ @ids)", false)]
     [InlineData("SELECT id FROM t WHERE a = @a AND (id IN @ids OR NOT (parent_id IN @ids))", true)]
     [InlineData("SELECT id FROM t WHERE NOT a = @a AND id IN @ids", false)]
+    [InlineData("SELECT id FROM t WHERE a = @a AND (id IN @ids) IS FALSE", true)]
     public void Parse_ParameterAfterIn_IsAList(string sql, bool negated) =>
         Blocks("-- name: Q\n" + sql + "\n")
             .ShouldHaveSingleItem()

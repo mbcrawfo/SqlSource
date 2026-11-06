@@ -12,8 +12,9 @@ internal enum SqlParameterUse
     List,
 
     /// <summary>
-    /// A list that a <c>NOT</c> negates, as in <c>id NOT IN @ids</c> or <c>NOT (id IN @ids)</c>, which is true of a row
-    /// whose value is <c>NULL</c> when the list is empty.
+    /// A list that a <c>NOT</c> negates, as in <c>id NOT IN @ids</c> or <c>NOT (id IN @ids)</c>, or whose truth the
+    /// query uses as a value, as in <c>(id IN @ids) IS FALSE</c>, which can be true of a row whose value is <c>NULL</c>
+    /// when the list is empty.
     /// </summary>
     NegatedList,
 

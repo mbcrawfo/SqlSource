@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
@@ -23,13 +24,108 @@ public sealed class SqlListUsesTests
     [InlineData("postgres", "NOT a AND id IN @ids", new[] { "List" })]
     [InlineData("postgres", "NOT (a) OR id IN @ids", new[] { "List" })]
     [InlineData("postgres", "(NOT a) AND id IN @ids", new[] { "List" })]
-    [InlineData("postgres", "f(NOT a, id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "SELECT NOT a, id IN @ids", new[] { "List" })]
     [InlineData("postgres", "id NOT IN @a AND id IN @b", new[] { "NegatedList", "List" })]
     [InlineData("postgres", "id IN @a AND NOT id IN @b", new[] { "List", "NegatedList" })]
-    // The NOT of IS NOT tests a value and negates nothing after it.
-    [InlineData("postgres", "x IS NOT DISTINCT FROM id IN @ids", new[] { "List" })]
-    // Only a NOT negates: a test of the truth of a list is read as a list (TD-0105).
-    [InlineData("postgres", "(id IN @ids) IS FALSE", new[] { "List" })]
+    // The NOT of IS NOT tests a value and negates nothing after it, though here the list is a value compared.
+    [InlineData("postgres", "WHERE NOT b AND x IS NOT DISTINCT FROM id IN @ids", new[] { "NegatedList" })]
+    // A list whose truth the query uses as a value, compared, tested, cast or passed to a call, is negated too: an
+    // empty list makes it FALSE where one value would make it NULL, and the value can turn that FALSE true.
+    [InlineData("postgres", "WHERE (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) IS NOT TRUE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE false = (id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE false = id IN @ids", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE id IN @ids = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) <> true", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) < true", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids)::int = 0", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE (id IN @ids) IN (false)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE COALESCE(id IN @ids, false) = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE CASE id IN @ids WHEN false THEN true END", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE CASE WHEN a THEN id IN @ids END = false", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE f(id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE a = 1 AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE x IS DISTINCT FROM y AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE left(a, 1) = 'x' AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "JOIN t ON (t.id IN @ids) = false JOIN u ON true", new[] { "NegatedList" })]
+    // A quoted name before "(" is a call's, and its argument a value.
+    [InlineData("postgres", "WHERE \"f\"(id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE s.\"f\"(id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE U&\"f\"(id IN @ids)", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE \"f\"(id IN @ids, a)", new[] { "NegatedList" })]
+    // A comma inside brackets, the GROUP of WITHIN GROUP and a name after "." end no condition.
+    [InlineData("postgres", "WHERE a && ARRAY[1, 2] AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE a[1:2] = ARRAY[3, 4] AND (id IN @ids) = false", new[] { "NegatedList" })]
+    [InlineData(
+        "postgres",
+        "SELECT a FROM t HAVING percentile_cont(0.5) WITHIN GROUP (ORDER BY a) > 0 AND (id IN @ids) IS FALSE",
+        new[] { "NegatedList" }
+    )]
+    [InlineData("postgres", "WHERE t.set = 1 AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE t.by = 1 AND t.output = 2 AND (id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT a FROM t GROUP BY a HAVING (a IN @ids) IS FALSE", new[] { "NegatedList" })]
+    // A value inside a subquery or a WITH query may reach a filter of the query around it.
+    [InlineData("postgres", "WITH s AS (SELECT id IN @ids AS f FROM t) SELECT f FROM s", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT f FROM (SELECT id IN @ids AS f FROM t) s", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT (SELECT t.id IN @ids FROM t LIMIT 1)", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT f FROM (SELECT a WHERE b UNION SELECT id IN @ids AS f) s", new[] { "NegatedList" })]
+    // A list reached from WHERE, ON, HAVING or WHEN through AND, OR and parentheses alone is a condition, which FALSE
+    // and NULL fail alike, and so is one in the output of the outermost statement.
+    [InlineData("postgres", "WHERE id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE lower(id) IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE id + 1 IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE data->>'k' IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE id::text IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE (@ids IS NULL OR id IN @ids)", new[] { "NullTest", "List" })]
+    [InlineData("postgres", "WHERE a BETWEEN 1 AND 2 AND id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE a = 1 OR (b AND id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "WHERE EXISTS (SELECT 1 FROM t WHERE t.id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "WHERE CASE WHEN id IN @ids THEN false ELSE true END", new[] { "List" })]
+    [InlineData("postgres", "WHERE CASE WHEN a THEN id IN @ids ELSE false END", new[] { "List" })]
+    [InlineData("postgres", "WHERE x LIKE @p AND id IN @ids", new[] { "Value", "List" })]
+    [InlineData("postgres", "SELECT a FROM t JOIN u ON u.id IN @ids LEFT JOIN v ON true", new[] { "List" })]
+    [InlineData("postgres", "SELECT id IN @ids AS f FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT (id IN @ids) = false AS f", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t ORDER BY id IN @ids DESC", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t GROUP BY id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t GROUP BY a HAVING a IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE ARRAY[1, 2] && a AND id IN @ids", new[] { "List" })]
+    // A call, a CASE or a bracket inside the outermost output is output too, but a subquery's own output is not.
+    [InlineData("postgres", "SELECT coalesce(id IN @ids, false) FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT coalesce(false, id IN @ids) FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT CASE (id IN @ids) WHEN true THEN 1 END", new[] { "List" })]
+    [InlineData("postgres", "SELECT ARRAY[1, (id IN @ids)::int]", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t ORDER BY coalesce(id IN @ids, false)", new[] { "List" })]
+    [InlineData("postgres", "SELECT f((SELECT t.id IN @ids FROM t))", new[] { "NegatedList" })]
+    [InlineData("postgres", "SELECT count(*) FILTER (WHERE (id IN @ids) IS FALSE) FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT CASE WHEN a > 1 THEN (id IN @ids)::int ELSE 0 END", new[] { "List" })]
+    [InlineData("postgres", "SELECT CASE WHEN b THEN coalesce(id IN @ids, false) END", new[] { "List" })]
+    [InlineData("postgres", "SELECT string_agg(n, ',' ORDER BY id IN @ids DESC) FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT row_number() OVER (ORDER BY id IN @ids DESC) FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT a FROM t WINDOW w AS (ORDER BY id IN @ids)", new[] { "List" })]
+    [InlineData("postgres", "SELECT DISTINCT ON (a) (id IN @ids) = false AS f FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT DISTINCT ON (id IN @ids) a FROM t", new[] { "List" })]
+    [InlineData("postgres", "SELECT a WHERE b UNION SELECT id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "UPDATE t SET f = id IN @ids WHERE a = 1", new[] { "List" })]
+    [InlineData("postgres", "DELETE FROM t WHERE a = 1 RETURNING id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "SELECT count(*) FILTER (WHERE id IN @ids) FROM t", new[] { "List" })]
+    [InlineData(
+        "postgres",
+        "INSERT INTO t SELECT a FROM u WHERE u.id IN @ids ON CONFLICT DO NOTHING",
+        new[] { "List" }
+    )]
+    // A statement's end starts the reading again at the outermost level.
+    [InlineData(
+        "postgres",
+        "SELECT (SELECT 1 WHERE (a IN @x) = false); SELECT b IN @y",
+        new[] { "NegatedList", "List" }
+    )]
+    [InlineData("postgres", "SELECT 1 WHERE (a IN @x); SELECT b IN @y", new[] { "List", "List" })]
+    // A parenthesis or a CASE left open ends with the query, and a ")" that closes nothing is passed over.
+    [InlineData("postgres", "WHERE (id IN @ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE id IN @ids) IS FALSE", new[] { "NegatedList" })]
+    [InlineData("postgres", "WHERE CASE WHEN a THEN (id IN @ids) = false", new[] { "NegatedList" })]
     [InlineData("postgres", "id IN /* c */ @ids", new[] { "List" })]
     [InlineData("postgres", "id IN\n-- c\n@ids", new[] { "List" })]
     [InlineData("postgres", "id IN /*+ hint */ @ids", new[] { "List" })]
@@ -144,6 +240,56 @@ public sealed class SqlListUsesTests
         (GC.GetAllocatedBytesForCurrentThread() - before).ShouldBe(0);
     }
 
+    // The reading of conditions keeps its frames and where each use waits in arrays rented from the pool, so Find
+    // allocates its result alone: once the pool holds them, a flat query and one of 21 frames, more than the 16 slots
+    // of the first array, allocate what three uses do.  No parenthesis, whose depth the reading of NOT keeps in a list.
+    [Fact]
+    public void Find_QueryWithLists_AllocatesItsUsesAlone()
+    {
+        const string Flat = "SELECT a FROM t WHERE a IN @a AND b IN @b AND c IN @b";
+        var nested =
+            "SELECT "
+            + string.Concat(Enumerable.Repeat("CASE WHEN a THEN ", 10))
+            + string.Concat(Enumerable.Repeat("ARRAY[", 10))
+            + "x IN @a"
+            + new string(']', 10)
+            + string.Concat(Enumerable.Repeat(" END", 10))
+            + " FROM t WHERE b IN @b IS FALSE AND c IN @b";
+        var rules = SqlDialectRules.PostgreSql;
+        var uses = UsesAllocated(3);
+
+        Allocated(Flat, rules).ShouldBe(uses);
+        Allocated(nested, rules).ShouldBe(uses);
+    }
+
+    // What building a result of that many uses allocates, as Find builds one.
+    private static long UsesAllocated(int count)
+    {
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = Build(count);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = Build(count);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+
+        static ImmutableArray<SqlParameterUse> Build(int count)
+        {
+            var builder = ImmutableArray.CreateBuilder<SqlParameterUse>(count);
+            for (var index = 0; index < count; index++)
+            {
+                builder.Add(SqlParameterUse.List);
+            }
+
+            return builder.MoveToImmutable();
+        }
+    }
+
     [Theory]
     [InlineData(nameof(SqlDialect.Ansi))]
     [InlineData(nameof(SqlDialect.SqlServer))]
@@ -160,5 +306,24 @@ public sealed class SqlListUsesTests
         var lexemes = SqlLexer.Lex(Sql, rules).Lexemes;
 
         SqlListUses.Find(Sql, lexemes, 0, lexemes.Count, rules).ShouldBe([SqlParameterUse.List]);
+    }
+
+    private static long Allocated(string sql, SqlDialectRules rules)
+    {
+        var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
+
+        // The first calls pay for one-off work, and fill the pool.
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var iteration = 0; iteration < Iterations; iteration++)
+        {
+            _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules);
+        }
+
+        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 }
