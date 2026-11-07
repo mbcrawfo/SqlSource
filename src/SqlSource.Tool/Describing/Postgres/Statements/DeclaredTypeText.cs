@@ -145,7 +145,7 @@ internal static class DeclaredTypeText
                     index++;
                 }
 
-                // A number ends before a letter, so that "4326Point" is neither.
+                // A number ends before a letter or a "_", so that "4326Point" and "4326_point" are neither.
                 if (index < text.Length && IsAsciiWordPart(text[index]) && !char.IsAsciiDigit(text[index]))
                 {
                     return false;

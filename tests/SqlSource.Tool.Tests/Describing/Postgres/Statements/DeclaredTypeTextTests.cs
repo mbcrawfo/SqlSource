@@ -92,6 +92,8 @@ public sealed class DeclaredTypeTextTests
     [InlineData("geometry((Point))")]
     [InlineData("geometry(Point(1))")]
     [InlineData("geometry(4326Point)")]
+    [InlineData("geometry(4326_point)")]
+    [InlineData("geometry(-1_a)")]
     [InlineData("geometry(-Point)")]
     [InlineData("geometry(Point$1)")]
     [InlineData("geometry($$Point$$)")]
