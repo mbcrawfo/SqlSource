@@ -184,7 +184,7 @@ A query's columns are those of its first result set as `sys.dm_exec_describe_fir
 
 `SqlServerColumns.Build` makes the sidecar's columns from the rows of `columns`, in the order of their ordinals:
 
-1. A row with `is_hidden` is dropped before anything is built, so `ROWSTAT` is in no model.  `mssql.columns` and the capture keep every row.
+1. A row with `is_hidden` is dropped before anything is built, by `SqlServerColumns.Visible` wherever rows are read, so `ROWSTAT` is in no model.  `mssql.columns` and the capture keep every row.
 2. No visible row is a statement without a result set: an `UPDATE` with no `OUTPUT`, a `SELECT ... INTO` or an `OUTPUT ... INTO`.
 3. A visible row with no name, as `SELECT 1` has, is `SQLSRC266`, naming the column's place counted from one, through `SqlServerErrors.NoColumnName`.  Paths of an `IF` that differ only in a column's name are not refused as two shapes: the server gives that column no name, and it is `SQLSRC266`.  Two columns of one name are recorded, and the generator's `SQLSRC255` reports them, as for PostgreSQL.
 4. Each other row is a column: `name` as the server returned it, a `!` or `?` suffix kept; `ordinal`, its place among the visible columns; `type` by `SqlServerTypes.FromColumn`; `nullable` the server's `is_nullable`, true where it gives none, with the `nullableSource` `server`; `origin`, as [origins](#origins) says; and `identity` and `computed`, the server's `is_identity_column` and `is_computed_column`, null where it gives none.

@@ -171,9 +171,6 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
     private static bool IsOperator(TsqlToken token) =>
         token.Kind == TsqlTokenKind.Symbol && token.Text is "+" or "-" or "*" or "/" or "%";
 
-    private static bool IsInteger(TsqlToken token) =>
-        token.Kind == TsqlTokenKind.Number && token.Text.All(char.IsAsciiDigit);
-
     // The proof with each leaf it kept numbered as an operand, a text asked before taking its number.
     private Proof Numbered(Proof proof) =>
         proof switch
@@ -451,7 +448,7 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         {
             "COUNT" or "COUNT_BIG" => Proof.Yes,
             "ROW_NUMBER" or "RANK" or "DENSE_RANK" when window is not null && arguments.IsEmpty => Proof.Yes,
-            "NTILE" when window is not null && arguments.Count == 1 && IsInteger(tokens[arguments.Start]) => Proof.Yes,
+            "NTILE" when window is not null && arguments.Count == 1 && tokens[arguments.Start].IsInteger => Proof.Yes,
             "SUM" or "MAX" or "MIN" => Aggregate(arguments, window, rows),
             "COALESCE" or "GREATEST" or "LEAST" when window is null => AllOf([
                 AnyOf(Arguments(arguments).Select(argument => Expression(argument, rows))),
@@ -543,7 +540,7 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         var (first, second) = (tokens[at], tokens[at + 1]);
         var isBound =
             (first.Is("CURRENT") && second.Is("ROW"))
-            || ((first.Is("UNBOUNDED") || IsInteger(first)) && second.Is(direction));
+            || ((first.Is("UNBOUNDED") || first.IsInteger) && second.Is(direction));
         return isBound ? at + 2 : -1;
     }
 
@@ -571,7 +568,7 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
     {
         var parts = Arguments(arguments);
         var styleProves =
-            parts.Count == 2 || (parts.Count == 3 && parts[2].Count == 1 && IsInteger(tokens[parts[2].Start]));
+            parts.Count == 2 || (parts.Count == 3 && parts[2].Count == 1 && tokens[parts[2].Start].IsInteger);
         return styleProves && CastTargets.IsBuiltIn(tokens, parts[0]) ? parts[1] : null;
     }
 
