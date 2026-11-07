@@ -7,6 +7,7 @@ using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Watching;
 
@@ -24,15 +25,6 @@ public sealed class WatchSetTests
     private static readonly string Compiled = P("App/UserQueries.cs");
 
     private static string P(string relative) => Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar));
-
-    private static FileChange Changed(string path) => new(FileChangeKind.Changed, path, IsFolder: false);
-
-    private static FileChange Created(string path) => new(FileChangeKind.Created, path, IsFolder: false);
-
-    private static FileChange Deleted(string path) => new(FileChangeKind.Deleted, path, IsFolder: false);
-
-    private static FileChange Renamed(string from, string to, bool isFolder = false) =>
-        new(FileChangeKind.Renamed, to, isFolder, from);
 
     private static ProjectManifest Manifest(string project, string[] files, string[] settings, string[] compile) =>
         new()
@@ -159,7 +151,7 @@ public sealed class WatchSetTests
         var set = AppSet();
         var folder = P("App/Queries/New");
 
-        set.Classify(new FileChange(FileChangeKind.Created, folder, IsFolder: true)).ShouldBe(WatchEffect.Evaluate);
+        set.Classify(CreatedFolder(folder)).ShouldBe(WatchEffect.Evaluate);
         set.Classify(Renamed(P("App/Queries/Old"), folder, isFolder: true)).ShouldBe(WatchEffect.Evaluate);
     }
 
@@ -168,8 +160,7 @@ public sealed class WatchSetTests
     {
         var set = AppSet();
 
-        set.Classify(new FileChange(FileChangeKind.Created, P("Elsewhere/New"), IsFolder: true))
-            .ShouldBe(WatchEffect.None);
+        set.Classify(CreatedFolder(P("Elsewhere/New"))).ShouldBe(WatchEffect.None);
     }
 
     // A run with no --env-file reads the .env of the unit's folder, and no other.
@@ -326,11 +317,9 @@ public sealed class WatchSetTests
     {
         var set = AppSet();
 
-        set.Classify(new FileChange(FileChangeKind.Created, P("App/bin/Debug"), IsFolder: true))
-            .ShouldBe(WatchEffect.None);
-        set.Classify(new FileChange(FileChangeKind.Created, P("App/bin"), IsFolder: true)).ShouldBe(WatchEffect.None);
-        set.Classify(new FileChange(FileChangeKind.Created, P("App/obj/Debug"), IsFolder: true))
-            .ShouldBe(WatchEffect.None);
+        set.Classify(CreatedFolder(P("App/bin/Debug"))).ShouldBe(WatchEffect.None);
+        set.Classify(CreatedFolder(P("App/bin"))).ShouldBe(WatchEffect.None);
+        set.Classify(CreatedFolder(P("App/obj/Debug"))).ShouldBe(WatchEffect.None);
     }
 
     // A restore writes the assets file below obj wherever the project puts that folder: an artifacts layout, or a
@@ -845,7 +834,7 @@ public sealed class WatchSetTests
 
     // A file or a folder in a folder that holds a listed file, outside every project's folder, which a glob of the
     // project may list now; a settings file in the folder of a listed file or above it, up to the repository's root,
-    // which may apply to it now; and a .sql file in the project's own folder, as any unlisted file under the project.
+    // which may apply to it now.
     [Theory]
     [InlineData("sqlsource.json", true, false)]
     [InlineData("sqlsource.json", false, false)]
@@ -858,8 +847,6 @@ public sealed class WatchSetTests
     [InlineData("Shared/sqlsource.json", false, false)]
     [InlineData("Shared/Queries", true, true)]
     [InlineData("Shared/Queries", false, true)]
-    [InlineData("src/App/sqlsource.json", false, false)]
-    [InlineData("src/App/New.sql", false, false)]
     public void Classify_NewContentForAListedFileOutsideTheProject_IsEvaluate(string path, bool solution, bool isFolder)
     {
         using var temp = new TempFolder();
@@ -867,8 +854,22 @@ public sealed class WatchSetTests
         var full = temp.PathOf("r/" + path);
 
         set.Classify(new FileChange(FileChangeKind.Created, full, isFolder)).ShouldBe(WatchEffect.Evaluate);
-        set.Classify(new FileChange(FileChangeKind.Renamed, full, isFolder, temp.PathOf("r/Shared/Old.txt")))
-            .ShouldBe(WatchEffect.Evaluate);
+        set.Classify(Renamed(temp.PathOf("r/Shared/Old.txt"), full, isFolder)).ShouldBe(WatchEffect.Evaluate);
+    }
+
+    // The project's own folder, in a repository with a listed file outside it: a settings file or a .sql file there is
+    // new content that the project's evaluation may reach.
+    [Theory]
+    [InlineData("src/App/sqlsource.json")]
+    [InlineData("src/App/Queries/New.sql")]
+    public void Classify_NewContentInTheProjectsFolderOfARepository_IsEvaluate(string path)
+    {
+        using var temp = new TempFolder();
+        var set = RepositorySet(temp, solution: false);
+        var full = temp.PathOf("r/" + path);
+
+        set.Classify(Created(full)).ShouldBe(WatchEffect.Evaluate);
+        set.Classify(Renamed(temp.PathOf("r/Shared/Old.txt"), full)).ShouldBe(WatchEffect.Evaluate);
     }
 
     // A .sql or C# file, or a folder, only in the folder of a listed file; a settings file only there or above it.

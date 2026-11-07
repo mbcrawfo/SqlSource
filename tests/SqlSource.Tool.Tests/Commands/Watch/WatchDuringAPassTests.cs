@@ -9,6 +9,7 @@ using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Commands.Watch;
 
@@ -26,18 +27,11 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _watch.DisposeAsync();
 
-    private static FileChange Changed(string path) => WatchTests.Changed(path);
-
-    private static FileChange Created(string path) => WatchTests.Created(path);
-
     private static string NewSql => "-- name: GetNew\nSELECT 5;\n";
 
     // A folder that an evaluation makes in the run's temporary folder, as ProjectEvaluator names it.
     private static string ManifestFolder =>
         "tmp/" + ProjectEvaluator.ManifestFolderPrefix + "0123456789abcdef0123456789abcdef";
-
-    private static (int Pass, int Changes, bool Evaluated)[] PassStarts(WatchScene watch) =>
-        WatchTests.PassStarts(watch.Run.Folder.PathOf("run.log"));
 
     // Holds each describe of the scene until it is let go, and says when the first came.
     private static DescribeHold HoldDescribes(WatchScene watch)
@@ -106,7 +100,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         _watch.Watcher.Requests.ShouldNotBeEmpty();
         _watch.Watcher.Requests.ShouldAllBe(request => request.Poll == polls);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, false)]);
     }
 
     // A new .sql file in the project's folder while the first evaluation runs: the set before it knows no project, so
@@ -132,7 +126,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         _watch.Describer.Described.Select(request => request.Name).ShouldBe(["GetUser", "GetNew"]);
         _watch.Clock.PendingTimers.ShouldBe(0);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true)]);
     }
 
     [Fact]
@@ -156,7 +150,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         _watch.ManifestRuns.ShouldBe(manifestRuns + 1);
         _watch.Describer.Described.Select(request => request.Name).ShouldBe(["GetUser", "GetNew"]);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
     // A change during an evaluation asks as much as the larger of the two sets says: a save of a file that the project
@@ -178,7 +172,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         await NextPassAsync(_watch, 3);
 
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
     }
 
     // A listed file deleted during an evaluation that no longer lists it is gone by the set before it, so the next
@@ -195,13 +189,13 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
 
         _watch.Project.Unlist(_users);
         File.Delete(_users);
-        _watch.Raise(new FileChange(FileChangeKind.Deleted, _users, IsFolder: false));
+        _watch.Raise(Deleted(_users));
         gate.Open();
         await _watch.PassesAsync(2);
         await NextPassAsync(_watch, 3);
 
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
     // A change held through an evaluation keeps the time it came, and the next pass waits for Debounce after the last
@@ -253,7 +247,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
 
         _watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(2);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
     // A watch that fails while the projects are evaluated is reported, and the next pass evaluates.
@@ -271,7 +265,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
 
         _watch.Errors.ShouldContain($"error SQLSRC287: watching '{_watch.Run.Folder.Path}' for changes failed: boom");
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true)]);
     }
 
     // The evaluation writes its manifests into a folder of its own in the tool's temporary folder, which a test's run
@@ -285,14 +279,9 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
 
         var temporary = _watch.Run.Folder.PathOf(ManifestFolder);
         _watch.Raise(
-            new FileChange(FileChangeKind.Created, temporary, IsFolder: true),
+            CreatedFolder(temporary),
             Created(Path.Combine(temporary, "manifest.txt")),
-            new FileChange(
-                FileChangeKind.Renamed,
-                Path.Combine(temporary, "b.cs"),
-                IsFolder: false,
-                Path.Combine(temporary, "a.cs")
-            )
+            Renamed(Path.Combine(temporary, "a.cs"), Path.Combine(temporary, "b.cs"))
         );
         gate.Open();
         await _watch.PassesAsync(1);
@@ -311,10 +300,10 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         var moved = _watch.Run.Folder.PathOf(ManifestFolder + "/Users.sql");
         File.Move(_users, moved);
 
-        await _watch.ChangeAsync(new FileChange(FileChangeKind.Renamed, moved, IsFolder: false, _users));
+        await _watch.ChangeAsync(Renamed(_users, moved));
 
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true)]);
     }
 
     // A project in the tool's temporary folder, as one in /tmp on Linux, outside a folder that an evaluation makes: its
@@ -369,7 +358,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         // The folder that both sets hold kept its watch.
         watch.Watcher.Requests.Count(request => request.Folder == app).ShouldBe(1);
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(watch).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
+        watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
     }
 
     // An evaluation that keeps the folders keeps their watches: none is closed and opened again, so nothing is missed
