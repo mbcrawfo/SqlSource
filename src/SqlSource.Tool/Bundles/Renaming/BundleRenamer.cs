@@ -14,9 +14,10 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// <remarks>
 /// <para>
 /// The steps run in this order, and the first refusal ends the run after its step: drop what the pipeline does not
-/// read; register the names of the catalog, the engine's own and the query's parameters; rename <c>query.sql</c>;
-/// rename every string of each call by its member's rule, then let the engine's part derive what its pipeline makes;
-/// rename the entry; check every token; and replay the renamed bundle, which must give its renamed answer.
+/// read; read the copies of reused parameters that the capture records; register the names of the catalog, the
+/// engine's own and the query's parameters; rename <c>query.sql</c>; rename every string of each call by its member's
+/// rule, then let the engine's part derive what its pipeline makes; rename the entry; check every token; and replay
+/// the renamed bundle, which must give its renamed answer.
 /// </para>
 /// <para>
 /// Every step that knows an engine asks the engine's part, and the renaming reads no file: the caller reads the raw
@@ -63,10 +64,11 @@ internal static class BundleRenamer
         }
 
         var mapping = new NameMapping(key, engine.Fold);
-        var run = RenamingRun.For(engine, mapping, raw.Query);
         var calls = CaptureRenamer.CallsOf(capture);
 
         CaptureRenamer.Drop(engine, calls);
+        var copies = RenamingCopies.Of(engine, calls, static call => call.Original);
+        var run = RenamingRun.For(engine, mapping, raw.Query, copies);
         CaptureRenamer.Register(engine, calls, run);
         run.RegisterParameters();
         if (run.Refusal is { } registered)

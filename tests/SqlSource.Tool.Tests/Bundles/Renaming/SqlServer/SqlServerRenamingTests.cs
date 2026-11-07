@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Parsing;
@@ -16,9 +16,6 @@ public sealed class SqlServerRenamingTests
         + "PublicKeyToken=89845dcd8080cc91";
 
     private static readonly SqlServerRenaming Engine = SqlServerRenaming.Instance;
-
-    // The query's parameters, compared as the renaming compares them.
-    private static readonly IReadOnlySet<string> Before = new HashSet<string>(["before"], SqlParameterName.Comparer);
 
     [Fact]
     public void Dialect_IsSqlServers() => Engine.Dialect.ShouldBe(SqlDialect.SqlServer);
@@ -245,44 +242,67 @@ public sealed class SqlServerRenamingTests
         Engine.IsEngineRow("columns", "request", new JsonObject { ["schema"] = "sys" }).ShouldBeFalse();
     }
 
+    // x__1 is a copy of x_ when the query reuses both x and x_, which no spelling tells, so it is read from reused.
     [Fact]
-    public void CopyOf_ACopyOfAQueryParameter_IsTheParameterAndOneSeparator()
-    {
-        Engine.CopyOf("before_1", Before).ShouldBe(("before", "_1"));
-        Engine.CopyOf("Before__12", Before).ShouldBe(("Before", "_12"));
-    }
-
-    [Fact]
-    public void CopyOf_AParameterWhoseNameEndsInASeparator_IsThatParameter() =>
+    public void CopiesIn_ACopyOfTwoParametersOfTheQuery_IsItsOwnParameter() =>
         Engine
-            .CopyOf("before___3", new HashSet<string>(["before_"], SqlParameterName.Comparer))
-            .ShouldBe(("before_", "_3"));
+            .CopiesIn("parameters", ParametersCall(("x", ["x_1", "x_2"]), ("x_", ["x__1", "x__2"])))
+            .ShouldBe([
+                new ParameterCopy("x_1", "x", "_1"),
+                new ParameterCopy("x_2", "x", "_2"),
+                new ParameterCopy("x__1", "x_", "_1"),
+                new ParameterCopy("x__2", "x_", "_2"),
+            ]);
 
-    // The shortest parameter the query holds is taken, so x__1, a copy of @x_ when the query holds both @x and @x_, is
-    // read back as a copy of x, which the proof refuses.  This is TD-0104's second case.
+    // ParameterCopies cuts a copy to fit 127 characters, as its own tests hold, so its parameter is no prefix of it.
     [Fact]
-    public void CopyOf_ACopyOfTwoParametersOfTheQuery_IsTheShortest() =>
-        Engine.CopyOf("x__1", new HashSet<string>(["x", "x_"], SqlParameterName.Comparer)).ShouldBe(("x", "_1"));
-
-    [Theory]
-    [InlineData("before_x")]
-    [InlineData("other_1")]
-    [InlineData("before_")]
-    [InlineData("before1")]
-    [InlineData("_1")]
-    [InlineData("before_1x")]
-    [InlineData("before_١")]
-    public void CopyOf_AnyOtherName_IsNull(string name) => Engine.CopyOf(name, Before).ShouldBeNull(name);
-
-    // A copy that ParameterCopies cut to fit 127 characters, as its own tests hold, has no parameter before its
-    // separator, so it is not read back and the proof refuses the bundle.  This is TD-0104.
-    [Fact]
-    public void CopyOf_ACopyCutToFit_IsNull()
+    public void CopiesIn_ACopyCutToFit_IsItsParameter()
     {
         var name = new string('a', ParameterCopies.MaximumCopyLength);
         var cut = new string('a', ParameterCopies.MaximumCopyLength - 2) + "_1";
 
-        Engine.CopyOf(cut, new HashSet<string>([name], SqlParameterName.Comparer)).ShouldBeNull();
+        Engine
+            .CopiesIn("parameters", ParametersCall((name, [cut])))
+            .ShouldHaveSingleItem()
+            .ShouldBe(new ParameterCopy(cut, name, "_1"));
+    }
+
+    // ParameterCopies passes over a number whose copy meets a name the text holds, which the renamed query's never do.
+    [Fact]
+    public void CopiesIn_ANumberPassedOver_IsSuffixedByPosition() =>
+        Engine
+            .CopiesIn("parameters", ParametersCall(("before", ["before_2", "before_3"])))
+            .ShouldBe([new ParameterCopy("before_2", "before", "_1"), new ParameterCopy("before_3", "before", "_2")]);
+
+    [Fact]
+    public void CopiesIn_AnotherMethodOrNoReused_IsEmpty()
+    {
+        var call = ParametersCall(("before", ["before_1", "before_2"]));
+        Engine.CopiesIn("probe", call).ShouldBeEmpty();
+        Engine.CopiesIn("columns", call).ShouldBeEmpty();
+
+        var request = new JsonObject { ["sql"] = "SELECT @before", ["params"] = null };
+        var absent = new JsonObject { ["request"] = request };
+        Engine.CopiesIn("parameters", absent).ShouldBeEmpty();
+        request["reused"] = null;
+        Engine.CopiesIn("parameters", absent).ShouldBeEmpty();
+        Engine.CopiesIn("parameters", new JsonObject { ["request"] = new JsonArray() }).ShouldBeEmpty();
+    }
+
+    // An entry with a member of another JSON kind records no copy, and the others still do.
+    [Fact]
+    public void CopiesIn_AnEntryOfAnotherKind_RecordsNone()
+    {
+        var reused = new JsonArray(
+            "before",
+            new JsonObject { ["name"] = 1, ["copies"] = new JsonArray("x_1") },
+            new JsonObject { ["name"] = "y", ["copies"] = "y_1" },
+            new JsonObject { ["name"] = "z", ["copies"] = new JsonArray("z_1", 2) },
+            new JsonObject { ["name"] = "before", ["copies"] = new JsonArray("before_1") }
+        );
+        var call = new JsonObject { ["request"] = new JsonObject { ["reused"] = reused } };
+
+        Engine.CopiesIn("parameters", call).ShouldBe([new ParameterCopy("before_1", "before", "_1")]);
     }
 
     // A money literal starts with $, which starts a word by the engine's word rule, so it is renamed to a name.  This
@@ -292,7 +312,7 @@ public sealed class SqlServerRenamingTests
     {
         const string Sql = "SELECT $12 AS price";
         var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold);
-        var run = RenamingRun.For(Engine, mapping, Sql);
+        var run = RenamingRun.For(Engine, mapping, Sql, RenamingCopies.None);
 
         var renamed = run.At("query.sql").Sql(Sql, NameClass.Alias).Text;
 
@@ -306,7 +326,13 @@ public sealed class SqlServerRenamingTests
     public void RenameOwn_AMessage_IsItsParametersRenamed()
     {
         var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold);
-        var run = RenamingRun.For(Engine, mapping, "SELECT @label, @label");
+        var call = ParametersCall(("label", ["label_1", "label_2"]), ("before", ["before_1", "before_2"]));
+        var copies = RenamingCopies.Of(
+            Engine,
+            [new RenamingCall(1, "parameters", call, call)],
+            static found => found.Original
+        );
+        var run = RenamingRun.For(Engine, mapping, "SELECT @label, @label, @before, @before", copies);
         run.RegisterParameters();
         var field = new RenamingField(
             0,
@@ -323,4 +349,23 @@ public sealed class SqlServerRenamingTests
         renamed.ShouldBe($"@{label} @before");
         Engine.WordsOf(field with { Value = renamed }).ShouldBe(["@", label, "@", "before"]);
     }
+
+    // A call of parameters whose request records the reused parameters given, each with its copies.
+    private static JsonObject ParametersCall(params (string Name, string[] Copies)[] reused) =>
+        new()
+        {
+            ["request"] = new JsonObject
+            {
+                ["sql"] = "SELECT 1",
+                ["params"] = null,
+                ["reused"] = new JsonArray([
+                    .. reused.Select(static entry => new JsonObject
+                    {
+                        ["name"] = entry.Name,
+                        ["copies"] = new JsonArray([.. entry.Copies.Select(static copy => (JsonNode)copy)]),
+                    }),
+                ]),
+            },
+            ["answer"] = new JsonObject(),
+        };
 }

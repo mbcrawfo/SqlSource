@@ -37,7 +37,7 @@ public sealed class SqlServerSessionColumnTests
         var table = new SqlServerTableRequest("dbo", "users");
         var script = new SqlServerScript()
             .Parameters(
-                new SqlServerParametersRequest(Sql, null),
+                new SqlServerParametersRequest(Sql, null, null),
                 new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null)
             )
             .Columns(columns, new SqlServerColumnsAnswer([IdColumn, NameColumn, Rowstat], null, null))
@@ -85,7 +85,7 @@ public sealed class SqlServerSessionColumnTests
         var columns = new SqlServerColumnsRequest(Sql, "@id int");
         var script = new SqlServerScript()
             .Parameters(
-                new SqlServerParametersRequest(Sql, null),
+                new SqlServerParametersRequest(Sql, null, null),
                 new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null)
             )
             .Columns(columns, NoRows);
@@ -127,7 +127,11 @@ public sealed class SqlServerSessionColumnTests
                 )
             )
             .Parameters(
-                new SqlServerParametersRequest(Renamed, "@tenant int"),
+                new SqlServerParametersRequest(
+                    Renamed,
+                    "@tenant int",
+                    [new SqlServerReusedParameter("name", ["name_1", "name_2"])]
+                ),
                 new SqlServerParametersAnswer(
                     [
                         new SqlServerParameterRow("@email", "nvarchar(320)", 640, 0, 0, "dbo", "Email", null),
@@ -198,7 +202,7 @@ public sealed class SqlServerSessionColumnTests
     public async Task DescribeAsync_Refused11501_AsksColumnsWithDeclarationsAlone()
     {
         const string Sql = "SELECT id INTO #t FROM dbo.users WHERE tenant = @tenant AND id = @id; SELECT id FROM #t";
-        var parameters = new SqlServerParametersRequest(Sql, "@tenant int");
+        var parameters = new SqlServerParametersRequest(Sql, "@tenant int", null);
         var columns = new SqlServerColumnsRequest(Sql, "@tenant int");
         var script = new SqlServerScript()
             .Declared(
@@ -251,7 +255,7 @@ public sealed class SqlServerSessionColumnTests
         ]);
         var columns = new SqlServerColumnsRequest(Sql, null);
         var script = new SqlServerScript()
-            .Parameters(new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer(null, refused))
+            .Parameters(new SqlServerParametersRequest(Sql, null, null), new SqlServerParametersAnswer(null, refused))
             .Columns(columns, new SqlServerColumnsAnswer(null, null, Lost));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
@@ -272,7 +276,11 @@ public sealed class SqlServerSessionColumnTests
     {
         const string Sql = "SELECT id FROM dbo.users WHERE id = @p AND name = @p";
         var script = new SqlServerScript().Parameters(
-            new SqlServerParametersRequest("SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2", null),
+            new SqlServerParametersRequest(
+                "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2",
+                null,
+                [new SqlServerReusedParameter("p", ["p_1", "p_2"])]
+            ),
             new SqlServerParametersAnswer(
                 null,
                 new SqlServerServerError([new SqlServerErrorRow(102, 15, 1, "Incorrect syntax near 'name'.")])

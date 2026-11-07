@@ -35,7 +35,16 @@
       "method": "parameters",
       "request": {
         "sql": "UPDATE dbo.users SET nickname = N'x' WHERE (@name_1 IS NULL OR name = @name_2);",
-        "params": null
+        "params": null,
+        "reused": [
+          {
+            "name": "name",
+            "copies": [
+              "name_1",
+              "name_2"
+            ]
+          }
+        ]
       },
       "answer": {
         "rows": [

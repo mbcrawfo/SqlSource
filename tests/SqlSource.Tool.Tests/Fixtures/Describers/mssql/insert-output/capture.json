@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "INSERT INTO dbo.orders (user_id, total, note)\nOUTPUT inserted.*\nVALUES (@userId, @total, @note);",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "UPDATE TOP (@n) dbo.users SET nickname = NULL WHERE name LIKE @pattern;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

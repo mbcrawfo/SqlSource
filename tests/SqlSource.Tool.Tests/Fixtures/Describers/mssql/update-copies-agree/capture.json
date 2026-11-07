@@ -35,7 +35,16 @@
       "method": "parameters",
       "request": {
         "sql": "UPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @before_1 OR deleted_at < @before_2;",
-        "params": null
+        "params": null,
+        "reused": [
+          {
+            "name": "before",
+            "copies": [
+              "before_1",
+              "before_2"
+            ]
+          }
+        ]
       },
       "answer": {
         "rows": [

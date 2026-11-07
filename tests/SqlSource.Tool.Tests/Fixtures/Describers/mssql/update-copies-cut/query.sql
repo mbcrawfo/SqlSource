@@ -1,0 +1,2 @@
+-- name: RetireCut
+UPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @retire_before_ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt OR deleted_at < @retire_before_ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt;

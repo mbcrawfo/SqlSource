@@ -151,3 +151,4 @@ SQLSRC292 | SqlSource | Error | Query is not in the file
 SQLSRC293 | SqlSource | Error | Bundle cannot be made safe to post
 SQLSRC294 | SqlSource | Error | Renamed bundle does not reproduce the query's answer
 SQLSRC295 | SqlSource | Error | Bundle is not a raw bundle
+SQLSRC296 | SqlSource | Error | Raw bundle is not reproduced by this version

@@ -180,6 +180,8 @@ public sealed class DescriberFixtureTests : IDisposable
                     "mssql/select-temporal-all",
                     "mssql/select-view-star",
                     "mssql/update-copies-agree",
+                    "mssql/update-copies-cut",
+                    "mssql/update-copies-of-two-parameters",
                     "mssql/update-inferred",
                     "mssql/update-optional-filter",
                     "mssql/update-wide-types",

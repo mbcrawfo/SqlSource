@@ -20,13 +20,13 @@ internal static class SqlServerMessages
     private const char Prefix = '@';
 
     /// <summary>
-    /// The message renamed: each <c>@name</c> it holds, renamed through the scope and joined by one space.  A global
-    /// variable, <c>@@ROWCOUNT</c>, and an <c>@</c> that no name follows, are left out.
+    /// The message renamed: each <c>@name</c> it holds, a copy that the capture records as its parameter, renamed
+    /// through the scope and joined by one space.  A global variable, <c>@@ROWCOUNT</c>, and an <c>@</c> that no name
+    /// follows, are left out.
     /// </summary>
     /// <param name="message">The message as captured.</param>
     /// <param name="scope">The scope of the message's place.</param>
-    /// <param name="isEngineWord">Whether a spelling is the engine's word, unquoted.</param>
-    public static string Rename(string message, IRenamingScope scope, Func<string, bool> isEngineWord)
+    public static string Rename(string message, IRenamingScope scope)
     {
         List<string> names = [];
         var at = message.IndexOf(Prefix, StringComparison.Ordinal);
@@ -41,7 +41,7 @@ internal static class SqlServerMessages
             var name = message[(at + 1)..end];
             if (name.Length > 0 && name[0] != Prefix)
             {
-                names.Add(Prefix + scope.Parameter(Named(name, scope, isEngineWord)));
+                names.Add(Prefix + scope.Parameter(scope.ParameterOf(name)));
             }
 
             at = end < message.Length ? message.IndexOf(Prefix, end) : -1;
@@ -60,34 +60,4 @@ internal static class SqlServerMessages
             .SelectMany(static piece =>
                 piece.Length > 1 && piece[0] == Prefix ? [Prefix.ToString(), piece[1..]] : (IEnumerable<string>)[piece]
             );
-
-    // The name a message's name is written as: its own when the mapping or the engine knows it, else the stem of a
-    // copy, <stem><one or more _><digits>, that the mapping or the engine knows, else its own.
-    private static string Named(string name, IRenamingScope scope, Func<string, bool> isEngineWord)
-    {
-        if (scope.IsMapped(name, quoted: false) || isEngineWord(name))
-        {
-            return name;
-        }
-
-        var digits = name.Length;
-        while (digits > 0 && char.IsAsciiDigit(name[digits - 1]))
-        {
-            digits--;
-        }
-
-        var stem = digits;
-        while (stem > 0 && name[stem - 1] == '_')
-        {
-            stem--;
-        }
-
-        if (digits == name.Length || stem == digits || stem == 0)
-        {
-            return name;
-        }
-
-        var parameter = name[..stem];
-        return scope.IsMapped(parameter, quoted: false) || isEngineWord(parameter) ? parameter : name;
-    }
 }
