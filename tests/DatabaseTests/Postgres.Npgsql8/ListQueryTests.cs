@@ -139,6 +139,28 @@ public sealed class ListQueryTests(AppContainer app)
         ]);
     }
 
+    // A list whose truth IS FALSE tests is read as one that NOT negates: an empty list keeps carol's row, whose body
+    // the join fills with NULL, and the method reads it.
+    [Fact]
+    public async Task NotesNotListed_Empty_ReadsTheAccountWithoutANote()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAccountNotesNotListed(
+            new ListAccountNotesNotListedArgs([]),
+            cancellationToken: token
+        );
+
+        rows.ShouldBe([
+            new ListAccountNotesNotListedDto(1, "alice", "Asked for a larger plan."),
+            new ListAccountNotesNotListedDto(1, "alice", "Sent the quote."),
+            new ListAccountNotesNotListedDto(2, "bob", "Closed the account on site."),
+            new ListAccountNotesNotListedDto(3, "carol", null),
+        ]);
+    }
+
     [Fact]
     public async Task NotesExcept_Ids_LeavesTheirNotesOut()
     {
