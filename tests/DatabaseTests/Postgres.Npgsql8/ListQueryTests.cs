@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.Npgsql8;
@@ -19,9 +20,6 @@ public sealed class ListQueryTests(AppContainer app)
 {
     // The most parameters PostgreSQL takes in one query, and Npgsql too.
     private const int Limit = 65535;
-
-    // The first of the ids that no account has.
-    private const int Unused = 1000;
 
     private static readonly ListedAccount Alice = new(1, "alice", "active");
     private static readonly ListedAccount Bob = new(2, "bob", "closed");
@@ -39,7 +37,7 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var accounts = await connection.ListAccountsByIds(
-            new ListAccountsByIdsArgs(CollectionOf(kind, [1, 3])),
+            new ListAccountsByIdsArgs(ListArguments.CollectionOf(kind, [1, 3])),
             cancellationToken: token
         );
 
@@ -297,7 +295,7 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var accounts = await connection.ListAccountsByIdsNoPadding(
-            new ListAccountsByIdsNoPaddingArgs([1, 3, Unused]),
+            new ListAccountsByIdsNoPaddingArgs([1, 3, ListArguments.Unused]),
             cancellationToken: token
         );
 
@@ -314,7 +312,7 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var accounts = await connection.ListAccountsByIds(
-            new ListAccountsByIdsArgs(IdsOf(Limit)),
+            new ListAccountsByIdsArgs(ListArguments.IdsOf(Limit)),
             cancellationToken: token
         );
 
@@ -329,7 +327,10 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var exception = await Should.ThrowAsync<ArgumentException>(() =>
-            connection.ListAccountsByIds(new ListAccountsByIdsArgs(IdsOf(Limit + 1)), cancellationToken: token)
+            connection.ListAccountsByIds(
+                new ListAccountsByIdsArgs(ListArguments.IdsOf(Limit + 1)),
+                cancellationToken: token
+            )
         );
 
         exception.ParamName.ShouldBe("parameters");
@@ -349,7 +350,7 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var accounts = await connection.ListAccountsByIds(
-            new ListAccountsByIdsArgs(IdsOf(65_500)),
+            new ListAccountsByIdsArgs(ListArguments.IdsOf(65_500)),
             cancellationToken: token
         );
 
@@ -365,7 +366,7 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var accounts = await connection.ListAccountsByIdsAndStatuses(
-            new ListAccountsByIdsAndStatusesArgs(IdsOf(Limit - 2), ["active", "suspended"]),
+            new ListAccountsByIdsAndStatusesArgs(ListArguments.IdsOf(Limit - 2), ["active", "suspended"]),
             cancellationToken: token
         );
 
@@ -382,7 +383,7 @@ public sealed class ListQueryTests(AppContainer app)
 
         var exception = await Should.ThrowAsync<ArgumentException>(() =>
             connection.ListAccountsByIdsAndStatuses(
-                new ListAccountsByIdsAndStatusesArgs(IdsOf(Limit - 1), ["active", "suspended"]),
+                new ListAccountsByIdsAndStatusesArgs(ListArguments.IdsOf(Limit - 1), ["active", "suspended"]),
                 cancellationToken: token
             )
         );
@@ -404,7 +405,7 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var accounts = await connection.ListAccountsOptional(
-            new ListAccountsOptionalArgs(IdsOf(Limit - 1)),
+            new ListAccountsOptionalArgs(ListArguments.IdsOf(Limit - 1)),
             cancellationToken: token
         );
 
@@ -419,7 +420,10 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var exception = await Should.ThrowAsync<ArgumentException>(() =>
-            connection.ListAccountsOptional(new ListAccountsOptionalArgs(IdsOf(Limit)), cancellationToken: token)
+            connection.ListAccountsOptional(
+                new ListAccountsOptionalArgs(ListArguments.IdsOf(Limit)),
+                cancellationToken: token
+            )
         );
 
         exception.ParamName.ShouldBe("parameters");
@@ -439,7 +443,10 @@ public sealed class ListQueryTests(AppContainer app)
         await using var connection = source.CreateConnection();
 
         var exception = Should.Throw<ArgumentException>(() =>
-            connection.StreamAccountsByIds(new StreamAccountsByIdsArgs(IdsOf(Limit + 1)), cancellationToken: token)
+            connection.StreamAccountsByIds(
+                new StreamAccountsByIdsArgs(ListArguments.IdsOf(Limit + 1)),
+                cancellationToken: token
+            )
         );
 
         exception.ParamName.ShouldBe("parameters");
@@ -493,22 +500,4 @@ public sealed class ListQueryTests(AppContainer app)
 
         exception.Message.ShouldBe("The list 'Ids' changed after the query counted it.");
     }
-
-    // The values in a collection of the kind, or in a lazy sequence that is none.
-    private static IEnumerable<int> CollectionOf(string kind, int[] values)
-    {
-        List<int> list = [.. values];
-        HashSet<int> set = [.. values];
-        return kind switch
-        {
-            "array" => values,
-            "List" => list,
-            "HashSet" => set,
-            "lazy" => values.Select(static id => id),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
-        };
-    }
-
-    // A count of ids: the seed's 1 and 3, and then ids that no account has.
-    private static int[] IdsOf(int count) => [1, 3, .. Enumerable.Range(Unused, count - 2)];
 }

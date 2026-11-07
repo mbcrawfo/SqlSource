@@ -14,11 +14,7 @@ public sealed class RealisticNullabilitySafetyTests(SqlServerDatabases sqlServer
         RealisticCases.Describe,
         sqlServer.Major,
         sqlServer.RealisticConnectionString,
-        (request, parameters, sample) =>
-            RealisticNullabilityOracle.RunAsync(
-                sqlServer.RealisticConnectionString,
-                RealisticSamples.Batch(request.Sql, sample, parameters)
-            )
+        RealisticNullabilityOracle.SampleRunOn(sqlServer.RealisticConnectionString)
     );
 
     [Theory]

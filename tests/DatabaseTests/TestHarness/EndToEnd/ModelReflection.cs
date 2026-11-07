@@ -40,6 +40,18 @@ internal static class ModelReflection
     // The names of the model's properties in the order they are declared.
     public static string[] NamesOf(Type model) => [.. PropertiesOf(model).Select(static property => property.Name)];
 
+    // Fails unless the model's property names, in ordinal order, are the names, and returns the properties in the order
+    // they are declared.
+    public static IReadOnlyList<PropertyInfo> ShouldHaveProperties(Type model, IEnumerable<string> names)
+    {
+        var properties = PropertiesOf(model);
+        properties
+            .Select(static property => property.Name)
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(names.Order(StringComparer.Ordinal), $"The properties of {model}");
+        return properties;
+    }
+
     // Whether the property can hold null: a Nullable<T>, or a reference type annotated nullable.
     public static bool IsNullable(PropertyInfo property) =>
         property.PropertyType.IsValueType

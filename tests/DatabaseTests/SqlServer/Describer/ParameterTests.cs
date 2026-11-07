@@ -537,14 +537,15 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         failure.Arguments.ShouldBe(["@p", Query, "int", "nvarchar(100)"]);
     }
 
-    // The list is the test's, empty as the plan of a run makes it for a DECLAREd variable, and the server does not
-    // report the variable.
+    // The request is the plan's, so the parser's reading of the DECLARE and the sample the run sends are both run: the
+    // plan lists no parameter for the variable, and the server reports none.
     [Fact]
     public async Task DescribeAsync_DeclaredVariable_IsNoParameter()
     {
-        var description = await ShouldDescribeAsync(
-            Listed("DECLARE @x int = 1; SELECT id FROM dbo.users WHERE id = @x")
-        );
+        var request = Planned("mssql", "DECLARE @x int = 1; SELECT id FROM dbo.users WHERE id = @x");
+        request.Parameters.ShouldBeEmpty();
+
+        var description = await ShouldDescribeAsync(request);
 
         description.Parameters.ShouldBeEmpty();
     }
