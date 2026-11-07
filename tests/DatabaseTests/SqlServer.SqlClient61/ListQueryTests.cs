@@ -538,15 +538,23 @@ public sealed class ListQueryTests(AppContainer app)
     private static async Task<MarkAccountsWithIdsDto[]> MarkRolledBackAsync(SqlConnection connection, int[] ids)
     {
         var token = TestContext.Current.CancellationToken;
-        await connection.OpenAsync(token);
-        await using var transaction = await connection.BeginTransactionAsync(token);
+        MarkAccountsWithIdsDto[] marks = [];
 
-        var marks = await connection.MarkAccountsWithIds(
-            new MarkAccountsWithIdsArgs(ids),
-            transaction: transaction,
-            cancellationToken: token
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+                marks = [
+                    .. (
+                        await connection.MarkAccountsWithIds(
+                            new MarkAccountsWithIdsArgs(ids),
+                            transaction: transaction,
+                            cancellationToken: token
+                        )
+                    ).OrderBy(static mark => mark.Id),
+                ],
+            token
         );
 
-        return [.. marks.OrderBy(static mark => mark.Id)];
+        return marks;
     }
 }
