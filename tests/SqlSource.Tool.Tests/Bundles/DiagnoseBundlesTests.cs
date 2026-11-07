@@ -151,9 +151,7 @@ public sealed class DiagnoseBundlesTests
             planned,
             await System.IO.File.ReadAllTextAsync(path, token),
             file.Dialect,
-            run,
-            entry,
-            failure,
+            new DescribedQuery(run, entry, failure),
             host
         );
     }

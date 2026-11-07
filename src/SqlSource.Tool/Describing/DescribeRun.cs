@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
@@ -23,29 +22,29 @@ internal static class DescribeRun
     /// <summary>
     /// What starts each line of the summary under <c>--online</c>, which the build's <c>SqlSourceRunOnline</c> reads.
     /// </summary>
-    internal const string SummaryPrefix = "sqlsource: summary: ";
+    internal const string SummaryPrefix = Cli.LinePrefix + "summary: ";
 
     /// <summary>
     /// Runs the steps in order, reports their errors and writes the summary.
     /// </summary>
     /// <param name="plan">The plan of the run.</param>
     /// <param name="options">What the command line says of the run, beside its plan.</param>
-    /// <param name="host">The describers, the environment, the <c>.env</c> file and standard output.</param>
-    /// <param name="reporter">Where the errors go, with the run's trace.</param>
+    /// <param name="context">
+    /// The describers, the environment, the <c>.env</c> file and standard output; where the errors go, with the
+    /// run's trace; and what ends the run.
+    /// </param>
     /// <param name="counted">
     /// Given the counts of each selected database, as <c>run.end</c> holds them, before the summary is written: a
     /// summary that cannot be written does not lose them.
     /// </param>
-    /// <param name="cancellationToken">Ends the run.</param>
     public static async Task RunAsync(
         RunPlan plan,
         DescribeOptions options,
-        ToolHost host,
-        Reporter reporter,
-        Action<LogValue> counted,
-        CancellationToken cancellationToken
+        RunContext context,
+        Action<LogValue> counted
     )
     {
+        var (host, reporter, cancellationToken) = context;
         // 1 and 2: what is there, and what each query needs.
         var errors = new List<ToolDiagnostic>();
         var files = RunDecisions.Decide(plan, options.Mode, errors);
@@ -71,11 +70,8 @@ internal static class DescribeRun
             plan,
             selected,
             RunDecisions.DescribableDatabases(plan),
-            options.Connections,
-            options.UnitFolder,
-            options.EnvFile,
-            host,
-            reporter
+            options.Sources,
+            context
         );
         // Found before the databases are run, which changes the queries' states.
         var offline = OfflineDatabases(options.Online, files, selected, connections);
@@ -83,11 +79,8 @@ internal static class DescribeRun
             selected,
             files,
             connections,
-            host,
-            reporter,
-            cancellationToken,
-            options.Online,
-            offline: !offline.IsEmpty
+            context,
+            new DatabaseMode(options.Online, Offline: !offline.IsEmpty, Capture: null)
         );
 
         // 4: a run that was cancelled changes no file.
@@ -140,7 +133,7 @@ internal static class DescribeRun
         {
             // In place of the summary: the build reads this line to know that the tool ran and found no database.
             await host.Out.WriteLineAsync(
-                $"sqlsource: offline: no connection for {string.Join(", ", offline.Select(OneLine.Of))}; "
+                $"{Cli.LinePrefix}offline: no connection for {string.Join(", ", offline.Select(OneLine.Of))}; "
                     + "the build uses the committed sidecars"
             );
             return;
@@ -150,7 +143,7 @@ internal static class DescribeRun
         // did not start.
         if (lines.IsEmpty && options.Online != OnlineMode.Off)
         {
-            await host.Out.WriteLineAsync("sqlsource: online: nothing to describe");
+            await host.Out.WriteLineAsync(Cli.LinePrefix + "online: nothing to describe");
         }
 
         // The build's Exec reads a line that starts "error " or "warning " as one of the build, and a database may be
@@ -172,33 +165,29 @@ internal static class DescribeRun
     /// <param name="describable">
     /// The selected databases that can be described, which decide whether <c>SQLSOURCE_CONNECTION</c> is for one.
     /// </param>
-    /// <param name="given">The values of <c>--connection</c>.</param>
-    /// <param name="unitFolder">The full path of the folder of the run's unit.</param>
-    /// <param name="envFile">The full path of the run's <c>.env</c> file, or null when it reads none.</param>
-    /// <param name="host">The environment and the files.</param>
-    /// <param name="reporter">Where the errors of the <c>.env</c> file go.</param>
+    /// <param name="sources">
+    /// The values of <c>--connection</c>, the full path of the unit's folder, and that of the run's <c>.env</c> file.
+    /// </param>
+    /// <param name="context">The environment and the files, and where the errors of the <c>.env</c> file go.</param>
     internal static Connections ConnectionsOf(
         RunPlan plan,
         ImmutableArray<PlannedDatabase> selected,
         ImmutableArray<PlannedDatabase> describable,
-        ImmutableArray<ConnectionArgument> given,
-        string unitFolder,
-        string? envFile,
-        ToolHost host,
-        Reporter reporter
+        ConnectionSources sources,
+        RunContext context
     )
     {
-        var environment = ConnectionEnvironment.Load(unitFolder, envFile, host);
+        var environment = ConnectionEnvironment.Load(sources.UnitFolder, sources.EnvFile, context.Host);
         foreach (var error in environment.Errors)
         {
-            reporter.Report(error);
+            context.Reporter.Report(error);
         }
 
         return Connections.Resolve(
             [.. selected.Select(static database => database.Name)],
             [.. describable.Select(static database => database.Name)],
             [.. plan.Databases.Select(static database => database.Name)],
-            given,
+            sources.Given,
             environment
         );
     }

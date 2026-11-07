@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
 using SqlSource.Tool.Logging;
@@ -35,17 +34,12 @@ internal static class RunProjects
     /// The paths that <c>--project</c> gave, as they were typed.  Empty when it gave none.  A message names one by
     /// its position when it holds <c>=</c> or <c>;</c>.
     /// </param>
-    /// <param name="host">The working directory, and what MSBuild is run with.</param>
-    /// <param name="reporter">Where the errors go.</param>
-    /// <param name="cancellationToken">Ends the run.</param>
-    public static async Task<FoundProjects> FindAsync(
-        RunUnit unit,
-        IReadOnlyList<UsageValue> named,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
+    /// <param name="context">
+    /// The working directory and what MSBuild is run with, where the errors go, and what ends the run.
+    /// </param>
+    public static async Task<FoundProjects> FindAsync(RunUnit unit, IReadOnlyList<UsageValue> named, RunContext context)
     {
+        var (host, reporter, cancellationToken) = context;
         ImmutableArray<string> projects = [unit.Path];
         string? solution = null;
         if (unit.Kind == RunUnitKind.Solution)
@@ -139,16 +133,10 @@ internal static class RunProjects
     /// under <c>--online</c>, whose manifest's path the build wrote and is no secret, so the path is always printed.
     /// </summary>
     /// <param name="manifestPath">The full path of the manifest file.</param>
-    /// <param name="host">Reads the file.</param>
-    /// <param name="reporter">Where the error goes.</param>
-    /// <param name="cancellationToken">Ends the run.</param>
-    public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(
-        string manifestPath,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
+    /// <param name="context">What reads the file, where the error goes, and what ends the run.</param>
+    public static Task<ImmutableArray<ProjectManifest>> FromManifestAsync(string manifestPath, RunContext context)
     {
+        var (host, reporter, cancellationToken) = context;
         cancellationToken.ThrowIfCancellationRequested();
         string? text;
         try

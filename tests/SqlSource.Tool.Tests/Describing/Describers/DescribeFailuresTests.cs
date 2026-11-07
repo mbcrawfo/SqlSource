@@ -52,8 +52,7 @@ public sealed class DescribeFailuresTests
 
         var failure = DescribeFailures.DeclaredType(
             Query,
-            "@p",
-            "nope_t",
+            new DeclaredParameter("@p", "nope_t"),
             DescribeFailures.NoSuchType,
             DescribeStep.DescribeParameters,
             lines,
@@ -72,8 +71,7 @@ public sealed class DescribeFailuresTests
     {
         var failure = DescribeFailures.DeclaredType(
             Query,
-            "@p",
-            null,
+            new DeclaredParameter("@p", null),
             "it is a pseudo-type",
             DescribeStep.ResolveType,
             EquatableArray<string>.Empty,

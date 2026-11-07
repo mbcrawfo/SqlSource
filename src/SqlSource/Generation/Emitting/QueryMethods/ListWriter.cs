@@ -28,11 +28,6 @@ internal static class ListWriter
     internal const string Invariant = "global::System.Globalization.CultureInfo.InvariantCulture";
 
     /// <summary>
-    /// The most parameters the engine takes in one query.
-    /// </summary>
-    public static int ParameterLimitOf(DatabaseEngine engine) => LimitOf(engine).Parameters;
-
-    /// <summary>
     /// Appends the documentation of the limit, and of a list that changed after it was counted, for a method with a
     /// list.
     /// </summary>

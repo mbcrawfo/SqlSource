@@ -83,7 +83,7 @@ internal static class SidecarStore
         TimeProvider time,
         bool onTheWhole,
         CancellationToken cancellationToken
-    ) => Apply(outcomes, reporter, time, onTheWhole, MoveOverwriting, DeleteFile, WaitFor, cancellationToken);
+    ) => Apply(outcomes, reporter, time, onTheWhole, FileActions.System, cancellationToken);
 
     /// <summary>
     /// <see cref="Apply(ImmutableArray{FileOutcome}, Reporter, TimeProvider, bool, CancellationToken)" /> with the
@@ -94,18 +94,14 @@ internal static class SidecarStore
     /// <param name="reporter">Where the errors go, with the run's trace.</param>
     /// <param name="time">The clock, which says how old a temporary file is.</param>
     /// <param name="onTheWhole">Whether the run has no filter, and so knows every file of its projects.</param>
-    /// <param name="move">Moves the first file over the second.</param>
-    /// <param name="delete">Deletes the file.</param>
-    /// <param name="wait">Waits for the time given, or until the token is cancelled.</param>
+    /// <param name="files">The move, the delete and the wait.</param>
     /// <param name="cancellationToken">Ends the run.</param>
     internal static void Apply(
         ImmutableArray<FileOutcome> outcomes,
         Reporter reporter,
         TimeProvider time,
         bool onTheWhole,
-        Action<string, string> move,
-        Action<string> delete,
-        Action<TimeSpan, CancellationToken> wait,
+        FileActions files,
         CancellationToken cancellationToken
     )
     {
@@ -121,14 +117,13 @@ internal static class SidecarStore
                         outcome.SidecarPath,
                         outcome.Text ?? throw new InvalidOperationException("A file to write has no text."),
                         reporter,
-                        move,
-                        wait,
+                        files,
                         cancellationToken
                     );
                     RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.Write, failed: !written);
                     break;
                 case FileAction.Delete:
-                    var deleted = Delete(outcome.SidecarPath, reporter, delete, wait, cancellationToken);
+                    var deleted = DeleteSidecar(outcome.SidecarPath, reporter, files, cancellationToken);
                     RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.Delete, failed: !deleted);
                     break;
                 case FileAction.Unreadable:
@@ -235,8 +230,7 @@ internal static class SidecarStore
         string path,
         string text,
         Reporter reporter,
-        Action<string, string> move,
-        Action<TimeSpan, CancellationToken> wait,
+        FileActions files,
         CancellationToken cancellationToken
     )
     {
@@ -247,7 +241,7 @@ internal static class SidecarStore
         {
             // UTF-8 without a byte order mark, and the line endings of the writer.
             File.WriteAllText(temporary, text);
-            WithRetries(() => move(temporary, path), wait, cancellationToken);
+            WithRetries(() => files.Move(temporary, path), files.Wait, cancellationToken);
             return true;
         }
         catch (OperationCanceledException)
@@ -305,21 +299,37 @@ internal static class SidecarStore
     /// <summary>The delete of a sidecar, as the system does it.</summary>
     internal static void DeleteFile(string path) => File.Delete(path);
 
-    // Not a measured time, so the host's clock has no part in it.  A cancelled run stops the wait at once.
-    private static void WaitFor(TimeSpan delay, CancellationToken cancellationToken) =>
-        _ = cancellationToken.WaitHandle.WaitOne(delay);
+    /// <summary>
+    /// What the store does to the files of a sidecar: the move of a temporary file over it, its delete, and the wait
+    /// between two tries of either.
+    /// </summary>
+    /// <param name="Move">Moves the first file over the second.</param>
+    /// <param name="Delete">Deletes the file.</param>
+    /// <param name="Wait">Waits for the time given, or until the token is cancelled.</param>
+    internal sealed record FileActions(
+        Action<string, string> Move,
+        Action<string> Delete,
+        Action<TimeSpan, CancellationToken> Wait
+    )
+    {
+        /// <summary>The move, the delete and the wait as the system does them.</summary>
+        public static FileActions System { get; } = new(MoveOverwriting, DeleteFile, WaitFor);
 
-    private static bool Delete(
+        // Not a measured time, so the host's clock has no part in it.  A cancelled run stops the wait at once.
+        private static void WaitFor(TimeSpan delay, CancellationToken cancellationToken) =>
+            _ = cancellationToken.WaitHandle.WaitOne(delay);
+    }
+
+    private static bool DeleteSidecar(
         string path,
         Reporter reporter,
-        Action<string> delete,
-        Action<TimeSpan, CancellationToken> wait,
+        FileActions files,
         CancellationToken cancellationToken
     )
     {
         try
         {
-            WithRetries(() => delete(path), wait, cancellationToken);
+            WithRetries(() => files.Delete(path), files.Wait, cancellationToken);
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

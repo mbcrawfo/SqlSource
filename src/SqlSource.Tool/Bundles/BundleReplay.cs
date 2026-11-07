@@ -26,9 +26,11 @@ namespace SqlSource.Tool.Bundles;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The steps are apart, so that a caller reports what each gives: <see cref="CaptureOf" />, <see cref="EngineOf" />,
-/// <see cref="Plan" />, <c>BundleDescribers.For</c>, then <see cref="RunAsync" />, whose outcome is compared with
-/// <see cref="ExpectedOf" />'s.  Every error is at the bundle's path, through <see cref="BundleErrors" />.
+/// <see cref="Prepare" /> runs the steps up to the replay, <see cref="CaptureOf" />, <see cref="EngineOf" />,
+/// <see cref="Plan" />, <c>BundleDescribers.For</c> and <see cref="ExpectedOf" />, and gives a
+/// <see cref="PreparedReplay" /> for <see cref="RunAsync" />, whose outcome is compared with the expected one.  A
+/// caller that must use another describer calls the steps itself.  Every error is at the bundle's path, through
+/// <see cref="BundleErrors" />.
 /// </para>
 /// <para>
 /// A question that the capture does not answer is a <see cref="ReplayOutcome.Missed" />, never an exception: it is
@@ -167,6 +169,50 @@ internal static class BundleReplay
     }
 
     /// <summary>
+    /// The steps up to the replay, in order: <see cref="CaptureOf" />, <see cref="EngineOf" />, <see cref="Plan" />,
+    /// <c>BundleDescribers.For</c> and <see cref="ExpectedOf" />.  The first to fail gives its error, so that a bundle
+    /// whose answer cannot be read is not replayed for nothing.
+    /// </summary>
+    /// <param name="bundle">The bundle.</param>
+    /// <param name="path">The bundle's full path, where an error is.</param>
+    /// <param name="describers">The describers to choose the bundle's engine's from.</param>
+    /// <param name="token">Ends the parse.</param>
+    public static Outcome<PreparedReplay, ToolDiagnostic> Prepare(
+        Bundle bundle,
+        string path,
+        DescriberRegistry describers,
+        CancellationToken token
+    )
+    {
+        var capture = CaptureOf(bundle, path);
+        if (!capture.Succeeded)
+        {
+            return Outcome<PreparedReplay, ToolDiagnostic>.Failed(capture.Failure);
+        }
+
+        var engine = EngineOf(bundle);
+        var planned = Plan(bundle, engine, path, token);
+        if (!planned.Succeeded)
+        {
+            return Outcome<PreparedReplay, ToolDiagnostic>.Failed(planned.Failure);
+        }
+
+        var (query, dialect) = planned.Value;
+        var describer = BundleDescribers.For(dialect, describers, bundle.ExplainSettings, engine, path);
+        if (!describer.Succeeded)
+        {
+            return Outcome<PreparedReplay, ToolDiagnostic>.Failed(describer.Failure);
+        }
+
+        var expected = ExpectedOf(bundle, path);
+        return expected.Succeeded
+            ? Outcome<PreparedReplay, ToolDiagnostic>.Of(
+                new PreparedReplay(query, dialect, capture.Value, describer.Value, expected.Value)
+            )
+            : Outcome<PreparedReplay, ToolDiagnostic>.Failed(expected.Failure);
+    }
+
+    /// <summary>
     /// Describes the query as a run does, answered from the capture: its entry, the describer's refusal, or the
     /// question the capture does not answer.
     /// </summary>
@@ -176,23 +222,18 @@ internal static class BundleReplay
     /// <see cref="ReplayOutcome.Missed" />, of <see cref="UnknownQuestion" /> when it names no method; any other
     /// exception is a bug, and is let through.
     /// </remarks>
-    /// <param name="query">The query as <see cref="Plan" /> gives it.</param>
-    /// <param name="dialect">Its dialect as <see cref="Plan" /> gives it.</param>
-    /// <param name="capture">The calls to answer from, as <see cref="CaptureOf" /> gives them.</param>
-    /// <param name="describer">The describer of the dialect, as <c>BundleDescribers.For</c> gives it.</param>
+    /// <param name="replay">What the replay needs, as <see cref="Prepare" /> gives it.</param>
     /// <param name="log">Where the describer's events go.</param>
     /// <param name="time">The clock the describer times its calls with.</param>
     /// <param name="token">Ends the replay.</param>
     public static async Task<ReplayOutcome> RunAsync(
-        PlannedQuery query,
-        SqlDialect dialect,
-        DescribeCapture capture,
-        IQueryDescriber describer,
+        PreparedReplay replay,
         IRunLog log,
         TimeProvider time,
         CancellationToken token
     )
     {
+        var (query, dialect, capture, describer, _) = replay;
         var database = query.Database ?? SqlDialectName.Canonical(dialect);
         try
         {

@@ -58,16 +58,14 @@ internal static class DescribeFailures
     /// <c>SQLSRC228</c>: the type a <c>-- param:</c> marker declares cannot be used; the last argument is why.
     /// </summary>
     /// <param name="query">The query.</param>
-    /// <param name="writtenParameter">The parameter as the SQL writes one, such as <c>@id</c>.</param>
-    /// <param name="type">The type as the marker writes it, or null when it writes none.</param>
+    /// <param name="parameter">The parameter as the SQL writes it, and the type its marker declares.</param>
     /// <param name="reason">Why the type cannot be used.</param>
     /// <param name="step">The step that found out.</param>
     /// <param name="serverLines">What the server said, verbatim, or none.</param>
     /// <param name="help">How to mend it.</param>
     public static DescribeFailure DeclaredType(
         DescribeRequest query,
-        string writtenParameter,
-        string? type,
+        DeclaredParameter parameter,
         string reason,
         DescribeStep step,
         EquatableArray<string> serverLines,
@@ -75,7 +73,7 @@ internal static class DescribeFailures
     ) =>
         new(
             ToolDiagnostics.DeclaredTypeNotValid,
-            new EquatableArray<string>([type ?? string.Empty, writtenParameter, query.Name, reason]),
+            new EquatableArray<string>([parameter.Type ?? string.Empty, parameter.Written, query.Name, reason]),
             step,
             serverLines,
             help

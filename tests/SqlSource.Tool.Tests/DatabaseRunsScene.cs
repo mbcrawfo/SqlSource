@@ -101,10 +101,8 @@ internal sealed class DatabaseRunsScene : IDisposable
             selected,
             files,
             connections,
-            host,
-            Reporter,
-            cancellationToken ?? TestContext.Current.CancellationToken,
-            capture: capture
+            new RunContext(host, Reporter, cancellationToken ?? TestContext.Current.CancellationToken),
+            new DatabaseMode(OnlineMode.Off, Offline: false, capture)
         );
         return files;
     }
