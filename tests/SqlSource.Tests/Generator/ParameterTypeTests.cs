@@ -100,8 +100,8 @@ public sealed class ParameterTypeTests
             Setting.TypeOverrides,
             LevelSettings.IsFile(level)
                 ? /*lang=json,strict*/
-                """{"int8": "long"}"""
-                : "int8 = long"
+                """{"int8": "decimal"}"""
+                : "int8 = decimal"
         );
         var files = settings.Files(baseFile, "ListPosts");
         var file = files[0];
@@ -126,7 +126,7 @@ public sealed class ParameterTypeTests
         run.ShouldBeClean();
         var model = run.Sources[ParamsModel];
         model.ShouldContain("global::App.UserId Author");
-        model.ShouldContain("long Editor");
+        model.ShouldContain("decimal Editor");
     }
 
     [Fact]

@@ -19,8 +19,6 @@ public sealed class QuerySettingsTests
 
     private static readonly SettingsLevel Sort = TestModels.ParametersOn(GeneratorParameters.SortInput);
 
-    // The place of a settings file, which a file's level holds.
-
     [Fact]
     public void Resolve_NoLevelSaysAnything_GivesTheDefaults()
     {

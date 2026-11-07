@@ -299,9 +299,13 @@ public sealed class TypeOverrideLevelTests
     }
 
     // One array key in any spelling is one key: _int4, pg_catalog._int4, int4[], integer[], int[] and INTEGER[] are the
-    // same.  The query's entry replaces the project's file's, whichever spellings the two use, and the query's default
-    // gives the array back to the base map.
+    // same.  The project's file's entry, in any spelling, types a query that says nothing; the query's entry replaces
+    // it, whichever spellings the two use, and the query's default gives the array back to the base map.
     [Theory]
+    [InlineData("_int4", "", "global::System.Collections.Generic.List<int>")]
+    [InlineData("integer[]", "", "global::System.Collections.Generic.List<int>")]
+    [InlineData("int4[]", "", "global::System.Collections.Generic.List<int>")]
+    [InlineData("pg_catalog._int4", "", "global::System.Collections.Generic.List<int>")]
     [InlineData(
         "_int4",
         "-- type-override: int4[] = System.Collections.Generic.List<long>\n",

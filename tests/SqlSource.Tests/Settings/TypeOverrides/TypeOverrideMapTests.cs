@@ -11,8 +11,6 @@ namespace SqlSource.Tests.Settings.TypeOverrides;
 
 public sealed class TypeOverrideMapTests
 {
-    // A settings file in the folder of the files, and one in a folder above it, which ranks below the nearer.
-
     [Fact]
     public void Over_Higher_ReplacesOnlyTheKeysItNames()
     {

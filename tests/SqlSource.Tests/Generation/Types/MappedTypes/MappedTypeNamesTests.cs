@@ -16,8 +16,7 @@ namespace SqlSource.Tests.Generation.Types.MappedTypes;
 
 public sealed class MappedTypeNamesTests
 {
-    // The places of a farther and of a nearer settings file.
-
+    // A settings file nearer than TestPlaces.SettingsFile.
     private static readonly SettingPlace Nearer = SettingPlace.OfSettingsFile("/app/Repo/sqlsource.json", 2);
 
     [Fact]

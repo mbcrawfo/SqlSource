@@ -11,8 +11,6 @@ namespace SqlSource.Tests.Settings.ColumnTypes;
 
 public sealed class ColumnTypeMapTests
 {
-    // A settings file in the folder of the files, and one in a folder above it, which ranks below the nearer.
-
     [Fact]
     public void Find_TwoPartKey_MatchesAnySchema()
     {
