@@ -193,18 +193,31 @@ public sealed class PlacementDiagnosticsTests
         run.Sources.Values.ShouldContain(source => source.Contains(" const string Kept = \"SELECT 9;\";"));
     }
 
-    // A public extension method of a type that is not public would take and return its internal models (CS0051), so
-    // the method is refused at the marker that wrote its visibility.  Its file keeps its other members and the query's
-    // models.
-    [Fact]
-    public void Run_PublicExtensionMethodWithModelsOfAnInternalType_ReportsSqlsrc123AndKeepsTheFile()
+    // A public extension method of a type that is not public would take or return its internal models (CS0051), so
+    // the method is refused at the marker that wrote its visibility, whether it has an input model, an output model or
+    // both.  Its file keeps its other members and the query's models.
+    [Theory]
+    [InlineData("SELECT id FROM users WHERE id = @id;", true, true, GetUserDtoFile)]
+    [InlineData("DELETE FROM users WHERE id = @id;", true, false, "App.GetUserParams-Model.g.cs")]
+    [InlineData("SELECT id FROM users;", false, true, GetUserDtoFile)]
+    public void Run_PublicExtensionMethodWithAModelOfAnInternalType_ReportsSqlsrc123AndKeepsTheFile(
+        string sql,
+        bool parameters,
+        bool rows,
+        string modelsFile
+    )
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: GetUser\n-- visibility: public\nSELECT id FROM users WHERE id = @id;\n" + GetName
+            "-- name: GetUser\n-- visibility: public\n" + sql + "\n" + GetName
         );
 
-        var run = MethodRuns.Run(file, [UserEntry(file)], InternalSample, otherFiles: [Kept]);
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetUser", parameters ? [Parameter("id")] : [], rows ? [Column("id")] : null)],
+            InternalSample,
+            otherFiles: [Kept]
+        );
 
         run.Problems()
             .ShouldBe([
@@ -214,7 +227,7 @@ public sealed class PlacementDiagnosticsTests
                     + "Write -- visibility: or -- member-location: on the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
-        run.Sources.Keys.ShouldContain(GetUserDtoFile);
+        run.Sources.Keys.ShouldContain(modelsFile);
         var type = run.Sources[GeneratorHarness.SampleFile];
         type.ShouldContain(" const string GetName = ");
         type.ShouldContain(" const string Kept = \"SELECT 9;\";");
@@ -405,6 +418,39 @@ public sealed class PlacementDiagnosticsTests
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources["App.Outer.Sample.g.cs"].ShouldContain("            public static partial class Sql\n");
         run.Sources["App.Outer.Sample.g.cs"].ShouldContain("                public const string GetName = ");
+    }
+
+    // The marker that makes a nested class public is on the query that wrote it, so the refusal of another query's
+    // method names that marker.
+    [Fact]
+    public void Run_NestedClassMadePublicByAMarkerOfATypeReachableAsProtected_ReportsSqlsrc123AtTheMarker()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- member-location: nested-class\nSELECT id FROM users WHERE id = @id;\n"
+        );
+        var constants = new SqlFile(
+            "/app/Repo/A.sql",
+            "-- visibility: public\n-- output: sql\n\n-- name: GetName\nSELECT 1;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [UserEntry(file)],
+            GeneratorHarness.NestedSampleSource("public", "", "protected"),
+            otherFiles: [constants]
+        );
+
+        run.Problems()
+            .ShouldBe([
+                Sqlsrc123AsProtected(
+                    "(2,1)-(2,33)",
+                    "",
+                    "public",
+                    "the file header for the query 'GetName'",
+                    "nested-class"
+                ),
+            ]);
     }
 
     // The same method with no parameters and no rows takes no models, so it is public in the public class Sql.
