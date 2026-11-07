@@ -304,7 +304,7 @@ Each file of the folder has its tests in `tests/SqlSource.Tool.Tests/Bundles/Ren
 | Member | SQL Server's answer |
 |----|----|
 | `Dialect` | `SqlDialect.SqlServer` |
-| `IsWordStart`, `IsWordPart` | Both `QuoteReader.IsNameCharacterOfSqlServer`, the describer's rule: a letter or a digit of any script, `_`, `@`, `#` or `$` |
+| `IsWordStart`, `IsWordPart` | Both `QuoteReader.IsNameCharacterOfSqlServer`, the describer's rule: a letter or a digit of any script, a combining mark, a letter number, a format character, a connector, `_`, `@`, `#` or `$` |
 | `Fold` | `SqlServerVocabulary.Fold`, each character upper-cased by the invariant culture, so that a fold never changes a spelling's length, quoted or not ([the fold](#sql-servers-fold)) |
 | `IsEngineWord` | A word of the vocabulary; ASCII digits alone, the alias of the tool's `SELECT @p AS [1]` of `declared` and of each `AS [n]` of `operands`; or the assembly-qualified name of a system CLR type, `geometry`, `geography` or `hierarchyid`, of any version, compared folded.  Quoting does not change the answer: `[1]` is the tool's, and `[1a]` and `[2 x]` are the user's |
 | `RuleOf` | `SqlServerFields.RuleOf` ([the fields](#sql-servers-fields)) |

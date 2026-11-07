@@ -1927,7 +1927,7 @@ See: [Parameters](postgresql.md#parameters)
 
 A `-- param:` marker gives a parameter a type, and the tool asks the server to resolve that type and to check it against every use of the parameter.  This type cannot be used, for the reason the message ends with:
 
-- `it is not written as a type name`: the text is not a type name as a column definition writes one, with at most one modifier in parentheses and `[]`.  On PostgreSQL the modifier holds numbers and plain words separated by commas, as in PostGIS's `geometry(Point,4326)`, and the server checks the words: one it does not know, such as `geometry(Nonsense,4326)`, gets this reason too, with a `server:` line.  The server can give the same reason for a type it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale; the `server:` line then says what the server made of the type.
+- `it is not written as a type name`: the text is not a type name as a column definition writes one, with at most one modifier in parentheses and `[]`.  When nothing of the query has been sent, the reason goes on with what was found where the text stops being a type name: a `;`, a comment, a line break, a name of more than two parts, a quote or a parenthesis left open, a modifier that holds more than numbers and plain words, or anything else as the shape of a type name.  On PostgreSQL the modifier holds numbers and plain words separated by commas, as in PostGIS's `geometry(Point,4326)`, and the server checks the words: one it does not know, such as `geometry(Nonsense,4326)`, gets this reason too, with a `server:` line and nothing after the reason.  The server can give the same reason for a type it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale; the `server:` line then says what the server made of the type.
 - `the database has no such type`: the server knows no type of that name on the session's search path.
 - `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two, or it is an array of such a type, `cstring[]`.
 
@@ -1943,7 +1943,7 @@ Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `t
 
 For SQL Server the error is at the step `resolve type`, and its reasons are these:
 
-- `it is not written as a type name`, followed by what was found: the text is not a type name as T-SQL writes one, a name of one or two parts, each plain, `[bracketed]` or `"quoted"`, then `(max)` or one or two numbers in parentheses.  A `;`, a comment, a second `(` and a line break are refused.  Nothing of the query is sent.
+- `it is not written as a type name`, followed by what was found: the text is not a type name as T-SQL writes one, a name of one or two parts, each plain, `[bracketed]` or `"quoted"`, with any spaces around the dot, then `(max)`, one or two numbers, or an XML schema collection in parentheses, as in `xml(CONTENT dbo.Schemas)`.  A `;`, a comment, a second `(` and a line break are refused.  Nothing of the query is sent.
 - `the database has no such type`: the database has no type of that name, `Msg 2715`.
 - `it is not a type`: SQL Server did not accept the text as a type, such as `nvarchar(9000)`, longer than the most it allows, `Msg 131`.
 
@@ -1957,7 +1957,7 @@ For SQL Server the error is at the step `resolve type`, and its reasons are thes
     help: write a type the database has, with its schema when it is not a built-in type: dbo.Email
 ```
 
-Write the type as a column definition would: `int`, `nvarchar(50)`, `varchar(max)`, `decimal(18,2)`, `dbo.Email`, `[billing].[Amount]`.  An alias type needs its schema unless it is in `dbo` or in the default schema of the login.
+Write the type as a column definition would: `int`, `nvarchar(50)`, `varchar(max)`, `decimal(18,2)`, `dbo.Email`, `[billing].[Amount]`, `xml(dbo.Schemas)`.  An alias type needs its schema unless it is in `dbo` or in the default schema of the login.
 
 See: [Parameters](postgresql.md#parameters), [SQL Server parameters](sqlserver.md#parameters)
 
