@@ -205,7 +205,7 @@ public sealed class RunLogDestinationTests : IDisposable
     )
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
-        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
         _scene.Run.CreateFile = static _ => new FullStream();
         var log = _scene.Run.Folder.PathOf($"a{character}b.log");
 

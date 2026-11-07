@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Watching;
 
@@ -21,7 +22,7 @@ public sealed class PollingFolderWatcherTests
         var path = scene.Folder.WriteFile("Users.sql", "SELECT 1");
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, path, IsFolder: false)]);
+        scene.Seen.ShouldBe([Created(path)]);
     }
 
     [Fact]
@@ -35,7 +36,7 @@ public sealed class PollingFolderWatcherTests
         File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path).AddMinutes(1));
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Changed, path, IsFolder: false)]);
+        scene.Seen.ShouldBe([Changed(path)]);
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public sealed class PollingFolderWatcherTests
         File.Delete(path);
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Deleted, path, IsFolder: false)]);
+        scene.Seen.ShouldBe([Deleted(path)]);
     }
 
     [Fact]
@@ -60,7 +61,7 @@ public sealed class PollingFolderWatcherTests
         var path = scene.Folder.CreateFolder("queries");
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, path, IsFolder: true)]);
+        scene.Seen.ShouldBe([CreatedFolder(path)]);
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public sealed class PollingFolderWatcherTests
         File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path).AddMinutes(1));
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Changed, path, IsFolder: false)]);
+        scene.Seen.ShouldBe([Changed(path)]);
     }
 
     [Theory]
@@ -125,7 +126,7 @@ public sealed class PollingFolderWatcherTests
         var path = scene.Folder.WriteFile(relativePath, "{}");
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, path, IsFolder: false)]);
+        scene.Seen.ShouldBe([Created(path)]);
     }
 
     // The assets file below a bin or .git folder of obj is passed over, as WatchSet ignores it.
@@ -156,7 +157,7 @@ public sealed class PollingFolderWatcherTests
         var path = scene.Folder.WriteFile("Orders.sql", "SELECT 2");
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, path, IsFolder: false)]);
+        scene.Seen.ShouldBe([Created(path)]);
     }
 
     // A watch of the folder alone sees a folder made in it, and nothing of what it holds.
@@ -170,7 +171,7 @@ public sealed class PollingFolderWatcherTests
         _ = scene.Folder.WriteFile("queries/Users.sql", "SELECT 1");
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, queries, IsFolder: true)]);
+        scene.Seen.ShouldBe([CreatedFolder(queries)]);
     }
 
     [Fact]
@@ -184,7 +185,7 @@ public sealed class PollingFolderWatcherTests
         Directory.Delete(queries, recursive: true);
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Deleted, queries, IsFolder: false)]);
+        scene.Seen.ShouldBe([Deleted(queries)]);
     }
 
     // A folder of any name: artifacts, watched alone above an assets folder artifacts/obj/App, sees obj deleted.
@@ -200,7 +201,7 @@ public sealed class PollingFolderWatcherTests
         var folder = scene.Folder.CreateFolder(name);
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, folder, IsFolder: true)]);
+        scene.Seen.ShouldBe([CreatedFolder(folder)]);
     }
 
     // A link to a folder is listed by its name, and what it leads to is not.
@@ -217,7 +218,7 @@ public sealed class PollingFolderWatcherTests
         _ = Directory.CreateSymbolicLink(link, other.Path);
         watch.Poll();
 
-        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, link, IsFolder: true)]);
+        scene.Seen.ShouldBe([CreatedFolder(link)]);
     }
 
     // A folder that is gone raises one failure however often it is listed, and its changes, against the last listing
@@ -244,10 +245,7 @@ public sealed class PollingFolderWatcherTests
         var users = scene.Folder.WriteFile("Users.sql", "SELECT 1");
         watch.Poll();
 
-        scene.Seen.ShouldBe([
-            new FileChange(FileChangeKind.Created, users, IsFolder: false),
-            new FileChange(FileChangeKind.Deleted, queries, IsFolder: false),
-        ]);
+        scene.Seen.ShouldBe([Created(users), Deleted(queries)]);
         scene.Failures.Count.ShouldBe(1);
 
         File.Delete(users);

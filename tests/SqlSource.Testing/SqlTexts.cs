@@ -17,6 +17,9 @@ internal static class SqlTexts
     // Users, and a query that needs no entry.
     public const string UsersAndPlain = Users + "\n-- name: Plain\n-- output: sql\nSELECT 3;\n";
 
+    // One query of the database "billing", the one that Users holds.
+    public const string GetInvoice = "-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
+
     // One query of the database "billing" alone.
     public const string ListInvoices = "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n";
 

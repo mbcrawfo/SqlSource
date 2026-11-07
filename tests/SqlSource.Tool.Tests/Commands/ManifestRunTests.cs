@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -13,27 +14,22 @@ namespace SqlSource.Tool.Tests.Commands;
 // calls the tool has already evaluated the project and wrote the manifest.
 public sealed class ManifestRunTests : IDisposable
 {
-    private const string Invoices = "-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
-
     private readonly DescribeScene _scene = new();
     private readonly string _invoices;
 
     public ManifestRunTests()
     {
         _scene.Run.Environment.Clear();
-        _invoices = _scene.Project.AddSql("Invoices.sql", Invoices);
+        _invoices = _scene.Project.AddSql("Invoices.sql", SqlTexts.GetInvoice);
     }
 
     public void Dispose() => _scene.Dispose();
-
-    // In a folder of its own, so that the manifest's folder is not the project's.
-    private string WriteManifest(string text) => _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", text);
 
     [Fact]
     public async Task Run_Manifest_DescribesItsProjectStartsNoProcessAndWritesTheSidecar()
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
-        var manifest = WriteManifest(_scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
 
         var result = await _scene.DescribeAsync("--manifest", manifest);
 
@@ -48,7 +44,7 @@ public sealed class ManifestRunTests : IDisposable
     public async Task Run_ManifestGivenRelativeToTheWorkingDirectory_IsRead()
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
-        _ = WriteManifest(_scene.Project.ManifestText());
+        _ = _scene.WriteManifest();
 
         var result = await _scene.DescribeAsync("--manifest", "obj/App.csproj.manifest");
 
@@ -60,9 +56,9 @@ public sealed class ManifestRunTests : IDisposable
     [Fact]
     public async Task Run_ManifestAndAConnectionOnlyInTheDotEnvFileOfTheProject_UsesIt()
     {
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=from-the-file\n");
+        _ = _scene.WriteDotEnv(DescribeScene.BillingFromTheFile);
         _ = _scene.Run.Folder.WriteFile("obj/.env", "SQLSOURCE_CONNECTION_BILLING=Host=from-the-manifest-folder\n");
-        var manifest = WriteManifest(_scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
 
         var result = await _scene.DescribeAsync("--manifest", manifest);
 
@@ -89,7 +85,7 @@ public sealed class ManifestRunTests : IDisposable
     [Fact]
     public async Task Run_ManifestOfAnotherFormat_IsSqlsrc206AtItsPath()
     {
-        var manifest = WriteManifest("SqlSourceManifest=1\nProject=/x/App.csproj\n");
+        var manifest = _scene.WriteManifest("SqlSourceManifest=1\nProject=/x/App.csproj\n");
 
         var result = await _scene.DescribeAsync("--manifest", manifest);
 
@@ -116,7 +112,7 @@ public sealed class ManifestRunTests : IDisposable
     [Fact]
     public async Task Run_ManifestThatCannotBeOpened_IsSqlsrc206AtItsPath()
     {
-        var manifest = WriteManifest(_scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
         _scene.Run.ReadTextFile = _ => throw new IOException("the disk is gone");
 
         var result = await _scene.DescribeAsync("--manifest", manifest);
@@ -184,7 +180,7 @@ public sealed class ManifestRunTests : IDisposable
         string path
     )
     {
-        var manifest = WriteManifest(_scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
         string[] args = option == "--manifest" ? ["--manifest", path] : ["--manifest", manifest, option, path];
 
         var result = await _scene.DescribeAsync(args);
@@ -209,7 +205,7 @@ public sealed class ManifestRunTests : IDisposable
         string character
     )
     {
-        var manifest = WriteManifest(_scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
         var path = _scene.Run.Folder.PathOf($"no-such-folder/a{character}b.{option[2..]}");
         string[] args =
             option == "--manifest"

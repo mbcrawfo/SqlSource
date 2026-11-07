@@ -354,13 +354,15 @@ public sealed class ConnectionTests
     }
 
     // A name near a database of the plan is kept, ignoring case as the databases are: BILING is near the selected
-    // billing.  UnusedNames_NameThatIsNoSelectedDatabase_IsNoErrorAndIsKept keeps one near an unselected database.
-    [Fact]
-    public void UnusedNames_NameCloseToAnUnselectedDatabaseOfThePlanIgnoringCase_IsKept()
+    // billing, and REPORT near the unselected reports.
+    [Theory]
+    [InlineData("BILING=A", "BILING")]
+    [InlineData("REPORT=A", "REPORT")]
+    public void UnusedNames_NameCloseToADatabaseOfThePlanIgnoringCase_IsKept(string given, string kept)
     {
-        var connections = Resolve(["billing", "reports"], ["billing"], ["billing"], ["BILING=A"]);
+        var connections = Resolve(["billing", "reports"], ["billing"], ["billing"], [given]);
 
-        connections.UnusedNames.ShouldBe(["BILING"]);
+        connections.UnusedNames.ShouldBe([kept]);
         connections.UnusedPositions.ShouldBeEmpty();
     }
 

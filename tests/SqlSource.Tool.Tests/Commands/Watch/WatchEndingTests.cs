@@ -8,6 +8,7 @@ using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Commands.Watch;
 
@@ -26,8 +27,6 @@ public sealed class WatchEndingTests : IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => _watch.DisposeAsync();
-
-    private static FileChange Changed(string path) => WatchTests.Changed(path);
 
     [Fact]
     public async Task Watch_PassWithAnError_KeepsWatching()
@@ -50,13 +49,13 @@ public sealed class WatchEndingTests : IAsyncDisposable
     public async Task Watch_DotEnvDeleted_NextPassReportsNoConnectionAndKeepsWatching()
     {
         _ = _watch.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
-        var dotEnv = _watch.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_POSTGRES=Host=db\n");
+        var dotEnv = _watch.Scene.WriteDotEnv("SQLSOURCE_CONNECTION_POSTGRES=Host=db\n");
         await _watch.StartAsync();
         _watch.Errors.ShouldBeEmpty();
         File.Delete(dotEnv);
         await File.WriteAllTextAsync(_users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
 
-        await _watch.ChangeAsync(new FileChange(FileChangeKind.Deleted, dotEnv, IsFolder: false));
+        await _watch.ChangeAsync(Deleted(dotEnv));
 
         // Against the one query to describe, the second.
         _watch.Errors.ShouldContain($"{_users}(4,10): error SQLSRC213: ");
@@ -79,12 +78,12 @@ public sealed class WatchEndingTests : IAsyncDisposable
         await _watch.StartAsync();
         _watch.Errors.Split(notRestored).Length.ShouldBe(2);
 
-        await _watch.ChangeAsync(Changed(_watch.Run.Folder.PathOf(".env")));
+        await _watch.ChangeAsync(Changed(_watch.Scene.DotEnvPath));
         _watch.Errors.Split(notRestored).Length.ShouldBe(3);
 
         project.Imported = "true";
         _ = _watch.Run.Folder.WriteFile("obj/project.assets.json", "{}");
-        await _watch.ChangeAsync(WatchTests.Created(assets));
+        await _watch.ChangeAsync(Created(assets));
 
         _watch.Errors.Split(notRestored).Length.ShouldBe(3);
         _watch.Output.ShouldEndWith($"{OneDescribed}{WatchSession.WatchingMarker}\n");

@@ -9,6 +9,7 @@ using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Commands.Watch;
 
@@ -35,12 +36,6 @@ public sealed class WatchFolderTests : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _watch.DisposeAsync();
 
-    private string LogPath => _watch.Run.Folder.PathOf("run.log");
-
-    private static FileChange Deleted(string path) => new(FileChangeKind.Deleted, path, IsFolder: false);
-
-    private static FileChange CreatedFolder(string path) => new(FileChangeKind.Created, path, IsFolder: true);
-
     private void WriteSettings() => _ = _watch.Run.Folder.WriteFile("libs/Shared/sqlsource.json", "{}");
 
     private IEnumerable<string> OpenFolders() => _watch.Watcher.Open.Select(request => request.Folder);
@@ -65,9 +60,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
         var away = path + "-old";
 
         Directory.Move(path, away);
-        await _watch.ChangeAsync(
-            renamed ? new FileChange(FileChangeKind.Renamed, away, IsFolder: true, path) : Deleted(path)
-        );
+        await _watch.ChangeAsync(renamed ? Renamed(path, away, isFolder: true) : Deleted(path));
 
         OpenFolders().ShouldNotContain(_shared);
         if (removed == "libs")
@@ -76,14 +69,12 @@ public sealed class WatchFolderTests : IAsyncDisposable
         }
 
         Directory.Move(away, path);
-        await _watch.ChangeAsync(
-            renamed ? new FileChange(FileChangeKind.Renamed, path, IsFolder: true, away) : CreatedFolder(path)
-        );
+        await _watch.ChangeAsync(renamed ? Renamed(away, path, isFolder: true) : CreatedFolder(path));
 
         OpenFolders().ShouldContain(_shared);
         RequestsOf(_shared).ShouldBe(2);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
     // Outside a repository the folder above each watched folder is watched too, so that a folder deleted and made
@@ -134,16 +125,14 @@ public sealed class WatchFolderTests : IAsyncDisposable
         WriteSettings();
         await StartAsync();
         var path = _watch.Run.Folder.PathOf(removed);
-        var change = renamed
-            ? new FileChange(FileChangeKind.Renamed, path + "-gone", IsFolder: true, path)
-            : Deleted(path);
+        var change = renamed ? Renamed(path, path + "-gone", isFolder: true) : Deleted(path);
 
-        await _watch.ChangeAsync(change, WatchTests.Changed(_settings));
+        await _watch.ChangeAsync(change, Changed(_settings));
 
         RequestsOf(_shared).ShouldBe(1);
         RequestsOf(_libs).ShouldBe(1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, false)]);
     }
 
     // A folder of the set made while its watch is open, as a poller reports a path that became a folder, or FSEvents
@@ -156,11 +145,11 @@ public sealed class WatchFolderTests : IAsyncDisposable
         WriteSettings();
         await StartAsync();
 
-        await _watch.ChangeAsync(CreatedFolder(_watch.Run.Folder.PathOf(created)), WatchTests.Changed(_settings));
+        await _watch.ChangeAsync(CreatedFolder(_watch.Run.Folder.PathOf(created)), Changed(_settings));
 
         RequestsOf(_shared).ShouldBe(1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, false)]);
     }
 
     // Deleted and made again before an evaluation, as a script that writes the folder anew does: the watch of the old
@@ -196,7 +185,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
         OpenFolders().ShouldContain(_libs);
         OpenFolders().ShouldContain(_shared);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true)]);
     }
 
     // A folder whose watch could not start is tried again by the next evaluation, which its failure starts.
@@ -248,13 +237,13 @@ public sealed class WatchFolderTests : IAsyncDisposable
         attempts.ShouldBe(2);
         _watch.Clock.PendingTimers.ShouldBe(0);
 
-        await _watch.ChangeAsync(WatchTests.Changed(_watch.Project.ProjectPath));
+        await _watch.ChangeAsync(Changed(_watch.Project.ProjectPath));
 
         attempts.ShouldBe(3);
         _watch.Clock.PendingTimers.ShouldBe(0);
         _watch.Errors.Split('\n').Count(line => line.Contains("error SQLSRC287", StringComparison.Ordinal)).ShouldBe(1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
     // A polling watch of a folder that stays gone: one more pass, and none however long it stays gone, so that the next
@@ -287,13 +276,13 @@ public sealed class WatchFolderTests : IAsyncDisposable
         }
 
         await File.WriteAllTextAsync(users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
-        watch.Raise(WatchTests.Changed(users));
+        watch.Raise(Changed(users));
         await PassAsync(watch, pollers, 3);
 
         watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(2);
         watch.Errors.ShouldNotContain("SQLSRC287");
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(watch.Run.Folder.PathOf("run.log")).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
+        watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
     }
 
     // A polled folder that is gone with no watch of the folder above it, whose own watch could not start here, is
@@ -362,7 +351,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
 
         _watch.Errors.ShouldNotContain("SQLSRC287");
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(LogPath)[..2].ShouldBe([(1, 0, true), (2, 1, true)]);
+        _watch.PassStarts()[..2].ShouldBe([(1, 0, true), (2, 1, true)]);
     }
 
     // Under polling, a folder deleted below a folder watched alone is seen by that folder's watch, and its own failed
@@ -383,7 +372,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
         _watch.Errors.ShouldNotContain("SQLSRC287");
         _watch.Clock.PendingTimers.ShouldBe(pollers - 1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(LogPath)[1].Evaluated.ShouldBeTrue();
+        _watch.PassStarts()[1].Evaluated.ShouldBeTrue();
     }
 
     // Under polling, a folder deleted and made again before the loop reports, as a git stash and its pop do: it was

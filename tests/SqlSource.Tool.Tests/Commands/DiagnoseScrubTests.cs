@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Bundles;
@@ -52,7 +55,9 @@ public sealed class DiagnoseScrubTests : IDisposable
     }
 
     // The same kind of bundle as diagnose writes directly: the same bundle.json, so renamed and with the same outcome,
-    // an expected.json in both or in neither, and the same explain settings.
+    // an expected.json in both or in neither, the same explain settings, the same entries in the zip, and the same
+    // text of query.sql and of capture.json, compared after each renaming is undone with its own mapping, since
+    // each run renames with a key of its own.
     [Fact]
     public async Task Diagnose_ScrubOfTheRawBundle_GivesWhatDiagnoseGives()
     {
@@ -66,6 +71,46 @@ public sealed class DiagnoseScrubTests : IDisposable
         scrubbed.Info.ShouldBe(direct.Info);
         (scrubbed.Expected is null).ShouldBe(direct.Expected is null);
         scrubbed.ExplainSettings.ShouldBe(direct.ExplainSettings);
+        using var directZip = await ZipFile.OpenReadAsync(
+            _scene.PathOf("direct.zip"),
+            TestContext.Current.CancellationToken
+        );
+        using var scrubbedZip = await ZipFile.OpenReadAsync(
+            _scene.PathOf("scrubbed.zip"),
+            TestContext.Current.CancellationToken
+        );
+        scrubbedZip.Entries.Select(e => e.FullName).Order().ShouldBe(directZip.Entries.Select(e => e.FullName).Order());
+        foreach (var name in new[] { "query.sql", "capture.json" })
+        {
+            (await RestoredTextAsync(_scene.PathOf("scrubbed.zip"), scrubbedZip, name)).ShouldBe(
+                await RestoredTextAsync(_scene.PathOf("direct.zip"), directZip, name)
+            );
+        }
+    }
+
+    // The text of an entry with each replacement of the bundle's mapping put back to its original, longest first.
+    private static async Task<string> RestoredTextAsync(string zipPath, ZipArchive zip, string name)
+    {
+        await using var stream = await zip.GetEntry(name)!.OpenAsync(TestContext.Current.CancellationToken);
+        using var reader = new StreamReader(stream);
+        var text = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+        using var mapping = JsonDocument.Parse(
+            await File.ReadAllTextAsync(zipPath + BundleFiles.MappingSuffix, TestContext.Current.CancellationToken)
+        );
+        foreach (
+            var entry in mapping
+                .RootElement.GetProperty("names")
+                .EnumerateArray()
+                .OrderByDescending(e => e.GetProperty("replacement").GetString()!.Length)
+        )
+        {
+            text = text.Replace(
+                entry.GetProperty("replacement").GetString()!,
+                entry.GetProperty("original").GetString()!,
+                StringComparison.Ordinal
+            );
+        }
+        return text;
     }
 
     [Fact]

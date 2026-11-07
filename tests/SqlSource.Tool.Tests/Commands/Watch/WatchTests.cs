@@ -9,6 +9,7 @@ using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Commands.Watch;
 
@@ -29,24 +30,6 @@ public sealed class WatchTests : IAsyncDisposable
     public ValueTask DisposeAsync() => _watch.DisposeAsync();
 
     private string LogPath => _watch.Run.Folder.PathOf("run.log");
-
-    internal static FileChange Changed(string path) => new(FileChangeKind.Changed, path, IsFolder: false);
-
-    internal static FileChange Created(string path) => new(FileChangeKind.Created, path, IsFolder: false);
-
-    // The members of each pass.start of the log, in order.
-    internal static (int Pass, int Changes, bool Evaluated)[] PassStarts(string log) =>
-        [
-            .. LogReader
-                .Events(log, "pass.start")
-                .Select(line =>
-                    (
-                        line.GetProperty("pass").GetInt32(),
-                        line.GetProperty("changes").GetInt32(),
-                        line.GetProperty("evaluated").GetBoolean()
-                    )
-                ),
-        ];
 
     [Fact]
     public async Task Watch_Start_DescribesThenWritesTheWatchingMarker()
@@ -100,14 +83,14 @@ public sealed class WatchTests : IAsyncDisposable
             Changed(temporary),
             Created(sidecar),
             Changed(sidecar),
-            new FileChange(FileChangeKind.Renamed, sidecar, IsFolder: false, temporary),
-            new FileChange(FileChangeKind.Deleted, temporary, IsFolder: false),
+            Renamed(temporary, sidecar),
+            Deleted(temporary),
             Changed(_users)
         );
 
         _watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, false)]);
     }
 
     // A build beside the watch writes hundreds of files under bin and obj.
@@ -129,7 +112,7 @@ public sealed class WatchTests : IAsyncDisposable
 
         _watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, false)]);
     }
 
     // A pass starts when the clock is past the last change by the debounce, and not before.
@@ -150,7 +133,7 @@ public sealed class WatchTests : IAsyncDisposable
         await _watch.PassesAsync(2);
         _watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 2, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 2, false)]);
     }
 
     // Saves during a long pass make one more pass after it, not one each.
@@ -179,7 +162,7 @@ public sealed class WatchTests : IAsyncDisposable
         _watch.Clock.PendingTimers.ShouldBe(0);
         _watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(2);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, true), (3, 5, false)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, true), (3, 5, false)]);
     }
 
     [Fact]
@@ -228,7 +211,8 @@ public sealed class WatchTests : IAsyncDisposable
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
-    // One log for the session: run.start, then each pass between its two events, then run.end.
+    // One log for the session: run.start, then each pass between its two events, then run.end.  An event outside a
+    // pass, other than the two of the run, fails it.
     [Fact]
     public async Task Watch_Log_IsOneFileForTheSession()
     {
@@ -239,15 +223,32 @@ public sealed class WatchTests : IAsyncDisposable
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
 
         var names = LogReader.Names(LogPath);
-        names
-            .Where(name => name is "run.start" or "pass.start" or "pass.end" or "run.end")
-            .ShouldBe(["run.start", "pass.start", "pass.end", "pass.start", "pass.end", "run.end"]);
         names[0].ShouldBe("run.start");
         names[^1].ShouldBe("run.end");
-        // The first event after run.start opens a pass, and the last before run.end closes one.
-        names[1].ShouldBe("pass.start");
-        names[^2].ShouldBe("pass.end");
-        PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, false)]);
+        var depth = 0;
+        for (var index = 0; index < names.Length; index++)
+        {
+            var name = names[index];
+            switch (name)
+            {
+                case "pass.start":
+                    depth++;
+                    break;
+                case "pass.end":
+                    depth--;
+                    break;
+                case "run.start" or "run.end":
+                    depth.ShouldBe(0, $"{name} at {index} is inside a pass");
+                    (index == 0 || index == names.Length - 1).ShouldBeTrue($"{name} at {index} is not at an end");
+                    break;
+                default:
+                    depth.ShouldBe(1, $"{name} at {index} is outside a pass");
+                    break;
+            }
+            depth.ShouldBeInRange(0, 1, $"{name} at {index} nests or closes a pass that is not open");
+        }
+        depth.ShouldBe(0);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 1, false)]);
         var ends = LogReader.Events(LogPath, "pass.end");
         ends.Select(line => (line.GetProperty("pass").GetInt32(), line.GetProperty("errors").GetInt32()))
             .ShouldBe([(1, 0), (2, 0)]);

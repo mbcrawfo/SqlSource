@@ -3,6 +3,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
@@ -16,19 +17,7 @@ public sealed class EntryBuilderTests : IDisposable
 {
     private static readonly ServerInfo Server = new("16.4", "Npgsql", "8.0.0", EquatableArray<ServerSetting>.Empty);
 
-    private static readonly PostgresType Integer = new(
-        "integer",
-        "base",
-        "pg_catalog",
-        "int4",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-    );
+    private static readonly PostgresType Integer = TestSidecars.Postgres();
 
     private readonly TempFolder _folder = new();
 

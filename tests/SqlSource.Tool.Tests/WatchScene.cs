@@ -50,6 +50,20 @@ internal sealed class WatchScene : IAsyncDisposable
     // How many times the run ran a manifest target, which a pass does only when it evaluates the projects.
     public int ManifestRuns => Run.Processes.Requests.Count(FakeProcessRunner.IsManifestRun);
 
+    // The members of each pass.start of the session's log, in order.
+    public (int Pass, int Changes, bool Evaluated)[] PassStarts(string log = "run.log") =>
+        [
+            .. LogReader
+                .Events(Run.Folder.PathOf(log), "pass.start")
+                .Select(line =>
+                    (
+                        line.GetProperty("pass").GetInt32(),
+                        line.GetProperty("changes").GetInt32(),
+                        line.GetProperty("evaluated").GetBoolean()
+                    )
+                ),
+        ];
+
     // Starts "describe --watch" with the arguments, and returns without waiting for anything.
     public RunningCli Begin(params string[] args)
     {
