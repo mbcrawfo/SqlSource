@@ -241,7 +241,7 @@ public sealed class RunLogFileTests : IDisposable
         opened.Succeeded.ShouldBeFalse();
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.ShouldBeSameAs(ToolDiagnostics.FileCannotBeChanged);
-        failure.Path.ShouldBe(Path.Combine(_folder.Path, expectedUnderFolder));
+        failure.Path.ShouldBe(Path.GetFullPath(Path.Combine(_folder.Path, expectedUnderFolder)));
         // The error quotes its path first.
         failure.Arguments[0].ShouldBe($"'{failure.Path}'");
         failure.Arguments[1].ShouldBe("written");
