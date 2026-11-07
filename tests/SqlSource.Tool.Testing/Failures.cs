@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Testing;
@@ -20,9 +21,5 @@ internal static class Failures
 
     // The message of the failure: the descriptor's format with the arguments.
     public static string MessageOf(DescribeFailure failure) =>
-        string.Format(
-            CultureInfo.InvariantCulture,
-            failure.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-            [.. failure.Arguments]
-        );
+        DiagnosticMessages.Format(failure.Descriptor, [.. failure.Arguments]);
 }
