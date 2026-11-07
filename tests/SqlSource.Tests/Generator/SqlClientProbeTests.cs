@@ -22,15 +22,6 @@ namespace SqlSource.Tests.Generator;
 // Findings read a probe alone.  The tests ask for the ids of the driver alone.
 public sealed class SqlClientProbeTests
 {
-    private const string Source = """
-        using SqlSource;
-
-        namespace App;
-
-        [SqlSourceGenerate(Source = ".")]
-        public partial class Sample;
-        """;
-
     private static readonly SqlFile Orders = new("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
 
     private static readonly SqlFile[] UsersWithSidecar =
@@ -96,8 +87,18 @@ public sealed class SqlClientProbeTests
             "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs "
             + "Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.";
 
-        var oneFile = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], UsersWithSidecar);
-        var twoFiles = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], BothWithSidecars);
+        var oneFile = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            UsersWithSidecar,
+            references: [SqlClientReferences.SqlClient60],
+            dialect: "mssql"
+        );
+        var twoFiles = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            BothWithSidecars,
+            references: [SqlClientReferences.SqlClient60],
+            dialect: "mssql"
+        );
 
         DriverDiagnostics(oneFile).ShouldBe([Expected]);
         oneFile.SeverityOf("SQLSRC267").ShouldBe(DiagnosticSeverity.Error);
@@ -121,8 +122,18 @@ public sealed class SqlClientProbeTests
         );
         SqlFile[] files = [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry)];
 
-        var older = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], files);
-        var current = Run(OutputKind.Models, [SqlClientReferences.SqlClient61], files);
+        var older = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            files,
+            references: [SqlClientReferences.SqlClient60],
+            dialect: "mssql"
+        );
+        var current = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            files,
+            references: [SqlClientReferences.SqlClient61],
+            dialect: "mssql"
+        );
 
         older
             .Diagnostics.Where(diagnostic => diagnostic.StartsWith("SQLSRC270 ", StringComparison.Ordinal))
@@ -138,7 +149,12 @@ public sealed class SqlClientProbeTests
     {
         var driver = SqlClientReferences.Synthetic("8.0.0.0", true, true, true, "8.0.1");
 
-        var run = Run(OutputKind.Models, [driver], BothWithSidecars);
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            BothWithSidecars,
+            references: [driver],
+            dialect: "mssql"
+        );
 
         DriverDiagnostics(run)
             .ShouldBe([
@@ -159,9 +175,24 @@ public sealed class SqlClientProbeTests
         var older = SqlClientReferences.SqlClient60;
         var newer = SqlClientReferences.Synthetic("8.0.0.0", true, true, true, "8.0.1");
 
-        var sql = Run(OutputKind.Sql, [older], GeneratorHarness.UsersFile, Orders);
-        var postgres = Run(OutputKind.Models, [older], "postgres", PostgresUsers);
-        var postgresNewer = Run(OutputKind.Models, [newer], "postgres", PostgresUsers);
+        var sql = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [GeneratorHarness.UsersFile, Orders],
+            references: [older],
+            dialect: "mssql"
+        );
+        var postgres = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            PostgresUsers,
+            references: [older],
+            dialect: "postgres"
+        );
+        var postgresNewer = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            PostgresUsers,
+            references: [newer],
+            dialect: "postgres"
+        );
 
         DriverDiagnostics(sql).ShouldBeEmpty();
         DriverDiagnostics(postgres).ShouldBeEmpty();
@@ -186,9 +217,24 @@ public sealed class SqlClientProbeTests
         var sqlServer = Orders with { Text = "-- dialect: mssql\n" + Orders.Text };
         SqlFile[] sqlServerFiles = [sqlServer, CurrentSidecar(sqlServer, "GetOrder")];
 
-        var both = Run(OutputKind.Models, drivers, "postgres", [.. PostgresUsers, .. sqlServerFiles]);
-        var postgresOnly = Run(OutputKind.Models, drivers, "postgres", PostgresUsers);
-        var sqlServerOnly = Run(OutputKind.Models, drivers, "postgres", sqlServerFiles);
+        var both = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            [.. PostgresUsers, .. sqlServerFiles],
+            references: drivers,
+            dialect: "postgres"
+        );
+        var postgresOnly = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            PostgresUsers,
+            references: drivers,
+            dialect: "postgres"
+        );
+        var sqlServerOnly = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            sqlServerFiles,
+            references: drivers,
+            dialect: "postgres"
+        );
 
         DriverDiagnostics(both).ShouldBe([Npgsql, SqlClient], ignoreOrder: true);
         DriverDiagnostics(postgresOnly).ShouldBe([Npgsql]);
@@ -212,7 +258,12 @@ public sealed class SqlClientProbeTests
     {
         var driver = SqlClientReferences.Synthetic(identity, true, true, false, informational);
 
-        var run = Run(OutputKind.Models, [driver], UsersWithSidecar);
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            UsersWithSidecar,
+            references: [driver],
+            dialect: "mssql"
+        );
 
         StepOutputs.Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe).Version.ShouldBe(expected);
     }
@@ -224,7 +275,12 @@ public sealed class SqlClientProbeTests
     {
         var driver = SqlClientReferences.Synthetic("6.0.0.0", true, true, false, arrayInformationalVersion: true);
 
-        var run = Run(OutputKind.Models, [driver], UsersWithSidecar);
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            UsersWithSidecar,
+            references: [driver],
+            dialect: "mssql"
+        );
 
         StepOutputs
             .Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe)
@@ -236,15 +292,17 @@ public sealed class SqlClientProbeTests
     [Fact]
     public void Run_SqlClientInAnAssemblyOfAnotherName_HasNoVersion()
     {
-        var old = Run(
+        var old = GeneratorHarness.RunSample(
             OutputKind.Models,
-            [SqlClientReferences.Synthetic("6.0.0.0", true, false, false, "6.0.5", assemblyName: "Merged")],
-            UsersWithSidecar
+            UsersWithSidecar,
+            references: [SqlClientReferences.Synthetic("6.0.0.0", true, false, false, "6.0.5", assemblyName: "Merged")],
+            dialect: "mssql"
         );
-        var newer = Run(
+        var newer = GeneratorHarness.RunSample(
             OutputKind.Models,
-            [SqlClientReferences.Synthetic("8.0.0.0", true, true, true, "8.0.1", assemblyName: "Merged")],
-            UsersWithSidecar
+            UsersWithSidecar,
+            references: [SqlClientReferences.Synthetic("8.0.0.0", true, true, true, "8.0.1", assemblyName: "Merged")],
+            dialect: "mssql"
         );
 
         DriverDiagnostics(old)
@@ -275,7 +333,12 @@ public sealed class SqlClientProbeTests
             assemblyName: "microsoft.data.sqlclient"
         );
 
-        var run = Run(OutputKind.Models, [driver], UsersWithSidecar);
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            UsersWithSidecar,
+            references: [driver],
+            dialect: "mssql"
+        );
 
         StepOutputs.Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe).Version.ShouldBe("8.0.1");
         DriverDiagnostics(run).ShouldHaveSingleItem().ShouldStartWith("SQLSRC268 ");
@@ -379,30 +442,17 @@ public sealed class SqlClientProbeTests
         SqlClientColumn column
     )
     {
-        var run = Run(OutputKind.Models, references, UsersWithSidecar);
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            UsersWithSidecar,
+            references: references,
+            dialect: "mssql"
+        );
 
         var probe = StepOutputs.Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe);
         probe.ShouldBe(expected);
         probe.Column.ShouldBe(column);
     }
-
-    // The project at the output, under mssql unless the dialect is given, with these references.
-    private static GeneratorRun Run(OutputKind output, MetadataReference[] references, params SqlFile[] files) =>
-        Run(output, references, "mssql", files);
-
-    private static GeneratorRun Run(
-        OutputKind output,
-        MetadataReference[] references,
-        string dialect,
-        params SqlFile[] files
-    ) =>
-        GeneratorHarness.Run(
-            output,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            files,
-            references: references,
-            dialect: dialect
-        );
 
     // The sidecar of the file with a current entry of the query under mssql.
     private static SqlFile CurrentSidecar(SqlFile file, string queryName) =>

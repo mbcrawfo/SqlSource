@@ -2,7 +2,6 @@
 
 using System.Linq;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -24,7 +23,7 @@ public sealed class ColumnMarkerTests
             "SELECT 1 AS a, 2 AS b, 3 AS c, 4 AS d;"
         );
 
-        var run = Run(
+        var run = CleanRun(
             file,
             Entry(
                 file,
@@ -48,7 +47,7 @@ public sealed class ColumnMarkerTests
     {
         var file = Query("-- column: TOTAL not null\n", "SELECT sum(amount) AS Total FROM payments;");
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("Total", nullable: true)]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("Total", nullable: true)]));
 
         run.Diagnostics.ShouldBeEmpty();
         Nullability(run).ShouldBe([("Total", false)]);
@@ -65,7 +64,7 @@ public sealed class ColumnMarkerTests
                 + "SELECT sum(amount) AS total, max(note) AS note FROM payments;\n"
         );
 
-        var run = Run(
+        var run = CleanRun(
             file,
             Entry(file, "GetTotals", [], [Column("total", nullable: true), Column("note", Text, nullable: false)])
         );
@@ -94,7 +93,7 @@ public sealed class ColumnMarkerTests
     {
         var file = Query("-- column: total not null\n", "SELECT sum(amount) AS \"total!\" FROM payments;");
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("total!", nullable: true)]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("total!", nullable: true)]));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,26): The -- column: marker for 'total' names a column "
@@ -112,7 +111,7 @@ public sealed class ColumnMarkerTests
     {
         var file = Query("-- column: " + value + "\n", "SELECT max(note) AS \"note?\" FROM payments;");
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("note?", Text, nullable: false)]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("note?", Text, nullable: false)]));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,{end}): The -- column: marker for '{name}' names a column "
@@ -126,7 +125,7 @@ public sealed class ColumnMarkerTests
     {
         var file = Query("-- column: id null\n-- column: totl not null\n", "SELECT 1 AS id, 2 AS total;");
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("id"), Column("total")]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("id"), Column("total")]));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC260 {GeneratorHarness.UsersPath}(3,1)-(3,25): The -- column: marker for 'totl' names no column of "
@@ -140,7 +139,7 @@ public sealed class ColumnMarkerTests
     {
         var file = Query("-- column: id null\n", "DELETE FROM users WHERE id = @id;");
 
-        var run = Run(file, Entry(file, "GetUser", [Parameter("id")], null));
+        var run = CleanRun(file, Entry(file, "GetUser", [Parameter("id")], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,19): The -- column: marker for 'id' names no column of "
@@ -157,7 +156,7 @@ public sealed class ColumnMarkerTests
         var file = Query("-- column: nope null\n", "SELECT 'users'::regclass AS relation;");
         var regclass = TestSidecars.Postgres(name: "regclass", internalName: "regclass");
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("relation", regclass)]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("relation", regclass)]));
 
         run.Diagnostics.Count.ShouldBe(2);
         run.Diagnostics[0].ShouldStartWith($"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,17): ");
@@ -175,7 +174,11 @@ public sealed class ColumnMarkerTests
                 + "-- name: GetOther\n-- column: id null\nSELECT 2;\n"
         );
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("b!")]), Entry(file, "GetOther", [], [Column("id")]));
+        var run = CleanRun(
+            file,
+            Entry(file, "GetUser", [], [Column("b!")]),
+            Entry(file, "GetOther", [], [Column("id")])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,18): The -- column: marker for 'a' names no column of the "
@@ -197,7 +200,7 @@ public sealed class ColumnMarkerTests
             "-- name: GetUser\n-- output: sql\n-- column: nope null\nSELECT 1;\n\n-- name: GetOther\nSELECT 2;\n"
         );
 
-        var run = Run(file, Entry(file, "GetOther", [], [Column("id")]));
+        var run = CleanRun(file, Entry(file, "GetOther", [], [Column("id")]));
 
         run.Diagnostics.ShouldBeEmpty();
         ModelsOf(run).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetOther");
@@ -212,7 +215,7 @@ public sealed class ColumnMarkerTests
     {
         var file = Query("-- column: display_name -> " + type + "\n", "SELECT name AS \"display_name!\" FROM users;");
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("display_name!", Text, nullable: true)]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("display_name!", Text, nullable: true)]));
 
         run.Diagnostics.ShouldBeEmpty();
         Nullability(run).ShouldBe([("DisplayName", false)]);
@@ -226,7 +229,7 @@ public sealed class ColumnMarkerTests
             "SELECT x AS a, y AS b, z AS c FROM t;"
         );
 
-        var run = Run(
+        var run = CleanRun(
             file,
             Entry(
                 file,
@@ -249,7 +252,7 @@ public sealed class ColumnMarkerTests
     {
         var file = Query("-- column: nope -> string\n", "SELECT 1 AS id;");
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("id")]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("id")]));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,26): The -- column: marker for 'nope' names no column of "
@@ -267,7 +270,7 @@ public sealed class ColumnMarkerTests
             "SELECT sum(amount) AS \"total!\" FROM payments;"
         );
 
-        var run = Run(file, Entry(file, "GetUser", [], [Column("total!", nullable: true)]));
+        var run = CleanRun(file, Entry(file, "GetUser", [], [Column("total!", nullable: true)]));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC260 {GeneratorHarness.UsersPath}(3,1)-(3,26): The -- column: marker for 'total' names a column "
@@ -279,15 +282,6 @@ public sealed class ColumnMarkerTests
     // A file of one query, GetUser, with these markers.
     private static SqlFile Query(string markers, string sql) =>
         new(GeneratorHarness.UsersPath, "-- name: GetUser\n" + markers + sql + "\n");
-
-    // Every run compiles, with no warning in the generated code, whatever its diagnostics.
-    private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries)
-    {
-        var run = ModelRuns.Run(file, entries);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        return run;
-    }
 
     private static (string Name, bool IsNullable)[] Nullability(GeneratorRun run) =>
         [

@@ -64,13 +64,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_DialectInTheFolder_ParsesTheFileWithIt()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"dialect":"postgres"}"""
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
+                    """{"dialect":"postgres"}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         run.ShouldBeClean();
@@ -80,13 +83,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_DialectInAFolderAbove_ParsesTheFileWithIt()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/sqlsource.json", /*lang=json,strict*/
-                """{"dialect":"postgres"}"""
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    "/app/sqlsource.json", /*lang=json,strict*/
+                    """{"dialect":"postgres"}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         run.ShouldBeClean();
@@ -96,13 +102,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_DialectMarker_OverridesTheFolder()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"dialect":"postgres"}"""
-            ),
-            new SqlFile(QueryPath, "-- dialect: ansi\n" + Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
+                    """{"dialect":"postgres"}"""
+                ),
+                new SqlFile(QueryPath, "-- dialect: ansi\n" + Query),
+            ],
+            dialect: null
         );
 
         run.ShouldBeClean();
@@ -114,13 +123,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_KeepCommentsInTheFolder_ParsesAndEmitsTheFormWithComments()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"generatorParameters":["keep-comments"]}"""
-            ),
-            new SqlFile(QueryPath, Kept)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
+                    """{"generatorParameters":["keep-comments"]}"""
+                ),
+                new SqlFile(QueryPath, Kept),
+            ],
+            dialect: null
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -138,8 +150,8 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_DefaultInANearerFile_ParsesAndEmitsNoFormWithComments()
     {
-        var run = Run(
-            null,
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
             [
                 GeneratorHarness.SettingsFile(
                     "/app/sqlsource.json", /*lang=json,strict*/
@@ -151,6 +163,7 @@ public sealed class SettingsFileTests
                 ),
                 new SqlFile(QueryPath, Kept),
             ],
+            dialect: null,
             generatorParameters: "keep-comments"
         );
 
@@ -168,7 +181,7 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_OutputInTheFolder_Applies()
     {
-        var run = ModelRuns.Run(
+        var run = Run(
             Source,
             [
                 GeneratorHarness.SettingsFile(
@@ -190,7 +203,7 @@ public sealed class SettingsFileTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- input-model-suffix: Args\n\n" + GetUser);
 
-        var run = ModelRuns.Run(
+        var run = Run(
             Source,
             [
                 GeneratorHarness.SettingsFile(
@@ -301,14 +314,17 @@ public sealed class SettingsFileTests
     // token-validation off, and a nearer one of this text.
     private static string RunUnderFarther(string nearer)
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                FartherSettingsPath, /*lang=json,strict*/
-                """{"generatorParameters":["keep-comments", "token-validation=off"]}"""
-            ),
-            GeneratorHarness.SettingsFile(SettingsPath, nearer),
-            new SqlFile(QueryPath, Kept + "\n-- name: ListFrom\nSELECT * FROM {{table}};\n")
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    FartherSettingsPath, /*lang=json,strict*/
+                    """{"generatorParameters":["keep-comments", "token-validation=off"]}"""
+                ),
+                GeneratorHarness.SettingsFile(SettingsPath, nearer),
+                new SqlFile(QueryPath, Kept + "\n-- name: ListFrom\nSELECT * FROM {{table}};\n"),
+            ],
+            dialect: null
         );
 
         run.ShouldBeClean();
@@ -329,7 +345,7 @@ public sealed class SettingsFileTests
             internalName: "Status",
             labels: ["new", "old"]
         );
-        var run = ModelRuns.Run(
+        var run = Run(
             Source,
             [
                 GeneratorHarness.SettingsFile(
@@ -357,7 +373,7 @@ public sealed class SettingsFileTests
     public void Run_ColumnTypeWithoutASchemaInANearerFile_BeatsOneWithASchemaFarther()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListPosts\nSELECT id FROM users;\n");
-        var run = ModelRuns.Run(
+        var run = Run(
             IdsSource,
             [
                 GeneratorHarness.SettingsFile(
@@ -473,13 +489,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_UnknownKey_IsReportedAtTheSettingsFile()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                "{\n  \"output\": \"sql\",\n  \"bogus\": 1\n}\n"
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    "{\n  \"output\": \"sql\",\n  \"bogus\": 1\n}\n"
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         run.Diagnostics.ShouldBe([
@@ -490,13 +509,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_InvalidTypeOverride_IsReported()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"typeOverrides":{" int4 ":" int? "}}"""
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"typeOverrides":{" int4 ":" int? "}}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
@@ -509,13 +531,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_InvalidDatabase_IsNotReported()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"database":" a b ","bogus":1}"""
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"database":" a b ","bogus":1}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /app/Repo/sqlsource.json(1,");
@@ -551,7 +576,7 @@ public sealed class SettingsFileTests
         var run = GeneratorHarness.Run(
             null,
             [
-                new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
+                GeneratorHarness.SampleSourceFile,
                 new SourceFile(
                     "Other.Gen/Other.Gen.Generator/Extra.g.cs",
                     "namespace Other;\n\ninternal static class Extra;\n"
@@ -599,7 +624,7 @@ public sealed class SettingsFileTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [
-                new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
+                GeneratorHarness.SampleSourceFile,
                 new SourceFile(
                     "/app/Code/Helpers.cs",
                     "[assembly: System.Reflection.AssemblyMetadata(\"Helpers\", \"none\")]\n"
@@ -621,14 +646,17 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_FileReachedByAnUnclaimedSqlFile_IsReported()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Other/sqlsource.json", /*lang=json,strict*/
-                """{"bogus":1}"""
-            ),
-            new SqlFile("/app/Other/Unclaimed.sql", Query),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    "/app/Other/sqlsource.json", /*lang=json,strict*/
+                    """{"bogus":1}"""
+                ),
+                new SqlFile("/app/Other/Unclaimed.sql", Query),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /app/Other/sqlsource.json(1,");
@@ -638,13 +666,16 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_FileNoItemReaches_IsNotReported()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/other/sqlsource.json", /*lang=json,strict*/
-                """{"bogus":1}"""
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    "/other/sqlsource.json", /*lang=json,strict*/
+                    """{"bogus":1}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         run.ShouldBeClean();
@@ -654,21 +685,24 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_FileListedTwice_IsReportedOnce()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"bogus":1}"""
-            ),
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"bogus":1}"""
-            ),
-            GeneratorHarness.SettingsFile(
-                "/APP/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"other":1}"""
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"bogus":1}"""
+                ),
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"bogus":1}"""
+                ),
+                GeneratorHarness.SettingsFile(
+                    "/APP/Repo/sqlsource.json", /*lang=json,strict*/
+                    """{"other":1}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         // The message whole: the last file's path differs from the first's only by case, which ShouldStartWith ignores,
@@ -686,36 +720,28 @@ public sealed class SettingsFileTests
     [Fact]
     public void Run_ListedFileNamedInAnotherCase_IsNotRead()
     {
-        var run = Run(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/SqlSource.json", /*lang=json,strict*/
-                """{"dialect":"postgres","bogus":1}"""
-            ),
-            new SqlFile(QueryPath, Query)
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [
+                GeneratorHarness.SettingsFile(
+                    "/app/Repo/SqlSource.json", /*lang=json,strict*/
+                    """{"dialect":"postgres","bogus":1}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ],
+            dialect: null
         );
 
         run.ShouldBeClean();
         run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
     }
 
-    private static GeneratorRun Run(string? dialect, params SqlFile[] files) => Run(dialect, files, null);
-
-    private static GeneratorRun Run(string? dialect, SqlFile[] files, string? generatorParameters) =>
-        GeneratorHarness.Run(
-            OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            files,
-            generatorParameters: generatorParameters,
-            dialect: dialect
-        );
-
     // GetUser of Users, at Models under postgres, with an entry of one parameter and one column, both id, the
     // project's settings and the settings files given.
     private static GeneratorRun RunUsers(string source, string? settings, params SqlFile[] settingsFiles)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, GetUser);
-        return ModelRuns.Run(
+        return Run(
             source,
             [.. settingsFiles, file, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
             settings: settings
@@ -726,7 +752,7 @@ public sealed class SettingsFileTests
     private static GeneratorRun RunInt4(params SqlFile[] settingsFiles)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser);
-        return ModelRuns.Run(
+        return Run(
             Source,
             [.. settingsFiles, file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("c0", Int4)]))]
         );
