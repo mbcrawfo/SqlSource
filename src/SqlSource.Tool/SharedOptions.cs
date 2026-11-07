@@ -77,7 +77,7 @@ internal static class SharedOptions
             Arity = ArgumentArity.ExactlyOne,
         };
 
-    /// <summary><c>--env-file</c>, which <c>DescribeCommand.EnvFileOf</c> reads.</summary>
+    /// <summary><c>--env-file</c>, which <c>PlanSteps.EnvFileOf</c> reads.</summary>
     public static Option<string> EnvFileOption() =>
         new(EnvFile)
         {

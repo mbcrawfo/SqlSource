@@ -17,7 +17,7 @@ How a bundle, `replay` and the renaming work: [`bundles.md`](../../../docs/archi
 
 ## `diagnose`
 
-- **`DiagnoseRun.cs` writes no sidecar and deletes none, and describes its query whatever its hash**: it plans and describes through `DescribeCommand`, `RunDecisions`, `DescribeRun.ConnectionsOf` and `Describing/DatabaseRuns.cs`, and never reaches `SidecarStore`.  A copy of a step would let its connection or secret handling drift from `describe`'s.
+- **`DiagnoseRun.cs` writes no sidecar and deletes none, and describes its query whatever its hash**: it plans and describes through `PlanSteps`, `RunDecisions`, `DescribeRun.ConnectionsOf` and `Describing/DatabaseRuns.cs`, and never reaches `SidecarStore`.  A copy of a step would let its connection or secret handling drift from `describe`'s.
 - **Its capture is given to `DatabaseRuns` as a `RunCapture`, of the one queried database**, which writes it through `CaptureJson.Write` with the secret; a second session for it is a fault of the tool.
 - **A bundle it writes is renamed by `Renaming/BundleRenamer.cs` alone, raw only under `--no-obfuscate`, and a refusal writes nothing**: its errors are built by `BundleErrors.CannotBeMadeSafe`, each with the private route, and an `--out` that cannot be written is `SQLSRC218`.
 

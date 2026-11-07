@@ -108,7 +108,7 @@ internal sealed class WatchSession
         _unitFolder = Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file.");
         _usage = usage;
         _host = host;
-        _envFile = DescribeCommand.EnvFileOf(usage, _unitFolder, host);
+        _envFile = PlanSteps.EnvFileOf(usage, _unitFolder, host);
         _session = session;
         _counted = counted;
         _set = WatchSet.Of(unit.Path, _unitFolder, _envFile, FoundProjects.None);
@@ -191,8 +191,7 @@ internal sealed class WatchSession
             }
 
             if (
-                await DescribeCommand.PlanFromAsync(_unit, _manifests, _usage, _host, reporter, cancellationToken) is
-                { } plan
+                await PlanSteps.PlanFromAsync(_unit, _manifests, _usage, _host, reporter, cancellationToken) is { } plan
             )
             {
                 await DescribeCommand.DescribePlanAsync(
@@ -237,7 +236,7 @@ internal sealed class WatchSession
         WatchSet? set = null;
         try
         {
-            var found = await DescribeCommand.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
+            var found = await PlanSteps.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
             _manifests = found.Manifests;
             _evaluationFailed = reporter.Count > errors;
             set = WatchSet.Of(_unit.Path, _unitFolder, _envFile, found);

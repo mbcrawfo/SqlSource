@@ -25,7 +25,7 @@ Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 
 ## Results and errors
 
-- **A result that may fail has one shape where files meet.**  A method that another file calls and that gives one value or one reason returns an `Outcome<TValue, TFailure>` and reports nothing: its caller does, as `DescribeCommand.FindUnit` reports what `Projects/RunUnitFinder.cs` found.  `Outcome.cs` says what is no `Outcome`, and how one of a value that must be disposed is made.
+- **A result that may fail has one shape where files meet.**  A method that another file calls and that gives one value or one reason returns an `Outcome<TValue, TFailure>` and reports nothing: its caller does, as `PlanSteps.FindUnit` reports what `Projects/RunUnitFinder.cs` found.  `Outcome.cs` says what is no `Outcome`, and how one of a value that must be disposed is made.
 - **Every error goes through `Reporting/Reporter.cs` with a descriptor of `ToolDiagnostics`**, or of `SqlDiagnostics` where the generator reports the same condition.  The descriptors are in the generator's project; `src/SqlSource/Diagnostics/AGENTS.md` lists the four places a new one touches.  A wrong command line is the one exception, below.
 - **The exit code is `0`, `1` or `2`**, as the manual's [exit codes](../../docs/manual/tool.md#exit-codes) say.  `Cli.ExitCodeOf` takes it from the reporter, so a command reports, goes on, and never returns `1`.  `2` is for `SQLSRC219` and for `replay`'s answer that is not the bundle's; a query that cannot be described is "could not check", never `SQLSRC219`.
 - **Every text the tool prints and did not write goes through `Reporting/OneLine.cs`**, which writes a line break as a space: an argument of a message, a path, a label, the name of an unknown option.

@@ -197,22 +197,19 @@ internal static class DiagnoseRun
         CancellationToken cancellationToken
     )
     {
-        if (DescribeCommand.FindUnit(usage, host, reporter) is not { } unit)
+        if (PlanSteps.FindUnit(usage, host, reporter) is not { } unit)
         {
             return null;
         }
 
-        var manifests = (
-            await DescribeCommand.FindManifestsAsync(unit, usage, host, reporter, cancellationToken)
-        ).Manifests;
+        var manifests = (await PlanSteps.FindManifestsAsync(unit, usage, host, reporter, cancellationToken)).Manifests;
         var filters = RunFilters.Create([query.File], [], host.WorkingDirectory);
         if (
-            await DescribeCommand.PlanFromAsync(
+            await PlanSteps.PlanFromAsync(
                 unit,
                 manifests,
                 filters,
-                isOnline: false,
-                elsewhereIsLogged: true,
+                PlanSteps.IsAtAFileNotNamed,
                 host,
                 reporter,
                 cancellationToken
@@ -296,9 +293,9 @@ internal static class DiagnoseRun
             target.Plan,
             selected,
             selected,
-            DescribeCommand.ConnectionsOf(usage),
-            DescribeCommand.UnitFolderOf(target.Unit),
-            DescribeCommand.EnvFileOf(usage, DescribeCommand.UnitFolderOf(target.Unit), host),
+            PlanSteps.ConnectionsOf(usage),
+            PlanSteps.UnitFolderOf(target.Unit),
+            PlanSteps.EnvFileOf(usage, PlanSteps.UnitFolderOf(target.Unit), host),
             host,
             reporter
         );
