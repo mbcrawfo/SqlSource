@@ -444,6 +444,8 @@ SELECT id, placed_at FROM dbo.orders WHERE id IN @ids;
 
 SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, is how a query method sends a list of values.  Above, `ListOrdersByIdsParams.Ids` is an `IEnumerable<int>`, and each of its values is sent as an `int`, the type of `id`, as [any parameter](#method-parameters) of that type is.  A list's test for null, `@ids IS NULL`, is sent as a `bit` of the list's name.
 
+- **A list after a `NOT` cannot stand inside an aggregate, a `GROUP BY` or an `OUTPUT` clause.**  SQL Server refuses there the form that such a list is sent in when it is empty or null, so under the output `codegen` a query such as `SELECT COUNT(IIF(category NOT IN @categories, 1, NULL)) AS others FROM dbo.products` is [SQLSRC127](diagnostics.md#sqlsrc127) at build.  Test the list in a `WITH` query, and aggregate its result, as the error's page shows.  An aggregate that `OVER` follows is not one of these places, and a list that no `NOT` reaches runs empty in all of them.  An aggregate of your own is a [known issue](#known-issues).
+- **An empty list assumes that the connection leaves `ANSI_NULLS` on**, as Microsoft.Data.SqlClient does.  With it off, an empty list after `IN` matches the rows whose value is null: see [known issues](#known-issues).
 - **A query sends at most 2,098 parameters.**  SQL Server takes 2,100 parameters in one request, and Microsoft.Data.SqlClient uses two of them to send a query with parameters.  Each value of each list counts, and so does every other parameter of the query: a method whose query would send more throws `ArgumentException`, as [the limit](parameters-and-tokens.md#list-limit) says, and leaves out the [padding](parameters-and-tokens.md#list-padding) of a query that padding alone would take past it.
 - **For more values than that, send them as one JSON array** in an `nvarchar(max)` parameter, and read it with `OPENJSON`, in a database whose compatibility level is 130 or later:
 
@@ -497,6 +499,8 @@ SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-pa
 
 - **A connection that turns `ANSI_WARNINGS` off can read null from a column whose property cannot be null.**  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null where an arithmetic overflow, a value too large for its type or a division by zero would otherwise be an error, so a count, a sum, a cast or a conversion, `COALESCE`, `GREATEST`, `LEAST` or arithmetic that SqlSource treats as never null can be null.  Microsoft.Data.SqlClient turns `ANSI_WARNINGS` on when it connects: leave it on, and run no `SET ANSI_WARNINGS OFF` on a connection that runs your queries.
 
+- **A connection that turns `ANSI_NULLS` off changes what an empty list matches.**  With `ANSI_NULLS` off, SQL Server takes `= NULL` as true for a null, so an empty or a null list after `IN` matches the rows whose value is null, where it should match none, and so does a null value in a list.  Microsoft.Data.SqlClient turns `ANSI_NULLS` on when it connects: leave it on, and run no `SET ANSI_NULLS OFF` on a connection that runs your queries.
+
 - **A query that returns several result sets gets a model of the first alone**, and nothing is reported of the others.  Its method reads that one alone.  Give each `SELECT` a `-- name:` of its own, or give the query the output `models` and read the result sets after the first with your own code.
 
 - **A transaction can be rolled back by an error hidden behind an error at a row.**  When SQL Server raises an error for a row that a method reads, such as a divide by zero, the method throws that error's `SqlException`, and the rest of the batch still runs.  With `XACT_ABORT` off the first error alone leaves the transaction open, but an error that the rest of the batch raises can roll it back, such as a later `CAST('x' AS int)`, and it is not thrown: the `SqlException` says nothing of it.  The same holds for a loop over [streamed rows](settings.md#streaming-rows).  If your code catches the `SqlException` and goes on with the transaction, the transaction's `Connection` is null: a generated method that you then give it [refuses it](#method-results) with `InvalidOperationException`, but a command of your own, or one that Dapper runs, given it runs outside any transaction and is committed on its own, and `Commit` throws `InvalidOperationException`, "This SqlTransaction has completed; it is no longer usable.".  After catching such an error, check the transaction, and treat a `Connection` that is null as a rollback:
@@ -516,15 +520,15 @@ SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-pa
 
 - **A query method fails on a connection that wraps a `SqlConnection` and creates parameters of its own.**  Give the method the `SqlConnection` inside: see [the generator's known issues](generator.md#known-issues).
 
-- **On SQL Server, a list inside an aggregate, a `GROUP BY` expression or an `OUTPUT` clause fails when it is empty or null.**  A query such as `SELECT SUM(CASE WHEN status IN @statuses THEN 1 ELSE 0 END) AS matching FROM dbo.accounts` runs for every list that holds a value, and throws `SqlException` when the list is empty or null: "Cannot perform an aggregate function on an expression containing an aggregate or a subquery." (130), or the error of a `GROUP BY` (144) or of an `OUTPUT` clause (10705).  The build and describing succeed.  Test the list in a `WITH` query, or a subquery in `FROM`, and aggregate its result, which runs for an empty list too:
+- **A list after a `NOT` inside an aggregate of your own fails when it is empty or null.**  A query such as `SELECT dbo.Median(IIF(status NOT IN @statuses, balance, NULL)) AS median FROM dbo.accounts` runs for every list that holds a value, and throws `SqlException` when the list is empty or null: "Cannot perform an aggregate function on an expression containing an aggregate or a subquery." (130).  The build and describing succeed.  So it is too where a token writes the aggregate's name, or the `GROUP BY` or `OUTPUT` that the list stands in.  Inside a built-in aggregate, a `GROUP BY` or an `OUTPUT` clause written in the query, such a list is [SQLSRC127](diagnostics.md#sqlsrc127) at build, and a list that no `NOT` reaches runs empty in every one of these places.  Test the list in a `WITH` query, or a subquery in `FROM`, and aggregate its result, which runs for an empty list too:
 
   ```sql mssql
-  -- name: CountAccountsWithStatuses
+  -- name: CountAccountsWithoutStatuses
   WITH tested AS (
-      SELECT CASE WHEN status IN @statuses THEN 1 ELSE 0 END AS hit
+      SELECT CASE WHEN status NOT IN @statuses THEN 1 ELSE 0 END AS hit
       FROM dbo.accounts
   )
-  SELECT SUM(hit) AS matching
+  SELECT SUM(hit) AS outside
   FROM tested;
   ```
 
