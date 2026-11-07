@@ -333,7 +333,7 @@ A number or a boolean is kept, an error's number, class and state among them.  A
 `SqlServerVocabulary` holds each list in its natural spelling, sorted, and looks a spelling up folded in one ordinal set of them all.  It is the union of what the floor image, `mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04`, and the default image, `DefaultImages.SqlServer`, know, and each list's comment says where and when it was taken:
 
 - the reserved, ODBC and future keywords of Microsoft's list, 185, 235 and 273 with `REGR_R2`, which a fetch of the page lost;
-- the words that are not reserved and that a statement reads, such as `APPLY`, `INSERTED` and `OPENJSON`;
+- the words that are not reserved and that a statement reads, such as `APPLY`, `INSERTED` and `OPENJSON`, and `CONTENT` and `DOCUMENT`, which a typed `xml`'s declaration reads, as in `-- param: @p xml(CONTENT dbo.S)`, so that the renamed declaration still replays, and a user's column named `content` is kept, as one named `source` is;
 - the words of the table hints, the query hints, a window's frame, `FOR XML`, `FOR JSON` and `FOR SYSTEM_TIME` that no keyword list holds, such as `NOLOCK`, `MAXDOP`, `FOLLOWING` and `INCLUDE_NULL_VALUES`, from the syntax of their pages;
 - the pseudo-columns with their `$`, such as `$action`, and the global variables with their `@@`, such as `@@ROWCOUNT`;
 - the documented functions either image knows, those of the documentation's table of contents with `STRING_SPLIT` and `GENERATE_SERIES`, which it lacks, and `CHANGETABLE` and `PREDICT`, which the server reads only with their own syntax and so `VocabularyTests` cannot find; and the system types of either image's `sys.types`;

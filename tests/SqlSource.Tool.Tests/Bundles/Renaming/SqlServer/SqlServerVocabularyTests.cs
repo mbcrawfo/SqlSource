@@ -41,6 +41,8 @@ public sealed class SqlServerVocabularyTests
     [InlineData(SqlServerVocabulary.HiddenRow)]
     [InlineData("geography")]
     [InlineData("SP_EXECUTESQL")]
+    [InlineData("content")]
+    [InlineData("Document")]
     public void Contains_AWordOfTheServer_IsTrue(string spelling) =>
         SqlServerVocabulary.Contains(spelling).ShouldBeTrue(spelling);
 
