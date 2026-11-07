@@ -44,7 +44,8 @@ internal interface IEngineRenaming
     /// <see cref="Fold" /> takes for one name: PostgreSQL's is its fold, since its pipeline compares a name folded;
     /// SQL Server's is the spelling as written, since its pipeline compares some names by ordinal and others ignoring
     /// case.  The mapping writes two spellings of one fold whose <c>Spelled</c> differ in cases of their own, so that
-    /// they stay apart by ordinal and equal ignoring case.  A token's name, which the generator compares as written,
+    /// they stay apart by ordinal and equal ignoring case, unless the first replacement's letters cannot tell them
+    /// apart (<see cref="NameMapping.FellBack" />).  A token's name, which the generator compares as written,
     /// is renamed as quoted: PostgreSQL's fold keeps a quoted spelling as written, and SQL Server's
     /// <c>Spelled</c>, which ignores quoting as its fold does, keeps its cases apart as it does any name's.
     /// </summary>
