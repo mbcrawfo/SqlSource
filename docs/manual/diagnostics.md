@@ -3111,7 +3111,7 @@ $ dotnet sqlsource describe /work/App
 /work/App/.env : error SQLSRC285: '/work/App/.env' cannot be read: Access to the path '/work/App/.env' is denied.
 ```
 
-Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment, with `--env-file none` so that the run reads no file.
+Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment, with `--env-file none`, or in a build [`SqlSourceEnvFile`](settings.md#setting-env-file) `none`, so that the run reads no file.
 
 See: [A `.env` file](tool.md#env-file)
 
