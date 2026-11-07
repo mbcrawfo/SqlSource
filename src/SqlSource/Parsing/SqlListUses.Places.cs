@@ -183,6 +183,7 @@ internal static partial class SqlListUses
             "AND",
             "OR",
             "COLLATE",
+            "WITH",
         ];
 
         // The words the reader tells apart, the places that each ends at its depth, and its traits.  Ending a NOT too
@@ -411,7 +412,8 @@ internal static partial class SqlListUses
 
         // Whether the item after the word OUTPUT, that the cursor has just met, makes it a name: ".", an operator, a
         // comma or ")", as in output.id, SET output = 1, a = output, b = 2 or (output), or a word of NameFollowers,
-        // as after a table's alias or before a test.  The cursor is a copy, so the walk goes on from the word.
+        // as after a table's alias, before its join or its table hint, or before a test.  The cursor is a copy, so
+        // the walk goes on from the word.
         private static bool IsNameAhead(Cursor cursor)
         {
             var item = cursor.Next();

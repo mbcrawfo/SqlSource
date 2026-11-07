@@ -129,6 +129,11 @@ public sealed class SqlListPlacesTests
             { "INSERT INTO t (a) SELECT output AS f, CASE WHEN s NOT IN @a THEN 1 END FROM u", ["UnderNot"] },
             { "UPDATE t SET a = 1 FROM t AS output WITH (NOLOCK) JOIN u ON u.id IN @a", ["None"] },
             { "UPDATE t SET a = 1 FROM t AS output JOIN u ON output.id = u.id AND u.id IN @a", ["None"] },
+            // An alias without AS, before a table hint, which no OUTPUT clause starts with.
+            {
+                "UPDATE x SET a = 1 FROM t output WITH (NOLOCK) JOIN (SELECT id FROM u WHERE id NOT IN @a) d ON 1 = 1",
+                ["UnderNot"]
+            },
             { "UPDATE t SET a = output, b = IIF(s IN @a, 1, 0)", ["None"] },
             { "UPDATE t SET output = IIF(s IN @a, 1, 0)", ["None"] },
             { "INSERT INTO t (a) OUTPUT CASE WHEN inserted.a IN @a THEN 1 END SELECT b FROM u", ["InOutput"] },
