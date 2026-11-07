@@ -149,17 +149,19 @@ public sealed class SampleSqlTests : IDisposable
                     + "DO UPDATE SET kind = 'b' WHERE ((SELECT NULL) IS NULL OR t.kind IN (@kinds));"
             );
 
-    // Words in a string or a quoted name are no clause.
-    [Fact]
-    public void Build_NullTestAfterAQuotedRegionOfTheWords_IsASubqueryOfNull() =>
-        Sample(
-                "-- name: A\nSELECT 'ON CONFLICT (id) WHERE' AS \"on conflict (id) where\" "
-                    + "FROM t WHERE (@ids IS NULL OR id IN @ids);\n"
-            )
-            .ShouldBe(
-                "SELECT 'ON CONFLICT (id) WHERE' AS \"on conflict (id) where\" "
-                    + "FROM t WHERE ((SELECT NULL) IS NULL OR id IN (@ids));"
-            );
+    // Words in a string or a quoted name are no clause, a DO among them included.
+    [Theory]
+    [InlineData(
+        "SELECT 1 FROM t WHERE name <> 'on conflict (id) where' AND (@ids IS NULL OR id IN @ids) AND kind <> 'do'",
+        "SELECT 1 FROM t WHERE name <> 'on conflict (id) where' AND ((SELECT NULL) IS NULL OR id IN (@ids)) "
+            + "AND kind <> 'do'"
+    )]
+    [InlineData(
+        "SELECT 1 AS \"on conflict (id) where\" FROM t WHERE (@ids IS NULL OR id IN @ids) AND \"do\" > 0",
+        "SELECT 1 AS \"on conflict (id) where\" FROM t WHERE ((SELECT NULL) IS NULL OR id IN (@ids)) AND \"do\" > 0"
+    )]
+    public void Build_NullTestBetweenQuotedRegionsOfTheWords_IsASubqueryOfNull(string sql, string sample) =>
+        Sample("-- name: A\n" + sql + ";\n").ShouldBe(sample + ";");
 
     // The predicate of an INSERT inside a WITH query ends at its DO, so the outer query's test is the subquery.
     [Fact]
