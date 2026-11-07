@@ -159,6 +159,67 @@ public sealed class PollingFolderWatcherTests
         scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, path, IsFolder: false)]);
     }
 
+    // A watch of the folder alone sees a folder made in it, and nothing of what it holds.
+    [Fact]
+    public void Poll_NotRecursiveFolderCreated_RaisesCreatedFolderAlone()
+    {
+        using var scene = new Scene();
+        using var watch = scene.Start(recursive: false);
+
+        var queries = scene.Folder.CreateFolder("queries");
+        _ = scene.Folder.WriteFile("queries/Users.sql", "SELECT 1");
+        watch.Poll();
+
+        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, queries, IsFolder: true)]);
+    }
+
+    [Fact]
+    public void Poll_NotRecursiveFolderDeleted_RaisesDeleted()
+    {
+        using var scene = new Scene();
+        _ = scene.Folder.WriteFile("queries/Users.sql", "SELECT 1");
+        var queries = scene.Folder.PathOf("queries");
+        using var watch = scene.Start(recursive: false);
+
+        Directory.Delete(queries, recursive: true);
+        watch.Poll();
+
+        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Deleted, queries, IsFolder: false)]);
+    }
+
+    // A folder of any name, since an artifacts layout watches artifacts alone until a restore makes obj in it.
+    [Theory]
+    [InlineData("bin")]
+    [InlineData("obj")]
+    [InlineData(".git")]
+    public void Poll_NotRecursiveIgnoredFolderCreated_RaisesCreatedFolder(string name)
+    {
+        using var scene = new Scene();
+        using var watch = scene.Start(recursive: false);
+
+        var folder = scene.Folder.CreateFolder(name);
+        watch.Poll();
+
+        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, folder, IsFolder: true)]);
+    }
+
+    // A link to a folder is listed by its name, and what it leads to is not.
+    [Fact]
+    public void Poll_NotRecursiveLinkToAFolderCreated_RaisesCreatedFolderAlone()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Making a symbolic link needs a privilege on Windows.");
+        using var scene = new Scene();
+        using var other = new TempFolder();
+        _ = other.WriteFile("Users.sql", "SELECT 1");
+        using var watch = scene.Start(recursive: false);
+
+        var link = scene.Folder.PathOf("linked");
+        _ = Directory.CreateSymbolicLink(link, other.Path);
+        watch.Poll();
+
+        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, link, IsFolder: true)]);
+    }
+
     // A folder that is gone raises one failure however often it is listed, and its changes, against the last listing
     // that worked, once it is back; gone again, it raises a failure again.
     [Fact]

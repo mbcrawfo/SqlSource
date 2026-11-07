@@ -368,8 +368,8 @@ internal sealed class WatchSession
     // without a word, so it is marked stale, and the evaluation closes it and watches the folder again when it is back.
     // A folder of either set without a watch created or renamed to: it did not exist, or its watch could not start,
     // when the set was watched.  Each folder above a folder of a set, up to the root of its repository, is a folder of
-    // the set too, so the creation of that folder is the one a watch of the system's events sees; a poller of a folder
-    // alone sees no folder made in it.  Under _gate.
+    // the set too, so the creation of the topmost new folder is the one a watch sees, a poller of a folder alone
+    // included, which lists the folders in it.  Under _gate.
     private bool ChangesAWatchedFolder(FileChange change, WatchSet other)
     {
         var removed = change.Kind switch
@@ -463,12 +463,30 @@ internal sealed class WatchSession
         ContinuationLine[] help = PollsForChanges() ? [] : [PollInstead];
 
         // Where adds each to what was reported as it goes, so a failure twice in one batch is reported once.
-        foreach (var failure in failures.Where(failure => _reported.Add((failure.Folder, failure.Message))))
+        foreach (
+            var failure in failures.Where(failure =>
+                !SeenFromAbove(failure) && _reported.Add((failure.Folder, failure.Message))
+            )
+        )
         {
             _session.Report(
                 ToolDiagnostic.ForFile(ToolDiagnostics.WatchFailed, failure.Folder, failure.Message).WithLines(help)
             );
         }
+    }
+
+    // True for the failure of a folder that is gone, below a folder with a watch of its own alone: that watch sees the
+    // deletion, which asks what it must, so the failure, as a poller's failed listing of its folder, is no error of its
+    // own; the system's events take the same deletion without a word.  Its order with the deletion is not known, since
+    // each poller lists on a timer of its own, so the disk decides.  A folder that is there but cannot be read, or one
+    // with no such watch above it, is still reported.  On the loop, which alone reads _watches.
+    private bool SeenFromAbove(WatchFailure failure)
+    {
+        var folder = Path.TrimEndingDirectorySeparator(failure.Folder);
+        return Path.GetDirectoryName(folder) is { } above
+            && _watches.TryGetValue(above, out var watch)
+            && watch is { Recursive: false, Watch: not null }
+            && !Directory.Exists(folder);
     }
 
     // Under _gate.  A change held through an evaluation keeps the time it came, which may be before the last one kept.

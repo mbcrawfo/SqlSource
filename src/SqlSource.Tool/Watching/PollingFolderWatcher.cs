@@ -8,9 +8,10 @@ namespace SqlSource.Tool.Watching;
 
 /// <summary>
 /// A watch that lists the folder on a timer and compares each listing with the one before, for a file system that
-/// raises no events, as a bind mount into a container often does.  It sees a file created, deleted or rewritten, and,
-/// when it watches the folders below, a folder created or deleted; a watch of the folder alone lists no folder in it,
-/// so it sees neither.  It raises none of the finer kinds of the system's events, a rename among them.
+/// raises no events, as a bind mount into a container often does.  It sees a file created, deleted or rewritten, and a
+/// folder created or deleted; a watch of the folder alone lists the names of the folders in it and not what they hold,
+/// as the system's events of such a watch tell.  It raises none of the finer kinds of the system's events, a rename
+/// among them.
 /// </summary>
 internal sealed class PollingFolderWatcher : IDisposable
 {
@@ -132,8 +133,16 @@ internal sealed class PollingFolderWatcher : IDisposable
         {
             if (info is DirectoryInfo directory)
             {
+                // A watch of the folder alone lists the name of each folder in it, whatever its name, and nothing it
+                // holds: an artifacts layout watches artifacts alone until a restore makes obj in it.
+                if (!_request.Recursive)
+                {
+                    listing[directory.FullName] = Entry.OfFolder;
+                    continue;
+                }
+
                 // A link to a folder is not followed, which a loop of links would never leave.
-                if (!_request.Recursive || directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                if (directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
                 {
                     continue;
                 }

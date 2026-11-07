@@ -256,11 +256,12 @@ public sealed class WatchFolderTests : IAsyncDisposable
         WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
-    // A polling watch of a folder that stays gone, with nothing above it watched: one more pass, and none however long
-    // it stays gone, so that the next save is a pass of its own.  The project's folder is watched by the test's
-    // watcher, since each evaluation of the scene writes the project's settings file.
+    // A polling watch of a folder that stays gone: one more pass, and none however long it stays gone, so that the next
+    // save is a pass of its own.  Outside a repository the folder above it is watched alone, which sees the deletion,
+    // so the failed listing is no error.  The project's folder is watched by the test's watcher, since each evaluation
+    // of the scene writes the project's settings file.
     [Fact]
-    public async Task Watch_PolledFolderThatStaysGone_GivesOnePass()
+    public async Task Watch_PolledFolderThatStaysGone_GivesOnePassAndNoError()
     {
         await using var watch = new WatchScene("App");
         var users = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
@@ -289,9 +290,119 @@ public sealed class WatchFolderTests : IAsyncDisposable
         await PassAsync(watch, pollers, 3);
 
         watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(2);
-        watch.Errors.Split('\n').Count(line => line.Contains("error SQLSRC287", StringComparison.Ordinal)).ShouldBe(1);
+        watch.Errors.ShouldNotContain("SQLSRC287");
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
         WatchTests.PassStarts(watch.Run.Folder.PathOf("run.log")).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, false)]);
+    }
+
+    // A polled folder that is gone with no watch of the folder above it, whose own watch could not start here, is
+    // reported, once however long it stays gone: nothing else sees the deletion.
+    [Fact]
+    public async Task Watch_PolledFolderGoneWithNoWatchAbove_IsReportedOnce()
+    {
+        await using var watch = new WatchScene("App");
+        _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
+        var settings = watch.Run.Folder.WriteFile("Shared/sqlsource.json", "{}");
+        var shared = Path.GetDirectoryName(settings)!;
+        watch.Project.ListSettings(settings);
+        watch.Run.Environment[WatchSession.PollingVariable] = "true";
+        watch.Run.Watch = request =>
+        {
+            if (request.Folder == watch.Run.Folder.Path)
+            {
+                throw new IOException("no watch above");
+            }
+
+            return request.Folder == shared
+                ? new PollingFolderWatcher(request, watch.Clock, PollingFolderWatcher.Interval)
+                : watch.Watcher.Watch(request);
+        };
+        await watch.StartAsync("App/App.csproj");
+        var pollers = watch.Clock.PendingTimers - 1;
+        await PassAsync(watch, pollers, 2);
+
+        // The second pass moved the clock by Debounce: the poll comes when a second has passed since the watch began,
+        // and the wait it starts ends after this move.
+        Directory.Delete(shared, recursive: true);
+        watch.Clock.Advance(PollingFolderWatcher.Interval - WatchSession.Debounce);
+        await PassAsync(watch, pollers, 3);
+        for (var second = 0; second < 5; second++)
+        {
+            watch.Clock.Advance(PollingFolderWatcher.Interval);
+        }
+
+        watch
+            .Errors.Split('\n')
+            .Count(line => line.Contains($"error SQLSRC287: watching '{shared}'", StringComparison.Ordinal))
+            .ShouldBe(1);
+        watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(2);
+        (await watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
+    // Under polling, a folder of the set made inside a folder watched alone, here libs and its Shared in the root, is
+    // seen by that folder's watch, and watched by the pass it starts, so that a save in it is seen.
+    [Fact]
+    public async Task Watch_PolledFolderMadeInAFolderWatchedAlone_IsWatched()
+    {
+        var polled = PollAllButTheProject();
+        await StartAsync();
+        var pollers = _watch.Clock.PendingTimers;
+        polled.ShouldBe([_watch.Run.Folder.Path]);
+
+        _ = Directory.CreateDirectory(_shared);
+        WriteSettings();
+        _watch.Clock.Advance(PollingFolderWatcher.Interval);
+        await PassAsync(_watch, pollers, 2);
+
+        polled.ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
+        File.SetLastWriteTimeUtc(_settings, File.GetLastWriteTimeUtc(_settings).AddMinutes(1));
+        _watch.Clock.Advance(PollingFolderWatcher.Interval);
+        await PassAsync(_watch, pollers: 3, 3);
+
+        _watch.Errors.ShouldNotContain("SQLSRC287");
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+        WatchTests.PassStarts(LogPath)[..2].ShouldBe([(1, 0, true), (2, 1, true)]);
+    }
+
+    // Under polling, a folder deleted below a folder watched alone is seen by that folder's watch, and its own failed
+    // listing is no error, whichever of the two polls first.
+    [Fact]
+    public async Task Watch_PolledFolderDeletedBelowAFolderWatchedAlone_ReportsNoError()
+    {
+        WriteSettings();
+        var polled = PollAllButTheProject();
+        await StartAsync();
+        var pollers = _watch.Clock.PendingTimers;
+        polled.ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
+
+        Directory.Delete(_shared, recursive: true);
+        _watch.Clock.Advance(PollingFolderWatcher.Interval);
+        await PassAsync(_watch, pollers, 2);
+
+        _watch.Errors.ShouldNotContain("SQLSRC287");
+        _watch.Clock.PendingTimers.ShouldBe(pollers - 1);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+        WatchTests.PassStarts(LogPath)[1].Evaluated.ShouldBeTrue();
+    }
+
+    // Polls every folder on the test's clock but the project's, which each evaluation of the scene writes a settings
+    // file in, and gives the folders polled, in the order their watches were made.
+    private List<string> PollAllButTheProject()
+    {
+        _watch.Run.Environment[WatchSession.PollingVariable] = "true";
+        var project = Path.GetDirectoryName(_watch.Project.ProjectPath);
+        var polled = new List<string>();
+        _watch.Run.Watch = request =>
+        {
+            if (request.Folder == project)
+            {
+                return _watch.Watcher.Watch(request);
+            }
+
+            polled.Add(request.Folder);
+            return new PollingFolderWatcher(request, _watch.Clock, PollingFolderWatcher.Interval);
+        };
+        return polled;
     }
 
     // A stale poller closed while it reports a change: its report waits for the session's lock, and closing it waits

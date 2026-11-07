@@ -3154,7 +3154,7 @@ $ dotnet sqlsource describe /work/App --watch
 
 On Linux, raise the limit that the message names.  For a message about `inotify instances`, as above, raise `fs.inotify.max_user_instances`, with `sudo sysctl fs.inotify.max_user_instances=1024`, and add `fs.inotify.max_user_instances=1024` to `/etc/sysctl.conf` to keep it.  For one about `inotify watches`, such as `The configured user limit (65536) on the number of inotify watches has been reached, or the operating system failed to allocate a required resource.`, raise `fs.inotify.max_user_watches` the same way, to `524288`.  Or set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1` before you start the watch: it then looks at the folders at a fixed interval instead of asking the system, which needs no limit and finds a change within a second or two.  Polling is also the way to watch a folder on a network share or in a container that does not pass on file changes.
 
-A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder, such as one that was deleted or that you may not read, and then gives no help line.  It says so once while the folder stays that way, and sees the folder's changes again as soon as it can list it.
+A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder, such as one that you may not read, or one that was deleted where the watch was not also looking at the folder that held it, such as your repository's own folder, and then gives no help line.  It says so once while the folder stays that way, and sees the folder's changes again as soon as it can list it.
 
 See: [Describe on save](tool.md#describe-on-save)
 
