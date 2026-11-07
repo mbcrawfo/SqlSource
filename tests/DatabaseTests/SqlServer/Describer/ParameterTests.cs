@@ -8,6 +8,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.DatabaseTests.SqlServer.Describer;
 
@@ -289,6 +290,71 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         failure.Arguments.ShouldBe(["dbo.Nope", "@p", Query, DescribeFailures.NoSuchType]);
         failure.Step.ShouldBe(DescribeStep.ResolveType);
         failure.ServerLines[0].ShouldStartWith("Msg 2715: ");
+    }
+
+    // The server reads an XML schema collection's name as part of the type, and says that the database lacks it.
+    [Fact]
+    public async Task DescribeAsync_XmlOfACollectionTheDatabaseLacks_IsNoSuchCollection()
+    {
+        var failure = await ShouldFailAsync(
+            Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "xml(CONTENT dbo.Nope)")),
+            "SQLSRC228"
+        );
+
+        failure.ServerLines.ShouldContain(line => line.StartsWith("Msg 6314", StringComparison.Ordinal));
+    }
+
+    // The server ends the session for a schema collection of three parts, so it is refused before anything is sent,
+    // and the session describes the next query.
+    [Fact]
+    public async Task DescribeAsync_XmlOfAThreePartCollection_IsRefusedAndTheSessionAnswers()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+
+        var refused = await session.DescribeAsync(
+            Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "xml(db.dbo.S)")),
+            token
+        );
+        var next = await session.DescribeAsync(Of(SqlDialectRules.SqlServer, "SELECT 1 AS v"), token);
+
+        var failure = refused.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC228");
+        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName + ": " + TypeNameFound.Parts);
+        failure.ServerLines.ShouldBeEmpty();
+        next.Failure.ShouldBeNull(next.Failure?.Descriptor.Id);
+    }
+
+    [Fact]
+    public async Task DescribeAsync_XmlOfACollectionTheDatabaseHas_IsXml()
+    {
+        await sqlServer.ExecuteAsync(
+            "IF EXISTS (SELECT 1 FROM sys.xml_schema_collections WHERE name = N'TdSchemas') "
+                + "DROP XML SCHEMA COLLECTION dbo.TdSchemas"
+        );
+        await sqlServer.ExecuteAsync(
+            "CREATE XML SCHEMA COLLECTION dbo.TdSchemas AS N'<xsd:schema "
+                + "xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><xsd:element name=\"a\" type=\"xsd:string\"/>"
+                + "</xsd:schema>'"
+        );
+        try
+        {
+            var description = await ShouldDescribeAsync(
+                Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "xml(DOCUMENT dbo.TdSchemas)"))
+            );
+
+            description.Parameters.ShouldBe([
+                new DescribedParameter(
+                    "p",
+                    new SqlServerType("xml", -1, 0, 0, null),
+                    SidecarValues.TypeSource.Declared
+                ),
+            ]);
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP XML SCHEMA COLLECTION dbo.TdSchemas");
+        }
     }
 
     // The optional filter: the use in "IS NULL" types nothing, and the parameter takes the type of the column, in a

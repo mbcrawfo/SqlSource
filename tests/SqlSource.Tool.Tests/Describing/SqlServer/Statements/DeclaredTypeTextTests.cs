@@ -7,7 +7,8 @@ using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.Type
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Statements;
 
 // The text of a -- param: type is put into a declaration the tool sends, so it is read against T-SQL's grammar of a
-// type name first: one or two parts, then (max) or one or two numbers in parentheses, and nothing else.
+// type name first: one or two parts, then (max), one or two numbers or an XML schema collection in parentheses, and
+// nothing else.
 public sealed class DeclaredTypeTextTests
 {
     [Theory]
@@ -32,6 +33,28 @@ public sealed class DeclaredTypeTextTests
     [InlineData("dbo.名前")]
     [InlineData("dbo.x٣")]
     [InlineData("dbo.Ａbc")]
+    [InlineData("xml(S)")]
+    [InlineData("xml(dbo.S)")]
+    [InlineData("xml(CONTENT dbo.S)")]
+    [InlineData("xml(DOCUMENT S)")]
+    [InlineData("xml(content dbo.S)")]
+    [InlineData("xml([dbo].[S])")]
+    [InlineData("xml(\"dbo\".\"S\")")]
+    [InlineData("xml(CONTENT[dbo].[S])")]
+    [InlineData("xml(CONTENT CONTENT)")]
+    [InlineData("xml(CONTENT.S)")]
+    [InlineData("xml(maxSchema)")]
+    [InlineData("xml(CONTENTx)")]
+    [InlineData("sys.xml(dbo.S)")]
+    [InlineData("xml (S)")]
+    [InlineData("xml( CONTENT dbo.S )")]
+    [InlineData("dbo . Email")]
+    [InlineData("dbo .Email")]
+    [InlineData("dbo. Email")]
+    [InlineData("dbo\t.\tEmail")]
+    [InlineData("[dbo] . [Email]")]
+    [InlineData("xml(dbo . S)")]
+    [InlineData("xml(CONTENT dbo . S)")]
     public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.ShouldBe(text);
 
     // A delimited name holds anything but its own closing delimiter alone, so what looks like a second statement
@@ -69,6 +92,10 @@ public sealed class DeclaredTypeTextTests
     [InlineData("int foo", DeclaredTypeText.Shape)]
     [InlineData("nvarchar(", DeclaredTypeText.Shape)]
     [InlineData("nvarchar(max, 2)", DeclaredTypeText.Shape)]
+    [InlineData("xml(CONTENT dbo.S, 1)", DeclaredTypeText.Shape)]
+    [InlineData("xml(dbo.S;)", TypeNameFound.Semicolon)]
+    [InlineData("xml(CONTENT -- x)", TypeNameFound.Comment)]
+    [InlineData("xml([dbo)", DeclaredTypeText.NotClosed)]
     [InlineData("decimal(18,2,1)", DeclaredTypeText.Shape)]
     [InlineData("nvarchar(-1)", DeclaredTypeText.Shape)]
     [InlineData("nvarchar()", DeclaredTypeText.Shape)]
@@ -89,10 +116,17 @@ public sealed class DeclaredTypeTextTests
     [InlineData("٣x", DeclaredTypeText.Shape)]
     [InlineData("x²", DeclaredTypeText.Shape)]
     [InlineData("a.b.c", TypeNameFound.Parts)]
-    [InlineData("dbo .Email", TypeNameFound.Parts)]
-    [InlineData("dbo. Email", TypeNameFound.Parts)]
+    [InlineData("a . b . c", TypeNameFound.Parts)]
+    [InlineData("a. b .c", TypeNameFound.Parts)]
     [InlineData(".t", TypeNameFound.Parts)]
     [InlineData("t.", TypeNameFound.Parts)]
+    [InlineData(". t", TypeNameFound.Parts)]
+    [InlineData("t .", TypeNameFound.Parts)]
+    // A schema collection of three parts makes the server end the session, so it never reaches the server.
+    [InlineData("xml(a.b.c)", TypeNameFound.Parts)]
+    [InlineData("xml(CONTENT a.b.c)", TypeNameFound.Parts)]
+    [InlineData("xml(a . b . c)", TypeNameFound.Parts)]
+    [InlineData("xml(.S)", TypeNameFound.Parts)]
     [InlineData("int\nfoo", TypeNameFound.OneLine)]
     [InlineData("int\r\n", TypeNameFound.OneLine)]
     [InlineData("[a\nb]", TypeNameFound.OneLine)]
