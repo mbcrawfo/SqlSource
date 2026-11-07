@@ -129,6 +129,17 @@ public sealed class SqlListSegmentsTests
                 Literal(" THEN 1 END) > 0;"),
             ]);
 
+    // A column named output is no clause, so the NOT before it reaches the list, which keeps the subquery.
+    [Fact]
+    public void Split_SqlServerListAfterNotAndAColumnNamedOutput_KeepsTheSubquery() =>
+        Blocks("-- name: Q\nUPDATE t SET a = 1 WHERE NOT output IN @a;\n", dialect: SqlServer)
+            .ShouldHaveSingleItem()
+            .Segments.ShouldBe([
+                Literal("UPDATE t SET a = 1 WHERE NOT output IN "),
+                List("@a", emptyIsNull: false),
+                Literal(";"),
+            ]);
+
     // The kept form's uses are the same uses, and take the same empty forms.
     [Fact]
     public void Split_SqlServerKeptForm_IsEmptyAsNullToo() =>

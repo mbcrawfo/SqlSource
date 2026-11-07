@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
@@ -148,6 +149,79 @@ public sealed class SqlListPlacesTests
             { "SELECT a FROM t GROUP BY a; IF IIF(1 IN @a, 1, 0) = 1 RETURN", ["None"] },
             { "DELETE t OUTPUT deleted.a; IF IIF(1 IN @a, 1, 0) = 1 RETURN", ["None"] },
             { "INSERT t (a) OUTPUT inserted.a SELECT CASE WHEN b IN @a THEN 1 END FROM u", ["None"] },
+            // A word ends a NOT only where it can be no name: OUTPUT and WINDOW are names, and the GROUP of WITHIN
+            // GROUP and the FROM of IS DISTINCT FROM start no clause.
+            { "SELECT a FROM t WHERE NOT output IN @a", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT (output IN @a)", ["UnderNot"] },
+            { "UPDATE t SET a = 1 WHERE NOT output IN @a", ["UnderNot"] },
+            { "MERGE t USING u ON t.id = u.id WHEN MATCHED AND NOT output IN @a THEN DELETE;", ["UnderNot"] },
+            { "SELECT COUNT(CASE WHEN NOT output IN @a THEN 1 END) FROM t", ["UnderNot, InAggregate"] },
+            { "SELECT a FROM t WHERE NOT window IN @a", ["UnderNot"] },
+            { "SELECT COUNT(*) FROM t GROUP BY window, CASE WHEN s NOT IN @a THEN 1 END", ["UnderNot, InGroupBy"] },
+            {
+                "SELECT g, SUM(x) OVER w FROM t GROUP BY g WINDOW w AS (PARTITION BY CASE WHEN s IN @a THEN 1 END)",
+                ["None"]
+            },
+            {
+                "SELECT g FROM t GROUP BY g HAVING NOT STRING_AGG(n, ',') WITHIN GROUP (ORDER BY n) IN @a",
+                ["UnderNot"]
+            },
+            {
+                "SELECT g FROM t GROUP BY g HAVING NOT (STRING_AGG(n, ',') WITHIN GROUP (ORDER BY n) IN @a)",
+                ["UnderNot"]
+            },
+            {
+                "SELECT g FROM t GROUP BY g HAVING NOT APPROX_PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY x) IN @a",
+                ["UnderNot"]
+            },
+            {
+                "SELECT CASE WHEN NOT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY x) OVER () IN @a THEN 1 END FROM t",
+                ["UnderNot"]
+            },
+            { "SELECT a FROM t WHERE NOT (x IS DISTINCT FROM y OR s IN @a)", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT (x IS NOT DISTINCT FROM y OR s IN @a)", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT t.output IN @a", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT by IN @a", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT geometry IN @a", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT end_date IN @a", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT CAST(x AS int) IN @a", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT LEFT(s, 1) IN @a", ["UnderNot"] },
+            { "SELECT a FROM t WHERE NOT x COLLATE c IN @a", ["UnderNot"] },
+            // OUTPUT opens a place only where its clause stands: before the WHERE of a statement that changes rows,
+            // and not as a name.
+            { "DELETE FROM t WHERE output NOT IN @a", ["UnderNot"] },
+            { "DELETE FROM t WHERE output IS NULL OR b NOT IN @a", ["UnderNot"] },
+            { "UPDATE t SET a = 1 WHERE output LIKE 'x%' OR b NOT IN @a", ["UnderNot"] },
+            { "DELETE t OUTPUT deleted.id WHERE output NOT IN @a", ["UnderNot"] },
+            { "UPDATE t SET a = 1 FROM output AS o JOIN u ON u.id NOT IN @a", ["UnderNot"] },
+            { "UPDATE t SET a = output OUTPUT CASE WHEN inserted.a IN @a THEN 1 END", ["InOutput"] },
+            {
+                "MERGE t USING u ON t.id = u.id WHEN MATCHED THEN DELETE OUTPUT CASE WHEN deleted.id IN @a THEN 1 END;",
+                ["InOutput"]
+            },
+            { "INSERT t (a) OUTPUT CASE WHEN inserted.a IN @a THEN 1 END VALUES (1)", ["InOutput"] },
+            {
+                "UPDATE t SET a = CASE WHEN b = 1 THEN 1 END OUTPUT CASE WHEN inserted.a IN @a THEN 1 END",
+                ["InOutput"]
+            },
+            { "UPDATE t SET a = DEFAULT OUTPUT CASE WHEN inserted.a IN @a THEN 1 END", ["InOutput"] },
+            // A place ends at the statement after it, which no ";" need end.
+            { "SELECT g FROM t GROUP BY g IF EXISTS (SELECT 1 FROM u WHERE u.id NOT IN @a) PRINT 'x'", ["UnderNot"] },
+            {
+                "SELECT g FROM t GROUP BY g DECLARE @n int = (SELECT COUNT(*) FROM u WHERE u.id NOT IN @a)",
+                ["None", "UnderNot"]
+            },
+            { "UPDATE t SET a = 1 OUTPUT inserted.a UPDATE u SET b = IIF(c NOT IN @a, 1, 0)", ["UnderNot"] },
+            {
+                "UPDATE t SET a = 1 OUTPUT inserted.a IF EXISTS (SELECT 1 FROM u WHERE u.id NOT IN @a) PRINT 'x'",
+                ["UnderNot"]
+            },
+            { "SELECT g FROM t GROUP BY g SELECT a FROM u WHERE a NOT IN @a", ["UnderNot"] },
+            {
+                "SELECT g FROM t GROUP BY g HAVING COUNT(*) > 1"
+                    + " IF EXISTS (SELECT 1 FROM u WHERE u.id NOT IN @a) PRINT 'x'",
+                ["UnderNot"]
+            },
         };
 
     // Each word, or item, ends a NOT open before it at its depth.
@@ -175,14 +249,12 @@ public sealed class SqlListPlacesTests
     [InlineData("UPDATE")]
     [InlineData("DELETE")]
     [InlineData("MERGE")]
-    [InlineData("OUTPUT")]
     [InlineData("SET")]
     [InlineData("VALUES")]
     [InlineData("IF")]
     [InlineData("WHILE")]
     [InlineData("RETURN")]
     [InlineData("FOR")]
-    [InlineData("WINDOW")]
     [InlineData("WITH")]
     [InlineData("OPTION")]
     [InlineData("INTO")]
@@ -200,8 +272,33 @@ public sealed class SqlListPlacesTests
         places.ShouldBe([SqlListPlace.None]);
     }
 
-    // OUTPUT before a join is the alias of a table.
+    // A word that can be a name, or a word of a clause where it starts none, ends no NOT.
     [Theory]
+    [InlineData("WHERE NOT a = 1 OUTPUT b IN @a")]
+    [InlineData("WHERE NOT a = 1 WINDOW b IN @a")]
+    [InlineData("WHERE NOT a = 1 THROW b IN @a")]
+    [InlineData("WHERE NOT a = 1 DECLARE b IN @a")]
+    [InlineData("WHERE NOT a = 1 PRINT b IN @a")]
+    [InlineData("WHERE NOT a = 1 RAISERROR b IN @a")]
+    [InlineData("WHERE NOT a = 1 WITHIN GROUP b IN @a")]
+    [InlineData("WHERE NOT a IS DISTINCT FROM b IN @a")]
+    public void Find_SqlServerWordThatStartsNoClauseAfterANot_EndsNothing(string sql)
+    {
+        var rules = SqlDialectRules.SqlServer;
+        var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
+
+        _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out var places);
+
+        places.ShouldBe([SqlListPlace.UnderNot]);
+    }
+
+    // The word OUTPUT before one of these items is a name, as in output.id, SET output = 1, a = output, b = 2,
+    // (output), a table's alias before a join, or a column tested or compared, and opens no place.
+    [Theory]
+    [InlineData(".")]
+    [InlineData("=")]
+    [InlineData(",")]
+    [InlineData(")")]
     [InlineData("JOIN")]
     [InlineData("INNER")]
     [InlineData("LEFT")]
@@ -210,15 +307,91 @@ public sealed class SqlListPlacesTests
     [InlineData("CROSS")]
     [InlineData("OUTER")]
     [InlineData("ON")]
-    public void Find_SqlServerOutputBeforeAJoin_IsAName(string word)
+    [InlineData("IN")]
+    [InlineData("IS")]
+    [InlineData("LIKE")]
+    [InlineData("BETWEEN")]
+    [InlineData("NOT")]
+    [InlineData("AND")]
+    [InlineData("OR")]
+    [InlineData("COLLATE")]
+    public void Find_SqlServerOutputBeforeAnItemOfAName_OpensNoPlace(string next) =>
+        PlacesOf("UPDATE t SET a = b output " + next + " c IIF(s NOT IN @a, 1, 0)").ShouldBe([SqlListPlace.UnderNot]);
+
+    // The word OUTPUT after one of these items is a name too, as in a = output, SET output = 1 or FROM output AS o.
+    // DELETE, END and DEFAULT end what may come before the clause, as in THEN DELETE OUTPUT.
+    [Theory]
+    [InlineData("=")]
+    [InlineData(",")]
+    [InlineData("AS")]
+    [InlineData("BY")]
+    [InlineData("NOT")]
+    [InlineData("AND")]
+    [InlineData("OR")]
+    [InlineData("IS")]
+    [InlineData("CASE")]
+    [InlineData("DISTINCT")]
+    [InlineData("GROUP")]
+    [InlineData("INSERT")]
+    [InlineData("UPDATE")]
+    [InlineData("MERGE")]
+    [InlineData("SELECT")]
+    [InlineData("WHERE")]
+    [InlineData("FROM")]
+    [InlineData("HAVING")]
+    [InlineData("ORDER")]
+    [InlineData("FOR")]
+    [InlineData("UNION")]
+    [InlineData("EXCEPT")]
+    [InlineData("INTERSECT")]
+    [InlineData("WITH")]
+    [InlineData("OPTION")]
+    [InlineData("INTO")]
+    [InlineData("VALUES")]
+    [InlineData("EXEC")]
+    [InlineData("EXECUTE")]
+    [InlineData("ON")]
+    [InlineData("WHEN")]
+    [InlineData("THEN")]
+    [InlineData("ELSE")]
+    [InlineData("SET")]
+    [InlineData("IF")]
+    [InlineData("WHILE")]
+    [InlineData("RETURN")]
+    [InlineData("BEGIN")]
+    [InlineData("DECLARE")]
+    [InlineData("PRINT")]
+    [InlineData("RAISERROR")]
+    public void Find_SqlServerOutputAfterAnItemOfAName_OpensNoPlace(string before) =>
+        PlacesOf("UPDATE t SET a = b " + before + " output c IIF(s NOT IN @a, 1, 0)").ShouldBe([SqlListPlace.UnderNot]);
+
+    // Between a value and an item that starts one, the word OUTPUT opens its clause, but after the statement's WHERE.
+    [Theory]
+    [InlineData("UPDATE t SET a = b output c IIF(s NOT IN @a, 1, 0)", "UnderNot, InOutput")]
+    [InlineData("DELETE t WHERE a = b output c IIF(s NOT IN @a, 1, 0)", "UnderNot")]
+    public void Find_SqlServerOutputAfterAValue_OpensItsClauseBeforeTheWhere(string sql, string expected) =>
+        PlacesOf(sql).Select(static place => place.ToString()).ShouldBe([expected]);
+
+    // A statement ends a GROUP BY and an OUTPUT before it, without a ";".
+    [Theory]
+    [InlineData("IF")]
+    [InlineData("WHILE")]
+    [InlineData("SET")]
+    [InlineData("RETURN")]
+    [InlineData("BEGIN")]
+    [InlineData("DECLARE")]
+    [InlineData("PRINT")]
+    [InlineData("RAISERROR")]
+    [InlineData("THROW")]
+    [InlineData("INSERT")]
+    [InlineData("UPDATE")]
+    [InlineData("DELETE")]
+    [InlineData("MERGE")]
+    public void Find_SqlServerStatementAfterAPlace_EndsIt(string word)
     {
-        var sql = "UPDATE t SET a = 1 FROM t output " + word + " u.id IN @a";
-        var rules = SqlDialectRules.SqlServer;
-        var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
-
-        _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out var places);
-
-        places.ShouldBe([SqlListPlace.None]);
+        PlacesOf("SELECT g FROM t GROUP BY g " + word + " IIF(s NOT IN @a, 1, 0)").ShouldBe([SqlListPlace.UnderNot]);
+        PlacesOf("UPDATE t SET a = 1 OUTPUT inserted.a " + word + " IIF(s NOT IN @a, 1, 0)")
+            .ShouldBe([SqlListPlace.UnderNot]);
     }
 
     // T-SQL puts a list in no CASE before its first WHEN, nor after IS NOT, but for a call that ends a NOT itself, so
@@ -309,6 +482,15 @@ public sealed class SqlListPlacesTests
         var with = Allocated(() => SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out _));
 
         (with - without).ShouldBe(Allocated(static () => new SqlListPlace[3]));
+    }
+
+    private static ImmutableArray<SqlListPlace> PlacesOf(string sql)
+    {
+        var rules = SqlDialectRules.SqlServer;
+        var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
+
+        _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out var places);
+        return places;
     }
 
     // What a call allocates, once the first calls have paid for one-off work and filled the pool.
