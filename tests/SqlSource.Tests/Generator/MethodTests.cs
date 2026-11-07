@@ -234,9 +234,7 @@ public sealed class MethodTests
 
         var run = MethodRuns.Run(MethodRuns.Source, users, Sidecars.Of(users, EntriesOf(users)), other);
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 /app/Repo/Zed.sql(");
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 /app/Repo/Zed.sql(");
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("class GetUserAsync");
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("SELECT 2;");
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
@@ -309,12 +307,11 @@ public sealed class MethodTests
 
         var run = MethodRuns.Run(file, [Entry(file, "GetUser", [], [Column("id")])]);
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC009 /app/Repo/Users.sql(1,10)-(1,13): A query of 'Sample' cannot be named 'Sql', because its member "
-                + "would have the name of the type that contains it",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC009 /app/Repo/Users.sql(1,10)-(1,13): A query of 'Sample' cannot be named 'Sql', because its member "
+                    + "would have the name of the type that contains it",
+            ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 

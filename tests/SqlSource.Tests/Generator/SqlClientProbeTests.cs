@@ -136,11 +136,10 @@ public sealed class SqlClientProbeTests
         );
 
         older
-            .Diagnostics.Where(diagnostic => diagnostic.StartsWith("SQLSRC270 ", StringComparison.Ordinal))
+            .Problems()
+            .Where(diagnostic => diagnostic.StartsWith("SQLSRC270 ", StringComparison.Ordinal))
             .ShouldBe([Expected]);
         DriverDiagnostics(older).ShouldHaveSingleItem().ShouldStartWith("SQLSRC267 ");
-        older.CompilationErrors.ShouldBeEmpty();
-        older.GeneratedCodeWarnings.ShouldBeEmpty();
         current.ShouldBeClean();
     }
 

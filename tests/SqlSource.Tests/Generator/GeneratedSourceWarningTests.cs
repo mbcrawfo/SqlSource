@@ -73,8 +73,7 @@ public sealed class GeneratedSourceWarningTests
             [GeneratedFile.EmbeddedAttributeName, "SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs"],
             ignoreOrder: true
         );
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
     }
 
     // An analyzer treats a file that does not start with the header as the consumer's own code, and reports in it what
@@ -127,8 +126,7 @@ public sealed class GeneratedSourceWarningTests
             references: [other]
         );
 
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
     }
 
     [Theory]

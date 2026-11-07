@@ -505,9 +505,7 @@ public sealed class ModelNameTests
                 )
                 : Run(file);
 
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        var diagnostic = run.Problems().ShouldHaveSingleItem();
         if (place == "modelNamespace")
         {
             diagnostic.ShouldStartWith($"SQLSRC019 {GeneratorHarness.ProjectSettingsPath}(");

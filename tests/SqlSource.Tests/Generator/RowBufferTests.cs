@@ -137,7 +137,6 @@ public sealed class RowBufferTests
         var run = MethodRuns.Run(file, [.. collections.Select(collection => Users(file, "List" + collection))]);
 
         run.ShouldBeClean();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldNotContain(Struct);
         Count(methods, NewBuffer).ShouldBe(collections.Length);
@@ -203,7 +202,6 @@ public sealed class RowBufferTests
         var run = MethodRuns.Run(file, [Users(file, "StreamUsers")]);
 
         run.ShouldBeClean();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
         run.Sources[MethodRuns.MethodsFile].ShouldNotContain("SqlSourceRowBuffer");
         run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
     }
@@ -219,7 +217,6 @@ public sealed class RowBufferTests
         var run = MethodRuns.Run(file, [Users(file, "StreamUsers"), Users(file, "ListUsers")]);
 
         run.ShouldBeClean();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
         var methods = run.Sources[MethodRuns.MethodsFile];
         run.Sources.Keys.ShouldContain(RowBuffer.HintName);
         Count(methods, NewBuffer).ShouldBe(1);
