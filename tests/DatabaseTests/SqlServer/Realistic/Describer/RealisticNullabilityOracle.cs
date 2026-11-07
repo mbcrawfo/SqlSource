@@ -14,6 +14,11 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Describer;
 // recorded of it, and says which columns held a NULL.
 internal static class RealisticNullabilityOracle
 {
+    // The run of a case's query with one sample, bound by the batch of RealisticSamples, on the connection to the
+    // database "realistic": the run that RealisticNullabilityChecks and RealisticMethodChecks are given.
+    public static RealisticSampleRun SampleRunOn(string connection) =>
+        (request, parameters, sample) => RunAsync(connection, RealisticSamples.Batch(request.Sql, sample, parameters));
+
     // Runs the batch of RealisticSamples, with the query's text and its declarations as parameters of their own, and
     // reads every row of its first result set, as the describer describes the first.  It runs in a transaction that is
     // rolled back, so that a query that writes leaves the seed as it was.
@@ -68,7 +73,7 @@ internal static class RealisticNullabilityOracle
     private static SqlParameter Text(string name, string value) => new(name, SqlDbType.NVarChar, -1) { Value = value };
 
     // The rollback of a query that failed, which fails too when the error ended the transaction or the connection.
-    // RealisticMethodTests rolls back a method that failed by it too.
+    // RealisticSeed rolls back a method that failed by it too.
     public static async Task RollBackAfterAsync(SqlTransaction transaction)
     {
         try

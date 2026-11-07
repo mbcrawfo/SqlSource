@@ -15,11 +15,7 @@ public sealed class RealisticNullabilitySafetyTests(PostgresDatabases postgres)
         RealisticCases.Describe,
         postgres.Major,
         postgres.RealisticConnectionString,
-        (request, parameters, sample) =>
-            RealisticNullabilityOracle.RunAsync(
-                postgres.RealisticConnectionString,
-                RealisticSamples.Substitute(request.Sql, sample, parameters)
-            )
+        RealisticNullabilityOracle.SampleRunOn(postgres.RealisticConnectionString)
     );
 
     [Theory]
