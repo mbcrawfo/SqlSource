@@ -1294,7 +1294,7 @@ See: [List parameters](parameters-and-tokens.md#list-parameters)
 
 **Negated list stands where SQL Server refuses an empty list**
 
-A [list](parameters-and-tokens.md#list-parameters) of a SQL Server query whose output is `codegen` stands after a `NOT`, as in `category NOT IN @categories` or `NOT (category IN @categories)`, and inside an aggregate such as `COUNT` or `SUM`, in a `GROUP BY`, or in an `OUTPUT` clause.  SQL Server refuses the form that the query method sends an empty list in there, so the method would fail whenever the list is empty or null.  An aggregate that `OVER` follows is not one of these places, and a list there that no `NOT` reaches runs empty.  The message names the list and where it stands.
+A [list](parameters-and-tokens.md#list-parameters) of a SQL Server query whose output is `codegen` stands after a `NOT`, as in `category NOT IN @categories` or `NOT (category IN @categories)`, and inside an aggregate such as `COUNT` or `SUM`, in a `GROUP BY`, or in an `OUTPUT` clause.  SQL Server refuses the form that the query method sends an empty list in there, so the method would fail whenever the list is empty or null.  The aggregates of `geometry` and `geography`, such as `geometry::UnionAggregate`, are aggregates too, and an aggregate that `OVER` follows is not one of these places.  A `NOT` reaches only the condition it stands in: one in a `WHERE` reaches no list in the `HAVING` after it, and one before a `CASE` or an `IIF` no list in its `WHEN` or its condition.  A list that no `NOT` reaches runs empty everywhere.  The message names the list and where it stands.
 
 ```sql error
 -- name: CountOtherProducts

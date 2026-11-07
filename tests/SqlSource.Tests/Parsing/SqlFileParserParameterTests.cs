@@ -899,6 +899,17 @@ public sealed class SqlFileParserParameterTests
             .ShouldHaveSingleItem()
             .CodeGenErrors.ShouldBeEmpty();
 
+    // A NOT ends at the clause after it, so the NOT of a WHERE never reaches a list in the HAVING after it.
+    [Fact]
+    public void Parse_SqlServerNotInAWhereBeforeAnAggregate_HasNone() =>
+        Blocks(
+                "-- name: Q\nSELECT g, COUNT(*) AS c FROM t WHERE NOT EXISTS (SELECT 1 FROM u WHERE u.id = t.id)"
+                    + " GROUP BY g HAVING SUM(CASE WHEN s IN @ids THEN 1 END) > 0\n",
+                dialect: SqlDialect.SqlServer
+            )
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBeEmpty();
+
     // A name the query declares is a variable of the batch, and no list.
     [Fact]
     public void Parse_DeclaredVariableNegatedInAnAggregate_HasNone() =>

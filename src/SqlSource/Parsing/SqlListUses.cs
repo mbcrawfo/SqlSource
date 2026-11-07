@@ -213,7 +213,7 @@ internal static partial class SqlListUses
                 var isList = afterIn && !(open is { Count: > 0 } && open[open.Count - 1].IsPosition);
                 var use = Classify(isList, notHere || notAbove, cursor);
                 hasList |= use is SqlParameterUse.List or SqlParameterUse.NegatedList;
-                reader.Parameter(uses.Count, use, notHere || notAbove);
+                reader.Parameter(uses.Count, use);
                 conditions.Parameter(uses.Count, use);
                 uses.Add(use);
             }

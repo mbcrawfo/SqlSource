@@ -111,6 +111,24 @@ public sealed class SqlListSegmentsTests
                 Literal(";"),
             ]);
 
+    // A NOT ends at the clause after it, so the list in the HAVING after a WHERE NOT is sent empty as one NULL.
+    [Fact]
+    public void Split_SqlServerListAfterTheClauseOfANot_IsEmptyAsNull() =>
+        Blocks(
+                "-- name: Q\nSELECT g FROM t WHERE NOT EXISTS (SELECT 1 FROM u WHERE u.id = t.id)"
+                    + " GROUP BY g HAVING SUM(CASE WHEN s IN @ids THEN 1 END) > 0;\n",
+                dialect: SqlServer
+            )
+            .ShouldHaveSingleItem()
+            .Segments.ShouldBe([
+                Literal(
+                    "SELECT g FROM t WHERE NOT EXISTS (SELECT 1 FROM u WHERE u.id = t.id)"
+                        + " GROUP BY g HAVING SUM(CASE WHEN s IN "
+                ),
+                List("@ids", emptyIsNull: true),
+                Literal(" THEN 1 END) > 0;"),
+            ]);
+
     // The kept form's uses are the same uses, and take the same empty forms.
     [Fact]
     public void Split_SqlServerKeptForm_IsEmptyAsNullToo() =>
