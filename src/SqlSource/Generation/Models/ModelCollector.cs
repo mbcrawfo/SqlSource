@@ -200,7 +200,8 @@ internal static class ModelCollector
                         request.Source.QueryIndex,
                         request.Role,
                         typeText,
-                        first.Kind
+                        first.Kind,
+                        isPublic
                     )
                 );
             }

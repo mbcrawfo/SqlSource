@@ -649,6 +649,41 @@ public sealed class PlacementTests
         );
     }
 
+    // A model is public when a public type shares it, so the public extension method of a type that is not public
+    // takes and returns public models when a public type claims its file too.  The types' namespaces differ, so that
+    // their extension methods do not clash, and the models' namespace is one.
+    [Fact]
+    public void Run_PublicMethodOfAnInternalTypeWithSharedPublicModels_Compiles()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = "Users.sql")]
+                public partial class Sample;
+            }
+
+            namespace App.Internal
+            {
+                [SqlSourceGenerate(Source = "Users.sql")]
+                internal partial class Other;
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- model-namespace: App.Models\n\n-- name: GetUser\n-- visibility: public\n"
+                + "SELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(Source, file, Sidecars.Of(file, UserEntry(file)));
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("    public static partial class SampleExtensions\n");
+        run.Sources["App.Internal.Other-Methods.g.cs"]
+            .ShouldContain("    public static partial class OtherExtensions\n");
+    }
+
     // A constant or a token method takes no models, so it may be public or protected on a type that a derived type of
     // another assembly reaches, on the type or in its nested class.
     [Theory]

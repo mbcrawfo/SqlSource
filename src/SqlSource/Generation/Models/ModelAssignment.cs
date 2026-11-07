@@ -18,13 +18,17 @@ namespace SqlSource.Generation.Models;
 /// The model as code names it from anywhere: <c>global::</c> and its full name as code writes it.
 /// </param>
 /// <param name="Kind">The generated model's shape, which the request got whichever it asked for.</param>
+/// <param name="IsPublic">
+/// Whether the generated model is public, as <see cref="Model.IsPublic" /> is; otherwise it is internal.
+/// </param>
 internal sealed record ModelAssignment(
     string ClaimingType,
     string NormalizedPath,
     int QueryIndex,
     ModelRole Role,
     string TypeText,
-    ModelKind Kind
+    ModelKind Kind,
+    bool IsPublic
 )
 {
     /// <summary>
