@@ -340,6 +340,9 @@ public sealed class SqlServerRenamingTests
     [InlineData("SELECT $+12 AS price")]
     [InlineData("SELECT $.5 AS price")]
     [InlineData("SELECT $-.5 AS price")]
+    [InlineData("SELECT $ -12 AS price")]
+    [InlineData("SELECT $\t12 AS price")]
+    [InlineData("SELECT $- 12 AS price")]
     public void Sql_AMoneyLiteral_IsKept(string sql)
     {
         var (renamed, mapping, refusal) = RenameQuery(sql);
@@ -356,6 +359,16 @@ public sealed class SqlServerRenamingTests
     [InlineData("SELECT $1_000", "$1_000")]
     [InlineData("SELECT $12abc", "$12abc")]
     [InlineData("SELECT $1.2.3", "$1.2.3")]
+    [InlineData("SELECT $-1e5", "$-1e5")]
+    [InlineData("SELECT $+1e5", "$+1e5")]
+    [InlineData("SELECT $ 1e5", "$ 1e5")]
+    [InlineData("SELECT $ -1e5", "$ -1e5")]
+    [InlineData("SELECT $.5e3", "$.5e3")]
+    [InlineData("SELECT $-.5e3", "$-.5e3")]
+    [InlineData("SELECT $-12.5e3", "$-12.5e3")]
+    [InlineData("SELECT $-1_000", "$-1_000")]
+    [InlineData("SELECT $ 1_000", "$ 1_000")]
+    [InlineData("SELECT $ 12abc", "$ 12abc")]
     public void Sql_AMoneyLiteralWithMore_IsRefused(string sql, string token)
     {
         var (_, _, refusal) = RenameQuery(sql);
@@ -377,6 +390,8 @@ public sealed class SqlServerRenamingTests
 
     [Theory]
     [InlineData("SELECT $")]
+    [InlineData("SELECT $.")]
+    [InlineData("SELECT $ -")]
     [InlineData("SELECT 1 /*+ $*/")]
     public void Sql_ADollarAtTheEnd_IsKept(string sql)
     {
@@ -399,6 +414,9 @@ public sealed class SqlServerRenamingTests
         TokenCheck
             .Check(Engine, mapping, [], $"-- name: {query}\nSELECT $1e5", expected: null)
             .ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "$1e5"));
+        TokenCheck
+            .Check(Engine, mapping, [], $"-- name: {query}\nSELECT $ -1e5", expected: null)
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "$ -1e5"));
     }
 
     [Fact]

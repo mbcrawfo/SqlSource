@@ -46,9 +46,11 @@ internal sealed partial class SqlRenamer(
     /// <see cref="IEngineRenaming.IsNumberStart" /> says one does: its end, and whether the run is a number, which is
     /// kept, or is refused whole.  A run from an ASCII digit ends by <see cref="NumberRunEnd" /> and is a number by
     /// <see cref="IsNumber" />.  A run from any other character, a sign such as SQL Server's <c>$</c>, is the sign
-    /// alone, or the sign and the run from the ASCII digit that follows it, which must be digits, then optionally
-    /// <c>.</c> and digits, with no exponent and no <c>_</c>, since SQL Server reads <c>$1e5</c> as
-    /// <c>$1 AS e5</c>.  The SQL renamer, the token check and the tests' leak search all read a number by this.
+    /// and, after any spaces and one optional <c>+</c> or <c>-</c>, the run from the ASCII digit or the <c>.</c> and
+    /// digit that follow, which must be digits, then optionally <c>.</c> and digits, with no exponent and no
+    /// <c>_</c>, since SQL Server reads <c>$1e5</c> and <c>$ -1e5</c> as money and the alias <c>e5</c>; it is the sign
+    /// alone when nothing of a number follows.  The SQL renamer, the token check and the tests' leak search all read
+    /// a number by this.
     /// </summary>
     /// <returns>The run, or null when no number starts there.</returns>
     internal static (int End, bool IsNumber)? NumberAt(IEngineRenaming engine, string text, int at, int end)
@@ -65,9 +67,25 @@ internal sealed partial class SqlRenamer(
         }
 
         var digits = at + 1;
-        if (digits == end || !char.IsAsciiDigit(text[digits]))
+        while (digits < end && text[digits] == ' ')
         {
-            return (digits, true);
+            digits++;
+        }
+
+        if (digits < end && text[digits] is '+' or '-')
+        {
+            digits++;
+        }
+
+        var startsDecimal =
+            digits < end
+            && (
+                char.IsAsciiDigit(text[digits])
+                || (text[digits] == '.' && digits + 1 < end && char.IsAsciiDigit(text[digits + 1]))
+            );
+        if (!startsDecimal)
+        {
+            return (at + 1, true);
         }
 
         var signedEnd = NumberRunEnd(engine, text, digits, end);
@@ -141,13 +159,15 @@ internal sealed partial class SqlRenamer(
         return at == text.Length;
     }
 
-    // ASCII digits, then optionally . and digits, which may be none.
+    // ASCII digits, then optionally . and digits, with a digit on one side of the . at least: 12, 12., 12.5 and .5.
     private static bool IsDecimal(ReadOnlySpan<char> text)
     {
         var at = 0;
+        var digits = 0;
         while (at < text.Length && char.IsAsciiDigit(text[at]))
         {
             at++;
+            digits++;
         }
 
         if (at < text.Length && text[at] == '.')
@@ -156,10 +176,11 @@ internal sealed partial class SqlRenamer(
             while (at < text.Length && char.IsAsciiDigit(text[at]))
             {
                 at++;
+                digits++;
             }
         }
 
-        return at > 0 && at == text.Length;
+        return digits > 0 && at == text.Length;
     }
 
     // The end of the digits from the index, each _ between two of them; the index itself when no digit is there.
