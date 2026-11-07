@@ -4,7 +4,7 @@ How a bundle, `replay` and the renaming work: [`bundles.md`](../../../docs/archi
 
 ## The bundle and `replay`
 
-- **`BundleReplay.cs` is the one replay of a bundle**, whose steps `ReplayCommand` and `Renaming/RenamingProof.cs` share.  A second way to replay one would let the proof pass a bundle that `replay` does not reproduce.
+- **`BundleReplay.cs` is the one replay of a bundle**, whose steps `ReplayCommand`, `DiagnoseRun.cs`'s `--scrub` and `Renaming/RenamingProof.cs` share, the first two through `Prepare`.  A second way to replay one would let the proof pass a bundle that `replay` does not reproduce.
 - **A question the capture does not answer is `ReplayOutcome.Missed`, never an exception that reaches `Cli`**: it is a bundle of another version, `SQLSRC290`, and no bug.
 - **A bundle reads no log and holds none.**  `replay`'s lines are built from the describer's events by `ReplayLines.cs`, so no describer writes a line for `replay`.
 - **Every error of reading or replaying a bundle is built by `BundleErrors.cs`**, at the bundle's path, so the command and the tests share its texts.

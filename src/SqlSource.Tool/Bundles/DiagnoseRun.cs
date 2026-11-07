@@ -65,10 +65,8 @@ internal static class DiagnoseRun
         CancellationToken cancellationToken
     )
     {
-        var outPath = Path.GetFullPath(output.Text, host.WorkingDirectory);
-        if (RefusedOutOf(outPath) is { } refused)
+        if (OutPathOf(output, host, reporter) is not { } outPath)
         {
-            reporter.Report(refused);
             return;
         }
 
@@ -148,10 +146,8 @@ internal static class DiagnoseRun
         CancellationToken cancellationToken
     )
     {
-        var outPath = Path.GetFullPath(output.Text, host.WorkingDirectory);
-        if (RefusedOutOf(outPath) is { } refused)
+        if (OutPathOf(output, host, reporter) is not { } outPath)
         {
-            reporter.Report(refused);
             return;
         }
 
@@ -167,33 +163,10 @@ internal static class DiagnoseRun
         }
 
         var bundle = read.Value;
-        var capture = BundleReplay.CaptureOf(bundle, path);
-        if (!capture.Succeeded)
+        var prepared = BundleReplay.Prepare(bundle, path, host.Describers, cancellationToken);
+        if (!prepared.Succeeded)
         {
-            Report(capture.Failure);
-            return;
-        }
-
-        var engine = BundleReplay.EngineOf(bundle);
-        var planned = BundleReplay.Plan(bundle, engine, path, cancellationToken);
-        if (!planned.Succeeded)
-        {
-            Report(planned.Failure);
-            return;
-        }
-
-        var dialect = planned.Value.Dialect;
-        var describer = BundleDescribers.For(dialect, host.Describers, bundle.ExplainSettings, engine, path);
-        if (!describer.Succeeded)
-        {
-            Report(describer.Failure);
-            return;
-        }
-
-        var expected = BundleReplay.ExpectedOf(bundle, path);
-        if (!expected.Succeeded)
-        {
-            Report(expected.Failure);
+            Report(prepared.Failure);
             return;
         }
 
@@ -203,7 +176,15 @@ internal static class DiagnoseRun
             return;
         }
 
-        await RenameAndWriteAsync(bundle, describer.Value, dialect, outPath, host, reporter, cancellationToken);
+        await RenameAndWriteAsync(
+            bundle,
+            prepared.Value.Describer,
+            prepared.Value.Dialect,
+            outPath,
+            host,
+            reporter,
+            cancellationToken
+        );
     }
 
     // The plan with the query's file as its one filter, and the query of the file it names, or null when the plan or
@@ -390,6 +371,19 @@ internal static class DiagnoseRun
                 + "the mapping holds your own names: keep it private, outside your project's folder, since a build "
                 + "may copy a .json file into its output"
         );
+    }
+
+    // The full path of --out, or null when it names a file of the run, which is reported.
+    private static string? OutPathOf(UsageValue output, ToolHost host, Reporter reporter)
+    {
+        var outPath = Path.GetFullPath(output.Text, host.WorkingDirectory);
+        if (RefusedOutOf(outPath) is not { } refused)
+        {
+            return outPath;
+        }
+
+        reporter.Report(refused);
+        return null;
     }
 
     // The SQLSRC218 of an --out that names a file of the run, which is refused before anything is described, or null.

@@ -208,42 +208,16 @@ internal static class ReplayCommand
             await host.Out.WriteLineAsync(Cli.LinePrefix + "this bundle is not renamed, and must not be posted");
         }
 
-        var capture = BundleReplay.CaptureOf(bundle, path);
-        if (!capture.Succeeded)
-        {
-            Report(capture.Failure);
-            return 0;
-        }
-
-        var engine = BundleReplay.EngineOf(bundle);
-        var planned = BundleReplay.Plan(bundle, engine, path, cancellationToken);
-        if (!planned.Succeeded)
-        {
-            Report(planned.Failure);
-            return 0;
-        }
-
-        var (query, dialect) = planned.Value;
-        var describer = BundleDescribers.For(dialect, host.Describers, bundle.ExplainSettings, engine, path);
-        if (!describer.Succeeded)
-        {
-            Report(describer.Failure);
-            return 0;
-        }
-
         // Before the replay, so that a bundle whose answer cannot be read is not replayed for nothing.
-        var expected = BundleReplay.ExpectedOf(bundle, path);
-        if (!expected.Succeeded)
+        var prepared = BundleReplay.Prepare(bundle, path, host.Describers, cancellationToken);
+        if (!prepared.Succeeded)
         {
-            Report(expected.Failure);
+            Report(prepared.Failure);
             return 0;
         }
 
         var replayed = await BundleReplay.RunAsync(
-            query,
-            dialect,
-            capture.Value,
-            describer.Value,
+            prepared.Value,
             new ReplayLines(reporter.Trace.Log, host.Out, verbose),
             host.Time,
             cancellationToken
@@ -254,7 +228,7 @@ internal static class ReplayCommand
             return 0;
         }
 
-        return await SayAsync(host.Out, bundle.Info, expected.Value, replayed);
+        return await SayAsync(host.Out, bundle.Info, prepared.Value.Expected, replayed);
     }
 
     // The outcome's lines, and the command's exit code.
@@ -319,8 +293,7 @@ internal static class ReplayCommand
         outcome switch
         {
             ReplayOutcome.Described => "an entry",
-            ReplayOutcome.Refused { Step: { } step } refused => $"{refused.Id} at {step}",
-            ReplayOutcome.Refused refused => refused.Id,
+            ReplayOutcome.Refused refused => refused.ShortText,
             // A miss is reported, and never compared or printed.
             _ => throw new InvalidOperationException($"An outcome of {outcome.GetType().Name} has no text."),
         };

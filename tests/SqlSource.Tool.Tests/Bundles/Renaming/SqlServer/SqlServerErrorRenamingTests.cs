@@ -561,10 +561,7 @@ public sealed partial class SqlServerErrorRenamingTests
         planned.Failure.ShouldBeNull();
         var (planQuery, dialect) = planned.Value;
         var replayed = await BundleReplay.RunAsync(
-            planQuery,
-            dialect,
-            read.Value,
-            new SqlServerDescriber(),
+            new PreparedReplay(planQuery, dialect, read.Value, new SqlServerDescriber(), Expected: null),
             NullRunLog.Instance,
             new TestClock(),
             token

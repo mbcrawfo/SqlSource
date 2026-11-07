@@ -42,15 +42,14 @@ Every error is `SQLSRC288` or `SQLSRC289` at the path, built by [`BundleErrors`]
 
 ```mermaid
 flowchart LR
-    read["BundleReader.Read"] --> capture["BundleReplay.CaptureOf"]
-    capture --> plan["BundleReplay.EngineOf, Plan"]
-    plan --> describer["BundleDescribers.For"]
-    describer --> expected["BundleReplay.ExpectedOf"]
-    expected --> run["BundleReplay.RunAsync"]
+    read["BundleReader.Read"] --> prepare["BundleReplay.Prepare: CaptureOf, EngineOf, Plan, BundleDescribers.For, ExpectedOf"]
+    prepare --> run["BundleReplay.RunAsync"]
     run --> say["reproduced, not reproduced, or replayed"]
 ```
 
 ### The steps
+
+`BundleReplay.Prepare` runs steps 2 to 5 in this order and gives a `PreparedReplay` for `RunAsync`, or the first step's error; each step keeps what it reports.  `RenamingProof` calls the steps apart, since its describer is not `BundleDescribers.For`'s.
 
 1. **Read.**  The path is made full against `ToolHost.WorkingDirectory` and read by `BundleReader.Read`.  When `bundle.json` says the bundle is not renamed, `replay` prints `sqlsource: this bundle is not renamed, and must not be posted`.
 2. **The capture.**  `CaptureOf` reads `captureVersion` first: one above `DescribeCapture.Version` is `SQLSRC289`.  Any other failure of `CaptureJson.Read` is `SQLSRC288`, its sentence made a reason, and so is an engine of `bundle.json` other than the capture's.
@@ -90,7 +89,7 @@ flowchart LR
     run --> raw["DiagnoseBundles.Raw"]
     raw -->|"--no-obfuscate"| write
     raw --> rename["BundleRenamer.RenameAsync"]
-    scrub["--scrub: BundleReader.Read, BundleReplay's steps"] --> rename
+    scrub["--scrub: BundleReader.Read, BundleReplay.Prepare"] --> rename
     rename --> write["BundleWriter.Write, MappingFile.Write"]
 ```
 
@@ -110,7 +109,7 @@ flowchart LR
 
 ### The run of `--scrub`
 
-`--out` is refused as above.  Then the bundle is read and checked by the steps `replay` takes, `BundleReader.Read`, `BundleReplay.CaptureOf`, `EngineOf` and `Plan`, `BundleDescribers.For` and `ExpectedOf`, each error at the bundle and named as `replay` names it (`ReplayCommand.AsNamed`).  A bundle whose `bundle.json` says it is renamed, or that has none, is `SQLSRC295` (`BundleErrors.NotRaw`), since only a bundle that `diagnose` wrote raw says what made it.  The rest is step 7 above.  No database, project or MSBuild is asked: `DiagnoseScrubTests` checks that the process runner gets no new request, under an exchange that throws if it is asked.
+`--out` is refused as above.  Then the bundle is read and checked by the steps `replay` takes, `BundleReader.Read` and `BundleReplay.Prepare`, each error at the bundle and named as `replay` names it (`ReplayCommand.AsNamed`).  A bundle whose `bundle.json` says it is renamed, or that has none, is `SQLSRC295` (`BundleErrors.NotRaw`), since only a bundle that `diagnose` wrote raw says what made it.  The rest is step 7 above.  No database, project or MSBuild is asked: `DiagnoseScrubTests` checks that the process runner gets no new request, under an exchange that throws if it is asked.
 
 ### Writing and printing
 
