@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using SqlSource.Parsing.Quoting;
 using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
@@ -11,14 +12,18 @@ namespace SqlSource.Tool.Describing.SqlServer.Statements;
 /// <remarks>
 /// <para>
 /// A type is a name of one or two parts joined by a dot, with any spaces and tabs around it, each part a plain
-/// identifier (a letter of any script, <c>_</c>, <c>@</c> or <c>#</c>, then those, digits of any script and <c>$</c>,
-/// as the server reads one), a bracketed one with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for
-/// a quote; then, after any spaces, one or two numbers in parentheses, or a name in parentheses, an XML schema
-/// collection's after <c>CONTENT</c> or <c>DOCUMENT</c> in any case or not, of which <c>(max)</c> is one; and
-/// nothing else but spaces at either end.  A comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open
-/// and a line break are refused, each with what was found.  A plain identifier that holds a combining mark, a letter
-/// number or a format character after its first character is refused, though the server takes it, and is written in
-/// brackets (TD-0076).
+/// identifier (a letter or a letter number of any script, <c>_</c>, <c>@</c> or <c>#</c>, then those, digits of any
+/// script, combining marks, format characters, connectors and <c>$</c>, as the server reads one), a bracketed one
+/// with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for a quote; then, after any spaces, one or two
+/// numbers in parentheses, or a name in parentheses, an XML schema collection's after <c>CONTENT</c> or
+/// <c>DOCUMENT</c> in any case or not, of which <c>(max)</c> is one; and nothing else but spaces at either end.  A
+/// comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open and a line break are refused, each with what
+/// was found.
+/// </para>
+/// <para>
+/// The server reads a plain identifier by the tables of Unicode 3.2, and this reader by the current ones of .NET, so a
+/// character added or recategorised since can differ: <c>ꞔ</c> is taken here and refused by the server, and <c>・</c>
+/// after the first character is refused here and taken by the server, which a name in brackets avoids.
 /// </para>
 /// <para>
 /// It is the first refusal and not the guarantee: a declaration reaches the server only as the value of a parameter
@@ -258,9 +263,13 @@ internal static class DeclaredTypeText
         return position > start;
     }
 
-    // A plain identifier of T-SQL as the server reads one: a letter of any script, "_", "#" or "@" first, then those,
-    // a digit of any script or "$".  A name with any other character is written in brackets.
-    private static bool IsFirst(char value) => char.IsLetter(value) || (value is '_' or '#' or '@');
+    // A plain identifier of T-SQL as the server reads one: a letter or a letter number of any script, "_", "#" or "@"
+    // first, then what QuoteReader.IsNameCharacterOfSqlServer takes.  A name with any other character is written in
+    // brackets.
+    private static bool IsFirst(char value) =>
+        char.IsLetter(value)
+        || (value is '_' or '#' or '@')
+        || char.GetUnicodeCategory(value) == UnicodeCategory.LetterNumber;
 
     private static bool IsNext(char value) => QuoteReader.IsNameCharacterOfSqlServer(value);
 

@@ -292,6 +292,38 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         failure.ServerLines[0].ShouldStartWith("Msg 2715: ");
     }
 
+    // The server takes a combining mark, a letter number, a format character and a connector after a name's first
+    // character, and a letter number first, so it reads each as a name and says that the database lacks the type.
+    [Theory]
+    [InlineData("dbo.x\u0301")]
+    [InlineData("dbo.x\u0903")]
+    [InlineData("dbo.xⅠ")]
+    [InlineData("dbo.x\u200C")]
+    [InlineData("dbo.x‿")]
+    [InlineData("dbo.x＿")]
+    [InlineData("dbo.Ⅰx")]
+    [InlineData("dbo.〇x")]
+    public async Task DescribeAsync_DeclaredNameTheServerTakes_IsATypeTheDatabaseLacks(string type)
+    {
+        var failure = await ShouldFailAsync(Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", type)), "SQLSRC228");
+
+        failure.Arguments.ShouldBe([type, "@p", Query, DescribeFailures.NoSuchType]);
+    }
+
+    // The server reads a name by Unicode 3.2's tables, which lack a letter added since: the reader takes it, and the
+    // server refuses it with error 102.
+    [Fact]
+    public async Task DescribeAsync_LetterNewerThanTheServer_IsNotAType()
+    {
+        var failure = await ShouldFailAsync(
+            Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "dbo.ꞔ")),
+            "SQLSRC228"
+        );
+
+        failure.Arguments.ShouldBe(["dbo.ꞔ", "@p", Query, SqlServerErrors.NotAType]);
+        failure.ServerLines[0].ShouldStartWith("Msg 102");
+    }
+
     // The server reads an XML schema collection's name as part of the type, and says that the database lacks it.
     [Fact]
     public async Task DescribeAsync_XmlOfACollectionTheDatabaseLacks_IsNoSuchCollection()

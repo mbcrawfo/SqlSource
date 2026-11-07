@@ -55,6 +55,15 @@ public sealed class DeclaredTypeTextTests
     [InlineData("[dbo] . [Email]")]
     [InlineData("xml(dbo . S)")]
     [InlineData("xml(CONTENT dbo . S)")]
+    [InlineData("dbo.x\u0301")]
+    [InlineData("dbo.x\u0903")]
+    [InlineData("dbo.xⅠ")]
+    [InlineData("dbo.x\u200C")]
+    [InlineData("dbo.ꞔ")]
+    [InlineData("x‿")]
+    [InlineData("x＿")]
+    [InlineData("Ⅰx")]
+    [InlineData("〇x")]
     public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.ShouldBe(text);
 
     // A delimited name holds anything but its own closing delimiter alone, so what looks like a second statement
@@ -115,6 +124,11 @@ public sealed class DeclaredTypeTextTests
     [InlineData("€type", DeclaredTypeText.Shape)]
     [InlineData("٣x", DeclaredTypeText.Shape)]
     [InlineData("x²", DeclaredTypeText.Shape)]
+    [InlineData("\u0301x", DeclaredTypeText.Shape)]
+    [InlineData("\u200Cx", DeclaredTypeText.Shape)]
+    [InlineData("dbo.\u0301x", DeclaredTypeText.Shape)]
+    [InlineData("x𝒳", DeclaredTypeText.Shape)]
+    [InlineData("𝒳", DeclaredTypeText.Shape)]
     [InlineData("a.b.c", TypeNameFound.Parts)]
     [InlineData("a . b . c", TypeNameFound.Parts)]
     [InlineData("a. b .c", TypeNameFound.Parts)]
