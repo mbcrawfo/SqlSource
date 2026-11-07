@@ -20,7 +20,7 @@ public sealed class SqlRenamerTests
     )
     {
         var engine = new FakeEngineRenaming(dialect);
-        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold);
+        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold, engine.Spelled);
         var parameters = new HashSet<string>(queryParameters, SqlParameterName.Comparer);
         return (new SqlRenamer(engine, mapping, parameters, RenamingCopies.None), mapping, []);
     }
@@ -35,8 +35,8 @@ public sealed class SqlRenamerTests
 
     private static string Of(NameMapping mapping, string spelling, bool quoted = false)
     {
-        mapping.TryGet(spelling, quoted, out var replacement).ShouldBeTrue(spelling);
-        return replacement;
+        mapping.IsMapped(spelling, quoted).ShouldBeTrue(spelling);
+        return mapping.Name(spelling, quoted, NameClass.Alias);
     }
 
     // The dialect of a theory's row, which names it as a query file does.
@@ -181,7 +181,7 @@ public sealed class SqlRenamerTests
     public void Rename_CopyOfAReusedParameter_IsRenamedThroughIt()
     {
         var engine = new FakeEngineRenaming(SqlDialect.SqlServer);
-        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold);
+        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold, engine.Spelled);
         var request = new JsonObject
         {
             ["copies"] = FakeEngineRenaming.Copies(("before_1", "before", "_1"), ("Before__x", "before", "_2")),

@@ -183,7 +183,7 @@ internal sealed class RenamingRun
 
         var (stem, mark) = MarkOf(value);
         var quoted = IsQuoted(cls);
-        if (engineRow && !Mapping.TryGet(stem, quoted, out _))
+        if (engineRow && !Mapping.IsMapped(stem, quoted))
         {
             return value;
         }
@@ -198,7 +198,7 @@ internal sealed class RenamingRun
 
         public void Keep(string spelling, bool quoted) => run.Mapping.Keep(spelling, quoted);
 
-        public bool IsMapped(string spelling, bool quoted) => run.Mapping.TryGet(spelling, quoted, out _);
+        public bool IsMapped(string spelling, bool quoted) => run.Mapping.IsMapped(spelling, quoted);
 
         public string Literal(string content) => run.Mapping.Literal(content);
 

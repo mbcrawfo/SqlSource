@@ -306,7 +306,7 @@ public sealed partial class SqlServerErrorRenamingTests
     }
 
     [Fact]
-    public async Task RenameAsync_ANameThatDiffersFromTheCatalogsByCaseAlone_IsRefusedByTheProof()
+    public async Task RenameAsync_ANameThatDiffersFromTheCatalogsByCaseAlone_IsRenamed()
     {
         const string Column = "email";
         const string Upper = "EMAIL";
@@ -335,14 +335,72 @@ public sealed partial class SqlServerErrorRenamingTests
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
         TableMatchOf(raw).ShouldBe("names-differ");
 
-        var refusal = await RefusedAsync(raw);
+        var renamed = await RenamedAsync(raw);
 
-        // The tool matches the column to the table's ordinally, so the raw entry matches no table; renamed, the two
-        // spellings are one name, the column matches, and the proof finds the entry changed.
-        refusal.Step.ShouldBe(RefusalStep.Replay);
-        refusal.Place.ShouldBe("expected.json");
-        refusal.Token.ShouldNotBeNull().ShouldStartWith("matchesTable: null -> ");
+        // The tool matches the column to the table's ordinally, so the two spellings stay apart by ordinal, in
+        // replacements that are one name ignoring case: the query holds the spelling it was written with, and the
+        // capture holds that one and the table's own.
+        TableMatchOf(renamed.Bundle).ShouldBe("names-differ");
+        var replacements = renamed
+            .Mapping.Where(static name => name.Class == NameClass.Column && name.Original is Column or Upper)
+            .Select(static name => name.Replacement)
+            .ToList();
+        replacements.Count.ShouldBe(2);
+        replacements.Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
+        string.Equals(replacements[0], replacements[1], StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
+        renamed.Bundle.Query.ShouldContain(renamed.Mapping.Single(static name => name.Original == Upper).Replacement);
+        replacements.ShouldAllBe(replacement => renamed.Bundle.Capture.Contains(replacement, StringComparison.Ordinal));
+        BundleLeaks
+            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+            .ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task RenameAsync_AParameterSpelledInTwoCases_IsOneParameter()
+    {
+        const string Fixture = "insert-declared";
+        var raw = await EditedAsync(
+            Fixture,
+            capture =>
+            {
+                foreach (var call in capture["calls"]!.AsArray().Select(static call => call!.AsObject()))
+                {
+                    foreach (var member in RequestTexts)
+                    {
+                        if (call["request"]![member] is { } text)
+                        {
+                            call["request"]![member] = text.GetValue<string>()
+                                .Replace("@nickname", "@NICKNAME", StringComparison.Ordinal);
+                        }
+                    }
+                }
+            },
+            WithUpperNickname
+        );
+        raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
+
+        var renamed = await RenamedAsync(raw);
+
+        renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
+        var replacements = renamed
+            .Mapping.Where(static name =>
+                name.Class == NameClass.Parameter
+                && string.Equals(name.Original, "NICKNAME", StringComparison.OrdinalIgnoreCase)
+            )
+            .Select(static name => name.Replacement)
+            .ToList();
+        replacements.ShouldNotBeEmpty();
+        replacements.ShouldAllBe(replacement =>
+            string.Equals(replacement, replacements[0], StringComparison.OrdinalIgnoreCase)
+        );
+        BundleLeaks
+            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+            .ShouldBeEmpty();
+    }
+
+    // The values' use of the parameter "@nickname" written in upper case, which its declaration and other uses are not.
+    private static string WithUpperNickname(string text) =>
+        text.Replace("@email, @nickname, @credit", "@email, @NICKNAME, @credit", StringComparison.Ordinal);
 
     // update-copies-agree with its reused parameter "before" written as the one given, in query.sql and in every
     // string of the capture that names it or a copy of it, and the answer of "parameters" the error 11502 that names

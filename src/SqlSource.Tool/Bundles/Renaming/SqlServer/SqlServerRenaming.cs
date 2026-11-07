@@ -17,7 +17,8 @@ namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
 /// by <see cref="SqlServerMessages" />.
 /// </summary>
 /// <remarks>
-/// A name folds ignoring case whatever the database's collation, which no member is given.  SQL Server has no plan
+/// A name folds ignoring case whatever the database's collation, which no member is given, and each spelling keeps a
+/// case of its own through <see cref="Spelled" />.  SQL Server has no plan
 /// and the describer asks no list in name order, so it registers and derives nothing: the tool's <c>AS [1]</c> is
 /// kept as its word, and a copy of a reused parameter comes through <see cref="CopiesIn" />.
 /// </remarks>
@@ -59,6 +60,8 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     public bool IsWordPart(char character) => QuoteReader.IsNameCharacterOfSqlServer(character);
 
     public string Fold(string spelling, bool quoted) => SqlServerVocabulary.Fold(spelling);
+
+    public string Spelled(string spelling, bool quoted) => spelling;
 
     /// <summary>
     /// A word of the vocabulary; the ASCII digits of the tool's <c>AS [1]</c>; or the assembly-qualified name of a

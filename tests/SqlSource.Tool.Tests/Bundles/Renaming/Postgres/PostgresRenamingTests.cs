@@ -20,6 +20,13 @@ public sealed class PostgresRenamingTests
     private const string Fixture = "select-declared-domain";
 
     [Fact]
+    public void Spelled_IsTheFold()
+    {
+        PostgresRenaming.Instance.Spelled("Users", false).ShouldBe("users");
+        PostgresRenaming.Instance.Spelled("Users", true).ShouldBe("Users");
+    }
+
+    [Fact]
     public async Task RenameAsync_SelectDeclaredDomain_RenamesAndReplays()
     {
         var fixture = PostgresRenamings.Fixture(Fixture);

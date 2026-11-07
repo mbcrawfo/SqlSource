@@ -40,6 +40,15 @@ internal interface IEngineRenaming
     string Fold(string spelling, bool quoted);
 
     /// <summary>
+    /// A spelling as the engine's pipeline may compare it by ordinal, which tells apart two spellings that
+    /// <see cref="Fold" /> takes for one name: PostgreSQL's is its fold, since its pipeline folds a name before it
+    /// compares it; SQL Server's is the spelling as written, since its pipeline compares some names by ordinal and
+    /// others ignoring case.  The mapping writes two spellings of one fold whose <c>Spelled</c> differ in cases of
+    /// their own, so that they stay apart by ordinal and equal ignoring case.
+    /// </summary>
+    string Spelled(string spelling, bool quoted);
+
+    /// <summary>
     /// Whether a spelling is kept verbatim: a keyword or word of the engine's vocabulary, the engine's own schema or
     /// database, or a name the planner or the tool makes, such as the <c>1</c> of SQL Server's <c>AS [1]</c>.  The
     /// spelling is folded by <see cref="Fold" /> before it is compared, so <c>EXCLUDED</c> is <c>excluded</c>.  A

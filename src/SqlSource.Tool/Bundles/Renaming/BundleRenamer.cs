@@ -63,7 +63,7 @@ internal static class BundleRenamer
             throw new ArgumentException($"The raw bundle is of the engine '{capture.Engine}'.", nameof(raw));
         }
 
-        var mapping = new NameMapping(key, engine.Fold);
+        var mapping = new NameMapping(key, engine.Fold, engine.Spelled);
         var calls = CaptureRenamer.CallsOf(capture);
 
         CaptureRenamer.Drop(engine, calls);

@@ -16,7 +16,21 @@ public sealed class NameMappingTests
     {
         var bytes = new byte[32];
         bytes[0] = seed;
-        return new NameMapping(RenamingKey.Of(bytes), Fold);
+        return new NameMapping(RenamingKey.Of(bytes), Fold, Fold);
+    }
+
+    // A mapping that tells apart spellings of one name that differ by case: SQL Server's way, where the spelling is as
+    // written and the name ignores case.
+    private static NameMapping CaseKeeping(byte seed = 0, int? firstLength = null)
+    {
+        var bytes = new byte[32];
+        bytes[0] = seed;
+        return new NameMapping(
+            RenamingKey.Of(bytes),
+            static (spelling, _) => spelling.ToUpperInvariant(),
+            static (spelling, _) => spelling,
+            firstLength ?? 8
+        );
     }
 
     [Fact]
@@ -72,7 +86,7 @@ public sealed class NameMappingTests
     [Fact]
     public void Name_ReplacementThatCollides_IsLengthened()
     {
-        var mapping = new NameMapping(RenamingKey.Of(Zeros), Fold, firstLength: 1);
+        var mapping = new NameMapping(RenamingKey.Of(Zeros), Fold, Fold, firstLength: 1);
         var spellings = Enumerable.Range(0, 17).Select(i => $"n{i}").ToList();
 
         var replacements = spellings.Select(spelling => mapping.Name(spelling, false, NameClass.Column)).ToList();
@@ -99,8 +113,8 @@ public sealed class NameMappingTests
         mapping.Keep("pg_catalog", false);
 
         mapping.Name("pg_catalog", false, NameClass.Schema).ShouldBe("pg_catalog");
-        mapping.TryGet("PG_CATALOG", false, out var replacement).ShouldBeTrue();
-        replacement.ShouldBe("pg_catalog");
+        mapping.IsMapped("PG_CATALOG", false).ShouldBeTrue();
+        mapping.Name("PG_CATALOG", false, NameClass.Schema).ShouldBe("pg_catalog");
         mapping.Names.ShouldBeEmpty();
     }
 
@@ -114,8 +128,8 @@ public sealed class NameMappingTests
         mapping.KeepFromEngineRow("regdictionary", false);
 
         mapping.IsKeptFromEngineRow("users", false).ShouldBeFalse();
-        mapping.TryGet("users", false, out var kept).ShouldBeTrue();
-        kept.ShouldBe("users");
+        mapping.IsMapped("users", false).ShouldBeTrue();
+        mapping.Name("users", false, NameClass.Table).ShouldBe("users");
         mapping.IsKeptFromEngineRow("REGDICTIONARY", false).ShouldBeTrue();
         mapping.Name("regdictionary", false, NameClass.Type).ShouldBe("regdictionary");
         mapping.Names.ShouldBeEmpty();
@@ -142,12 +156,107 @@ public sealed class NameMappingTests
         mapping.Keep("users", false);
 
         mapping.Name("users", false, NameClass.Table).ShouldBe(replacement);
-        mapping.TryGet("users", false, out var found).ShouldBeTrue();
-        found.ShouldBe(replacement);
+        mapping.IsMapped("users", false).ShouldBeTrue();
     }
 
     [Fact]
-    public void TryGet_UnknownSpelling_IsFalse() => Mapping().TryGet("x", false, out _).ShouldBeFalse();
+    public void IsMapped_UnknownSpelling_IsFalse() => Mapping().IsMapped("x", false).ShouldBeFalse();
+
+    [Fact]
+    public void Name_SpellingsTheEngineTellsApart_DifferByCaseAlone()
+    {
+        var mapping = CaseKeeping();
+        var lower = mapping.Name("email", false, NameClass.Column);
+        var upper = mapping.Name("EMAIL", false, NameClass.Column);
+
+        lower.ShouldMatch("^c_[0-9a-f]{8}$");
+        upper.ShouldNotBe(lower);
+        string.Equals(upper, lower, StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
+        upper.ShouldBe("C" + lower[1..]);
+        mapping.Name("EMAIL", false, NameClass.Column).ShouldBe(upper);
+        mapping.Name("email", false, NameClass.Column).ShouldBe(lower);
+        mapping.IsReplacement(upper).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Name_SpellingsTheEngineTellsApart_AreEachListedWithTheirOriginal()
+    {
+        var mapping = CaseKeeping();
+        var lower = mapping.Name("email", false, NameClass.Column);
+        var upper = mapping.Name("EMAIL", false, NameClass.Column);
+
+        mapping.Names.ShouldBe([
+            new MappedName(lower, NameClass.Column, "email"),
+            new MappedName(upper, NameClass.Column, "EMAIL"),
+        ]);
+    }
+
+    [Fact]
+    public void Name_SpellingsTheEngineTakesForOne_AreOneName()
+    {
+        var mapping = Mapping();
+
+        mapping.Name("Users", false, NameClass.Table).ShouldBe(mapping.Name("users", false, NameClass.Table));
+        _ = mapping.Names.ShouldHaveSingleItem();
+    }
+
+    // firstLength 1: a replacement holds two letters at most, so four spellings at most differ by case alone.
+    [Fact]
+    public void Name_MoreSpellingsThanTheCaseCanTellApart_EachHasItsOwnName()
+    {
+        var mapping = CaseKeeping(firstLength: 1);
+        string[] spellings = ["abc", "abC", "aBc", "aBC", "Abc", "AbC", "ABc", "ABC"];
+
+        var replacements = spellings.Select(spelling => mapping.Name(spelling, false, NameClass.Column)).ToList();
+
+        replacements.Distinct(StringComparer.Ordinal).Count().ShouldBe(spellings.Length);
+        replacements.ShouldAllBe(r => mapping.IsReplacement(r));
+        var alike = replacements.Count(r => string.Equals(r, replacements[0], StringComparison.OrdinalIgnoreCase));
+        alike.ShouldBeInRange(2, 4);
+        spellings.Select(spelling => mapping.Name(spelling, false, NameClass.Column)).ShouldBe(replacements);
+    }
+
+    [Fact]
+    public void Keep_SpellingsTheEngineTellsApart_KeepEachAsWritten()
+    {
+        var mapping = CaseKeeping();
+
+        mapping.Keep("sys", false);
+
+        mapping.Name("SYS", false, NameClass.Schema).ShouldBe("SYS");
+        mapping.Name("sys", false, NameClass.Schema).ShouldBe("sys");
+        mapping.Names.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Keep_SpellingsTheEngineTakesForOne_MapToTheFirstKept()
+    {
+        var mapping = Mapping();
+
+        mapping.Keep("pg_catalog", false);
+
+        mapping.Name("PG_CATALOG", false, NameClass.Schema).ShouldBe("pg_catalog");
+    }
+
+    [Fact]
+    public void KeepFromEngineRow_AnotherCase_IsKeptFromTheRow()
+    {
+        var mapping = CaseKeeping();
+
+        mapping.KeepFromEngineRow("name", false);
+
+        mapping.IsKeptFromEngineRow("NAME", false).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsMapped_AnotherCaseOfAMappedName_IsTrue()
+    {
+        var mapping = CaseKeeping();
+        _ = mapping.Name("email", false, NameClass.Column);
+
+        mapping.IsMapped("EMAIL", false).ShouldBeTrue();
+        mapping.IsMapped("x", false).ShouldBeFalse();
+    }
 
     [Fact]
     public void Literal_IsClassLiteral()
@@ -187,7 +296,7 @@ public sealed class NameMappingTests
 
     [Fact]
     public void RenamingKey_Random_GivesAnotherNameEachTime() =>
-        new NameMapping(RenamingKey.Random(), Fold)
+        new NameMapping(RenamingKey.Random(), Fold, Fold)
             .Name("users", false, NameClass.Table)
-            .ShouldNotBe(new NameMapping(RenamingKey.Random(), Fold).Name("users", false, NameClass.Table));
+            .ShouldNotBe(new NameMapping(RenamingKey.Random(), Fold, Fold).Name("users", false, NameClass.Table));
 }
