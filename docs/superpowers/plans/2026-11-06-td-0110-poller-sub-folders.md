@@ -13,7 +13,7 @@
 ## Where the code differs from the spec
 
 - td-0111 has merged: `PollingFolderWatcherTests.Scene.Start` already passes a `TestClock`; no cherry-pick is needed.
-- The spec's "a failed listing of a folder whose deletion was just seen" cannot be decided by order, since the folder's own poller and the poller above it run on separate timers and either may list first, and the session reports a failure 300 ms after it.  The plan decides it by state at report time instead: the folder does not exist and the nearest folder above it that exists has an open watch of the folder alone, which sees (or has seen) the topmost deleted folder.  A folder that exists but cannot be read, or one with no such watch above (a repository's root), is still reported.
+- The spec's "a failed listing of a folder whose deletion was just seen" cannot be decided by order, since the folder's own poller and the poller above it run on separate timers and either may list first, and the session reports a failure 300 ms after it.  The plan decides it by state instead: the folder did not exist when the failure came, and at report time the nearest folder above it that exists has an open watch of the folder alone, which sees (or has seen) the topmost deleted folder.  A folder that exists but cannot be read, or one with no such watch above (a repository's root), is still reported.
 
 ## Global Constraints
 
@@ -84,7 +84,7 @@ Expected: all pass, the existing `Poll_NotRecursive_RaisesNothingForAFileBelow` 
 - Modify: `src/SqlSource.Tool/Watching/WatchSession.cs` (`ReportFailures`, the comment of `ChangesAWatchedFolder`)
 - Test: `tests/SqlSource.Tool.Tests/Commands/Watch/WatchFolderTests.cs`
 
-**Interfaces:** consumes Task 1's poller.  New private `bool SeenFromAbove(WatchFailure failure)` in `WatchSession`, on the loop: `!Directory.Exists(failure.Folder)` and `_watches` holds the nearest folder above it that exists with `Recursive == false` and a non-null watch (the nearest that exists, since a folder deleted with its parent may fail during the evaluation that closes the parent's watch).
+**Interfaces:** consumes Task 1's poller.  New private `bool SeenFromAbove(WatchFailure failure, bool gone)` in `WatchSession`, on the loop: the folder was gone when `Failed` kept the failure (`gone`, read before the lock), and `_watches` holds the nearest folder above it that exists with `Recursive == false` and a non-null watch (the nearest that exists, since a folder deleted with its parent may fail during the evaluation that closes the parent's watch).
 
 - [ ] **Step 1: Write the failing tests** in `WatchFolderTests`
 

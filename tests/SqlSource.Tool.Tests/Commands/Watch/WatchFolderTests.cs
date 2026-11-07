@@ -386,6 +386,33 @@ public sealed class WatchFolderTests : IAsyncDisposable
         WatchTests.PassStarts(LogPath)[1].Evaluated.ShouldBeTrue();
     }
 
+    // Under polling, a folder deleted and made again before the loop reports, as a git stash and its pop do: it was
+    // gone when its listing failed, below a folder watched alone, so the failure is no error, whether that folder's
+    // watch listed while it was gone or not.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Watch_PolledFolderDeletedAndMadeAgain_ReportsNoError(bool aboveListsWhileItIsGone)
+    {
+        WriteSettings();
+        var polled = PollAllButTheProject();
+        await StartAsync();
+        var pollers = _watch.Clock.PendingTimers;
+
+        Directory.Delete(_shared, recursive: true);
+        PollerOf(polled, _shared).Poll();
+        if (aboveListsWhileItIsGone)
+        {
+            PollerOf(polled, _libs).Poll();
+        }
+
+        WriteSettings();
+        await PassAsync(_watch, pollers, 2);
+
+        _watch.Errors.ShouldNotContain("SQLSRC287");
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     // Under polling, a folder deleted together with the folder above it: the root's watch sees the topmost folder
     // deleted, so the failed listing of the folder below is no error, even when it comes during the evaluation that the
     // deletion starts, which closes both their watches before the loop reports.  Each poller lists when the test says,

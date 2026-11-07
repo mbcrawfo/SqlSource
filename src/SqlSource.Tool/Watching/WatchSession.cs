@@ -81,7 +81,7 @@ internal sealed class WatchSession
     // _gate is held: a watch's callbacks take it, and closing a watch may wait for a callback that is running.
     private readonly object _gate = new();
     private readonly HashSet<string> _gone = [with(RunProjects.PathComparer)];
-    private readonly List<WatchFailure> _failures = [];
+    private readonly List<(WatchFailure Failure, bool Gone)> _failures = [];
     private readonly HashSet<string> _watched = [with(RunProjects.PathComparer)];
     private readonly HashSet<string> _stale = [with(RunProjects.PathComparer)];
     private int _changes;
@@ -426,13 +426,16 @@ internal sealed class WatchSession
 
     // What a watch tells of its failure, a lost batch of events included, and what a watch that cannot start is: the
     // folder may have changed unseen, so the next pass evaluates.  A lost batch of events is not reported.  Any other
-    // failure is kept for the loop to report, so that it is not written in the middle of a pass's output.
+    // failure is kept for the loop to report, so that it is not written in the middle of a pass's output, with whether
+    // its folder was gone when it came, which SeenFromAbove reads.
     private void Failed(WatchFailure failure) => Failed(failure, evaluate: true);
 
     // As above, but a watch that could not start again, when it is tried again, asks nothing: the evaluation that tried
     // it would otherwise start another, which would try it again, without end.
     private void Failed(WatchFailure failure, bool evaluate)
     {
+        // Before the lock, which a look at the disk need not hold up.
+        var gone = !failure.Overflow && !Directory.Exists(failure.Folder);
         lock (_gate)
         {
             if (evaluate)
@@ -442,7 +445,7 @@ internal sealed class WatchSession
 
             if (!failure.Overflow)
             {
-                _failures.Add(failure);
+                _failures.Add((failure, gone));
             }
         }
     }
@@ -452,7 +455,7 @@ internal sealed class WatchSession
     // error again and again.
     private void ReportFailures()
     {
-        WatchFailure[] failures;
+        (WatchFailure Failure, bool Gone)[] failures;
         lock (_gate)
         {
             failures = [.. _failures];
@@ -464,8 +467,9 @@ internal sealed class WatchSession
 
         // Where adds each to what was reported as it goes, so a failure twice in one batch is reported once.
         foreach (
-            var failure in failures.Where(failure =>
-                !SeenFromAbove(failure) && _reported.Add((failure.Folder, failure.Message))
+            var (failure, _) in failures.Where(entry =>
+                !SeenFromAbove(entry.Failure, entry.Gone)
+                && _reported.Add((entry.Failure.Folder, entry.Failure.Message))
             )
         )
         {
@@ -475,22 +479,22 @@ internal sealed class WatchSession
         }
     }
 
-    // True for the failure of a folder that is gone, whose nearest folder above that is there has a watch of its own
-    // alone: that watch lists every folder in it, so it sees the topmost folder deleted, which asks what it must, and
-    // the failure is no error of its own.  It is a poller's failed listing of its folder, or on macOS the error of the
-    // system's watch of a deleted folder; on Linux that watch says nothing.  Its order with the deletion is not known,
-    // since each poller lists on a timer of its own and the evaluation that the deletion starts closes the watches
-    // below, so the disk decides.  A folder that is there but cannot be read, or one with no such watch above it, is
-    // still reported.  On the loop, which alone reads _watches.
-    private bool SeenFromAbove(WatchFailure failure)
+    // True for the failure of a folder that was gone when the failure came, whose nearest folder above that is there
+    // now has a watch of its own alone: that watch lists every folder in it, so it sees the topmost folder deleted,
+    // which asks what it must, and the failure is no error of its own, though the folder may be back by now.  It is a
+    // poller's failed listing of its folder, or on macOS the error of the system's watch of a deleted folder; on Linux
+    // that watch says nothing.  Its order with the deletion is not known, since each poller lists on a timer of its
+    // own and the evaluation that the deletion starts closes the watches below, so the disk decides, as it stood when
+    // the failure came for the folder and as it stands now for the folders above.  A folder that was there but could
+    // not be read, or one with no such watch above it, is still reported.  On the loop, which alone reads _watches.
+    private bool SeenFromAbove(WatchFailure failure, bool gone)
     {
-        var folder = Path.TrimEndingDirectorySeparator(failure.Folder);
-        if (Directory.Exists(folder))
+        if (!gone)
         {
             return false;
         }
 
-        var above = Path.GetDirectoryName(folder);
+        var above = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(failure.Folder));
         while (above is not null && !Directory.Exists(above))
         {
             above = Path.GetDirectoryName(above);
