@@ -394,11 +394,12 @@
         .env, never one in a folder above, and none when SqlSourceEnvFile is none, which a condition matches ignoring
         case.  The build tests only that a file, not a folder, is at the path, as the tool passes over a folder, and
         never reads it.  When SqlSourceEnvFile is set, the build gives the tool the full path, or none, as the value of
-        its env-file option, so that both look at the one file, and a default build's command is unchanged.  MSBuild
-        logs a variable that a file reads as a property with its value, at the detailed verbosity and in a binary log,
-        so the variable is read by a property function whose answer alone is the property: no file of the package names
-        it as a property, and BuildFileTests holds that.  A project whose connections are only in named variables, which
-        a condition cannot list, sets true.
+        its env-file option, so that both look at the one file, and a default build's command is unchanged.  A symbolic
+        link to a file that is not there is a file to File.Exists and none to the tool, so under auto it starts a tool
+        that goes on offline, at every build: the manual says so.  MSBuild logs a variable that a file reads as a
+        property with its value, at the detailed verbosity and in a binary log, so the variable is read by a property
+        function whose answer alone is the property: no file of the package names it as a property, and BuildFileTests
+        holds that.  A project whose connections are only in named variables, which a condition cannot list, sets true.
 
         SqlSourceToolCommand is how the build starts the tool, a local tool of the repository by default; the tests
         set it to a stand-in of the tool.  SqlSourceFirstFramework is the framework of TargetFrameworks that the tool
