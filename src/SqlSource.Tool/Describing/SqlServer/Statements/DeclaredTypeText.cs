@@ -220,13 +220,11 @@ internal static class DeclaredTypeText
             return found;
         }
 
+        // The part holds its brackets or quotes, so a delimited word is never one of the two.
         var part = text.AsSpan(start, position - start);
         var isWord =
-            !(text[start] is '[' or '"')
-            && (
-                part.Equals("CONTENT", StringComparison.OrdinalIgnoreCase)
-                || part.Equals("DOCUMENT", StringComparison.OrdinalIgnoreCase)
-            );
+            part.Equals("CONTENT", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("DOCUMENT", StringComparison.OrdinalIgnoreCase);
         SkipSpaces(text, ref position);
         if (!isWord || position == text.Length || text[position] is ')' or '.')
         {

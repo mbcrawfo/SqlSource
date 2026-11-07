@@ -102,6 +102,9 @@ public sealed class DeclaredTypeTextTests
     [InlineData("nvarchar(", DeclaredTypeText.Shape)]
     [InlineData("nvarchar(max, 2)", DeclaredTypeText.Shape)]
     [InlineData("xml(CONTENT dbo.S, 1)", DeclaredTypeText.Shape)]
+    // A bracketed or quoted word is a name, never the keyword, so a second name after it is out of place.
+    [InlineData("xml([CONTENT] dbo.S)", DeclaredTypeText.Shape)]
+    [InlineData("xml(\"DOCUMENT\" dbo.S)", DeclaredTypeText.Shape)]
     [InlineData("xml(dbo.S;)", TypeNameFound.Semicolon)]
     [InlineData("xml(CONTENT -- x)", TypeNameFound.Comment)]
     [InlineData("xml([dbo)", DeclaredTypeText.NotClosed)]
