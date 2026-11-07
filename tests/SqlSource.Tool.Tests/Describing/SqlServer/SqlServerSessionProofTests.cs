@@ -41,7 +41,7 @@ public sealed class SqlServerSessionProofTests
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Shown));
 
         asked.ShouldBe([
-            Call(Calls.Parameters, new SqlServerParametersRequest(Shown, null)),
+            Call(Calls.Parameters, new SqlServerParametersRequest(Shown, null, null)),
             Call(Calls.Columns, new SqlServerColumnsRequest(Shown, null)),
             Call(Calls.Operands, operands),
         ]);
@@ -120,7 +120,7 @@ public sealed class SqlServerSessionProofTests
             "@x int"
         );
         var script = new SqlServerScript()
-            .Parameters(new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([IntRow], null))
+            .Parameters(new SqlServerParametersRequest(Sql, null, null), new SqlServerParametersAnswer([IntRow], null))
             .Columns(
                 new SqlServerColumnsRequest(Sql, "@x int"),
                 new SqlServerColumnsAnswer([ExpressionRow(1, "shown")], null, null)

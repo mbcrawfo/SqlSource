@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "MERGE dbo.orders AS t\nUSING dbo.users AS s ON t.user_id = s.id\nWHEN MATCHED THEN UPDATE SET total = @total\nWHEN NOT MATCHED THEN INSERT (user_id, total) VALUES (s.id, 0)\nWHEN NOT MATCHED BY SOURCE THEN DELETE\nOUTPUT $action AS action, inserted.id AS inserted_id, inserted.total AS inserted_total,\n    deleted.id AS deleted_id, deleted.total AS deleted_total;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

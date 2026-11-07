@@ -63,7 +63,20 @@ internal sealed record SqlServerErrorRow(int Number, int Class, int State, strin
 /// </summary>
 /// <param name="Sql">The SQL with each use of a reused parameter renamed to a copy of its own.</param>
 /// <param name="Params">The declarations of the declared parameters, <c>@a int, @b nvarchar(50)</c>, or null.</param>
-internal sealed record SqlServerParametersRequest(string Sql, string? Params);
+/// <param name="Reused">
+/// The parameters the SQL uses more than once and the copies it renamed their uses to, in the order of the query's
+/// list; null when none is reused.  Null too in a capture recorded before <c>parameters</c> asked it.
+/// </param>
+internal sealed record SqlServerParametersRequest(
+    string Sql,
+    string? Params,
+    IReadOnlyList<SqlServerReusedParameter>? Reused
+);
+
+/// <summary>A parameter that the SQL uses more than once, and the names of its copies.</summary>
+/// <param name="Name">The parameter's name as the query's list spells it.</param>
+/// <param name="Copies">The copies' names, without their <c>@</c>, in the order the SQL uses them.</param>
+internal sealed record SqlServerReusedParameter(string Name, IReadOnlyList<string> Copies);
 
 /// <summary>The parameters the server typed, or why it typed none.</summary>
 /// <param name="Rows">One for each parameter that the declarations leave out, in the server's order.</param>

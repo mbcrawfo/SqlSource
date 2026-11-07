@@ -81,7 +81,8 @@
       "method": "parameters",
       "request": {
         "sql": "INSERT INTO dbo.users (name, email, nickname, credit) VALUES (@name, @email, @nickname, @credit);",
-        "params": "@email dbo.Email, @nickname nvarchar(50)"
+        "params": "@email dbo.Email, @nickname nvarchar(50)",
+        "reused": null
       },
       "answer": {
         "rows": [

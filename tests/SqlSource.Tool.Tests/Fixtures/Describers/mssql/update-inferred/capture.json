@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "UPDATE dbo.users SET name = @name, email = @email WHERE id = @id;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

@@ -54,7 +54,7 @@ public sealed class SqlServerSessionTableTests
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
         asked.ShouldBe([
-            Call(Calls.Parameters, new SqlServerParametersRequest(Sql, null)),
+            Call(Calls.Parameters, new SqlServerParametersRequest(Sql, null, null)),
             Call(Calls.Columns, columns),
             Call(Calls.Table, table),
         ]);
@@ -73,7 +73,7 @@ public sealed class SqlServerSessionTableTests
         const string Sql = "SELECT id, name_len_p FROM dbo.users WHERE id = @id";
         var script = new SqlServerScript()
             .Parameters(
-                new SqlServerParametersRequest(Sql, null),
+                new SqlServerParametersRequest(Sql, null, null),
                 new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null)
             )
             .Columns(

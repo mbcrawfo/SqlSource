@@ -58,7 +58,8 @@
       "method": "parameters",
       "request": {
         "sql": "DELETE FROM dbo.orders WHERE user_id = @userId AND note IS NOT NULL;",
-        "params": "@tenant int"
+        "params": "@tenant int",
+        "reused": null
       },
       "answer": {
         "rows": [

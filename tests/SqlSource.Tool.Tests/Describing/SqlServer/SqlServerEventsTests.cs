@@ -18,7 +18,7 @@ public sealed class SqlServerEventsTests
     public void Parameters_RowsOfTheServer_WritesTheSqlTheDeclarationsAndEveryMemberOfEachRow()
     {
         var log = new RecordingLog();
-        var request = new SqlServerParametersRequest("SELECT id FROM dbo.users WHERE id = @id", "@tenant int");
+        var request = new SqlServerParametersRequest("SELECT id FROM dbo.users WHERE id = @id", "@tenant int", null);
         var answer = new SqlServerParametersAnswer(
             [
                 new SqlServerParameterRow("@id", "int", 4, 10, 0, null, null, null),
@@ -54,7 +54,7 @@ public sealed class SqlServerEventsTests
         SqlServerEvents.Parameters(
             log,
             "GetUser",
-            new SqlServerParametersRequest("SELECT @x", null),
+            new SqlServerParametersRequest("SELECT @x", null, null),
             new SqlServerParametersAnswer(
                 [new SqlServerParameterRow("@x", null, null, null, null, null, null, null)],
                 null
@@ -76,7 +76,7 @@ public sealed class SqlServerEventsTests
         SqlServerEvents.Parameters(
             log,
             "GetUser",
-            new SqlServerParametersRequest("SELECT @p, @p", null),
+            new SqlServerParametersRequest("SELECT @p, @p", null, null),
             new SqlServerParametersAnswer(null, Refused),
             5
         );
@@ -101,7 +101,7 @@ public sealed class SqlServerEventsTests
         SqlServerEvents.Parameters(
             log,
             "GetUser",
-            new SqlServerParametersRequest("SELECT 1", null),
+            new SqlServerParametersRequest("SELECT 1", null, null),
             new SqlServerParametersAnswer(null, null),
             0
         );
