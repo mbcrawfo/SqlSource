@@ -18,7 +18,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 internal sealed partial class SqlRenamer(
     IEngineRenaming engine,
     NameMapping mapping,
-    IReadOnlySet<string> queryParameters
+    IReadOnlySet<string> queryParameters,
+    RenamingCopies copies
 )
 {
     /// <summary>
@@ -165,18 +166,18 @@ internal sealed partial class SqlRenamer(
         _engine.IsEngineWord(spelling, quoted) ? spelling : _mapping.Name(spelling, quoted, cls);
 
     /// <summary>
-    /// A parameter's name, without its prefix: a copy of one of the query's through its parameter, else a name of its
-    /// own, kept when it is the engine's word.
+    /// A parameter's name, without its prefix: a copy that the raw capture records through its parameter and its
+    /// suffix, else a name of its own, kept when it is the engine's word.  A query's parameter is never a copy.
     /// </summary>
-    internal string ParameterName(string name)
-    {
-        if (!queryParameters.Contains(name) && _engine.CopyOf(name, queryParameters) is var (parameter, suffix))
-        {
-            return NameOf(parameter, quoted: false, NameClass.Parameter) + suffix;
-        }
+    internal string ParameterName(string name) =>
+        CopyNamed(name) is { } copy
+            ? NameOf(copy.Parameter, quoted: false, NameClass.Parameter) + copy.Suffix
+            : NameOf(name, quoted: false, NameClass.Parameter);
 
-        return NameOf(name, quoted: false, NameClass.Parameter);
-    }
+    /// <summary>The parameter of a copy that the raw capture records, else the name itself.</summary>
+    internal string ParameterOf(string name) => CopyNamed(name)?.Parameter ?? name;
+
+    private ParameterCopy? CopyNamed(string name) => queryParameters.Contains(name) ? null : copies.Find(name);
 
     // One renaming of one text.
     private sealed partial class Pass(

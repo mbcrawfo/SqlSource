@@ -32,15 +32,15 @@ internal sealed partial class TokenCheck
     private readonly IEngineRenaming _engine;
     private readonly NameMapping _mapping;
     private readonly SqlDialectRules _rules;
-    private readonly HashSet<string> _parameters;
+    private readonly RenamingCopies _copies;
     private RenamingRefusal? _refusal;
 
-    private TokenCheck(IEngineRenaming engine, NameMapping mapping, string query)
+    private TokenCheck(IEngineRenaming engine, NameMapping mapping, RenamingCopies copies)
     {
         _engine = engine;
         _mapping = mapping;
         _rules = SqlDialectRules.For(engine.Dialect);
-        _parameters = new HashSet<string>(ParametersOf(query, _rules), SqlParameterName.Comparer);
+        _copies = copies;
     }
 
     /// <summary>The first token that is not safe, as a refusal of <see cref="RefusalStep.Token" />, or null.</summary>
@@ -57,7 +57,7 @@ internal sealed partial class TokenCheck
         string? expected
     )
     {
-        var check = new TokenCheck(engine, mapping, query);
+        var check = new TokenCheck(engine, mapping, RenamingCopies.Of(engine, calls, static call => call.Renamed));
         foreach (var call in calls)
         {
             foreach (var part in (string[])[CaptureRenamer.Request, CaptureRenamer.Answer])
@@ -86,17 +86,6 @@ internal sealed partial class TokenCheck
         }
 
         return check._refusal;
-    }
-
-    // The names of a query file's parameters.  A file that does not lex has none, and is refused when it is checked.
-    private static IEnumerable<string> ParametersOf(string query, SqlDialectRules rules)
-    {
-        var lexed = SqlLexer.Lex(query, rules);
-        return lexed.Error is null
-            ? lexed
-                .Lexemes.Where(static lexeme => lexeme.Kind == SqlLexemeKind.Parameter)
-                .Select(lexeme => query.Substring(lexeme.ParameterName.Start, lexeme.ParameterName.Length))
-            : [];
     }
 
     private void Refuse(string place, string token) =>
@@ -208,11 +197,17 @@ internal sealed partial class TokenCheck
         }
     }
 
+    // A parameter's name after its prefix: safe itself, or a copy that the renamed capture records, spelled as its
+    // parameter, which is safe, and its suffix.
     private bool IsParameter(string value)
     {
         var name = value.Length > 1 && value[0] == _rules.ParameterPrefix ? value[1..] : value;
         return IsSafe(name, quoted: false)
-            || (_engine.CopyOf(name, _parameters) is var (parameter, _) && IsSafe(parameter, quoted: false));
+            || (
+                _copies.Find(name) is { } copy
+                && IsSafe(copy.Parameter, quoted: false)
+                && SqlParameterName.Comparer.Equals(name, copy.Parameter + copy.Suffix)
+            );
     }
 
     // A replacement, a word of the engine's, a spelling the mapping kept from a row of the engine's, or a number.

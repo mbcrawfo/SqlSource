@@ -138,7 +138,7 @@ public sealed class TokenCheckTests
             [],
             new JsonObject { ["request"] = new JsonObject(), ["answer"] = answer }
         );
-        var run = RenamingRun.For(engine, mapping, "SELECT 1");
+        var run = RenamingRun.For(engine, mapping, "SELECT 1", RenamingCopies.None);
         CaptureRenamer.Register(engine, [call], run);
         column["name"] = mapping.Name("total", quoted: true, NameClass.Column);
         var query = mapping.Name("GetTotals", quoted: false, NameClass.Query);
@@ -258,7 +258,9 @@ public sealed class TokenCheckTests
     public void Check_SpellingKeptThroughTheScope_IsRefusedUnlessAnEngineWord()
     {
         var (engine, mapping) = Mapping();
-        var scope = RenamingRun.For(engine, mapping, "SELECT 1").At("capture.json call 0 'describe'");
+        var scope = RenamingRun
+            .For(engine, mapping, "SELECT 1", RenamingCopies.None)
+            .At("capture.json call 0 'describe'");
         scope.Keep("users", quoted: true);
         scope.Keep("integer", quoted: true);
         var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
@@ -403,7 +405,8 @@ public sealed class TokenCheckTests
             );
     }
 
-    // A parameter passes as a replacement, or as a copy of the query's whose parameter is one, after its prefix.
+    // A parameter passes as a replacement, or as a copy that the renamed capture records whose parameter is one,
+    // after its prefix.
     [Theory]
     [InlineData("secret")]
     [InlineData("@secret")]
@@ -413,11 +416,11 @@ public sealed class TokenCheckTests
         var (engine, mapping) = Mapping();
         var id = mapping.Name("id", quoted: false, NameClass.Parameter);
         var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
-        static RenamingCall Parameter(string value) =>
-            Describe(new JsonObject { ["parameters"] = new JsonArray(new JsonObject { ["name"] = value }) });
         var file = $"-- name: {query}\nSELECT @{id}";
 
-        TokenCheck.Check(engine, mapping, [Parameter($"@{id}"), Parameter($"{id}_2")], file, null).ShouldBeNull();
+        TokenCheck
+            .Check(engine, mapping, [Parameter($"@{id}"), Parameter($"{id}_2", ($"{id}_2", id, "_2"))], file, null)
+            .ShouldBeNull();
         TokenCheck
             .Check(engine, mapping, [Parameter(name)], file, expected: null)
             .ShouldBe(
@@ -432,9 +435,7 @@ public sealed class TokenCheckTests
     {
         var (engine, mapping) = Mapping();
         var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
-        var call = Describe(
-            new JsonObject { ["parameters"] = new JsonArray(new JsonObject { ["name"] = "secret_1" }) }
-        );
+        var call = Parameter("secret_1", ("secret_1", "secret", "_1"));
 
         TokenCheck
             .Check(engine, mapping, [call], $"-- name: {query}\nSELECT @secret", expected: null)
@@ -443,6 +444,26 @@ public sealed class TokenCheckTests
                     RefusalStep.Token,
                     "capture.json call 0 'describe' request.parameters[].name",
                     "secret_1"
+                )
+            );
+    }
+
+    // A copy passes only spelled as its parameter and its suffix, so a renamed record that holds the user's spelling
+    // as a copy does not make it pass.
+    [Fact]
+    public void Check_ARenamedCopyThatIsNotItsParameterAndSuffix_IsRefused()
+    {
+        var (engine, mapping) = Mapping();
+        var id = mapping.Name("id", quoted: false, NameClass.Parameter);
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+
+        TokenCheck
+            .Check(engine, mapping, [Parameter("secret", ("secret", id, "_1"))], $"-- name: {query}\nSELECT 1", null)
+            .ShouldBe(
+                new RenamingRefusal(
+                    RefusalStep.Token,
+                    "capture.json call 0 'describe' request.parameters[].name",
+                    "secret"
                 )
             );
     }
@@ -539,6 +560,19 @@ public sealed class TokenCheckTests
             .Check(engine, mapping, [], $"-- name: {query}\nSELECT 1", Sidecar(key ?? query, entry))
             .ShouldBe(new RenamingRefusal(RefusalStep.Token, place, token));
     }
+
+    // A call of describe whose request has one parameter of the name given, then records the copies given.
+    private static RenamingCall Parameter(
+        string name,
+        params (string Name, string Parameter, string Suffix)[] copies
+    ) =>
+        Describe(
+            new JsonObject
+            {
+                ["parameters"] = new JsonArray(new JsonObject { ["name"] = name }),
+                ["copies"] = FakeEngineRenaming.Copies(copies),
+            }
+        );
 
     // The check of the calls given, with a query.sql of SELECT 1 alone.
     private static RenamingRefusal? Check(params RenamingCall[] calls)

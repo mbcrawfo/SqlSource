@@ -35,6 +35,12 @@ internal interface IRenamingScope
     /// <summary>A parameter's name renamed: a query's parameter, or a copy of one through its parameter.</summary>
     string Parameter(string name);
 
+    /// <summary>
+    /// The query's parameter of a copy that the pipeline made, as <see cref="IEngineRenaming.CopiesIn" /> read it from
+    /// the raw capture, or the name itself when it is no such copy.
+    /// </summary>
+    string ParameterOf(string name);
+
     /// <summary>Refuses the bundle; the renaming writes nothing.</summary>
     void Refuse(RenamingRefusal refusal);
 }
