@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Shouldly;
 
 namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
@@ -115,7 +114,7 @@ internal static class SqlServerAllTypesRows
     // properties named, whose columns a test did not write.  The rowversion is never null, so it cannot be named.
     public static void ShouldBeTheFullRow(object row, int id = FullRowId, IReadOnlySet<string>? nullProperties = null)
     {
-        var properties = PropertiesOf(row, FullRow);
+        var properties = ModelReflection.ShouldHaveProperties(row.GetType(), FullRow.Keys);
         nullProperties ??= new HashSet<string>(StringComparer.Ordinal);
         nullProperties.ShouldNotContain("Id");
         nullProperties.ShouldNotContain(Rowversion);
@@ -137,7 +136,7 @@ internal static class SqlServerAllTypesRows
     // rowversion.
     public static void ShouldBeTheNullRow(object row, int id = NullRowId)
     {
-        foreach (var property in PropertiesOf(row, FullRow))
+        foreach (var property in ModelReflection.ShouldHaveProperties(row.GetType(), FullRow.Keys))
         {
             var expected = property.Name switch
             {
@@ -152,7 +151,7 @@ internal static class SqlServerAllTypesRows
     // Asserts that the row of new_types is row 1 of the seed, with another id.
     public static void ShouldBeTheFullNewTypesRow(object row, int id = FullRowId)
     {
-        foreach (var property in PropertiesOf(row, FullNewTypesRow))
+        foreach (var property in ModelReflection.ShouldHaveProperties(row.GetType(), FullNewTypesRow.Keys))
         {
             ShouldBeValue(
                 property.GetValue(row),
@@ -165,7 +164,7 @@ internal static class SqlServerAllTypesRows
     // Asserts that the row of new_types is row 2 of the seed, with another id, with null in both columns.
     public static void ShouldBeTheNullNewTypesRow(object row, int id = NullRowId)
     {
-        foreach (var property in PropertiesOf(row, FullNewTypesRow))
+        foreach (var property in ModelReflection.ShouldHaveProperties(row.GetType(), FullNewTypesRow.Keys))
         {
             ShouldBeValue(property.GetValue(row), property.Name == "Id" ? id : null, property.Name);
         }
@@ -186,17 +185,6 @@ internal static class SqlServerAllTypesRows
 
     private static object? ValueOf(object? row, string property) =>
         row?.GetType().GetProperty(property).ShouldNotBeNull(property).GetValue(row);
-
-    // The public properties of the row, which are those that the expectations name, no more and no fewer.
-    private static PropertyInfo[] PropertiesOf(object row, Dictionary<string, object> expectations)
-    {
-        var properties = row.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-        properties
-            .Select(static property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ShouldBe(expectations.Keys.Order(StringComparer.Ordinal), $"The properties of {row.GetType()}");
-        return properties;
-    }
 
     private static void ShouldBeValue(object? actual, object? expected, string path)
     {

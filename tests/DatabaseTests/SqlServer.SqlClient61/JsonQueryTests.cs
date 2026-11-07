@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -41,8 +40,12 @@ public sealed class JsonQueryTests(AppContainer app)
 
         inserted.ShouldBe(1);
         read.Id.ShouldBe(row.Id);
-        ShouldBeSame(read.Element, row.Element, nameof(read.Element));
-        ShouldBeSame(readDocument.ShouldNotBeNull().RootElement, document.RootElement, nameof(read.Document));
+        JsonElements.ShouldBeSame(read.Element, row.Element, nameof(read.Element));
+        JsonElements.ShouldBeSame(
+            readDocument.ShouldNotBeNull().RootElement,
+            document.RootElement,
+            nameof(read.Document)
+        );
         JsonNode.DeepEquals(read.Node, row.Node).ShouldBeTrue(nameof(read.Node));
         JsonNode.DeepEquals(read.Obj, row.Obj).ShouldBeTrue(nameof(read.Obj));
         JsonNode.DeepEquals(read.Arr, row.Arr).ShouldBeTrue(nameof(read.Arr));
@@ -248,7 +251,7 @@ public sealed class JsonQueryTests(AppContainer app)
         await using var transaction = await BeginAsync(connection, token);
         var row = new InsertJsonColumnsArgs(
             Id: 211,
-            Element: ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
+            Element: JsonElements.ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
             Meta: new OrderMetadata(12, "json")
         );
 
@@ -267,7 +270,7 @@ public sealed class JsonQueryTests(AppContainer app)
 
         inserted.ShouldBe(1);
         read.Id.ShouldBe(row.Id);
-        ShouldBeSame(read.Element, row.Element, nameof(read.Element));
+        JsonElements.ShouldBeSame(read.Element, row.Element, nameof(read.Element));
         read.Meta.ShouldBe(row.Meta);
         stored.ShouldBe("12");
     }
@@ -303,7 +306,7 @@ public sealed class JsonQueryTests(AppContainer app)
 
         var thrown = await Should.ThrowAsync<SqlException>(() =>
             connection.InsertJsonColumns(
-                new InsertJsonColumnsArgs(213, ElementOf("null"), null),
+                new InsertJsonColumnsArgs(213, JsonElements.ElementOf("null"), null),
                 transaction,
                 cancellationToken: token
             )
@@ -353,7 +356,7 @@ public sealed class JsonQueryTests(AppContainer app)
     private static InsertJsonValuesArgs EveryValue(int id, JsonDocument document) =>
         new(
             Id: id,
-            Element: ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
+            Element: JsonElements.ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
             Document: document,
             Node: JsonValue.Create(3.25),
             Obj: new JsonObject { ["name"] = "obj", ["count"] = 3 },
@@ -374,13 +377,4 @@ public sealed class JsonQueryTests(AppContainer app)
         await connection.OpenAsync(token);
         return (SqlTransaction)await connection.BeginTransactionAsync(token);
     }
-
-    private static JsonElement ElementOf([StringSyntax(StringSyntaxAttribute.Json)] string json)
-    {
-        using var document = JsonDocument.Parse(json);
-        return document.RootElement.Clone();
-    }
-
-    private static void ShouldBeSame(JsonElement? read, JsonElement? written, string name) =>
-        JsonElement.DeepEquals(read.ShouldNotBeNull(name), written!.Value).ShouldBeTrue(name);
 }

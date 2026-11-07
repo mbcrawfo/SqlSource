@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -38,18 +37,22 @@ public sealed class JsonQueryTests(AppContainer app)
 
         inserted.ShouldBe(1);
         read.Id.ShouldBe(row.Id);
-        ShouldBeSame(read.Element, row.Element, nameof(read.Element));
-        ShouldBeSame(read.ElementJson, row.ElementJson, nameof(read.ElementJson));
+        JsonElements.ShouldBeSame(read.Element, row.Element, nameof(read.Element));
+        JsonElements.ShouldBeSame(read.ElementJson, row.ElementJson, nameof(read.ElementJson));
         // The input model holds the array as any sequence.
         var elements = read.Elements.ShouldNotBeNull();
         var written = row.Elements.ShouldNotBeNull().ToArray();
         elements.Length.ShouldBe(written.Length);
         for (var i = 0; i < elements.Length; i++)
         {
-            ShouldBeSame(elements[i], written[i], nameof(read.Elements));
+            JsonElements.ShouldBeSame(elements[i], written[i], nameof(read.Elements));
         }
 
-        ShouldBeSame(readDocument.ShouldNotBeNull().RootElement, document.RootElement, nameof(read.Document));
+        JsonElements.ShouldBeSame(
+            readDocument.ShouldNotBeNull().RootElement,
+            document.RootElement,
+            nameof(read.Document)
+        );
         JsonNode.DeepEquals(read.Node, row.Node).ShouldBeTrue(nameof(read.Node));
         JsonNode.DeepEquals(read.Obj, row.Obj).ShouldBeTrue(nameof(read.Obj));
         JsonNode.DeepEquals(read.Arr, row.Arr).ShouldBeTrue(nameof(read.Arr));
@@ -256,9 +259,14 @@ public sealed class JsonQueryTests(AppContainer app)
     private static InsertJsonValuesArgs EveryValue(JsonDocument document) =>
         new(
             Id: 201,
-            Element: ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
-            ElementJson: ElementOf("""{"z": {"y": []},  "a": -1.5}"""),
-            Elements: [ElementOf("""{"k": "v"}"""), ElementOf("42"), ElementOf("\"text\"")],
+            Element: JsonElements.ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
+            ElementJson: JsonElements.ElementOf("""{"z": {"y": []},  "a": -1.5}"""),
+            Elements:
+            [
+                JsonElements.ElementOf("""{"k": "v"}"""),
+                JsonElements.ElementOf("42"),
+                JsonElements.ElementOf("\"text\""),
+            ],
             Document: document,
             Node: JsonValue.Create(3.25),
             Obj: new JsonObject { ["name"] = "obj", ["count"] = 3 },
@@ -287,13 +295,4 @@ public sealed class JsonQueryTests(AppContainer app)
             Camel: null,
             TextMeta: null
         );
-
-    private static JsonElement ElementOf([StringSyntax(StringSyntaxAttribute.Json)] string json)
-    {
-        using var document = JsonDocument.Parse(json);
-        return document.RootElement.Clone();
-    }
-
-    private static void ShouldBeSame(JsonElement? read, JsonElement? written, string name) =>
-        JsonElement.DeepEquals(read.ShouldNotBeNull(name), written!.Value).ShouldBeTrue(name);
 }

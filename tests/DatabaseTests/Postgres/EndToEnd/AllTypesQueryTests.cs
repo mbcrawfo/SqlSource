@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Data;
@@ -359,18 +358,5 @@ public sealed class AllTypesQueryTests(PostgresDatabases postgres)
             cancellationToken: token
         );
         return rows.ShouldHaveSingleItem();
-    }
-
-    private sealed class CountingSequence(int[] items) : IEnumerable<int>
-    {
-        public int Enumerations { get; private set; }
-
-        public IEnumerator<int> GetEnumerator()
-        {
-            Enumerations++;
-            return ((IEnumerable<int>)items).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
