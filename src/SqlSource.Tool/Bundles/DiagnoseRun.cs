@@ -156,6 +156,26 @@ internal static class DiagnoseRun
             return;
         }
 
+        // A bundle that another version made may ask what this version does not: replay's error, and no renaming,
+        // whose proof would miss the same call and blame the renaming.
+        var replayed = await BundleReplay.RunAsync(prepared.Value, NullRunLog.Instance, host.Time, cancellationToken);
+        if (replayed is ReplayOutcome.Missed missed)
+        {
+            Report(BundleErrors.CallMissing(path, missed.Method, BundleErrors.MadeBy(bundle.Info.ToolVersion)));
+            return;
+        }
+
+        // Nor is a bundle whose answer this version does not reproduce, which the proof would refuse as the renaming's
+        // fault.  A bundle with no expected answer has nothing to reproduce.
+        if (
+            prepared.Value.Expected is { } expected
+            && ReplayCommand.DifferencesOf(expected, replayed) is [var first, ..]
+        )
+        {
+            Report(BundleErrors.NotReproduced(path, first, BundleErrors.MadeBy(bundle.Info.ToolVersion)));
+            return;
+        }
+
         await RenameAndWriteAsync(bundle, prepared.Value.Describer, prepared.Value.Dialect, outPath, context);
     }
 

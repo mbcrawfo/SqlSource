@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT j.job_id, d.database_id\nFROM msdb.dbo.sysjobs AS j\nCROSS JOIN master.sys.databases AS d;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [],

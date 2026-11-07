@@ -367,6 +367,13 @@ public sealed partial class SqlServerErrorRenamingTests
 
                 var parameters = CallOf(capture, "parameters");
                 copy = FirstCopyIn(parameters["request"]!["sql"]!.GetValue<string>(), parameter);
+
+                // The capture records the parameter's copies beside the SQL that holds them.
+                var reused = parameters["request"]!["reused"]!.AsArray().Single()!.AsObject();
+                reused["name"] = parameter;
+                reused["copies"] = new JsonArray(
+                    reused["copies"]!.AsArray().Select((_, index) => (JsonNode)$"{parameter}_{index + 1}").ToArray()
+                );
                 parameters["answer"] = Answer(
                     ("rows", null),
                     (

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Parsing;
@@ -21,7 +22,7 @@ public sealed class SqlRenamerTests
         var engine = new FakeEngineRenaming(dialect);
         var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold);
         var parameters = new HashSet<string>(queryParameters, SqlParameterName.Comparer);
-        return (new SqlRenamer(engine, mapping, parameters), mapping, []);
+        return (new SqlRenamer(engine, mapping, parameters, RenamingCopies.None), mapping, []);
     }
 
     private static string Rename(string sql, SqlDialect dialect = SqlDialect.PostgreSql)
@@ -174,18 +175,38 @@ public sealed class SqlRenamerTests
         renamer.Rename("SELECT @count", NameClass.Alias, Place, refusals.Add).Text.ShouldBe("SELECT @count");
     }
 
+    // A copy is renamed through what the capture records, whatever its spelling: a name that looks like a copy and
+    // that no call records is a name of its own.
     [Fact]
     public void Rename_CopyOfAReusedParameter_IsRenamedThroughIt()
     {
-        var (renamer, mapping, refusals) = Renamer(SqlDialect.SqlServer, "before");
+        var engine = new FakeEngineRenaming(SqlDialect.SqlServer);
+        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold);
+        var request = new JsonObject
+        {
+            ["copies"] = FakeEngineRenaming.Copies(("before_1", "before", "_1"), ("Before__x", "before", "_2")),
+        };
+        var copies = RenamingCopies.Of(
+            engine,
+            [new RenamingCall(0, "describe", new JsonObject { ["request"] = request }, [])],
+            static call => call.Original
+        );
+        var renamer = new SqlRenamer(
+            engine,
+            mapping,
+            new HashSet<string>(["before"], SqlParameterName.Comparer),
+            copies
+        );
+        List<RenamingRefusal> refusals = [];
 
         var renamed = renamer
-            .Rename("SELECT @before, @before_1, @before_x, @after_2", NameClass.Alias, Place, refusals.Add)
+            .Rename("SELECT @before, @before_1, @BEFORE__X, @before_2", NameClass.Alias, Place, refusals.Add)
             .Text;
 
+        refusals.ShouldBeEmpty();
         var before = Of(mapping, "before");
         before.ShouldMatch($"^p_{Hex}$");
-        renamed.ShouldBe($"SELECT @{before}, @{before}_1, @{Of(mapping, "before_x")}, @{Of(mapping, "after_2")}");
+        renamed.ShouldBe($"SELECT @{before}, @{before}_1, @{before}_2, @{Of(mapping, "before_2")}");
     }
 
     // PostgreSQL reads every character outside ASCII as a word's, so SQL Server's rule, which reads letters alone, has

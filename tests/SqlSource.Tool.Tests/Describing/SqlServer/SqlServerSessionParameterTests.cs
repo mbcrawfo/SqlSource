@@ -21,7 +21,7 @@ public sealed class SqlServerSessionParameterTests
     public async Task DescribeAsync_TwoInferredParameters_AsksParametersOnceWithNoDeclarations()
     {
         const string Sql = "SELECT id FROM dbo.users WHERE id = @id AND name = @name";
-        var parameters = new SqlServerParametersRequest(Sql, null);
+        var parameters = new SqlServerParametersRequest(Sql, null, null);
         var columns = new SqlServerColumnsRequest(Sql, "@id int, @name nvarchar(100)");
         var script = new SqlServerScript()
             .Parameters(
@@ -49,7 +49,11 @@ public sealed class SqlServerSessionParameterTests
     {
         const string Sql = "SELECT id FROM dbo.users WHERE (@name IS NULL OR name = @name)";
         const string Renamed = "SELECT id FROM dbo.users WHERE (@name_1 IS NULL OR name = @name_2)";
-        var parameters = new SqlServerParametersRequest(Renamed, null);
+        var parameters = new SqlServerParametersRequest(
+            Renamed,
+            null,
+            [new SqlServerReusedParameter("name", ["name_1", "name_2"])]
+        );
         var xmlFirst = new SqlServerProbeRequest(Renamed, "@name_1 xml, @name_2 nvarchar(100)");
         var intFirst = new SqlServerProbeRequest(Renamed, "@name_1 int, @name_2 nvarchar(100)");
         var xmlSecond = new SqlServerProbeRequest(Renamed, "@name_1 int, @name_2 xml");
@@ -88,7 +92,11 @@ public sealed class SqlServerSessionParameterTests
     {
         const string Sql = "SELECT id FROM dbo.orders WHERE id = @p OR user_id = @p";
         const string Renamed = "SELECT id FROM dbo.orders WHERE id = @p_1 OR user_id = @p_2";
-        var parameters = new SqlServerParametersRequest(Renamed, null);
+        var parameters = new SqlServerParametersRequest(
+            Renamed,
+            null,
+            [new SqlServerReusedParameter("p", ["p_1", "p_2"])]
+        );
         var columns = new SqlServerColumnsRequest(Sql, "@p int");
         var script = new SqlServerScript()
             .Parameters(
@@ -112,7 +120,7 @@ public sealed class SqlServerSessionParameterTests
     {
         const string Sql = "SELECT id FROM dbo.orders WHERE user_id = @tenant AND id = @id";
         var declared = new SqlServerDeclaredRequest("SELECT @tenant AS [1]", "@tenant int");
-        var parameters = new SqlServerParametersRequest(Sql, "@tenant int");
+        var parameters = new SqlServerParametersRequest(Sql, "@tenant int", null);
         var columns = new SqlServerColumnsRequest(Sql, "@tenant int, @id int");
         var script = new SqlServerScript()
             .Declared(
@@ -161,7 +169,7 @@ public sealed class SqlServerSessionParameterTests
     public async Task DescribeAsync_ServerReportsAParameterTheListLacks_IsSqlsrc231()
     {
         const string Sql = "SELECT TOP (@n) id, @p + 1 AS q FROM dbo.users";
-        var parameters = new SqlServerParametersRequest(Sql, null);
+        var parameters = new SqlServerParametersRequest(Sql, null, null);
         var script = new SqlServerScript().Parameters(
             parameters,
             new SqlServerParametersAnswer(
@@ -187,7 +195,11 @@ public sealed class SqlServerSessionParameterTests
     public async Task DescribeAsync_ListsDifferAndCopiesDisagree_IsSqlsrc231AndAsksNoProbe()
     {
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2 AND id = @q";
-        var parameters = new SqlServerParametersRequest(Renamed, null);
+        var parameters = new SqlServerParametersRequest(
+            Renamed,
+            null,
+            [new SqlServerReusedParameter("p", ["p_1", "p_2"])]
+        );
         var script = new SqlServerScript().Parameters(
             parameters,
             new SqlServerParametersAnswer(
@@ -208,7 +220,11 @@ public sealed class SqlServerSessionParameterTests
     public async Task DescribeAsync_CopiesThatConstrainDisagree_IsSqlsrc262()
     {
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2";
-        var parameters = new SqlServerParametersRequest(Renamed, null);
+        var parameters = new SqlServerParametersRequest(
+            Renamed,
+            null,
+            [new SqlServerReusedParameter("p", ["p_1", "p_2"])]
+        );
         var script = new SqlServerScript()
             .Parameters(
                 parameters,
@@ -236,7 +252,7 @@ public sealed class SqlServerSessionParameterTests
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2";
         var script = new SqlServerScript()
             .Parameters(
-                new SqlServerParametersRequest(Renamed, null),
+                new SqlServerParametersRequest(Renamed, null, [new SqlServerReusedParameter("p", ["p_1", "p_2"])]),
                 new SqlServerParametersAnswer([IntRow with { Name = "@p_1" }, Name100Row with { Name = "@p_2" }], null)
             )
             .Probe(

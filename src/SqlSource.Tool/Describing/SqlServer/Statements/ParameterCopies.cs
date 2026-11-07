@@ -18,14 +18,9 @@ namespace SqlSource.Tool.Describing.SqlServer.Statements;
 /// </param>
 internal sealed record CopiedSql(
     string Sql,
-    IReadOnlyList<ReusedParameter> Reused,
+    IReadOnlyList<SqlServerReusedParameter> Reused,
     IReadOnlyDictionary<string, string> ParameterOfCopy
 );
-
-/// <summary>A parameter that the SQL uses more than once, and the names of its copies.</summary>
-/// <param name="Name">The parameter's name as the list spells it.</param>
-/// <param name="Copies">The copies' names, without their <c>@</c>, in the order the SQL uses them.</param>
-internal sealed record ReusedParameter(string Name, IReadOnlyList<string> Copies);
 
 /// <summary>
 /// What the server said of one copy.  It is no record of a call, so its name does not end in <c>Answer</c>, which
@@ -125,7 +120,10 @@ internal static class ParameterCopies
         var separator = SeparatorFor(reused, taken);
         var made = new HashSet<string>(SqlParameterName.Comparer);
         var copies = reused
-            .Select(parameter => new ReusedParameter(parameter.Name, CopiesOf(parameter, separator, taken, made)))
+            .Select(parameter => new SqlServerReusedParameter(
+                parameter.Name,
+                CopiesOf(parameter, separator, taken, made)
+            ))
             .ToList();
         return new CopiedSql(Renamed(sql, lexemes, copies), copies, ParameterOfCopy(copies));
     }
@@ -227,7 +225,7 @@ internal static class ParameterCopies
         return true;
     }
 
-    private static string Renamed(string sql, EquatableArray<SqlLexeme> lexemes, List<ReusedParameter> copies)
+    private static string Renamed(string sql, EquatableArray<SqlLexeme> lexemes, List<SqlServerReusedParameter> copies)
     {
         var byName = copies.ToDictionary(static copy => copy.Name, SqlParameterName.Comparer);
         var next = new Dictionary<string, int>(SqlParameterName.Comparer);
@@ -248,7 +246,7 @@ internal static class ParameterCopies
         return renamed.ToString();
     }
 
-    private static Dictionary<string, string> ParameterOfCopy(List<ReusedParameter> copies)
+    private static Dictionary<string, string> ParameterOfCopy(List<SqlServerReusedParameter> copies)
     {
         var parameterOfCopy = new Dictionary<string, string>(SqlParameterName.Comparer);
         foreach (var reused in copies)

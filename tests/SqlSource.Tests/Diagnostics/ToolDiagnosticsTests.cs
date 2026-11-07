@@ -89,8 +89,8 @@ public sealed class ToolDiagnosticsTests
         };
         // SQLSRC200 is formatted above, and SQLSRC215 starts with a count, SQLSRC231 with the name of the reader,
         // SQLSRC266 with a column's position, SQLSRC288 to SQLSRC291 with a sentence about the bundle, which the
-        // path they are reported at names, SQLSRC292 with a query's name, and SQLSRC293 and SQLSRC294 with a sentence
-        // about a renamed bundle; their own tests format them.
+        // path they are reported at names, SQLSRC292 with a query's name, SQLSRC293 and SQLSRC294 with a sentence
+        // about a renamed bundle, and SQLSRC296 with one about a raw bundle; their own tests format them.
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)
@@ -104,6 +104,7 @@ public sealed class ToolDiagnosticsTests
                 .Remove(ToolDiagnostics.QueryNotInFile)
                 .Remove(ToolDiagnostics.BundleCannotBeMadeSafe)
                 .Remove(ToolDiagnostics.RenamedBundleDoesNotReproduce)
+                .Remove(ToolDiagnostics.RawBundleNotReproduced)
         )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it
@@ -145,6 +146,11 @@ public sealed class ToolDiagnosticsTests
             .ShouldBe("The renamed bundle does not reproduce the query's answer: its replay differs at expected.json");
         Format(ToolDiagnostics.BundleIsNotRaw, "/work/report.zip", "the reason")
             .ShouldBe("'/work/report.zip' is not a raw bundle: the reason");
+        Format(ToolDiagnostics.RawBundleNotReproduced, "columns[0].nullable: true -> false", "sqlsource 1.4.0", "1.6.0")
+            .ShouldBe(
+                "This version of sqlsource does not reproduce the bundle's answer, so it is not renamed: "
+                    + "columns[0].nullable: true -> false; it was made by sqlsource 1.4.0, and this is sqlsource 1.6.0"
+            );
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Shouldly;
@@ -52,7 +52,11 @@ public sealed class PostgresRenamingTests
         engine.Fold("Users", quoted: false).ShouldBe("users");
         engine.IsEngineWord("SELECT", quoted: false).ShouldBeTrue();
         engine.RuleOf(PostgresCallNames.Explain, "answer.plan").ShouldBe(FieldRule.Own);
-        engine.CopyOf("id_1", new HashSet<string>(StringComparer.Ordinal) { "id" }).ShouldBeNull();
+        var reused = new JsonObject { ["name"] = "id", ["copies"] = new JsonArray("id_1") };
+        var request = new JsonObject { ["reused"] = new JsonArray(reused), ["copies"] = new JsonArray("id_1") };
+        var call = new JsonObject { ["request"] = request };
+        engine.CopiesIn(PostgresCallNames.Prepare, call).ShouldBeEmpty();
+        engine.CopiesIn("parameters", call).ShouldBeEmpty();
     }
 
     [Fact]

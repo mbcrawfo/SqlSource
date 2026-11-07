@@ -58,7 +58,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT\n    o.user_id AS user_id,\n    COUNT(*) AS order_count,\n    SUM(o.total) AS total_spent,\n    MAX(o.total * u.credit) AS largest_weighted,\n    COALESCE(u.nickname, u.name) AS shown_name,\n    CAST(o.user_id AS bigint) AS user_key,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS order_rank\nFROM dbo.orders AS o\nJOIN dbo.users AS u ON u.id = o.user_id\nWHERE o.total >= @minimum_total\nGROUP BY o.user_id, u.nickname, u.name;",
-        "params": "@minimum_total decimal(18,2)"
+        "params": "@minimum_total decimal(18,2)",
+        "reused": null
       },
       "answer": {
         "rows": [],

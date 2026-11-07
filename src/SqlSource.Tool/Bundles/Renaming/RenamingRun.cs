@@ -20,12 +20,17 @@ internal sealed class RenamingRun
     private readonly SqlRenamer _sql;
     private readonly IReadOnlyList<string> _parameters;
 
-    private RenamingRun(IEngineRenaming engine, NameMapping mapping, IReadOnlyList<string> parameters)
+    private RenamingRun(
+        IEngineRenaming engine,
+        NameMapping mapping,
+        IReadOnlyList<string> parameters,
+        RenamingCopies copies
+    )
     {
         _engine = engine;
         _parameters = parameters;
         Mapping = mapping;
-        _sql = new SqlRenamer(engine, mapping, new HashSet<string>(parameters, SqlParameterName.Comparer));
+        _sql = new SqlRenamer(engine, mapping, new HashSet<string>(parameters, SqlParameterName.Comparer), copies);
     }
 
     /// <summary>The bundle's one mapping.</summary>
@@ -35,10 +40,10 @@ internal sealed class RenamingRun
     public RenamingRefusal? Refusal { get; private set; }
 
     /// <summary>
-    /// A run over the parameters of a query file: the names of its parameter lexemes, in their order.  A file that does
-    /// not lex has none here, and its renaming refuses it.
+    /// A run over the parameters of a query file, the names of its parameter lexemes in their order, and the copies of
+    /// them that the raw capture records.  A file that does not lex has no parameter here, and its renaming refuses it.
     /// </summary>
-    public static RenamingRun For(IEngineRenaming engine, NameMapping mapping, string query)
+    public static RenamingRun For(IEngineRenaming engine, NameMapping mapping, string query, RenamingCopies copies)
     {
         var lexed = SqlLexer.Lex(query, SqlDialectRules.For(engine.Dialect));
         List<string> parameters = [];
@@ -54,7 +59,7 @@ internal sealed class RenamingRun
             }
         }
 
-        return new RenamingRun(engine, mapping, parameters);
+        return new RenamingRun(engine, mapping, parameters, copies);
     }
 
     /// <summary>
@@ -200,6 +205,8 @@ internal sealed class RenamingRun
         public RenamedText Sql(string sql, NameClass newWords) => run._sql.Rename(sql, newWords, place, run.Refuse);
 
         public string Parameter(string name) => run._sql.ParameterName(name);
+
+        public string ParameterOf(string name) => run._sql.ParameterOf(name);
 
         public void Refuse(RenamingRefusal refusal) => run.Refuse(refusal);
     }

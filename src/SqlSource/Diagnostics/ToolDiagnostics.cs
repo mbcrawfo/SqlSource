@@ -614,6 +614,18 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor RawBundleNotReproduced = new(
+        id: "SQLSRC296",
+        title: "Raw bundle is not reproduced by this version",
+        messageFormat: "This version of sqlsource does not reproduce the bundle's answer, so it is not renamed: {0}; "
+            + "it was made by {1}, and this is sqlsource {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc296",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -672,6 +684,7 @@ internal static class ToolDiagnostics
             QueryNotInFile,
             BundleCannotBeMadeSafe,
             RenamedBundleDoesNotReproduce,
-            BundleIsNotRaw
+            BundleIsNotRaw,
+            RawBundleNotReproduced
         );
 }

@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT id, name FROM dbo.users;\nSELECT id, total FROM dbo.orders;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [],

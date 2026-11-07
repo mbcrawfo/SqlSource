@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT * FROM dbo.user_orders WHERE user_id = @userId;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT id, name, email, nickname, credit, created_at, deleted_at, name_len, name_len_p, rv\nFROM dbo.users\nWHERE id = @id;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

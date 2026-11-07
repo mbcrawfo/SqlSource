@@ -134,7 +134,11 @@ public sealed class SqlServerEventsSessionTests
         const string Sql = "SELECT id FROM dbo.users WHERE tenant = @tenant AND (@name IS NULL OR name = @name)";
         const string Renamed =
             "SELECT id FROM dbo.users WHERE tenant = @tenant AND (@name_1 IS NULL OR name = @name_2)";
-        var parameters = new SqlServerParametersRequest(Renamed, "@tenant int");
+        var parameters = new SqlServerParametersRequest(
+            Renamed,
+            "@tenant int",
+            [new SqlServerReusedParameter("name", ["name_1", "name_2"])]
+        );
         var intRow = new SqlServerParameterRow("@name_1", "int", 4, 10, 0, null, null, null);
         var textRow = new SqlServerParameterRow("@name_2", "nvarchar(100)", 200, 0, 0, null, null, null);
         var script = new SqlServerScript()
@@ -195,7 +199,7 @@ public sealed class SqlServerEventsSessionTests
     {
         const string Sql = "SELECT id FROM dbo.users WHERE id = @id";
         var script = new SqlServerScript().Parameters(
-            new SqlServerParametersRequest(Sql, null),
+            new SqlServerParametersRequest(Sql, null, null),
             new SqlServerParametersAnswer(null, Refused)
         );
         var log = new RecordingLog();
@@ -223,7 +227,7 @@ public sealed class SqlServerEventsSessionTests
                 )
             )
             .Parameters(
-                new SqlServerParametersRequest(Sql, "@p dbo.Email"),
+                new SqlServerParametersRequest(Sql, "@p dbo.Email", null),
                 new SqlServerParametersAnswer(
                     [new SqlServerParameterRow("@e", "nvarchar(320)", 640, 0, 0, "dbo", "Email", null)],
                     null
@@ -257,7 +261,7 @@ public sealed class SqlServerEventsSessionTests
     {
         const string Sql = "SELECT id FROM dbo.secret WHERE id = @id";
         var script = new SqlServerScript().Parameters(
-            new SqlServerParametersRequest(Sql, null),
+            new SqlServerParametersRequest(Sql, null, null),
             new SqlServerParametersAnswer(
                 null,
                 new SqlServerServerError([new SqlServerErrorRow(208, 16, 1, "Invalid object name 'dbo.secret'.")])

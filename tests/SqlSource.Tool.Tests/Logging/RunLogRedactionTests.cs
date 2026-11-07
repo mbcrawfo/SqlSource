@@ -222,11 +222,11 @@ public sealed class RunLogRedactionTests : IDisposable
                 [new SqlServerParameterRow("@" + value, value, 4, 10, 0, value, value, value)],
                 null
             );
-            SqlServerEvents.Parameters(log, "GetUser", new(sql, declarations), rows, 1);
+            SqlServerEvents.Parameters(log, "GetUser", new(sql, declarations, null), rows, 1);
             var error = new SqlServerServerError([
                 new SqlServerErrorRow(102, 15, 1, "Incorrect syntax near '" + value + "'."),
             ]);
-            SqlServerEvents.Parameters(log, "GetUser", new(sql, declarations), new(null, error), 1);
+            SqlServerEvents.Parameters(log, "GetUser", new(sql, declarations, null), new(null, error), 1);
         };
 
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
