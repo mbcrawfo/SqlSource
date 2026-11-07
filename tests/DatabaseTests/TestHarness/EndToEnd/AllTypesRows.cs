@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Reflection;
 using Shouldly;
 using SqlSource.Testing;
 
@@ -149,7 +148,7 @@ internal static class AllTypesRows
     // whose columns a test did not write.
     public static void ShouldBeTheFullRow(object row, int id = FullRowId, IReadOnlySet<string>? nullProperties = null)
     {
-        var properties = PropertiesOf(row);
+        var properties = ModelReflection.ShouldHaveProperties(row.GetType(), FullRow.Keys);
         nullProperties ??= new HashSet<string>(StringComparer.Ordinal);
         nullProperties.ShouldNotContain("Id");
         nullProperties.ShouldBeSubsetOf(properties.Select(static property => property.Name));
@@ -169,7 +168,7 @@ internal static class AllTypesRows
     // Asserts that the row is row 2 of the seed, with null in every column but id, which may be another.
     public static void ShouldBeTheNullRow(object row, int id = NullRowId)
     {
-        foreach (var property in PropertiesOf(row))
+        foreach (var property in ModelReflection.ShouldHaveProperties(row.GetType(), FullRow.Keys))
         {
             ShouldBeValue(property.GetValue(row), property.Name == "Id" ? id : null, property.Name);
         }
@@ -196,17 +195,6 @@ internal static class AllTypesRows
             })
             .ToArray();
         return (TArgs)constructor.Invoke(arguments);
-    }
-
-    // The public properties of the row, which are those that the expectations name, no more and no fewer.
-    private static PropertyInfo[] PropertiesOf(object row)
-    {
-        var properties = row.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-        properties
-            .Select(static property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ShouldBe(FullRow.Keys.Order(StringComparer.Ordinal), $"The properties of {row.GetType()}");
-        return properties;
     }
 
     private static void ShouldBeValue(object? actual, object? expected, string path)

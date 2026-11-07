@@ -1,5 +1,4 @@
 using System;
-using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -33,9 +32,12 @@ public sealed class MethodAllTypesTests(AppContainer app)
     }
 
     [Fact]
-    public async Task WriteAllTypes_TheValuesOfRow1_WritesThemWhole() =>
-        await RolledBackAsync(
-            async (connection, transaction) =>
+    public async Task WriteAllTypes_TheValuesOfRow1_WritesThemWhole()
+    {
+        await using var connection = new SqlConnection(app.ConnectionString);
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
             {
                 var token = TestContext.Current.CancellationToken;
                 var full = (await connection.ListAllTypes(transaction: transaction, cancellationToken: token)).Single(
@@ -51,13 +53,18 @@ public sealed class MethodAllTypesTests(AppContainer app)
                 SqlServerAllTypesRows.ShouldBeTheFullRow(written, InsertedId);
                 var rows = await connection.ListAllTypes(transaction: transaction, cancellationToken: token);
                 SqlServerAllTypesRows.ShouldBeTheFullRow(rows.Single(static row => row.Id == InsertedId), InsertedId);
-            }
+            },
+            TestContext.Current.CancellationToken
         );
+    }
 
     [Fact]
-    public async Task WriteAllTypes_EveryColumnNull_WritesTheNullRow() =>
-        await RolledBackAsync(
-            async (connection, transaction) =>
+    public async Task WriteAllTypes_EveryColumnNull_WritesTheNullRow()
+    {
+        await using var connection = new SqlConnection(app.ConnectionString);
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
             {
                 var written = await connection.WriteAllTypes(
                     SqlServerAllTypesRows.ArgsOf<WriteAllTypesArgs>(InsertedId, row: null),
@@ -66,8 +73,10 @@ public sealed class MethodAllTypesTests(AppContainer app)
                 );
 
                 SqlServerAllTypesRows.ShouldBeTheNullRow(written, InsertedId);
-            }
+            },
+            TestContext.Current.CancellationToken
         );
+    }
 
     [Fact]
     public async Task FindByRowversion_TheRowversionOfRow1_FindsRow1()
@@ -110,9 +119,12 @@ public sealed class MethodAllTypesTests(AppContainer app)
     }
 
     [Fact]
-    public async Task WriteNewTypes_TheValuesOfRow1_WritesThemWhole() =>
-        await RolledBackAsync(
-            async (connection, transaction) =>
+    public async Task WriteNewTypes_TheValuesOfRow1_WritesThemWhole()
+    {
+        await using var connection = new SqlConnection(app.ConnectionString);
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
             {
                 var written = await connection.WriteNewTypes(
                     new WriteNewTypesArgs(
@@ -126,13 +138,18 @@ public sealed class MethodAllTypesTests(AppContainer app)
                 );
 
                 SqlServerAllTypesRows.ShouldBeTheFullNewTypesRow(written, InsertedId);
-            }
+            },
+            TestContext.Current.CancellationToken
         );
+    }
 
     [Fact]
-    public async Task WriteNewTypes_BothColumnsNull_WritesTheNullRow() =>
-        await RolledBackAsync(
-            async (connection, transaction) =>
+    public async Task WriteNewTypes_BothColumnsNull_WritesTheNullRow()
+    {
+        await using var connection = new SqlConnection(app.ConnectionString);
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
             {
                 var written = await connection.WriteNewTypes(
                     new WriteNewTypesArgs(InsertedId, null, null),
@@ -141,8 +158,10 @@ public sealed class MethodAllTypesTests(AppContainer app)
                 );
 
                 SqlServerAllTypesRows.ShouldBeTheNullNewTypesRow(written, InsertedId);
-            }
+            },
+            TestContext.Current.CancellationToken
         );
+    }
 
     [Fact]
     public async Task GetNewType_RowWithAVector_ReadsIt()
@@ -171,16 +190,5 @@ public sealed class MethodAllTypesTests(AppContainer app)
         );
 
         thrown.Message.ShouldBe("Column 'v' is null.");
-    }
-
-    // Runs the write in a transaction that is rolled back when it is disposed, and that the write gives to every call,
-    // since SqlClient refuses a command on a connection whose transaction it is not given.
-    private async Task RolledBackAsync(Func<SqlConnection, DbTransaction, Task> write)
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var connection = new SqlConnection(app.ConnectionString);
-        await connection.OpenAsync(token);
-        await using var transaction = await connection.BeginTransactionAsync(token);
-        await write(connection, transaction);
     }
 }

@@ -13,6 +13,13 @@ namespace SqlSource.DatabaseTests.Postgres.Realistic.Describer;
 // recorded of it, and says which columns held a NULL.
 internal static class RealisticNullabilityOracle
 {
+    // The run of a case's query with one sample, its literals put into the query's text by RealisticSamples, on the
+    // connection to the database "realistic": the run that RealisticNullabilityChecks and RealisticMethodChecks are
+    // given.
+    public static RealisticSampleRun SampleRunOn(string connection) =>
+        (request, parameters, sample) =>
+            RunAsync(connection, RealisticSamples.Substitute(request.Sql, sample, parameters));
+
     // Reads every row, in a transaction that is rolled back, so that a query that writes leaves the seed as it was.
     [SuppressMessage(
         "Security",
@@ -55,8 +62,8 @@ internal static class RealisticNullabilityOracle
         return run;
     }
 
-    // The rollback of a query that failed, which fails too when the connection broke.  RealisticMethodTests rolls back
-    // a method that failed by it too.
+    // The rollback of a query that failed, which fails too when the connection broke.  RealisticSeed rolls back a
+    // method that failed by it too.
     public static async Task RollBackAfterAsync(NpgsqlTransaction transaction)
     {
         try
