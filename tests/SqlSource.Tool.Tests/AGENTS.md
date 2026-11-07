@@ -13,7 +13,7 @@
 - **A test that changes the environment of the test process is in the collection `ChangesTheEnvironment`**, which runs alone, and puts back what it changed.
 - **A test runs `dotnet build` of a fixture through `FixtureProjects.BuildAsync`**, which clears the variables that would take the build online, keep it offline as in CI or have MSBuild log every variable, whatever the developer's shell or the runner holds.
 - **A test of the online build gives the build the stand-in of the tool through `StandIn.CommandSwitch` and tells it what to do through `StandIn.Tell`**, never a script, which would not run on Windows.
-- **A test that takes for granted what is above the system's temporary folder skips through `AboveTheTempFolder`**: one of what the tool does outside a repository with `SkipWhenInARepository`, and a build that must find no `.env` with `SkipWhenAnEnvIsAbove`, since a machine may hold either above it.
+- **A test that takes for granted that no `.git` is above the system's temporary folder skips through `AboveTheTempFolder.SkipWhenInARepository`**, since a machine may hold one there: the watch climbs to it.
 - **A test that starts a program of the operating system skips with `Programs.SkipUnlessOnPath`** where the program is missing, and one that needs a program that waits takes it from `Programs.Waiter`, whichever the operating system.
 
 ## Fixture projects and bundles

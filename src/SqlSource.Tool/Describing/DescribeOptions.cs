@@ -14,10 +14,8 @@ namespace SqlSource.Tool.Describing;
 /// <param name="Databases">
 /// The values of <c>--database</c>, each name once ignoring case, in the order given; the first of a name is kept.
 /// </param>
-/// <param name="UnitFolder">
-/// The full path of the folder of the run's unit, the project or the solution, where the search for its <c>.env</c>
-/// file starts.
-/// </param>
+/// <param name="UnitFolder">The full path of the folder of the run's unit, the project or the solution.</param>
+/// <param name="EnvFile">The full path of the <c>.env</c> file the run reads, or null when it reads none.</param>
 /// <param name="Online">
 /// What <c>--online</c> said: <see cref="OnlineMode.Off" /> for a run that is not part of a build.
 /// </param>
@@ -27,5 +25,6 @@ internal sealed record DescribeOptions(
     ImmutableArray<ConnectionArgument> Connections,
     ImmutableArray<UsageValue> Databases,
     string UnitFolder,
+    string? EnvFile,
     OnlineMode Online
 );

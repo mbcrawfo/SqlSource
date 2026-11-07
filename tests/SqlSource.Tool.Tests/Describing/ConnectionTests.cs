@@ -59,7 +59,7 @@ public sealed class ConnectionTests
             describable,
             planned,
             [.. given.Select((text, index) => ConnectionArguments.Parse(text, (2 * index) + 3))],
-            ConnectionEnvironment.Of(name => variables.GetValueOrDefault(name), dotEnv, "/work")
+            ConnectionEnvironment.Of(name => variables.GetValueOrDefault(name), dotEnv, "/work", DotEnvPath)
         );
     }
 
@@ -289,10 +289,14 @@ public sealed class ConnectionTests
                     ImmutableDictionary<string, string>.Empty.Add("SQLSOURCE_CONNECTION", Secrets.Marker),
                     []
                 ),
-                "/work"
+                "/work",
+                DotEnvPath
             )
             .ToString()
-            .ShouldBe("ConnectionEnvironment { UnitFolder = /work, FilePath = /work/.env, Errors = 0 }");
+            .ShouldBe(
+                "ConnectionEnvironment { UnitFolder = /work, LookedFor = /work/.env, FilePath = /work/.env, "
+                    + "Errors = 0 }"
+            );
 
     [Fact]
     public void For_VariableWithNoNameAndTwoSelectedDatabases_IsNotUsed()

@@ -73,6 +73,7 @@ internal static class DescribeRun
             RunDecisions.DescribableDatabases(plan),
             options.Connections,
             options.UnitFolder,
+            options.EnvFile,
             host,
             reporter
         );
@@ -162,8 +163,8 @@ internal static class DescribeRun
     }
 
     /// <summary>
-    /// The connections of the selected databases, from the command line, the environment and then the <c>.env</c>
-    /// file nearest to the unit, with what is wrong with that file reported.  A file that cannot be read gives no
+    /// The connections of the selected databases, from the command line, the environment and then the run's
+    /// <c>.env</c> file, with what is wrong with that file reported.  A file that cannot be read gives no
     /// value.  <c>diagnose</c> looks up the connection of its one database here.
     /// </summary>
     /// <param name="plan">The plan of the run, whose databases a value of <c>--connection</c> may name.</param>
@@ -172,7 +173,8 @@ internal static class DescribeRun
     /// The selected databases that can be described, which decide whether <c>SQLSOURCE_CONNECTION</c> is for one.
     /// </param>
     /// <param name="given">The values of <c>--connection</c>.</param>
-    /// <param name="unitFolder">The full path of the folder of the run's unit, where the search starts.</param>
+    /// <param name="unitFolder">The full path of the folder of the run's unit.</param>
+    /// <param name="envFile">The full path of the run's <c>.env</c> file, or null when it reads none.</param>
     /// <param name="host">The environment and the files.</param>
     /// <param name="reporter">Where the errors of the <c>.env</c> file go.</param>
     internal static Connections ConnectionsOf(
@@ -181,11 +183,12 @@ internal static class DescribeRun
         ImmutableArray<PlannedDatabase> describable,
         ImmutableArray<ConnectionArgument> given,
         string unitFolder,
+        string? envFile,
         ToolHost host,
         Reporter reporter
     )
     {
-        var environment = ConnectionEnvironment.Load(unitFolder, host);
+        var environment = ConnectionEnvironment.Load(unitFolder, envFile, host);
         foreach (var error in environment.Errors)
         {
             reporter.Report(error);

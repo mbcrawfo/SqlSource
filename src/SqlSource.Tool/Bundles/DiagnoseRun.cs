@@ -319,6 +319,7 @@ internal static class DiagnoseRun
             selected,
             DescribeCommand.ConnectionsOf(usage),
             DescribeCommand.UnitFolderOf(target.Unit),
+            DescribeCommand.EnvFileOf(usage, DescribeCommand.UnitFolderOf(target.Unit), host),
             host,
             reporter
         );

@@ -30,6 +30,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Install the tool and describe my queries | [Install the tool](tool.md#install-the-tool) |
 | Have the build describe my queries, or keep it from doing so | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
 | Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](tool.md#connections), [a `.env` file](tool.md#env-file), or the [recipe](recipes.md#use-several-databases) |
+| Keep one `.env` file at the root of a repository, or read another file or none | [A `.env` file](tool.md#env-file), [the build's `.env` file](settings.md#setting-env-file) |
 | Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |
 | Set up git for the sidecars, or mend a merge conflict in one | [Sidecars in git](tool.md#sidecars-in-git) |
 | Describe each query as I save it, and have my editor start that | [Describe on save](tool.md#describe-on-save), [what your editor shows](tool.md#what-your-editor-shows), or the [recipe](recipes.md#start-the-watcher-with-your-editor) |
@@ -70,7 +71,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
-| Connections in a `.env` file | Available | [Connections](tool.md#connections) |
+| Connections in a `.env` file, and `--env-file` and `SqlSourceEnvFile` to choose another | Available | [A `.env` file](tool.md#env-file), [the build's `.env` file](settings.md#setting-env-file) |
 | Describing on save with `describe --watch` | Available | [Describe on save](tool.md#describe-on-save) |
 | Starting the watcher with your editor: VS Code, Rider and Visual Studio | Available | [The recipe](recipes.md#start-the-watcher-with-your-editor) |
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |

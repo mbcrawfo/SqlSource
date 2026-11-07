@@ -389,11 +389,17 @@
         ToLowerInvariant until it is one of the three.  No build in CI runs the tool, so that the job
         that checks the sidecars never rewrites them: CI is recognised by the variables the services set.
 
-        A connection source is the variable SQLSOURCE_CONNECTION set and not blank, or a .env file in the project's
-        folder or a folder above it.  MSBuild logs a variable that a file reads as a property with its value, at the
-        detailed verbosity and in a binary log, so the variable is read by a property function whose answer alone
-        is the property: no file of the package names it as a property, and BuildFileTests holds that.  A project
-        whose connections are only in named variables, which a condition cannot list, sets true.
+        A connection source is the variable SQLSOURCE_CONNECTION set and not blank, or the .env file: the file
+        SqlSourceEnvFile names, trimmed, from the project's folder when its path is relative, else the project folder's
+        .env, never one in a folder above, and none when SqlSourceEnvFile is none, which a condition matches ignoring
+        case.  The build tests only that a file, not a folder, is at the path, as the tool passes over a folder, and
+        never reads it.  When SqlSourceEnvFile is set, the build gives the tool the full path, or none, as the value of
+        its env-file option, so that both look at the one file, and a default build's command is unchanged.  A symbolic
+        link to a file that is not there is a file to File.Exists and none to the tool, so under auto it starts a tool
+        that goes on offline, at every build: the manual says so.  MSBuild logs a variable that a file reads as a
+        property with its value, at the detailed verbosity and in a binary log, so the variable is read by a property
+        function whose answer alone is the property: no file of the package names it as a property, and BuildFileTests
+        holds that.  A project whose connections are only in named variables, which a condition cannot list, sets true.
 
         SqlSourceToolCommand is how the build starts the tool, a local tool of the repository by default; the tests
         set it to a stand-in of the tool.  SqlSourceFirstFramework is the framework of TargetFrameworks that the tool
@@ -428,11 +434,19 @@
         <SqlSourceHasConnectionVariable
             Condition="$([System.String]::IsNullOrWhiteSpace($([System.Environment]::GetEnvironmentVariable('SQLSOURCE_CONNECTION'))))"
             >false</SqlSourceHasConnectionVariable>
-        <SqlSourceEnvFolder>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.env'))</SqlSourceEnvFolder>
+        <SqlSourceEnvFileValue>$(SqlSourceEnvFile.Trim())</SqlSourceEnvFileValue>
+        <SqlSourceEnvFilePath>$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), '.env'))</SqlSourceEnvFilePath>
+        <SqlSourceEnvFilePath Condition="'$(SqlSourceEnvFileValue)' != ''"
+            >$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), $(SqlSourceEnvFileValue)))</SqlSourceEnvFilePath>
+        <SqlSourceEnvFilePath Condition="'$(SqlSourceEnvFileValue)' == 'none'" />
+        <SqlSourceHasEnvFile>false</SqlSourceHasEnvFile>
+        <SqlSourceHasEnvFile
+            Condition="'$(SqlSourceEnvFilePath)' != '' and $([System.IO.File]::Exists($(SqlSourceEnvFilePath)))"
+            >true</SqlSourceHasEnvFile>
         <SqlSourceFirstFramework>$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))</SqlSourceFirstFramework>
         <SqlSourceGoesOnline>false</SqlSourceGoesOnline>
         <SqlSourceGoesOnline
-            Condition="'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true')) or ($(SqlSourceOnlineValue.Equals('auto')) and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceEnvFolder)' != '')))"
+            Condition="'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true')) or ($(SqlSourceOnlineValue.Equals('auto')) and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceHasEnvFile)' == 'true')))"
             >true</SqlSourceGoesOnline>
         <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);SQLSRC026</MSBuildWarningsNotAsErrors>
         <SqlSourceDescribeOnlineDependsOn />
@@ -536,14 +550,15 @@
         the run compares is written in the configuration that runs the tool, before its check of what is up to date,
         wherever it is called from.  It writes two files under obj, each only when its text changes: the list of the
         sidecars of the .sql files that exist, so that a deleted sidecar runs the tool again, and the value of
-        SqlSourceOnline with the folder of this file, whose path in NuGet's cache names the package's version, so
-        that a change of either does.  NuGet keeps a package's files at the time they were packed, so the files
-        themselves would not.  WriteLinesToFile writes an empty file for an empty list.
+        SqlSourceOnline with the folder of this file, whose path in NuGet's cache names the package's version, and the
+        path of the .env file, which no line gives under none, so that a change of any of them does.  NuGet keeps a
+        package's files at the time they were packed, and the file SqlSourceEnvFile comes to name can be older than the
+        stamp, so the files themselves would not.  WriteLinesToFile writes an empty file for an empty list.
 
         It gathers the run's inputs too: the manifest; the .sql files and the settings files among the AdditionalFiles
         items; the sidecars of the .sql files, so that one a checkout replaced is described again; the two files above;
-        the .env that the connection source found; and the tool manifests above the project, which dotnet tool
-        update rewrites.  GetPathOfFileAbove takes no folder in the name, so the tool manifest under .config is found
+        the .env file, when a file is at its path; and the tool manifests above the project, which dotnet tool update
+        rewrites.  GetPathOfFileAbove takes no folder in the name, so the tool manifest under .config is found
         by its folder.  Each found path comes from a property function, which gives it unescaped, so it is escaped
         before it is an item.
     -->
@@ -563,6 +578,7 @@
             <SqlSourceSidecarListed Include="@(SqlSourceSidecarOfSqlFile->Exists())" />
             <SqlSourceOnlineValueLine Include="$(SqlSourceOnlineValue)" />
             <SqlSourceOnlineValueLine Include="$(MSBuildThisFileDirectory)" />
+            <SqlSourceOnlineValueLine Include="$([MSBuild]::Escape($(SqlSourceEnvFilePath)))" />
         </ItemGroup>
         <WriteLinesToFile
             File="$(SqlSourceSidecarList)"
@@ -588,8 +604,8 @@
             <SqlSourceOnlineInput Include="$(SqlSourceSidecarList)" />
             <SqlSourceOnlineInput Include="$(SqlSourceOnlineValueFile)" />
             <SqlSourceOnlineInput
-                Include="$([MSBuild]::Escape($([MSBuild]::NormalizePath($(SqlSourceEnvFolder), '.env'))))"
-                Condition="'$(SqlSourceEnvFolder)' != ''"
+                Include="$([MSBuild]::Escape($(SqlSourceEnvFilePath)))"
+                Condition="'$(SqlSourceHasEnvFile)' == 'true'"
             />
             <SqlSourceOnlineInput
                 Include="$([MSBuild]::Escape($([MSBuild]::NormalizePath($(SqlSourceToolManifestFolder), '.config', 'dotnet-tools.json'))))"
@@ -614,10 +630,13 @@
         streams, for this target to read.  The summary and the offline line are messages of low importance: the build
         says what failed, and -v:d shows the rest.  Under SQLSOURCE_LOG the tool writes its log to a file of this
         project and framework, since projects built at once would otherwise open one file.  Exec runs the command in the
-        system's shell, /bin/sh or cmd, which reads some characters even within quotes, and a project's name or its obj
-        folder can hold them, so each path is escaped for that shell first.  For /bin/sh each $, `, " and \ is put in
-        single quotes between the double ones, and not after a \: MSBuild on Unix turns each \ of a value that names a
-        file that exists into a /.  For cmd each % is doubled, and no path there holds a ".
+        system's shell, /bin/sh or cmd, which reads some characters even within quotes, and a project's name, its obj
+        folder or the .env file's path can hold them, so each path is escaped for that shell first.  For /bin/sh each
+        $, `, " and \ is put in single quotes between the double ones, and not after a \: MSBuild on Unix turns each \
+        of a value that names a file that exists into a /.  For cmd each % is doubled, and no path there holds a ".  On
+        Windows the tool reads its arguments by the C runtime's rules, where a \ before a " escapes it, so the
+        backslashes that end the .env file's path, which SqlSourceEnvFile can give as a folder, are doubled before its
+        closing quote; the manifest's and the log's paths end in their file's name.
 
         When dotnet cannot start the tool, it prints its own words, which are localised, and its exit code is no guide,
         so a run that printed no line of the tool's own is a tool that did not start: a line starting sqlsource:, which
@@ -656,13 +675,21 @@
             <SqlSourceShellSpecial Condition="'$(OS)' == 'Windows_NT'">%</SqlSourceShellSpecial>
             <SqlSourceShellEscape Condition="'$(OS)' == 'Windows_NT'">%$0</SqlSourceShellEscape>
             <SqlSourceToolManifestArgument>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceManifestFile), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))</SqlSourceToolManifestArgument>
+            <SqlSourceToolEnvFileArgument>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceEnvFilePath), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))</SqlSourceToolEnvFileArgument>
+            <SqlSourceToolEnvFileArgument Condition="'$(OS)' == 'Windows_NT'"
+                >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceToolEnvFileArgument), '\\+$', '$0$0'))</SqlSourceToolEnvFileArgument>
+            <SqlSourceToolEnvFile />
+            <SqlSourceToolEnvFile Condition="'$(SqlSourceEnvFileValue)' != ''"
+                > --env-file &quot;$(SqlSourceToolEnvFileArgument)&quot;</SqlSourceToolEnvFile>
+            <SqlSourceToolEnvFile Condition="'$(SqlSourceEnvFileValue)' == 'none'"
+                > --env-file none</SqlSourceToolEnvFile>
             <SqlSourceToolLogFile>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log</SqlSourceToolLogFile>
             <SqlSourceToolLog />
             <SqlSourceToolLog Condition="'$(SQLSOURCE_LOG)' != ''"
                 > --log &quot;$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceToolLogFile), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))&quot;</SqlSourceToolLog>
         </PropertyGroup>
         <Exec
-            Command="$(SqlSourceToolCommand) describe --manifest &quot;$(SqlSourceToolManifestArgument)&quot; --online $(SqlSourceOnlineValue)$(SqlSourceToolLog)"
+            Command="$(SqlSourceToolCommand) describe --manifest &quot;$(SqlSourceToolManifestArgument)&quot; --online $(SqlSourceOnlineValue)$(SqlSourceToolEnvFile)$(SqlSourceToolLog)"
             WorkingDirectory="$(MSBuildProjectDirectory)"
             IgnoreExitCode="true"
             ConsoleToMSBuild="true"

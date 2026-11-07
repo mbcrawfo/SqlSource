@@ -288,7 +288,8 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldContain(
             "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
                 + $"environment or in {DotEnvPath}.  "
-                + "The value of --connection at position 3 names no database of this run\n"
+                + "The value of --connection at position 3 names no database of this run"
+                + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain("Host");
         result.Error.ShouldNotContain("Password");
@@ -307,7 +308,8 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldContain(
             "    help: pass --connection hosts=<connection string>, or set SQLSOURCE_CONNECTION_HOSTS in the "
                 + $"environment or in {DotEnvPath}.  "
-                + "--connection was given for Host, which is no database of this run\n"
+                + "--connection was given for Host, which is no database of this run"
+                + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain("Password");
     }
@@ -330,7 +332,8 @@ public sealed class SecretTests : IDisposable
             "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
                 + $"environment or in {DotEnvPath}.  "
                 + "--connection was given for postgress, which is no database of this run.  "
-                + "The values of --connection at positions 3 and 7 name no databases of this run\n"
+                + "The values of --connection at positions 3 and 7 name no databases of this run"
+                + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain("Host");
         result.Error.ShouldNotContain("Server");

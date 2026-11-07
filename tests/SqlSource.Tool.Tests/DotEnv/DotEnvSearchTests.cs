@@ -24,7 +24,7 @@ public sealed class DotEnvSearchTests : IDisposable
     {
         var path = _folder.WriteFile("unit/.env", $"{KeyA}=Host=unit\n");
 
-        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("unit");
 
         file.Path.ShouldBe(path);
         file.Values.Count.ShouldBe(1);
@@ -33,12 +33,11 @@ public sealed class DotEnvSearchTests : IDisposable
     }
 
     [Fact]
-    public void Read_NoEnvAnywhere_GivesNoFile()
+    public void Read_NoEnvInTheUnitFolder_GivesNoFile()
     {
-        AboveTheTempFolder.SkipWhenInARepository(_folder.Path);
         _ = _folder.CreateFolder("unit");
 
-        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("unit");
 
         file.Path.ShouldBeNull();
         file.Values.ShouldBeEmpty();
@@ -46,80 +45,94 @@ public sealed class DotEnvSearchTests : IDisposable
     }
 
     [Fact]
-    public void Read_EnvsInTheUnitFolderAndAbove_NearestWins()
+    public void Read_EnvAboveTheUnitFolderInARepository_IsNotRead()
     {
         _ = _folder.CreateFolder("repo/.git");
         _ = _folder.WriteFile("repo/.env", $"{KeyA}=Host=repo\n");
-        var nearest = _folder.WriteFile("repo/src/app/.env", $"{KeyA}=Host=app\n");
-
-        var file = DotEnvSearch.Read(_folder.PathOf("repo/src/app"), ToolHost.ReadText);
-
-        file.Path.ShouldBe(nearest);
-        file.Values[KeyA].ShouldBe("Host=app");
-    }
-
-    [Fact]
-    public void Read_EnvAboveTheUnitFolder_IsReadUpToTheRepositoryRoot()
-    {
-        _ = _folder.CreateFolder("repo/.git");
-        var path = _folder.WriteFile("repo/.env", $"{KeyA}=Host=repo\n");
         _ = _folder.CreateFolder("repo/src/app");
 
-        var file = DotEnvSearch.Read(_folder.PathOf("repo/src/app"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("repo/src/app");
 
-        file.Path.ShouldBe(path);
+        file.Path.ShouldBeNull();
+        file.Values.ShouldBeEmpty();
     }
 
+    // A .git that someone else put above the unit marks no folder of the unit's own.
     [Fact]
-    public void Read_EnvAboveTheRepositoryRoot_IsNotRead()
+    public void Read_EnvAboveTheUnitFolderOutsideARepository_IsNotRead()
     {
-        _ = _folder.WriteFile(".env", $"{KeyA}=Host=above\n");
-        _ = _folder.CreateFolder("repo/.git");
+        _ = _folder.CreateFolder(".git");
+        _ = _folder.WriteFile("repo/.env", $"{KeyA}=Host=repo\n");
         _ = _folder.CreateFolder("repo/src");
 
-        var file = DotEnvSearch.Read(_folder.PathOf("repo/src"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("repo/src");
 
         file.Path.ShouldBeNull();
         file.Values.ShouldBeEmpty();
     }
 
     [Fact]
-    public void Read_GitFileMarksTheRoot()
-    {
-        _ = _folder.WriteFile(".env", $"{KeyA}=Host=above\n");
-        _ = _folder.WriteFile("worktree/.git", "gitdir: /elsewhere\n");
-        _ = _folder.CreateFolder("worktree/src");
-
-        var file = DotEnvSearch.Read(_folder.PathOf("worktree/src"), ToolHost.ReadText);
-
-        file.Path.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Read_OutsideARepository_ReadsOnlyTheUnitFolder()
-    {
-        AboveTheTempFolder.SkipWhenInARepository(_folder.Path);
-        _ = _folder.WriteFile(".env", $"{KeyA}=Host=parent\n");
-        _ = _folder.CreateFolder("unit");
-
-        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
-
-        file.Path.ShouldBeNull();
-        file.Values.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Read_EnvIsAFolder_IsPassedOverAndTheSearchGoesOn()
+    public void Read_EnvIsAFolder_GivesNoFile()
     {
         _ = _folder.CreateFolder("repo/.git");
         _ = _folder.CreateFolder("repo/unit/.env/lib");
-        var path = _folder.WriteFile("repo/.env", $"{KeyA}=Host=repo\n");
+        _ = _folder.WriteFile("repo/.env", $"{KeyA}=Host=repo\n");
 
-        var file = DotEnvSearch.Read(_folder.PathOf("repo/unit"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("repo/unit");
 
-        file.Path.ShouldBe(path);
+        file.Path.ShouldBeNull();
         file.Errors.ShouldBeEmpty();
     }
+
+    [Fact]
+    public void Read_NamedFileMissing_GivesNoFileAndNoError()
+    {
+        var file = DotEnvSearch.Read(_folder.PathOf("config/missing.env"), ToolHost.ReadText);
+
+        file.Path.ShouldBeNull();
+        file.Values.ShouldBeEmpty();
+        file.Errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_NoPath_GivesNoFileAndReadsNothing()
+    {
+        var file = DotEnvSearch.Read(path: null, static _ => throw new InvalidOperationException("Nothing is read."));
+
+        file.Path.ShouldBeNull();
+        file.Values.ShouldBeEmpty();
+        file.Errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void FileOf_NoOption_IsTheEnvOfTheDefaultFolder() =>
+        DotEnvSearch
+            .FileOf(option: null, _folder.PathOf("unit"), _folder.PathOf("work"))
+            .ShouldBe(_folder.PathOf("unit/.env"));
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData(" NONE ")]
+    public void FileOf_None_IsNull(string option) =>
+        DotEnvSearch.FileOf(option, _folder.PathOf("unit"), _folder.PathOf("work")).ShouldBeNull();
+
+    [Fact]
+    public void FileOf_RelativePath_IsFromTheWorkingDirectory() =>
+        DotEnvSearch
+            .FileOf(Path.Combine("config", "dev.env"), _folder.PathOf("unit"), _folder.PathOf("work"))
+            .ShouldBe(_folder.PathOf("work/config/dev.env"));
+
+    [Fact]
+    public void FileOf_DotSlashNone_IsAFileNamedNone() =>
+        DotEnvSearch
+            .FileOf("./none", _folder.PathOf("unit"), _folder.PathOf("work"))
+            .ShouldBe(_folder.PathOf("work/none"));
+
+    [Fact]
+    public void FileOf_AbsolutePath_IsItself() =>
+        DotEnvSearch
+            .FileOf(_folder.PathOf("elsewhere/app.env"), _folder.PathOf("unit"), _folder.PathOf("work"))
+            .ShouldBe(_folder.PathOf("elsewhere/app.env"));
 
     [Fact]
     public void Read_ReaderThrows_ReportsSqlsrc285AndGivesNothing()
@@ -128,7 +141,7 @@ public sealed class DotEnvSearchTests : IDisposable
         var path = _folder.PathOf("unit/.env");
 
         var file = DotEnvSearch.Read(
-            _folder.PathOf("unit"),
+            path,
             requested => requested == path ? throw new IOException("Disk on fire.") : null
         );
 
@@ -145,7 +158,7 @@ public sealed class DotEnvSearchTests : IDisposable
         _ = _folder.CreateFolder("unit");
 
         var file = DotEnvSearch.Read(
-            _folder.PathOf("unit"),
+            _folder.PathOf("unit/.env"),
             static _ => throw new UnauthorizedAccessException("Access denied.")
         );
 
@@ -161,7 +174,7 @@ public sealed class DotEnvSearchTests : IDisposable
             $"{KeyA}=Host=good\nSQLSOURCE_CONNECTION_B=\"Password=hunter2\nSQLSOURCE_CONNECTION_C=Host=c\n"
         );
 
-        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("unit");
 
         file.Path.ShouldBe(path);
         file.Values.ShouldBeEmpty();
@@ -187,7 +200,7 @@ public sealed class DotEnvSearchTests : IDisposable
             Encoding.Latin1.GetBytes($"{KeyA}=Password=p\u00e4ss\nGREETING=caf\u00e9\nSQLSOURCE_CONNECTION_B=Host=b\n")
         );
 
-        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("unit");
 
         file.Path.ShouldBe(path);
         file.Values.ShouldBeEmpty();
@@ -208,7 +221,7 @@ public sealed class DotEnvSearchTests : IDisposable
         _ = _folder.CreateFolder("unit");
         File.WriteAllBytes(path, Encoding.Latin1.GetBytes($"GREETING=caf\u00e9\n{KeyA}=Host=a\n"));
 
-        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("unit");
 
         file.Path.ShouldBe(path);
         file.Errors.ShouldBeEmpty();
@@ -221,7 +234,7 @@ public sealed class DotEnvSearchTests : IDisposable
     {
         _ = _folder.WriteFile("unit/.env", $"{KeyA}\nSQLSOURCE_CONNECTION_B='x\n");
 
-        var file = DotEnvSearch.Read(_folder.PathOf("unit"), ToolHost.ReadText);
+        var file = ReadOfTheUnit("unit");
 
         file.Values.ShouldBeEmpty();
         file.Errors.Length.ShouldBe(2);
@@ -310,14 +323,11 @@ public sealed class DotEnvSearchTests : IDisposable
         notRead.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void FoldersOf_InsideARepository_AreTheUnitFolderUpToTheRoot()
+    // The .env of the unit's folder, as a run with no --env-file reads it.
+    private DotEnvFile ReadOfTheUnit(string unit)
     {
-        _ = _folder.CreateFolder("repo/.git");
-
-        DotEnvSearch
-            .FoldersOf(_folder.PathOf("repo/src/app"))
-            .ShouldBe([_folder.PathOf("repo/src/app"), _folder.PathOf("repo/src"), _folder.PathOf("repo")]);
+        var folder = _folder.PathOf(unit);
+        return DotEnvSearch.Read(DotEnvSearch.FileOf(option: null, folder, folder), ToolHost.ReadText);
     }
 
     private static string ReportedLine(ToolDiagnostic diagnostic)

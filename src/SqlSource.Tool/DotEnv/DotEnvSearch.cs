@@ -10,95 +10,92 @@ using Path = System.IO.Path;
 namespace SqlSource.Tool.DotEnv;
 
 /// <summary>
-/// Finds the <c>.env</c> file of a run and reads it.
+/// Says which <c>.env</c> file a run reads, and reads it.
 /// </summary>
 /// <remarks>
-/// The search starts in the folder of the run's unit, the project or the solution, and goes up, one folder at a time,
-/// to the first folder that holds a <c>.git</c> folder or file, the root of the repository, or of a worktree.  With
-/// no such folder up to the root of the file system only the unit's folder is searched, so that a file in a folder
-/// that is not the project's own is never picked up by chance.  The nearest file wins and files are never merged.
-/// The file is read through the host, so a test never reads a developer's own.
+/// A run reads one file, or none: the <c>.env</c> of one folder, its unit's, or a file named by its path.  No folder
+/// above is looked in, so that a file that is not the project's own is never picked up by chance.  The file is read
+/// through the host, so a test never reads a developer's own.
 /// </remarks>
 internal static class DotEnvSearch
 {
     /// <summary>The name of the file.</summary>
     public const string FileName = ".env";
 
-    private const string RepositoryMarker = ".git";
+    /// <summary>The value of the option that reads no file, whatever its case.</summary>
+    public const string NoneValue = "none";
 
     /// <summary>
-    /// The folders searched, nearest first.
+    /// The full path of the file a run reads, or null when it reads none.
     /// </summary>
-    public static ImmutableArray<string> FoldersOf(string unitFolder)
+    /// <param name="option">
+    /// The value of the option that names the file: null for the <c>.env</c> of <paramref name="defaultFolder" />;
+    /// <see cref="NoneValue" />, ignoring case and the white space around it, for none; else a path, which is from
+    /// <paramref name="workingDirectory" /> when it is relative, so that <c>./none</c> names a file.
+    /// </param>
+    /// <param name="defaultFolder">The folder whose <c>.env</c> a run reads when the option names none.</param>
+    /// <param name="workingDirectory">The folder that a relative path is from.</param>
+    public static string? FileOf(string? option, string defaultFolder, string workingDirectory)
     {
-        var folders = ImmutableArray.CreateBuilder<string>();
-        for (var folder = Normalize(unitFolder); folder is not null; folder = Path.GetDirectoryName(folder))
+        if (option is null)
         {
-            folders.Add(folder);
-            if (IsRepositoryRoot(folder))
-            {
-                return folders.ToImmutable();
-            }
+            return Path.GetFullPath(Path.Combine(defaultFolder, FileName));
         }
 
-        return [Normalize(unitFolder)];
+        return string.Equals(option.Trim(), NoneValue, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : Path.GetFullPath(option, workingDirectory);
     }
 
     /// <summary>
-    /// True when the folder is in a repository, or a worktree: the last folder of <see cref="FoldersOf" /> holds a
-    /// <c>.git</c> folder or file.
+    /// Reads the file at <paramref name="path" />.  No path, or a path where the host finds no file, gives no file.  A
+    /// file that cannot be read, or has a line of a key of the tool that cannot be, gives errors and no values, so the
+    /// run goes on as if there were none.
     /// </summary>
-    public static bool IsInRepository(string folder) => IsRepositoryRoot(FoldersOf(folder)[^1]);
-
-    /// <summary>
-    /// Reads the nearest <c>.env</c> of <see cref="FoldersOf" />.  A file that cannot be read, or has a line of a
-    /// key of the tool that cannot be, gives errors and no values, so the run goes on as if there were none.
-    /// </summary>
-    public static DotEnvFile Read(string unitFolder, Func<string, string?> readTextFile)
+    public static DotEnvFile Read(string? path, Func<string, string?> readTextFile)
     {
-        foreach (var folder in FoldersOf(unitFolder))
+        if (path is null)
         {
-            var path = Path.Combine(folder, FileName);
-            string? text;
-            try
-            {
-                text = readTextFile(path);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                return new DotEnvFile(
-                    path,
-                    [],
-                    [ToolDiagnostic.ForFile(ToolDiagnostics.DotEnvCannotBeRead, path, exception.Message)]
-                );
-            }
-
-            if (text is null)
-            {
-                continue;
-            }
-
-            var contents = DotEnvParser.Parse(text);
-            return contents.Errors.IsEmpty
-                ? new DotEnvFile(path, contents.Values, [])
-                : new DotEnvFile(
-                    path,
-                    [],
-                    [
-                        .. contents.Errors.Select(error =>
-                            ToolDiagnostic.At(
-                                ToolDiagnostics.DotEnvLineCannotBeRead,
-                                path,
-                                new(error.Line, error.Column),
-                                error.Key,
-                                error.Reason
-                            )
-                        ),
-                    ]
-                );
+            return new DotEnvFile(Path: null, [], []);
         }
 
-        return new DotEnvFile(Path: null, [], []);
+        string? text;
+        try
+        {
+            text = readTextFile(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return new DotEnvFile(
+                path,
+                [],
+                [ToolDiagnostic.ForFile(ToolDiagnostics.DotEnvCannotBeRead, path, exception.Message)]
+            );
+        }
+
+        if (text is null)
+        {
+            return new DotEnvFile(Path: null, [], []);
+        }
+
+        var contents = DotEnvParser.Parse(text);
+        return contents.Errors.IsEmpty
+            ? new DotEnvFile(path, contents.Values, [])
+            : new DotEnvFile(
+                path,
+                [],
+                [
+                    .. contents.Errors.Select(error =>
+                        ToolDiagnostic.At(
+                            ToolDiagnostics.DotEnvLineCannotBeRead,
+                            path,
+                            new(error.Line, error.Column),
+                            error.Key,
+                            error.Reason
+                        )
+                    ),
+                ]
+            );
     }
 
     /// <summary>
@@ -154,13 +151,6 @@ internal static class DotEnvSearch
         {
             return true;
         }
-    }
-
-    // A plain disk check, as the tool's other reads of a project's folders are.
-    private static bool IsRepositoryRoot(string folder)
-    {
-        var marker = Path.Combine(folder, RepositoryMarker);
-        return Directory.Exists(marker) || File.Exists(marker);
     }
 
     private static string Normalize(string folder) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));

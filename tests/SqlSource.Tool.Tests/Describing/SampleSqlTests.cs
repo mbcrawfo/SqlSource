@@ -53,6 +53,130 @@ public sealed class SampleSqlTests : IDisposable
         Sample("-- name: A\nSELECT 1 FROM t WHERE (@ids IS NULL OR id IN @ids);\n")
             .ShouldBe("SELECT 1 FROM t WHERE ((SELECT NULL) IS NULL OR id IN (@ids));");
 
+    // PostgreSQL refuses a subquery in the index predicate of ON CONFLICT, which reduces no join, so the test there is
+    // NULL.
+    [Fact]
+    public void Build_NullTestInAnIndexPredicate_IsNull() =>
+        Sample(
+                "-- name: A\nINSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (@kinds IS NULL OR kind IN @kinds) DO NOTHING;\n"
+            )
+            .ShouldBe(
+                "INSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (NULL IS NULL OR kind IN (@kinds)) DO NOTHING;"
+            );
+
+    [Fact]
+    public void Build_NullTestInAnIndexPredicateWithoutParentheses_IsNull() =>
+        Sample(
+                "-- name: A\ninsert into t (id, kind) values (1, 'a') "
+                    + "on conflict ((id + 0), kind) where @kinds is null or kind in @kinds do nothing;\n"
+            )
+            .ShouldBe(
+                "insert into t (id, kind) values (1, 'a') "
+                    + "on conflict ((id + 0), kind) where NULL is null or kind in (@kinds) do nothing;"
+            );
+
+    // A parenthesis closed inside the predicate does not end it.
+    [Fact]
+    public void Build_NullTestAfterAFunctionInAnIndexPredicate_IsNull() =>
+        Sample(
+                "-- name: A\nINSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (lower(kind) <> '' AND (@kinds IS NULL OR kind IN @kinds)) DO NOTHING;\n"
+            )
+            .ShouldBe(
+                "INSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (lower(kind) <> '' AND (NULL IS NULL OR kind IN (@kinds))) DO NOTHING;"
+            );
+
+    // A join ON a function named conflict, and the WHERE after it, is no conflict target: no DO ends its WHERE, and
+    // NULL there would let the planner make the LEFT JOIN inner.
+    [Theory]
+    [InlineData(
+        "SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) WHERE (@ids IS NULL OR a.id IN @ids)",
+        "SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) WHERE ((SELECT NULL) IS NULL OR a.id IN (@ids))"
+    )]
+    [InlineData(
+        "SELECT s.total FROM (SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) "
+            + "WHERE (@ids IS NULL OR a.id IN @ids)) s",
+        "SELECT s.total FROM (SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) "
+            + "WHERE ((SELECT NULL) IS NULL OR a.id IN (@ids))) s"
+    )]
+    [InlineData(
+        "INSERT INTO t SELECT a.id FROM a JOIN b ON conflict(a.id, b.id) WHERE (@ids IS NULL OR b.id IN @ids) "
+            + "ON CONFLICT DO NOTHING",
+        "INSERT INTO t SELECT a.id FROM a JOIN b ON conflict(a.id, b.id) "
+            + "WHERE ((SELECT NULL) IS NULL OR b.id IN (@ids)) ON CONFLICT DO NOTHING"
+    )]
+    public void Build_NullTestAfterAJoinOnAFunctionNamedConflict_IsASubqueryOfNull(string sql, string sample) =>
+        Sample("-- name: A\n" + sql + ";\n").ShouldBe(sample + ";");
+
+    // A conflict target without a predicate leaves the WHERE of DO UPDATE a condition like any other.
+    [Fact]
+    public void Build_NullTestInTheWhereOfDoUpdateWithoutAPredicate_IsASubqueryOfNull() =>
+        Sample(
+                "-- name: A\nINSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) DO UPDATE SET kind = 'b' WHERE (@kinds IS NULL OR t.kind IN @kinds);\n"
+            )
+            .ShouldBe(
+                "INSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) DO UPDATE SET kind = 'b' WHERE ((SELECT NULL) IS NULL OR t.kind IN (@kinds));"
+            );
+
+    // The predicate ends at the DO of the action, whose WHERE is a condition like any other.
+    [Fact]
+    public void Build_NullTestInTheWhereOfDoUpdate_IsASubqueryOfNull() =>
+        Sample(
+                "-- name: A\nINSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (@kinds IS NULL OR kind IN @kinds) "
+                    + "DO UPDATE SET kind = 'b' WHERE (@kinds IS NULL OR t.kind IN @kinds);\n"
+            )
+            .ShouldBe(
+                "INSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (NULL IS NULL OR kind IN (@kinds)) "
+                    + "DO UPDATE SET kind = 'b' WHERE ((SELECT NULL) IS NULL OR t.kind IN (@kinds));"
+            );
+
+    // A conflict on a constraint names no index, and has no predicate.
+    [Fact]
+    public void Build_NullTestAfterOnConstraint_IsASubqueryOfNull() =>
+        Sample(
+                "-- name: A\nINSERT INTO t (id, kind) VALUES (1, 'a') ON CONFLICT ON CONSTRAINT t_pkey "
+                    + "DO UPDATE SET kind = 'b' WHERE (@kinds IS NULL OR t.kind IN @kinds);\n"
+            )
+            .ShouldBe(
+                "INSERT INTO t (id, kind) VALUES (1, 'a') ON CONFLICT ON CONSTRAINT t_pkey "
+                    + "DO UPDATE SET kind = 'b' WHERE ((SELECT NULL) IS NULL OR t.kind IN (@kinds));"
+            );
+
+    // Words in a string or a quoted name are no clause, a DO among them included.
+    [Theory]
+    [InlineData(
+        "SELECT 1 FROM t WHERE name <> 'on conflict (id) where' AND (@ids IS NULL OR id IN @ids) AND kind <> 'do'",
+        "SELECT 1 FROM t WHERE name <> 'on conflict (id) where' AND ((SELECT NULL) IS NULL OR id IN (@ids)) "
+            + "AND kind <> 'do'"
+    )]
+    [InlineData(
+        "SELECT 1 AS \"on conflict (id) where\" FROM t WHERE (@ids IS NULL OR id IN @ids) AND \"do\" > 0",
+        "SELECT 1 AS \"on conflict (id) where\" FROM t WHERE ((SELECT NULL) IS NULL OR id IN (@ids)) AND \"do\" > 0"
+    )]
+    public void Build_NullTestBetweenQuotedRegionsOfTheWords_IsASubqueryOfNull(string sql, string sample) =>
+        Sample("-- name: A\n" + sql + ";\n").ShouldBe(sample + ";");
+
+    // The predicate of an INSERT inside a WITH query ends at its DO, so the outer query's test is the subquery.
+    [Fact]
+    public void Build_NullTestsInAndAfterAWithQuerysIndexPredicate_EachHasItsOwn() =>
+        Sample(
+                "-- name: A\nWITH i AS (INSERT INTO t (id) VALUES (1) "
+                    + "ON CONFLICT (id) WHERE (@ids IS NULL OR id IN @ids) DO NOTHING RETURNING id) "
+                    + "SELECT id FROM i WHERE (@ids IS NULL OR id IN @ids);\n"
+            )
+            .ShouldBe(
+                "WITH i AS (INSERT INTO t (id) VALUES (1) "
+                    + "ON CONFLICT (id) WHERE (NULL IS NULL OR id IN (@ids)) DO NOTHING RETURNING id) "
+                    + "SELECT id FROM i WHERE ((SELECT NULL) IS NULL OR id IN (@ids));"
+            );
+
     // SQL Server refuses a subquery in an aggregate, a GROUP BY and an OUTPUT clause, and folds nothing it describes.
     [Fact]
     public void Build_NullTestOnSqlServer_IsNull() =>

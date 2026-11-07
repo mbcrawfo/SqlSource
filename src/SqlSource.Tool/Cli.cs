@@ -293,21 +293,12 @@ public static class Cli
     private static bool OpenLog(ParsedCommandLine commandLine, string[] args, RunState state)
     {
         var host = state.Host;
-        var (logPath, logOption) = commandLine.Runs switch
+        var logPath = commandLine.Runs switch
         {
-            Running.Describe => (
-                DescribeCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
-                DescribeCommand.LogOptionOf(commandLine.Usage)
-            ),
-            Running.Replay => (
-                ReplayCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
-                ReplayCommand.LogOptionOf(commandLine.Usage)
-            ),
-            Running.Diagnose => (
-                DiagnoseCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
-                DiagnoseCommand.LogOptionOf(commandLine.Usage)
-            ),
-            Running.Nothing => (null, null),
+            Running.Describe => DescribeCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
+            Running.Replay => ReplayCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
+            Running.Diagnose => DiagnoseCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable),
+            Running.Nothing => null,
             _ => throw UnexpectedEnumValueException.Of(commandLine.Runs),
         };
 
@@ -331,7 +322,7 @@ public static class Cli
             return true;
         }
 
-        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time, logOption);
+        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time);
         if (!opened.Succeeded)
         {
             state.Reporter.Report(opened.Failure);

@@ -1,5 +1,4 @@
-using System.IO;
-using SqlSource.Tool.DotEnv;
+using SqlSource.Tool.Watching;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -10,22 +9,8 @@ internal static class AboveTheTempFolder
 {
     public const string RepositoryReason = "The temporary folder is inside a git work tree.";
 
-    public const string EnvReason = "A folder above the temporary folder holds a .env.";
-
-    // For a test of what the tool does outside a repository: the tool climbs to the nearest folder that holds a .git.
+    // For a test of what the watch does outside a repository: it watches the folders up to the nearest that holds a
+    // .git, for the settings files and a restore's assets folder.
     public static void SkipWhenInARepository(string folder) =>
-        Assert.SkipWhen(DotEnvSearch.IsInRepository(folder), RepositoryReason);
-
-    // For a build that must find no .env: the build looks for one in every folder up to the root of the file system.
-    public static void SkipWhenAnEnvIsAbove(string folder)
-    {
-        for (
-            var above = Path.GetDirectoryName(Path.GetFullPath(folder));
-            above is not null;
-            above = Path.GetDirectoryName(above)
-        )
-        {
-            Assert.SkipWhen(File.Exists(Path.Combine(above, DotEnvSearch.FileName)), EnvReason);
-        }
-    }
+        Assert.SkipWhen(RepositoryFolders.IsInRepository(folder), RepositoryReason);
 }

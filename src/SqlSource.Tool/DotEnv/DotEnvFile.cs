@@ -6,7 +6,7 @@ namespace SqlSource.Tool.DotEnv;
 /// <summary>
 /// The <c>.env</c> file that a run reads.
 /// </summary>
-/// <param name="Path">The full path of the file, or null when no folder searched holds one.</param>
+/// <param name="Path">The full path of the file read, or null when the run reads none or finds none there.</param>
 /// <param name="Values">
 /// The value of each of the tool's keys, by key.  Empty when the file has an error: no value of a file that could
 /// not be read in full is used.  A value is a connection and is never printed.

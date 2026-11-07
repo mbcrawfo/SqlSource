@@ -29,11 +29,19 @@
         <SqlSourceHasConnectionVariable
             Condition="$([System.String]::IsNullOrWhiteSpace($([System.Environment]::GetEnvironmentVariable('SQLSOURCE_CONNECTION'))))"
             >false</SqlSourceHasConnectionVariable>
-        <SqlSourceEnvFolder>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.env'))</SqlSourceEnvFolder>
+        <SqlSourceEnvFileValue>$(SqlSourceEnvFile.Trim())</SqlSourceEnvFileValue>
+        <SqlSourceEnvFilePath>$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), '.env'))</SqlSourceEnvFilePath>
+        <SqlSourceEnvFilePath Condition="'$(SqlSourceEnvFileValue)' != ''"
+            >$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), $(SqlSourceEnvFileValue)))</SqlSourceEnvFilePath>
+        <SqlSourceEnvFilePath Condition="'$(SqlSourceEnvFileValue)' == 'none'" />
+        <SqlSourceHasEnvFile>false</SqlSourceHasEnvFile>
+        <SqlSourceHasEnvFile
+            Condition="'$(SqlSourceEnvFilePath)' != '' and $([System.IO.File]::Exists($(SqlSourceEnvFilePath)))"
+            >true</SqlSourceHasEnvFile>
         <SqlSourceFirstFramework>$([System.Text.RegularExpressions.Regex]::Match($(TargetFrameworks), '[^;\s]+'))</SqlSourceFirstFramework>
         <SqlSourceGoesOnline>false</SqlSourceGoesOnline>
         <SqlSourceGoesOnline
-            Condition="'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true')) or ($(SqlSourceOnlineValue.Equals('auto')) and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceEnvFolder)' != '')))"
+            Condition="'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true')) or ($(SqlSourceOnlineValue.Equals('auto')) and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceHasEnvFile)' == 'true')))"
             >true</SqlSourceGoesOnline>
         <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);SQLSRC026</MSBuildWarningsNotAsErrors>
     </PropertyGroup>
