@@ -165,6 +165,17 @@ internal static class DiagnoseRun
             return;
         }
 
+        // Nor is a bundle whose answer this version does not reproduce, which the proof would refuse as the renaming's
+        // fault.  A bundle with no expected answer has nothing to reproduce.
+        if (
+            prepared.Value.Expected is { } expected
+            && ReplayCommand.DifferencesOf(expected, replayed) is [var first, ..]
+        )
+        {
+            Report(BundleErrors.NotReproduced(path, first, BundleErrors.MadeBy(bundle.Info.ToolVersion)));
+            return;
+        }
+
         await RenameAndWriteAsync(bundle, prepared.Value.Describer, prepared.Value.Dialect, outPath, context);
     }
 

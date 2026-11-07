@@ -234,9 +234,11 @@ internal static class ReplayCommand
         return 2;
     }
 
-    // What sets the expected answer apart from the replayed one: none when they are the same.  Two entries are the
-    // same when a sidecar writes them the same, whichever version of the tool wrote each.
-    private static IReadOnlyList<string> DifferencesOf(ReplayOutcome expected, ReplayOutcome replayed) =>
+    /// <summary>
+    /// What sets the expected answer apart from the replayed one: none when they are the same.  Two entries are the
+    /// same when a sidecar writes them the same, whichever version of the tool wrote each.
+    /// </summary>
+    internal static IReadOnlyList<string> DifferencesOf(ReplayOutcome expected, ReplayOutcome replayed) =>
         (expected, replayed) switch
         {
             (ReplayOutcome.Described left, ReplayOutcome.Described right) => EntryDifferences.Of(
