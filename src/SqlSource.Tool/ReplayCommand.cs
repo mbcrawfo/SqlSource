@@ -124,11 +124,6 @@ internal static class ReplayCommand
     }
 
     /// <summary>
-    /// The value of <c>--log</c> as <see cref="UsageCheck" /> read it, or null when it was not given.
-    /// </summary>
-    public static UsageValue? LogOptionOf(Usage usage) => LogsOf(usage) is [{ } value] ? value : null;
-
-    /// <summary>
     /// What is wrong with a command line of <c>replay</c> by the command's own rules, each a whole line to write.
     /// Empty for another command.
     /// </summary>

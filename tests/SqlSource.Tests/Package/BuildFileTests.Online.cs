@@ -56,7 +56,9 @@ public sealed partial class BuildFileTests
         "SqlSourceOnlineValue",
         "SqlSourceInCI",
         "SqlSourceHasConnectionVariable",
-        "SqlSourceEnvFolder",
+        "SqlSourceEnvFileValue",
+        "SqlSourceEnvFilePath",
+        "SqlSourceHasEnvFile",
         "SqlSourceFirstFramework",
         "SqlSourceGoesOnline",
         "MSBuildWarningsNotAsErrors",
@@ -65,7 +67,9 @@ public sealed partial class BuildFileTests
     // The online properties, each as (name, condition, value) in the order it is set: SqlSourceOnline matched
     // ignoring case and the white space around it, by Equals, since a comparison of a condition reads yes, on and no
     // as booleans and would take yes for true; CI by the variables its services set; the connection source by its
-    // answer alone; the .env above the project; the first framework as ProjectEvaluator.FirstFramework of the tool
+    // answer alone; the .env file, the one SqlSourceEnvFile names from the project's folder, trimmed, or the project
+    // folder's own, or none under none, which a condition matches ignoring case, and whether a file, not a folder, is
+    // at its path, which the build never reads; the first framework as ProjectEvaluator.FirstFramework of the tool
     // reads it; and the run only outside CI, under true, or under auto with a connection source.  The package's
     // warning of a tool that cannot start stays a warning under -warnaserror.  The tool's command is the tests' seam.
     [Fact]
@@ -92,10 +96,19 @@ public sealed partial class BuildFileTests
                 ),
                 ("SqlSourceHasConnectionVariable", null, "true"),
                 ("SqlSourceHasConnectionVariable", NoConnectionVariable, "false"),
+                ("SqlSourceEnvFileValue", null, "$(SqlSourceEnvFile.Trim())"),
+                ("SqlSourceEnvFilePath", null, "$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), '.env'))"),
                 (
-                    "SqlSourceEnvFolder",
-                    null,
-                    "$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.env'))"
+                    "SqlSourceEnvFilePath",
+                    "'$(SqlSourceEnvFileValue)' != ''",
+                    "$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), $(SqlSourceEnvFileValue)))"
+                ),
+                ("SqlSourceEnvFilePath", "'$(SqlSourceEnvFileValue)' == 'none'", ""),
+                ("SqlSourceHasEnvFile", null, "false"),
+                (
+                    "SqlSourceHasEnvFile",
+                    "'$(SqlSourceEnvFilePath)' != '' and $([System.IO.File]::Exists($(SqlSourceEnvFilePath)))",
+                    "true"
                 ),
                 (
                     "SqlSourceFirstFramework",
@@ -107,7 +120,8 @@ public sealed partial class BuildFileTests
                     "SqlSourceGoesOnline",
                     "'$(SqlSourceInCI)' != 'true' and ($(SqlSourceOnlineValue.Equals('true'))"
                         + " or ($(SqlSourceOnlineValue.Equals('auto'))"
-                        + " and ('$(SqlSourceHasConnectionVariable)' == 'true' or '$(SqlSourceEnvFolder)' != '')))",
+                        + " and ('$(SqlSourceHasConnectionVariable)' == 'true'"
+                        + " or '$(SqlSourceHasEnvFile)' == 'true')))",
                     "true"
                 ),
                 (
@@ -313,9 +327,11 @@ public sealed partial class BuildFileTests
     }
 
     // The inputs of the run: the manifest; the .sql files and the settings files among the AdditionalFiles items; the
-    // sidecars of the .sql files that exist; the list of them, which a deleted sidecar changes; the file of the value
-    // and the package's folder; the .env the connection source found; and the tool manifests above the project.  Each
-    // file the target writes, it writes only when its text changes, under obj, and adds to FileWrites.
+    // sidecars of the .sql files that exist; the list of them, which a deleted sidecar changes; the file of the value,
+    // the package's folder and the .env file's path, none under none, which a change of SqlSourceEnvFile changes when
+    // the file it names is older than the stamp; the .env file, when a file is at its path; and the tool manifests
+    // above the project.  Each file the target writes, it writes only when its text changes, under obj, and adds to
+    // FileWrites.
     [Fact]
     public void Targets_ListSidecars_WritesTheFilesTheRunComparesAndGathersItsInputs()
     {
@@ -354,6 +370,7 @@ public sealed partial class BuildFileTests
                 ("SqlSourceSidecarListed", "Include=@(SqlSourceSidecarOfSqlFile->Exists())"),
                 ("SqlSourceOnlineValueLine", "Include=$(SqlSourceOnlineValue)"),
                 ("SqlSourceOnlineValueLine", "Include=$(MSBuildThisFileDirectory)"),
+                ("SqlSourceOnlineValueLine", "Include=$([MSBuild]::Escape($(SqlSourceEnvFilePath)))"),
                 ("FileWrites", "Include=$(SqlSourceSidecarList)"),
                 ("FileWrites", "Include=$(SqlSourceOnlineValueFile)"),
             ]);
@@ -380,8 +397,7 @@ public sealed partial class BuildFileTests
                 ("SqlSourceOnlineInput", "Include=$(SqlSourceOnlineValueFile)"),
                 (
                     "SqlSourceOnlineInput",
-                    "Include=$([MSBuild]::Escape($([MSBuild]::NormalizePath($(SqlSourceEnvFolder), '.env'))))"
-                        + " Condition='$(SqlSourceEnvFolder)' != ''"
+                    "Include=$([MSBuild]::Escape($(SqlSourceEnvFilePath))) Condition='$(SqlSourceHasEnvFile)' == 'true'"
                 ),
                 (
                     "SqlSourceOnlineInput",
@@ -397,11 +413,13 @@ public sealed partial class BuildFileTests
     }
 
     // The tool is run on the manifest this build wrote, from the project's folder, with the value of SqlSourceOnline,
-    // and with a log of this project and framework when SQLSOURCE_LOG is set.  Exec reads its errors as a
+    // with the .env file's full path, or none, when SqlSourceEnvFile is set, so that a default build's command is
+    // unchanged, and with a log of this project and framework when SQLSOURCE_LOG is set.  Exec reads its errors as a
     // compiler's, ignores the exit code, which would add an error of Exec's own to the tool's, and keeps every line
-    // for the target to read; the summary and the offline line are messages of low importance.  Both paths are
+    // for the target to read; the summary and the offline line are messages of low importance.  The paths are
     // escaped for the shell Exec runs the command in, which reads $, `, " and \ within quotes on Unix, each put in
-    // single quotes, since MSBuild turns a \ of a path into a /, and % in cmd, each doubled.
+    // single quotes, since MSBuild turns a \ of a path into a /, and % in cmd, each doubled.  On Windows the
+    // backslashes that end the .env file's path, a folder's, are doubled, or the tool would read its closing quote.
     [Fact]
     public void Targets_RunOnline_ExecsTheToolOnTheManifest()
     {
@@ -414,7 +432,7 @@ public sealed partial class BuildFileTests
                 {
                     ["Command"] =
                         "$(SqlSourceToolCommand) describe --manifest \"$(SqlSourceToolManifestArgument)\""
-                        + " --online $(SqlSourceOnlineValue)$(SqlSourceToolLog)",
+                        + " --online $(SqlSourceOnlineValue)$(SqlSourceToolEnvFile)$(SqlSourceToolLog)",
                     ["WorkingDirectory"] = "$(MSBuildProjectDirectory)",
                     ["IgnoreExitCode"] = "true",
                     ["ConsoleToMSBuild"] = "true",
@@ -446,6 +464,20 @@ public sealed partial class BuildFileTests
                 ("SqlSourceShellSpecial", "'$(OS)' == 'Windows_NT'", "%"),
                 ("SqlSourceShellEscape", "'$(OS)' == 'Windows_NT'", "%$0"),
                 ("SqlSourceToolManifestArgument", null, ShellEscaped("$(SqlSourceManifestFile)")),
+                ("SqlSourceToolEnvFileArgument", null, ShellEscaped("$(SqlSourceEnvFilePath)")),
+                (
+                    "SqlSourceToolEnvFileArgument",
+                    "'$(OS)' == 'Windows_NT'",
+                    "$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceToolEnvFileArgument), '\\\\+$',"
+                        + " '$0$0'))"
+                ),
+                ("SqlSourceToolEnvFile", null, ""),
+                (
+                    "SqlSourceToolEnvFile",
+                    "'$(SqlSourceEnvFileValue)' != ''",
+                    " --env-file \"$(SqlSourceToolEnvFileArgument)\""
+                ),
+                ("SqlSourceToolEnvFile", "'$(SqlSourceEnvFileValue)' == 'none'", " --env-file none"),
                 ("SqlSourceToolLogFile", null, "$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log"),
                 ("SqlSourceToolLog", null, ""),
                 (

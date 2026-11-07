@@ -243,5 +243,6 @@ public sealed class FilterTests : IDisposable
         result.Out.ShouldContain("--database <name>");
         result.Out.ShouldContain("--connection <name=value>");
         result.Out.ShouldContain("--force");
+        result.Out.ShouldContain("--env-file <path>");
     }
 }
