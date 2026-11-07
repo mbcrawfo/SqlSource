@@ -13,10 +13,20 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The combinations of member location, visibility and nested class that are errors, through the whole generator:
-// where each is reported, that its file gives the type no members, and that the type's other files keep theirs.  No
-// run leaves an error in the compilation.  PlacementTests has the combinations that are allowed.
+// where each is reported, that its file gives the type no members, and that the type's other files keep theirs.  A
+// query method refused for its models leaves out the method alone: its file keeps its other members and the query's
+// models.  No run leaves an error in the compilation.  PlacementTests has the combinations that are allowed.
 public sealed class PlacementDiagnosticsTests
 {
+    // The source of the internal type App.Sample, which claims every file of its folder.
+    private const string InternalSample =
+        "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\")]\n"
+        + "    internal partial class Sample;\n}\n";
+
+    // A query at sql that ends a file, whose constant the file keeps when another query's method is refused for its
+    // models.
+    private const string GetName = "-- name: GetName\n-- output: sql\nSELECT name FROM users;\n";
+
     // A file of the type that no error reaches, whose constant the type keeps.
     private static readonly SqlFile Kept = new("/app/Repo/Kept.sql", "-- name: Kept\n-- output: sql\nSELECT 9;\n");
 
@@ -113,15 +123,6 @@ public sealed class PlacementDiagnosticsTests
     // else at the query's name.
     [Theory]
     [InlineData(
-        "internal partial class Sample;",
-        "-- name: GetUser\n-- visibility: public\nSELECT id FROM users WHERE id = @id;\n",
-        "(2,1)-(2,22)",
-        "public",
-        "its own marker",
-        "extension-class",
-        "'App.Sample' is not public, so its models are internal, which a public extension method cannot take or return"
-    )]
-    [InlineData(
         "public partial class Sample;",
         "-- name: GetUser\n-- member-location: extension-class\n-- visibility: protected\n"
             + "SELECT id FROM users WHERE id = @id;\n",
@@ -192,6 +193,51 @@ public sealed class PlacementDiagnosticsTests
         run.Sources.Values.ShouldContain(source => source.Contains(" const string Kept = \"SELECT 9;\";"));
     }
 
+    // A public extension method of a type that is not public would take and return its internal models (CS0051), so
+    // the method is refused at the marker that wrote its visibility.  Its file keeps its other members and the query's
+    // models.
+    [Fact]
+    public void Run_PublicExtensionMethodWithModelsOfAnInternalType_ReportsSqlsrc123AndKeepsTheFile()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- visibility: public\nSELECT id FROM users WHERE id = @id;\n" + GetName
+        );
+
+        var run = MethodRuns.Run(file, [UserEntry(file)], InternalSample, otherFiles: [Kept]);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC123 /app/Repo/Users.sql(2,1)-(2,22): The query 'GetUser' of 'App.Sample' cannot be public, "
+                    + "which its own marker sets, at the member location extension-class, because 'App.Sample' is not "
+                    + "public, so its models are internal, which a public extension method cannot take or return.  "
+                    + "Write -- visibility: or -- member-location: on the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
+        var type = run.Sources[GeneratorHarness.SampleFile];
+        type.ShouldContain(" const string GetName = ");
+        type.ShouldContain(" const string Kept = \"SELECT 9;\";");
+    }
+
+    // A public extension method with no parameters and no rows takes no models, so it compiles on a type that is not
+    // public, and makes the extension class public.
+    [Fact]
+    public void Run_PublicExtensionMethodWithNoModelsOfAnInternalType_Compiles()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- visibility: public\nDELETE FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetUser", [], null)], InternalSample);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("    public static partial class SampleExtensions\n");
+        methods.ShouldContain(" public static async global::System.Threading.Tasks.Task<int> GetUser(");
+    }
+
     // A derived type of another assembly reaches a type nested as protected or protected internal, with no level
     // around it internal, private or private protected, and so a public or protected method of it, which would take
     // the type's internal models (CS0051).  The type's own visibility, a nested class's and one written in the header
@@ -220,6 +266,7 @@ public sealed class PlacementDiagnosticsTests
             GeneratorHarness.UsersPath,
             $"-- name: GetUser\n-- member-location: {location}\n-- visibility: {visibility}\n"
                 + "SELECT id FROM users WHERE id = @id;\n"
+                + GetName
         );
 
         var run = MethodRuns.Run(
@@ -231,28 +278,60 @@ public sealed class PlacementDiagnosticsTests
 
         run.Problems().ShouldBe([Sqlsrc123AsProtected(span, middle, visibility, "its own marker", location)]);
         run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
-        run.Sources.Values.ShouldContain(source => source.Contains(" const string Kept = \"SELECT 9;\";"));
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
+        var type = run.Sources[middle.Length > 0 ? "App.Outer.Middle.Sample.g.cs" : "App.Outer.Sample.g.cs"];
+        type.ShouldContain(" const string GetName = ");
+        type.ShouldContain(" const string Kept = \"SELECT 9;\";");
     }
 
-    // A query method with no parameters and no rows takes no models and would compile, but placement cannot see a
-    // query's models, so it is refused as one with models is (TD-0101).
-    [Fact]
-    public void Run_MethodWithNoModelsOfATypeReachableAsProtected_ReportsSqlsrc123()
+    // A query method with no parameters and no rows takes no models, so it compiles wherever a derived type of another
+    // assembly reaches it.
+    [Theory]
+    [InlineData("class", "public", "")]
+    [InlineData("nested-class", "public", "public static partial class Sql\n")]
+    [InlineData("class", "protected", "")]
+    public void Run_MethodWithNoModelsOfATypeReachableAsProtected_Compiles(
+        string location,
+        string visibility,
+        string host
+    )
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: GetUser\n-- member-location: class\n-- visibility: public\nDELETE FROM users;\n"
+            $"-- name: GetUser\n-- member-location: {location}\n-- visibility: {visibility}\nDELETE FROM users;\n"
         );
 
         var run = MethodRuns.Run(
             file,
             [Entry(file, "GetUser", [], null)],
-            GeneratorHarness.NestedSampleSource("public", "", "protected"),
-            otherFiles: [Kept]
+            GeneratorHarness.NestedSampleSource("public", "", "protected")
         );
 
-        run.Problems().ShouldBe([Sqlsrc123AsProtected("(3,1)-(3,22)", "", "public", "its own marker", "class")]);
-        run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
+        run.ShouldBeClean();
+        var methods = run.Sources["App.Outer.Sample-Methods.g.cs"];
+        methods.ShouldContain(host);
+        // In a nested class the method is public, and the class has the visibility.
+        var modifier = location == "class" ? visibility : "public";
+        methods.ShouldContain(" " + modifier + " static async global::System.Threading.Tasks.Task<int> GetUser(");
+    }
+
+    // A query with models but no entry yet has the missing entry's error alone: its models are not known, so its
+    // method is not refused for them until it is described.
+    [Fact]
+    public void Run_MethodOfATypeReachableAsProtectedWithoutAnEntry_ReportsNoSqlsrc123()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- member-location: class\n-- visibility: public\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(file, [], GeneratorHarness.NestedSampleSource("public", "", "protected"));
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC241 /app/Repo/Users.sql(1,10)-(1,17): The query 'GetUser' has no entry in the sidecar of its "
+                    + "file, and its output 'codegen' needs one.  Run 'sqlsource describe'.",
+            ]);
     }
 
     // The header's visibility reaches the query, whose own member location is where the error is; with neither on
@@ -323,7 +402,35 @@ public sealed class PlacementDiagnosticsTests
                 ),
             ]);
         run.Sources.Keys.ShouldNotContain(source => source.EndsWith("-Methods.g.cs", StringComparison.Ordinal));
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources["App.Outer.Sample.g.cs"].ShouldContain("            public static partial class Sql\n");
+        run.Sources["App.Outer.Sample.g.cs"].ShouldContain("                public const string GetName = ");
+    }
+
+    // The same method with no parameters and no rows takes no models, so it is public in the public class Sql.
+    [Fact]
+    public void Run_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtectedWithNoModels_Compiles()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- member-location: nested-class\n\n-- name: GetUser\nDELETE FROM users;\n"
+        );
+        var constants = new SqlFile(
+            "/app/Repo/A.sql",
+            "-- visibility: public\n-- output: sql\n\n-- name: GetName\nSELECT 1;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetUser", [], null)],
+            GeneratorHarness.NestedSampleSource("public", "", "protected"),
+            otherFiles: [constants]
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources["App.Outer.Sample-Methods.g.cs"];
+        methods.ShouldContain("            public static partial class Sql\n");
+        methods.ShouldContain(" public static async global::System.Threading.Tasks.Task<int> GetUser(");
         run.Sources["App.Outer.Sample.g.cs"].ShouldContain("                public const string GetName = ");
     }
 
@@ -604,6 +711,46 @@ public sealed class PlacementDiagnosticsTests
                 "SQLSRC123 /app/Repo/Users.sql(3,10)-(3,17): The query 'GetUser' of 'App.Sample' cannot be private, "
                     + "which the file header sets, at the member location extension-class, because an extension method "
                     + "is public or internal.  Write -- visibility: or -- member-location: on the query.",
+            ]);
+    }
+
+    // Two types that are not public claim one file, so the model of its public extension method is internal for both,
+    // and each type reports the refusal at the one place.
+    [Fact]
+    public void Run_TwoInternalTypesClaimingAFileWithAPublicMethod_NamesEachType()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = "Users.sql")]
+                internal partial class Sample;
+
+                [SqlSourceGenerate(Source = "Users.sql")]
+                internal partial class Other;
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- visibility: public\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(Source, file, Sidecars.Of(file, UserEntry(file)));
+
+        var problems = run.Problems();
+        problems.Distinct().Count().ShouldBe(2);
+        problems
+            .Order(StringComparer.Ordinal)
+            .ShouldBe([
+                "SQLSRC123 /app/Repo/Users.sql(2,1)-(2,22): The query 'GetUser' of 'App.Other' cannot be public, "
+                    + "which its own marker sets, at the member location extension-class, because 'App.Other' is not "
+                    + "public, so its models are internal, which a public extension method cannot take or return.  "
+                    + "Write -- visibility: or -- member-location: on the query.",
+                "SQLSRC123 /app/Repo/Users.sql(2,1)-(2,22): The query 'GetUser' of 'App.Sample' cannot be public, "
+                    + "which its own marker sets, at the member location extension-class, because 'App.Sample' is not "
+                    + "public, so its models are internal, which a public extension method cannot take or return.  "
+                    + "Write -- visibility: or -- member-location: on the query.",
             ]);
     }
 

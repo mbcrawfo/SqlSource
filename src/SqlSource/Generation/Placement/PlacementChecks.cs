@@ -4,9 +4,9 @@ using SqlSource.Settings;
 namespace SqlSource.Generation.Placement;
 
 /// <summary>
-/// The rules of placement that need nothing but a query's location, its visibility, its output and its type: the
-/// default visibility, the combinations that C# or the generated code cannot have, and how a marker and the code spell
-/// each value.
+/// The rules of placement that need nothing but a query's location, its visibility and its type: the default
+/// visibility, the combinations that C# or the generated code cannot have, and how a marker and the code spell each
+/// value.
 /// </summary>
 internal static class PlacementChecks
 {
@@ -29,31 +29,19 @@ internal static class PlacementChecks
 
     /// <summary>
     /// Why a query's members cannot have the visibility at the location, as <c>SQLSRC123</c> says it, or null when they
-    /// can.  Only what C# forbids, or what would not compile, is refused: <c>protected</c> on a sealed type is allowed.
+    /// can.  Only what C# forbids whatever a member takes is refused: <c>protected</c> on a sealed type is allowed, and
+    /// a query method's models are <see cref="MethodModelsReason" />'s.
     /// </summary>
     /// <param name="type">The type, which a reason names in full.</param>
     /// <param name="location">Where the query's members go.</param>
     /// <param name="visibility">Their visibility, which is the nested class's under a nested class.</param>
-    /// <param name="output">
-    /// The query's output: only a query method takes models, so only its visibility depends on theirs.
-    /// </param>
-    public static string? VisibilityReason(
-        TargetType type,
-        MemberLocation location,
-        Visibility visibility,
-        OutputKind output
-    ) =>
+    public static string? VisibilityReason(TargetType type, MemberLocation location, Visibility visibility) =>
         location switch
         {
-            // A top-level class is public or internal, and so is the extension class.  Its public method cannot take
-            // or return the type's internal models (CS0051).  A method with no models is refused too (TD-0101).
+            // A top-level class is public or internal, and so is the extension class.
             MemberLocation.ExtensionClass => visibility switch
             {
                 Visibility.Private or Visibility.Protected => "an extension method is public or internal",
-                Visibility.Public when !type.IsPublic => "'"
-                    + NameOf(type)
-                    + "' is not public, so its models are internal, which a public extension method cannot take or "
-                    + "return",
                 Visibility.Public or Visibility.Internal => null,
                 _ => throw UnexpectedEnumValueException.Of(visibility),
             },
@@ -62,17 +50,32 @@ internal static class PlacementChecks
             MemberLocation.Class when visibility == Visibility.Protected && type.IsStruct => StructReason(type),
             // A protected class nested in a static class compiles; one nested in a struct is CS0666.
             MemberLocation.NestedClass when visibility == Visibility.Protected && type.IsStruct => StructReason(type),
-            // A derived type of another assembly reaches a public or protected method there, which cannot take or
-            // return the type's internal models (CS0051).  A method with no models is refused too (TD-0101).
+            MemberLocation.Class or MemberLocation.NestedClass => null,
+            _ => throw UnexpectedEnumValueException.Of(location),
+        };
+
+    /// <summary>
+    /// Why a query method of the visibility at the location could not take or return the type's internal models
+    /// (CS0050, CS0051), as <c>SQLSRC123</c> says it, or null when it could.  The method planner asks it only for a
+    /// method that takes or returns an internal model.
+    /// </summary>
+    /// <param name="type">The type, which a reason names in full.</param>
+    /// <param name="location">Where the method goes.</param>
+    /// <param name="visibility">Its visibility, which is the nested class's under a nested class.</param>
+    public static string? MethodModelsReason(TargetType type, MemberLocation location, Visibility visibility) =>
+        location switch
+        {
+            MemberLocation.ExtensionClass when visibility == Visibility.Public && !type.IsPublic => "'"
+                + NameOf(type)
+                + "' is not public, so its models are internal, which a public extension method cannot take or return",
+            // A derived type of another assembly reaches a public or protected method there.
             MemberLocation.Class
             or MemberLocation.NestedClass
-                when output == OutputKind.CodeGen
-                    && type.IsReachableAsProtected
-                    && visibility is Visibility.Public or Visibility.Protected => "'"
+                when type.IsReachableAsProtected && visibility is Visibility.Public or Visibility.Protected => "'"
                 + NameOf(type)
                 + "' is reachable as protected, so its models are internal, which a method reachable from another "
                 + "assembly cannot take or return",
-            MemberLocation.Class or MemberLocation.NestedClass => null,
+            MemberLocation.ExtensionClass or MemberLocation.Class or MemberLocation.NestedClass => null,
             _ => throw UnexpectedEnumValueException.Of(location),
         };
 

@@ -295,8 +295,10 @@ public sealed class TypePlacementTests
             .ShouldEndWith(Reminder);
     }
 
+    // Placement does not see the query's models, so it leaves a public extension method of a type that is not public
+    // to the method planner, which refuses it only for an internal model.
     [Fact]
-    public void Of_PublicExtensionMethodOfAnInternalType_ReportsSqlsrc123AtTheVisibilityMarker()
+    public void Of_PublicExtensionMethodOfAnInternalType_IsUsable()
     {
         var query = Query("GetUser", visibility: Visibility.Public, place: SettingPlace.Query) with
         {
@@ -304,21 +306,10 @@ public sealed class TypePlacementTests
             MemberLocationMarker = At("Users.sql", 1),
         };
 
-        var (_, diagnostics) = Analyse(TestModels.Type(isPublic: false), Files(File("Users.sql", query)));
+        var (placement, diagnostics) = Analyse(TestModels.Type(isPublic: false), Files(File("Users.sql", query)));
 
-        diagnostics.ShouldBe([
-            DiagnosticInfo.Create(
-                SqlDiagnostics.VisibilityNotFit,
-                At("Users.sql", 2),
-                "GetUser",
-                "App.UserRepository",
-                "public",
-                "its own marker",
-                "extension-class",
-                "'App.UserRepository' is not public, so its models are internal, which a public extension method "
-                    + "cannot take or return"
-            ),
-        ]);
+        diagnostics.ShouldBeEmpty();
+        placement.Usable.ShouldBe([true]);
     }
 
     // Only what C# forbids is an error: protected on a static class (CS1057) or a struct (CS0666), and a protected
@@ -402,11 +393,10 @@ public sealed class TypePlacementTests
     }
 
     // Another file's query writes the class Sql public, which its constant can be.  The method of the query that writes
-    // no visibility would be public in it too, which a type reachable as protected cannot have: the error is at that
-    // query, it names the query that wrote the visibility, and only the method's file is left out.  The class keeps
-    // the visibility written for it.
+    // no visibility is public in it too, which placement allows: the method planner refuses it only for an internal
+    // model.  Every file is usable, and the class keeps the visibility written for it.
     [Fact]
-    public void Of_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtected_ReportsSqlsrc123AtTheMethod()
+    public void Of_NestedClassMadePublicByAnotherFileOfATypeReachableAsProtected_IsUsable()
     {
         var files = Files(
             File("Users.sql", Query("GetName", output: OutputKind.Sql, visibility: Visibility.Public)),
@@ -415,26 +405,14 @@ public sealed class TypePlacementTests
 
         var (placement, diagnostics) = Analyse(ReachableAsProtected(), files);
 
-        diagnostics.ShouldBe([
-            DiagnosticInfo.Create(
-                SqlDiagnostics.VisibilityNotFit,
-                At("Orders.sql", 2),
-                "GetOrder",
-                "App.UserRepository",
-                "public",
-                "the file header for the query 'GetName'",
-                "nested-class",
-                "'App.UserRepository' is reachable as protected, so its models are internal, which a method reachable "
-                    + "from another assembly cannot take or return"
-            ),
-        ]);
-        placement.Usable.ShouldBe([true, false]);
+        diagnostics.ShouldBeEmpty();
+        placement.Usable.ShouldBe([true, true]);
         placement.NestedClasses.ShouldBe([new NestedClassPlacement("Sql", Visibility.Public)]);
     }
 
-    // The error is at the query's own member-location marker when it has no visibility marker.
+    // The same with both queries in one file.
     [Fact]
-    public void Of_NestedClassMadePublicByAnotherQuery_ReportsSqlsrc123AtTheMemberLocationMarker()
+    public void Of_NestedClassMadePublicByAnotherQuery_IsUsable()
     {
         var method = Query("GetOrder", location: MemberLocation.NestedClass, at: At("Users.sql", 2)) with
         {
@@ -446,64 +424,53 @@ public sealed class TypePlacementTests
 
         var (placement, diagnostics) = Analyse(ReachableAsProtected(), files);
 
-        diagnostics.ShouldBe([
-            DiagnosticInfo.Create(
-                SqlDiagnostics.VisibilityNotFit,
-                At("Users.sql", 3),
-                "GetOrder",
-                "App.UserRepository",
-                "protected",
-                "the file header for the query 'GetName'",
-                "nested-class",
-                "'App.UserRepository' is reachable as protected, so its models are internal, which a method reachable "
-                    + "from another assembly cannot take or return"
-            ),
-        ]);
-        placement.Usable.ShouldBe([false]);
+        diagnostics.ShouldBeEmpty();
+        placement.Usable.ShouldBe([true]);
+        placement.NestedClasses.ShouldBe([new NestedClassPlacement("Sql", Visibility.Protected)]);
     }
 
-    // Only a public or protected query method of a type reachable as protected is refused for its models: not a
-    // constant, not an internal or private method, not one of a type that is not reachable so, and not one in the
-    // extension class, whose own reason refuses a public method of a type that is not public.
+    // Where a query method could not take or return the type's internal models: a public or protected method of a type
+    // reachable as protected, on it or in its nested class, and a public extension method of a type that is not
+    // public.  Not an internal or private method, not one of a type that is not reachable so, and not a public
+    // extension method of a public type.
     [Theory]
-    [InlineData("Class", "Public", "CodeGen", true, true)]
-    [InlineData("Class", "Protected", "CodeGen", true, true)]
-    [InlineData("NestedClass", "Public", "CodeGen", true, true)]
-    [InlineData("NestedClass", "Protected", "CodeGen", true, true)]
-    [InlineData("Class", "Internal", "CodeGen", true, false)]
-    [InlineData("NestedClass", "Private", "CodeGen", true, false)]
-    [InlineData("Class", "Public", "Sql", true, false)]
-    [InlineData("NestedClass", "Protected", "Models", true, false)]
-    [InlineData("Class", "Public", "CodeGen", false, false)]
-    [InlineData("NestedClass", "Protected", "CodeGen", false, false)]
-    public void VisibilityReason_OfATypeReachableAsProtected_RefusesOnlyAPublicOrProtectedMethod(
+    [InlineData("Class", "Public", false, true, "protected")]
+    [InlineData("Class", "Protected", false, true, "protected")]
+    [InlineData("NestedClass", "Public", false, true, "protected")]
+    [InlineData("NestedClass", "Protected", false, true, "protected")]
+    [InlineData("Class", "Internal", false, true, null)]
+    [InlineData("NestedClass", "Private", false, true, null)]
+    [InlineData("Class", "Public", false, false, null)]
+    [InlineData("NestedClass", "Protected", false, false, null)]
+    [InlineData("ExtensionClass", "Public", false, false, "extension")]
+    [InlineData("ExtensionClass", "Public", true, false, null)]
+    [InlineData("ExtensionClass", "Internal", false, false, null)]
+    public void MethodModelsReason_OfEachLocationAndVisibility_RefusesOnlyWhereModelsWouldNotCompile(
         string locationName,
         string visibilityName,
-        string outputName,
+        bool isPublic,
         bool isReachableAsProtected,
-        bool isRefused
+        string? refusal
     )
     {
-        var type = TestModels.Type(isPublic: false, isReachableAsProtected: isReachableAsProtected);
+        var type = TestModels.Type(isPublic: isPublic, isReachableAsProtected: isReachableAsProtected);
 
-        var reason = PlacementChecks.VisibilityReason(
+        var reason = PlacementChecks.MethodModelsReason(
             type,
             System.Enum.Parse<MemberLocation>(locationName),
-            System.Enum.Parse<Visibility>(visibilityName),
-            System.Enum.Parse<OutputKind>(outputName)
+            System.Enum.Parse<Visibility>(visibilityName)
         );
 
-        if (isRefused)
-        {
-            reason.ShouldBe(
-                "'App.UserRepository' is reachable as protected, so its models are internal, which a method reachable "
-                    + "from another assembly cannot take or return"
-            );
-        }
-        else
-        {
-            reason.ShouldBeNull();
-        }
+        reason.ShouldBe(
+            refusal switch
+            {
+                "protected" => "'App.UserRepository' is reachable as protected, so its models are internal, which a "
+                    + "method reachable from another assembly cannot take or return",
+                "extension" => "'App.UserRepository' is not public, so its models are internal, which a public "
+                    + "extension method cannot take or return",
+                _ => null,
+            }
+        );
     }
 
     // A written visibility beats a default: the class of the two files is public, whichever file comes first.
@@ -734,6 +701,19 @@ public sealed class TypePlacementTests
         PlacementChecks.DefaultVisibility(MemberLocation.Class, false).ShouldBe(Visibility.Internal);
         PlacementChecks.DefaultVisibility(MemberLocation.ExtensionClass, true).ShouldBe(Visibility.Internal);
         PlacementChecks.DefaultVisibility(MemberLocation.ExtensionClass, false).ShouldBe(Visibility.Internal);
+        foreach (
+            var location in (MemberLocation[])
+                [MemberLocation.NestedClass, MemberLocation.Class, MemberLocation.ExtensionClass]
+        )
+        {
+            foreach (var isPublic in (bool[])[true, false])
+            {
+                var type = TestModels.Type(isPublic: isPublic, isReachableAsProtected: !isPublic);
+                PlacementChecks
+                    .MethodModelsReason(type, location, PlacementChecks.DefaultVisibility(location, isPublic))
+                    .ShouldBeNull();
+            }
+        }
     }
 
     [Fact]

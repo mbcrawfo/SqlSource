@@ -89,10 +89,9 @@ internal sealed class TypePlacement
     /// <c>SQLSRC125</c> for a constant or token method on the type named like a member, a nested type or a type
     /// parameter that the type declares, else <c>SQLSRC008</c>, then the errors of its kept form
     /// (<see cref="SqlQuery.KeptErrors" />), then <c>SQLSRC122</c>, else <c>SQLSRC123</c> for its own visibility; then,
-    /// over the files left, <c>SQLSRC124</c> for a nested class given two visibilities, <c>SQLSRC123</c> for a query
-    /// method that writes no visibility in a nested class whose visibility, written by another query, does not fit it,
-    /// <c>SQLSRC007</c> for a nested class named like a member of the type, and <c>SQLSRC125</c> for a member on the
-    /// type named like a nested class.  Each of the last four leaves out every file it names.
+    /// over the files left, <c>SQLSRC124</c> for a nested class given two visibilities, <c>SQLSRC007</c> for a nested
+    /// class named like a member of the type, and <c>SQLSRC125</c> for a member on the type named like a nested class.
+    /// Each of the last three leaves out every file it names.
     /// </summary>
     /// <param name="type">The type.</param>
     /// <param name="files">The type's files, in member order.</param>
@@ -110,7 +109,6 @@ internal sealed class TypePlacement
         var analysis = new Analysis(type, files, fileSettings, diagnostics);
         analysis.CheckQueries();
         analysis.CheckClassVisibilities();
-        analysis.CheckMethodsOfClassVisibilities();
         analysis.CheckTakenClassNames();
         analysis.CheckMembersNamedLikeClasses();
         return new TypePlacement(
@@ -234,67 +232,6 @@ internal sealed class TypePlacement
             if (conflicting.Count > 0)
             {
                 LeaveOutFilesOf(conflicting);
-            }
-        }
-
-        // SQLSRC123 at each query method in a nested class whose visibility, written by another query, does not fit the
-        // method, and its file left out.  A query that writes one was checked with its own, which after SQLSRC124 is
-        // the class's, so it is never reported here.  Only a type reachable as protected has a nested class whose
-        // visibility fits its constants and not its methods, so no other type looks for one.
-        public void CheckMethodsOfClassVisibilities()
-        {
-            if (!type.IsReachableAsProtected)
-            {
-                return;
-            }
-
-            var firstWritten = new Dictionary<string, (Placed<Visibility> Visibility, string Query)>(
-                StringComparer.Ordinal
-            );
-            foreach (var (_, query, settings) in UsableQueries(MemberLocation.NestedClass))
-            {
-                if (settings.WrittenVisibility is { } written && !firstWritten.ContainsKey(settings.NestedClass))
-                {
-                    firstWritten.Add(settings.NestedClass, (written, query.Name));
-                }
-            }
-
-            var leftOut = new List<int>();
-            foreach (var (fileIndex, query, settings) in UsableQueries(MemberLocation.NestedClass))
-            {
-                if (
-                    !firstWritten.TryGetValue(settings.NestedClass, out var first)
-                    || PlacementChecks.VisibilityReason(
-                        type,
-                        MemberLocation.NestedClass,
-                        first.Visibility.Value,
-                        settings.Output
-                    )
-                        is not { } reason
-                )
-                {
-                    continue;
-                }
-
-                // The query writes no visibility, so it has no marker of one.
-                diagnostics?.Add(
-                    DiagnosticInfo.Create(
-                        SqlDiagnostics.VisibilityNotFit,
-                        query.MemberLocationMarker ?? query.NameLocation,
-                        query.Name,
-                        TypeName,
-                        PlacementChecks.KeywordOf(first.Visibility.Value),
-                        PlaceText.Of(first.Visibility.Place) + " for the query '" + first.Query + "'",
-                        PlacementChecks.TextOf(MemberLocation.NestedClass),
-                        reason
-                    )
-                );
-                leftOut.Add(fileIndex);
-            }
-
-            foreach (var fileIndex in leftOut)
-            {
-                Usable[fileIndex] = false;
             }
         }
 
@@ -489,7 +426,7 @@ internal sealed class TypePlacement
             // The default of a location always fits it, so only a written visibility is checked.
             if (
                 settings.WrittenVisibility is { } written
-                && PlacementChecks.VisibilityReason(type, location, written.Value, settings.Output) is { } reason
+                && PlacementChecks.VisibilityReason(type, location, written.Value) is { } reason
             )
             {
                 diagnostics?.Add(
