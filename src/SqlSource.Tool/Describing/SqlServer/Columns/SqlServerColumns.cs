@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer.Types;
 
@@ -36,9 +37,22 @@ internal static class SqlServerColumns
     /// </summary>
     public const string NotATableOrView = "not a table or view";
 
-    // The source types, OBJECTPROPERTYEX's BaseType, of a table and of a view.
-    private const string Table = "U";
+    /// <summary>The source type, OBJECTPROPERTYEX's BaseType, of a table.</summary>
+    internal const string Table = "U";
+
+    // The source type of a view.
     private const string View = "V";
+
+    /// <summary>The rows that are not hidden, in order: the only rows that are columns of the result.</summary>
+    /// <param name="rows">The rows of <c>columns</c> or of <c>table</c>, the hidden ones included.</param>
+    internal static IEnumerable<SqlServerColumnRow> Visible(IEnumerable<SqlServerColumnRow> rows) =>
+        rows.Where(static row => !row.IsHidden);
+
+    /// <summary>
+    /// Whether the row's column is nullable as the describer records it: a row whose server cannot say is nullable.
+    /// </summary>
+    /// <param name="row">A row of <c>columns</c>.</param>
+    internal static bool NullableAsRecorded(SqlServerColumnRow row) => row.IsNullable ?? true;
 
     /// <summary>
     /// The visible columns, in order, each with why it has no origin; or the ordinal of the first that has no name.
@@ -53,13 +67,8 @@ internal static class SqlServerColumns
     )
     {
         var columns = new List<BuiltColumn>();
-        foreach (var row in rows)
+        foreach (var row in Visible(rows))
         {
-            if (row.IsHidden)
-            {
-                continue;
-            }
-
             if (row.Name is not { } name)
             {
                 return Outcome<IReadOnlyList<BuiltColumn>, int>.Failed(row.ColumnOrdinal);
@@ -72,7 +81,7 @@ internal static class SqlServerColumns
                         columns.Count,
                         name,
                         SqlServerTypes.FromColumn(row),
-                        row.IsNullable ?? true,
+                        NullableAsRecorded(row),
                         SidecarValues.NullableSource.Server,
                         origin,
                         row.IsIdentityColumn,

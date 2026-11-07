@@ -4,5 +4,6 @@
 - **A column has an origin only when its source is a table or a view of the session's database, the `DB_NAME()` that `open` reads** (`SqlServerColumns.OriginOf`, [origins](../../../../../docs/architecture/sqlserver-describer.md#origins)).  The sidecar's origin names no database, so a column of another database, a linked server or the system resource must not match a table of the same name in the session's.
 - **`SqlServerTableMatcher` runs the format's checks through `TableMatchChecks`, the one order both matchers share**, and the server is asked for `table` only when its first two checks pass ([the table match](../../../../../docs/architecture/sqlserver-describer.md#the-table-match)).
 - **The matcher reads the table's columns and their nullability from `table`'s answer, never from `sys.columns`**, so that a hidden period column is out of the list, and compares a query with those rows corrected by `ColumnProofs.TableRows`.
+- **A row's hidden flag and a missing `is_nullable` are read through `SqlServerColumns.Visible` and `SqlServerColumns.NullableAsRecorded`, never by a spelling of the rule**, so that the builder, the matcher and the proofs cannot differ on them.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

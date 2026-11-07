@@ -73,7 +73,7 @@ internal sealed class ColumnProofs
     )
     {
         var none = new ColumnProofs(columns, [], [], null, 0);
-        var visible = rows.Where(static row => !row.IsHidden).ToList();
+        var visible = SqlServerColumns.Visible(rows).ToList();
         if (visible.Count != columns.Count)
         {
             return none;
@@ -106,7 +106,7 @@ internal sealed class ColumnProofs
             {
                 catalog[index] = true;
             }
-            else if (visible[index].IsNullable != false && !SqlServerTypes.MayBeClr(visible[index]))
+            else if (SqlServerColumns.NullableAsRecorded(visible[index]) && !SqlServerTypes.MayBeClr(visible[index]))
             {
                 proofs[index] = expressions.Of(item.Expression);
             }
@@ -150,7 +150,7 @@ internal sealed class ColumnProofs
     // True when the catalog proves the column of the row, whose item is a column alone or the one *, in the body: its
     // row says PERSISTED NOT NULL, the FROM is its one table, and no grouping set gives a total row.
     private static bool IsProvedByTheCatalog(SelectBody body, SqlServerColumnRow row) =>
-        row.IsNullable != false
+        SqlServerColumns.NullableAsRecorded(row)
         && IsPersistedNotNull(row)
         && body.IsOneTable
         && body.Grouping is SelectGrouping.None or SelectGrouping.Plain;
@@ -158,7 +158,7 @@ internal sealed class ColumnProofs
     // The row's source is a table of the session's database whose column is PERSISTED NOT NULL.  The SQL of "columns"
     // already asks for a table, and SourceType says so again, for a capture made by hand.
     private static bool IsPersistedNotNull(SqlServerColumnRow row) =>
-        row is { PersistedNotNull: true, SourceType: "U" };
+        row is { PersistedNotNull: true, SourceType: SqlServerColumns.Table };
 
     // The nullableSource that proves the column in the place not null, or null when nothing does.
     private string? SourceOf(int index, IReadOnlyList<OperandFacts>? answers)

@@ -182,8 +182,7 @@ internal static class ParameterPlaceholders
         for (var index = from; index < lexemes.Count; index++)
         {
             var lexeme = lexemes[index];
-            var isComment =
-                lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment or SqlLexemeKind.Hint;
+            var isComment = DescriberSql.IsCommentOrHint(lexeme.Kind);
             var isSpace =
                 lexeme.Kind == SqlLexemeKind.Text && sql.AsSpan(lexeme.Span.Start, lexeme.Span.Length).IsWhiteSpace();
             if (!isComment && !isSpace)

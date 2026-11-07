@@ -137,6 +137,33 @@ public sealed class NullabilityWalkNameTests
     public void Run_AliasAtAModifyTableThatIsNotTheTargetsWhereNeitherIsNamed_TakesTheCatalogsAnswer() =>
         AnswersOf(Run(ModifyOverOld, false, NotNull, NotNull)).ShouldBe([NotNullCatalog, NotNullCatalog]);
 
+    // A single-target UPDATE or DELETE prints bare names on every major, and the flag is a word of the SQL: a bare
+    // name with the flag on is still the target's column.
+    [Fact]
+    public void Run_BareNameAtARootModifyTableWhereOldOrNewMayBeNamed_IsTheTargetsColumn()
+    {
+        var plan = Over("ModifyTable", Scan("orders")) with { Alias = "orders", Output = ["id"] };
+
+        AnswersOf(Run(plan, true, NotNull)).ShouldBe([NotNullCatalog]);
+    }
+
+    // An expression reads no bare name where OLD or NEW may be named, though it proves the same one qualified, and
+    // proves it bare with the flag off (NullabilityWalkExpressionTests).
+    [Fact]
+    public void Run_BareNameInAnExpressionAtARootModifyTableWhereOldOrNewMayBeNamed_KeepsWhatItWasBuiltWith()
+    {
+        var plan = Over("ModifyTable", Scan("a")) with
+        {
+            Alias = "a",
+            RelationName = "a",
+            Schema = "public",
+            Output = ["GREATEST(id, opt)", "GREATEST(a.id, a.opt)"],
+        };
+
+        AnswersOf(RunAs(Scope(true, oldAndNewMayBeNamed: true), plan, Expression, Expression))
+            .ShouldBe([UnknownNoOrigin, NotNullExpression]);
+    }
+
     // The old and the new row are a RETURNING list's alone.
     [Fact]
     public void Run_RootThatIsNoModifyTable_IsNotAffectedByOldOrNew() =>
