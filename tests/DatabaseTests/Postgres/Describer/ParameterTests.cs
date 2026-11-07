@@ -323,6 +323,21 @@ public sealed class ParameterTests(PostgresDatabases postgres)
         parameters.ShouldBe([Inferred("ids", TestSidecars.Postgres())]);
     }
 
+    // PostgreSQL refuses a subquery in the index predicate of ON CONFLICT, so the test there is described as NULL.
+    [Fact]
+    public async Task DescribeAsync_ListsNullTestInAnIndexPredicate_IsDescribed()
+    {
+        var parameters = await ShouldDescribeAsync(
+            DescribeRequests.Planned(
+                "postgres",
+                "INSERT INTO samples (id, flag) VALUES (@id, true) "
+                    + "ON CONFLICT (id) WHERE (@ids IS NULL OR id IN @ids) DO NOTHING"
+            )
+        );
+
+        parameters.ShouldBe([Inferred("id", TestSidecars.Postgres()), Inferred("ids", TestSidecars.Postgres())]);
+    }
+
     [Fact]
     public async Task DescribeAsync_ListUsedTwice_IsDescribed()
     {
