@@ -13,13 +13,13 @@ $ dotnet tool install SqlSource.Tool --prerelease
 
 ## Use
 
-Give it the connection string of your database in a `.env` file at the root of your repository, and keep that file out of git, since it holds your password:
+Give it the connection string of your database in a `.env` file in the folder of your project or solution, and keep that file out of git, since it holds your password:
 
 ```dotenv
 SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password=secret"
 ```
 
-The same variable in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.  Then run the tool from the folder of your project or solution, or name it: `dotnet sqlsource describe src/App/App.csproj`.
+The tool never reads a `.env` in a folder above that one: `--env-file <path>` names another file.  The same variable in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.  Then run the tool from the folder of your project or solution, or name it: `dotnet sqlsource describe src/App/App.csproj`.
 
 ```console
 $ dotnet sqlsource describe
@@ -35,7 +35,7 @@ $ dotnet sqlsource describe --watch
 - `describe --check` writes nothing, and fails when a sidecar is out of date: run it on a build server.
 - `describe --watch` describes again each time you save a `.sql` file or another file of your project, until you stop it with Ctrl+C: leave it running while you work, or have your editor start it, as [describe on save](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#describe-on-save) says.
 
-On a machine with that `.env` file, or `SQLSOURCE_CONNECTION` in the environment, `dotnet build` runs `describe` itself before it compiles, and reports a query the database rejects as a build error at the query; a build in CI never does: see [running in the build](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#running-in-the-build).
+On a machine with a `.env` file in the project's folder, or `SQLSOURCE_CONNECTION` in the environment, `dotnet build` runs `describe` itself before it compiles, and reports a query the database rejects as a build error at the query; a build in CI never does: see [running in the build](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#running-in-the-build).
 
 To report a query whose model is wrong, two more commands:
 

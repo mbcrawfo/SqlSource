@@ -676,7 +676,7 @@ See: [Running in the build](tool.md#running-in-the-build)
 
 **Build cannot run the tool and uses the committed sidecars**
 
-`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or a `.env` file in the project's folder or a folder above it, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
+`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](settings.md#setting-env-file) names, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
 ```console
 /repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.
@@ -1388,7 +1388,7 @@ $ dotnet sqlsource describe
 
 The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool --prerelease`.  The two are released together under one version number.
 
-When the build runs the tool, the message names the manifest file the build wrote, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, or, when its path holds `=` or `;`, its position on the command line, as `The project manifest at position 3 cannot be read`, with no reason from the operating system, which would quote it.
+When the build runs the tool, the message names the manifest file the build wrote by its full path, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
 
 Any other reason, one that names a line for one, means that the package wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
@@ -1511,10 +1511,10 @@ A query that must be described belongs to a database that the run has no connect
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
-    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env
+    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env.  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another
 ```
 
-Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run read, or, when it found none, the `.env` it would read in the folder of the solution or project it runs on.  A run on a solution reads the `.env` beside the solution or above it, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads the .env nearest to /work`.  Move the file, or its connection variables, to the solution's folder or to the root of the repository.  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](tool.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
+Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run reads, whether or not it is there: the one in the folder of the solution or project it runs on, or the one `--env-file` names.  It ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`, so a `.env` that sits elsewhere, such as in a folder above the project's, is seen not to be read.  Under `--env-file none` it says `The run reads no .env file` instead.  The run never reads a `.env` in a folder above its own.  A run on a solution reads the `.env` beside the solution, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`, in the place of the sentence above.  Move the file, or its connection variables, to the solution's folder, or name the file with [`--env-file`](tool.md#env-file), or for a build with [`SqlSourceEnvFile`](settings.md#setting-env-file).  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](tool.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
 
 See: [Connections](tool.md#connections)
 
@@ -1599,7 +1599,6 @@ For a log:
 - **The log cannot be made or emptied as the run starts**, because its folder is not there, it is a folder, or the system will not let the tool write it.  Nothing runs and the exit code is 1.  Give a path that can be written, or run the command from another folder.
 - **The path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`, touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file.  Give the log a name of its own.
 - **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars, the error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
-- **The log of a build whose path holds `=` or `;`**, which the name of a project can give it, is named by its position on the command line, as `The path at position 7 could not be written: the system would not write it`, since the operating system's reason would quote the path.
 
 For a bundle of `diagnose`:
 
@@ -3105,14 +3104,14 @@ See: [Type overrides](settings.md#setting-type-overrides), [column types](settin
 
 **.env file cannot be read**
 
-`sqlsource describe` looks for a `.env` file for the connections of a run, and the file it found cannot be read: the system would not open or read it.  The message names the file and ends with the reason the system gave.  The run goes on as if the file gave no connection at all, so the databases that needed a connection from it report [SQLSRC213](#sqlsrc213), unless another source gives one.
+`sqlsource describe` reads the run's `.env` file for its connections, and the file cannot be read: the system would not open or read it.  The message names the file and ends with the reason the system gave.  The run goes on as if the file gave no connection at all, so the databases that needed a connection from it report [SQLSRC213](#sqlsrc213), unless another source gives one.
 
 ```console
 $ dotnet sqlsource describe /work/App
-/work/.env : error SQLSRC285: '/work/.env' cannot be read: Access to the path '/work/.env' is denied.
+/work/App/.env : error SQLSRC285: '/work/App/.env' cannot be read: Access to the path '/work/App/.env' is denied.
 ```
 
-Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment.
+Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment, with `--env-file none`, or in a build [`SqlSourceEnvFile`](settings.md#setting-env-file) `none`, so that the run reads no file.
 
 See: [A `.env` file](tool.md#env-file)
 

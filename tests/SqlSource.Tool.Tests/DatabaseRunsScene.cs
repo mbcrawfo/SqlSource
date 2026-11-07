@@ -31,6 +31,7 @@ internal sealed class DatabaseRunsScene : IDisposable
         Exchange = new CapturingExchange(LiveExchange.Instance, Capture);
         Project = Plans.Postgres(Folder);
         UsersPath = Project.AddSql("Users.sql", Users);
+        DotEnvLookedFor = Folder.PathOf(".env");
     }
 
     public TempFolder Folder { get; } = new();
@@ -48,6 +49,9 @@ internal sealed class DatabaseRunsScene : IDisposable
     public TestProject Project { get; }
 
     public string UsersPath { get; }
+
+    // The .env file the run looks for, which it never finds, or null for a run that reads none.
+    public string? DotEnvLookedFor { get; set; }
 
     // The files of the last run.
     public ImmutableArray<FileWork> Files { get; private set; }
@@ -79,7 +83,12 @@ internal sealed class DatabaseRunsScene : IDisposable
                     given ?? ["postgres=" + Secrets.ConnectionWithWord, "billing=" + Secrets.ConnectionWithWord]
                 ).Select((text, index) => ConnectionArguments.Parse(text, (2 * index) + 3)),
             ],
-            ConnectionEnvironment.Of(name => Environment.GetValueOrDefault(name), NoDotEnv, Folder.Path)
+            ConnectionEnvironment.Of(
+                name => Environment.GetValueOrDefault(name),
+                NoDotEnv,
+                Folder.Path,
+                DotEnvLookedFor
+            )
         );
         var host = Hosts.Create(Folder.Path, new FakeProcessRunner(), Folder.Path, environment: Environment) with
         {

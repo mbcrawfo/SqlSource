@@ -4,7 +4,7 @@ How the tool works: [`tool.md`](../../docs/architecture/tool.md).
 How the PostgreSQL describer works: [`postgres-describer.md`](../../docs/architecture/postgres-describer.md) and [`postgres-nullability.md`](../../docs/architecture/postgres-nullability.md).
 How the SQL Server describer works: [`sqlserver-describer.md`](../../docs/architecture/sqlserver-describer.md).
 
-The tool's tests, and where each kind goes, are in [`tests/README.md`](../../tests/README.md).
+Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 
 ## The project
 
@@ -16,7 +16,7 @@ The tool's tests, and where each kind goes, are in [`tests/README.md`](../../tes
 
 ## The host
 
-- **Everything from outside comes through `ToolHost`.**  Nothing reads `Console`, `Environment`, `RuntimeInformation` or the current directory except `ToolHost.Create` and `Cli.Run` ([the host](../../docs/architecture/tool.md#the-host)).  What a later phase takes from outside is a new member of `ToolHost`.
+- **Everything from outside comes through `ToolHost`.**  Nothing reads `Console`, `Environment`, `RuntimeInformation` or the current directory except `ToolHost.Create` and `Cli.Run` ([the host](../../docs/architecture/tool.md#the-host)).
 - **The clock is `ToolHost.Time`.**  The time of a log's events and how long a step took come from it, never from `DateTime` or `Stopwatch`.
 - **Every file event comes through `ToolHost.Watch`**: nothing else makes a `FileSystemWatcher` or lists a folder on a timer ([the watches](../../docs/architecture/tool.md#the-watches)).
 - **Every process goes through `ToolHost.Processes`.**  `Processes/ProcessRunner.cs` is the only code that starts one, and a test gives `tests/SqlSource.Tool.Testing/FakeProcessRunner.cs`.
@@ -29,10 +29,10 @@ The tool's tests, and where each kind goes, are in [`tests/README.md`](../../tes
 - **Every error goes through `Reporting/Reporter.cs` with a descriptor of `ToolDiagnostics`**, or of `SqlDiagnostics` where the generator reports the same condition.  The descriptors are in the generator's project; `src/SqlSource/Diagnostics/AGENTS.md` lists the four places a new one touches.  A wrong command line is the one exception, below.
 - **The exit code is `0`, `1` or `2`**, as the manual's [exit codes](../../docs/manual/tool.md#exit-codes) say.  `Cli.ExitCodeOf` takes it from the reporter, so a command reports, goes on, and never returns `1`.  `2` is for `SQLSRC219` and for `replay`'s answer that is not the bundle's; a query that cannot be described is "could not check", never `SQLSRC219`.
 - **Every text the tool prints and did not write goes through `Reporting/OneLine.cs`**, which writes a line break as a space: an argument of a message, a path, a label, the name of an unknown option.
-- **A path in a message is a full path**, or `The path at position <n>` when its token holds `=` or `;` (`UsageValue.NamedAsPath`).
+- **A path in a message is a full path**, or `The path at position <n>` when its token holds `=` or `;` (`UsageValue.NamedAsPath`), but not under `--online`, whose `--manifest`, `--log` and `--env-file` paths the owner ruled no secret.
 - **No error carries a hint to a log.**  A failed `describe` with no log ends with `Cli.RunAgainLine` instead, but not under `--online` or `--watch`.
 - **An exception is `SQLSRC200`**, caught in `Cli.RunCommandAsync`, in each pass of `Watching/WatchSession.cs`, in `Cli.Run` when the host cannot be made, and in `Describing/DatabaseRuns.cs`, which rethrows a describer's as a `DescriberFaultException` without the connection's value ([describing](../../docs/architecture/tool.md#describing)).
-- **No `catch (InvalidOperationException)` may stand between `Describing/DatabaseRuns.cs` and `Cli.RunCommandAsync` or `Watching/WatchSession.cs`**: `DescriberFaultException` derives from it, so the catch would swallow the fault and the run would go on.
+- **No `catch (InvalidOperationException)` may stand between `Describing/DatabaseRuns.cs` and `Cli.RunCommandAsync` or `Watching/WatchSession.cs`**: `DescriberFaultException` derives from it, so the catch would swallow the fault.
 
 ## A connection's value
 

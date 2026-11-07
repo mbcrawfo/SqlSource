@@ -71,6 +71,9 @@ internal sealed class WatchSession
     private readonly Reporter _session;
     private readonly Action<LogValue> _counted;
 
+    // The .env file that each pass reads, or null when the run reads none, which every set the session makes watches.
+    private readonly string? _envFile;
+
     // The changes that came since the last pass began, and what they ask, those that came during the evaluation under
     // way, null when there is none, which are read when it ends, and the failures that the loop has not reported yet.
     // Also the folders that have a watch, as the loop last opened them, and those of them whose folder a change
@@ -105,9 +108,10 @@ internal sealed class WatchSession
         _unitFolder = Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file.");
         _usage = usage;
         _host = host;
+        _envFile = DescribeCommand.EnvFileOf(usage, _unitFolder, host);
         _session = session;
         _counted = counted;
-        _set = WatchSet.Of(unit.Path, _unitFolder, FoundProjects.None);
+        _set = WatchSet.Of(unit.Path, _unitFolder, _envFile, FoundProjects.None);
     }
 
     /// <summary>
@@ -236,7 +240,7 @@ internal sealed class WatchSession
             var found = await DescribeCommand.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
             _manifests = found.Manifests;
             _evaluationFailed = reporter.Count > errors;
-            set = WatchSet.Of(_unit.Path, _unitFolder, found);
+            set = WatchSet.Of(_unit.Path, _unitFolder, _envFile, found);
         }
         finally
         {

@@ -11,6 +11,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
 using SqlSource.Settings;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
@@ -43,6 +44,8 @@ internal static class DescribeCommand
     private const string VerboseOption = "--verbose";
 
     internal const string LogOption = "--log";
+
+    internal const string EnvFileOption = "--env-file";
 
     internal const string ManifestOption = "--manifest";
 
@@ -135,6 +138,15 @@ internal static class DescribeCommand
             Arity = ArgumentArity.ExactlyOne,
         };
 
+        var envFile = new Option<string>(EnvFileOption)
+        {
+            Description =
+                "Read the connections from this .env file instead of the one in the folder of the solution or "
+                + "project; 'none' reads none.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
         // The two options of the build that calls the tool.  Each takes exactly one value, given once.
         var manifest = new Option<string>(ManifestOption)
         {
@@ -171,6 +183,7 @@ internal static class DescribeCommand
             check,
             verbose,
             log,
+            envFile,
             manifest,
             online,
             watch,
@@ -298,6 +311,13 @@ internal static class DescribeCommand
                     messages.Add(problem);
                 }
             }
+            else if (value.Option.Name == EnvFileOption)
+            {
+                if (ProblemOfEnvFile(value, isOnline) is { } problem)
+                {
+                    messages.Add(problem);
+                }
+            }
             else if (value.Option.Name == ConnectionOption && ProblemOfConnection(value, connections) is { } problem)
             {
                 messages.Add(problem);
@@ -381,7 +401,7 @@ internal static class DescribeCommand
         }
     }
 
-    // Whether the command line has --online: the build's, whose paths of --manifest and --log are its own.
+    // Whether the command line has --online: the build's, whose paths of --manifest, --log and --env-file are its own.
     private static bool IsOnline(Usage usage) => usage.Values.Any(static value => value.Option?.Name == OnlineOption);
 
     // What --online said, as OnlineOf(ParseResult) reads it, for the steps that have only the usage, a watch's passes
@@ -403,8 +423,17 @@ internal static class DescribeCommand
         ProblemOfPath(log, LogOption, "a log's path", isOnline);
 
     /// <summary>
-    /// What is wrong with the value of an option that is a path the run writes, as a whole line, or null: it is no
-    /// path, or, without <c>--online</c>, it holds <c>=</c> or <c>;</c>.
+    /// What is wrong with a value of <c>--env-file</c> as a path, as a whole line, or null, by the rule of
+    /// <c>--log</c>.  <c>diagnose</c> holds its <c>--env-file</c> to the same rule.
+    /// </summary>
+    /// <param name="envFile">The value of <c>--env-file</c>.</param>
+    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
+    internal static string? ProblemOfEnvFile(UsageValue envFile, bool isOnline) =>
+        ProblemOfPath(envFile, EnvFileOption, "a .env file's path", isOnline);
+
+    /// <summary>
+    /// What is wrong with the value of an option that is a path, as a whole line, or null: it is no path, or, without
+    /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.
     /// </summary>
     /// <param name="value">The value.</param>
     /// <param name="option">The option's name.</param>
@@ -419,7 +448,8 @@ internal static class DescribeCommand
         }
 
         // "=" and ";" are what a connection string is made of: the value may be one typed after the option.  The
-        // build's paths may hold them, as a project's name may, and a message names such a path by its position.
+        // build's paths may hold them, as a project's name may, and the owner ruled that a path the build writes is
+        // no secret, so under --online a message prints such a path in full.
         return !isOnline && !value.MayBePrintedAsPath
             ? $"sqlsource: the value of option '{option}' at position {value.Position} holds '=' or ';', which "
                 + $"{ofWhat} may not"
@@ -518,15 +548,9 @@ internal static class DescribeCommand
     }
 
     /// <summary>
-    /// The value of <c>--log</c> as <see cref="UsageCheck" /> read it, which names the path in a message, or null when
-    /// the option was not given.
-    /// </summary>
-    public static UsageValue? LogOptionOf(Usage usage) => ValuesOf(usage, LogOption) is [{ } value] ? value : null;
-
-    /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
-    /// <c>--connection</c>, <c>--log</c>, <c>--manifest</c> and <c>--online</c> the same values, in the same order.
-    /// True for a command other than <c>describe</c>.
+    /// <c>--connection</c>, <c>--log</c>, <c>--env-file</c>, <c>--manifest</c> and <c>--online</c> the same values, in
+    /// the same order.  True for a command other than <c>describe</c>.
     /// </summary>
     /// <remarks>
     /// The run reads these values from <see cref="Usage" />, and the log's <c>arguments</c> is redacted from it,
@@ -541,6 +565,7 @@ internal static class DescribeCommand
             && ReadsAs(usage, parsed, DatabaseOption)
             && ReadsAs(usage, parsed, ConnectionOption)
             && ReadsAsOne(usage, parsed, LogOption)
+            && ReadsAsOne(usage, parsed, EnvFileOption)
             && ReadsAsOne(usage, parsed, ManifestOption)
             && ReadsAsOne(usage, parsed, OnlineOption)
         );
@@ -574,14 +599,32 @@ internal static class DescribeCommand
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
     // The plan's filters hold --database and the .sql paths, and not --project.  A .sql path that names no file still
     // counts as a filter, so that such a run deletes no sidecar.
-    private static DescribeOptions OptionsOf(Usage usage, RunUnit unit, RunPlan plan, RunMode mode) =>
+    private static DescribeOptions OptionsOf(Usage usage, RunUnit unit, RunPlan plan, RunMode mode, ToolHost host) =>
         new(
             mode,
             ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
             ConnectionsOf(usage),
             plan.Filters.Databases,
             UnitFolderOf(unit),
+            EnvFileOf(usage, UnitFolderOf(unit), host),
             OnlineOf(usage)
+        );
+
+    /// <summary>
+    /// The full path of the <c>.env</c> file a run reads, or null when it reads none: the one <c>--env-file</c>
+    /// names, or the one in <paramref name="unitFolder" /> when it names none.  <c>describe</c>, each pass of a watch
+    /// and <c>diagnose</c> read it here.
+    /// </summary>
+    /// <param name="usage">
+    /// The command line, whose <c>--env-file</c> <see cref="CheckUsage" /> has held to a path.
+    /// </param>
+    /// <param name="unitFolder">The folder of the run's unit.</param>
+    /// <param name="host">The working folder, which a relative path is from.</param>
+    internal static string? EnvFileOf(Usage usage, string unitFolder, ToolHost host) =>
+        DotEnvSearch.FileOf(
+            ValuesOf(usage, EnvFileOption) is [{ } value] ? value.Text : null,
+            unitFolder,
+            host.WorkingDirectory
         );
 
     /// <summary>
@@ -607,7 +650,7 @@ internal static class DescribeCommand
     }
 
     /// <summary>
-    /// The full path of the folder of the unit, where the search for the run's <c>.env</c> file starts.
+    /// The full path of the folder of the unit, whose <c>.env</c> the run reads.
     /// </summary>
     internal static string UnitFolderOf(RunUnit unit) =>
         Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file in a folder.");
@@ -639,7 +682,7 @@ internal static class DescribeCommand
         CancellationToken cancellationToken
     ) => (await PlanUnitAsync(usage, host, reporter, cancellationToken))?.Plan;
 
-    // The plan, with the unit it was built for, whose folder is where the run's .env is searched for.
+    // The plan, with the unit it was built for, whose folder holds the run's .env.
     private static async Task<(RunUnit Unit, RunPlan Plan)?> PlanUnitAsync(
         Usage usage,
         ToolHost host,
@@ -653,7 +696,6 @@ internal static class DescribeCommand
         {
             // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
             manifests = await RunProjects.FromManifestAsync(
-                manifestValue,
                 Path.GetFullPath(manifestValue.Text, host.WorkingDirectory),
                 host,
                 reporter,
@@ -855,5 +897,13 @@ internal static class DescribeCommand
         Reporter reporter,
         Action<LogValue> counted,
         CancellationToken cancellationToken
-    ) => DescribeRun.RunAsync(plan, OptionsOf(usage, unit, plan, mode), host, reporter, counted, cancellationToken);
+    ) =>
+        DescribeRun.RunAsync(
+            plan,
+            OptionsOf(usage, unit, plan, mode, host),
+            host,
+            reporter,
+            counted,
+            cancellationToken
+        );
 }

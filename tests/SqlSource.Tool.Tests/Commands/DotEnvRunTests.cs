@@ -8,7 +8,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
 
-// A run takes the connection of a database from the .env file nearest to its unit when the environment has none.
+// A run takes the connection of a database from the .env file of its unit's folder, or the one --env-file names, when
+// the environment has none.
 public sealed class DotEnvRunTests : IDisposable
 {
     private const string Invoices = "-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
@@ -32,6 +33,11 @@ public sealed class DotEnvRunTests : IDisposable
     private static string NoConnectionHelp(string file) =>
         "    help: pass --connection billing=<connection string>, or set SQLSOURCE_CONNECTION_BILLING in the "
         + $"environment or in {file}";
+
+    // The same, with the sentence that says the run reads that file alone, as when no other .env was found.
+    private static string NoConnectionHelpReadingAlone(string file) =>
+        NoConnectionHelp(file)
+        + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another";
 
     [Fact]
     public async Task Run_ValueOnlyInTheDotEnvFile_DescribesAndExitsZero()
@@ -88,7 +94,7 @@ public sealed class DotEnvRunTests : IDisposable
                     + "read: a quote is not closed\n"
                     + Expected.See("SQLSRC286")
                     + $"{_invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
-                    + NoConnectionHelp(DotEnvPath)
+                    + NoConnectionHelpReadingAlone(DotEnvPath)
                     + "\n"
                     + Expected.See("SQLSRC213")
                     + DescribeScene.RunAgain
@@ -137,26 +143,39 @@ public sealed class DotEnvRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldContain("\n" + NoConnectionHelp(DotEnvPath) + "\n");
+        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(DotEnvPath) + "\n");
     }
 
-    // The file read is the nearest to the unit, up to the root of the repository.
+    // The unit's own .env is read and has no value for the database: the run still says it reads that file alone.
     [Fact]
-    public async Task Run_NoConnectionAndADotEnvFileAboveTheUnit_HelpNamesTheFileRead()
+    public async Task Run_UnitsDotEnvFileWithoutTheVariable_HelpSaysTheRunReadsThatFileAlone()
+    {
+        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_REPORTS=Host=db\n");
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(DotEnvPath) + "\n");
+    }
+
+    // A .env above the unit's folder is not read, though the folder above is the root of the repository.
+    [Fact]
+    public async Task Run_NoConnectionAndADotEnvFileAboveTheUnit_HelpNamesTheUnitsFile()
     {
         var project = Plans.Postgres(_scene.Run.Folder, directory: "repo/app").AnsweredBy(_scene.Run.Processes);
         var invoices = project.AddSql("Invoices.sql", Invoices);
         _ = _scene.Run.Folder.CreateFolder("repo/.git");
-        var read = _scene.Run.Folder.WriteFile("repo/.env", "OTHER=1\n");
+        _ = _scene.Run.Folder.WriteFile("repo/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
 
         var result = await _scene.DescribeAsync(project.ProjectPath);
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldStartWith(
             $"{invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
-                + NoConnectionHelp(read)
+                + NoConnectionHelpReadingAlone(_scene.Run.Folder.PathOf("repo/app/.env"))
                 + "\n"
         );
+        _scene.Describer.Opened.ShouldBeEmpty();
     }
 
     // A solution's run reads the .env of the solution's folder, not one of a project's own.
@@ -190,8 +209,10 @@ public sealed class DotEnvRunTests : IDisposable
         result.Error.ShouldContain(
             "\n"
                 + NoConnectionHelp(DotEnvPath)
-                + $".  The run did not read {listed}: it reads the .env nearest to {_scene.Run.Folder.Path}\n"
+                + $".  The run did not read {listed}: it reads {DotEnvPath} alone, and --env-file, or "
+                + "SqlSourceEnvFile in a build, names another\n"
         );
+        result.Error.ShouldNotContain("reads that file alone");
         _scene.Describer.Opened.ShouldBeEmpty();
     }
 
@@ -214,10 +235,117 @@ public sealed class DotEnvRunTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain(
             "    help: pass --connection reports=<connection string>, or set SQLSOURCE_CONNECTION_REPORTS in the "
-                + $"environment or in {DotEnvPath}.  The run did not read {reportsEnv}: it reads the .env nearest to "
-                + $"{_scene.Run.Folder.Path}\n"
+                + $"environment or in {DotEnvPath}.  The run did not read {reportsEnv}: it reads {DotEnvPath} alone, "
+                + "and --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain(_scene.Run.Folder.PathOf("Billing/.env"));
+        result.Error.ShouldNotContain("reads that file alone");
+    }
+
+    [Fact]
+    public async Task Run_EnvFileNamed_ReadsItAndNotTheUnitsOwn()
+    {
+        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=wrong\n");
+        var named = _scene.Run.Folder.WriteFile("other/.env.local", "SQLSOURCE_CONNECTION_BILLING=Host=right\n");
+
+        var result = await _scene.DescribeAsync("--env-file", "other/.env.local", "--verbose");
+
+        result.ExitCode.ShouldBe(0);
+        result.Error.ShouldBeEmpty();
+        result.Out.ShouldContain(
+            $"sqlsource: database 'billing' (postgres): connection from SQLSOURCE_CONNECTION_BILLING in {named}\n"
+        );
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=right");
+    }
+
+    // A relative path is from the folder the tool runs in, not from the unit's.
+    [Fact]
+    public async Task Run_EnvFileRelative_IsFromTheWorkingFolder()
+    {
+        var project = Plans.Postgres(_scene.Run.Folder, directory: "app").AnsweredBy(_scene.Run.Processes);
+        _ = project.AddSql("Invoices.sql", Invoices);
+        _ = _scene.Run.Folder.WriteFile("app/shared.env", "SQLSOURCE_CONNECTION_BILLING=Host=wrong\n");
+        _ = _scene.Run.Folder.WriteFile("shared.env", "SQLSOURCE_CONNECTION_BILLING=Host=right\n");
+
+        var result = await _scene.DescribeAsync(project.ProjectPath, "--env-file=shared.env");
+
+        result.ShouldBe(new CliResult(0, Summary, ""));
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=right");
+    }
+
+    // "none" is matched ignoring case and the white space around it.
+    [Theory]
+    [InlineData("none")]
+    [InlineData("NONE")]
+    [InlineData(" None ")]
+    public async Task Run_EnvFileNone_ReadsNoFile_AndHelpSaysSo(string none)
+    {
+        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
+
+        var result = await _scene.DescribeAsync("--env-file", none);
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "billing (postgres): 0 described, 0 skipped, 1 failed\n",
+                $"{_invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
+                    + "    help: pass --connection billing=<connection string>, or set SQLSOURCE_CONNECTION_BILLING in "
+                    + "the environment.  The run reads no .env file\n"
+                    + Expected.See("SQLSRC213")
+                    + DescribeScene.RunAgain
+            )
+        );
+        _scene.Describer.Opened.ShouldBeEmpty();
+    }
+
+    // The .env files of a solution's projects are named, without saying again that the run reads none.
+    [Fact]
+    public async Task Run_EnvFileNoneInASolutionWithDotEnvFilesInItsProjectFolders_HelpNamesTheFilesNotRead()
+    {
+        var project = Plans.Postgres(_scene.Run.Folder, "Lib", "Lib").AnsweredBy(_scene.Run.Processes);
+        _ = project.AddSql("Invoices.sql", Invoices);
+        var notRead = _scene.Run.Folder.WriteFile("Lib/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
+        _ = _scene.Run.Folder.WriteFile("All.slnx", "<Solution><Project Path=\"Lib/Lib.csproj\" /></Solution>");
+
+        var result = await _scene.DescribeAsync("All.slnx", "--env-file", "none");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain(
+            "    help: pass --connection billing=<connection string>, or set SQLSOURCE_CONNECTION_BILLING in the "
+                + $"environment.  The run reads no .env file.  The run did not read {notRead}: --env-file, or "
+                + "SqlSourceEnvFile in a build, names a file to read\n"
+        );
+        _scene.Describer.Opened.ShouldBeEmpty();
+    }
+
+    // A file that is not there is no file, as a missing .env is: the help names it, so a misspelt path is seen.
+    [Fact]
+    public async Task Run_EnvFileMissing_IsNoErrorAndHelpNamesIt()
+    {
+        var result = await _scene.DescribeAsync("--env-file", "missing/.env");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "billing (postgres): 0 described, 0 skipped, 1 failed\n",
+                $"{_invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
+                    + NoConnectionHelpReadingAlone(_scene.Run.Folder.PathOf("missing/.env"))
+                    + "\n"
+                    + Expected.See("SQLSRC213")
+                    + DescribeScene.RunAgain
+            )
+        );
+    }
+
+    [Fact]
+    public async Task Run_EnvFileDotSlashNone_ReadsTheFileNamedNone()
+    {
+        _ = _scene.Run.Folder.WriteFile("none", "SQLSOURCE_CONNECTION_BILLING=Host=from-none\n");
+
+        var result = await _scene.DescribeAsync("--env-file", "./none");
+
+        result.ShouldBe(new CliResult(0, Summary, ""));
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=from-none");
     }
 
     // The tool gives "dotnet msbuild" no variable of its own that holds a connection.

@@ -250,6 +250,27 @@ public sealed class DiagnoseTests : IDisposable
         File.Exists(_scene.PathOf("report.zip" + BundleFiles.MappingSuffix)).ShouldBeFalse();
     }
 
+    // The unit's own .env, which has an error, is not read: the connection is the named file's.
+    [Fact]
+    public async Task Diagnose_EnvFileNamed_TakesTheConnectionFromIt()
+    {
+        _ = _scene.AddCase(_scene.Case(Plain));
+        _ = _scene.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
+        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_POSTGRES=\"Host=db\n");
+        _ = _scene.Run.Folder.WriteFile("other/.env.local", $"SQLSOURCE_CONNECTION_POSTGRES={Secrets.Connection}\n");
+
+        var result = await _scene.DiagnoseAsync(
+            "--query",
+            Query,
+            "--out",
+            "report.zip",
+            "--env-file",
+            "other/.env.local"
+        );
+
+        result.ShouldBe(new CliResult(0, _scene.Written("report.zip"), ""));
+    }
+
     // A name is compared exactly, as the generator compares them.
     [Fact]
     public async Task Diagnose_ANameInAnotherCase_IsSQLSRC292()
@@ -452,6 +473,7 @@ public sealed class DiagnoseTests : IDisposable
                 "--verbose",
                 "--log",
                 "--scrub",
+                "--env-file",
             }
         )
         {
@@ -501,6 +523,10 @@ public sealed class DiagnoseTests : IDisposable
         new[] { "sqlsource: option '--scrub' takes no other option but '--out'" }
     )]
     [InlineData(
+        new[] { "diagnose", "--scrub", "raw.zip", "--out", "r.zip", "--env-file", "none" },
+        new[] { "sqlsource: option '--scrub' takes no other option but '--out'" }
+    )]
+    [InlineData(
         new[] { "diagnose", "--scrub", "raw.zip", "--query", "Q.sql:N", "--out", "r.zip" },
         new[] { "sqlsource: options '--query' and '--scrub' cannot be used together" }
     )]
@@ -527,6 +553,18 @@ public sealed class DiagnoseTests : IDisposable
     [InlineData(
         new[] { "diagnose", "--query", "Q.sql:N", "--out", "r.zip", "--log", "a=" + Secrets.Word + ".log" },
         new[] { "sqlsource: the value of option '--log' at position 7 holds '=' or ';', which a log's path may not" }
+    )]
+    [InlineData(
+        new[] { "diagnose", "--query", "Q.sql:N", "--out", "r.zip", "--env-file", " " },
+        new[] { "sqlsource: the value of option '--env-file' at position 7 is not a path" }
+    )]
+    [InlineData(
+        new[] { "diagnose", "--query", "Q.sql:N", "--out", "r.zip", "--env-file=a;" + Secrets.Word + ".env" },
+        new[]
+        {
+            "sqlsource: the value of option '--env-file' at position 6 holds '=' or ';', which a .env file's path may "
+                + "not",
+        }
     )]
     public async Task Diagnose_WrongCommandLine_IsAUsageLineThatNamesNoToken(string[] args, string[] lines)
     {
