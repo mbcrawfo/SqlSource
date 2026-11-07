@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -85,35 +86,36 @@ public sealed class SettingsFileSchemaTests
         }
     }
 
-    // On a property or its items, each anyOf is a list for completion and a pattern, which Choices and Pattern read by
-    // their places.  The anyOf of the library types' names and values and of a column type's value sit deeper, and
-    // their own tests check them.
+    // Every anyOf of the schema, found at any depth, is a list for completion and a pattern, which Choices and Pattern
+    // read by their places, but a column type's value, whose string-or-object form
+    // Schema_ColumnTypes_TakeTheObjectFormTheReaderReads checks.
     [Fact]
-    public void Schema_AnyOf_IsOnTheChoicesTheDialectAndTheParametersAlone()
+    public void Schema_EveryAnyOf_IsAChoiceListAndAPatternButAColumnTypesValue()
     {
-        var withAnyOf = Properties
-            .EnumerateObject()
-            .SelectMany(property =>
-                new[] { (Path: property.Name, Schema: property.Value) }.Concat(
-                    property.Value.TryGetProperty("items", out var items)
-                        ? [(Path: property.Name + "/items", Schema: items)]
-                        : []
-                )
-            )
-            .Where(place => place.Schema.TryGetProperty("anyOf", out _))
-            .ToArray();
+        const string ColumnTypeValue = "properties/columnTypes/additionalProperties";
+        using var schema = JsonDocument.Parse(SchemaText);
+        var found = new List<(string Path, JsonElement AnyOf)>();
+        CollectAnyOf(schema.RootElement, "", found);
 
-        withAnyOf
+        found
             .Select(place => place.Path)
             .ShouldBe(
                 [
-                    .. ChoiceKeys.Select(row => row.Data.Item1),
-                    SettingsFileKeys.Dialect,
-                    SettingsFileKeys.GeneratorParameters + "/items",
+                    .. ChoiceKeys.Select(row => "properties/" + row.Data.Item1),
+                    "properties/" + SettingsFileKeys.Dialect,
+                    "properties/" + SettingsFileKeys.GeneratorParameters + "/items",
+                    "properties/libraryTypes/propertyNames",
+                    "properties/libraryTypes/additionalProperties",
+                    ColumnTypeValue,
                 ],
                 ignoreOrder: true
             );
-        withAnyOf.ShouldAllBe(place => place.Schema.GetProperty("anyOf").GetArrayLength() == 2);
+        found.ShouldAllBe(place => place.AnyOf.GetArrayLength() == 2);
+        foreach (var (path, anyOf) in found.Where(place => place.Path != ColumnTypeValue))
+        {
+            anyOf[0].TryGetProperty("enum", out _).ShouldBeTrue(path);
+            anyOf[1].TryGetProperty("pattern", out _).ShouldBeTrue(path);
+        }
     }
 
     [Theory]
@@ -521,6 +523,49 @@ public sealed class SettingsFileSchemaTests
     {
         Errors(text).ShouldNotBeEmpty();
         SettingsFileReader.Read(text, TestPlaces.SettingsFile).Errors.ShouldNotBeEmpty();
+    }
+
+    // The path and the array of each anyOf in the element, whatever its depth.
+    private static void CollectAnyOf(JsonElement element, string path, List<(string Path, JsonElement AnyOf)> found)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var member in element.EnumerateObject())
+                {
+                    var memberPath = path.Length == 0 ? member.Name : path + "/" + member.Name;
+                    if (member.Name == "anyOf")
+                    {
+                        found.Add((path, member.Value));
+                    }
+
+                    CollectAnyOf(member.Value, memberPath, found);
+                }
+
+                break;
+            case JsonValueKind.Array:
+                var index = 0;
+                foreach (var item in element.EnumerateArray())
+                {
+                    CollectAnyOf(item, path + "/" + index++, found);
+                }
+
+                break;
+            case JsonValueKind.Undefined:
+                break;
+            case JsonValueKind.String:
+                break;
+            case JsonValueKind.Number:
+                break;
+            case JsonValueKind.True:
+                break;
+            case JsonValueKind.False:
+                break;
+            case JsonValueKind.Null:
+                break;
+            default:
+                break;
+        }
     }
 
     private static JsonElement ReadProperties()
