@@ -154,7 +154,7 @@ internal sealed class SqlServerScript
 
     // "parameters" answering that the statement has none, then "columns" of the statement, for a test of its columns.
     public SqlServerScript NoParametersThenColumns(string sql, SqlServerColumnsAnswer answer) =>
-        Parameters(new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
+        Parameters(new SqlServerParametersRequest(sql, null, null), new SqlServerParametersAnswer([], null))
             .Columns(new SqlServerColumnsRequest(sql, null), answer);
 
     // A capture of the one call "open", answered as the test gives, for a test of what the session makes of it.

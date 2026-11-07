@@ -47,7 +47,7 @@ internal sealed class PostgresRenaming : IEngineRenaming
     public bool IsEngineRow(string method, string path, JsonObject row) => PostgresFieldRules.IsEngineRow(row);
 
     /// <summary>None: PostgreSQL's pipeline makes no copy of a parameter.</summary>
-    public (string Parameter, string Suffix)? CopyOf(string name, IReadOnlySet<string> queryParameters) => null;
+    public IEnumerable<ParameterCopy> CopiesIn(string method, JsonObject call) => [];
 
     /// <summary>The names of an <c>explain</c> call's plan; no other call has a name only the engine finds.</summary>
     public void Register(RenamingCall call, IRenamingScope scope)

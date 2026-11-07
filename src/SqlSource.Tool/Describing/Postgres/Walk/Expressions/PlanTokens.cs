@@ -27,6 +27,19 @@ internal static class PlanTokens
 
     internal readonly record struct Token(Kind Kind, int Start, int End);
 
+    // The name a word or a quoted name holds, unquoted, or null for any other token.
+    public static string? NameOf(string entry, Token token)
+    {
+        if (token.Kind == Kind.Word)
+        {
+            return entry[token.Start..token.End];
+        }
+
+        return token.Kind == Kind.QuotedName
+            ? PostgresIdentifiers.Unquote(entry.AsSpan(token.Start, token.End - token.Start))
+            : null;
+    }
+
     // The entry as tokens, or null when a quote does not close or a parenthesis or a bracket does not balance.  A
     // string is '...' with '' for a quote, and a quoted name "..." with "" for a quote; a space only separates.
     public static List<Token>? Read(string entry)
@@ -56,11 +69,7 @@ internal static class PlanTokens
             }
             else if (PostgresIdentifiers.IsWordStart(character))
             {
-                while (at < entry.Length && PostgresIdentifiers.IsWordPart(entry[at]))
-                {
-                    at++;
-                }
-
+                at = PostgresIdentifiers.WordEnd(entry, at);
                 kind = Kind.Word;
             }
             else if (char.IsAsciiDigit(character))

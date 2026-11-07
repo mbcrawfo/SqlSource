@@ -175,4 +175,17 @@ public sealed class TsqlTokensTests
     [Fact]
     public void Is_QuotedName_IsNoWord() =>
         new TsqlToken(TsqlTokenKind.QuotedName, "[SELECT]", 0, 8).Is("[SELECT]").ShouldBeFalse();
+
+    [Theory]
+    [InlineData(true, "42", true)]
+    [InlineData(true, "4.2", false)]
+    [InlineData(true, "1e3", false)]
+    [InlineData(true, "0x1F", false)]
+    [InlineData(false, "abc", false)]
+    public void IsInteger_OfDigitsADecimalAndAWord_IsTrueOnlyForDigits(bool isNumber, string text, bool expected)
+    {
+        var kind = isNumber ? TsqlTokenKind.Number : TsqlTokenKind.Word;
+
+        new TsqlToken(kind, text, 0, text.Length).IsInteger.ShouldBe(expected);
+    }
 }

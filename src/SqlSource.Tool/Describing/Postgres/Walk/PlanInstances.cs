@@ -81,7 +81,27 @@ internal sealed record PlanInstance(
     IReadOnlyList<long> Parents,
     IReadOnlyList<PostgresRelationName> Members,
     PlanNode? Child
-);
+)
+{
+    /// <summary>
+    /// A <see cref="InstanceKind.Relation" /> instance, of the relation the plan names, when it does.
+    /// </summary>
+    public static PlanInstance OfRelation(bool nullExtended, string? schema, string? relation) =>
+        new(InstanceKind.Relation, nullExtended, schema, relation, [], [], null);
+
+    /// <summary>A <see cref="InstanceKind.Partitioned" /> instance, of its parents and its members.</summary>
+    public static PlanInstance OfPartitionedTable(
+        bool nullExtended,
+        IReadOnlyList<long> parents,
+        IReadOnlyList<PostgresRelationName> members
+    ) => new(InstanceKind.Partitioned, nullExtended, null, null, parents, members, null);
+
+    /// <summary>
+    /// A <see cref="InstanceKind.Plan" /> instance, of the root of the plan it scans, when it can be told.
+    /// </summary>
+    public static PlanInstance OfPlan(bool nullExtended, PlanNode? child) =>
+        new(InstanceKind.Plan, nullExtended, null, null, [], [], child);
+}
 
 /// <summary>
 /// The relation instances of a plan, each by its alias, and whether a join on the path from the root to it
@@ -301,14 +321,10 @@ internal sealed class PlanInstances
                 partitioned.Alias,
                 node,
                 depth,
-                new PlanInstance(
-                    InstanceKind.Partitioned,
+                PlanInstance.OfPartitionedTable(
                     extended,
-                    null,
-                    null,
                     partitioned.Parents,
-                    node.SubplansRemoved == 0 ? PlanPartitions.RelationsOf(node) : [],
-                    null
+                    node.SubplansRemoved == 0 ? PlanPartitions.RelationsOf(node) : []
                 )
             );
         }
@@ -318,16 +334,11 @@ internal sealed class PlanInstances
         }
         else if (node.Alias is { } alias && NamesARelation(node, depth == 0))
         {
-            Add(
-                alias,
-                node,
-                depth,
-                new PlanInstance(InstanceKind.Relation, extended, node.Schema, node.RelationName, [], [], null)
-            );
+            Add(alias, node, depth, PlanInstance.OfRelation(extended, node.Schema, node.RelationName));
         }
         else if (node.Alias is { } scan && node.NodeType is PlanNodeTypes.SubqueryScan or PlanNodeTypes.CteScan)
         {
-            Add(scan, node, depth, new PlanInstance(InstanceKind.Plan, extended, null, null, [], [], ChildOf(node)));
+            Add(scan, node, depth, PlanInstance.OfPlan(extended, ChildOf(node)));
         }
 
         foreach (var child in node.JoinChildren)

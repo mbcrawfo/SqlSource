@@ -220,20 +220,14 @@ internal static partial class NullabilityWalk
 
     private static WalkedColumn Kept(SidecarColumn column, string? entry) => new(column, entry, null, false, false);
 
+    // A column the walk answered without mapping a reference: an expression's, or a set operation's from its inputs.
+    private static WalkedColumn Answered(SidecarColumn column, bool nullable, string source, string? entry) =>
+        new(column with { Nullable = nullable, NullableSource = source }, entry, null, false, false);
+
     // A column of no origin: the answer of its entry as an expression, or what it was built with.
     private static WalkedColumn ExpressionOf(SidecarColumn column, string entry, long type, Expressions? expressions) =>
         expressions?.NullableOf(entry, type) is { } nullable
-            ? new WalkedColumn(
-                column with
-                {
-                    Nullable = nullable,
-                    NullableSource = SidecarValues.NullableSource.Expression,
-                },
-                entry,
-                null,
-                false,
-                false
-            )
+            ? Answered(column, nullable, SidecarValues.NullableSource.Expression, entry)
             : Kept(column, entry);
 
     // Whether every reference the walk can map names the column the row description gives as its origin: a guard that
@@ -251,7 +245,8 @@ internal static partial class NullabilityWalk
         for (var index = 0; index < origins.Count; index++)
         {
             if (
-                origins[index] is { Table.Relkind: "r" or "p" } origin
+                origins[index] is { } origin
+                && ColumnNullability.IsTable(origin.Table)
                 && OutputReference.Parse(entries[index]) is { } reference
                 && (
                     reference.Alias is { } alias
@@ -281,17 +276,9 @@ internal static partial class NullabilityWalk
     )
     {
         var reference = OutputReference.Parse(entry);
-        var instance = reference switch
-        {
-            null => null,
-            { Alias: { } alias } => (onlyAlias is null || string.Equals(alias, onlyAlias, StringComparison.Ordinal))
-            && instances.TryFind(alias, out var named)
-                ? named
-                : null,
-
-            // A bare name is a column of the plan's one relation, which no join extends.
-            _ => instances.BareAlias is { } bare && instances.TryFind(bare, out var only) ? only : null,
-        };
+        var instance = reference is null
+            ? null
+            : plans.InstanceOf(reference, instances, onlyAlias, BareNames.OfTheOneRelation)?.Instance;
 
         var resolved = instance switch
         {
@@ -341,6 +328,19 @@ internal static partial class NullabilityWalk
         Extended,
     }
 
+    // Which instance a bare name of an entry names, by the caller's rule (Plans.InstanceOf).
+    private enum BareNames
+    {
+        // None: a bare name is never resolved.
+        Refused,
+
+        // The plan's one relation's (PlanInstances.BareAlias).
+        OfTheOneRelation,
+
+        // The plan's one relation's, unless the statement may name OLD or NEW.
+        OfTheOneRelationUnlessOldOrNew,
+    }
+
     // The plans of a walk, with what the walk is asked: the root's, and the plan of each scan of another plan, each
     // walked as a plan of its own.
     // A column through a scan is resolved by its origin, as the class's remarks say.  A column with an origin is a
@@ -365,6 +365,47 @@ internal static partial class NullabilityWalk
         // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
         public string? OnlyAliasOf(PlanNode root) =>
             scope.OldAndNewMayBeNamed && root.NodeType == PlanNodeTypes.ModifyTable ? root.Alias ?? string.Empty : null;
+
+        /// <summary>
+        /// The instance an entry's reference names, with the alias that names it: a qualified one's alias, when it is
+        /// the one alias the plan's root allows (<see cref="OnlyAliasOf" />) or there is none; and a bare one's by
+        /// the rule of the caller.
+        /// </summary>
+        /// <remarks>
+        /// The rules differ by what each caller reads, and each keeps the answers it has always given.  In a scanned
+        /// plan a bare name is never resolved (<see cref="BareNames.Refused" />).  A column with an origin maps one to
+        /// the plan's one relation, at a root <c>ModifyTable</c> its target, even in a statement that may name
+        /// <c>OLD</c> or <c>NEW</c>, since PostgreSQL 18 prints the old and the new row qualified, <c>old.id</c> and
+        /// <c>new.id</c>, as <c>DescribeAsync_ReturningOldAndNew_KeepsTheHeuristic</c> of <c>ColumnTests</c> pins.
+        /// An expression refuses a bare name in such a statement, a stricter rule kept as it is: a single-target
+        /// <c>UPDATE</c> or <c>DELETE</c> prints bare names on every major, and the statement is told by a word of
+        /// its SQL on every major, so changing either rule would change answers on 14 to 18.  A bare name of
+        /// <see cref="BareNames.OfTheOneRelation" /> is not held to the one alias, as it never was.
+        /// </remarks>
+        public (string Alias, PlanInstance Instance)? InstanceOf(
+            OutputReference reference,
+            PlanInstances instances,
+            string? onlyAlias,
+            BareNames bareNames
+        )
+        {
+            var alias =
+                reference.Alias
+                ?? bareNames switch
+                {
+                    BareNames.Refused => null,
+                    BareNames.OfTheOneRelation => instances.BareAlias,
+                    BareNames.OfTheOneRelationUnlessOldOrNew => scope.OldAndNewMayBeNamed ? null : instances.BareAlias,
+                    _ => throw UnexpectedEnumValueException.Of(bareNames),
+                };
+            var held = reference.Alias is not null || bareNames != BareNames.OfTheOneRelation;
+            return
+                alias is not null
+                && (!held || onlyAlias is null || string.Equals(alias, onlyAlias, StringComparison.Ordinal))
+                && instances.TryFind(alias, out var instance)
+                ? (alias, instance)
+                : null;
+        }
 
         // The column of the origin in the plan of the child, as the entries of its root's Output that it can be say.
         public Resolution Resolve(PlanNode? child, ColumnOrigin origin, int depth)
@@ -398,16 +439,12 @@ internal static partial class NullabilityWalk
                     continue;
                 }
 
-                if (
-                    reference.Alias is not { } alias
-                    || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
-                    || !instances.TryFind(alias, out var instance)
-                )
+                if (InstanceOf(reference, instances, onlyAlias, BareNames.Refused) is not { } named)
                 {
                     return Resolution.Unknown;
                 }
 
-                found = Combine(found, Candidate(instance, reference, origin, depth));
+                found = Combine(found, Candidate(named.Instance, reference, origin, depth));
                 if (found == Resolution.Unknown)
                 {
                     return found;

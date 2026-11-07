@@ -173,22 +173,23 @@ internal static partial class NullabilityWalk
 
         // The type of the entry of the node's Output, read where it is computed (ComputedAt), when every reading
         // proves it of one type.
-        private long? ProvedTypeAt(PlanNode node, string entry, ExpressionContext context)
-        {
-            if (ComputedAt(node, entry, context, 0) is not { } readings)
-            {
-                return null;
-            }
+        private long? ProvedTypeAt(PlanNode node, string entry, ExpressionContext context) =>
+            ComputedAt(node, entry, context, 0) is { } readings
+                ? OneTypeOf(readings, static reading => PlanExpression.ProvedTypeOf(reading.Entry, reading.Context))
+                : null;
 
+        // The one type every item proves, or null when one proves none, two prove different types, or there is none.
+        private static long? OneTypeOf<T>(List<T> items, Func<T, long?> typeOf)
+        {
             long? type = null;
-            foreach (var (computed, at) in readings)
+            foreach (var item in items)
             {
-                if (PlanExpression.ProvedTypeOf(computed, at) is not { } read || (type is { } seen && seen != read))
+                if (typeOf(item) is not { } proved || (type is { } seen && seen != proved))
                 {
                     return null;
                 }
 
-                type = read;
+                type = proved;
             }
 
             return type;
@@ -364,38 +365,12 @@ internal static partial class NullabilityWalk
 
         // The alias a reference names and its instance: a bare name is the plan's one relation's, unless the
         // statement may name OLD or NEW, and only the plan's one alias where it has one.
-        private (string Alias, PlanInstance Instance)? InstanceOf(OutputReference reference)
-        {
-            var alias = reference.Alias ?? (_scope.OldAndNewMayBeNamed ? null : instances.BareAlias);
-            return
-                alias is not null
-                && (onlyAlias is null || string.Equals(alias, onlyAlias, StringComparison.Ordinal))
-                && instances.TryFind(alias, out var instance)
-                ? (alias, instance)
-                : null;
-        }
+        private (string Alias, PlanInstance Instance)? InstanceOf(OutputReference reference) =>
+            plans.InstanceOf(reference, instances, onlyAlias, BareNames.OfTheOneRelationUnlessOldOrNew);
 
         // The type of the column of the name through the instance's rows, when each proves it, all of one type.
-        private long? ProvedTypeThrough(PlanInstance instance, string column)
-        {
-            if (RowsOf(instance) is not [_, ..] rows)
-            {
-                return null;
-            }
-
-            long? type = null;
-            foreach (var row in rows)
-            {
-                if (ProvedTypeIn(row, column) is not { } own || (type is { } seen && seen != own))
-                {
-                    return null;
-                }
-
-                type = own;
-            }
-
-            return type;
-        }
+        private long? ProvedTypeThrough(PlanInstance instance, string column) =>
+            OneTypeOf(RowsOf(instance), row => ProvedTypeIn(row, column));
 
         // The type of the column of the name in the table's row, when the catalog's rule proves it not NULL.
         private static long? ProvedTypeIn(PostgresTableRow table, string column)

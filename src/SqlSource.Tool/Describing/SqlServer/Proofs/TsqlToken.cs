@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 
@@ -47,6 +48,12 @@ internal readonly record struct TsqlToken(TsqlTokenKind Kind, string Text, int S
     /// start with <c>@</c>, which <c>@@ROWCOUNT</c> does.
     /// </summary>
     public bool IsName => Kind == TsqlTokenKind.QuotedName || (Kind == TsqlTokenKind.Word && Text[0] != '@');
+
+    /// <summary>
+    /// True for a <see cref="TsqlTokenKind.Number" /> of ASCII digits alone: not <c>4.2</c>, <c>1e3</c> or
+    /// <c>0x1F</c>.
+    /// </summary>
+    public bool IsInteger => Kind == TsqlTokenKind.Number && Text.All(char.IsAsciiDigit);
 
     /// <summary>
     /// The name this token writes, without its quotes, or null for a token that writes no name.  A word is itself,

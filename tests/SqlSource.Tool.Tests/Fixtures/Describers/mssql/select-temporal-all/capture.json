@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT id, amount FROM dbo.prices FOR SYSTEM_TIME ALL WHERE id = @id;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

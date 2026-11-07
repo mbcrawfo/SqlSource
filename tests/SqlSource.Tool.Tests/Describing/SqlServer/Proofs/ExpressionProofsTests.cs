@@ -284,6 +284,47 @@ public sealed class ExpressionProofsTests
         asked.ShouldBe(operands);
     }
 
+    // Every form, one of each of its names, through both readings: alone, the proof of the form, and inside
+    // COALESCE(..., 0), the proof of its type.  With every operand answered not null and of no CLR type, each proves
+    // both ways; with every operand of a CLR type, the form inside COALESCE proves only when its type is fixed.
+    [Theory]
+    [InlineData("COUNT(t.a)", "", true)]
+    [InlineData("COUNT_BIG(t.a)", "", true)]
+    [InlineData("ROW_NUMBER() OVER ()", "", true)]
+    [InlineData("RANK() OVER ()", "", true)]
+    [InlineData("DENSE_RANK() OVER ()", "", true)]
+    [InlineData("NTILE(2) OVER ()", "", true)]
+    [InlineData("SUM(t.a)", "GROUP BY t.b", true)]
+    [InlineData("MAX(t.a)", "GROUP BY t.b", false)]
+    [InlineData("MIN(t.a)", "GROUP BY t.b", false)]
+    [InlineData("COALESCE(t.a, 0)", "", false)]
+    [InlineData("GREATEST(t.a, 0)", "", false)]
+    [InlineData("LEAST(t.a, 0)", "", false)]
+    [InlineData("CAST(t.a AS int)", "", true)]
+    [InlineData("CONVERT(int, t.a)", "", true)]
+    [InlineData("JSON_OBJECT('a': t.a)", "", true)]
+    [InlineData("JSON_ARRAY(t.a)", "", true)]
+    public void Of_EveryForm_ProvedByBothReadings(string form, string tail, bool typeFixed)
+    {
+        foreach (var item in (string[])[form, $"COALESCE({form}, 0)"])
+        {
+            var (_, _, proofs, body) = Read($"SELECT {item} AS c FROM t AS t {tail}");
+            var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+            var count = proofs.Operands.Count;
+            proof
+                .Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: true), count)])
+                .ShouldBeTrue(item);
+        }
+
+        var (_, _, typed, typedBody) = Read($"SELECT COALESCE({form}, 0) AS c FROM t AS t {tail}");
+        var typeProof = typed.Of(typedBody.Items.ShouldHaveSingleItem().Expression);
+
+        typeProof
+            .Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: false), typed.Operands.Count)])
+            .ShouldBe(typeFixed);
+    }
+
     // A string converted to a CLR type may be its Null: with every operand answered not null but of a CLR type, none
     // of these is proved, and each is with every operand of no CLR type.
     [Theory]

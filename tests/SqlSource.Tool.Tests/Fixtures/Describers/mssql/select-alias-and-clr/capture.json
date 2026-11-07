@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT id, dbo_email_value, hierarchyid_value\nFROM dbo.all_types\nWHERE dbo_email_value = @email AND hierarchyid_value = @node;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [

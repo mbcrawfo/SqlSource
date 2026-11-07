@@ -1,0 +1,115 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null,
+        "database": "fixtures"
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "UPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @since_1 OR deleted_at < @since_2 OR created_at > @since__1 OR deleted_at > @since__2;",
+        "params": null,
+        "reused": [
+          {
+            "name": "since",
+            "copies": [
+              "since_1",
+              "since_2"
+            ]
+          },
+          {
+            "name": "since_",
+            "copies": [
+              "since__1",
+              "since__2"
+            ]
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "name": "@since_1",
+            "suggestedSystemTypeName": "datetime2(7)",
+            "suggestedMaxLength": 8,
+            "suggestedPrecision": 27,
+            "suggestedScale": 7,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@since_2",
+            "suggestedSystemTypeName": "datetime2(7)",
+            "suggestedMaxLength": 8,
+            "suggestedPrecision": 27,
+            "suggestedScale": 7,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@since__1",
+            "suggestedSystemTypeName": "datetime2(7)",
+            "suggestedMaxLength": 8,
+            "suggestedPrecision": 27,
+            "suggestedScale": 7,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@since__2",
+            "suggestedSystemTypeName": "datetime2(7)",
+            "suggestedMaxLength": 8,
+            "suggestedPrecision": 27,
+            "suggestedScale": 7,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "UPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @since OR deleted_at < @since OR created_at > @since_ OR deleted_at > @since_;",
+        "params": "@since datetime2(7), @since_ datetime2(7)"
+      },
+      "answer": {
+        "rows": [],
+        "errors": null,
+        "error": null
+      }
+    }
+  ]
+}

@@ -73,17 +73,17 @@ internal interface IEngineRenaming
     bool IsEngineRow(string method, string path, JsonObject row);
 
     /// <summary>
-    /// A copy of a reused parameter that the pipeline made, such as SQL Server's <c>before_1</c> of <c>before</c>, as
-    /// the parameter it copies and the text after it.  Asked for every parameter name that is not one of the query's;
-    /// the renaming writes the renamed parameter and the suffix as given.
+    /// The copies of reused parameters that one call records, such as SQL Server's <c>before_1</c> of <c>before</c>,
+    /// read from the call alone: each copy's name, the parameter it copies and the suffix of the copy that the
+    /// pipeline makes of the renamed parameter.  Asked of every call, as captured and as renamed; the renaming writes
+    /// a copy as the renamed parameter and the suffix, and the token check passes one so spelled.
     /// </summary>
-    /// <param name="name">The name, without its prefix.</param>
-    /// <param name="queryParameters">The query's parameters, without their prefix.</param>
+    /// <param name="method">The call's method.</param>
+    /// <param name="call">The call, with its <c>request</c> and <c>answer</c>.</param>
     /// <returns>
-    /// The parameter, which must be one of <paramref name="queryParameters" />, and the suffix, which must hold nothing
-    /// of the user's; or null when the name is no copy the engine's pipeline makes.
+    /// The copies, each of whose suffixes holds nothing of the user's; none for a call that records none.
     /// </returns>
-    (string Parameter, string Suffix)? CopyOf(string name, IReadOnlySet<string> queryParameters);
+    IEnumerable<ParameterCopy> CopiesIn(string method, JsonObject call);
 
     /// <summary>
     /// Registers the names that only the engine finds, before the query's SQL is renamed and after the catalog fields

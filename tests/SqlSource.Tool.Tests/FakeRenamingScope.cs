@@ -10,7 +10,8 @@ namespace SqlSource.Tool.Tests;
 /// recorded.
 /// </summary>
 /// <remarks>
-/// A spelling kept through <see cref="Keep" />, or one that <c>isEngineWord</c> says is the engine's, is its own.
+/// A spelling kept through <see cref="Keep" />, or one that <c>isEngineWord</c> says is the engine's, is its own, and
+/// no parameter's name is a copy.
 /// Spellings are compared as given, each with its quoting, or as <c>fold</c> folds them when it is given, and a name
 /// is then the prefix and the folded spelling.  SQL is renamed word by word through <see cref="Name" />, unquoted and
 /// in the class given: a word is a letter or an underscore and the letters, digits and underscores after it.
@@ -80,6 +81,8 @@ internal sealed class FakeRenamingScope(
     }
 
     public string Parameter(string name) => NameClasses.PrefixOf(NameClass.Parameter) + name;
+
+    public string ParameterOf(string name) => name;
 
     public void Refuse(RenamingRefusal refusal) => Refusals.Add(refusal);
 

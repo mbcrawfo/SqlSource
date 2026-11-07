@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT o.id, o.user_id, o.total, o.note\nFROM dbo.users AS u\nLEFT JOIN dbo.orders AS o ON o.user_id = u.id;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [],

@@ -12,9 +12,9 @@ namespace SqlSource.Tool.Tests;
 
 /// <summary>
 /// The engine part of the renaming for <see cref="FakeDescriber" />: PostgreSQL's lexer and word rule, or SQL Server's
-/// for a test of brackets and prefixes, a small vocabulary, a copy of a reused parameter as
-/// <c>&lt;name&gt;_&lt;n&gt;</c>, and the rule of every member of <c>FakeDescriberCalls.cs</c>' <c>open</c> and
-/// <c>describe</c> and of the entry's PostgreSQL types.
+/// for a test of brackets and prefixes, a small vocabulary, the copies of reused parameters that a request records
+/// under <c>copies</c>, as <see cref="Copies" /> writes them, and the rule of every member of
+/// <c>FakeDescriberCalls.cs</c>' <c>open</c> and <c>describe</c> and of the entry's PostgreSQL types.
 /// </summary>
 /// <remarks>
 /// A row of <c>pg_catalog</c> is the engine's.  A setting's value and a server's line are its own strings, renamed as
@@ -91,6 +91,9 @@ internal sealed class FakeEngineRenaming(
             ["describe request.sql"] = FieldRule.Sql,
             ["describe request.parameters[].name"] = FieldRule.Parameter,
             ["describe request.parameters[].type"] = FieldRule.TypeSpelling,
+            ["describe request.copies[].name"] = FieldRule.Parameter,
+            ["describe request.copies[].parameter"] = FieldRule.Parameter,
+            ["describe request.copies[].suffix"] = FieldRule.Fixed,
             ["describe answer.description.resultKind"] = FieldRule.Closed,
             ["describe answer.description.parameters[].name"] = FieldRule.Parameter,
             ["describe answer.description.parameters[].typeSource"] = FieldRule.Fixed,
@@ -158,21 +161,31 @@ internal sealed class FakeEngineRenaming(
         && schema.TryGetValue<string>(out var name)
         && string.Equals(name, "pg_catalog", StringComparison.Ordinal);
 
-    public (string Parameter, string Suffix)? CopyOf(string name, IReadOnlySet<string> queryParameters)
-    {
-        var separator = name.LastIndexOf('_');
-        if (
-            separator <= 0
-            || separator == name.Length - 1
-            || !name[(separator + 1)..].All(char.IsAsciiDigit)
-            || !queryParameters.Contains(name[..separator])
-        )
-        {
-            return null;
-        }
+    // The copies a call's request records under copies, as Copies writes them.
+    public IEnumerable<ParameterCopy> CopiesIn(string method, JsonObject call) =>
+        call["request"]?["copies"] is JsonArray copies
+            ? copies
+                .OfType<JsonObject>()
+                .Select(static copy => new ParameterCopy(
+                    copy["name"]!.GetValue<string>(),
+                    copy["parameter"]!.GetValue<string>(),
+                    copy["suffix"]!.GetValue<string>()
+                ))
+            : [];
 
-        return (name[..separator], name[separator..]);
-    }
+    /// <summary>
+    /// The copies of reused parameters as a request of <c>describe</c> records them for <see cref="CopiesIn" />, each
+    /// copy's name, the parameter it copies and its suffix.
+    /// </summary>
+    public static JsonArray Copies(params (string Name, string Parameter, string Suffix)[] copies) =>
+        [
+            .. copies.Select(static copy => new JsonObject
+            {
+                ["name"] = copy.Name,
+                ["parameter"] = copy.Parameter,
+                ["suffix"] = copy.Suffix,
+            }),
+        ];
 
     public void Register(RenamingCall call, IRenamingScope scope) { }
 

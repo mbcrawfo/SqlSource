@@ -44,7 +44,7 @@ internal static class ColumnNullability
             { Table.Relkind: "f" } => (null, SidecarValues.NullableSource.ForeignTable),
             _ when gated => (true, SidecarValues.NullableSource.Heuristic),
 
-            { Table: { Relkind: "r" or "p" } table } when !KeepsNotNull(table) => (
+            { Table: var table } when IsTable(table) && !KeepsNotNull(table) => (
                 true,
                 SidecarValues.NullableSource.Catalog
             ),
@@ -61,11 +61,17 @@ internal static class ColumnNullability
     /// the <c>RETURNING</c> rows of an <c>INSTEAD</c> rule are its action's.  False for any other kind of relation.
     /// </summary>
     public static bool KeepsNotNull(PostgresTableRow table) =>
-        table
-            is { Relkind: "r" or "p" }
-                and not (
-                    { Relkind: "r", Relhassubclass: true }
-                    or { Relkind: "p", HasForeignPartition: true }
-                    or { HasInsteadRule: true }
-                );
+        IsTable(table)
+        && table
+            is not (
+                { Relkind: "r", Relhassubclass: true }
+                or { Relkind: "p", HasForeignPartition: true }
+                or { HasInsteadRule: true }
+            );
+
+    /// <summary>
+    /// Whether the relation is a table or a partitioned table: the relations a column's <c>NOT NULL</c> is read of.
+    /// </summary>
+    /// <param name="table">The relation's row.</param>
+    public static bool IsTable(PostgresTableRow table) => table.Relkind is "r" or "p";
 }

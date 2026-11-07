@@ -522,7 +522,7 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         var live = new SqlServerLive(session.Connection);
 
         var answer = await live.ParametersAsync(
-            new SqlServerParametersRequest("SELECT id FROM dbo.users WHERE id = @p", $"@p int; {DropVictim}"),
+            new SqlServerParametersRequest("SELECT id FROM dbo.users WHERE id = @p", $"@p int; {DropVictim}", null),
             token
         );
 

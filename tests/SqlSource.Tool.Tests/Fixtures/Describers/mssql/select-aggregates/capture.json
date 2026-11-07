@@ -35,7 +35,8 @@
       "method": "parameters",
       "request": {
         "sql": "SELECT user_id, COUNT(*) AS order_count, MAX(total) AS max_total\nFROM dbo.orders\nGROUP BY user_id;",
-        "params": null
+        "params": null,
+        "reused": null
       },
       "answer": {
         "rows": [],

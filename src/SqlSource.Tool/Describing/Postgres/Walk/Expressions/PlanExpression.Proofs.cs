@@ -87,13 +87,14 @@ internal static partial class PlanExpression
                     return _context.ScalarSubPlanTypeOf?.Invoke(scalar.Name);
                 }
 
-                var outside = EnterGroup(from, to);
-                var proved =
-                    OperatorAt(from + 1, to - 1) is null && !IsWord(from + 1, "ANY")
-                        ? Proved(from + 1, to - 1)
-                        : CatalogForm(from, to);
-                _groupsHaveRows = outside;
-                return proved;
+                return InGroup(
+                    from,
+                    to,
+                    () =>
+                        OperatorAt(from + 1, to - 1) is null && !IsWord(from + 1, "ANY")
+                            ? Proved(from + 1, to - 1)
+                            : CatalogForm(from, to)
+                );
             }
 
             if (Constant(from, to) == false || IsCountOrRanking(from, to) || IsCatalogsCount(from, to))
@@ -139,7 +140,7 @@ internal static partial class PlanExpression
         {
             var sides = FullJoinSides(from, to);
             return sides is not null || AnyArgumentIsNotNull(from, to)
-                ? CommonType(ArgumentSpans(from, to), sides ?? [])
+                ? CommonType(ArgumentSpans(from, to, emptyHasOne: true), sides ?? [])
                 : null;
         }
 

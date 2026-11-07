@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,7 +19,7 @@ namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
 /// <remarks>
 /// A name folds ignoring case whatever the database's collation, which no member is given.  SQL Server has no plan
 /// and the describer asks no list in name order, so it registers and derives nothing: the tool's <c>AS [1]</c> is
-/// kept as its word, and a copy of a reused parameter comes through <see cref="CopyOf" />.
+/// kept as its word, and a copy of a reused parameter comes through <see cref="CopiesIn" />.
 /// </remarks>
 internal sealed class SqlServerRenaming : IEngineRenaming
 {
@@ -107,49 +108,49 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     }
 
     /// <summary>
-    /// A copy that <c>ParameterCopies</c> makes, <c>&lt;parameter&gt;&lt;one or more _&gt;&lt;digits&gt;</c>, as the
-    /// parameter and <c>_</c> with the digits: the renamed query's copies need one <c>_</c>, since a renamed name is
-    /// its class's prefix and hex digits.  The shortest parameter that the query holds is taken.
+    /// The copies that a <c>parameters</c> request records in <c>reused</c>: each copy of an entry is a copy of the
+    /// entry's parameter, whose suffix is <c>_</c> and the copy's position among the entry's copies, from one, since
+    /// that is what <c>ParameterCopies</c> makes from the renamed query, whose names a cut or a longer separator never
+    /// needs.  Any other call and a request with no <c>reused</c> record none, nor does an entry with a member of
+    /// another JSON kind.
     /// </summary>
-    /// <remarks>
-    /// A copy whose parameter's part was cut to fit is not read back, and a copy of a parameter whose name ends in
-    /// <c>_</c> can be read back as another's, which the proof refuses: TD-0104.
-    /// </remarks>
-    public (string Parameter, string Suffix)? CopyOf(string name, IReadOnlySet<string> queryParameters)
+    public IEnumerable<ParameterCopy> CopiesIn(string method, JsonObject call)
     {
-        var digits = name.Length;
-        while (digits > 0 && char.IsAsciiDigit(name[digits - 1]))
+        if (
+            method != SqlServerCallNames.Parameters
+            || call[CaptureRenamer.Request] is not JsonObject request
+            || request["reused"] is not JsonArray reused
+        )
         {
-            digits--;
+            yield break;
         }
 
-        if (digits == name.Length)
+        foreach (var entry in reused)
         {
-            return null;
-        }
-
-        var stem = digits;
-        while (stem > 0 && name[stem - 1] == '_')
-        {
-            stem--;
-        }
-
-        for (var end = stem; end < digits; end++)
-        {
-            var parameter = name[..end];
-            if (parameter.Length > 0 && queryParameters.Contains(parameter))
+            if (
+                entry is not JsonObject found
+                || StringOf(found, "name") is not { } parameter
+                || found["copies"] is not JsonArray copies
+                || !copies.All(static copy => copy is JsonValue value && value.GetValueKind() == JsonValueKind.String)
+            )
             {
-                return (parameter, "_" + name[digits..]);
+                continue;
+            }
+
+            for (var index = 0; index < copies.Count; index++)
+            {
+                yield return new ParameterCopy(
+                    copies[index]!.GetValue<string>(),
+                    parameter,
+                    "_" + (index + 1).ToString(CultureInfo.InvariantCulture)
+                );
             }
         }
-
-        return null;
     }
 
     public void Register(RenamingCall call, IRenamingScope scope) { }
 
-    public string RenameOwn(RenamingField field, IRenamingScope scope) =>
-        SqlServerMessages.Rename(field.Value, scope, spelling => IsEngineWord(spelling, quoted: false));
+    public string RenameOwn(RenamingField field, IRenamingScope scope) => SqlServerMessages.Rename(field.Value, scope);
 
     public IEnumerable<string> WordsOf(RenamingField field) => SqlServerMessages.WordsOf(field.Value);
 

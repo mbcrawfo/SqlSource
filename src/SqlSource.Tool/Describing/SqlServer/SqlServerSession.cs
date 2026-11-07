@@ -176,7 +176,7 @@ internal sealed partial class SqlServerSession : DescriberSession
         var declaredParams = declared.Count == 0 ? null : SqlServerLive.Declarations(declared);
         var answer = await ParametersAsync(
             request.Name,
-            new SqlServerParametersRequest(copied.Sql, declaredParams),
+            new SqlServerParametersRequest(copied.Sql, declaredParams, copied.Reused.Count == 0 ? null : copied.Reused),
             cancellationToken
         );
         if (answer.Error is { } error)
@@ -391,7 +391,7 @@ internal sealed partial class SqlServerSession : DescriberSession
     // otherwise the type of the copies the probes do not leave out.
     private async Task<Outcome<SqlServerType, DescribeFailure>> UnifyAsync(
         DescribeRequest request,
-        ReusedParameter reused,
+        SqlServerReusedParameter reused,
         Probes probes,
         Dictionary<string, SqlServerParameterRow> rowOf,
         CancellationToken cancellationToken

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Kind = SqlSource.Tool.Describing.Postgres.Walk.Expressions.PlanTokens.Kind;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk.Expressions;
@@ -59,9 +60,7 @@ internal static partial class PlanExpression
                 return null;
             }
 
-            var outside = EnterGroup(from, to);
-            var left = Proved(from + 1, at);
-            _groupsHaveRows = outside;
+            var left = InGroup(from, to, () => Proved(from + 1, at));
             return
                 left is { } proved
                 && _context.SubPlanColumnTypeOf?.Invoke(name, column) is { } right
@@ -169,9 +168,7 @@ internal static partial class PlanExpression
                 return null;
             }
 
-            var outside = EnterGroup(from, close + 1);
-            var source = Proved(from + 1, close);
-            _groupsHaveRows = outside;
+            var source = InGroup(from, close + 1, () => Proved(from + 1, close));
             return source is { } proved && SetOperationTypes.Carries(proved, target) ? target : null;
         }
 
@@ -229,23 +226,8 @@ internal static partial class PlanExpression
 
         // Whether no argument of [from, to), between the commas of depth zero, starts with the word VARIADIC, which the
         // plan prints as the call wrote it.
-        private bool NoVariadic(int from, int to)
-        {
-            if (IsWord(from, "VARIADIC"))
-            {
-                return false;
-            }
-
-            for (var at = from; at < to; at = Next(at))
-            {
-                if (Is(at, Kind.Comma) && IsWord(at + 1, "VARIADIC"))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
+        private bool NoVariadic(int from, int to) =>
+            !ArgumentSpans(from, to, emptyHasOne: true).Any(argument => IsWord(argument.From, "VARIADIC"));
 
         // name([DISTINCT] a, ... [ORDER BY ...]) as a function is, an aggregate of the table over proved arguments,
         // read only where the node's groups each have a row.  Nothing follows its parenthesis: a FILTER, an OVER or a
@@ -285,24 +267,7 @@ internal static partial class PlanExpression
         }
 
         // The number of arguments of [from, to), between the commas of depth zero: none for an empty span.
-        private int ArgumentCount(int from, int to)
-        {
-            if (to <= from)
-            {
-                return 0;
-            }
-
-            var count = 1;
-            for (var at = from; at < to; at = Next(at))
-            {
-                if (Is(at, Kind.Comma))
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
+        private int ArgumentCount(int from, int to) => ArgumentSpans(from, to, emptyHasOne: false).Count;
 
         // Whether the span is a lower-case bare name and the parentheses of its call, to the end.
         private bool IsCall(int from, int to) => IsLowerWord(from) && ClosesAtTheEnd(from, to);
@@ -316,29 +281,14 @@ internal static partial class PlanExpression
         private List<long>? Arguments(int from, int to)
         {
             var arguments = new List<long>();
-            var start = from;
-            for (var at = start; at < to; at = Next(at))
+            foreach (var (start, end) in ArgumentSpans(from, to, emptyHasOne: false))
             {
-                if (Is(at, Kind.Comma))
-                {
-                    if (Proved(start, at) is not { } argument)
-                    {
-                        return null;
-                    }
-
-                    arguments.Add(argument);
-                    start = at + 1;
-                }
-            }
-
-            if (start < to || arguments.Count > 0)
-            {
-                if (Proved(start, to) is not { } last)
+                if (Proved(start, end) is not { } argument)
                 {
                     return null;
                 }
 
-                arguments.Add(last);
+                arguments.Add(argument);
             }
 
             return arguments;

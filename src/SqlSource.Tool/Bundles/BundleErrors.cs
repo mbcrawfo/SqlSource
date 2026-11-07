@@ -101,6 +101,22 @@ internal static class BundleErrors
         );
     }
 
+    /// <summary>
+    /// <c>SQLSRC296</c>: <c>--scrub</c> was given a raw bundle whose answer this version does not reproduce from its
+    /// capture, which is not renamed.
+    /// </summary>
+    /// <param name="path">The bundle's full path.</param>
+    /// <param name="difference">The first difference of the replay, as <c>replay</c> prints it.</param>
+    /// <param name="madeBy">What made the bundle, as <see cref="MadeBy" /> says it.</param>
+    public static ToolDiagnostic NotReproduced(string path, string difference, string madeBy) =>
+        ToolDiagnostic.AtFile(
+            ToolDiagnostics.RawBundleNotReproduced,
+            path,
+            BundleText.Of(difference),
+            BundleText.Of(madeBy),
+            OneLine.Of(Cli.Version)
+        );
+
     /// <summary><c>SQLSRC295</c>: <c>--scrub</c> was given a bundle that is not raw.</summary>
     /// <param name="path">The bundle's full path.</param>
     /// <param name="isRenamed">

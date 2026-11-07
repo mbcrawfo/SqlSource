@@ -78,6 +78,8 @@ internal static class SqlServerFields
             ["open answer.database"] = FieldRule.Name(NameClass.Database),
             ["table request.schema"] = FieldRule.Name(NameClass.Schema),
             ["table request.table"] = FieldRule.Name(NameClass.Table),
+            ["parameters request.reused[].name"] = FieldRule.Parameter,
+            ["parameters request.reused[].copies[]"] = FieldRule.Parameter,
             ["parameters answer.rows[].name"] = FieldRule.Parameter,
             ["parameters answer.rows[].suggestedSystemTypeName"] = FieldRule.TypeSpelling,
             ["parameters answer.rows[].suggestedUserTypeSchema"] = FieldRule.Name(NameClass.Schema),
