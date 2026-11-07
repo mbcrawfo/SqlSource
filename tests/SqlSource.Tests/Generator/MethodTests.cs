@@ -316,7 +316,7 @@ public sealed class MethodTests
     }
 
     // One file of a query at each output, by its marker, under the run's member location class, so the constants are
-    // public members of the public type and the method is in the methods file.
+    // public members of the public type and the method is a public static method of the type in the methods file.
     [Fact]
     public void Run_MixedType_HasConstantsMethodsAndModels()
     {
@@ -348,7 +348,10 @@ public sealed class MethodTests
         type.ShouldContain("public const string GetEmail = \"SELECT email FROM users WHERE id = @id;\";\n");
         type.ShouldNotContain("GetUser");
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain(" GetUser(\n");
+        methods.ShouldStartWith(GeneratedFile.Header + "\nnamespace App\n{\n    partial class Sample\n    {\n");
+        methods.ShouldContain(
+            "        public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
+        );
         methods.ShouldNotContain("GetName");
         methods.ShouldNotContain("GetEmail");
         ModelFiles(run)

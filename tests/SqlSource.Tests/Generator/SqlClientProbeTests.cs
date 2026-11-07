@@ -106,7 +106,7 @@ public sealed class SqlClientProbeTests
     }
 
     // A vector column below 6.1 has no C# type, and the project compiles beside its two errors: the project's, and the
-    // query's.  On 6.1 the same entry runs clean.
+    // query's, and no model is written.  On 6.1 the same entry runs clean and writes the query's Dto model alone.
     [Fact]
     public void Run_VectorColumnBelowSqlClient61_IsSqlsrc270AndCompiles()
     {
@@ -140,7 +140,9 @@ public sealed class SqlClientProbeTests
             .Where(diagnostic => diagnostic.StartsWith("SQLSRC270 ", StringComparison.Ordinal))
             .ShouldBe([Expected]);
         DriverDiagnostics(older).ShouldHaveSingleItem().ShouldStartWith("SQLSRC267 ");
+        ModelRuns.ModelFiles(older).ShouldBeEmpty();
         current.ShouldBeClean();
+        ModelRuns.ModelFiles(current).ShouldBe([ModelRuns.GetUserDtoFile]);
     }
 
     [Fact]
