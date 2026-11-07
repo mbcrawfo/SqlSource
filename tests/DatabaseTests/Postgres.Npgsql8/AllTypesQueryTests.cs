@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -118,10 +117,9 @@ public sealed class AllTypesQueryTests(AppContainer app)
         );
         await transaction.RollbackAsync(token);
 
-        var written = typeof(InsertAllTypesArgs).GetProperties().Select(static property => property.Name);
-        var notWritten = typeof(AllTypesDto)
-            .GetProperties()
-            .Select(static property => property.Name)
+        var written = ModelReflection.NamesOf(typeof(InsertAllTypesArgs));
+        var notWritten = ModelReflection
+            .NamesOf(typeof(AllTypesDto))
             .Except(written, StringComparer.Ordinal)
             .ToHashSet(StringComparer.Ordinal);
         notWritten.ShouldNotBeEmpty();
@@ -251,18 +249,5 @@ public sealed class AllTypesQueryTests(AppContainer app)
             cancellationToken: token
         );
         return rows.ShouldHaveSingleItem();
-    }
-
-    private sealed class CountingSequence(int[] items) : IEnumerable<int>
-    {
-        public int Enumerations { get; private set; }
-
-        public IEnumerator<int> GetEnumerator()
-        {
-            Enumerations++;
-            return ((IEnumerable<int>)items).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

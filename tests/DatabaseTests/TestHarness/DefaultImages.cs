@@ -20,4 +20,9 @@ internal static class DefaultImages
     // and SqlServerContainer.ImageBuilds of the harness records the build its server reports.
     // See tests/DatabaseTests/SqlServer/README.md.
     public const string SqlServer = "mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04";
+
+    // The oldest supported PostgreSQL image, which CI runs; the renaming's vocabulary holds its words beside the
+    // default's.  Moving it is done by rule 5 of the root AGENTS.md.  The scripts' sed reads the line of `Postgres`
+    // by its shape, `const string Postgres = "`, and does not match this one.
+    public const string PostgresFloor = "postgres:14.24";
 }

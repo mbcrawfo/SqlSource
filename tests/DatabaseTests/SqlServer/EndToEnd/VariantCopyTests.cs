@@ -1,6 +1,4 @@
-using System.IO;
-using System.Text.Json.Nodes;
-using Shouldly;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
@@ -33,14 +31,6 @@ public sealed class VariantCopyTests
     [InlineData("Collections/Claimed.sql", "ListCollectedAccounts", "ListCollectedAccountsAsImmutableList")]
     [InlineData("Lists.sql", "ListAccountsByIds", "StreamAccountsByIds")]
     [InlineData("Lists.sql", "ListAccountsByIds", "ListAccountsByIdsNoPadding")]
-    public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy)
-    {
-        var queries = JsonNode
-            .Parse(File.ReadAllText(Path.Combine(RepositoryPaths.EndToEndQueries, file + ".json")))
-            .ShouldNotBeNull()["queries"]
-            .ShouldNotBeNull();
-        var hash = queries[original].ShouldNotBeNull()["hash"].ShouldNotBeNull().GetValue<string>();
-
-        queries[copy].ShouldNotBeNull()["hash"].ShouldNotBeNull().GetValue<string>().ShouldBe(hash);
-    }
+    public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy) =>
+        VariantCopies.ShouldShareHash(RepositoryPaths.EndToEndQueries, file, original, copy);
 }

@@ -6,13 +6,9 @@ namespace SqlSource.Tool.Testing.Realistic;
 
 // The noise of a describer over a corpus: the columns that are not null in truth and that the describer answers
 // nullable or unknown.  Noise is safe, since the generated type is wider than it need be, and it is a cost the corpus
-// keeps in view: each engine's test holds the count to a budget for each recorded major.
+// keeps in view: RealisticNoiseChecks holds the count to a budget for each recorded major.
 internal static class RealisticNoise
 {
-    // The noise of one case, from the columns that RealisticDescriptions.ColumnsOf gave for it.
-    public static int CountOf(RealisticCase found, IReadOnlyList<SidecarColumn> columns) =>
-        NoisyOf(found, columns).Count;
-
     // The positions of the case's noisy columns, in order, from the columns that RealisticDescriptions.ColumnsOf gave
     // for it, so that a test over the budget can name them.
     public static IReadOnlyList<int> NoisyOf(RealisticCase found, IReadOnlyList<SidecarColumn> columns) =>

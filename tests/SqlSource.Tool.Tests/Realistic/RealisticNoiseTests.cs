@@ -11,7 +11,7 @@ namespace SqlSource.Tool.Tests.Realistic;
 public sealed class RealisticNoiseTests
 {
     [Fact]
-    public void CountOf_Columns_CountsANotNullTruthDescribedNullableOrUnknown()
+    public void NoisyOf_Columns_CountsANotNullTruthDescribedNullableOrUnknown()
     {
         var found = RealisticTestCases.Keyed() with
         {
@@ -25,7 +25,7 @@ public sealed class RealisticNoiseTests
         };
 
         RealisticNoise
-            .CountOf(
+            .NoisyOf(
                 found,
                 [
                     Column(0, "nullable", true),
@@ -34,7 +34,7 @@ public sealed class RealisticNoiseTests
                     Column(3, "truly_nullable", true),
                 ]
             )
-            .ShouldBe(2);
+            .Count.ShouldBe(2);
     }
 
     [Fact]
