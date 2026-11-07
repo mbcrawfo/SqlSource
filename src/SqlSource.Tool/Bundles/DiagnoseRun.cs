@@ -318,7 +318,7 @@ internal static class DiagnoseRun
             raw,
             EngineRenamings.For(SqlDescribableDialects.EngineOf(dialect)),
             describer,
-            RenamingKey.Random(),
+            RenamingKey.Random,
             cancellationToken
         );
         if (!renamed.Succeeded)

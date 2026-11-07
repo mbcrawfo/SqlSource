@@ -5,54 +5,98 @@ using System.Text;
 namespace SqlSource.Tool.Bundles.Renaming;
 
 /// <summary>
-/// The mapping of one renaming: one spelling has one replacement throughout, whatever class it is found in, and its
-/// class is that of the first place it is found.
+/// The mapping of one renaming: one name has one replacement throughout, whatever class it is found in, and its class
+/// is that of the first place it is found.
 /// </summary>
 /// <remarks>
-/// A replacement is the class's prefix and the HMAC-SHA256 of the class word and the folded spelling, keyed by the
-/// run's key and cut to eight lower-case hex digits; a replacement that is already given lengthens by two digits
-/// until it is free.  A spelling that is kept maps to the spelling first kept, wins over a later <see cref="Name" />
-/// and carries no class; one that already has a replacement keeps it.  Only a spelling kept from a row of the
-/// engine's is kept for the token check, which trusts no other.  The renaming starts at eight digits; a test gives a
-/// shorter <c>firstLength</c> to force a collision.
+/// A name is what the engine's <c>fold</c> takes for one; a spelling is how it is written, as <c>spelled</c> gives
+/// it.  A replacement is the class's prefix and the HMAC-SHA256 of the class word and the folded spelling, keyed by
+/// the run's key and cut to eight lower-case hex digits; a replacement that is already given lengthens by two digits
+/// until it is free.  Two spellings of one name that <c>spelled</c> tells apart get replacements that differ by case
+/// alone, so that they stay apart where the engine's pipeline compares by ordinal and are one name where it ignores
+/// case: the first has the lower-case replacement, and the k-th has the letters of it, the prefix's and each hex
+/// letter <c>a</c> to <c>f</c>, left to right, upper-cased where bit i of k is set.  When the letters cannot tell
+/// another spelling apart, it gets a replacement of its own, made from the class word, the folded spelling and the
+/// spelling, which differs from the rest ignoring case too, and <see cref="FellBack" /> is true: such a replacement
+/// may change an answer where the pipeline ignores case, so a refused renaming whose mapping fell back is tried again
+/// with another key.  A spelling that is kept maps to the spelling first kept with its <c>spelled</c>, wins over a
+/// later <see cref="Name" /> and carries no class; one that already has a replacement keeps it.  Only a spelling kept
+/// from a row of the engine's is kept for the token check, which trusts no other.  The renaming starts at eight
+/// digits; a test gives a shorter <c>firstLength</c> to force a collision.
 /// </remarks>
-internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fold, int firstLength)
+internal sealed class NameMapping(
+    RenamingKey key,
+    Func<string, bool, string> fold,
+    Func<string, bool, string> spelled,
+    int firstLength
+)
 {
     private const int FirstLength = 8;
     private const string HexDigits = "0123456789abcdef";
 
-    private readonly Dictionary<string, MappedName> _byKey = [with(StringComparer.Ordinal)];
-    private readonly Dictionary<string, string> _kept = [with(StringComparer.Ordinal)];
+    // The spellings of one name: the first's name, which gives the class, and each spelling's replacement.
+    private sealed class Spellings(MappedName first)
+    {
+        public MappedName First { get; } = first;
+
+        public Dictionary<string, string> Replacements { get; } = [with(StringComparer.Ordinal)];
+    }
+
+    private readonly Dictionary<string, Spellings> _byKey = [with(StringComparer.Ordinal)];
+    private readonly Dictionary<string, Dictionary<string, string>> _kept = [with(StringComparer.Ordinal)];
     private readonly HashSet<string> _keptFromEngineRows = [with(StringComparer.Ordinal)];
     private readonly Dictionary<string, MappedName> _literals = [with(StringComparer.Ordinal)];
     private readonly HashSet<string> _replacements = [with(StringComparer.Ordinal)];
     private readonly List<MappedName> _names = [];
 
     /// <summary>A mapping whose replacements start at eight hex digits.</summary>
-    public NameMapping(RenamingKey key, Func<string, bool, string> fold)
-        : this(key, fold, FirstLength) { }
+    public NameMapping(RenamingKey key, Func<string, bool, string> fold, Func<string, bool, string> spelled)
+        : this(key, fold, spelled, FirstLength) { }
 
     /// <summary>The names made, in the order they were made; a kept name is left out.</summary>
     public IReadOnlyList<MappedName> Names => _names;
+
+    /// <summary>
+    /// Whether a spelling got a replacement of its own because the letters of its name's first replacement could not
+    /// tell it apart by case.
+    /// </summary>
+    public bool FellBack { get; private set; }
 
     /// <summary>The replacement of a spelling, made in the class given if it has none yet.</summary>
     public string Name(string spelling, bool quoted, NameClass cls)
     {
         var folded = fold(spelling, quoted);
+        var exact = spelled(spelling, quoted);
         if (_kept.TryGetValue(folded, out var kept))
         {
-            return kept;
+            if (!kept.TryGetValue(exact, out var keptSpelling))
+            {
+                keptSpelling = spelling;
+                kept[exact] = spelling;
+            }
+
+            return keptSpelling;
         }
 
-        if (_byKey.TryGetValue(folded, out var found))
+        if (!_byKey.TryGetValue(folded, out var found))
         {
-            return found.Replacement;
+            var first = new MappedName(Make(cls, folded), cls, spelling);
+            found = new Spellings(first);
+            found.Replacements[exact] = first.Replacement;
+            _byKey[folded] = found;
+            _names.Add(first);
+            return first.Replacement;
         }
 
-        var made = new MappedName(Make(cls, folded), cls, spelling);
-        _byKey[folded] = made;
-        _names.Add(made);
-        return made.Replacement;
+        if (found.Replacements.TryGetValue(exact, out var replacement))
+        {
+            return replacement;
+        }
+
+        var variant = Variant(found, folded, exact);
+        found.Replacements[exact] = variant;
+        _names.Add(new MappedName(variant, found.First.Class, spelling));
+        return variant;
     }
 
     /// <summary>
@@ -60,7 +104,8 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
     /// already has a replacement, and a spelling kept already maps to the spelling first kept.  The token check does
     /// not trust a spelling kept here, which <see cref="IsKeptFromEngineRow" /> does not answer for.
     /// </summary>
-    public void Keep(string spelling, bool quoted) => _ = Store(fold(spelling, quoted), spelling);
+    public void Keep(string spelling, bool quoted) =>
+        _ = Store(fold(spelling, quoted), spelled(spelling, quoted), spelling);
 
     /// <summary>
     /// Keeps a spelling as <see cref="Keep" /> does, as a name of a row that the engine's part says is its own, which
@@ -69,30 +114,19 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
     public void KeepFromEngineRow(string spelling, bool quoted)
     {
         var folded = fold(spelling, quoted);
-        if (Store(folded, spelling))
+        if (Store(folded, spelled(spelling, quoted), spelling))
         {
             _ = _keptFromEngineRows.Add(folded);
         }
     }
 
-    /// <summary>Whether a spelling has a replacement, and what it is; a kept spelling is its own.</summary>
-    public bool TryGet(string spelling, bool quoted, out string replacement)
+    /// <summary>
+    /// Whether a spelling is of a name that has a replacement or is kept, whatever case it is spelled in.
+    /// </summary>
+    public bool IsMapped(string spelling, bool quoted)
     {
         var folded = fold(spelling, quoted);
-        if (_kept.TryGetValue(folded, out var kept))
-        {
-            replacement = kept;
-            return true;
-        }
-
-        if (_byKey.TryGetValue(folded, out var found))
-        {
-            replacement = found.Replacement;
-            return true;
-        }
-
-        replacement = string.Empty;
-        return false;
+        return _kept.ContainsKey(folded) || _byKey.ContainsKey(folded);
     }
 
     /// <summary>The replacement of a literal's content, of class <see cref="NameClass.Literal" />.</summary>
@@ -123,16 +157,58 @@ internal sealed class NameMapping(RenamingKey key, Func<string, bool, string> fo
     /// <summary>The first <paramref name="length" /> digits of a hash.</summary>
     internal static string Cut(string hex, int length) => hex[..length];
 
-    // Keeps a folded spelling unless it has a replacement: whether it is kept now.
-    private bool Store(string folded, string spelling)
+    // Keeps a spelling unless its name has a replacement: whether it is kept now.
+    private bool Store(string folded, string exact, string spelling)
     {
         if (_byKey.ContainsKey(folded))
         {
             return false;
         }
 
-        _ = _kept.TryAdd(folded, spelling);
+        if (!_kept.TryGetValue(folded, out var kept))
+        {
+            kept = [with(StringComparer.Ordinal)];
+            _kept[folded] = kept;
+        }
+
+        _ = kept.TryAdd(exact, spelling);
         return true;
+    }
+
+    // The replacement of a spelling of a name that has others: the next case of the first's letters, or when they are
+    // all given, one of its own.
+    private string Variant(Spellings found, string folded, string exact)
+    {
+        var first = found.First.Replacement;
+        var prefix = NameClasses.PrefixOf(found.First.Class);
+        var letters = new List<int> { 0 };
+        for (var i = prefix.Length; i < first.Length; i++)
+        {
+            if (first[i] is >= 'a' and <= 'f')
+            {
+                letters.Add(i);
+            }
+        }
+
+        var variant = found.Replacements.Count;
+        if (variant >= 1L << letters.Count)
+        {
+            FellBack = true;
+            return Make(found.First.Class, folded + ":" + exact);
+        }
+
+        var text = first.ToCharArray();
+        for (var bit = 0; bit < letters.Count; bit++)
+        {
+            if (((variant >> bit) & 1) != 0)
+            {
+                text[letters[bit]] = char.ToUpperInvariant(text[letters[bit]]);
+            }
+        }
+
+        var made = new string(text);
+        _ = _replacements.Add(made);
+        return made;
     }
 
     private string Make(NameClass cls, string folded)
