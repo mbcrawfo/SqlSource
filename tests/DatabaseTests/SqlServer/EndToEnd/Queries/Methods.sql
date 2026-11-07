@@ -148,10 +148,51 @@ SELECT CAST('x' AS int);
 -- name: ListFailingAtSecondThenFailConversion
 -- summary: Every account with 10 divided by its id less 2, which fails at the second, and then a conversion that
 -- fails.
--- The divide by zero is the database's error, which the method throws as it is, and the reader's disposal reads the
--- failed conversion after it.
+-- The divide by zero is the database's error, and the method reads the failed conversion after it, which with
+-- XACT_ABORT off rolls back a transaction: its tests pin that the method reports the rollback, with the divide by
+-- zero inside it.
 SELECT id, 10 / (id - 2) AS quotient
 FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
+-- name: ListFailingAtSecondThenOverflow
+-- summary: Every account with 10 divided by its id less 2, which fails at the second, and then an overflow.
+-- ListFailingAtSecondThenFailConversion with an overflow in the place of the failed conversion: with XACT_ABORT off
+-- the overflow leaves a transaction open, so the method throws the divide by zero as it is.
+SELECT id, 10 / (id - 2) AS quotient
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST(300 AS tinyint);
+
+-- name: ListThenOverflowThenFailConversion
+-- summary: The accounts, then an overflow, which the method throws, and then a conversion that fails.
+-- The overflow is the error that the drain before the return throws, and the failed conversion after it rolls back a
+-- transaction with XACT_ABORT off: its test pins that the method reports the rollback, with the overflow inside it.
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST(300 AS tinyint);
+SELECT CAST('x' AS int);
+
+-- name: GetFailingAtSecondThenFailConversion -> one
+-- summary: The first two accounts with 10 divided by its id less 2, which fails at the second, and then a conversion
+-- that fails.
+-- ListFailingAtSecondThenFailConversion under one, which fails at its second read.
+SELECT TOP (2) id, 10 / (id - 2) AS quotient
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
+-- name: ListFailingBeforeTheRowsThenFailConversion
+-- summary: A divide by zero before three rows of constants, and then a conversion that fails.
+-- The divide by zero is raised before the first result set, so the method's ExecuteReaderAsync throws it, and the
+-- failed conversion rolls back a transaction with XACT_ABORT off.  The rows are few, so SqlClient's error lists the
+-- divide by zero alone: its test pins that the method throws it as it is, with nothing to say the transaction is gone.
+DECLARE @zero int = 0;
+DECLARE @quotient int = 1 / @zero;
+SELECT id
+FROM (VALUES (1), (2), (3)) AS numbers (id)
 ORDER BY id;
 SELECT CAST('x' AS int);
 

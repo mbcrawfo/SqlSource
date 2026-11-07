@@ -46,8 +46,11 @@ internal static class RowsWriter
             return;
         }
 
-        // A method that checks for a rollback has the read, its drain and its returns in a try whose catch checks.
-        if (!context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead))
+        // A method that checks for a rollback has the read, its drain and its returns in a try whose catches check: the
+        // database's error first, then an exception of the method's own.
+        var checksAfterDatabaseError = context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError);
+        var checksAtRead = context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead);
+        if (!checksAfterDatabaseError && !checksAtRead)
         {
             AppendRows(in context, indent, output);
             return;
@@ -56,7 +59,15 @@ internal static class RowsWriter
         _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
         AppendRows(in context, GeneratedText.Deeper(indent), output);
         QueryMethodWriter.AppendEnd(builder, indent);
-        ExecutionCapabilityWriter.AppendRollbackCheck(in context, indent);
+        if (checksAfterDatabaseError)
+        {
+            ExecutionCapabilityWriter.AppendDatabaseErrorCheck(in context, indent);
+        }
+
+        if (checksAtRead)
+        {
+            ExecutionCapabilityWriter.AppendRollbackCheck(in context, indent);
+        }
     }
 
     // The rows read into the buffer and the collection returned, or the one row read and returned, each return after
@@ -114,9 +125,10 @@ internal static class RowsWriter
 
     // The iterator's loop, which yields each row as it reads it.  A method that drains when its loop is left at a row
     // has the loop, and the drain after it, in a try whose finally drains then.  C# allows no catch on a try that holds
-    // a yield return, so a method that checks for a rollback builds each row in a try of its own, whose catch checks
-    // when the row's checks or construction throw; a read's exception is the database's or the caller's cancellation,
-    // which the catch would throw as it is.  Either builds the row into a local before it yields it.
+    // a yield return, so a method that checks for a rollback at its read builds each row in a try of its own, whose
+    // catch checks when the row's checks or construction throw, and one that checks after a database error reads each
+    // row in a try of its own, whose catch takes the database's error, as each drain's does.  A method that checks at
+    // its read or tracks the row builds the row into a local before it yields it.
     private static void AppendStream(in QueryMethodContext context, string indent, MethodOutput output)
     {
         var builder = context.Builder;
@@ -130,9 +142,17 @@ internal static class RowsWriter
             ExecutionCapabilityWriter.AppendLeftAtARowStart(in context, indent);
         }
 
-        _ = builder.Append(loopIndent).Append("while (");
-        AppendRead(in context);
-        _ = builder.Append(")\n").Append(loopIndent).Append("{\n");
+        if (context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError))
+        {
+            AppendCheckedRead(in context, loopIndent);
+        }
+        else
+        {
+            _ = builder.Append(loopIndent).Append("while (");
+            AppendRead(in context);
+            _ = builder.Append(")\n").Append(loopIndent).Append("{\n");
+        }
+
         if (!tracksRow && !checksRollback)
         {
             RowReaderWriter.AppendVectorChecks(in context, innerIndent, output);
@@ -164,6 +184,40 @@ internal static class RowsWriter
         {
             ExecutionCapabilityWriter.AppendLeftAtARowEnd(in context, indent, loopIndent, innerIndent);
         }
+    }
+
+    // The start of a loop that reads its row in a try of its own, followed by the catch of the database's error, and
+    // leaves when the read finds no row, up to the blank line before the row.
+    private static void AppendCheckedRead(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var hasRow = context.Locals.HasRow;
+        var innerIndent = GeneratedText.Deeper(indent);
+        var readIndent = GeneratedText.Deeper(innerIndent);
+        _ = builder
+            .Append(indent)
+            .Append("while (true)\n")
+            .Append(indent)
+            .Append("{\n")
+            .Append(innerIndent)
+            .Append("bool ")
+            .Append(hasRow)
+            .Append(";\n")
+            .Append(innerIndent)
+            .Append("try\n")
+            .Append(innerIndent)
+            .Append("{\n")
+            .Append(readIndent)
+            .Append(hasRow)
+            .Append(" = ");
+        AppendRead(in context);
+        _ = builder.Append(";\n");
+        QueryMethodWriter.AppendEnd(builder, innerIndent);
+        ExecutionCapabilityWriter.AppendDatabaseErrorCheck(in context, innerIndent);
+        _ = builder.Append('\n').Append(innerIndent).Append("if (!").Append(hasRow).Append(")\n");
+        _ = builder.Append(innerIndent).Append("{\n").Append(readIndent).Append("break;\n");
+        QueryMethodWriter.AppendEnd(builder, innerIndent);
+        _ = builder.Append('\n');
     }
 
     // The row's local, declared, then its checks and its construction, in a try whose catch checks for a rollback when
