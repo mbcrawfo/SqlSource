@@ -337,6 +337,7 @@ public sealed class SqlRenamerTests
     [InlineData("-- dialect: postgres-ish")]
     [InlineData("-- param: id int")]
     [InlineData("-- token: {{filter}}")]
+    [InlineData("-- token-ignore: two words")]
     public void RenameQueryFile_MarkerThatDoesNotRead_IsRefused(string marker)
     {
         var (renamer, _, refusals) = Renamer();

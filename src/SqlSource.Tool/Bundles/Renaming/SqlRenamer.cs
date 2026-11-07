@@ -414,7 +414,7 @@ internal sealed partial class SqlRenamer(
         }
 
         // A token placeholder, {{name}} or {{name:default}}, as the generator reads one: its name is renamed as a
-        // token, and the rest goes on as SQL.
+        // token, quoted, since the generator compares it as written, and the rest goes on as SQL.
         private bool TryToken(int at, int end, out int after)
         {
             after = at;
@@ -430,7 +430,10 @@ internal sealed partial class SqlRenamer(
             }
 
             _into.CopyTo(name.Start);
-            _into.ReplaceTo(name.End, renamer.NameOf(text.Substring(name.Start, name.Length), false, NameClass.Token));
+            _into.ReplaceTo(
+                name.End,
+                renamer.NameOf(text.Substring(name.Start, name.Length), quoted: true, NameClass.Token)
+            );
             after = name.End;
             return true;
         }

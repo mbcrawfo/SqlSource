@@ -11,8 +11,10 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// </summary>
 /// <remarks>
 /// A name of a member is found by its spelling as the engine compares it.  A catalog holds a name as the engine keeps
-/// it, which is its quoted spelling; a query's, a token's, a parameter's or a logical database's name is the query
-/// file's own, which reads it unquoted, so that one spelling of it has one name in the file and in the capture.
+/// it, which is its quoted spelling; a query's, a parameter's or a logical database's name is the query file's own,
+/// which reads it unquoted, so that one spelling of it has one name in the file and in the capture.  A token's name is
+/// renamed as quoted, since the generator compares it as written: two of its spellings that differ by case then have
+/// replacements that differ, by ordinal at least, whatever the engine.
 /// </remarks>
 internal sealed class RenamingRun
 {
@@ -63,8 +65,8 @@ internal sealed class RenamingRun
     }
 
     /// <summary>
-    /// Whether a name of the class is compared as its quoted spelling: a catalog's name.  One of the query file's own
-    /// is compared as it reads there, unquoted.
+    /// Whether a name of the class is compared as its quoted spelling: a catalog's name, and a token's, which the
+    /// generator compares as written.  Another of the query file's own is compared as it reads there, unquoted.
     /// </summary>
     public static bool IsQuoted(NameClass cls) =>
         cls switch
@@ -75,9 +77,9 @@ internal sealed class RenamingRun
             or NameClass.Alias
             or NameClass.Function
             or NameClass.Type
-            or NameClass.Index => true,
-            NameClass.Parameter or NameClass.Token or NameClass.Query or NameClass.Database or NameClass.Literal =>
-                false,
+            or NameClass.Index
+            or NameClass.Token => true,
+            NameClass.Parameter or NameClass.Query or NameClass.Database or NameClass.Literal => false,
             _ => throw UnexpectedEnumValueException.Of(cls),
         };
 

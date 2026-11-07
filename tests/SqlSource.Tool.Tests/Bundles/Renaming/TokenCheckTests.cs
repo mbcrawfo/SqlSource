@@ -296,6 +296,18 @@ public sealed class TokenCheckTests
     public void Check_QueryFileTokenOfTheUser_IsRefused(string dialect, string sql, string token) =>
         CheckQuery(sql, DialectOf(dialect)).ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", token));
 
+    // A token's name is renamed as quoted, so it is checked as quoted: SELECT is the fake's word only once folded.
+    [Theory]
+    [InlineData("SELECT 1 {{SELECT}}")]
+    [InlineData("-- token: {{SELECT:}}\nSELECT 1")]
+    [InlineData("-- token-ignore: SELECT\nSELECT 1")]
+    public void Check_TokenNamedAsAnEngineWordOnceFolded_IsRefused(string sql) =>
+        CheckQuery(sql).ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "SELECT"));
+
+    // Braces around what is not a name and a default are no token, and their words are plain words.
+    [Fact]
+    public void Check_BracesThatAreNoToken_HoldPlainWords() => CheckQuery("SELECT 1 {{SELECT-1}}").ShouldBeNull();
+
     [Fact]
     public void Check_NameMarkerThatIsNoReplacement_IsRefused()
     {

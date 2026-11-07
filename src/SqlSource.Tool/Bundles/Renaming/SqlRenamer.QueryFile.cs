@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
 using SqlSource.Settings;
@@ -28,7 +29,7 @@ internal sealed partial class SqlRenamer
                 SqlMarkerKind.Database => DatabaseMarker(value),
                 SqlMarkerKind.Param => ParamMarker(marker),
                 SqlMarkerKind.Token => TokenMarker(marker),
-                SqlMarkerKind.TokenIgnore => Nested(value, NameClass.Token),
+                SqlMarkerKind.TokenIgnore => TokenIgnoreMarker(marker),
                 SqlMarkerKind.Summary
                 or SqlMarkerKind.GeneratorParameters
                 or SqlMarkerKind.Output
@@ -121,7 +122,8 @@ internal sealed partial class SqlRenamer
             };
         }
 
-        // "{{name:default}}": the name a token's, the default renamed as SQL.
+        // "{{name:default}}": the name a token's, quoted, since the generator compares it as written, and the default
+        // renamed as SQL.
         private string? TokenMarker(SqlMarker marker)
         {
             var defaults = Read(marker, scope => scope.TokenDefaults);
@@ -130,9 +132,15 @@ internal sealed partial class SqlRenamer
                 return null;
             }
 
-            var name = renamer.NameOf(token.Name, quoted: false, NameClass.Token);
+            var name = renamer.NameOf(token.Name, quoted: true, NameClass.Token);
             return "{{" + name + ":" + Nested(token.Text, NameClass.Alias) + "}}";
         }
+
+        // "name": a token's name, quoted, as the token it keeps is.
+        private string? TokenIgnoreMarker(SqlMarker marker) =>
+            Read(marker, scope => scope.IgnoredTokens) is { Count: 1 } names
+                ? renamer.NameOf(names.Single(), quoted: true, NameClass.Token)
+                : null;
 
         // What the generator's scope of markers reads from one marker, or null when it reports an error.
         private T? Read<T>(SqlMarker marker, Func<SqlMarkerScope, T> read)

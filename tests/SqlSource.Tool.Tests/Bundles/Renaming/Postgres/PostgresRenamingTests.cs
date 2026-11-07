@@ -5,10 +5,13 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
+using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.Postgres;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing.Bundles;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.Postgres;
@@ -18,6 +21,14 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming.Postgres;
 public sealed class PostgresRenamingTests
 {
     private const string Fixture = "select-declared-domain";
+
+    // The fixture with a token, and where the cases below add markers and tokens to its query.
+    private const string TokenFixture = "delete-declared-only";
+    private const string ParamMarker = "-- param: @tenant int\n";
+    private const string FilterToken = "{{filter:AND deleted_at IS NOT NULL}}";
+
+    // A word of the engine's vocabulary only as written, since its unquoted fold is not.
+    private const string QuotedEngineWord = "RI_FKey_check_ins";
 
     [Fact]
     public void Spelled_IsTheFold()
@@ -126,6 +137,62 @@ public sealed class PostgresRenamingTests
             PostgresRenaming.Instance.RenameOwn(field, new FakeRenamingScope())
         );
         _ = Should.Throw<InvalidOperationException>(() => PostgresRenaming.Instance.WordsOf(field));
+    }
+
+    // Two tokens whose names differ by case alone, as each place that names a token writes them: the generator takes
+    // them for two, so they have two replacements.
+    [Theory]
+    [InlineData("", "{{Extra:}}{{extra:}}")]
+    [InlineData("-- token: {{Extra:}}\n", "{{Extra}}{{extra:}}")]
+    [InlineData("-- token-ignore: Extra\n", "{{extra:}}")]
+    public async Task RenameAsync_TokensThatDifferByCase_AreTwoNames(string markers, string tokens)
+    {
+        var raw = await WithTokensAsync(markers, tokens);
+
+        var renamed = await PostgresRenamings.RenameAsync(raw);
+
+        var result = renamed.Value.ShouldNotBeNull(renamed.Failure?.ToString());
+        var upper = result.Mapping.Single(static name => name.Original == "Extra");
+        var lower = result.Mapping.Single(static name => name.Original == "extra");
+        upper.Class.ShouldBe(NameClass.Token);
+        lower.Class.ShouldBe(NameClass.Token);
+        upper.Replacement.ShouldNotBe(lower.Replacement);
+    }
+
+    // A token whose name is the engine's word only as written: it is kept, and each place that names it passes the
+    // token check, which asks about it as the renaming did.
+    [Theory]
+    [InlineData("", "{{" + QuotedEngineWord + ":}}")]
+    [InlineData("-- token: {{" + QuotedEngineWord + ":}}\n", "{{" + QuotedEngineWord + "}}")]
+    [InlineData("-- token-ignore: " + QuotedEngineWord + "\n", "")]
+    public async Task RenameAsync_ATokenNamedAsAnEngineWordAsWritten_IsKept(string markers, string tokens)
+    {
+        var raw = await WithTokensAsync(markers, tokens);
+
+        var renamed = await PostgresRenamings.RenameAsync(raw);
+
+        var result = renamed.Value.ShouldNotBeNull(renamed.Failure?.ToString());
+        result.Bundle.Query.ShouldContain(QuotedEngineWord);
+        result.Mapping.ShouldNotContain(static name => name.Original == QuotedEngineWord);
+    }
+
+    // delete-declared-only with the markers given after its declaration and the tokens given after its token, and the
+    // entry that replaying it raw gives.  A token added has an empty default, so the requests are the case's own.
+    private static async Task<Bundle> WithTokensAsync(string markers, string tokens)
+    {
+        var fixture = PostgresRenamings.Fixture(TokenFixture);
+        var query = fixture
+            .Query.Replace(ParamMarker, ParamMarker + markers, StringComparison.Ordinal)
+            .Replace(FilterToken, FilterToken + tokens, StringComparison.Ordinal);
+        var raw = RawBundles.OfFixture(fixture) with { Query = query, Expected = null };
+        var replayed = await BundleReplays.ReplayAsync(raw, "/work/report.zip");
+        var entry = replayed.ShouldBeOfType<ReplayOutcome.Described>().Entry;
+        return raw with
+        {
+            Expected = SidecarWriter.Write(
+                new Sidecar(SidecarFormat.Version, FixtureReplay.ToolVersion, new EquatableArray<SidecarEntry>([entry]))
+            ),
+        };
     }
 
     private static bool WordIn(string text, string word) =>

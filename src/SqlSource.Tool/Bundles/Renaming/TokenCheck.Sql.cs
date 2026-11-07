@@ -1,6 +1,8 @@
 using System;
+using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
+using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 
 namespace SqlSource.Tool.Bundles.Renaming;
@@ -8,8 +10,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 internal sealed partial class TokenCheck
 {
     // SQL, lexeme by lexeme and word by word as the SQL renamer reads it.  In query.sql a marker's value is checked by
-    // its kind.
-    private void Sql(string text, string place, bool queryFile)
+    // its kind, and a token placeholder's name, as in a -- token: marker's value, as quoted, as the renamer renames it.
+    private void Sql(string text, string place, bool queryFile, bool tokens = false)
     {
         var lexed = SqlLexer.Lex(text, _rules);
         if (lexed.Error is { } error)
@@ -27,7 +29,7 @@ internal sealed partial class TokenCheck
             {
                 case SqlLexemeKind.Text:
                     var quoteFollows = index + 1 < lexemes.Count && lexemes[index + 1].Kind == SqlLexemeKind.Quoted;
-                    Words(text, start, end, quoteFollows, place);
+                    Words(text, start, end, quoteFollows, place, tokens || queryFile);
                     break;
                 case SqlLexemeKind.Quoted:
                     Quoted(text, start, end, place);
@@ -87,9 +89,14 @@ internal sealed partial class TokenCheck
                 Name(value, NameClass.Database, place);
                 break;
             case SqlMarkerKind.Param:
-            case SqlMarkerKind.Token:
-            case SqlMarkerKind.TokenIgnore:
                 Sql(value, place, queryFile: false);
+                break;
+            case SqlMarkerKind.Token:
+                Sql(value, place, queryFile: false, tokens: true);
+                break;
+            case SqlMarkerKind.TokenIgnore:
+                // A token's name, renamed as quoted.
+                Whole(IsSafe(value, quoted: true), place, value);
                 break;
             case SqlMarkerKind.Summary:
             case SqlMarkerKind.GeneratorParameters:
@@ -118,14 +125,20 @@ internal sealed partial class TokenCheck
     }
 
     // Plain text: numbers, white space and punctuation pass, a run from a digit that is no number is refused, and each
-    // word must be safe.
-    private void Words(string text, int start, int end, bool quoteFollows, string place)
+    // word must be safe.  Where tokens are read, a token placeholder's name must be safe as quoted.
+    private void Words(string text, int start, int end, bool quoteFollows, string place, bool tokens = false)
     {
         var at = start;
         while (at < end)
         {
             var character = text[at];
-            if (char.IsAsciiDigit(character))
+            if (tokens && character == '{' && TokenNameAt(text, at, end) is { } name)
+            {
+                var token = text.Substring(name.Start, name.Length);
+                Whole(IsSafe(token, quoted: true), place, token);
+                at = name.End;
+            }
+            else if (char.IsAsciiDigit(character))
             {
                 var runEnd = SqlRenamer.NumberRunEnd(_engine, text, at, end);
                 if (!SqlRenamer.IsNumber(text.AsSpan(at, runEnd - at)))
@@ -159,6 +172,18 @@ internal sealed partial class TokenCheck
                 at += length;
             }
         }
+    }
+
+    // The name of the token placeholder at the index, as the SQL renamer reads one, or null when none is there.
+    private static TextSpan? TokenNameAt(string text, int at, int end)
+    {
+        if (!TokenScanner.TryReadToken(text, at, out _, out _, out _))
+        {
+            return null;
+        }
+
+        _ = TokenScanner.TryReadOpener(text, at, out var name, out _);
+        return name.End <= end ? name : null;
     }
 
     // A word: a literal's one-letter prefix passes, and SQL Server's @ and # before a name are punctuation.
