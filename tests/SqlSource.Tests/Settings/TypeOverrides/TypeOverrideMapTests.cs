@@ -5,21 +5,18 @@ using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing.Snapshot;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 
 namespace SqlSource.Tests.Settings.TypeOverrides;
 
 public sealed class TypeOverrideMapTests
 {
-    // A settings file in the folder of the files, and one in a folder above it, which ranks below the nearer.
-    private static readonly SettingPlace Near = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-    private static readonly SettingPlace Far = SettingPlace.OfSettingsFile("/sqlsource.json", 0);
-
     [Fact]
     public void Over_Higher_ReplacesOnlyTheKeysItNames()
     {
         var lower = TestSidecars.Of(
-            Entry("int4", "int", Far),
-            Entry("timestamptz", "global::System.DateTimeOffset", Far)
+            Entry("int4", "int", RootSettingsFile),
+            Entry("timestamptz", "global::System.DateTimeOffset", RootSettingsFile)
         );
         var higher = TestSidecars.Of(Entry("timestamptz", "global::System.DateTime", SettingPlace.Query));
 
@@ -27,7 +24,7 @@ public sealed class TypeOverrideMapTests
             .Over(higher, lower)
             .ShouldBe(
                 TestSidecars.Of(
-                    Entry("int4", "int", Far),
+                    Entry("int4", "int", RootSettingsFile),
                     Entry("timestamptz", "global::System.DateTime", SettingPlace.Query)
                 )
             );
@@ -36,22 +33,25 @@ public sealed class TypeOverrideMapTests
     [Fact]
     public void Over_KeysThatDifferByCase_AreTwoKeys()
     {
-        var lower = TestSidecars.Of(Entry("bool", "bool", Far), Entry("public.Status", "global::App.S", Far));
+        var lower = TestSidecars.Of(
+            Entry("bool", "bool", RootSettingsFile),
+            Entry("public.Status", "global::App.S", RootSettingsFile)
+        );
         var higher = TestSidecars.Of(
-            Entry("int4", "long", Near),
-            Entry("PUBLIC.status", "global::App.T", Near),
-            Entry("text", "string", Near)
+            Entry("int4", "long", SettingsFile),
+            Entry("PUBLIC.status", "global::App.T", SettingsFile),
+            Entry("text", "string", SettingsFile)
         );
 
         TypeOverrideMap
             .Over(higher, lower)
             .ShouldBe(
                 TestSidecars.Of(
-                    Entry("bool", "bool", Far),
-                    Entry("int4", "long", Near),
-                    Entry("PUBLIC.status", "global::App.T", Near),
-                    Entry("public.Status", "global::App.S", Far),
-                    Entry("text", "string", Near)
+                    Entry("bool", "bool", RootSettingsFile),
+                    Entry("int4", "long", SettingsFile),
+                    Entry("PUBLIC.status", "global::App.T", SettingsFile),
+                    Entry("public.Status", "global::App.S", RootSettingsFile),
+                    Entry("text", "string", SettingsFile)
                 )
             );
     }
@@ -61,7 +61,7 @@ public sealed class TypeOverrideMapTests
         TypeOverrideMap
             .Over(
                 TestSidecars.Of(Entry("public.\"status\"", "long", SettingPlace.Query)),
-                TestSidecars.Of(Entry("public.status", "int", Far))
+                TestSidecars.Of(Entry("public.status", "int", RootSettingsFile))
             )
             .ShouldBe(TestSidecars.Of(Entry("public.\"status\"", "long", SettingPlace.Query)));
 
@@ -79,7 +79,7 @@ public sealed class TypeOverrideMapTests
                     Entry("public.tag[]", "C", SettingPlace.Query),
                     Entry("public.x", "D", SettingPlace.Query)
                 ),
-                TestSidecars.Of(Entry("public", "A", Far), Entry("public.tag", "B", Far))
+                TestSidecars.Of(Entry("public", "A", RootSettingsFile), Entry("public.tag", "B", RootSettingsFile))
             )!
             .Value;
 
@@ -91,15 +91,18 @@ public sealed class TypeOverrideMapTests
     public void Over_DefaultAbove_HidesTheKeyBelowAndFindFindsNothing()
     {
         var lower = TestSidecars.Of(
-            Entry("int4", "long", Far),
-            Entry("timestamptz", "global::System.DateTimeOffset", Far)
+            Entry("int4", "long", RootSettingsFile),
+            Entry("timestamptz", "global::System.DateTimeOffset", RootSettingsFile)
         );
         var higher = TestSidecars.Of(Entry("timestamptz", null, SettingPlace.FileHeader));
 
         var merged = TypeOverrideMap.Over(higher, lower)!.Value;
 
         merged.ShouldBe(
-            TestSidecars.Of(Entry("int4", "long", Far), Entry("timestamptz", null, SettingPlace.FileHeader))
+            TestSidecars.Of(
+                Entry("int4", "long", RootSettingsFile),
+                Entry("timestamptz", null, SettingPlace.FileHeader)
+            )
         );
         TypeOverrideMap.Find(merged, "timestamptz").ShouldBeNull();
         TypeOverrideMap.Find(merged, "int4")!.Type.ShouldBe("long");
@@ -109,13 +112,15 @@ public sealed class TypeOverrideMapTests
     [Fact]
     public void Over_DefaultMergedOverALowerLevel_StillHidesItsKey()
     {
-        var farther = TestSidecars.Of(Entry("int4", "long", Far));
-        var nearer = TestSidecars.Of(Entry("int4", null, Near));
+        var farther = TestSidecars.Of(Entry("int4", "long", RootSettingsFile));
+        var nearer = TestSidecars.Of(Entry("int4", null, SettingsFile));
         var markers = TestSidecars.Of(Entry("text", "string", SettingPlace.Query));
 
         var merged = TypeOverrideMap.Over(markers, TypeOverrideMap.Over(nearer, farther))!.Value;
 
-        merged.ShouldBe(TestSidecars.Of(Entry("int4", null, Near), Entry("text", "string", SettingPlace.Query)));
+        merged.ShouldBe(
+            TestSidecars.Of(Entry("int4", null, SettingsFile), Entry("text", "string", SettingPlace.Query))
+        );
         TypeOverrideMap.Find(merged, "int4").ShouldBeNull();
     }
 
@@ -125,7 +130,7 @@ public sealed class TypeOverrideMapTests
     [Fact]
     public void Over_OneSideNull_IsTheOther()
     {
-        var map = TestSidecars.Of(Entry("int4", "long", Far));
+        var map = TestSidecars.Of(Entry("int4", "long", RootSettingsFile));
 
         TypeOverrideMap.Over(map, null).ShouldBe(map);
         TypeOverrideMap.Over(null, map).ShouldBe(map);
@@ -143,9 +148,9 @@ public sealed class TypeOverrideMapTests
     public void Find_Key_IsFoundIgnoringCase(string key, string? type)
     {
         var map = TestSidecars.Of(
-            Entry("int4", "long", Far),
-            Entry("public.USER_STATUS", "global::App.Status", Far),
-            Entry("text", "string", Far)
+            Entry("int4", "long", RootSettingsFile),
+            Entry("public.USER_STATUS", "global::App.Status", RootSettingsFile),
+            Entry("text", "string", RootSettingsFile)
         );
 
         TypeOverrideMap.Find(map, key)?.Type.ShouldBe(type);
@@ -216,7 +221,7 @@ public sealed class TypeOverrideMapTests
     {
         var merged = TypeOverrideMap.Over(
             TestSidecars.Of(Entry("public.status", null, SettingPlace.Query)),
-            TestSidecars.Of(Entry("public.Status", "global::App.A", Far))
+            TestSidecars.Of(Entry("public.Status", "global::App.A", RootSettingsFile))
         )!;
 
         TypeOverrideMap.Find(merged.Value, key).ShouldBeNull();
@@ -224,10 +229,10 @@ public sealed class TypeOverrideMapTests
 
     // The entry of the more specific place wins, though the one below is spelled exactly as the type's key.
     [Theory]
-    [InlineData("Near", "Far")]
-    [InlineData("FileHeader", "Near")]
+    [InlineData("SettingsFile", "RootSettingsFile")]
+    [InlineData("FileHeader", "SettingsFile")]
     [InlineData("Query", "FileHeader")]
-    [InlineData("Query", "Far")]
+    [InlineData("Query", "RootSettingsFile")]
     public void Find_PlainEntryAboveAnExactOne_Wins(string higher, string lower)
     {
         var above = Entry("public.User_Status", "global::App.B", PlaceNamed(higher));
@@ -245,10 +250,12 @@ public sealed class TypeOverrideMapTests
     {
         var merged = TypeOverrideMap.Over(
             TestSidecars.Of(Entry("public.\"Status\"", "global::App.A", SettingPlace.Query)),
-            TestSidecars.Of(Entry("public.status", "global::App.B", Far))
+            TestSidecars.Of(Entry("public.status", "global::App.B", RootSettingsFile))
         )!;
 
-        TypeOverrideMap.Find(merged.Value, "public.status").ShouldBe(Entry("public.status", "global::App.B", Far));
+        TypeOverrideMap
+            .Find(merged.Value, "public.status")
+            .ShouldBe(Entry("public.status", "global::App.B", RootSettingsFile));
         TypeOverrideMap.Find(merged.Value, "public.Status")!.Type.ShouldBe("global::App.A");
     }
 
@@ -282,7 +289,7 @@ public sealed class TypeOverrideMapTests
     [Fact]
     public void Winner_DefaultThatWins_IsGivenWhereFindGivesNull()
     {
-        var map = TestSidecars.Of(Entry("public._tag", null, Far));
+        var map = TestSidecars.Of(Entry("public._tag", null, RootSettingsFile));
 
         TypeOverrideMap.Winner(map, "public._tag")!.Type.ShouldBeNull();
         TypeOverrideMap.Find(map, "public._tag").ShouldBeNull();
@@ -294,7 +301,7 @@ public sealed class TypeOverrideMapTests
         var above = Entry("public._tag", null, SettingPlace.Query);
         var merged = TypeOverrideMap.Over(
             TestSidecars.Of(above),
-            TestSidecars.Of(Entry("public._tag", "global::App.A", Far))
+            TestSidecars.Of(Entry("public._tag", "global::App.A", RootSettingsFile))
         )!;
 
         TypeOverrideMap.Winner(merged.Value, "public._tag").ShouldBe(above);
@@ -303,14 +310,14 @@ public sealed class TypeOverrideMapTests
     [Fact]
     public void Winner_NoEntryMatches_IsNull() =>
         TypeOverrideMap
-            .Winner(TestSidecars.Of(Entry("public.tag[]", "global::App.A", Far)), "public._tag")
+            .Winner(TestSidecars.Of(Entry("public.tag[]", "global::App.A", RootSettingsFile)), "public._tag")
             .ShouldBeNull();
 
     private static SettingPlace PlaceNamed(string name) =>
         name switch
         {
-            "Near" => Near,
-            "Far" => Far,
+            "SettingsFile" => SettingsFile,
+            "RootSettingsFile" => RootSettingsFile,
             "FileHeader" => SettingPlace.FileHeader,
             "Query" => SettingPlace.Query,
             _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No such place in this test."),

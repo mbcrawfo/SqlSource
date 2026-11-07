@@ -4,15 +4,14 @@ using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing.Snapshot;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generation.Types;
 
 public sealed class FileTypesInputTests
 {
-    private static readonly SettingPlace Place = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
-    private static readonly TypeOverride Entry = new("int", "long", Place);
+    private static readonly TypeOverride Entry = new("int", "long", SettingsFile);
 
     // A level whose only type setting is one engine's override must survive, whichever engine reads it.
     [Fact]

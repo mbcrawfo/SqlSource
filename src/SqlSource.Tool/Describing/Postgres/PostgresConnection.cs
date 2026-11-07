@@ -138,8 +138,7 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             using var reader = new StreamReader(stream);
             return PasswordFile.Passwords(reader.ReadToEnd());
         }
-        catch (Exception exception)
-            when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
             return [];
         }

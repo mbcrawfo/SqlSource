@@ -127,7 +127,7 @@ public sealed class CachingSettingsFileTests
 
     // A folder of the build that holds no C# file of the scene: the folders are read again and changed, and the same
     // settings files are reached, so no file is parsed.  The folders of the build are a property, an input of the
-    // build and no setting, and the output stays the project's settings file's.
+    // build and no setting, and the output stays the project's settings file's: nothing is reported or emitted again.
     [Fact]
     public void Run_BuildFolderChanged_ReachesTheSameSettingsFiles()
     {
@@ -147,6 +147,7 @@ public sealed class CachingSettingsFileTests
         AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ParsedFile)
             .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // Another property changed: the options are new, so whether the exceptions are public is read again, and comes out

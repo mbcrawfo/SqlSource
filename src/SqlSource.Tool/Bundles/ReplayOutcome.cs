@@ -21,7 +21,11 @@ internal abstract record ReplayOutcome
     /// The step as <c>DescribeStepName.Of</c> names it, such as <c>describe parameters</c>, or null for a session that
     /// could not be opened.
     /// </param>
-    internal sealed record Refused(string Id, string? Step) : ReplayOutcome;
+    internal sealed record Refused(string Id, string? Step) : ReplayOutcome
+    {
+        /// <summary>The id and the step, as <c>SQLSRC226 at describe parameters</c>, or the id with no step.</summary>
+        public string ShortText => Step is { } step ? $"{Id} at {step}" : Id;
+    }
 
     /// <summary>The describer asked what the capture holds no answer to.</summary>
     /// <param name="Method">

@@ -137,7 +137,7 @@ public sealed class GeneratorParameterLevelTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             [new SqlFile(GeneratorHarness.UsersPath, ReservedTokenInAComment)],
             generatorParameters: null
         );
@@ -161,7 +161,7 @@ public sealed class GeneratorParameterLevelTests
 
         return GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             settings.Files(new SqlFile("/app/Repo/Q.sql", sql)),
             settings: settings.ProjectSettings
         );
@@ -189,7 +189,7 @@ public sealed class GeneratorParameterLevelTests
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)),
             generatorParameters: projectFile
         );

@@ -10,21 +10,17 @@ namespace SqlSource.Tool.Describing;
 /// Whether the run has <c>--project</c>, <c>--database</c> or a <c>.sql</c> path.  The plan's filters do not hold
 /// <c>--project</c>, and a sidecar is deleted only in a run with none of the three.
 /// </param>
-/// <param name="Connections">The values of <c>--connection</c>.</param>
+/// <param name="Sources">Where the run looks for its connections: <c>--connection</c> and the <c>.env</c> file.</param>
 /// <param name="Databases">
 /// The values of <c>--database</c>, each name once ignoring case, in the order given; the first of a name is kept.
 /// </param>
-/// <param name="UnitFolder">The full path of the folder of the run's unit, the project or the solution.</param>
-/// <param name="EnvFile">The full path of the <c>.env</c> file the run reads, or null when it reads none.</param>
 /// <param name="Online">
 /// What <c>--online</c> said: <see cref="OnlineMode.Off" /> for a run that is not part of a build.
 /// </param>
 internal sealed record DescribeOptions(
     RunMode Mode,
     bool HasFilter,
-    ImmutableArray<ConnectionArgument> Connections,
+    ConnectionSources Sources,
     ImmutableArray<UsageValue> Databases,
-    string UnitFolder,
-    string? EnvFile,
     OnlineMode Online
 );

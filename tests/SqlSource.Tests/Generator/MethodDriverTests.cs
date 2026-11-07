@@ -47,12 +47,11 @@ public sealed class MethodDriverTests
     {
         var run = MethodRuns.Run(Users, PostgresEntries, references: []);
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output codegen, and this project does not reference "
-                + "Npgsql, which its method needs.  Reference Npgsql, or set the output to models.",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output codegen, and this project does not "
+                    + "reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.",
+            ]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldContain("App.ListUsersDto-Model.g.cs");
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
@@ -63,13 +62,12 @@ public sealed class MethodDriverTests
     {
         var run = MethodRuns.RunSqlServer(Users, SqlServerEntries, references: []);
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output codegen, and this project does not reference "
-                + "Microsoft.Data.SqlClient, which its method needs.  Reference Microsoft.Data.SqlClient, or set the "
-                + "output to models.",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output codegen, and this project does not "
+                    + "reference Microsoft.Data.SqlClient, which its method needs.  Reference "
+                    + "Microsoft.Data.SqlClient, or set the output to models.",
+            ]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
@@ -142,12 +140,11 @@ public sealed class MethodDriverTests
 
         var run = MethodRuns.Run(Users, PostgresEntries, references: [driver]);
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC247 (1,1)-(1,1): This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later, so "
-                + "no query method is generated.  Update the package.",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC247 (1,1)-(1,1): This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later, "
+                    + "so no query method is generated.  Update the package.",
+            ]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
@@ -157,12 +154,11 @@ public sealed class MethodDriverTests
     {
         var run = MethodRuns.RunSqlServer(Users, SqlServerEntries, references: [SqlClientReferences.SqlClient60]);
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs "
-                + "Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs "
+                    + "Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.",
+            ]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }

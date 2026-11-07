@@ -298,15 +298,32 @@ public sealed class TypeOverrideLevelTests
             ]);
     }
 
-    // _int4 and int4[] are one key, so the query's int4[] entry replaces the project's file's _int4 one, and the
-    // query's default gives the array back to the base map.
+    // One array key in any spelling is one key: _int4, pg_catalog._int4, int4[], integer[], int[] and INTEGER[] are the
+    // same.  The project's file's entry, in any spelling, types a query that says nothing; the query's entry replaces
+    // it, whichever spellings the two use, and the query's default gives the array back to the base map.
     [Theory]
+    [InlineData("_int4", "", "global::System.Collections.Generic.List<int>")]
+    [InlineData("integer[]", "", "global::System.Collections.Generic.List<int>")]
+    [InlineData("int4[]", "", "global::System.Collections.Generic.List<int>")]
+    [InlineData("pg_catalog._int4", "", "global::System.Collections.Generic.List<int>")]
     [InlineData(
+        "_int4",
         "-- type-override: int4[] = System.Collections.Generic.List<long>\n",
         "global::System.Collections.Generic.List<long>"
     )]
-    [InlineData("-- type-override: int4[] = default\n", "int[]")]
-    public void Run_ArrayKeySpelledTwoWaysAtTwoLevels_IsOneKey(string marker, string expected)
+    [InlineData("_int4", "-- type-override: int4[] = default\n", "int[]")]
+    [InlineData(
+        "integer[]",
+        "-- type-override: _int4 = System.Collections.Generic.List<long>\n",
+        "global::System.Collections.Generic.List<long>"
+    )]
+    [InlineData("int4[]", "-- type-override: int[] = default\n", "int[]")]
+    [InlineData(
+        "pg_catalog._int4",
+        "-- type-override: INTEGER[] = System.Collections.Generic.List<long>\n",
+        "global::System.Collections.Generic.List<long>"
+    )]
+    public void Run_ArrayKeySpelledTwoWaysAtTwoLevels_IsOneKey(string projectKey, string marker, string expected)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n" + marker + "SELECT 1;\n");
         var array = TestSidecars.Postgres(
@@ -317,7 +334,7 @@ public sealed class TypeOverrideLevelTests
         );
 
         var run = Run( /*lang=json,strict*/
-            """{"_int4": "System.Collections.Generic.List<int>"}""",
+            GeneratorHarness.Json(new JsonObject { [projectKey] = "System.Collections.Generic.List<int>" }),
             (file, [Entry(file, "GetUser", array)])
         );
 

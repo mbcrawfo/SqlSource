@@ -648,5 +648,13 @@ internal static class PostgresErrors
         DescribeStep step,
         EquatableArray<string> serverLines,
         string help
-    ) => DescribeFailures.DeclaredType(query, Written(parameter), parameter.Type, reason, step, serverLines, help);
+    ) =>
+        DescribeFailures.DeclaredType(
+            query,
+            new DeclaredParameter(Written(parameter), parameter.Type),
+            reason,
+            step,
+            serverLines,
+            help
+        );
 }

@@ -23,7 +23,7 @@ public sealed class GeneratorHarnessTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             [GeneratorHarness.UsersFile],
             dialect: "postgres"
         );
@@ -40,7 +40,7 @@ public sealed class GeneratorHarnessTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.CodeGen,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             [GeneratorHarness.UsersFile],
             dialect: "postgres",
             settings: /*lang=json,strict*/
@@ -57,7 +57,7 @@ public sealed class GeneratorHarnessTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             [new SqlFile("/app/Repo/Q.sql", Kept)],
             generatorParameters: " sort-output  keep-comments "
         );
@@ -80,7 +80,7 @@ public sealed class GeneratorHarnessTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             [],
             generatorParameters: " keep-comments  sort-output ",
             dialect: "a\"b\nc"
@@ -112,7 +112,7 @@ public sealed class GeneratorHarnessTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             [GeneratorHarness.UsersFile],
             settings: GeneratorHarness.InNestedClass
         );

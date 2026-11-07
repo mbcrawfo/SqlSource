@@ -4,13 +4,12 @@ using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 
 namespace SqlSource.Tests.Settings.ColumnTypes;
 
 public sealed class ColumnTypeGrammarTests
 {
-    private static readonly SettingPlace Place = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
     [Fact]
     public void ReadMembers_Members_AreEntriesInTheOrderOfTheMapAtThePlace()
     {
@@ -19,13 +18,13 @@ public sealed class ColumnTypeGrammarTests
         ColumnTypeGrammar
             .ReadMembers(
                 [new("users.id", "UserId"), new("public.posts.created_by", "UserId")],
-                Place,
+                SettingsFile,
                 invalid,
                 repeated
             )
             .ShouldBe([
-                new ColumnType("public.posts.created_by", "UserId", Place),
-                new ColumnType("users.id", "UserId", Place),
+                new ColumnType("public.posts.created_by", "UserId", SettingsFile),
+                new ColumnType("users.id", "UserId", SettingsFile),
             ]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
@@ -41,8 +40,8 @@ public sealed class ColumnTypeGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         ColumnTypeGrammar
-            .ReadMembers([new(key, type)], Place, invalid, repeated)
-            .ShouldBe([new ColumnType("users.id", expected, Place)]);
+            .ReadMembers([new(key, type)], SettingsFile, invalid, repeated)
+            .ShouldBe([new ColumnType("users.id", expected, SettingsFile)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }
@@ -61,8 +60,8 @@ public sealed class ColumnTypeGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         ColumnTypeGrammar
-            .ReadMembers([new("posts.id", "PostId"), new(key, type)], Place, invalid, repeated)
-            .ShouldBe([new ColumnType("posts.id", "PostId", Place)]);
+            .ReadMembers([new("posts.id", "PostId"), new(key, type)], SettingsFile, invalid, repeated)
+            .ShouldBe([new ColumnType("posts.id", "PostId", SettingsFile)]);
         invalid.ShouldBe([1]);
         repeated.ShouldBeEmpty();
     }
@@ -77,8 +76,16 @@ public sealed class ColumnTypeGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         ColumnTypeGrammar
-            .ReadMembers([new(first, "A"), new("posts.id", "PostId"), new(second, "B")], Place, invalid, repeated)
-            .ShouldBe([new ColumnType("posts.id", "PostId", Place), new ColumnType("users.id", "A", Place)]);
+            .ReadMembers(
+                [new(first, "A"), new("posts.id", "PostId"), new(second, "B")],
+                SettingsFile,
+                invalid,
+                repeated
+            )
+            .ShouldBe([
+                new ColumnType("posts.id", "PostId", SettingsFile),
+                new ColumnType("users.id", "A", SettingsFile),
+            ]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBe([(2, 0)]);
     }
@@ -92,14 +99,14 @@ public sealed class ColumnTypeGrammarTests
         ColumnTypeGrammar
             .ReadMembers(
                 [new("orders.metadata", "OrderMetadata"), new("orders.note", "Note")],
-                Place,
+                SettingsFile,
                 invalid,
                 repeated,
                 [true, false]
             )
             .ShouldBe([
-                new ColumnType("orders.metadata", "OrderMetadata", Place, IsJson: true),
-                new ColumnType("orders.note", "Note", Place),
+                new ColumnType("orders.metadata", "OrderMetadata", SettingsFile, IsJson: true),
+                new ColumnType("orders.note", "Note", SettingsFile),
             ]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
@@ -116,12 +123,12 @@ public sealed class ColumnTypeGrammarTests
         ColumnTypeGrammar
             .ReadMembers(
                 [new("posts.id", "PostId"), new("orders.metadata", type)],
-                Place,
+                SettingsFile,
                 invalid,
                 repeated,
                 [false, true]
             )
-            .ShouldBe([new ColumnType("posts.id", "PostId", Place)]);
+            .ShouldBe([new ColumnType("posts.id", "PostId", SettingsFile)]);
         invalid.ShouldBe([1]);
         repeated.ShouldBeEmpty();
     }
@@ -131,7 +138,7 @@ public sealed class ColumnTypeGrammarTests
     {
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
-        ColumnTypeGrammar.ReadMembers([], Place, invalid, repeated).ShouldBeEmpty();
+        ColumnTypeGrammar.ReadMembers([], SettingsFile, invalid, repeated).ShouldBeEmpty();
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }

@@ -96,6 +96,26 @@ internal static class GeneratorHarness
         + (arguments ?? "Source = \".\"")
         + ")]\npublic partial class Sample;\n";
 
+    // The file of the type App.Sample at SourcePath, which claims every .sql file of its folder.
+    public static SourceFile SampleSourceFile => new(SourcePath, SampleSource(null));
+
+    // The sample's source and these files, with the dialect and generator parameters of the project's settings file.
+    public static GeneratorRun RunSample(
+        OutputKind? output,
+        SqlFile[] sqlFiles,
+        MetadataReference[]? references = null,
+        string? dialect = null,
+        string? generatorParameters = null
+    ) =>
+        Run(
+            output,
+            [SampleSourceFile],
+            sqlFiles,
+            references: references,
+            generatorParameters: generatorParameters,
+            dialect: dialect
+        );
+
     // The source of a type Sample of the accessibility nested in a class Outer of its own, through a class Middle of
     // the middle accessibility when it is not empty: App.Outer.Sample, else App.Outer.Middle.Sample.
     public static string NestedSampleSource(string outer, string middle, string accessibility) =>

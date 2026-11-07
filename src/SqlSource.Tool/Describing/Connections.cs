@@ -12,7 +12,7 @@ namespace SqlSource.Tool.Describing;
 /// </summary>
 internal sealed class Connections
 {
-    public const string CommandLineSource = "--connection";
+    public const string CommandLineSource = SharedOptions.Connection;
 
     private readonly Dictionary<string, DatabaseConnection> _byDatabase;
 

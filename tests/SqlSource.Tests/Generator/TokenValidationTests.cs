@@ -72,7 +72,7 @@ public sealed class TokenValidationTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [GeneratorHarness.SampleSourceFile],
             [
                 new SqlFile(
                     GeneratorHarness.UsersPath,

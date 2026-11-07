@@ -7,7 +7,8 @@ namespace SqlSource.Tests.Parsing.Quoting;
 public sealed class QuoteReaderTests
 {
     // What SQL Server takes in a name, found against 2017 and 2025: a letter or a digit of any script, and "_", "@",
-    // "#" and "$".  Of what it refuses, the rows hold a currency sign, a superscript digit and a middle dot.
+    // "#" and "$".  Of what it refuses, the rows hold a currency sign, a superscript digit, a circled digit and a
+    // middle dot.
     [Theory]
     [InlineData('a')]
     [InlineData('Z')]
@@ -27,6 +28,7 @@ public sealed class QuoteReaderTests
     [InlineData('.')]
     [InlineData('€')]
     [InlineData('²')]
+    [InlineData('①')]
     [InlineData('·')]
     [InlineData('[')]
     public void IsNameCharacterOfSqlServer_Character_IsNotAPartOfAName(char value) =>

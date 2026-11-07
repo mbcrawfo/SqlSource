@@ -47,30 +47,20 @@ internal static class DatabaseRuns
     /// <param name="selected">The selected databases, in the plan's order.</param>
     /// <param name="files">The files, with the queries to describe.</param>
     /// <param name="connections">The connections of the selected databases.</param>
-    /// <param name="host">The describers, the environment and the clock.</param>
-    /// <param name="reporter">Where the errors go, with the run's trace.</param>
-    /// <param name="cancellationToken">Ends the run.</param>
-    /// <param name="online">What <c>--online</c> said: the help for a database that cannot be opened.</param>
-    /// <param name="offline">
-    /// Whether the run is offline (<see cref="DescribeRun" />): a database with no connection fails its queries and
-    /// reports nothing, where the run would report <c>SQLSRC213</c>.
+    /// <param name="context">
+    /// The describers, the environment and the clock; where the errors go, with the run's trace; and what ends the
+    /// run.
     /// </param>
-    /// <param name="capture">
-    /// Where the run records its one session, or null for a run that records nothing.  A second session for it is a
-    /// fault of the tool.
-    /// </param>
+    /// <param name="mode">What the run's options make of each database.</param>
     public static async Task RunAsync(
         ImmutableArray<PlannedDatabase> selected,
         ImmutableArray<FileWork> files,
         Connections connections,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken,
-        OnlineMode online = OnlineMode.Off,
-        bool offline = false,
-        RunCapture? capture = null
+        RunContext context,
+        DatabaseMode mode
     )
     {
+        var (host, reporter, cancellationToken) = context;
         foreach (var database in selected)
         {
             RunEvents.Database(
@@ -88,16 +78,7 @@ internal static class DatabaseRuns
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await RunDatabaseAsync(
-                database,
-                files,
-                queries,
-                connections,
-                host,
-                reporter,
-                new DatabaseMode(online, offline, capture),
-                cancellationToken
-            );
+            await RunDatabaseAsync(database, files, queries, connections, context, mode);
         }
     }
 
@@ -109,12 +90,11 @@ internal static class DatabaseRuns
         ImmutableArray<FileWork> files,
         List<QueryWork> queries,
         Connections connections,
-        ToolHost host,
-        Reporter reporter,
-        DatabaseMode mode,
-        CancellationToken cancellationToken
+        RunContext context,
+        DatabaseMode mode
     )
     {
+        var (host, reporter, cancellationToken) = context;
         if (host.Describers.Find(database.Dialect) is not { } describer)
         {
             foreach (var query in queries)
@@ -172,15 +152,8 @@ internal static class DatabaseRuns
         // either, and an outcome that holds neither is a fault.
         if (opened.Value is not { } session)
         {
-            var failure = ReportFailure(
-                guard,
-                () => opened.Failure,
-                first,
-                database,
-                server: null,
-                reporter,
-                mode.Online
-            );
+            var (failure, error) = Redacted(guard, () => opened.Failure, first, database, server: null, mode.Online);
+            reporter.Report(error);
             RunEvents.NotOpened(trace, database, failure.Descriptor.Id);
             Fail(queries, failure.Descriptor.Id, trace);
             return;
@@ -271,16 +244,17 @@ internal static class DatabaseRuns
             }
             else
             {
-                var failure = ReportFailure(
-                    guard,
-                    () => result.Failure,
-                    planned,
-                    database,
-                    server,
-                    run.Reporter,
-                    online,
-                    write: run.Capture is null
-                );
+                var (failure, error) = Redacted(guard, () => result.Failure, planned, database, server, online);
+                // A run that records keeps the refusal in its bundle, so the error is counted and logged, not written.
+                if (run.Capture is null)
+                {
+                    run.Reporter.Report(error);
+                }
+                else
+                {
+                    run.Reporter.ReportWithoutWriting(error);
+                }
+
                 query.Failure = failure;
                 query.State = QueryState.Failed;
                 RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);
@@ -288,18 +262,16 @@ internal static class DatabaseRuns
         }
     }
 
-    // A failure a describer gave is read under the guard, where a null is the describer's fault, and redacted before
-    // it is printed, or before it is reported without being written.  It is returned redacted, for the events the
-    // caller writes.
-    private static DescribeFailure ReportFailure(
+    // A failure a describer gave is read under the guard, where a null is the describer's fault, and redacted, with
+    // its error, before the caller reports the error.  The failure is returned redacted, for the events the caller
+    // writes.
+    private static (DescribeFailure Failure, ToolDiagnostic Error) Redacted(
         Guard guard,
         Func<DescribeFailure?> failureOf,
         PlannedQuery planned,
         PlannedDatabase database,
         ServerInfo? server,
-        Reporter reporter,
-        OnlineMode online,
-        bool write = true
+        OnlineMode online
     )
     {
         var secret = guard.Secret;
@@ -307,17 +279,7 @@ internal static class DatabaseRuns
             guard.Call(() => failureOf() ?? throw new InvalidOperationException(Guard.Nothing)),
             secret
         );
-        var error = Redaction.Of(DescribeErrors.Failure(failure, planned, database, server, online), secret);
-        if (write)
-        {
-            reporter.Report(error);
-        }
-        else
-        {
-            reporter.ReportWithoutWriting(error);
-        }
-
-        return failure;
+        return (failure, Redaction.Of(DescribeErrors.Failure(failure, planned, database, server, online), secret));
     }
 
     // What a describer gave goes into a sidecar, which is committed: a value in it is a bug of the describer.
@@ -391,10 +353,6 @@ internal static class DatabaseRuns
         RunTrace Trace,
         RunCapture? Capture
     );
-
-    // What the run's options make of each database: the help of one that cannot be opened, whether one with no
-    // connection is held back silently, and where its session is recorded.
-    private sealed record DatabaseMode(OnlineMode Online, bool Offline, RunCapture? Capture);
 
     // What a describer says of a connection's value before its session is opened.  The rewrite is none for a value
     // that its driver cannot read.  It is a class and not a record, since a record prints its members.

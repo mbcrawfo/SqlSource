@@ -5,13 +5,12 @@ using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 
 namespace SqlSource.Tests.Settings.TypeOverrides;
 
 public sealed class TypeOverrideGrammarTests
 {
-    private static readonly SettingPlace Place = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
     [Theory]
     [InlineData("timestamptz=System.DateTimeOffset", "timestamptz", "global::System.DateTimeOffset")]
     [InlineData("int4=int", "int4", "int")]
@@ -59,6 +58,9 @@ public sealed class TypeOverrideGrammarTests
     [InlineData("Billing.Invoice$State=Billing.State", "Billing.Invoice$State", "global::Billing.State")]
     [InlineData("s.\"a=b\"=long", "s.\"a=b\"", "long")]
     [InlineData("s.U&\"a=b\\0022 c\"=int", "s.\"a=b\"\" c\"", "int")]
+    [InlineData("\"my schema\".\"x y\" = int", "\"my schema\".\"x y\"", "int")]
+    [InlineData("public.U&\"st\\0061tus\" = int", "public.\"status\"", "int")]
+    [InlineData("public.U&\"a\\000ab\" = MyApp.Tag", "public.U&\"a\\000Ab\"", "global::MyApp.Tag")]
     public void TryReadEntry_ValidEntry_GivesItsKeyAndTheCanonicalText(string text, string key, string type)
     {
         var entry = Read(text);
@@ -78,59 +80,8 @@ public sealed class TypeOverrideGrammarTests
     [InlineData("numeric= System.Double", "global::System.Double")]
     [InlineData("numeric =System.Double", "global::System.Double")]
     [InlineData("numeric\t=\tdefault", null)]
-    public void TryReadEntry_SpacesAroundTheEquals_AreAllowed(string text, string? type)
-    {
-        TypeOverrideGrammar
-            .TryReadEntry(text.AsSpan(), SettingPlace.Query, DatabaseEngine.PostgreSql, out var entry)
-            .ShouldBeTrue();
-
-        entry.ShouldBe(new TypeOverride("numeric", type, SettingPlace.Query));
-    }
-
-    [Fact]
-    public void TryReadEntry_QuotedKeyWithSpaces_AllowsSpacesAroundEquals()
-    {
-        TypeOverrideGrammar
-            .TryReadEntry(
-                "\"my schema\".\"x y\" = int".AsSpan(),
-                SettingPlace.Query,
-                DatabaseEngine.PostgreSql,
-                out var entry
-            )
-            .ShouldBeTrue();
-
-        entry.ShouldBe(new TypeOverride("\"my schema\".\"x y\"", "int", SettingPlace.Query));
-    }
-
-    [Fact]
-    public void TryReadEntry_EscapedKey_IsItsQuotedForm()
-    {
-        TypeOverrideGrammar
-            .TryReadEntry(
-                "public.U&\"st\\0061tus\" = int".AsSpan(),
-                SettingPlace.Query,
-                DatabaseEngine.PostgreSql,
-                out var entry
-            )
-            .ShouldBeTrue();
-
-        entry.ShouldBe(new TypeOverride("public.\"status\"", "int", SettingPlace.Query));
-    }
-
-    [Fact]
-    public void TryReadEntry_EscapedKey_IsItsWrittenForm()
-    {
-        TypeOverrideGrammar
-            .TryReadEntry(
-                "public.U&\"a\\000ab\" = MyApp.Tag".AsSpan(),
-                SettingPlace.Query,
-                DatabaseEngine.PostgreSql,
-                out var entry
-            )
-            .ShouldBeTrue();
-
-        entry.ShouldBe(new TypeOverride("public.U&\"a\\000Ab\"", "global::MyApp.Tag", SettingPlace.Query));
-    }
+    public void TryReadEntry_SpacesAroundTheEquals_AreAllowed(string text, string? type) =>
+        Read(text).ShouldBe(new TypeOverride("numeric", type, SettingPlace.Query));
 
     [Theory]
     // A ? at the end of the whole type: a property's nullability is its column's.
@@ -225,18 +176,19 @@ public sealed class TypeOverrideGrammarTests
 
         var lists = TypeOverrideGrammar.ReadMembers(
             [new("timestamptz", "default"), new("int4", "long"), new("public.\"Email\"", "MyApp.Email")],
-            Place,
+            SettingsFile,
             invalid,
             repeated
         );
 
         lists[DatabaseEngine.PostgreSql]
             .ShouldBe([
-                new TypeOverride("int4", "long", Place),
-                new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place),
-                new TypeOverride("timestamptz", null, Place),
+                new TypeOverride("int4", "long", SettingsFile),
+                new TypeOverride("public.\"Email\"", "global::MyApp.Email", SettingsFile),
+                new TypeOverride("timestamptz", null, SettingsFile),
             ]);
-        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place)]);
+        lists[DatabaseEngine.SqlServer]
+            .ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", SettingsFile)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }
@@ -258,7 +210,7 @@ public sealed class TypeOverrideGrammarTests
                     new("public.status", "App.T"),
                     new("bool", "bool"),
                 ],
-                Place,
+                SettingsFile,
                 invalid,
                 repeated
             )[DatabaseEngine.PostgreSql]
@@ -277,13 +229,13 @@ public sealed class TypeOverrideGrammarTests
         TypeOverrideGrammar
             .ReadMembers(
                 [new("\"my schema\".\"order status\"", "MyApp.A"), new("int4", "long")],
-                Place,
+                SettingsFile,
                 invalid,
                 repeated
             )[DatabaseEngine.PostgreSql]
             .ShouldBe([
-                new TypeOverride("int4", "long", Place),
-                new TypeOverride("\"my schema\".\"order status\"", "global::MyApp.A", Place),
+                new TypeOverride("int4", "long", SettingsFile),
+                new TypeOverride("\"my schema\".\"order status\"", "global::MyApp.A", SettingsFile),
             ]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
@@ -294,10 +246,10 @@ public sealed class TypeOverrideGrammarTests
     {
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
-        var lists = TypeOverrideGrammar.ReadMembers([new("nvarchar", "string")], Place, invalid, repeated);
+        var lists = TypeOverrideGrammar.ReadMembers([new("nvarchar", "string")], SettingsFile, invalid, repeated);
 
         lists[DatabaseEngine.PostgreSql].ShouldBeEmpty();
-        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("nvarchar", "string", Place)]);
+        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("nvarchar", "string", SettingsFile)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }
@@ -311,8 +263,8 @@ public sealed class TypeOverrideGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         TypeOverrideGrammar
-            .ReadMembers([new(key, type)], Place, invalid, repeated)[DatabaseEngine.PostgreSql]
-            .ShouldBe([new TypeOverride("int4", expected, Place)]);
+            .ReadMembers([new(key, type)], SettingsFile, invalid, repeated)[DatabaseEngine.PostgreSql]
+            .ShouldBe([new TypeOverride("int4", expected, SettingsFile)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBeEmpty();
     }
@@ -331,8 +283,10 @@ public sealed class TypeOverrideGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         TypeOverrideGrammar
-            .ReadMembers([new("int8", "long"), new(key, type)], Place, invalid, repeated)[DatabaseEngine.PostgreSql]
-            .ShouldBe([new TypeOverride("int8", "long", Place)]);
+            .ReadMembers([new("int8", "long"), new(key, type)], SettingsFile, invalid, repeated)[
+                DatabaseEngine.PostgreSql
+            ]
+            .ShouldBe([new TypeOverride("int8", "long", SettingsFile)]);
         invalid.ShouldBe([1]);
         repeated.ShouldBeEmpty();
     }
@@ -354,8 +308,10 @@ public sealed class TypeOverrideGrammarTests
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
         TypeOverrideGrammar
-            .ReadMembers([new(first, "long"), new(second, "int")], Place, invalid, repeated)[DatabaseEngine.PostgreSql]
-            .ShouldBe([new TypeOverride(key, "long", Place)]);
+            .ReadMembers([new(first, "long"), new(second, "int")], SettingsFile, invalid, repeated)[
+                DatabaseEngine.PostgreSql
+            ]
+            .ShouldBe([new TypeOverride(key, "long", SettingsFile)]);
         invalid.ShouldBeEmpty();
         repeated.ShouldBe([(1, 0)]);
     }
@@ -369,12 +325,12 @@ public sealed class TypeOverrideGrammarTests
 
         var lists = TypeOverrideGrammar.ReadMembers(
             [new("int4", "long"), new("int", "MyApp.X")],
-            Place,
+            SettingsFile,
             invalid,
             repeated
         );
 
-        lists[DatabaseEngine.PostgreSql].ShouldBe([new TypeOverride("int4", "long", Place)]);
+        lists[DatabaseEngine.PostgreSql].ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
         lists[DatabaseEngine.SqlServer].ShouldBeEmpty();
         repeated.ShouldBe([(1, 0)]);
     }
@@ -387,13 +343,13 @@ public sealed class TypeOverrideGrammarTests
 
         var lists = TypeOverrideGrammar.ReadMembers(
             [new("rowversion", "byte[]"), new("timestamp", "MyApp.X")],
-            Place,
+            SettingsFile,
             invalid,
             repeated
         );
 
         lists[DatabaseEngine.PostgreSql].ShouldBeEmpty();
-        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("timestamp", "byte[]", Place)]);
+        lists[DatabaseEngine.SqlServer].ShouldBe([new TypeOverride("timestamp", "byte[]", SettingsFile)]);
         repeated.ShouldBe([(1, 0)]);
     }
 
@@ -405,7 +361,7 @@ public sealed class TypeOverrideGrammarTests
 
         _ = TypeOverrideGrammar.ReadMembers(
             [new("sys.int", "long"), new("int4", "long"), new("integer", "MyApp.X")],
-            Place,
+            SettingsFile,
             invalid,
             repeated
         );
@@ -418,7 +374,7 @@ public sealed class TypeOverrideGrammarTests
     {
         var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
 
-        var lists = TypeOverrideGrammar.ReadMembers([], Place, invalid, repeated);
+        var lists = TypeOverrideGrammar.ReadMembers([], SettingsFile, invalid, repeated);
 
         lists[DatabaseEngine.PostgreSql].ShouldBeEmpty();
         lists[DatabaseEngine.SqlServer].ShouldBeEmpty();

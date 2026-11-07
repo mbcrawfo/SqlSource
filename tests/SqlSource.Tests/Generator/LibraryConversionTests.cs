@@ -170,22 +170,27 @@ public sealed class LibraryConversionTests
         run.Sources.Keys.ShouldNotContain(ClassFile);
     }
 
-    // An override to one of NodaTime's types finds the library's edge with the switch off, and the class is emitted
-    // for it.
+    // An override to one of NodaTime's types finds the library's edge with the switch off or on, and the class is
+    // emitted for it: the override wins over the library's rows.
     [Theory]
-    [InlineData("datetime2", "NodaTime.Instant", "InstantFromDateTime", "DateTimeFromInstant")]
-    [InlineData("time", "NodaTime.Duration", "DurationFromTimeSpan", "TimeSpanFromDuration")]
-    [InlineData("datetimeoffset", "NodaTime.Instant", "InstantFromDateTimeOffset", "DateTimeOffsetFromInstant")]
-    public void Run_OverrideWithTheSwitchOff_GetsTheConversion(
+    [InlineData("datetime2", "NodaTime.Instant", "InstantFromDateTime", "DateTimeFromInstant", false)]
+    [InlineData("datetime2", "NodaTime.Instant", "InstantFromDateTime", "DateTimeFromInstant", true)]
+    [InlineData("time", "NodaTime.Duration", "DurationFromTimeSpan", "TimeSpanFromDuration", false)]
+    [InlineData("time", "NodaTime.Duration", "DurationFromTimeSpan", "TimeSpanFromDuration", true)]
+    [InlineData("datetimeoffset", "NodaTime.Instant", "InstantFromDateTimeOffset", "DateTimeOffsetFromInstant", false)]
+    [InlineData("datetimeoffset", "NodaTime.Instant", "InstantFromDateTimeOffset", "DateTimeOffsetFromInstant", true)]
+    public void Run_OverrideWithTheSwitchOnOrOff_GetsTheConversion(
         string databaseType,
         string type,
         string read,
-        string write
+        string write,
+        bool switchOn
     )
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: "
+            (switchOn ? NodaTimeOn : "")
+                + "-- type-override: "
                 + databaseType
                 + "="
                 + type

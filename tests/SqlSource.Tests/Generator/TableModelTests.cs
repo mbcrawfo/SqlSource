@@ -218,13 +218,13 @@ public sealed class TableModelTests
 
         var run = Run(Source, [a, Sidecar(a, "GetA", [Column("id")]), b, Sidecar(b, "GetB", [Column("id")])]);
 
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC257 {GetBName}: The output model 'App.UsersDto' of the query 'GetB' is not the same as the output "
-                + "model of that name of the query 'GetA' in A.sql: the property 'Id' is 'long' here and 'int' "
-                + $"there.{Help257}",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC257 {GetBName}: The output model 'App.UsersDto' of the query 'GetB' is not the same as the "
+                    + $"output "
+                    + "model of that name of the query 'GetA' in A.sql: the property 'Id' is 'long' here and 'int' "
+                    + $"there.{Help257}",
+            ]);
         ModelFiles(run).ShouldBe(["App.UsersDto-Model.g.cs"]);
         run.Sources["App.UsersDto-Model.g.cs"].ShouldContain("record UsersDto(int Id);");
         run.Sources["App.UsersDto-Model.g.cs"].ShouldContain("read by the query <c>GetA</c> from <c>A.sql</c>.\n");
@@ -356,14 +356,13 @@ public sealed class TableModelTests
             [a, Sidecar(a, "GetA", PublicUsers, [Column("id")]), b, Sidecar(b, "Users", null, [Column("name")])]
         );
 
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC257 {GetBName.Replace("(1,10)-(1,14)", "(1,10)-(1,15)", StringComparison.Ordinal)}: The output "
-                + "model 'App.UsersDto' of the query 'Users' is not the same as the output model of that name of the "
-                + "query 'GetA' in A.sql: its property 1 is 'Name' here and 'Id' there."
-                + Help257,
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC257 {GetBName.Replace("(1,10)-(1,14)", "(1,10)-(1,15)", StringComparison.Ordinal)}: The output "
+                    + "model 'App.UsersDto' of the query 'Users' is not the same as the output model of that name of "
+                    + "the query 'GetA' in A.sql: its property 1 is 'Name' here and 'Id' there."
+                    + Help257,
+            ]);
         ModelFiles(run).ShouldBe(["App.UsersDto-Model.g.cs"]);
     }
 

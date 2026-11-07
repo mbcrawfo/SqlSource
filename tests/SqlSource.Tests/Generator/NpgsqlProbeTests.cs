@@ -24,15 +24,6 @@ namespace SqlSource.Tests.Generator;
 // driver.
 public sealed class NpgsqlProbeTests
 {
-    private const string Source = """
-        using SqlSource;
-
-        namespace App;
-
-        [SqlSourceGenerate(Source = ".")]
-        public partial class Sample;
-        """;
-
     // A project with a type of its own for the override to name.
     private const string SourceWithDateSpan = """
         using SqlSource;
@@ -243,8 +234,18 @@ public sealed class NpgsqlProbeTests
             + "no query method is generated.  Update the package.";
         var driver = NpgsqlReferences.Synthetic("7.0.0", slimBuilder: false, cube: false);
 
-        var oneFile = Run(OutputKind.Models, [driver], UsersWithSidecar);
-        var twoFiles = Run(OutputKind.Models, [driver], BothWithSidecars);
+        var oneFile = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            UsersWithSidecar,
+            references: [driver],
+            dialect: "postgres"
+        );
+        var twoFiles = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            BothWithSidecars,
+            references: [driver],
+            dialect: "postgres"
+        );
 
         oneFile.Diagnostics.ShouldBe([Expected]);
         oneFile.SeverityOf("SQLSRC247").ShouldBe(DiagnosticSeverity.Error);
@@ -257,7 +258,12 @@ public sealed class NpgsqlProbeTests
     {
         var driver = NpgsqlReferences.Synthetic("11.0.0", slimBuilder: true, cube: true);
 
-        var run = Run(OutputKind.Models, [driver], BothWithSidecars);
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            BothWithSidecars,
+            references: [driver],
+            dialect: "postgres"
+        );
 
         run.Diagnostics.ShouldBe([
             "SQLSRC248 (1,1)-(1,1): This project references Npgsql 11.0.0, which is newer than this version of "
@@ -276,13 +282,17 @@ public sealed class NpgsqlProbeTests
     {
         var driver = NpgsqlReferences.Synthetic(version, slimBuilder, cube);
 
-        var sql = Run(OutputKind.Sql, [driver], GeneratorHarness.UsersFile, Orders);
-        var mssql = Run(
+        var sql = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [GeneratorHarness.UsersFile, Orders],
+            references: [driver],
+            dialect: "postgres"
+        );
+        var mssql = GeneratorHarness.RunSample(
             OutputKind.Models,
-            [driver],
-            "mssql",
-            GeneratorHarness.UsersFile,
-            Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.SqlServer, "GetUser")
+            [GeneratorHarness.UsersFile, Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.SqlServer, "GetUser")],
+            references: [driver],
+            dialect: "mssql"
         );
 
         sql.Diagnostics.ShouldBeEmpty();
@@ -294,15 +304,17 @@ public sealed class NpgsqlProbeTests
     [Fact]
     public void Run_NpgsqlInAnAssemblyOfAnotherName_HasNoVersion()
     {
-        var old = Run(
+        var old = GeneratorHarness.RunSample(
             OutputKind.Models,
-            [NpgsqlReferences.Synthetic("7.0.0", slimBuilder: false, cube: false, assemblyName: "Merged")],
-            UsersWithSidecar
+            UsersWithSidecar,
+            references: [NpgsqlReferences.Synthetic("7.0.0", slimBuilder: false, cube: false, assemblyName: "Merged")],
+            dialect: "postgres"
         );
-        var newer = Run(
+        var newer = GeneratorHarness.RunSample(
             OutputKind.Models,
-            [NpgsqlReferences.Synthetic("11.0.0", slimBuilder: true, cube: true, assemblyName: "Merged")],
-            UsersWithSidecar
+            UsersWithSidecar,
+            references: [NpgsqlReferences.Synthetic("11.0.0", slimBuilder: true, cube: true, assemblyName: "Merged")],
+            dialect: "postgres"
         );
 
         old.Diagnostics.ShouldBe([
@@ -322,10 +334,11 @@ public sealed class NpgsqlProbeTests
     [Fact]
     public void Run_AssemblyNamedInAnotherCase_GivesItsVersion()
     {
-        var run = Run(
+        var run = GeneratorHarness.RunSample(
             OutputKind.Models,
-            [NpgsqlReferences.Synthetic("11.0.0", slimBuilder: true, cube: true, assemblyName: "npgsql")],
-            UsersWithSidecar
+            UsersWithSidecar,
+            references: [NpgsqlReferences.Synthetic("11.0.0", slimBuilder: true, cube: true, assemblyName: "npgsql")],
+            dialect: "postgres"
         );
 
         StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe).Version.ShouldBe(new Version(11, 0, 0, 0));
@@ -414,31 +427,18 @@ public sealed class NpgsqlProbeTests
     // Users with its sidecar at Models, with the driver's references, gives no diagnostic and the probe and column.
     private static void ShouldReadTheFlags(MetadataReference[] references, NpgsqlProbe expected, NpgsqlColumn column)
     {
-        var run = Run(OutputKind.Models, references, UsersWithSidecar);
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Models,
+            UsersWithSidecar,
+            references: references,
+            dialect: "postgres"
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         var probe = StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe);
         probe.ShouldBe(expected);
         probe.Column.ShouldBe(column);
     }
-
-    // The project at the output, under postgres unless the dialect is given, with these references.
-    private static GeneratorRun Run(OutputKind output, MetadataReference[] references, params SqlFile[] files) =>
-        Run(output, references, "postgres", files);
-
-    private static GeneratorRun Run(
-        OutputKind output,
-        MetadataReference[] references,
-        string dialect,
-        params SqlFile[] files
-    ) =>
-        GeneratorHarness.Run(
-            output,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            files,
-            references: references,
-            dialect: dialect
-        );
 
     // The help of SQLSRC249 that offers the type override's entries.
     private static string OrMap(string entries) =>

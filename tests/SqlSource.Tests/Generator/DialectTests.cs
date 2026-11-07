@@ -54,7 +54,11 @@ public sealed class DialectTests
         string expected
     )
     {
-        var run = Run(projectFile, Files(QueryPath, Query, marker, folderFile));
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            Files(QueryPath, Query, marker, folderFile),
+            dialect: projectFile
+        );
 
         run.ShouldBeClean();
         run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + expected + "\";");
@@ -101,7 +105,11 @@ public sealed class DialectTests
         string? projectFile
     )
     {
-        var run = Run(projectFile, Files(QueryPath, PathQuery, marker, folderFile));
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            Files(QueryPath, PathQuery, marker, folderFile),
+            dialect: projectFile
+        );
 
         run.ShouldBeClean();
     }
@@ -117,7 +125,11 @@ public sealed class DialectTests
         string? projectFile
     )
     {
-        var run = Run(projectFile, Files(QueryPath, PathQuery, marker, folderFile));
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            Files(QueryPath, PathQuery, marker, folderFile),
+            dialect: projectFile
+        );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC101 ");
     }
@@ -125,7 +137,11 @@ public sealed class DialectTests
     [Fact]
     public void Run_MarkerWithAnOptionThatIsNotValid_IsAnErrorAtItsValue()
     {
-        var run = Run(null, new SqlFile(QueryPath, "-- dialect: postgres,ansi-quotes\n" + Query));
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [new SqlFile(QueryPath, "-- dialect: postgres,ansi-quotes\n" + Query)],
+            dialect: null
+        );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,13)-(1,33): ");
     }
@@ -136,7 +152,11 @@ public sealed class DialectTests
     [InlineData("Cockroach")]
     public void Run_BytesLiteralWithAnEscapedQuoteUnderCockroachDb_IsRead(string dialect)
     {
-        var run = Run(dialect, new SqlFile(QueryPath, BytesWithAnEscapedQuote));
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [new SqlFile(QueryPath, BytesWithAnEscapedQuote)],
+            dialect: dialect
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
@@ -146,19 +166,14 @@ public sealed class DialectTests
     [Fact]
     public void Run_BytesLiteralWithAnEscapedQuoteUnderPostgres_IsSqlsrc101()
     {
-        var run = Run("postgres", new SqlFile(QueryPath, BytesWithAnEscapedQuote));
+        var run = GeneratorHarness.RunSample(
+            OutputKind.Sql,
+            [new SqlFile(QueryPath, BytesWithAnEscapedQuote)],
+            dialect: "postgres"
+        );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC101 ");
     }
-
-    // The files at sql under the project's file of the dialect, or of none when it is null.
-    private static GeneratorRun Run(string? projectFile, params SqlFile[] files) =>
-        GeneratorHarness.Run(
-            OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            files,
-            dialect: projectFile
-        );
 
     // The .sql file at the path, under its marker of the dialect when one is given, and then the settings file of its
     // folder when that file's dialect is given.

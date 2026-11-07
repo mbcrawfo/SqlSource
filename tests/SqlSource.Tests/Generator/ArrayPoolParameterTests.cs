@@ -1,14 +1,9 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using Shouldly;
-using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
-using SqlSource.Generation.Methods;
-using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using Xunit;
-using static SqlSource.Testing.Generator.ModelRuns;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -65,10 +60,10 @@ public sealed class ArrayPoolParameterTests
             + (query is null ? string.Empty : "-- generator: " + query + "\n")
             + "SELECT id, name FROM users;\n";
 
-        var run = Run(settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)), projectFile);
+        var run = MethodRuns.ListUsers(settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)), projectFile);
 
         run.ShouldBeClean();
-        Method(run).UseArrayPool.ShouldBe(expected);
+        MethodRuns.SingleMethod(run).UseArrayPool.ShouldBe(expected);
     }
 
     [Theory]
@@ -117,12 +112,12 @@ public sealed class ArrayPoolParameterTests
 
         var unpooledFile = file with { Text = "-- generator: array-pool=off\n\n" + file.Text };
 
-        var pooled = Run([file], null, hasRows: hasRows);
-        var unpooled = Run([unpooledFile], null, hasRows: hasRows);
+        var pooled = MethodRuns.ListUsers([file], null, hasRows: hasRows);
+        var unpooled = MethodRuns.ListUsers([unpooledFile], null, hasRows: hasRows);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
-        Method(unpooled).UseArrayPool.ShouldBeFalse();
+        MethodRuns.SingleMethod(unpooled).UseArrayPool.ShouldBeFalse();
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
     }
 
@@ -134,38 +129,13 @@ public sealed class ArrayPoolParameterTests
         var file = new SqlFile(GeneratorHarness.UsersPath, collectionType + query);
         var unpooledFile = file with { Text = collectionType + "-- generator: array-pool=off\n" + query };
 
-        var pooled = Run([file], null);
-        var unpooled = Run([unpooledFile], null);
+        var pooled = MethodRuns.ListUsers([file], null);
+        var unpooled = MethodRuns.ListUsers([unpooledFile], null);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
-        Method(pooled).UseArrayPool.ShouldBeTrue();
-        Method(unpooled).UseArrayPool.ShouldBeFalse();
+        MethodRuns.SingleMethod(pooled).UseArrayPool.ShouldBeTrue();
+        MethodRuns.SingleMethod(unpooled).UseArrayPool.ShouldBeFalse();
         return (pooled, unpooled);
     }
-
-    // The one method the run planned for App.Sample.
-    private static QueryMethod Method(GeneratorRun run) =>
-        StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods).Methods.ShouldHaveSingleItem();
-
-    // The first of the files, a .sql file, with its sidecar, and the others, at CodeGen under postgres on Npgsql 10, on
-    // App.Sample, with the generator parameters of the project's settings file.  The entry of ListUsers has the rows id
-    // and name, or none.
-    private static GeneratorRun Run(SqlFile[] files, string? projectFile, bool hasRows = true)
-    {
-        var file = files[0];
-
-        return GeneratorHarness.Run(
-            OutputKind.CodeGen,
-            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
-            [.. files, Sidecars.Of(file, Entries(file, hasRows))],
-            references: [NpgsqlReferences.Npgsql10],
-            generatorParameters: projectFile,
-            dialect: "postgres"
-        );
-    }
-
-    // The entry of ListUsers, with the rows id and name, or none.
-    private static SidecarEntry[] Entries(SqlFile file, bool hasRows) =>
-        [Entry(file, "ListUsers", [], hasRows ? [Column("id"), Column("name", Text, nullable: true)] : null)];
 }

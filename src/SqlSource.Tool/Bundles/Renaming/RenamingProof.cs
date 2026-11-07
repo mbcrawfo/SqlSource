@@ -55,10 +55,7 @@ internal static class RenamingProof
 
         var (query, dialect) = planned.Value;
         var replayed = await BundleReplay.RunAsync(
-            query,
-            dialect,
-            capture.Value,
-            describer,
+            new PreparedReplay(query, dialect, capture.Value, describer, expected.Value),
             NullRunLog.Instance,
             StillClock.Instance,
             token
@@ -110,8 +107,7 @@ internal static class RenamingProof
         outcome switch
         {
             ReplayOutcome.Described described => "the entry of " + described.Entry.Name,
-            ReplayOutcome.Refused { Step: { } step } refused => $"{refused.Id} at {step}",
-            ReplayOutcome.Refused refused => refused.Id,
+            ReplayOutcome.Refused refused => refused.ShortText,
             _ => throw new InvalidOperationException($"A replay gave the outcome {outcome}."),
         };
 

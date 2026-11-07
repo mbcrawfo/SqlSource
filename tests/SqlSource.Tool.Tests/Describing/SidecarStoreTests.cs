@@ -270,9 +270,7 @@ public sealed class SidecarStoreTests : IDisposable
             new Reporter(_error),
             _clock,
             onTheWhole: false,
-            changes.Move,
-            changes.Delete,
-            changes.Wait,
+            new SidecarStore.FileActions(changes.Move, changes.Delete, changes.Wait),
             cancellationToken
         );
 
@@ -396,9 +394,7 @@ public sealed class SidecarStoreTests : IDisposable
                 new Reporter(_error),
                 _clock,
                 onTheWhole: false,
-                changes.Move,
-                changes.Delete,
-                (_, _) => cancel.Cancel(),
+                new SidecarStore.FileActions(changes.Move, changes.Delete, (_, _) => cancel.Cancel()),
                 cancel.Token
             )
         );
@@ -426,9 +422,11 @@ public sealed class SidecarStoreTests : IDisposable
             new Reporter(_error),
             _clock,
             onTheWhole: false,
-            SidecarStore.MoveOverwriting,
-            SidecarStore.DeleteFile,
-            (_, _) => holder.Dispose(),
+            new SidecarStore.FileActions(
+                SidecarStore.MoveOverwriting,
+                SidecarStore.DeleteFile,
+                (_, _) => holder.Dispose()
+            ),
             TestContext.Current.CancellationToken
         );
 

@@ -22,7 +22,7 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ColumnNames_ArePascalCase()
     {
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(
                 GeneratorHarness.UsersFile,
@@ -41,7 +41,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @accountId, @user_id;\n");
 
-        var run = Run(file, Entry(file, "GetUser", [Parameter("accountId"), Parameter("user_id")], null));
+        var run = CleanRun(file, Entry(file, "GetUser", [Parameter("accountId"), Parameter("user_id")], null));
 
         run.Diagnostics.ShouldBeEmpty();
         NamesOf(QueryOf(run).Input).ShouldBe(["AccountId", "UserId"]);
@@ -50,7 +50,7 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ColumnNamedQuestionColumn_IsSqlsrc253()
     {
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("id"), Column("?column?")])
         );
@@ -65,7 +65,7 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ColumnNotAnIdentifier_IsSqlsrc254()
     {
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("api-url")])
         );
@@ -82,7 +82,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @2fa;\n");
 
-        var run = Run(file, Entry(file, "GetUser", [Parameter("2fa")], null));
+        var run = CleanRun(file, Entry(file, "GetUser", [Parameter("2fa")], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC254 {GetUserName}: The parameter '2fa' gives the property name '2fa', which is not a C# "
@@ -94,7 +94,7 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_TwoColumnsOneName_IsSqlsrc255()
     {
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("id"), Column("id")])
         );
@@ -109,7 +109,7 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_UserIdBesideUserId_IsSqlsrc255()
     {
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("user_id"), Column("userId")])
         );
@@ -127,7 +127,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @a_b, @aB;\n");
 
-        var run = Run(file, Entry(file, "GetUser", [Parameter("a_b"), Parameter("aB")], null));
+        var run = CleanRun(file, Entry(file, "GetUser", [Parameter("a_b"), Parameter("aB")], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC255 {GetUserName}: The parameter 'a_b' at position 1 and the parameter 'aB' at position 2 give "
@@ -150,7 +150,10 @@ public sealed class ModelNameTests
     [InlineData("Clone")]
     public void Run_ReservedName_IsSqlsrc256(string name)
     {
-        var run = Run(GeneratorHarness.UsersFile, Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column(name)]));
+        var run = CleanRun(
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column(name)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC256 {GetUserName}: The column '{name}' gives the property name '{name}', which a record or object "
@@ -164,7 +167,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @to_string;\n");
 
-        var run = Run(file, Entry(file, "GetUser", [Parameter("to_string")], null));
+        var run = CleanRun(file, Entry(file, "GetUser", [Parameter("to_string")], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC256 {GetUserName}: The parameter 'to_string' gives the property name 'ToString', which a record "
@@ -182,7 +185,7 @@ public sealed class ModelNameTests
             "-- name: DeleteUser\n-- output-model: UserRow\nDELETE FROM users;\n"
         );
 
-        var run = Run(file, Entry(file, "DeleteUser", [], null));
+        var run = CleanRun(file, Entry(file, "DeleteUser", [], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC259 {GeneratorHarness.UsersPath}(2,1)-(2,25): The query 'DeleteUser' names an output model, and "
@@ -198,7 +201,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @2fa;\n");
 
-        var run = Run(
+        var run = CleanRun(
             file,
             Entry(file, "GetUser", [Parameter("2fa")], [Column("?column?"), Column("id"), Column("ID")])
         );
@@ -222,7 +225,7 @@ public sealed class ModelNameTests
             "-- name: GetUser\nSELECT 1;\n\n-- name: GetOther\nSELECT 2;\n"
         );
 
-        var run = Run(
+        var run = CleanRun(
             file,
             Entry(file, "GetUser", [], [Column("id"), Column("id")]),
             Entry(file, "GetOther", [], [Column("id")])
@@ -235,7 +238,7 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ColumnSuffixes_SetNullability()
     {
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(
                 GeneratorHarness.UsersFile,
@@ -257,7 +260,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @p, @q, @r;\n");
 
-        var run = Run(
+        var run = CleanRun(
             file,
             Entry(
                 file,
@@ -279,7 +282,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
         var numeric = TestSidecars.Postgres(name: "numeric(10,2)", internalName: "numeric");
-        var run = Run(
+        var run = CleanRun(
             file,
             Entry(
                 file,
@@ -322,7 +325,7 @@ public sealed class ModelNameTests
             labels: ["x"]
         );
 
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("id", odd)])
         );
@@ -339,7 +342,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @user_id;\n");
 
-        var run = Run(file, Entry(file, "GetUser", [Parameter("user_id")], [Column("id")]));
+        var run = CleanRun(file, Entry(file, "GetUser", [Parameter("user_id")], [Column("id")]));
 
         run.Diagnostics.ShouldBeEmpty();
         var query = QueryOf(run);
@@ -354,7 +357,10 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_NoParameters_HasNoInputModel()
     {
-        var run = Run(GeneratorHarness.UsersFile, Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("id")]));
+        var run = CleanRun(
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("id")])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         var query = QueryOf(run);
@@ -367,7 +373,7 @@ public sealed class ModelNameTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
 
-        var run = Run(file, Entry(file, "GetUser", [Parameter("id")], null));
+        var run = CleanRun(file, Entry(file, "GetUser", [Parameter("id")], null));
 
         run.Diagnostics.ShouldBeEmpty();
         var query = QueryOf(run);
@@ -379,7 +385,7 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_NoColumns_HasAnEmptyOutputModel()
     {
-        var run = Run(GeneratorHarness.UsersFile, Entry(GeneratorHarness.UsersFile, "GetUser", [], []));
+        var run = CleanRun(GeneratorHarness.UsersFile, Entry(GeneratorHarness.UsersFile, "GetUser", [], []));
 
         run.Diagnostics.ShouldBeEmpty();
         QueryOf(run).Output.ShouldNotBeNull().ShouldBeEmpty();
@@ -391,7 +397,7 @@ public sealed class ModelNameTests
     {
         var regclass = TestSidecars.Postgres(name: "regclass", internalName: "regclass");
 
-        var run = Run(
+        var run = CleanRun(
             GeneratorHarness.UsersFile,
             Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("relation", regclass), Column("?column?")])
         );
@@ -411,7 +417,7 @@ public sealed class ModelNameTests
         );
         var regclass = TestSidecars.Postgres(name: "regclass", internalName: "regclass");
 
-        var run = Run(file, Entry(file, "DeleteUser", [TestSidecars.Parameter(0, "id", regclass)], null));
+        var run = CleanRun(file, Entry(file, "DeleteUser", [TestSidecars.Parameter(0, "id", regclass)], null));
 
         run.Diagnostics.Count.ShouldBe(2);
         run.Diagnostics[0].ShouldStartWith($"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): ");
@@ -437,7 +443,7 @@ public sealed class ModelNameTests
             MatchesTable = new SidecarTable("public", "users"),
         };
 
-        var run = Run(file, Entry(file, "GetFirst", [], [Column("one")]), entry);
+        var run = CleanRun(file, Entry(file, "GetFirst", [], [Column("one")]), entry);
 
         run.Diagnostics.ShouldBeEmpty();
         var models = ModelsOf(run);
@@ -492,16 +498,14 @@ public sealed class ModelNameTests
         // A file with a marker that is not valid is not described, so it has no entry.
         var run =
             place == "modelNamespace"
-                ? ModelRuns.Run(
+                ? Run(
                     file,
                     [Entry(file, "GetUser", [Parameter("id")], [Column("id")])],
                     $$"""{"modelNamespace": "{{value}}"}"""
                 )
-                : ModelRuns.Run(file);
+                : Run(file);
 
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        var diagnostic = run.Problems().ShouldHaveSingleItem();
         if (place == "modelNamespace")
         {
             diagnostic.ShouldStartWith($"SQLSRC019 {GeneratorHarness.ProjectSettingsPath}(");
@@ -515,15 +519,6 @@ public sealed class ModelNameTests
                 $"SQLSRC111 {GeneratorHarness.UsersPath}(2,{start})-(2,{start + value.Length}): "
             );
         }
-    }
-
-    // Every run compiles, with no warning in the generated code, whatever its diagnostics.
-    private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries)
-    {
-        var run = ModelRuns.Run(file, entries);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        return run;
     }
 
     private static QueryModels QueryOf(GeneratorRun run) => ModelsOf(run).Queries.ShouldHaveSingleItem();

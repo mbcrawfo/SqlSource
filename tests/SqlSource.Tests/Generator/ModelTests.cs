@@ -701,9 +701,7 @@ public sealed class ModelTests
 
         var run = Run(source, [AllUsers, Sidecars.Of(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")]))]);
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC001 ");
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC001 ");
         ModelFiles(run).ShouldBe([GetUserDtoFile]);
     }
 
@@ -739,9 +737,7 @@ public sealed class ModelTests
             ]
         );
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 ");
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 ");
         ModelFiles(run).ShouldBe([GetUserDtoFile, "Other.GetUserDto-Model.g.cs"]);
         run.Sources[GetUserDtoFile].ShouldContain("record GetUserDto(int One);");
         run.Sources["Other.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int Id);");
@@ -780,9 +776,7 @@ public sealed class ModelTests
             ]
         );
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC009 ");
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC009 ");
         ModelFiles(run).ShouldBe(["Other.SqlDto-Model.g.cs"]);
     }
 
@@ -797,11 +791,10 @@ public sealed class ModelTests
 
         var run = Run(file, Entry(file, "GetUser", [], [Column("one")]));
 
-        run.Diagnostics.ShouldBe([
-            $"SQLSRC114 {GeneratorHarness.UsersPath}(4,21)-(4,30): The token name 'class' is a reserved C# keyword",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC114 {GeneratorHarness.UsersPath}(4,21)-(4,30): The token name 'class' is a reserved C# keyword",
+            ]);
         ModelFiles(run).ShouldBeEmpty();
     }
 

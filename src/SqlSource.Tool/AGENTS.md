@@ -25,7 +25,7 @@ Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 
 ## Results and errors
 
-- **A result that may fail has one shape where files meet.**  A method that another file calls and that gives one value or one reason returns an `Outcome<TValue, TFailure>` and reports nothing: its caller does, as `DescribeCommand.FindUnit` reports what `Projects/RunUnitFinder.cs` found.  `Outcome.cs` says what is no `Outcome`, and how one of a value that must be disposed is made.
+- **A result that may fail has one shape where files meet.**  A method that another file calls and that gives one value or one reason returns an `Outcome<TValue, TFailure>` and reports nothing: its caller does, as `PlanSteps.FindUnit` reports what `Projects/RunUnitFinder.cs` found.  `Outcome.cs` says what is no `Outcome`, and how one of a value that must be disposed is made.
 - **Every error goes through `Reporting/Reporter.cs` with a descriptor of `ToolDiagnostics`**, or of `SqlDiagnostics` where the generator reports the same condition.  The descriptors are in the generator's project; `src/SqlSource/Diagnostics/AGENTS.md` lists the four places a new one touches.  A wrong command line is the one exception, below.
 - **The exit code is `0`, `1` or `2`**, as the manual's [exit codes](../../docs/manual/tool.md#exit-codes) say.  `Cli.ExitCodeOf` takes it from the reporter, so a command reports, goes on, and never returns `1`.  `2` is for `SQLSRC219` and for `replay`'s answer that is not the bundle's; a query that cannot be described is "could not check", never `SQLSRC219`.
 - **Every text the tool prints and did not write goes through `Reporting/OneLine.cs`**, which writes a line break as a space: an argument of a message, a path, a label, the name of an unknown option.
@@ -52,6 +52,6 @@ Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 - **A wrong command line is reported by `UsageCheck.cs`, before System.CommandLine reads it, and never repeats a token's text**, since a token can be a secret ([reading a command line](../../docs/architecture/tool.md#reading-a-command-line)).  Its lines have no id and do not go through the reporter.
 - **`UsageCheck` and System.CommandLine must read a command line the same way**, or `Cli` runs nothing.  The remarks of `UsageCheck.cs` name the tests that hold them together, which a new option joins.
 - **A command's own rules for its values are in the command**, as `DescribeCommand.CheckUsage`, whose lines name a position and never a token.
-- **An option is declared by the rules at the top of `DescribeCommand.Create`**, so that `UsageCheck` reads it right.
+- **An option is declared by the rules in the remarks of `SharedOptions`**, so that `UsageCheck` reads it right.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.
