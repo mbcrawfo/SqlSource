@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Bundles;
@@ -52,7 +54,7 @@ public sealed class DiagnoseScrubTests : IDisposable
     }
 
     // The same kind of bundle as diagnose writes directly: the same bundle.json, so renamed and with the same outcome,
-    // an expected.json in both or in neither, and the same explain settings.
+    // an expected.json in both or in neither, the same explain settings, and the same entries in the zip.
     [Fact]
     public async Task Diagnose_ScrubOfTheRawBundle_GivesWhatDiagnoseGives()
     {
@@ -66,6 +68,15 @@ public sealed class DiagnoseScrubTests : IDisposable
         scrubbed.Info.ShouldBe(direct.Info);
         (scrubbed.Expected is null).ShouldBe(direct.Expected is null);
         scrubbed.ExplainSettings.ShouldBe(direct.ExplainSettings);
+        using var directZip = await ZipFile.OpenReadAsync(
+            _scene.PathOf("direct.zip"),
+            TestContext.Current.CancellationToken
+        );
+        using var scrubbedZip = await ZipFile.OpenReadAsync(
+            _scene.PathOf("scrubbed.zip"),
+            TestContext.Current.CancellationToken
+        );
+        scrubbedZip.Entries.Select(e => e.FullName).Order().ShouldBe(directZip.Entries.Select(e => e.FullName).Order());
     }
 
     [Fact]

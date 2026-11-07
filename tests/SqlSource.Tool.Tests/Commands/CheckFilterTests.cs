@@ -59,6 +59,26 @@ public sealed class CheckFilterTests : IDisposable
         );
     }
 
+    // A sidecar that cannot be read leaves each of its queries under "differ".
+    [Fact]
+    public async Task Check_SidecarThatCannotBeRead_CountsItsQueriesUnderDiffer()
+    {
+        (await DescribeAsync()).ExitCode.ShouldBe(0);
+        var sidecar = SidecarFormat.PathFor(_scene.Project.PathOf("Invoices.sql"));
+        await File.WriteAllTextAsync(
+            sidecar,
+            "<<<<<<< HEAD\n" + await File.ReadAllTextAsync(sidecar, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken
+        );
+
+        var result = await DescribeAsync("--check");
+
+        result.ExitCode.ShouldBe(2);
+        result.Out.ShouldBe(
+            "billing (postgres): 1 same, 1 differ, 0 failed\npostgres (postgres): 1 same, 0 differ, 0 failed\n"
+        );
+    }
+
     [Fact]
     public async Task Check_DatabaseWithADifferenceInTheOthersEntry_ExitsZero()
     {

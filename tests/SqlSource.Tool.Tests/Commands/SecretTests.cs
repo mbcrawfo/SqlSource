@@ -78,7 +78,7 @@ public sealed class SecretTests : IDisposable
         _scene.Describer.Opened.ShouldAllBe(request => request.Connection == Secrets.ConnectionWithMarker);
     }
 
-    // The same run with a log: the file holds the describer's error, and the marker word nowhere.
+    // The same run with a log: the file holds every error, and the marker word nowhere.
     [Fact]
     public async Task Run_ValueOnTheCommandLineAndEveryErrorWithLog_IsNeverLogged()
     {
@@ -97,7 +97,10 @@ public sealed class SecretTests : IDisposable
             TestContext.Current.CancellationToken
         );
         log.ShouldNotContain(Secrets.Marker);
-        log.ShouldContain("\"id\":\"SQLSRC999\"");
+        foreach (var id in new[] { "213", "214", "216", "217", "218", "221", "999" })
+        {
+            log.ShouldContain($"\"id\":\"SQLSRC{id}\"");
+        }
     }
 
     // The describer of PostgreSQL itself, given a connection that nothing answers: the port 1 of this machine
