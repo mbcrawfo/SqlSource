@@ -91,8 +91,42 @@ internal static partial class SqlListUses
         int start,
         int end,
         SqlDialectRules rules
+    ) => Find(text, lexemes, start, end, rules, readPlaces: false, out _);
+
+    /// <summary>
+    /// The use of each parameter lexeme from <paramref name="start" /> up to <paramref name="end" />, as the overload
+    /// without <paramref name="places" /> gives it, and where each use stands, as <see cref="Places" /> reads it.
+    /// </summary>
+    /// <param name="text">The text of the file.</param>
+    /// <param name="lexemes">The lexemes of the file.</param>
+    /// <param name="start">The first lexeme of the query.</param>
+    /// <param name="end">The lexeme after the last one of the query.</param>
+    /// <param name="rules">The rules the file was read by.</param>
+    /// <param name="places">
+    /// The place of each use, in the order of the uses, and empty exactly when they are.  A use that is not a list is
+    /// <see cref="SqlListPlace.None" />.
+    /// </param>
+    public static ImmutableArray<SqlParameterUse> Find(
+        string text,
+        EquatableArray<SqlLexeme> lexemes,
+        int start,
+        int end,
+        SqlDialectRules rules,
+        out ImmutableArray<SqlListPlace> places
+    ) => Find(text, lexemes, start, end, rules, readPlaces: true, out places);
+
+    // The walk of both overloads.  The places are read only when asked for.
+    private static ImmutableArray<SqlParameterUse> Find(
+        string text,
+        EquatableArray<SqlLexeme> lexemes,
+        int start,
+        int end,
+        SqlDialectRules rules,
+        bool readPlaces,
+        out ImmutableArray<SqlListPlace> places
     )
     {
+        places = ImmutableArray<SqlListPlace>.Empty;
         if (start >= end)
         {
             return ImmutableArray<SqlParameterUse>.Empty;
@@ -127,9 +161,11 @@ internal static partial class SqlListUses
         var notHere = false;
         var notAbove = false;
         var conditions = new Conditions(uses, count);
+        var reader = readPlaces ? Places.Start(count) : default;
         var cursor = new Cursor(text, lexemes, start, end, rules);
         for (var item = cursor.Next(); item != Item.End; item = cursor.Next())
         {
+            reader.Read(item, cursor);
             if (item == Item.Word)
             {
                 conditions.Word(cursor);
@@ -177,6 +213,7 @@ internal static partial class SqlListUses
                 var isList = afterIn && !(open is { Count: > 0 } && open[open.Count - 1].IsPosition);
                 var use = Classify(isList, notHere || notAbove, cursor);
                 hasList |= use is SqlParameterUse.List or SqlParameterUse.NegatedList;
+                reader.Parameter(uses.Count, use, notHere || notAbove);
                 conditions.Parameter(uses.Count, use);
                 uses.Add(use);
             }
@@ -208,6 +245,12 @@ internal static partial class SqlListUses
 
         conditions.End();
         conditions.Return();
+        if (hasList && readPlaces)
+        {
+            places = reader.Result(count);
+        }
+
+        reader.Return();
         return hasList ? uses.MoveToImmutable() : ImmutableArray<SqlParameterUse>.Empty;
     }
 
