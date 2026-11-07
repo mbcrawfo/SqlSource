@@ -59,7 +59,7 @@ public sealed class VerboseTests : IDisposable
     public async Task Run_VerboseWithAConnectionFromTheDotEnvFile_SaysTheVariableAndTheFile()
     {
         _ = _scene.Run.Environment.Remove("SQLSOURCE_CONNECTION_BILLING");
-        var path = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=from-the-file\n");
+        var path = _scene.WriteDotEnv(DescribeScene.BillingFromTheFile);
 
         var result = await _scene.DescribeAsync("All.slnx", "--verbose");
 

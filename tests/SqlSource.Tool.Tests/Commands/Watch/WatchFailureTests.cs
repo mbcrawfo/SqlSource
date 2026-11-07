@@ -6,6 +6,7 @@ using SqlSource.Testing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Commands.Watch;
 
@@ -117,7 +118,7 @@ public sealed class WatchFailureTests : IAsyncDisposable
         {
             await _watch.StartAsync();
             _watch.Describer.BeforeDescribe = Hold;
-            _watch.Raise(WatchTests.Changed(_watch.Project.PathOf("Users.sql")));
+            _watch.Raise(Changed(_watch.Project.PathOf("Users.sql")));
             await _watch.TimerAsync();
             _watch.Clock.Advance(WatchSession.Debounce);
         }

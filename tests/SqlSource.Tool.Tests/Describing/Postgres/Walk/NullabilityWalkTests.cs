@@ -101,8 +101,13 @@ public sealed class NullabilityWalkTests
     // A query that gives a table's columns aliases, users u(a, b), prints them under the aliases, which name another
     // column than the origin's: the join's answer stands all the same.
     [Fact]
-    public void Run_ReferenceThatNamesAnotherColumnUnderALeftJoin_KeepsTheJoinsAnswer() =>
-        AnswersOf(Run(LeftJoin("a.other", "b.other"), NotNull, NotNull)).ShouldBe([NotNullCatalog, NullableOuterJoin]);
+    public void Run_ReferenceThatNamesAnotherColumnUnderALeftJoin_KeepsTheJoinsAnswer()
+    {
+        var outcome = Run(LeftJoin("a.other", "b.other"), NotNull, NotNull);
+
+        outcome.Reason.ShouldBe(WalkReasons.OutputDiffers);
+        AnswersOf(outcome).ShouldBe([NotNullCatalog, NullableOuterJoin]);
+    }
 
     [Fact]
     public void Run_UngatedQueryWhoseReferenceNamesAnotherColumn_IsUnavailableAndKeepsTheCatalogsAnswer()

@@ -389,7 +389,8 @@ public sealed class PlanInstancesTests
         Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe(NullExtension.Inner);
 
     // A set operation prints its first branch at the root: an Append under a UNION's Aggregate or under a Sort, a SetOp
-    // over its two branches as Outer and Inner, as 18 plans it, a Recursive Union and a Merge Append.
+    // over its two branches as Outer and Inner, as 18 plans it, a SetOp over an Append of both branches, as 14 to 17
+    // plan it, a Recursive Union and a Merge Append.
     [Fact]
     public void HasSetOperation_AppendOrSetOpUnderTheRoot_IsTrue()
     {
@@ -412,6 +413,7 @@ public sealed class PlanInstancesTests
         Find(Over("Aggregate", append)).HasSetOperation.ShouldBeTrue();
         Find(Over("Sort", append)).HasSetOperation.ShouldBeTrue();
         Find(setOp).HasSetOperation.ShouldBeTrue();
+        Find(Over("SetOp", append)).HasSetOperation.ShouldBeTrue();
         Find(Over("Recursive Union", Scan("a"))).HasSetOperation.ShouldBeTrue();
         Find(Over("Merge Append", Scan("a"))).HasSetOperation.ShouldBeTrue();
     }

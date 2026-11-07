@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
+using static SqlSource.Tool.Tests.FileChanges;
 
 namespace SqlSource.Tool.Tests.Commands.Watch;
 
@@ -22,10 +23,6 @@ public sealed class WatchChangeTests : IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => _watch.DisposeAsync();
-
-    private static FileChange Changed(string path) => WatchTests.Changed(path);
-
-    private static FileChange Created(string path) => WatchTests.Created(path);
 
     // Starts the watch, makes the change, and says whether the pass it made ran the manifest target.
     private async Task<bool> EvaluatesAsync(params FileChange[] changes)
@@ -56,7 +53,7 @@ public sealed class WatchChangeTests : IAsyncDisposable
 
         _watch.ManifestRuns.ShouldBe(manifestRuns + 1);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
-        WatchTests.PassStarts(_watch.Run.Folder.PathOf("run.log")).ShouldBe([(1, 0, true), (2, 2, true)]);
+        _watch.PassStarts().ShouldBe([(1, 0, true), (2, 2, true)]);
     }
 
     [Fact]
@@ -80,9 +77,7 @@ public sealed class WatchChangeTests : IAsyncDisposable
 
     [Fact]
     public async Task Watch_FolderCreatedUnderTheProject_RunsTheManifestTarget() =>
-        (
-            await EvaluatesAsync(new FileChange(FileChangeKind.Created, _watch.Project.PathOf("More"), IsFolder: true))
-        ).ShouldBeTrue();
+        (await EvaluatesAsync(CreatedFolder(_watch.Project.PathOf("More")))).ShouldBeTrue();
 
     [Fact]
     public async Task Watch_ListedSettingsFileChanged_RunsNoManifestTarget() =>
@@ -181,7 +176,7 @@ public sealed class WatchChangeTests : IAsyncDisposable
     public async Task Watch_DotEnvWritten_TheNextPassUsesItsValue()
     {
         _ = _watch.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
-        var dotEnv = _watch.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_POSTGRES=Host=first\n");
+        var dotEnv = _watch.Scene.WriteDotEnv("SQLSOURCE_CONNECTION_POSTGRES=Host=first\n");
         await _watch.StartAsync();
         var manifestRuns = _watch.ManifestRuns;
         await File.WriteAllTextAsync(
@@ -259,11 +254,7 @@ public sealed class WatchChangeTests : IAsyncDisposable
         var written = _users + "___jb_tmp___";
         await File.WriteAllTextAsync(_users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
 
-        var evaluates = await EvaluatesAsync(
-            new FileChange(FileChangeKind.Renamed, old, IsFolder: false, _users),
-            new FileChange(FileChangeKind.Renamed, _users, IsFolder: false, written),
-            new FileChange(FileChangeKind.Deleted, old, IsFolder: false)
-        );
+        var evaluates = await EvaluatesAsync(Renamed(_users, old), Renamed(written, _users), Deleted(old));
 
         evaluates.ShouldBeFalse();
         _watch.Describer.Described.Select(request => request.Name).ShouldBe(["GetUser", "ListUsers"]);
@@ -278,7 +269,7 @@ public sealed class WatchChangeTests : IAsyncDisposable
         var manifestRuns = _watch.ManifestRuns;
         File.Delete(other);
 
-        await _watch.ChangeAsync(new FileChange(FileChangeKind.Deleted, other, IsFolder: false));
+        await _watch.ChangeAsync(Deleted(other));
 
         _watch.ManifestRuns.ShouldBeGreaterThan(manifestRuns);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
