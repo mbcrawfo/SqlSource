@@ -68,10 +68,13 @@ internal static class BundleReplays
         describer.Failure.ShouldBeNull();
 
         return await BundleReplay.RunAsync(
-            query,
-            dialect,
-            capture.Value.ShouldNotBeNull(),
-            describer.Value.ShouldNotBeNull(),
+            new PreparedReplay(
+                query,
+                dialect,
+                capture.Value.ShouldNotBeNull(),
+                describer.Value.ShouldNotBeNull(),
+                Expected: null
+            ),
             log ?? NullRunLog.Instance,
             new TestClock(),
             token

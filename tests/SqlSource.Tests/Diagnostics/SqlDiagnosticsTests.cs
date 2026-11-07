@@ -8,6 +8,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using Xunit;
+using static SqlSource.Testing.DiagnosticMessages;
 
 namespace SqlSource.Tests.Diagnostics;
 
@@ -51,27 +52,6 @@ public sealed class SqlDiagnosticsTests
         }
     }
 
-    [Fact]
-    public void All_Ids_AreUniqueAndInOrder()
-    {
-        var ids = SqlDiagnostics.All.Select(descriptor => descriptor.Id).ToArray();
-
-        ids.ShouldBe(ids.Distinct().OrderBy(id => id, StringComparer.Ordinal));
-        ids.ShouldAllBe(id => id.StartsWith("SQLSRC", StringComparison.Ordinal) && id.Length == 9);
-    }
-
-    [Fact]
-    public void All_HelpLinks_PointAtTheDescriptorsSectionOfTheDiagnosticsDocument()
-    {
-        foreach (var descriptor in SqlDiagnostics.All)
-        {
-            // The anchor of a heading is its text in lower case, and an id is "SQLSRC" followed by digits.
-            descriptor.HelpLinkUri.ShouldBe(
-                "https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc" + descriptor.Id[6..]
-            );
-        }
-    }
-
     // The parser's ids follow the order of its kinds, from SQLSRC101.  SQLSRC122 to SQLSRC125 are placement errors,
     // which the build reports for the type that claims a file, so the kinds after the first twenty-one go on from
     // SQLSRC126.
@@ -92,13 +72,14 @@ public sealed class SqlDiagnosticsTests
             index < BeforeThePlacementErrors ? 101 + index : 126 + index - BeforeThePlacementErrors;
     }
 
-    [Fact]
-    public void ForParseError_InputModelWithoutParameters_IsSqlsrc119() =>
-        SqlDiagnostics.ForParseError(SqlParseErrorKind.InputModelWithoutParameters).Id.ShouldBe("SQLSRC119");
-
-    [Fact]
-    public void ForParseError_TokenCrossesComment_IsSqlsrc120() =>
-        SqlDiagnostics.ForParseError(SqlParseErrorKind.TokenCrossesComment).Id.ShouldBe("SQLSRC120");
+    [Theory]
+    [InlineData("InputModelWithoutParameters", "SQLSRC119")]
+    [InlineData("TokenCrossesComment", "SQLSRC120")]
+    [InlineData("ParameterInTwoSpellings", "SQLSRC121")]
+    [InlineData("ListParameterMisused", "SQLSRC126")]
+    [InlineData("NegatedListRefusedEmpty", "SQLSRC127")]
+    public void ForParseError_Kind_IsItsId(string kind, string id) =>
+        SqlDiagnostics.ForParseError(Enum.Parse<SqlParseErrorKind>(kind)).Id.ShouldBe(id);
 
     [Fact]
     public void TokenCrossesComment_Message_HoldsTheToken() =>
@@ -107,10 +88,6 @@ public sealed class SqlDiagnosticsTests
                 "Token 'filter' and a comment overlap, so the token is read differently where comments are kept.  Keep "
                     + "a comment wholly inside the token's default, or outside the token."
             );
-
-    [Fact]
-    public void ForParseError_ParameterInTwoSpellings_IsSqlsrc121() =>
-        SqlDiagnostics.ForParseError(SqlParseErrorKind.ParameterInTwoSpellings).Id.ShouldBe("SQLSRC121");
 
     [Fact]
     public void ParameterInTwoSpellings_Message_HoldsBothSpellings() =>
@@ -122,20 +99,12 @@ public sealed class SqlDiagnosticsTests
             );
 
     [Fact]
-    public void ForParseError_ListParameterMisused_IsSqlsrc126() =>
-        SqlDiagnostics.ForParseError(SqlParseErrorKind.ListParameterMisused).Id.ShouldBe("SQLSRC126");
-
-    [Fact]
     public void ListParameterMisused_Message_HoldsTheParameterAndTheReason() =>
         Format(SqlDiagnostics.ListParameterMisused, "@ids", "is used here as one value")
             .ShouldBe(
                 "The parameter '@ids' is a list, written after IN, and is used here as one value.  A list can stand "
                     + "after IN or NOT IN, or before IS NULL or IS NOT NULL."
             );
-
-    [Fact]
-    public void ForParseError_NegatedListRefusedEmpty_IsSqlsrc127() =>
-        SqlDiagnostics.ForParseError(SqlParseErrorKind.NegatedListRefusedEmpty).Id.ShouldBe("SQLSRC127");
 
     [Fact]
     public void NegatedListRefusedEmpty_Message_HoldsTheListAndWhereItStands() =>
@@ -313,11 +282,4 @@ public sealed class SqlDiagnosticsTests
         Create(text).ShouldBe(Create(text));
         Create(text).GetHashCode().ShouldBe(Create(text).GetHashCode());
     }
-
-    private static string Format(DiagnosticDescriptor descriptor, params object[] arguments) =>
-        string.Format(
-            CultureInfo.InvariantCulture,
-            descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-            arguments
-        );
 }

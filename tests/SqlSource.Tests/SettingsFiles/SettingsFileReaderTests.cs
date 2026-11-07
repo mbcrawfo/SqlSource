@@ -9,37 +9,13 @@ using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.SettingsFiles;
+using SqlSource.Tests.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.SettingsFiles;
 
 public sealed class SettingsFileReaderTests
 {
-    /// <summary>
-    /// The example under "The settings file" in docs/superpowers/specs/2026-10-25-settings-files-design.md.
-    /// </summary>
-    internal const string DesignsExample = /*lang=json*/
-        """
-        {
-            "$schema": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json",
-            "root": true,
-            "dialect": "postgres",
-            "generatorParameters": ["keep-comments", "async-method-suffix"],
-            // Dapper reads these through UtcDateTimeOffsetHandler.
-            "typeOverrides": {
-                "timestamptz": "System.DateTimeOffset",
-                "public.\"Email\"": "MyApp.Email",
-            },
-            // Every query that reads one of these columns gets the C# type, by its short name.
-            "columnTypes": {
-                "users.id": "UserId",
-                "posts.created_by_user_id": "UserId",
-            },
-        }
-        """;
-
-    private static readonly SettingPlace Place = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
     // Each key whose value is a string and sets a member of the level, with that member.
     private static readonly Dictionary<string, Func<SettingsLevel, object?>> StringSettings = new()
     {
@@ -59,7 +35,7 @@ public sealed class SettingsFileReaderTests
     [Fact]
     public void Read_DesignsExample_SetsEverySettingWithoutErrors()
     {
-        var file = SettingsFileReader.Read(DesignsExample, Place);
+        var file = SettingsFileReader.Read(SettingsFileExamples.Design, TestPlaces.SettingsFile);
 
         file.Errors.ShouldBeEmpty();
         file.Root.ShouldBe(true);
@@ -73,16 +49,16 @@ public sealed class SettingsFileReaderTests
         file.Level.TypeOverrides[DatabaseEngine.PostgreSql]
             .ShouldNotBeNull()
             .ShouldBe([
-                new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place),
-                new TypeOverride("timestamptz", "global::System.DateTimeOffset", Place),
+                new TypeOverride("public.\"Email\"", "global::MyApp.Email", TestPlaces.SettingsFile),
+                new TypeOverride("timestamptz", "global::System.DateTimeOffset", TestPlaces.SettingsFile),
             ]);
         file.Level.TypeOverrides[DatabaseEngine.SqlServer]
             .ShouldNotBeNull()
-            .ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", Place)]);
+            .ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", TestPlaces.SettingsFile)]);
         file.Level.ColumnTypes.ShouldNotBeNull()
             .ShouldBe([
-                new ColumnType("posts.created_by_user_id", "UserId", Place),
-                new ColumnType("users.id", "UserId", Place),
+                new ColumnType("posts.created_by_user_id", "UserId", TestPlaces.SettingsFile),
+                new ColumnType("users.id", "UserId", TestPlaces.SettingsFile),
             ]);
     }
 
@@ -107,7 +83,7 @@ public sealed class SettingsFileReaderTests
             }
             """;
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Errors.ShouldBeEmpty();
         file.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
@@ -123,8 +99,8 @@ public sealed class SettingsFileReaderTests
                 OutputModelType = ModelKind.Class,
                 CollectionType = CollectionKind.IReadOnlyList,
                 NestedClass = "Queries",
-                MemberLocation = new Placed<MemberLocation>(MemberLocation.NestedClass, Place),
-                Visibility = new Placed<Visibility>(Visibility.Protected, Place),
+                MemberLocation = new Placed<MemberLocation>(MemberLocation.NestedClass, TestPlaces.SettingsFile),
+                Visibility = new Placed<Visibility>(Visibility.Protected, TestPlaces.SettingsFile),
             }
         );
     }
@@ -139,7 +115,7 @@ public sealed class SettingsFileReaderTests
     [InlineData("{}")]
     public void Read_RootFalseOrAbsent_IsFalse(string text)
     {
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Root.ShouldBe(false);
         file.Errors.ShouldBeEmpty();
@@ -154,7 +130,7 @@ public sealed class SettingsFileReaderTests
     [InlineData("{ /* open", 9, 0)]
     public void Read_TextThatIsNotJson_IsInvalidJsonAndGivesNothing(string text, int start, int length)
     {
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         ShouldGiveNothing(
             file,
@@ -168,7 +144,7 @@ public sealed class SettingsFileReaderTests
     {
         var text = "{\"x\": " + new string('[', 65) + new string(']', 65) + "}";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         ShouldGiveNothing(
             file,
@@ -191,7 +167,7 @@ public sealed class SettingsFileReaderTests
     [InlineData(" // a comment\n [1, 2,] ", 15, 7)]
     public void Read_TopLevelThatIsNotAnObject_IsNotAnObject(string text, int start, int length)
     {
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         ShouldGiveNothing(
             file,
@@ -206,7 +182,7 @@ public sealed class SettingsFileReaderTests
         const string Text = /*lang=json,strict*/
             """{"Dialect": "postgres", "bogus": [1, {}]}""";
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Dialect.ShouldBeNull();
         file.Root.ShouldBe(false);
@@ -222,7 +198,7 @@ public sealed class SettingsFileReaderTests
         const string Text = /*lang=json,strict*/
             """{"output": "sql", "output": "models", "zzz": 1, "zzz": 2}""";
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Level.Output.ShouldBe(OutputKind.Sql);
         file.Errors.ShouldBe([
@@ -256,7 +232,7 @@ public sealed class SettingsFileReaderTests
     {
         var text = $$"""{"{{key}}": {{value}}}""";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Root.ShouldBe(false);
         file.Dialect.ShouldBeNull();
@@ -274,8 +250,8 @@ public sealed class SettingsFileReaderTests
         const string Overrides = /*lang=json,strict*/
             """{"typeOverrides": {"int4": "long", "text": {}}}""";
 
-        var parameters = SettingsFileReader.Read(Parameters, Place);
-        var overrides = SettingsFileReader.Read(Overrides, Place);
+        var parameters = SettingsFileReader.Read(Parameters, TestPlaces.SettingsFile);
+        var overrides = SettingsFileReader.Read(Overrides, TestPlaces.SettingsFile);
 
         parameters
             .Level.Parameters.Resolve()
@@ -292,7 +268,7 @@ public sealed class SettingsFileReaderTests
         overrides
             .Level.TypeOverrides[DatabaseEngine.PostgreSql]
             .ShouldNotBeNull()
-            .ShouldBe([new TypeOverride("int4", "long", Place)]);
+            .ShouldBe([new TypeOverride("int4", "long", TestPlaces.SettingsFile)]);
         overrides.Errors.ShouldBe([
             new SettingsFileError(SettingsFileErrorKind.WrongType, Span(Overrides, "{}"), "typeOverrides", null, null),
         ]);
@@ -306,7 +282,7 @@ public sealed class SettingsFileReaderTests
         var keys = new[] { SettingsFileKeys.Dialect }.Concat(StringSettings.Keys);
         var text = "{" + string.Join(", ", keys.Select(key => $"\"{key}\": {blank}")) + "}";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Errors.ShouldBeEmpty();
         file.Dialect.ShouldBeNull();
@@ -330,7 +306,7 @@ public sealed class SettingsFileReaderTests
     {
         var text = $$"""{"{{key}}": "{{value}}"}""";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Dialect.ShouldBeNull();
         file.Level.ShouldBeSameAs(SettingsLevel.None);
@@ -355,10 +331,10 @@ public sealed class SettingsFileReaderTests
 
         var empty = SettingsFileReader.Read( /*lang=json,strict*/
             """{"generatorParameters": []}""",
-            Place
+            TestPlaces.SettingsFile
         );
-        var misspelt = SettingsFileReader.Read(Misspelt, Place);
-        var withDefault = SettingsFileReader.Read(WithDefault, Place);
+        var misspelt = SettingsFileReader.Read(Misspelt, TestPlaces.SettingsFile);
+        var withDefault = SettingsFileReader.Read(WithDefault, TestPlaces.SettingsFile);
 
         empty.Errors.ShouldBeEmpty();
         empty.Level.ShouldBeSameAs(SettingsLevel.None);
@@ -400,7 +376,7 @@ public sealed class SettingsFileReaderTests
     {
         var text = $$"""{"{{key}}": {{value}}}""";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Level.ShouldBeSameAs(SettingsLevel.None);
         file.Errors.ShouldNotBeEmpty();
@@ -415,13 +391,13 @@ public sealed class SettingsFileReaderTests
         const string Repeated = /*lang=json,strict*/
             """{"typeOverrides": {"integer": "long", "int4": "int"}}""";
 
-        var invalid = SettingsFileReader.Read(Invalid, Place);
-        var repeated = SettingsFileReader.Read(Repeated, Place);
+        var invalid = SettingsFileReader.Read(Invalid, TestPlaces.SettingsFile);
+        var repeated = SettingsFileReader.Read(Repeated, TestPlaces.SettingsFile);
 
         invalid
             .Level.TypeOverrides[DatabaseEngine.PostgreSql]
             .ShouldNotBeNull()
-            .ShouldBe([new TypeOverride("int8", "long", Place)]);
+            .ShouldBe([new TypeOverride("int8", "long", TestPlaces.SettingsFile)]);
         invalid.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.InvalidValue,
@@ -434,7 +410,7 @@ public sealed class SettingsFileReaderTests
         repeated
             .Level.TypeOverrides[DatabaseEngine.PostgreSql]
             .ShouldNotBeNull()
-            .ShouldBe([new TypeOverride("int4", "long", Place)]);
+            .ShouldBe([new TypeOverride("int4", "long", TestPlaces.SettingsFile)]);
         repeated.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.RepeatedKey,
@@ -454,10 +430,12 @@ public sealed class SettingsFileReaderTests
         const string Repeated = /*lang=json,strict*/
             """{"columnTypes": {"users.id": "UserId", "\"users\".id": "Y"}}""";
 
-        var invalid = SettingsFileReader.Read(Invalid, Place);
-        var repeated = SettingsFileReader.Read(Repeated, Place);
+        var invalid = SettingsFileReader.Read(Invalid, TestPlaces.SettingsFile);
+        var repeated = SettingsFileReader.Read(Repeated, TestPlaces.SettingsFile);
 
-        invalid.Level.ColumnTypes.ShouldNotBeNull().ShouldBe([new ColumnType("users.id", "UserId", Place)]);
+        invalid
+            .Level.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("users.id", "UserId", TestPlaces.SettingsFile)]);
         invalid.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.InvalidValue,
@@ -467,7 +445,9 @@ public sealed class SettingsFileReaderTests
                 "X"
             ),
         ]);
-        repeated.Level.ColumnTypes.ShouldNotBeNull().ShouldBe([new ColumnType("users.id", "UserId", Place)]);
+        repeated
+            .Level.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("users.id", "UserId", TestPlaces.SettingsFile)]);
         repeated.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.RepeatedKey,
@@ -495,15 +475,15 @@ public sealed class SettingsFileReaderTests
             }
             """;
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Errors.ShouldBeEmpty();
         file.Level.ColumnTypes.ShouldNotBeNull()
             .ShouldBe([
-                new ColumnType("orders.created_by", "UserId", Place),
-                new ColumnType("orders.metadata", "OrderMetadata", Place, IsJson: true),
-                new ColumnType("orders.note", "Note", Place),
-                new ColumnType("orders.tags", "Tags", Place),
+                new ColumnType("orders.created_by", "UserId", TestPlaces.SettingsFile),
+                new ColumnType("orders.metadata", "OrderMetadata", TestPlaces.SettingsFile, IsJson: true),
+                new ColumnType("orders.note", "Note", TestPlaces.SettingsFile),
+                new ColumnType("orders.tags", "Tags", TestPlaces.SettingsFile),
             ]);
     }
 
@@ -523,16 +503,16 @@ public sealed class SettingsFileReaderTests
             }
             """;
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Errors.ShouldBe([
             new SettingsFileError(SettingsFileErrorKind.WrongType, Span(Text, "5"), "columnTypes", null, null),
         ]);
         file.Level.ColumnTypes.ShouldNotBeNull()
             .ShouldBe([
-                new ColumnType("orders.created_by", "UserId", Place),
-                new ColumnType("orders.metadata", "OrderMetadata", Place, IsJson: true),
-                new ColumnType("orders.note", "Note", Place),
+                new ColumnType("orders.created_by", "UserId", TestPlaces.SettingsFile),
+                new ColumnType("orders.metadata", "OrderMetadata", TestPlaces.SettingsFile, IsJson: true),
+                new ColumnType("orders.note", "Note", TestPlaces.SettingsFile),
             ]);
     }
 
@@ -574,9 +554,10 @@ public sealed class SettingsFileReaderTests
     {
         var text = "{ \"columnTypes\": { \"orders.metadata\": " + member + ", \"orders.note\": \"Note\" } }";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
-        file.Level.ColumnTypes.ShouldNotBeNull().ShouldBe([new ColumnType("orders.note", "Note", Place)]);
+        file.Level.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("orders.note", "Note", TestPlaces.SettingsFile)]);
         file.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.InvalidValue,
@@ -596,7 +577,7 @@ public sealed class SettingsFileReaderTests
         const string Member = "\"orders.metadata\": { \"type\": \"default\", \"json\": true }";
         const string Text = "{ \"columnTypes\": { " + Member + " } }";
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Level.ShouldBeSameAs(SettingsLevel.None);
         file.Errors.ShouldBe([
@@ -621,7 +602,7 @@ public sealed class SettingsFileReaderTests
             "{ \"type\": \"long\", \"json\": true }";
         var text = $$"""{ "{{key}}": { "{{member}}": {{Value}} } }""";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Level.ShouldBeSameAs(SettingsLevel.None);
         file.Errors.ShouldBe([
@@ -635,11 +616,11 @@ public sealed class SettingsFileReaderTests
         const string Text = /*lang=json,strict*/
             "{\n  \"dialect\": \"postgres\",\n  \"libraryTypes\": { \"nodaTime\": \"on\" }\n}";
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Errors.ShouldBeEmpty();
         file.Level.LibraryTypes.ShouldNotBeNull()
-            .ShouldBe([new LibrarySetting(SqlLibrary.NodaTime, LibraryState.On, Place)]);
+            .ShouldBe([new LibrarySetting(SqlLibrary.NodaTime, LibraryState.On, TestPlaces.SettingsFile)]);
         var member = file.LibraryMemberOf(SqlLibrary.NodaTime).ShouldNotBeNull();
         member.Span.ShouldBe(Span(Text, "\"nodaTime\": \"on\""));
         member.LineSpan.Start.Line.ShouldBe(2);
@@ -655,13 +636,13 @@ public sealed class SettingsFileReaderTests
         const string Invalid = /*lang=json,strict*/
             """{"libraryTypes": {"netTopologySuites": "on"}}""";
 
-        var valid = SettingsFileReader.Read(Valid, Place);
-        var invalid = SettingsFileReader.Read(Invalid, Place);
+        var valid = SettingsFileReader.Read(Valid, TestPlaces.SettingsFile);
+        var invalid = SettingsFileReader.Read(Invalid, TestPlaces.SettingsFile);
 
         valid.Errors.ShouldBeEmpty();
         valid
             .Level.LibraryTypes.ShouldNotBeNull()
-            .ShouldBe([new LibrarySetting(SqlLibrary.NetTopologySuite, LibraryState.On, Place)]);
+            .ShouldBe([new LibrarySetting(SqlLibrary.NetTopologySuite, LibraryState.On, TestPlaces.SettingsFile)]);
         invalid.Level.ShouldBeSameAs(SettingsLevel.None);
         invalid.Errors.ShouldBe([
             new SettingsFileError(
@@ -683,8 +664,8 @@ public sealed class SettingsFileReaderTests
         const string After = /*lang=json,strict*/
             "{\"outputModelSuffix\": \"Record\",\n\n \"libraryTypes\": {\"nodaTime\": \"on\"}}";
 
-        var before = SettingsFileReader.Read(Before, Place);
-        var after = SettingsFileReader.Read(After, Place);
+        var before = SettingsFileReader.Read(Before, TestPlaces.SettingsFile);
+        var after = SettingsFileReader.Read(After, TestPlaces.SettingsFile);
 
         after.Level.LibraryTypes.ShouldBe(before.Level.LibraryTypes);
         after.LibraryMembers.ShouldNotBe(before.LibraryMembers);
@@ -699,11 +680,11 @@ public sealed class SettingsFileReaderTests
             """{"libraryTypes": {"nodaTime": "on", "noda-time": "off"}}""";
 
         SettingsFileReader
-            .Read(Repeated, Place)
+            .Read(Repeated, TestPlaces.SettingsFile)
             .LibraryMembers.ShouldHaveSingleItem()
             .Span.ShouldBe(Span(Repeated, "\"nodaTime\": \"on\""));
-        SettingsFileReader.Read("{}", Place).LibraryMembers.ShouldBeEmpty();
-        SettingsFileReader.Read("{}", Place).LibraryMemberOf(SqlLibrary.NodaTime).ShouldBeNull();
+        SettingsFileReader.Read("{}", TestPlaces.SettingsFile).LibraryMembers.ShouldBeEmpty();
+        SettingsFileReader.Read("{}", TestPlaces.SettingsFile).LibraryMemberOf(SqlLibrary.NodaTime).ShouldBeNull();
     }
 
     [Fact]
@@ -714,8 +695,8 @@ public sealed class SettingsFileReaderTests
         const string Repeated = /*lang=json,strict*/
             """{"libraryTypes": {"nodaTime": "on", "noda-time": "off"}}""";
 
-        var invalid = SettingsFileReader.Read(Invalid, Place);
-        var repeated = SettingsFileReader.Read(Repeated, Place);
+        var invalid = SettingsFileReader.Read(Invalid, TestPlaces.SettingsFile);
+        var repeated = SettingsFileReader.Read(Repeated, TestPlaces.SettingsFile);
 
         invalid.Level.ShouldBeSameAs(SettingsLevel.None);
         invalid.Errors.ShouldBe([
@@ -746,7 +727,7 @@ public sealed class SettingsFileReaderTests
         const string Text = /*lang=json,strict*/
             """{"nestedClass": "class", "output": "bogus", "bogus": 1}""";
 
-        var file = SettingsFileReader.Read(Text, Place);
+        var file = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         file.Errors.Select(static error => error.Kind)
             .ShouldBe([
@@ -768,7 +749,7 @@ public sealed class SettingsFileReaderTests
     )]
     public void Read_FileThatSetsNothing_GivesTheSharedEmptyLevel(string text)
     {
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Level.ShouldBeSameAs(SettingsLevel.None);
         file.Errors.ShouldBeEmpty();
@@ -780,12 +761,14 @@ public sealed class SettingsFileReaderTests
         const string Text = /*lang=json,strict*/
             """{"output": "bogus", "typeOverrides": {"int4": "long"}, "x": 1}""";
 
-        var first = SettingsFileReader.Read(Text, Place);
-        var second = SettingsFileReader.Read(Text, Place);
+        var first = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
+        var second = SettingsFileReader.Read(Text, TestPlaces.SettingsFile);
 
         second.ShouldBe(first);
         second.GetHashCode().ShouldBe(first.GetHashCode());
-        SettingsFileReader.Read(DesignsExample, Place).ShouldBe(SettingsFileReader.Read(DesignsExample, Place));
+        SettingsFileReader
+            .Read(SettingsFileExamples.Design, TestPlaces.SettingsFile)
+            .ShouldBe(SettingsFileReader.Read(SettingsFileExamples.Design, TestPlaces.SettingsFile));
     }
 
     [Fact]

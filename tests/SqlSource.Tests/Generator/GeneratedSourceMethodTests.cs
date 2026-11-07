@@ -460,8 +460,7 @@ public sealed class GeneratedSourceMethodTests
             )
         );
 
-        withDefaults.Diagnostics.ShouldBeEmpty();
-        withDefaults.GeneratedCodeWarnings.ShouldBeEmpty();
+        withDefaults.ShouldBeClean();
         withDefaults.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
     }
 }

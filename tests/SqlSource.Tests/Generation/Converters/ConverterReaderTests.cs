@@ -58,21 +58,20 @@ public sealed class ConverterReaderTests
             languageVersion: LanguageVersion.Latest
         );
 
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Diagnostics.ShouldBe(
-            [
-                "SQLSRC277 /app/Repo/Sample.cs(15,34)-(15,46): The method "
-                    + "'App.UserIdConversions.extension(App.UserId).FromDatabase(long)' is marked "
-                    + "[SqlSourceConverter], but it is in an extension block.  A converter is a static method of one "
-                    + "argument that returns the converted value.",
-                "SQLSRC277 /app/Repo/Sample.cs(18,32)-(18,42): The method "
-                    + "'App.UserIdConversions.extension(App.UserId).ToDatabase(App.UserId)' is marked "
-                    + "[SqlSourceConverter], but it is in an extension block.  A converter is a static method of one "
-                    + "argument that returns the converted value.",
-            ],
-            ignoreOrder: true
-        );
+        run.Problems()
+            .ShouldBe(
+                [
+                    "SQLSRC277 /app/Repo/Sample.cs(15,34)-(15,46): The method "
+                        + "'App.UserIdConversions.extension(App.UserId).FromDatabase(long)' is marked "
+                        + "[SqlSourceConverter], but it is in an extension block.  A converter is a static method of "
+                        + "one argument that returns the converted value.",
+                    "SQLSRC277 /app/Repo/Sample.cs(18,32)-(18,42): The method "
+                        + "'App.UserIdConversions.extension(App.UserId).ToDatabase(App.UserId)' is marked "
+                        + "[SqlSourceConverter], but it is in an extension block.  A converter is a static method of "
+                        + "one argument that returns the converted value.",
+                ],
+                ignoreOrder: true
+            );
         run.Sources.Values.ShouldAllBe(source => !source.Contains("UserIdConversions", StringComparison.Ordinal));
     }
 }

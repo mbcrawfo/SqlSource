@@ -45,9 +45,9 @@ internal static class LoggedArguments
     private static bool IsReplaced(UsageValue value) =>
         value.Option?.Name switch
         {
-            DescribeCommand.DatabaseOption or DescribeCommand.ConnectionOption => true,
+            DescribeCommand.DatabaseOption or SharedOptions.Connection => true,
             null
-            or DescribeCommand.ProjectOption
+            or SharedOptions.Project
             or DiagnoseCommand.QueryOption
             or DiagnoseCommand.OutOption
             or DiagnoseCommand.ScrubOption => !value.MayBePrintedAsPath,

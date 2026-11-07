@@ -1,17 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.CommandLine;
-using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
 using SqlSource.Settings;
 using SqlSource.Tool.Describing;
-using SqlSource.Tool.DotEnv;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
@@ -21,9 +16,9 @@ using SqlSource.Tool.Watching;
 namespace SqlSource.Tool;
 
 /// <summary>
-/// The <c>describe</c> command.  It finds the unit and the projects, builds the plan of the run and reports what is
-/// wrong with it, and hands the plan to <see cref="DescribeRun" />, which describes, and writes or, under
-/// <c>--check</c>, compares.
+/// The <c>describe</c> command.  Its run takes the plan from <see cref="PlanSteps" />, which finds the unit and the
+/// projects, builds the plan and reports what is wrong with it, and hands it to <see cref="DescribeRun" />, which
+/// describes, and writes or, under <c>--check</c>, compares.
 /// </summary>
 internal static class DescribeCommand
 {
@@ -31,21 +26,11 @@ internal static class DescribeCommand
 
     private const string PathArgument = "path";
 
-    internal const string ProjectOption = "--project";
-
     internal const string DatabaseOption = "--database";
-
-    internal const string ConnectionOption = "--connection";
 
     private const string ForceOption = "--force";
 
     private const string CheckOption = "--check";
-
-    private const string VerboseOption = "--verbose";
-
-    internal const string LogOption = "--log";
-
-    internal const string EnvFileOption = "--env-file";
 
     internal const string ManifestOption = "--manifest";
 
@@ -56,18 +41,26 @@ internal static class DescribeCommand
     private const string OnlineTrue = "true";
     internal const string WatchOption = "--watch";
 
-    /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
-    internal const string LogVariable = "SQLSOURCE_LOG";
+    /// <summary>
+    /// The command as <see cref="Cli" /> runs it.  Under <c>--online</c> it reads no <c>SQLSOURCE_LOG</c>, writes
+    /// each error on one line and never ends with <c>Cli.RunAgainLine</c>, and a watch never ends with it either.
+    /// </summary>
+    public static ToolCommand Entry =>
+        new()
+        {
+            Name = Name,
+            Create = Create,
+            CheckUsage = CheckUsage,
+            ReadsValuesAs = ReadsValuesAs,
+            ReadsLogVariable = static parsed => OnlineOf(parsed) == OnlineMode.Off,
+            WritesOneLine = static parsed => OnlineOf(parsed) != OnlineMode.Off,
+            MayPoint = static parsed => OnlineOf(parsed) == OnlineMode.Off && !Watches(parsed),
+            Bind = Bind,
+        };
 
     public static Command Create()
     {
-        // Every option is declared so that UsageCheck reads it right.  A flag has Arity = ArgumentArity.Zero:
-        // System.CommandLine's default for a bool takes an optional value, and the token after the flag would be read
-        // as that value.  An option that takes a value takes exactly one each time it is given: ExactlyOne when it is
-        // given once, and an array with OneOrMore when it may be repeated, since System.CommandLine rejects a second
-        // ExactlyOne.  UsageCheck rejects that second one itself, since System.CommandLine's message repeats the
-        // value.  An option is added to --help in the change that gives it an effect, not before: one that is read
-        // and checked earlier is Hidden until then.
+        // The rules of SharedOptions hold: every option is declared so that UsageCheck reads it right.
 
         // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
         var path = new Argument<string[]>(PathArgument)
@@ -78,15 +71,7 @@ internal static class DescribeCommand
             Arity = ArgumentArity.ZeroOrMore,
         };
 
-        // One value each time it is given, and it may be given several times: UsageCheck reads the token after it as
-        // its value and no further.
-        var project = new Option<string[]>(ProjectOption)
-        {
-            Description = "A project to run on, of the solution.  May be given several times.",
-            HelpName = "path",
-            Arity = ArgumentArity.OneOrMore,
-            AllowMultipleArgumentsPerToken = false,
-        };
+        var project = SharedOptions.ProjectOption();
 
         // It selects queries: what is described, what is written, and what the summary counts.
         var database = new Option<string[]>(DatabaseOption)
@@ -97,15 +82,7 @@ internal static class DescribeCommand
             AllowMultipleArgumentsPerToken = false,
         };
 
-        // Always a name, "=" and a value.  CheckUsage holds each to that, and a message never repeats one.
-        var connection = new Option<string[]>(ConnectionOption)
-        {
-            Description =
-                "The connection string of a database, as <name>=<connection string>.  May be given several times.",
-            HelpName = "name=value",
-            Arity = ArgumentArity.OneOrMore,
-            AllowMultipleArgumentsPerToken = false,
-        };
+        var connection = SharedOptions.ConnectionOption();
 
         var force = new Option<bool>(ForceOption)
         {
@@ -123,29 +100,11 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
-        var verbose = new Option<bool>(VerboseOption)
-        {
-            Description = "Say what the run decides for each project, file, database and query, as it goes.",
-            Arity = ArgumentArity.Zero,
-        };
-
-        var log = new Option<string>(LogOption)
-        {
-            Description =
-                "Write what the run did to this file, one JSON object on a line.  The file is overwritten.  "
-                + $"{LogVariable} gives the path when the option does not.",
-            HelpName = "path",
-            Arity = ArgumentArity.ExactlyOne,
-        };
-
-        var envFile = new Option<string>(EnvFileOption)
-        {
-            Description =
-                "Read the connections from this .env file instead of the one in the folder of the solution or "
-                + "project; 'none' reads none.",
-            HelpName = "path",
-            Arity = ArgumentArity.ExactlyOne,
-        };
+        var verbose = SharedOptions.VerboseOption(
+            "Say what the run decides for each project, file, database and query, as it goes."
+        );
+        var log = SharedOptions.LogOption();
+        var envFile = SharedOptions.EnvFileOption();
 
         // The two options of the build that calls the tool.  Each takes exactly one value, given once.
         var manifest = new Option<string>(ManifestOption)
@@ -209,39 +168,24 @@ internal static class DescribeCommand
         parsed.CommandResult.Command.SetAction(
             async (command, cancellationToken) =>
             {
+                var context = new RunContext(host, reporter, cancellationToken);
+
                 // A watch runs a pass after each change, until it is stopped, and ends only by its token.  A unit that
                 // cannot be found ends it before the first pass.
                 if (Watches(command))
                 {
-                    if (FindUnit(usage, host, reporter) is { } watched)
+                    if (PlanSteps.FindUnit(usage, context) is { } watched)
                     {
-                        await WatchSession.RunAsync(
-                            watched,
-                            usage,
-                            command,
-                            host,
-                            reporter,
-                            counted,
-                            cancellationToken
-                        );
+                        await WatchSession.RunAsync(watched, usage, command, context, counted);
                     }
 
                     return 0;
                 }
 
                 // An error is in the reporter, where the exit code is taken.
-                if (await PlanUnitAsync(usage, host, reporter, cancellationToken) is { } planned)
+                if (await PlanSteps.PlanUnitAsync(usage, context) is { } planned)
                 {
-                    await DescribePlanAsync(
-                        planned.Plan,
-                        usage,
-                        planned.Unit,
-                        ModeOf(command),
-                        host,
-                        reporter,
-                        counted,
-                        cancellationToken
-                    );
+                    await DescribePlanAsync(planned.Plan, usage, planned.Unit, ModeOf(command), context, counted);
                 }
 
                 return 0;
@@ -277,48 +221,51 @@ internal static class DescribeCommand
             && usage.Flags.Any(static flag => flag.Name == CheckOption)
         )
         {
-            messages.Add($"sqlsource: options '{WatchOption}' and '{CheckOption}' cannot be used together");
+            messages.Add($"{Cli.LinePrefix}options '{WatchOption}' and '{CheckOption}' cannot be used together");
         }
 
         var units = 0;
         var connections = new HashSet<string>(DatabaseName.Comparer);
-        var hasConnection = usage.Values.Any(static value => value.Option?.Name == ConnectionOption);
+        var hasConnection = usage.Values.Any(static value => value.Option?.Name == SharedOptions.Connection);
         var isOnline = IsOnline(usage);
         foreach (var value in usage.Values)
         {
             if (value.Option is null)
             {
-                if (hasConnection && SplitConnectionOf(value) is { } split)
+                if (hasConnection && SharedOptions.SplitConnectionOf(value) is { } split)
                 {
                     messages.Add(split);
                 }
                 else if (!SqlPath.IsSqlFile(value.Text) && ++units > 1)
                 {
-                    messages.Add($"sqlsource: unexpected argument at position {value.Position}");
+                    messages.Add($"{Cli.LinePrefix}unexpected argument at position {value.Position}");
                 }
             }
             else if (value.Option.Name == DatabaseOption && !SettingValue.IsDatabaseName(value.Text))
             {
                 messages.Add(
-                    $"sqlsource: the value of option '{DatabaseOption}' at position {value.Position} is not a "
+                    $"{Cli.LinePrefix}the value of option '{DatabaseOption}' at position {value.Position} is not a "
                         + "database name"
                 );
             }
-            else if (value.Option.Name == LogOption)
+            else if (value.Option.Name == SharedOptions.Log)
             {
-                if (ProblemOfLogPath(value, isOnline) is { } problem)
+                if (SharedOptions.ProblemOfLogPath(value, isOnline) is { } problem)
                 {
                     messages.Add(problem);
                 }
             }
-            else if (value.Option.Name == EnvFileOption)
+            else if (value.Option.Name == SharedOptions.EnvFile)
             {
-                if (ProblemOfEnvFile(value, isOnline) is { } problem)
+                if (SharedOptions.ProblemOfEnvFile(value, isOnline) is { } problem)
                 {
                     messages.Add(problem);
                 }
             }
-            else if (value.Option.Name == ConnectionOption && ProblemOfConnection(value, connections) is { } problem)
+            else if (
+                value.Option.Name == SharedOptions.Connection
+                && SharedOptions.ProblemOfConnection(value, connections) is { } problem
+            )
             {
                 messages.Add(problem);
             }
@@ -328,42 +275,11 @@ internal static class DescribeCommand
         return messages;
     }
 
-    /// <summary>
-    /// What is wrong with an argument on a line with a <c>--connection</c>, as a whole line, or null: one that holds
-    /// <c>=</c> or <c>;</c> is taken for the rest of a value that the shell split.  <c>diagnose</c> holds its
-    /// arguments to the same rule.
-    /// </summary>
-    internal static string? SplitConnectionOf(UsageValue argument) =>
-        argument.Text.AsSpan().IndexOfAny('=', ';') >= 0
-            ? $"sqlsource: the argument at position {argument.Position} looks like a part of a connection string; put "
-                + $"the value of '{ConnectionOption}' in quotes"
-            : null;
-
-    /// <summary>
-    /// What is wrong with a value of <c>--connection</c>, as a whole line, or null: it is not a name, <c>=</c> and a
-    /// value, or it names a database that an earlier one names.  <c>diagnose</c> holds its values to the same rule.
-    /// </summary>
-    /// <param name="value">The value.</param>
-    /// <param name="named">The names of the earlier values, which gains this one's.</param>
-    internal static string? ProblemOfConnection(UsageValue value, HashSet<string> named)
-    {
-        if (!ConnectionArgument.TryParse(value.Text, out var connection))
-        {
-            return $"sqlsource: the value of option '{ConnectionOption}' at position {value.Position} is not "
-                + "<name>=<connection string>";
-        }
-
-        return named.Add(connection.Name)
-            ? null
-            : $"sqlsource: option '{ConnectionOption}' at position {value.Position} names a database that an earlier "
-                + "one names";
-    }
-
     // The rules of --manifest and --online.  A run from a manifest is on the one project the manifest names, so
     // nothing else names what to run, and --online is the build's word about that run.
     private static void CheckManifestUsage(Usage usage, List<string> messages)
     {
-        var manifests = ValuesOf(usage, ManifestOption);
+        var manifests = SharedOptions.ValuesOf(usage, ManifestOption);
         var isOnline = IsOnline(usage);
         messages.AddRange(manifests.Select(manifest => ProblemOfManifestPath(manifest, isOnline)).OfType<string>());
 
@@ -374,87 +290,46 @@ internal static class DescribeCommand
                     .Values.Select(static value => (value.Position, Kind: WhatIsNamedBy(value)))
                     .Where(static named => named.Kind is not null)
                     .Select(named =>
-                        $"sqlsource: option '{ManifestOption}' takes no {named.Kind} (position {named.Position})"
+                        $"{Cli.LinePrefix}option '{ManifestOption}' takes no {named.Kind} (position {named.Position})"
                     )
             );
 
             // A watch evaluates the projects again after a change, and a run from a manifest evaluates none.
             if (usage.Flags.Any(static flag => flag.Name == WatchOption))
             {
-                messages.Add($"sqlsource: option '{ManifestOption}' takes no '{WatchOption}'");
+                messages.Add($"{Cli.LinePrefix}option '{ManifestOption}' takes no '{WatchOption}'");
             }
         }
 
-        var onlines = ValuesOf(usage, OnlineOption);
+        var onlines = SharedOptions.ValuesOf(usage, OnlineOption);
         messages.AddRange(
             onlines
                 .Where(static online => OnlineModeOf(online.Text) is null)
                 .Select(online =>
-                    $"sqlsource: the value of option '{OnlineOption}' at position {online.Position} is not "
+                    $"{Cli.LinePrefix}the value of option '{OnlineOption}' at position {online.Position} is not "
                     + $"'{OnlineAuto}' or '{OnlineTrue}'"
                 )
         );
 
         if (manifests.Length == 0 && onlines.Length > 0)
         {
-            messages.Add($"sqlsource: option '{OnlineOption}' needs '{ManifestOption}'");
+            messages.Add($"{Cli.LinePrefix}option '{OnlineOption}' needs '{ManifestOption}'");
         }
     }
 
-    // Whether the command line has --online: the build's, whose paths of --manifest, --log and --env-file are its own.
-    private static bool IsOnline(Usage usage) => usage.Values.Any(static value => value.Option?.Name == OnlineOption);
+    /// <summary>
+    /// Whether the command line has <c>--online</c>: the build's, whose paths of <c>--manifest</c>, <c>--log</c> and
+    /// <c>--env-file</c> are its own.
+    /// </summary>
+    internal static bool IsOnline(Usage usage) => usage.Values.Any(static value => value.Option?.Name == OnlineOption);
 
     // What --online said, as OnlineOf(ParseResult) reads it, for the steps that have only the usage, a watch's passes
     // among them.  A watch is never online: --online needs --manifest, which takes no --watch.
     private static OnlineMode OnlineOf(Usage usage) =>
-        ValuesOf(usage, OnlineOption) is [{ } online]
+        SharedOptions.ValuesOf(usage, OnlineOption) is [{ } online]
             ? OnlineModeOf(online.Text)
                 ?? throw new InvalidOperationException("An --online that is no mode was let through.")
             : OnlineMode.Off;
-
-    /// <summary>
-    /// What is wrong with a value of <c>--log</c> as a path, as a whole line, or null: it is no path, or, without
-    /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.  <c>replay</c> and <c>diagnose</c> hold their <c>--log</c> to
-    /// the same rule.
-    /// </summary>
-    /// <param name="log">The value of <c>--log</c>.</param>
-    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
-    internal static string? ProblemOfLogPath(UsageValue log, bool isOnline) =>
-        ProblemOfPath(log, LogOption, "a log's path", isOnline);
-
-    /// <summary>
-    /// What is wrong with a value of <c>--env-file</c> as a path, as a whole line, or null, by the rule of
-    /// <c>--log</c>.  <c>diagnose</c> holds its <c>--env-file</c> to the same rule.
-    /// </summary>
-    /// <param name="envFile">The value of <c>--env-file</c>.</param>
-    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
-    internal static string? ProblemOfEnvFile(UsageValue envFile, bool isOnline) =>
-        ProblemOfPath(envFile, EnvFileOption, "a .env file's path", isOnline);
-
-    /// <summary>
-    /// What is wrong with the value of an option that is a path, as a whole line, or null: it is no path, or, without
-    /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.
-    /// </summary>
-    /// <param name="value">The value.</param>
-    /// <param name="option">The option's name.</param>
-    /// <param name="ofWhat">What the path is of, as the line names it: <c>a log's path</c>.</param>
-    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
-    internal static string? ProblemOfPath(UsageValue value, string option, string ofWhat, bool isOnline)
-    {
-        // What --log "$UNSET" gives.
-        if (string.IsNullOrWhiteSpace(value.Text))
-        {
-            return $"sqlsource: the value of option '{option}' at position {value.Position} is not a path";
-        }
-
-        // "=" and ";" are what a connection string is made of: the value may be one typed after the option.  The
-        // build's paths may hold them, as a project's name may, and the owner ruled that a path the build writes is
-        // no secret, so under --online a message prints such a path in full.
-        return !isOnline && !value.MayBePrintedAsPath
-            ? $"sqlsource: the value of option '{option}' at position {value.Position} holds '=' or ';', which "
-                + $"{ofWhat} may not"
-            : null;
-    }
 
     // What is wrong with the value of --manifest as a path, as a whole line, or null.  Without --online a path that
     // holds "=" or ";" is refused, as one of --log is: it may be a connection string typed after the option.
@@ -462,11 +337,13 @@ internal static class DescribeCommand
     {
         if (string.IsNullOrWhiteSpace(manifest.Text))
         {
-            return $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} is not a path";
+            return $"{Cli.LinePrefix}the value of option '{ManifestOption}' at position {manifest.Position} "
+                + "is not a path";
         }
 
         return !isOnline && !manifest.MayBePrintedAsPath
-            ? $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} holds '=' or ';', "
+            ? $"{Cli.LinePrefix}the value of option '{ManifestOption}' at position {manifest.Position} holds "
+                + "'=' or ';', "
                 + "which a manifest's path may not"
             : null;
     }
@@ -488,7 +365,7 @@ internal static class DescribeCommand
         value.Option?.Name switch
         {
             null => SqlPath.IsSqlFile(value.Text) ? ".sql path" : "path",
-            ProjectOption => $"'{ProjectOption}'",
+            SharedOptions.Project => $"'{SharedOptions.Project}'",
             DatabaseOption => $"'{DatabaseOption}'",
             _ => null,
         };
@@ -504,48 +381,12 @@ internal static class DescribeCommand
             : OnlineMode.Off;
 
     /// <summary>
-    /// Whether the command line runs <c>describe</c>: the command is named, and it is its own action that runs
-    /// and not the help's.  Until <see cref="Bind" /> gives the command its action it has none, and neither has a
-    /// command line that runs it, so the answer is the same before and after.
+    /// Whether the command line runs <c>describe</c>, and not its help, by <see cref="SharedOptions.Runs" />.
     /// </summary>
-    public static bool Runs(ParseResult parsed) =>
-        parsed.CommandResult.Command.Name == Name
-        && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
-
-    /// <summary>Whether a <c>describe</c> that runs was given <c>--verbose</c>.</summary>
-    public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
+    public static bool Runs(ParseResult parsed) => SharedOptions.Runs(parsed, Name);
 
     /// <summary>Whether a <c>describe</c> that runs was given <c>--watch</c>.</summary>
     public static bool Watches(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(WatchOption);
-
-    /// <summary>
-    /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when
-    /// the run has none.  A command line that does not run <c>describe</c> has none: the help must not empty the
-    /// log of the last run.  A variable that is empty or white space is not set, and a run under <c>--online</c>
-    /// does not read it.
-    /// </summary>
-    public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
-    {
-        if (!Runs(parsed))
-        {
-            return null;
-        }
-
-        if (parsed.GetValue<string>(LogOption) is { } option)
-        {
-            return option;
-        }
-
-        // The build passes --log, with a path of its own for each project and framework, when SQLSOURCE_LOG asks for
-        // logs.  Read here too, the projects built at once would open one file.
-        if (OnlineOf(parsed) != OnlineMode.Off)
-        {
-            return null;
-        }
-
-        var variable = getEnvironmentVariable(LogVariable);
-        return string.IsNullOrWhiteSpace(variable) ? null : variable;
-    }
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
@@ -561,40 +402,14 @@ internal static class DescribeCommand
     public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
         usage.Command.Name != Name
         || (
-            ReadsAs(usage, parsed, ProjectOption)
-            && ReadsAs(usage, parsed, DatabaseOption)
-            && ReadsAs(usage, parsed, ConnectionOption)
-            && ReadsAsOne(usage, parsed, LogOption)
-            && ReadsAsOne(usage, parsed, EnvFileOption)
-            && ReadsAsOne(usage, parsed, ManifestOption)
-            && ReadsAsOne(usage, parsed, OnlineOption)
+            SharedOptions.ReadsAs(usage, parsed, SharedOptions.Project)
+            && SharedOptions.ReadsAs(usage, parsed, DatabaseOption)
+            && SharedOptions.ReadsAs(usage, parsed, SharedOptions.Connection)
+            && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Log)
+            && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.EnvFile)
+            && SharedOptions.ReadsAsOne(usage, parsed, ManifestOption)
+            && SharedOptions.ReadsAsOne(usage, parsed, OnlineOption)
         );
-
-    /// <summary>
-    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave an option that may be repeated the same values,
-    /// in the same order.
-    /// </summary>
-    internal static bool ReadsAs(Usage usage, ParseResult parsed, string option) =>
-        ValuesOf(usage, option)
-            .Select(static value => value.Text)
-            .SequenceEqual(parsed.GetValue<string[]>(option) ?? [], StringComparer.Ordinal);
-
-    /// <summary>
-    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave an option that takes one value, given once, the
-    /// same value.
-    /// </summary>
-    internal static bool ReadsAsOne(Usage usage, ParseResult parsed, string option) =>
-        ValuesOf(usage, option)
-            .Select(static value => value.Text)
-            .SequenceEqual(parsed.GetValue<string>(option) is { } text ? [text] : [], StringComparer.Ordinal);
-
-    /// <summary>The values of an option, in order.</summary>
-    internal static ImmutableArray<UsageValue> ValuesOf(Usage usage, string option) =>
-        [.. usage.Values.Where(value => value.Option?.Name == option)];
-
-    // The arguments of the command: the unit, and the .sql paths.
-    private static ImmutableArray<UsageValue> ArgumentsOf(Usage usage) =>
-        [.. usage.Values.Where(static value => value.Option is null)];
 
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
     // The plan's filters hold --database and the .sql paths, and not --project.  A .sql path that names no file still
@@ -602,58 +417,13 @@ internal static class DescribeCommand
     private static DescribeOptions OptionsOf(Usage usage, RunUnit unit, RunPlan plan, RunMode mode, ToolHost host) =>
         new(
             mode,
-            ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
-            ConnectionsOf(usage),
+            SharedOptions.ValuesOf(usage, SharedOptions.Project).Length > 0
+                || !plan.Filters.Files.IsEmpty
+                || !plan.Filters.Databases.IsEmpty,
+            PlanSteps.SourcesOf(usage, unit, host),
             plan.Filters.Databases,
-            UnitFolderOf(unit),
-            EnvFileOf(usage, UnitFolderOf(unit), host),
             OnlineOf(usage)
         );
-
-    /// <summary>
-    /// The full path of the <c>.env</c> file a run reads, or null when it reads none: the one <c>--env-file</c>
-    /// names, or the one in <paramref name="unitFolder" /> when it names none.  <c>describe</c>, each pass of a watch
-    /// and <c>diagnose</c> read it here.
-    /// </summary>
-    /// <param name="usage">
-    /// The command line, whose <c>--env-file</c> <see cref="CheckUsage" /> has held to a path.
-    /// </param>
-    /// <param name="unitFolder">The folder of the run's unit.</param>
-    /// <param name="host">The working folder, which a relative path is from.</param>
-    internal static string? EnvFileOf(Usage usage, string unitFolder, ToolHost host) =>
-        DotEnvSearch.FileOf(
-            ValuesOf(usage, EnvFileOption) is [{ } value] ? value.Text : null,
-            unitFolder,
-            host.WorkingDirectory
-        );
-
-    /// <summary>
-    /// The values of <c>--connection</c>, each with its position.  <see cref="CheckUsage" /> has held each to its
-    /// form, as <c>diagnose</c>'s holds its own.
-    /// </summary>
-    internal static ImmutableArray<ConnectionArgument> ConnectionsOf(Usage usage)
-    {
-        var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
-        foreach (var value in ValuesOf(usage, ConnectionOption))
-        {
-            connections.Add(
-                ConnectionArgument.TryParse(value.Text, out var connection)
-                    ? connection with
-                    {
-                        Position = value.Position,
-                    }
-                    : throw new InvalidOperationException("A --connection that is no name and value was let through.")
-            );
-        }
-
-        return connections.ToImmutable();
-    }
-
-    /// <summary>
-    /// The full path of the folder of the unit, whose <c>.env</c> the run reads.
-    /// </summary>
-    internal static string UnitFolderOf(RunUnit unit) =>
-        Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file in a folder.");
 
     /// <summary>
     /// The mode that the command line asks for.  <c>--check</c> beside <c>--force</c> is <c>--check</c>: it describes
@@ -668,223 +438,6 @@ internal static class DescribeCommand
         };
 
     /// <summary>
-    /// Builds the plan of the run that a command line asks for, and reports what is wrong with it.  Null when there
-    /// is nothing to plan: no unit, or no project of it that uses SqlSource and could be read.
-    /// </summary>
-    /// <remarks>
-    /// The summary of a run prints counts for each selected database and not which queries it selected, so a test
-    /// reads the plan from here, and the run goes on from it.
-    /// </remarks>
-    internal static async Task<RunPlan?> PlanAsync(
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    ) => (await PlanUnitAsync(usage, host, reporter, cancellationToken))?.Plan;
-
-    // The plan, with the unit it was built for, whose folder holds the run's .env.
-    private static async Task<(RunUnit Unit, RunPlan Plan)?> PlanUnitAsync(
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
-    {
-        RunUnit unit;
-        ImmutableArray<ProjectManifest> manifests;
-        if (ValuesOf(usage, ManifestOption) is [{ } manifestValue])
-        {
-            // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
-            manifests = await RunProjects.FromManifestAsync(
-                Path.GetFullPath(manifestValue.Text, host.WorkingDirectory),
-                host,
-                reporter,
-                cancellationToken
-            );
-            if (manifests.IsEmpty)
-            {
-                return null;
-            }
-
-            unit = new RunUnit(RunUnitKind.Project, manifests[0].ProjectPath);
-            RunEvents.Unit(reporter.Trace, unit, wasGiven: true);
-        }
-        else if (FindUnit(usage, host, reporter) is { } found)
-        {
-            unit = found;
-            manifests = (await FindManifestsAsync(unit, usage, host, reporter, cancellationToken)).Manifests;
-        }
-        else
-        {
-            return null;
-        }
-
-        return await PlanFromAsync(unit, manifests, usage, host, reporter, cancellationToken) is { } plan
-            ? (unit, plan)
-            : null;
-    }
-
-    /// <summary>
-    /// The unit that a command line runs on, from its path or from the working directory.  Null when there is none,
-    /// which is reported.
-    /// </summary>
-    internal static RunUnit? FindUnit(Usage usage, ToolHost host, Reporter reporter)
-    {
-        // With file filters and no unit, the unit is found from the working directory, not from the files.
-        var unitPath = ArgumentsOf(usage).FirstOrDefault(static path => !SqlPath.IsSqlFile(path.Text));
-        var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
-        if (!found.Succeeded)
-        {
-            reporter.Report(found.Failure);
-            return null;
-        }
-
-        RunEvents.Unit(reporter.Trace, found.Value, wasGiven: unitPath is not null);
-        return found.Value;
-    }
-
-    /// <summary>
-    /// The projects of the unit that the command line runs, which <c>--project</c> narrows, and their manifests: the
-    /// evaluation of each, and its manifest target.  A project with an error is reported and has no manifest.
-    /// </summary>
-    internal static Task<FoundProjects> FindManifestsAsync(
-        RunUnit unit,
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    ) => RunProjects.FindAsync(unit, ValuesOf(usage, ProjectOption), host, reporter, cancellationToken);
-
-    /// <summary>
-    /// The plan of the manifests, which <c>--database</c> and the <c>.sql</c> paths narrow, with what is wrong with it
-    /// reported.  Null when there is no manifest; a run with no error then says that no project uses SqlSource.
-    /// </summary>
-    internal static Task<RunPlan?> PlanFromAsync(
-        RunUnit unit,
-        ImmutableArray<ProjectManifest> manifests,
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    ) =>
-        PlanFromAsync(
-            unit,
-            manifests,
-            RunFilters.Create(
-                ArgumentsOf(usage).Where(static path => SqlPath.IsSqlFile(path.Text)),
-                ValuesOf(usage, DatabaseOption),
-                host.WorkingDirectory
-            ),
-            IsOnline(usage),
-            elsewhereIsLogged: false,
-            host,
-            reporter,
-            cancellationToken
-        );
-
-    /// <summary>
-    /// The plan of the manifests, which the filters narrow, with what is wrong with it reported.  Null when there is
-    /// no manifest; a run with no error then says that no project uses SqlSource.  <c>diagnose</c> plans with the file
-    /// of its query as the one filter.
-    /// </summary>
-    /// <param name="unit">The unit the manifests are of.</param>
-    /// <param name="manifests">The manifests of its projects.</param>
-    /// <param name="filters">What the run is restricted to.</param>
-    /// <param name="isOnline">
-    /// Whether the run is the build's, under <c>--online</c>, which only counts and logs what the compiler reports too.
-    /// </param>
-    /// <param name="elsewhereIsLogged">
-    /// Whether an error at a claimed <c>.sql</c> file that no file filter names is only counted and logged, as
-    /// <c>diagnose</c> reports one: it cannot change the one query of that run, and <c>describe</c> prints it.  An
-    /// error at a named file, at a settings file or a C# file, or at no file, is written whatever this says.
-    /// </param>
-    /// <param name="host">Standard output.</param>
-    /// <param name="reporter">Where the errors go, with the run's trace.</param>
-    /// <param name="cancellationToken">Ends the plan.</param>
-    internal static async Task<RunPlan?> PlanFromAsync(
-        RunUnit unit,
-        ImmutableArray<ProjectManifest> manifests,
-        RunFilters filters,
-        bool isOnline,
-        bool elsewhereIsLogged,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
-    {
-        if (manifests.IsEmpty)
-        {
-            if (reporter.Count == 0)
-            {
-                // A run that found nothing to do must not look like one that did it.
-                await host.Out.WriteLineAsync($"sqlsource: no project of '{OneLine.Of(unit.Path)}' uses SqlSource");
-            }
-
-            return null;
-        }
-
-        var result = RunPlanner.Plan(manifests, filters, cancellationToken);
-        for (var index = 0; index < manifests.Length; index++)
-        {
-            RunEvents.Unclaimed(reporter.Trace, manifests[index].ProjectPath, result.Unclaimed[index]);
-        }
-
-        foreach (var file in result.Plan.Files)
-        {
-            RunEvents.File(reporter.Trace, file);
-        }
-
-        // The build's compiler reports most of these too, at the same place, and the build lists the errors of both.
-        // So under --online they are counted and logged and their lines are left out: the plan holds back the same
-        // files and the run deletes nothing, as after any error, and the run exits 0 with its summary, since an exit
-        // code of 1 with no error line would be a tool that failed.  diagnose does the same with an error at another
-        // .sql file, so that the bundle it writes is not beside an exit code of 1.
-        var elsewhere = elsewhereIsLogged ? FilesNotNamed(result.Plan) : null;
-        foreach (var error in result.Errors)
-        {
-            if ((isOnline && IsReportedByTheCompiler(error)) || (elsewhere is not null && IsAtOneOf(error, elsewhere)))
-            {
-                reporter.ReportWithoutWriting(error);
-            }
-            else
-            {
-                reporter.Report(error);
-            }
-        }
-
-        return result.Plan;
-    }
-
-    // The normalised paths of the planned files that no file filter names.
-    private static HashSet<string> FilesNotNamed(RunPlan plan)
-    {
-        var named = new HashSet<string>(
-            plan.Filters.Files.Select(static filter => filter.NormalizedPath).OfType<string>(),
-            SqlPath.Comparer
-        );
-        return new HashSet<string>(
-            plan.Files.Select(static file => file.NormalizedPath).Where(path => !named.Contains(path)),
-            SqlPath.Comparer
-        );
-    }
-
-    // Whether the error is at one of the files, by its normalised path: the planner gives a file's error at the path
-    // it read, or at the normalised path the generator's reader was given.
-    private static bool IsAtOneOf(ToolDiagnostic error, HashSet<string> normalizedPaths) =>
-        error.Path is { } path && SqlPath.Normalize(path) is { } normalized && normalizedPaths.Contains(normalized);
-
-    // The generator reports every SqlDiagnostics descriptor the planner finds, from the same code, and two of the
-    // tool's own that SidecarChecker reports where the tool does (GeneratorParityTests compares them).  An error of one
-    // of those descriptors that the generator does not report, a settings file's database, says so itself.
-    private static bool IsReportedByTheCompiler(ToolDiagnostic error) =>
-        !error.IsNotReportedByTheCompiler
-        && (
-            SqlDiagnostics.All.Contains(error.Descriptor)
-            || ReferenceEquals(error.Descriptor, ToolDiagnostics.OutputNeedsDescribableDialect)
-            || ReferenceEquals(error.Descriptor, ToolDiagnostics.TokenHasNoDefault)
-        );
-
-    /// <summary>
     /// Describes the plan, and writes or deletes the sidecars, in the mode given: the steps after the plan, with what
     /// the command line says of the run beside it.
     /// </summary>
@@ -893,17 +446,7 @@ internal static class DescribeCommand
         Usage usage,
         RunUnit unit,
         RunMode mode,
-        ToolHost host,
-        Reporter reporter,
-        Action<LogValue> counted,
-        CancellationToken cancellationToken
-    ) =>
-        DescribeRun.RunAsync(
-            plan,
-            OptionsOf(usage, unit, plan, mode, host),
-            host,
-            reporter,
-            counted,
-            cancellationToken
-        );
+        RunContext context,
+        Action<LogValue> counted
+    ) => DescribeRun.RunAsync(plan, OptionsOf(usage, unit, plan, mode, context.Host), context, counted);
 }

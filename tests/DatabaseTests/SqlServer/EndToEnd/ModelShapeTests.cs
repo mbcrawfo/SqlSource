@@ -6,6 +6,7 @@ using Microsoft.Data.SqlTypes;
 using Shouldly;
 using SqlSource.DatabaseTests.SqlServer.EndToEnd.Types;
 using SqlSource.DatabaseTests.TestHarness.EndToEnd;
+using SqlSource.Generation;
 using Xunit;
 using static SqlSource.DatabaseTests.TestHarness.EndToEnd.ModelReflection;
 
@@ -34,7 +35,7 @@ public sealed class ModelShapeTests
 
     [Fact]
     public void Build_Project_DeclaresTheGeneratorsAttribute() =>
-        _ = typeof(ModelShapeTests).Assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull();
+        _ = typeof(ModelShapeTests).Assembly.GetType(AttributeSource.AttributeMetadataName).ShouldNotBeNull();
 
     [Fact]
     public void Build_ProjectFileSettings_GiveARecordInputAndASealedRecordOutput()

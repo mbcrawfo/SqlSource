@@ -64,6 +64,14 @@ internal static class ModelRuns
     public static GeneratorRun Run(SqlFile file, SidecarEntry[] entries, string? settings) =>
         Run(Source, [file, Sidecars.Of(file, entries)], settings);
 
+    // Every run compiles, with no warning in the generated code, whatever its diagnostics.
+    public static GeneratorRun CleanRun(SqlFile file, params SidecarEntry[] entries)
+    {
+        var run = Run(file, entries);
+        _ = run.Problems();
+        return run;
+    }
+
     // An entry of the query for its current hash: with rows when it has columns, and without when they are null.  The
     // parameters and columns are numbered by their place.
     public static SidecarEntry Entry(

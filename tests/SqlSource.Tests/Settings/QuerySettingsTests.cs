@@ -5,7 +5,9 @@ using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing.Snapshot;
+using SqlSource.Tests.Generation;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 
 namespace SqlSource.Tests.Settings;
 
@@ -13,12 +15,9 @@ namespace SqlSource.Tests.Settings;
 // rule: the most specific level that has a value gives it.
 public sealed class QuerySettingsTests
 {
-    private static readonly SettingsLevel Keep = Turn(GeneratorParameters.KeepComments, GeneratorParameterState.On);
+    private static readonly SettingsLevel Keep = TestModels.ParametersOn(GeneratorParameters.KeepComments);
 
-    private static readonly SettingsLevel Sort = Turn(GeneratorParameters.SortInput, GeneratorParameterState.On);
-
-    // The place of a settings file, which a file's level holds.
-    private static readonly SettingPlace SettingsFile = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
+    private static readonly SettingsLevel Sort = TestModels.ParametersOn(GeneratorParameters.SortInput);
 
     [Fact]
     public void Resolve_NoLevelSaysAnything_GivesTheDefaults()
@@ -51,7 +50,7 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_MarkersTurnAnOptionOff_OverTheFile()
     {
-        var off = Turn(GeneratorParameters.KeepComments, GeneratorParameterState.Off);
+        var off = TestModels.ParametersOff(GeneratorParameters.KeepComments);
         var file = new SettingsLevel { Parameters = Keep.Parameters.Over(Sort.Parameters) };
 
         var settings = QuerySettings.Resolve(off, file);
@@ -69,13 +68,13 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_TokenValidationOff_TurnsValidationOff() =>
         QuerySettings
-            .Resolve(Turn(GeneratorParameters.TokenValidation, GeneratorParameterState.Off), Keep)
+            .Resolve(TestModels.ParametersOff(GeneratorParameters.TokenValidation), Keep)
             .ValidateTokens.ShouldBeFalse();
 
     [Fact]
     public void Resolve_ArrayPoolOff_TurnsThePoolOff() =>
         QuerySettings
-            .Resolve(Turn(GeneratorParameters.ArrayPool, GeneratorParameterState.Off), Keep)
+            .Resolve(TestModels.ParametersOff(GeneratorParameters.ArrayPool), Keep)
             .UseArrayPool.ShouldBeFalse();
 
     [Fact]
@@ -85,7 +84,7 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_ListPaddingOff_TurnsPaddingOff() =>
         QuerySettings
-            .Resolve(Turn(GeneratorParameters.ListPadding, GeneratorParameterState.Off), Keep)
+            .Resolve(TestModels.ParametersOff(GeneratorParameters.ListPadding), Keep)
             .PadsLists.ShouldBeFalse();
 
     [Fact]
@@ -506,8 +505,4 @@ public sealed class QuerySettingsTests
 
     private static SettingsLevel Columns(params ColumnType[] entries) =>
         new() { ColumnTypes = TestSidecars.Of(entries) };
-
-    // A level that gives the parameter that state, and says nothing else.
-    private static SettingsLevel Turn(GeneratorParameters parameter, GeneratorParameterState state) =>
-        new() { Parameters = GeneratorParameterChoices.None.With(parameter, state) };
 }

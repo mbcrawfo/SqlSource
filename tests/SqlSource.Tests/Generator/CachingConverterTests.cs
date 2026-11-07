@@ -275,7 +275,8 @@ public sealed class CachingConverterTests
     }
 
     // NodaTime is referenced after the first run: the probe changes, and the library's edges are found and joined into
-    // the set, while the project's converters, which read the probe without its version, are not.
+    // the set, while the project's converters, which read the probe without its version, are not.  The files are typed
+    // again with the new probe and get the same types.
     [Fact]
     public void Run_NodaTimeReferenceAdded_RunsLibraryConvertersAndConverters()
     {
@@ -292,6 +293,9 @@ public sealed class CachingConverterTests
         NodaTimeEdgesOf(result).Count().ShouldBe(14);
         AllReasons(result, TrackingNames.ProjectConverters)
             .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBe(IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.TypedFile).ShouldAllBe(IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(IncrementalStepRunReason.Unchanged);
     }
 
     // An edit of a converter's body, which changes neither the probe nor any converter's signature: the library's

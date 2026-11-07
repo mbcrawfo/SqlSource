@@ -7,13 +7,12 @@ using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 
 namespace SqlSource.Tests.Settings;
 
 public sealed class SettingsLevelReaderTests
 {
-    private static readonly SettingPlace SettingsFile = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
     // The settings that are a text, each with the member of the level it sets.
     private static readonly Dictionary<SettingId, Func<SettingsLevel, string?>> Texts = new()
     {

@@ -1,8 +1,7 @@
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Shouldly;
 using SqlSource.Generation.Types.MappedTypes;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Types.MappedTypes;
@@ -83,8 +82,8 @@ public sealed class TransitivePackageAssembliesTests
     public void Read_GlobalOption_IsTheProperty() =>
         TransitivePackageAssemblies
             .Read(
-                new Options(
-                    new Dictionary<string, string>
+                new TestAnalyzerConfigOptions(
+                    new Dictionary<string, string?>
                     {
                         ["build_property.SqlSourceTransitivePackageAssemblies"] =
                             "Microsoft.Identity.Client|Azure.Core",
@@ -95,11 +94,7 @@ public sealed class TransitivePackageAssembliesTests
 
     [Fact]
     public void Read_NoProperty_IsNone() =>
-        TransitivePackageAssemblies.Read(new Options([])).ShouldBe(TransitivePackageAssemblies.None);
-
-    private sealed class Options(Dictionary<string, string> values) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) =>
-            values.TryGetValue(key, out value);
-    }
+        TransitivePackageAssemblies
+            .Read(new TestAnalyzerConfigOptions(new Dictionary<string, string?>()))
+            .ShouldBe(TransitivePackageAssemblies.None);
 }

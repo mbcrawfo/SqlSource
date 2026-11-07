@@ -225,14 +225,13 @@ public sealed class ModelWarningTests
             """{"typeOverrides": {"text": "MyApp.GoneName"}}"""
         );
 
-        run.Diagnostics.ShouldHaveSingleItem()
+        run.Problems()
+            .ShouldHaveSingleItem()
             .ShouldStartWith(
                 $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'text' is mapped to "
                     + "'MyApp.GoneName' for column 'name', in the typeOverrides of the settings file "
                     + $"{GeneratorHarness.ProjectSettingsPath}, and no property can have that type."
             );
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
         ModelFiles(run).ShouldBeEmpty();
     }
 
@@ -258,14 +257,13 @@ public sealed class ModelWarningTests
             """{"typeOverrides": {"text": "MyApp.ValueBox<string>"}}"""
         );
 
-        run.Diagnostics.ShouldHaveSingleItem()
+        run.Problems()
+            .ShouldHaveSingleItem()
             .ShouldStartWith(
                 $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'text' is mapped to "
                     + "'MyApp.ValueBox<string>' for column 'name', in the typeOverrides of the settings file "
                     + $"{GeneratorHarness.ProjectSettingsPath}, and no property can have that type."
             );
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
         ModelFiles(run).ShouldBeEmpty();
     }
 

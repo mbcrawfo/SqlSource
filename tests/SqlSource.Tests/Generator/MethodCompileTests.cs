@@ -190,7 +190,6 @@ public sealed class MethodCompileTests
         );
 
         run.ShouldBeClean();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
         var methods = run.Sources[MethodRuns.MethodsFile];
         foreach (var row in kinds)
         {

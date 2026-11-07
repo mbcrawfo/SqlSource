@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
@@ -47,39 +46,41 @@ internal static class ReplayCommand
 
     private const string BundleArgument = "bundle";
 
-    private const string VerboseOption = "--verbose";
-
-    private const string Prefix = "sqlsource: ";
-
     private static readonly JsonSerializerOptions EntryOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    /// <summary>
+    /// The command as <see cref="Cli" /> runs it: it always reads <c>SQLSOURCE_LOG</c>, writes its errors as they are,
+    /// and never ends with <c>Cli.RunAgainLine</c>.
+    /// </summary>
+    public static ToolCommand Entry =>
+        new()
+        {
+            Name = Name,
+            Create = Create,
+            CheckUsage = CheckUsage,
+            ReadsValuesAs = ReadsValuesAs,
+            ReadsLogVariable = static _ => true,
+            WritesOneLine = static _ => false,
+            MayPoint = static _ => false,
+            Bind = static (parsed, usage, host, reporter, _) => Bind(parsed, usage, host, reporter),
+        };
+
     public static Command Create()
     {
-        // The rules of DescribeCommand.Create hold: a flag has Arity = ArgumentArity.Zero, and an option that takes a
-        // value takes exactly one.  --log is describe's, with its name, its variable and its rules.
+        // The rules of SharedOptions hold, and --log is the one of SharedOptions, with its variable and its rules.
         var bundle = new Argument<string>(BundleArgument)
         {
             Description = "A bundle: the zip, or the folder it was unzipped to.",
             Arity = ArgumentArity.ExactlyOne,
         };
 
-        var verbose = new Option<bool>(VerboseOption)
-        {
-            Description = "Print every event of the replay, not only the decisions of the walk and the table match.",
-            Arity = ArgumentArity.Zero,
-        };
-
-        var log = new Option<string>(DescribeCommand.LogOption)
-        {
-            Description =
-                "Write what the run did to this file, one JSON object on a line.  The file is overwritten.  "
-                + $"{DescribeCommand.LogVariable} gives the path when the option does not.",
-            HelpName = "path",
-            Arity = ArgumentArity.ExactlyOne,
-        };
+        var verbose = SharedOptions.VerboseOption(
+            "Print every event of the replay, not only the decisions of the walk and the table match."
+        );
+        var log = SharedOptions.LogOption();
 
         return new Command(
             Name,
@@ -93,43 +94,13 @@ internal static class ReplayCommand
     }
 
     /// <summary>
-    /// Whether the command line runs <c>replay</c>: the command is named, and it is its own action that runs and not
-    /// the help's, as <see cref="DescribeCommand.Runs" /> says it of <c>describe</c>.
-    /// </summary>
-    public static bool Runs(ParseResult parsed) =>
-        parsed.CommandResult.Command.Name == Name
-        && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
-
-    /// <summary>Whether a <c>replay</c> that runs was given <c>--verbose</c>.</summary>
-    public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
-
-    /// <summary>
-    /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when the
-    /// run has none, as <see cref="DescribeCommand.LogPathOf" /> reads it for <c>describe</c>.
-    /// </summary>
-    public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
-    {
-        if (!Runs(parsed))
-        {
-            return null;
-        }
-
-        if (parsed.GetValue<string>(DescribeCommand.LogOption) is { } option)
-        {
-            return option;
-        }
-
-        var variable = getEnvironmentVariable(DescribeCommand.LogVariable);
-        return string.IsNullOrWhiteSpace(variable) ? null : variable;
-    }
-
-    /// <summary>
     /// What is wrong with a command line of <c>replay</c> by the command's own rules, each a whole line to write.
     /// Empty for another command.
     /// </summary>
     /// <remarks>
     /// System.CommandLine needs the bundle and says so with a message of its own, so the line that asks for it is
-    /// written here, unless the help is asked for.  A value of <c>--log</c> is held to <c>describe</c>'s rule.
+    /// written here, unless the help is asked for.  A value of <c>--log</c> is held to the rule of
+    /// <see cref="SharedOptions.ProblemOfLogPath" /> without <c>--online</c>.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -141,11 +112,14 @@ internal static class ReplayCommand
         var messages = new List<string>();
         if (usage.Arguments.Count == 0 && !usage.Flags.Any(static flag => flag is HelpOption))
         {
-            messages.Add($"sqlsource: command '{Name}' needs the path of a {BundleArgument}");
+            messages.Add($"{Cli.LinePrefix}command '{Name}' needs the path of a {BundleArgument}");
         }
 
         messages.AddRange(
-            LogsOf(usage).Select(static log => DescribeCommand.ProblemOfLogPath(log, isOnline: false)).OfType<string>()
+            SharedOptions
+                .ValuesOf(usage, SharedOptions.Log)
+                .Select(static log => SharedOptions.ProblemOfLogPath(log, isOnline: false))
+                .OfType<string>()
         );
         return messages;
     }
@@ -155,18 +129,12 @@ internal static class ReplayCommand
     /// other than <c>replay</c>.
     /// </summary>
     public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
-        usage.Command.Name != Name
-        || LogsOf(usage)
-            .Select(static value => value.Text)
-            .SequenceEqual(
-                parsed.GetValue<string>(DescribeCommand.LogOption) is { } log ? [log] : [],
-                StringComparer.Ordinal
-            );
+        usage.Command.Name != Name || SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Log);
 
     /// <summary>
     /// Gives the <c>replay</c> that a command line runs its action, once the run has its reporter.
     /// </summary>
-    /// <param name="parsed">A command line for which <see cref="Runs" /> is true.</param>
+    /// <param name="parsed">A command line that runs <c>replay</c>, by <see cref="SharedOptions.Runs" />.</param>
     /// <param name="usage">The same command line as <see cref="UsageCheck" /> read it, which gives the bundle.</param>
     /// <param name="host">What the run takes from outside.</param>
     /// <param name="reporter">
@@ -177,23 +145,16 @@ internal static class ReplayCommand
             (command, cancellationToken) =>
                 ReplayAsync(
                     usage.Values.Single(static value => value.Option is null),
-                    IsVerbose(command),
-                    host,
-                    reporter,
-                    cancellationToken
+                    SharedOptions.IsVerbose(command, Name),
+                    new RunContext(host, reporter, cancellationToken)
                 )
         );
 
     // The replay of the bundle at the argument.  An error is in the reporter, where the exit code is taken; the
     // command gives 2 for an answer that is not the bundle's.
-    private static async Task<int> ReplayAsync(
-        UsageValue argument,
-        bool verbose,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
+    private static async Task<int> ReplayAsync(UsageValue argument, bool verbose, RunContext context)
     {
+        var (host, reporter, cancellationToken) = context;
         var path = Path.GetFullPath(argument.Text, host.WorkingDirectory);
         void Report(ToolDiagnostic error) => reporter.Report(AsNamed(error, argument, path));
 
@@ -207,45 +168,19 @@ internal static class ReplayCommand
         var bundle = read.Value;
         if (bundle.Info is { Renamed: false })
         {
-            await host.Out.WriteLineAsync(Prefix + "this bundle is not renamed, and must not be posted");
-        }
-
-        var capture = BundleReplay.CaptureOf(bundle, path);
-        if (!capture.Succeeded)
-        {
-            Report(capture.Failure);
-            return 0;
-        }
-
-        var engine = BundleReplay.EngineOf(bundle);
-        var planned = BundleReplay.Plan(bundle, engine, path, cancellationToken);
-        if (!planned.Succeeded)
-        {
-            Report(planned.Failure);
-            return 0;
-        }
-
-        var (query, dialect) = planned.Value;
-        var describer = BundleDescribers.For(dialect, host.Describers, bundle.ExplainSettings, engine, path);
-        if (!describer.Succeeded)
-        {
-            Report(describer.Failure);
-            return 0;
+            await host.Out.WriteLineAsync(Cli.LinePrefix + "this bundle is not renamed, and must not be posted");
         }
 
         // Before the replay, so that a bundle whose answer cannot be read is not replayed for nothing.
-        var expected = BundleReplay.ExpectedOf(bundle, path);
-        if (!expected.Succeeded)
+        var prepared = BundleReplay.Prepare(bundle, path, host.Describers, cancellationToken);
+        if (!prepared.Succeeded)
         {
-            Report(expected.Failure);
+            Report(prepared.Failure);
             return 0;
         }
 
         var replayed = await BundleReplay.RunAsync(
-            query,
-            dialect,
-            capture.Value,
-            describer.Value,
+            prepared.Value,
             new ReplayLines(reporter.Trace.Log, host.Out, verbose),
             host.Time,
             cancellationToken
@@ -256,7 +191,7 @@ internal static class ReplayCommand
             return 0;
         }
 
-        return await SayAsync(host.Out, bundle.Info, expected.Value, replayed);
+        return await SayAsync(host.Out, bundle.Info, prepared.Value.Expected, replayed);
     }
 
     // The outcome's lines, and the command's exit code.
@@ -269,27 +204,27 @@ internal static class ReplayCommand
     {
         if (expected is null)
         {
-            await output.WriteLineAsync(Prefix + "replayed: " + OneLine.Of(TextOf(replayed)));
+            await output.WriteLineAsync(Cli.LinePrefix + "replayed: " + OneLine.Of(TextOf(replayed)));
             return 0;
         }
 
         var differences = DifferencesOf(expected, replayed);
         if (differences.Count == 0)
         {
-            await output.WriteLineAsync(Prefix + "reproduced: the pipeline gives this answer");
+            await output.WriteLineAsync(Cli.LinePrefix + "reproduced: the pipeline gives this answer");
             return 0;
         }
 
-        await output.WriteLineAsync(Prefix + "not reproduced");
+        await output.WriteLineAsync(Cli.LinePrefix + "not reproduced");
         foreach (var difference in differences)
         {
-            await output.WriteLineAsync(Prefix + "  " + BundleText.Of(difference));
+            await output.WriteLineAsync(Cli.LinePrefix + "  " + BundleText.Of(difference));
         }
 
         if (info is not null)
         {
             await output.WriteLineAsync(
-                Prefix
+                Cli.LinePrefix
                     + $"the bundle was made by sqlsource {BundleText.Of(info.ToolVersion)}, sidecar format "
                     + $"{info.FormatVersion}; this is sqlsource {OneLine.Of(Cli.Version)}, sidecar format "
                     + $"{SidecarFormat.Version}"
@@ -321,8 +256,7 @@ internal static class ReplayCommand
         outcome switch
         {
             ReplayOutcome.Described => "an entry",
-            ReplayOutcome.Refused { Step: { } step } refused => $"{refused.Id} at {step}",
-            ReplayOutcome.Refused refused => refused.Id,
+            ReplayOutcome.Refused refused => refused.ShortText,
             // A miss is reported, and never compared or printed.
             _ => throw new InvalidOperationException($"An outcome of {outcome.GetType().Name} has no text."),
         };
@@ -363,8 +297,4 @@ internal static class ReplayCommand
         ];
         return ToolDiagnostic.Create(error.Descriptor, arguments).WithLines(new ContinuationLine("bundle", named));
     }
-
-    // The values of --log, in order.
-    private static UsageValue[] LogsOf(Usage usage) =>
-        [.. usage.Values.Where(static value => value.Option?.Name == DescribeCommand.LogOption)];
 }

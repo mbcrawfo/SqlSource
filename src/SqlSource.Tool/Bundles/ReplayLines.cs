@@ -24,8 +24,6 @@ namespace SqlSource.Tool.Bundles;
 /// <param name="verbose">Whether every event is printed, and not only the decisions.</param>
 internal sealed class ReplayLines(IRunLog inner, TextWriter output, bool verbose) : IRunLog
 {
-    private const string Prefix = "sqlsource: ";
-
     private static readonly string[] Decisions = ["walk.node", "walk.column", "table-match"];
 
     private static readonly JsonWriterOptions ValueOptions = new()
@@ -50,7 +48,7 @@ internal sealed class ReplayLines(IRunLog inner, TextWriter output, bool verbose
             _ = line.Append(' ').Append(member.Name).Append('=').Append(Json(member.Value));
         }
 
-        output.WriteLine(Prefix + OneLine.Of(line.ToString()));
+        output.WriteLine(Cli.LinePrefix + OneLine.Of(line.ToString()));
     }
 
     // The name without the engine of a describer that the tool has, and a dot.

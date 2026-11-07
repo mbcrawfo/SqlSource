@@ -110,8 +110,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
 
             return new Outcome<RunLogFile, ToolDiagnostic>(new RunLogFile(path, createFile(path), time));
         }
-        catch (Exception exception)
-            when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
             // An empty path, a directory, a folder that is not there, or a file the system will not open.
             return Outcome<RunLogFile, ToolDiagnostic>.Failed(
