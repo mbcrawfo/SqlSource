@@ -77,6 +77,52 @@ public sealed class SampleSqlTests : IDisposable
                     + "on conflict ((id + 0), kind) where NULL is null or kind in (@kinds) do nothing;"
             );
 
+    // A parenthesis closed inside the predicate does not end it.
+    [Fact]
+    public void Build_NullTestAfterAFunctionInAnIndexPredicate_IsNull() =>
+        Sample(
+                "-- name: A\nINSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (lower(kind) <> '' AND (@kinds IS NULL OR kind IN @kinds)) DO NOTHING;\n"
+            )
+            .ShouldBe(
+                "INSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) WHERE (lower(kind) <> '' AND (NULL IS NULL OR kind IN (@kinds))) DO NOTHING;"
+            );
+
+    // A join ON a function named conflict, and the WHERE after it, is no conflict target: no DO ends its WHERE, and
+    // NULL there would let the planner make the LEFT JOIN inner.
+    [Theory]
+    [InlineData(
+        "SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) WHERE (@ids IS NULL OR a.id IN @ids)",
+        "SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) WHERE ((SELECT NULL) IS NULL OR a.id IN (@ids))"
+    )]
+    [InlineData(
+        "SELECT s.total FROM (SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) "
+            + "WHERE (@ids IS NULL OR a.id IN @ids)) s",
+        "SELECT s.total FROM (SELECT b.total FROM a LEFT JOIN b ON conflict(a.id, b.id) "
+            + "WHERE ((SELECT NULL) IS NULL OR a.id IN (@ids))) s"
+    )]
+    [InlineData(
+        "INSERT INTO t SELECT a.id FROM a JOIN b ON conflict(a.id, b.id) WHERE (@ids IS NULL OR b.id IN @ids) "
+            + "ON CONFLICT DO NOTHING",
+        "INSERT INTO t SELECT a.id FROM a JOIN b ON conflict(a.id, b.id) "
+            + "WHERE ((SELECT NULL) IS NULL OR b.id IN (@ids)) ON CONFLICT DO NOTHING"
+    )]
+    public void Build_NullTestAfterAJoinOnAFunctionNamedConflict_IsASubqueryOfNull(string sql, string sample) =>
+        Sample("-- name: A\n" + sql + ";\n").ShouldBe(sample + ";");
+
+    // A conflict target without a predicate leaves the WHERE of DO UPDATE a condition like any other.
+    [Fact]
+    public void Build_NullTestInTheWhereOfDoUpdateWithoutAPredicate_IsASubqueryOfNull() =>
+        Sample(
+                "-- name: A\nINSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) DO UPDATE SET kind = 'b' WHERE (@kinds IS NULL OR t.kind IN @kinds);\n"
+            )
+            .ShouldBe(
+                "INSERT INTO t (id, kind) VALUES (1, 'a') "
+                    + "ON CONFLICT (id) DO UPDATE SET kind = 'b' WHERE ((SELECT NULL) IS NULL OR t.kind IN (@kinds));"
+            );
+
     // The predicate ends at the DO of the action, whose WHERE is a condition like any other.
     [Fact]
     public void Build_NullTestInTheWhereOfDoUpdate_IsASubqueryOfNull() =>

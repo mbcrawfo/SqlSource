@@ -92,8 +92,10 @@ internal static class SampleSql
 
     // Where the index predicates of ON CONFLICT ( ... ) WHERE stand in PostgreSQL's SQL: from the WHERE to the DO of
     // the conflict's action, at the WHERE's depth of parentheses.  Words are read from the text lexemes alone, so that
-    // a string or a quoted name is never one.  A predicate also ends at a ")" that closes its depth, at a ";" and at
-    // the end, in SQL that PostgreSQL refuses anyway.
+    // a string or a quoted name is never one.  The grammar puts DO right after a predicate, and the reserved ON never
+    // stands in one, so the same words that end anywhere else, such as a join ON a function named conflict and the
+    // WHERE after it, are no predicate: such a run is dropped at the ON, at a ")" that closes its depth, at a ";" and
+    // at the end.
     private static List<TextSpan> IndexPredicates(string text)
     {
         var predicates = new List<TextSpan>();
@@ -153,11 +155,6 @@ internal static class SampleSql
             }
         }
 
-        if (stage == Stage.Predicate)
-        {
-            predicates.Add(TextSpan.FromBounds(predicateStart, text.Length));
-        }
-
         return predicates;
 
         void Step(Item item, TextSpan span)
@@ -177,12 +174,17 @@ internal static class SampleSql
 
                     break;
                 case Stage.Predicate:
-                    var ends =
-                        depth == predicateDepth
-                        && (item is Item.Close or Item.Semicolon || (item == Item.Word && Is(span, "DO")));
-                    if (ends)
+                    if (item == Item.Word && Is(span, "ON"))
+                    {
+                        stage = Stage.On;
+                    }
+                    else if (depth == predicateDepth && item == Item.Word && Is(span, "DO"))
                     {
                         predicates.Add(TextSpan.FromBounds(predicateStart, span.Start));
+                        stage = Stage.None;
+                    }
+                    else if (depth == predicateDepth && item is Item.Close or Item.Semicolon)
+                    {
                         stage = Stage.None;
                     }
 
