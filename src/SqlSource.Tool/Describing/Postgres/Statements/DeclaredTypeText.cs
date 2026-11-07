@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using SqlSource.Tool.Describing.Describers;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.Tool.Describing.Postgres.Statements;
 
@@ -14,7 +14,7 @@ namespace SqlSource.Tool.Describing.Postgres.Statements;
 /// nothing leaves the tool that is not written as a type: a name, one bare identifier or one quoted one, or two
 /// joined by a dot; then any of PostgreSQL's own type words, with one modifier in parentheses, of numbers and
 /// bare words, before, among or after them; then any number of <c>[]</c>.  A comment, a <c>;</c>, a quote left
-/// open, a <c>)</c> without its <c>(</c> and any other bare word are refused.
+/// open, a <c>)</c> without its <c>(</c> and any other bare word are refused, each with what was found.
 /// </para>
 /// <para>
 /// It does not say whether the database has the type: the server does, and checks it against every use.
@@ -22,6 +22,12 @@ namespace SqlSource.Tool.Describing.Postgres.Statements;
 /// </remarks>
 internal static class DeclaredTypeText
 {
+    public const string NotClosed = "a quote or a parenthesis is not closed";
+
+    public const string Modifier = "a modifier in parentheses holds numbers and plain words";
+
+    public const string Shape = "a type name is a name, then type words and one modifier in parentheses, then []";
+
     // The words of PostgreSQL's multi-word type names, compared ignoring case.
     private static readonly HashSet<string> TypeWords = new(
         [
@@ -45,42 +51,45 @@ internal static class DeclaredTypeText
     );
 
     /// <summary>
-    /// The text to put into the type list, without the spaces around it, or
-    /// <see cref="DescribeFailures.NotATypeName" /> for a text that is not written as a type name.
+    /// The text to put into the type list, without the spaces around it, or why it is refused:
+    /// <see cref="TypeNameFound.Reason" /> of what was found at the first place the text leaves the grammar.
     /// </summary>
-    public static Outcome<string, string> Read(string text) =>
-        IsTypeName(text)
-            ? Outcome<string, string>.Of(text.Trim(' ', '\t'))
-            : Outcome<string, string>.Failed(DescribeFailures.NotATypeName);
-
-    private static bool IsTypeName(string text)
+    public static Outcome<string, string> Read(string text)
     {
         var position = 0;
-        if (!TryReadIdentifier(text, ref position))
+        var found =
+            ReadName(text, ref position)
+            ?? ReadWordsAndModifier(text, ref position)
+            ?? ReadArrayMarks(text, ref position);
+        return found is null
+            ? Outcome<string, string>.Of(text.Trim(' ', '\t'))
+            : Outcome<string, string>.Failed(TypeNameFound.Reason(found));
+    }
+
+    // One identifier, or two joined by a dot.  Null when it was read, else what was found.  A dot with no identifier
+    // on one side of it is a count of parts.
+    private static string? ReadName(string text, ref int position)
+    {
+        var found = ReadIdentifier(text, ref position);
+        if (found is not null)
         {
-            return false;
+            return found;
         }
 
         SkipSpaces(text, ref position);
-        if (position < text.Length && text[position] == '.')
+        if (!IsAt(text, position, '.'))
         {
-            position++;
-            if (!TryReadIdentifier(text, ref position))
-            {
-                return false;
-            }
+            return null;
         }
 
-        if (!TryReadWordsAndModifier(text, ref position) || !TryReadArrayMarks(text, ref position))
-        {
-            return false;
-        }
-
-        return true;
+        position++;
+        SkipSpaces(text, ref position);
+        return position == text.Length ? TypeNameFound.Parts : ReadIdentifier(text, ref position);
     }
 
-    // Type words and at most one modifier, in any order, up to the first array mark or the end.
-    private static bool TryReadWordsAndModifier(string text, ref int position)
+    // Type words and at most one modifier, in any order, up to the first array mark or the end.  A dot where a type
+    // word is expected is a third part.
+    private static string? ReadWordsAndModifier(string text, ref int position)
     {
         var hasModifier = false;
         while (true)
@@ -88,37 +97,42 @@ internal static class DeclaredTypeText
             SkipSpaces(text, ref position);
             if (position == text.Length || text[position] == '[')
             {
-                return true;
+                return null;
             }
 
-            if (text[position] == '(')
+            if (text[position] == '(' && !hasModifier)
             {
-                if (hasModifier || !TryReadModifier(text, ref position))
+                var found = ReadModifier(text, ref position);
+                if (found is not null)
                 {
-                    return false;
+                    return found;
                 }
 
                 hasModifier = true;
+                continue;
             }
-            else
-            {
-                var start = position;
-                while (position < text.Length && IsBare(text[position]))
-                {
-                    position++;
-                }
 
-                if (position == start || !TypeWords.Contains(text[start..position]))
-                {
-                    return false;
-                }
+            if (text[position] == '.')
+            {
+                return TypeNameFound.Parts;
+            }
+
+            var start = position;
+            while (position < text.Length && IsBare(text[position]))
+            {
+                position++;
+            }
+
+            if (position == start || !TypeWords.Contains(text[start..position]))
+            {
+                return TypeNameFound.At(text, start, Shape);
             }
         }
     }
 
     // "(" with signed integers and bare ASCII words, separated by commas and spaces, up to ")".  A "-" stands before
     // a digit, so that two cannot start a comment; a word is ASCII, as PostGIS's are.
-    private static bool TryReadModifier(string text, ref int position)
+    private static string? ReadModifier(string text, ref int position)
     {
         var index = position + 1;
         while (index < text.Length)
@@ -127,7 +141,7 @@ internal static class DeclaredTypeText
             if (value == ')')
             {
                 position = index + 1;
-                return true;
+                return null;
             }
 
             if (value is ',' or ' ')
@@ -148,7 +162,7 @@ internal static class DeclaredTypeText
                 // A number ends before a letter or a "_", so that "4326Point" and "4326_point" are neither.
                 if (index < text.Length && IsAsciiWordPart(text[index]) && !char.IsAsciiDigit(text[index]))
                 {
-                    return false;
+                    return Modifier;
                 }
             }
             else if (char.IsAsciiLetter(value) || value == '_')
@@ -160,38 +174,49 @@ internal static class DeclaredTypeText
             }
             else
             {
-                return false;
+                return TypeNameFound.At(text, index, Modifier);
             }
         }
 
-        return false;
+        return NotClosed;
     }
 
     private static bool IsAsciiWordPart(char value) => char.IsAsciiLetterOrDigit(value) || value == '_';
 
     // Any number of "[]", and then the end.
-    private static bool TryReadArrayMarks(string text, ref int position)
+    private static string? ReadArrayMarks(string text, ref int position)
     {
         while (position < text.Length)
         {
-            if (text[position] != '[' || position + 1 == text.Length || text[position + 1] != ']')
+            if (text[position] != '[')
             {
-                return false;
+                return TypeNameFound.At(text, position, Shape);
+            }
+
+            if (!IsAt(text, position + 1, ']'))
+            {
+                return TypeNameFound.At(text, position + 1, Shape);
             }
 
             position += 2;
             SkipSpaces(text, ref position);
         }
 
-        return true;
+        return null;
     }
 
-    private static bool TryReadIdentifier(string text, ref int position)
+    // A bare identifier or a quoted one, after any spaces.  A dot where one is expected is a count of parts.
+    private static string? ReadIdentifier(string text, ref int position)
     {
         SkipSpaces(text, ref position);
-        if (position < text.Length && text[position] == '"')
+        if (IsAt(text, position, '"'))
         {
-            return TryReadQuoted(text, ref position);
+            return ReadQuoted(text, ref position);
+        }
+
+        if (IsAt(text, position, '.'))
+        {
+            return TypeNameFound.Parts;
         }
 
         var start = position;
@@ -200,22 +225,27 @@ internal static class DeclaredTypeText
             position++;
         }
 
-        return position > start;
+        return position > start ? null : TypeNameFound.At(text, position, Shape);
     }
 
-    // A quoted identifier, with "" for a quote.  It ends on its line.
-    private static bool TryReadQuoted(string text, ref int position)
+    // A quoted identifier, with "" for a quote.  It ends on its line and holds no NUL, and what stands first of a line
+    // break, a NUL and the end of the text is what was found.
+    private static string? ReadQuoted(string text, ref int position)
     {
-        if (
-            !PostgresIdentifiers.SkipQuoted(text, position, out var end)
-            || text.AsSpan(position, end - position).IndexOfAny('\r', '\n', '\0') >= 0
-        )
+        var closed = PostgresIdentifiers.SkipQuoted(text, position, out var end);
+        var inside = text.AsSpan(position, end - position).IndexOfAny('\r', '\n', '\0');
+        if (inside >= 0)
         {
-            return false;
+            return text[position + inside] == '\0' ? Shape : TypeNameFound.OneLine;
+        }
+
+        if (!closed)
+        {
+            return NotClosed;
         }
 
         position = end;
-        return true;
+        return null;
     }
 
     // Stricter than PostgreSQL's word rule (PostgresIdentifiers.IsWordPart) on purpose, and not to be replaced by it:
@@ -223,6 +253,9 @@ internal static class DeclaredTypeText
     // a parameter.  A type whose name holds "$", or a character above U+007F that is no letter or digit, is written
     // quoted.
     private static bool IsBare(char value) => char.IsLetterOrDigit(value) || value == '_';
+
+    private static bool IsAt(string text, int position, char value) =>
+        position < text.Length && text[position] == value;
 
     private static void SkipSpaces(string text, ref int position)
     {

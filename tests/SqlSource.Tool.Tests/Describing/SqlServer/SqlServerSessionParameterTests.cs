@@ -4,7 +4,6 @@ using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
-using SqlSource.Tool.Describing.SqlServer.Statements;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.SqlServerScript;
@@ -152,7 +151,7 @@ public sealed class SqlServerSessionParameterTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments[0].ShouldBe("int; DROP TABLE dbo.victim");
-        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName + ": " + DeclaredTypeText.Semicolon);
+        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName + ": " + DescribeFailures.TypeNameFound.Semicolon);
         asked.ShouldBeEmpty();
     }
 

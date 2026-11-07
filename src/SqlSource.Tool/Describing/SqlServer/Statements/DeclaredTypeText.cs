@@ -1,6 +1,6 @@
 using System;
 using SqlSource.Parsing.Quoting;
-using SqlSource.Tool.Describing.Describers;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.Tool.Describing.SqlServer.Statements;
 
@@ -27,23 +27,15 @@ namespace SqlSource.Tool.Describing.SqlServer.Statements;
 /// </remarks>
 internal static class DeclaredTypeText
 {
-    public const string Semicolon = "a ; is not part of a type name";
-
-    public const string Comment = "a comment is not part of a type name";
-
     public const string NotClosed = "a quote or a bracket is not closed";
 
-    public const string Parts = "a type name has one or two parts";
-
     public const string Shape = "a type name is a name, then (max) or one or two numbers in parentheses";
-
-    public const string OneLine = "a type name is on one line";
 
     private const string Max = "max";
 
     /// <summary>
-    /// The type without the spaces around it, or why it is refused: <see cref="DescribeFailures.NotATypeName" />,
-    /// <c>": "</c> and what was found at the first place the text leaves the grammar.
+    /// The type without the spaces around it, or why it is refused: <see cref="TypeNameFound.Reason" /> of what was
+    /// found at the first place the text leaves the grammar.
     /// </summary>
     public static Outcome<string, string> Read(string text)
     {
@@ -51,7 +43,7 @@ internal static class DeclaredTypeText
         var found = ReadName(text, ref position) ?? ReadModifier(text, ref position) ?? ReadEnd(text, position);
         return found is null
             ? Outcome<string, string>.Of(text.Trim(' ', '\t'))
-            : Outcome<string, string>.Failed(DescribeFailures.NotATypeName + ": " + found);
+            : Outcome<string, string>.Failed(TypeNameFound.Reason(found));
     }
 
     // One part, or two joined by a dot.  Null when it was read, else what was found.  A dot with no part on one side
@@ -61,7 +53,7 @@ internal static class DeclaredTypeText
         SkipSpaces(text, ref position);
         if (IsAt(text, position, '.'))
         {
-            return Parts;
+            return TypeNameFound.Parts;
         }
 
         var found = ReadPart(text, ref position);
@@ -73,10 +65,10 @@ internal static class DeclaredTypeText
         position++;
         if (position == text.Length || (text[position] is ' ' or '\t' or '.'))
         {
-            return Parts;
+            return TypeNameFound.Parts;
         }
 
-        return ReadPart(text, ref position) ?? (IsAt(text, position, '.') ? Parts : null);
+        return ReadPart(text, ref position) ?? (IsAt(text, position, '.') ? TypeNameFound.Parts : null);
     }
 
     // A plain identifier, a bracketed one or a double-quoted one.
@@ -113,9 +105,9 @@ internal static class DeclaredTypeText
         while (index < text.Length)
         {
             var value = text[index];
-            if (IsLineBreak(value))
+            if (TypeNameFound.IsLineBreak(value))
             {
-                return OneLine;
+                return TypeNameFound.OneLine;
             }
 
             if (value != closing)
@@ -194,28 +186,12 @@ internal static class DeclaredTypeText
             return null;
         }
 
-        return text[position] == '.' ? Parts : Found(text, position);
+        return text[position] == '.' ? TypeNameFound.Parts : Found(text, position);
     }
 
-    // What stands where the grammar was left: a ";", a comment or a line break by name, and anything else as the
-    // shape of a type name.
-    private static string Found(string text, int position)
-    {
-        if (position == text.Length)
-        {
-            return Shape;
-        }
-
-        var next = position + 1 < text.Length ? text[position + 1] : '\0';
-        return text[position] switch
-        {
-            ';' => Semicolon,
-            '-' when next == '-' => Comment,
-            '/' when next == '*' => Comment,
-            var value when IsLineBreak(value) => OneLine,
-            _ => Shape,
-        };
-    }
+    // What stands where the grammar was left, anything but a ";", a comment or a line break being the shape of a
+    // type name.
+    private static string Found(string text, int position) => TypeNameFound.At(text, position, Shape);
 
     private static bool ReadDigits(string text, ref int position)
     {
@@ -233,9 +209,6 @@ internal static class DeclaredTypeText
     private static bool IsFirst(char value) => char.IsLetter(value) || (value is '_' or '#' or '@');
 
     private static bool IsNext(char value) => QuoteReader.IsNameCharacterOfSqlServer(value);
-
-    // A line break of any kind a reader may take for one: a type name stays on its line, quoted or not.
-    private static bool IsLineBreak(char value) => value is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029';
 
     private static bool IsAt(string text, int position, char value) =>
         position < text.Length && text[position] == value;

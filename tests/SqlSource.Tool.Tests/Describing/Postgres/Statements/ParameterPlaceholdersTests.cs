@@ -99,7 +99,7 @@ public sealed class ParameterPlaceholdersTests
         );
 
         types.Value.ShouldBeNull();
-        types.Failure.ShouldBe((refused, DescribeFailures.NotATypeName));
+        types.Failure.ShouldBe((refused, DescribeFailures.NotATypeName + ": " + DeclaredTypeText.Shape));
     }
 
     // The list ends on a line of its own: whatever a type's text held, the ") AS" is not on its line.

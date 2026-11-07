@@ -2,6 +2,7 @@ using Shouldly;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer.Statements;
 using Xunit;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Statements;
 
@@ -56,11 +57,11 @@ public sealed class DeclaredTypeTextTests
         DeclaredTypeText.Read("  nvarchar(50) \t").Value.ShouldBe("nvarchar(50)");
 
     [Theory]
-    [InlineData("int;", DeclaredTypeText.Semicolon)]
-    [InlineData("int; DROP TABLE x", DeclaredTypeText.Semicolon)]
-    [InlineData("int -- x", DeclaredTypeText.Comment)]
-    [InlineData("int /* x */", DeclaredTypeText.Comment)]
-    [InlineData("nvarchar(/* x */50)", DeclaredTypeText.Comment)]
+    [InlineData("int;", TypeNameFound.Semicolon)]
+    [InlineData("int; DROP TABLE x", TypeNameFound.Semicolon)]
+    [InlineData("int -- x", TypeNameFound.Comment)]
+    [InlineData("int /* x */", TypeNameFound.Comment)]
+    [InlineData("nvarchar(/* x */50)", TypeNameFound.Comment)]
     [InlineData("[dbo", DeclaredTypeText.NotClosed)]
     [InlineData("\"dbo", DeclaredTypeText.NotClosed)]
     [InlineData("[a]]", DeclaredTypeText.NotClosed)]
@@ -87,21 +88,21 @@ public sealed class DeclaredTypeTextTests
     [InlineData("€type", DeclaredTypeText.Shape)]
     [InlineData("٣x", DeclaredTypeText.Shape)]
     [InlineData("x²", DeclaredTypeText.Shape)]
-    [InlineData("a.b.c", DeclaredTypeText.Parts)]
-    [InlineData("dbo .Email", DeclaredTypeText.Parts)]
-    [InlineData("dbo. Email", DeclaredTypeText.Parts)]
-    [InlineData(".t", DeclaredTypeText.Parts)]
-    [InlineData("t.", DeclaredTypeText.Parts)]
-    [InlineData("int\nfoo", DeclaredTypeText.OneLine)]
-    [InlineData("int\r\n", DeclaredTypeText.OneLine)]
-    [InlineData("[a\nb]", DeclaredTypeText.OneLine)]
-    [InlineData("\"a\rb\"", DeclaredTypeText.OneLine)]
-    [InlineData("int\u0085foo", DeclaredTypeText.OneLine)]
-    [InlineData("int\u2028", DeclaredTypeText.OneLine)]
-    [InlineData("int\u2029foo", DeclaredTypeText.OneLine)]
-    [InlineData("[a\u0085b]", DeclaredTypeText.OneLine)]
-    [InlineData("[a\u2028b]", DeclaredTypeText.OneLine)]
-    [InlineData("\"a\u2029b\"", DeclaredTypeText.OneLine)]
+    [InlineData("a.b.c", TypeNameFound.Parts)]
+    [InlineData("dbo .Email", TypeNameFound.Parts)]
+    [InlineData("dbo. Email", TypeNameFound.Parts)]
+    [InlineData(".t", TypeNameFound.Parts)]
+    [InlineData("t.", TypeNameFound.Parts)]
+    [InlineData("int\nfoo", TypeNameFound.OneLine)]
+    [InlineData("int\r\n", TypeNameFound.OneLine)]
+    [InlineData("[a\nb]", TypeNameFound.OneLine)]
+    [InlineData("\"a\rb\"", TypeNameFound.OneLine)]
+    [InlineData("int\u0085foo", TypeNameFound.OneLine)]
+    [InlineData("int\u2028", TypeNameFound.OneLine)]
+    [InlineData("int\u2029foo", TypeNameFound.OneLine)]
+    [InlineData("[a\u0085b]", TypeNameFound.OneLine)]
+    [InlineData("[a\u2028b]", TypeNameFound.OneLine)]
+    [InlineData("\"a\u2029b\"", TypeNameFound.OneLine)]
     public void Read_AnythingElse_IsRefusedWithWhatWasFound(string text, string found) =>
         DeclaredTypeText.Read(text).Failure.ShouldBe(DescribeFailures.NotATypeName + ": " + found, text);
 
