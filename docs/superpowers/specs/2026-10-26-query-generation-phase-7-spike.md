@@ -197,7 +197,7 @@ The floors of NodaTime and NetTopologySuite are the plugins' minimums, so NuGet 
 **Owner decisions.**
 
 1. **The NodaTime range defaults** (question 1).  The owner chose on 2026-10-30, "B: NpgsqlRange": `tstzrange` is `NpgsqlRange<Instant>`, `tsrange` stays `NpgsqlRange<LocalDateTime>`, `daterange` is `NpgsqlRange<LocalDate>`, and the multiranges are their arrays.  `Interval` and `DateInterval` stay reachable by a type override, with the empty-range throw and the 1 ns shift in the manual.  The design's NodaTime table and the epic's Decided item say so.
-2. **The `-- param:` modifier limit** (question 4), found by this branch's review.  The owner chose "Record as TD": [TD-0093](../../tech-debt/TD-0093-a-param-marker-takes-a-modifier-of-numbers-alone.md), with a known issue in the manual.
+2. **The `-- param:` modifier limit** (question 4), found by this branch's review.  The owner chose "Record as TD": TD-0093, with a known issue in the manual.
 
 **Amended in the design**, each a designer's call or a "Verify first" the spike answered:
 
@@ -221,4 +221,4 @@ The floors of NodaTime and NetTopologySuite are the plugins' minimums, so NuGet 
 - The probes are in `src/SqlSource/Generation/Types/Drivers/`, and the converters in `src/SqlSource/Generation/Converters/`.
 - Microsoft.Data.SqlClient 6.1.8 is published; the floor project pins 6.1.7, which this spike ran.
 
-**Found outside phase 7**: a `-- param:` marker cannot name a type whose modifier is not digits, such as `geometry(Point,4326)` (question 4).  It is the marker grammar's.  The owner chose to record it as tech debt, [TD-0093](../../tech-debt/TD-0093-a-param-marker-takes-a-modifier-of-numbers-alone.md), with a known issue in the manual, and to leave the grammar as it is.
+**Found outside phase 7**: a `-- param:` marker cannot name a type whose modifier is not digits, such as `geometry(Point,4326)` (question 4).  It is the marker grammar's.  The owner chose to record it as tech debt, TD-0093, with a known issue in the manual, and to leave the grammar as it is.
