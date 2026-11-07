@@ -78,7 +78,7 @@ public sealed class WatchEndingTests : IAsyncDisposable
         await _watch.StartAsync();
         _watch.Errors.Split(notRestored).Length.ShouldBe(2);
 
-        await _watch.ChangeAsync(Changed(_watch.Run.Folder.PathOf(".env")));
+        await _watch.ChangeAsync(Changed(_watch.Scene.DotEnvPath));
         _watch.Errors.Split(notRestored).Length.ShouldBe(3);
 
         project.Imported = "true";

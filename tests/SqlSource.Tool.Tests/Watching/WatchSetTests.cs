@@ -861,7 +861,7 @@ public sealed class WatchSetTests
     // new content that the project's evaluation may reach.
     [Theory]
     [InlineData("src/App/sqlsource.json")]
-    [InlineData("src/App/Queries/New.sql")]
+    [InlineData("src/App/New.sql")]
     public void Classify_NewContentInTheProjectsFolderOfARepository_IsEvaluate(string path)
     {
         using var temp = new TempFolder();

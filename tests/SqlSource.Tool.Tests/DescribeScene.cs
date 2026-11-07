@@ -33,12 +33,13 @@ internal sealed class DescribeScene : IDisposable
 
     public TestProject Project { get; }
 
-    // Where the run looks for its .env file.
+    // The .env file of the working folder, which the run reads when its unit is there: the scene's project unless a
+    // directory is given.
     public string DotEnvPath => Run.Folder.PathOf(".env");
 
     public Task<CliResult> DescribeAsync(params string[] args) => Run.RunAsync(["describe", .. args]);
 
-    // Writes the .env file of the run and returns its path.
+    // Writes the .env file of the working folder and returns its path.
     public string WriteDotEnv(string text) => Run.Folder.WriteFile(".env", text);
 
     // Writes the manifest of the project, null for the one the project describes.  It is in a folder of its own, so

@@ -78,7 +78,7 @@ The bundle and renaming tests were written by sessions working in parallel, each
 
 ## Impact
 
-Low each, Medium together: a fix to one copy leaves the other wrong, as the noise tests of item 7 already show, item 18 lets a check stop running without a failure, and items 20 to 41 are cases a reader may think are covered.
+Low each, Medium together: a fix to one copy leaves the other wrong, as the noise tests of item 7 already show, item 18 lets a check stop running without a failure, and items 20 and 32 are cases a reader may think are covered.
 
 ## Proposed fix
 
