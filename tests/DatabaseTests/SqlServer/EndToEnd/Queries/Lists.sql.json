@@ -646,6 +646,181 @@
         }
       ]
     },
+    "CountAccountsGroupedByStatuses": {
+      "hash": "a6dcd0ea842ea067ef2cbb5049c8c444fd3b405a5c1491db9c0cc2f58cd3b111",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "statuses",
+          "ordinal": 0,
+          "type": {
+            "name": "varchar(20)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "first_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "accounts",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "MarkAccountsWithIds": {
+      "hash": "b6fe2817601a3e2f20375d1a14166bc5005c5e7fa5dbc9ae8cfb55f0c1d61034",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "ids",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "listed",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": true
+        }
+      ]
+    },
+    "CountAccountsExceptAndBefore": {
+      "hash": "986fe9baa50b2a81b7523564adee4e4e4780035d184c3003f78062487f4c0a3d",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "ids",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred-from-copies"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "outside",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "before_listed",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "CountAccountsWithStatusesTestedFirst": {
       "hash": "33ffd3a5cc87c2df7032be21132a9de80b525a6a297137baf71c632241c9c0e1",
       "toolVersion": "0.1.0",

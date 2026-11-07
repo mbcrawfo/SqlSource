@@ -26,12 +26,18 @@ internal static class SqlListSegments
     /// <param name="uses">
     /// What each parameter of <paramref name="sql" /> is used as, in its order, or empty when no use is a list.
     /// </param>
+    /// <param name="places">
+    /// Where each use stands, in the order of <paramref name="uses" />, or empty when they were not read.  A list that
+    /// no <c>NOT</c> reaches is written empty as one <c>NULL</c> when they were, and every list keeps the subquery when
+    /// they were not.
+    /// </param>
     /// <param name="parameters">The query's parameters.</param>
     public static EquatableArray<SqlSegment> Split(
         EquatableArray<SqlSegment> segments,
         EquatableArray<SqlTokenOccurrence> occurrences,
         SqlBlockText sql,
         ImmutableArray<SqlParameterUse> uses,
+        ImmutableArray<SqlListPlace> places,
         EquatableArray<SqlQueryParameter> parameters
     )
     {
@@ -98,7 +104,11 @@ internal static class SqlListSegments
                 }
 
                 AddLiteral(split, sql.Text, rest, span.Start);
-                split.Add(new SqlSegment(kind, sql.Text.Substring(span.Start, span.Length)));
+                var emptyIsNull =
+                    kind == SqlSegmentKind.List
+                    && !places.IsEmpty
+                    && (places[position] & SqlListPlace.UnderNot) == SqlListPlace.None;
+                split.Add(new SqlSegment(kind, sql.Text.Substring(span.Start, span.Length), emptyIsNull));
                 rest = span.End;
             }
 

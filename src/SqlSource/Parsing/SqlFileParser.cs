@@ -349,10 +349,23 @@ internal static class SqlFileParser
             // no use to classify.
             var variables =
                 sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
-            var uses =
-                sql.Parameters.Length == 0
-                    ? ImmutableArray<SqlParameterUse>.Empty
-                    : SqlListUses.Find(text, lexemes, start, end, rules);
+            // Where each list stands is read for SQL Server alone: a list there that no NOT reaches is sent empty as
+            // one NULL, which SQL Server takes where it refuses a subquery.
+            var places = ImmutableArray<SqlListPlace>.Empty;
+            ImmutableArray<SqlParameterUse> uses;
+            if (sql.Parameters.Length == 0)
+            {
+                uses = ImmutableArray<SqlParameterUse>.Empty;
+            }
+            else if (rules.Dialect == SqlDialect.SqlServer)
+            {
+                uses = SqlListUses.Find(text, lexemes, start, end, rules, out places);
+            }
+            else
+            {
+                uses = SqlListUses.Find(text, lexemes, start, end, rules);
+            }
+
             var parameters = SqlParameterList.Create(
                 rules,
                 new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables, uses),
@@ -362,7 +375,7 @@ internal static class SqlFileParser
                 _warnings
             );
 
-            var segments = SqlListSegments.Split(scanned.Segments, scanned.Occurrences, sql, uses, parameters);
+            var segments = SqlListSegments.Split(scanned.Segments, scanned.Occurrences, sql, uses, places, parameters);
             return new BuiltQuery(
                 sql,
                 segments,
@@ -370,6 +383,7 @@ internal static class SqlFileParser
                 tokens,
                 parameters,
                 uses,
+                places,
                 variables?.ToNames() ?? EquatableArray<string>.Empty
             );
         }
@@ -452,12 +466,14 @@ internal static class SqlFileParser
             FindOpenedDefaults(kept, start, end, ref errors);
 
             // Both forms are built from the same lexemes, so each holds the same parameters in the same order, and the
-            // uses read from those lexemes are this form's too.  The split finds each at this form's places.
+            // uses read from those lexemes, and where they stand, are this form's too.  The split finds each at this
+            // form's offsets.
             var segments = SqlListSegments.Split(
                 scanned.Segments,
                 scanned.Occurrences,
                 kept,
                 query.Uses,
+                query.Places,
                 query.Parameters
             );
             if (errors is null)
@@ -669,7 +685,8 @@ internal static class SqlFileParser
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
             _errors.Add(SqlParseError.Create(kind, span, arguments));
 
-        // What step two gives.  Uses is what each parameter of Sql is used as, or empty when no use is a list.
+        // What step two gives.  Uses is what each parameter of Sql is used as, or empty when no use is a list, and
+        // Places where each use stands, or empty when they were not read.
         private readonly record struct BuiltQuery(
             SqlBlockText Sql,
             EquatableArray<SqlSegment> Segments,
@@ -677,6 +694,7 @@ internal static class SqlFileParser
             EquatableArray<SqlToken> Tokens,
             EquatableArray<SqlQueryParameter> Parameters,
             ImmutableArray<SqlParameterUse> Uses,
+            ImmutableArray<SqlListPlace> Places,
             EquatableArray<string> DeclaredVariables
         );
     }

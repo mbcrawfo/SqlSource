@@ -11,10 +11,10 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
 // The queries of Queries/Lists.sql, run on the seed of "app" through the methods that ListQueries gets, each of which
 // sends a parameter for each value of a list: every kind of collection, the counts on each side of the padded sizes,
-// an empty list and a null one, two lists, a list used twice, a list inside an aggregate, which SQL Server refuses
-// empty, and its workaround, a list sent at its own count, and the counts at the most parameters a query sends SQL
-// Server and past it, which the method refuses before it sends.  The lists of the limit are of ids that no account
-// has, around the seed's own.
+// an empty list and a null one, two lists, a list used twice, a list inside an aggregate, a GROUP BY and an OUTPUT
+// clause, full and empty, one used after a NOT and inside an aggregate, the test in a WITH query, a list sent at its
+// own count, and the counts at the most parameters a query sends SQL Server and past it, which the method refuses
+// before it sends.  The lists of the limit are of ids that no account has, around the seed's own.
 [Collection(UsesSqlServer.Name)]
 public sealed class ListQueryTests(SqlServerDatabases sqlServer)
 {
@@ -128,19 +128,109 @@ public sealed class ListQueryTests(SqlServerDatabases sqlServer)
         counts.ShouldBe([new CountAccountsWithStatusesDto(1)]);
     }
 
-    // An empty list is sent as a subquery, which SQL Server refuses inside an aggregate: Msg 130, a known issue of the
-    // manual's sqlserver.md (TD-0106).
+    // An empty list is sent as one NULL, which SQL Server takes inside an aggregate, and which matches no account.
     [Fact]
-    public async Task CountStatuses_Empty_IsRefusedByTheServer()
+    public async Task CountStatuses_Empty_CountsNone()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var thrown = await Should.ThrowAsync<SqlException>(() =>
-            connection.CountAccountsWithStatuses(new CountAccountsWithStatusesArgs([]), cancellationToken: token)
+        var counts = await connection.CountAccountsWithStatuses(
+            new CountAccountsWithStatusesArgs([]),
+            cancellationToken: token
         );
 
-        thrown.Number.ShouldBe(130);
+        counts.ShouldBe([new CountAccountsWithStatusesDto(0)]);
+    }
+
+    // A list in a GROUP BY: carol alone is suspended, so alice and bob are one group and carol the other.
+    [Fact]
+    public async Task GroupedByStatuses_List_GroupsByTheTest()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var groups = await connection.CountAccountsGroupedByStatuses(
+            new CountAccountsGroupedByStatusesArgs(["suspended"]),
+            cancellationToken: token
+        );
+
+        groups.ShouldBe([new CountAccountsGroupedByStatusesDto(1, 2), new CountAccountsGroupedByStatusesDto(3, 1)]);
+    }
+
+    // An empty list in a GROUP BY matches no account, so every account is in one group.
+    [Fact]
+    public async Task GroupedByStatuses_Empty_IsOneGroupOfEveryAccount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var groups = await connection.CountAccountsGroupedByStatuses(
+            new CountAccountsGroupedByStatusesArgs([]),
+            cancellationToken: token
+        );
+
+        groups.ShouldBe([new CountAccountsGroupedByStatusesDto(1, 3)]);
+    }
+
+    // A list in an OUTPUT clause marks bob alone.
+    [Fact]
+    public async Task MarkIds_List_MarksTheListedAccounts()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var marks = await MarkRolledBackAsync(connection, [2]);
+
+        marks.ShouldBe([
+            new MarkAccountsWithIdsDto(1, 0),
+            new MarkAccountsWithIdsDto(2, 1),
+            new MarkAccountsWithIdsDto(3, 0),
+        ]);
+    }
+
+    // An empty list in an OUTPUT clause matches no account, so none is marked.
+    [Fact]
+    public async Task MarkIds_Empty_MarksNone()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var marks = await MarkRolledBackAsync(connection, []);
+
+        marks.ShouldBe([
+            new MarkAccountsWithIdsDto(1, 0),
+            new MarkAccountsWithIdsDto(2, 0),
+            new MarkAccountsWithIdsDto(3, 0),
+        ]);
+    }
+
+    // The list's two uses: alice and carol are not in it, and alice's next id, bob's, is.
+    [Fact]
+    public async Task ExceptAndBefore_List_CountsBoth()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var counts = await connection.CountAccountsExceptAndBefore(
+            new CountAccountsExceptAndBeforeArgs([2]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsExceptAndBeforeDto(2, 1)]);
+    }
+
+    // Empty, the use after a NOT matches every account, and the one inside the aggregate none, each in its own form.
+    [Fact]
+    public async Task ExceptAndBefore_Empty_CountsEveryAccountAndNoneBefore()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var counts = await connection.CountAccountsExceptAndBefore(
+            new CountAccountsExceptAndBeforeArgs([]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsExceptAndBeforeDto(3, 0)]);
     }
 
     // The known issue's workaround: the test in a WITH query, and the aggregate over its result, runs for an empty
@@ -422,6 +512,22 @@ public sealed class ListQueryTests(SqlServerDatabases sqlServer)
         var exception = await Should.ThrowAsync<InvalidOperationException>(() => stream.ToListAsync(token).AsTask());
 
         exception.Message.ShouldBe("The list 'Ids' changed after the query counted it.");
+    }
+
+    // The marks of MarkAccountsWithIds, by id, in a transaction that is rolled back.
+    private static async Task<MarkAccountsWithIdsDto[]> MarkRolledBackAsync(SqlConnection connection, int[] ids)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await connection.OpenAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+
+        var marks = await connection.MarkAccountsWithIds(
+            new MarkAccountsWithIdsArgs(ids),
+            transaction: transaction,
+            cancellationToken: token
+        );
+
+        return [.. marks.OrderBy(static mark => mark.Id)];
     }
 
     // The values in a collection of the kind, or in a lazy sequence that is none.

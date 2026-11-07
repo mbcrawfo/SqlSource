@@ -14,6 +14,8 @@ public sealed class SqlListSegmentsTests
 {
     private const int Iterations = 20;
 
+    private static readonly SqlDialectChoice SqlServer = new(SqlDialect.SqlServer, SqlDialectOptions.None);
+
     [Fact]
     public void Split_ListUse_IsASegmentOfItsOwn() =>
         Blocks("-- name: Q\nWHERE id IN @ids;\n")
@@ -95,6 +97,47 @@ public sealed class SqlListSegmentsTests
             ]);
     }
 
+    // Under SQL Server a use that no NOT reaches is sent empty as one NULL, and one that a NOT reaches keeps the
+    // subquery, the only empty form that NOT IN matches every row with.
+    [Fact]
+    public void Split_SqlServerListNoNotReaches_IsEmptyAsNull() =>
+        Blocks("-- name: Q\nWHERE a IN @ids AND b NOT IN @ids;\n", dialect: SqlServer)
+            .ShouldHaveSingleItem()
+            .Segments.ShouldBe([
+                Literal("WHERE a IN "),
+                List("@ids", emptyIsNull: true),
+                Literal(" AND b NOT IN "),
+                List("@ids"),
+                Literal(";"),
+            ]);
+
+    // The kept form's uses are the same uses, and take the same empty forms.
+    [Fact]
+    public void Split_SqlServerKeptForm_IsEmptyAsNullToo() =>
+        Blocks(
+                "-- name: Q\n-- generator: keep-comments\nWHERE a IN /* a */ @ids AND NOT (b IN @ids);\n",
+                dialect: SqlServer
+            )
+            .ShouldHaveSingleItem()
+            .KeptSegments.ShouldNotBeNull()
+            .ShouldBe([
+                Literal("WHERE a IN /* a */ "),
+                List("@ids", emptyIsNull: true),
+                Literal(" AND NOT (b IN "),
+                List("@ids"),
+                Literal(");"),
+            ]);
+
+    // Other dialects keep the subquery for every use.
+    [Fact]
+    public void Split_PostgresList_KeepsTheSubquery() =>
+        Blocks(
+                "-- name: Q\nWHERE a IN @ids;\n",
+                dialect: new SqlDialectChoice(SqlDialect.PostgreSql, SqlDialectOptions.None)
+            )
+            .ShouldHaveSingleItem()
+            .Segments.ShouldBe([Literal("WHERE a IN "), List("@ids", emptyIsNull: false), Literal(";")]);
+
     // Without a list nothing is split, and the segments come back as they were, with nothing allocated.
     [Theory]
     [InlineData(false)]
@@ -107,7 +150,14 @@ public sealed class SqlListSegmentsTests
         var uses = hasUses ? [SqlParameterUse.List] : ImmutableArray<SqlParameterUse>.Empty;
         var parameters = new EquatableArray<SqlQueryParameter>([new SqlQueryParameter("other", null, null, true)]);
 
-        var split = SqlListSegments.Split(segments, EquatableArray<SqlTokenOccurrence>.Empty, sql, uses, parameters);
+        var split = SqlListSegments.Split(
+            segments,
+            EquatableArray<SqlTokenOccurrence>.Empty,
+            sql,
+            uses,
+            [],
+            parameters
+        );
 
         split.ShouldBe(segments);
         split[0].ShouldBeSameAs(segments[0]);
@@ -115,13 +165,13 @@ public sealed class SqlListSegmentsTests
         // The first calls pay for one-off work: JIT compilation and static initialisers.
         for (var iteration = 0; iteration < Iterations; iteration++)
         {
-            _ = SqlListSegments.Split(segments, EquatableArray<SqlTokenOccurrence>.Empty, sql, uses, parameters);
+            _ = SqlListSegments.Split(segments, EquatableArray<SqlTokenOccurrence>.Empty, sql, uses, [], parameters);
         }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var iteration = 0; iteration < Iterations; iteration++)
         {
-            _ = SqlListSegments.Split(segments, EquatableArray<SqlTokenOccurrence>.Empty, sql, uses, parameters);
+            _ = SqlListSegments.Split(segments, EquatableArray<SqlTokenOccurrence>.Empty, sql, uses, [], parameters);
         }
 
         (GC.GetAllocatedBytesForCurrentThread() - before).ShouldBe(0);
@@ -138,7 +188,8 @@ public sealed class SqlListSegmentsTests
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
 
-    private static SqlSegment List(string text) => new(SqlSegmentKind.List, text);
+    private static SqlSegment List(string text, bool emptyIsNull = false) =>
+        new(SqlSegmentKind.List, text, emptyIsNull);
 
     private static SqlSegment ListNullTest(string text) => new(SqlSegmentKind.ListNullTest, text);
 }
