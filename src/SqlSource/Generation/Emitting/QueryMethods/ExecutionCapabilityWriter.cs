@@ -99,14 +99,15 @@ internal static class ExecutionCapabilityWriter
     }
 
     /// <summary>
-    /// Appends the catch of a read, for an exception of the method's own: every one but the database's error, which
-    /// reports itself, and the caller's cancellation.  With a transaction given, it disposes the reader, which reads
-    /// the rest of the batch and drops any error there, and when such an error rolled the transaction back, which
-    /// leaves its <c>Connection</c> null, it throws the exception that says so, with the method's as its inner
-    /// exception; otherwise it throws the method's own as it is.  A transaction that had completed before the query
-    /// ran was refused, so a null <c>Connection</c> here comes from this query's batch.  A call that does not throw
-    /// runs none of it, though the <c>await</c> in the catch makes the method's state machine keep room for the
-    /// exception.  <see cref="ExecutionCapabilities.ChecksRollbackAtRead" /> turns it on.
+    /// Appends the catch of a read, for an exception of the method's own: every one but the database's error, which is
+    /// <see cref="AppendDatabaseErrorCheck" />'s around each read that can raise it, and the caller's cancellation.
+    /// With a transaction given, it disposes the reader, which reads the rest of the batch and drops any error there,
+    /// and when such an error rolled the transaction back, which leaves its <c>Connection</c> null, it throws the
+    /// exception that says so, with the method's as its inner exception; otherwise it throws the method's own as it
+    /// is.  A transaction that had completed before the query ran was refused, so a null <c>Connection</c> here comes
+    /// from this query's batch.  A call that does not throw runs none of it, though the <c>await</c> in the catch makes
+    /// the method's state machine keep room for the exception.
+    /// <see cref="ExecutionCapabilities.ChecksRollbackAtRead" /> turns it on.
     /// </summary>
     public static void AppendRollbackCheck(in QueryMethodContext context, string indent)
     {
