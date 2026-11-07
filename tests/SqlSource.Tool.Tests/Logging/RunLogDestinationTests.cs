@@ -195,14 +195,19 @@ public sealed class RunLogDestinationTests : IDisposable
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
     }
 
-    // The build's log path can hold "=" or ";", which a run under --online takes, and a message then names it by its
-    // position and leaves out the system's reason, which may quote it.
-    [Fact]
-    public async Task Run_OnlineLogThatHoldsASemicolonAndStopsBeingWritable_IsSqlsrc218ByItsPosition()
+    // The build's log path can hold "=" or ";", which a run under --online takes, and the owner ruled that a path the
+    // build writes is no secret: a message prints it in full, with the system's reason.
+    [Theory]
+    [InlineData(";")]
+    [InlineData("=")]
+    public async Task Run_OnlineLogThatHoldsASemicolonOrAnEqualsSignAndStopsBeingWritable_IsSqlsrc218AtItsPath(
+        string character
+    )
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
         var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
         _scene.Run.CreateFile = static _ => new FullStream();
+        var log = _scene.Run.Folder.PathOf($"a{character}b.log");
 
         var result = await _scene.DescribeAsync(
             "--manifest",
@@ -210,12 +215,12 @@ public sealed class RunLogDestinationTests : IDisposable
             "--online",
             "auto",
             "--log",
-            "a;" + Secrets.Word + ".log"
+            $"a{character}b.log"
         );
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldBe(
-            "sqlsource : error SQLSRC218: The path at position 7 could not be written: the system would not write it; "
+            $"{log} : error SQLSRC218: '{log}' could not be written: No space left on device; "
                 + "see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc218\n"
         );
     }

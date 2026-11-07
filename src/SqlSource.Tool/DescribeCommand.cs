@@ -401,7 +401,7 @@ internal static class DescribeCommand
         }
     }
 
-    // Whether the command line has --online: the build's, whose paths of --manifest and --log are its own.
+    // Whether the command line has --online: the build's, whose paths of --manifest, --log and --env-file are its own.
     private static bool IsOnline(Usage usage) => usage.Values.Any(static value => value.Option?.Name == OnlineOption);
 
     // What --online said, as OnlineOf(ParseResult) reads it, for the steps that have only the usage, a watch's passes
@@ -448,7 +448,8 @@ internal static class DescribeCommand
         }
 
         // "=" and ";" are what a connection string is made of: the value may be one typed after the option.  The
-        // build's paths may hold them, as a project's name may, and a message names such a path by its position.
+        // build's paths may hold them, as a project's name may, and the owner ruled that a path the build writes is
+        // no secret, so under --online a message prints such a path in full.
         return !isOnline && !value.MayBePrintedAsPath
             ? $"sqlsource: the value of option '{option}' at position {value.Position} holds '=' or ';', which "
                 + $"{ofWhat} may not"
@@ -545,12 +546,6 @@ internal static class DescribeCommand
         var variable = getEnvironmentVariable(LogVariable);
         return string.IsNullOrWhiteSpace(variable) ? null : variable;
     }
-
-    /// <summary>
-    /// The value of <c>--log</c> as <see cref="UsageCheck" /> read it, which names the path in a message, or null when
-    /// the option was not given.
-    /// </summary>
-    public static UsageValue? LogOptionOf(Usage usage) => ValuesOf(usage, LogOption) is [{ } value] ? value : null;
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
@@ -701,7 +696,6 @@ internal static class DescribeCommand
         {
             // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
             manifests = await RunProjects.FromManifestAsync(
-                manifestValue,
                 Path.GetFullPath(manifestValue.Text, host.WorkingDirectory),
                 host,
                 reporter,

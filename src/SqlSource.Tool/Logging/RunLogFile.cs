@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
 using SqlSource.Tool.Reporting;
 
@@ -49,9 +48,6 @@ internal sealed class RunLogFile : IRunLog, IDisposable
 
     private const string TimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
 
-    // The reason of a failure whose path is named by its position, in place of the system's.
-    private const string Refused = "the system would not write it";
-
     // The log is for people: only what JSON must escape is escaped.
     private static readonly JsonWriterOptions Options = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
@@ -59,20 +55,17 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     private readonly MemoryStream _line = new();
     private readonly Stream _stream;
     private readonly TimeProvider _time;
-    private readonly UsageValue? _option;
     private bool _closed;
 
     /// <summary>Writes to a stream that is open.</summary>
     /// <param name="path">The full path of the file, for the error of a write that fails.</param>
     /// <param name="stream">Where the lines go.  The log closes it.</param>
     /// <param name="time">The clock of the run.</param>
-    /// <param name="option">The value of <c>--log</c> that gave the path, or null when the variable gave it.</param>
-    internal RunLogFile(string path, Stream stream, TimeProvider time, UsageValue? option = null)
+    internal RunLogFile(string path, Stream stream, TimeProvider time)
     {
         Path = path;
         _stream = stream;
         _time = time;
-        _option = option;
     }
 
     public string Path { get; }
@@ -84,21 +77,19 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     /// Makes the file, or empties the one that is there.  When it cannot be, the <c>SQLSRC218</c> that says why:
     /// the system's reason, or that the name is a file of the run (a <c>.sql</c> file, a sidecar, a project or a
     /// solution, whatever the case), which is refused before anything is opened, made or emptied.  The error is
-    /// at the full path, or at <paramref name="given" /> when that is no path at all.  When <c>--log</c> gave a path
-    /// that holds <c>=</c> or <c>;</c>, which only a run under <c>--online</c> takes, the error is at no file and
-    /// names the path by its position.
+    /// at the full path, or at <paramref name="given" /> when that is no path at all.  A path of <c>--log</c> that
+    /// holds <c>=</c> or <c>;</c> was refused before the run unless the run is under <c>--online</c>, whose log's path
+    /// the build wrote and is no secret, so the path is always printed.
     /// </summary>
     /// <param name="given">The path as the option or the variable gave it.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
     /// <param name="createFile">Makes or empties the file at the full path and gives its stream.</param>
     /// <param name="time">The clock of the run.</param>
-    /// <param name="option">The value of <c>--log</c> that gave the path, or null when the variable gave it.</param>
     public static Outcome<RunLogFile, ToolDiagnostic> Open(
         string given,
         string workingDirectory,
         Func<string, Stream> createFile,
-        TimeProvider time,
-        UsageValue? option = null
+        TimeProvider time
     )
     {
         var path = given;
@@ -109,22 +100,22 @@ internal sealed class RunLogFile : IRunLog, IDisposable
             if (IsAFileOfTheRun(full))
             {
                 return Outcome<RunLogFile, ToolDiagnostic>.Failed(
-                    NotWritten(
+                    ToolDiagnostic.NotChanged(
                         path,
-                        option,
+                        "written",
                         "a log is not written over a .sql file, a sidecar, a project or a solution"
                     )
                 );
             }
 
-            return new Outcome<RunLogFile, ToolDiagnostic>(new RunLogFile(path, createFile(path), time, option));
+            return new Outcome<RunLogFile, ToolDiagnostic>(new RunLogFile(path, createFile(path), time));
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             // An empty path, a directory, a folder that is not there, or a file the system will not open.
             return Outcome<RunLogFile, ToolDiagnostic>.Failed(
-                NotWritten(path, option, SystemReason(option, exception.Message))
+                ToolDiagnostic.NotChanged(path, "written", exception.Message)
             );
         }
     }
@@ -141,16 +132,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     /// names the file.
     /// </summary>
     /// <param name="reason">The system's reason.</param>
-    public ToolDiagnostic NotWritten(string reason) => NotWritten(Path, _option, SystemReason(_option, reason));
-
-    // The system's message quotes the path, so a path that is named by its position gets no part of it.
-    private static string SystemReason(UsageValue? option, string reason) =>
-        option is { MayBePrintedAsPath: false } ? Refused : reason;
-
-    private static ToolDiagnostic NotWritten(string path, UsageValue? option, string reason) =>
-        option is { MayBePrintedAsPath: false }
-            ? ToolDiagnostic.Create(ToolDiagnostics.FileCannotBeChanged, option.NamedAsPath(path), "written", reason)
-            : ToolDiagnostic.NotChanged(path, "written", reason);
+    public ToolDiagnostic NotWritten(string reason) => ToolDiagnostic.NotChanged(Path, "written", reason);
 
     public bool Writes => true;
 

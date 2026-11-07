@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Logging;
 
 /// <summary>
 /// The command line as <c>run.start</c> holds it: every token, with the value of each <c>--database</c> and each
-/// <c>--connection</c> replaced, and each path that holds <c>=</c> or <c>;</c>.
+/// <c>--connection</c> replaced, and each path that holds <c>=</c> or <c>;</c> but the build's own.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,13 +16,15 @@ namespace SqlSource.Tool.Logging;
 /// comes here: the run ended before the log was opened.
 /// </para>
 /// <para>
-/// A path, which is an argument or the value of <c>--project</c>, <c>--log</c>, <c>--manifest</c>, or of
-/// <c>diagnose</c>'s <c>--query</c>, <c>--out</c> or <c>--scrub</c>, is written only where a message may print it
+/// A path, which is an argument or the value of <c>--project</c>, or of <c>diagnose</c>'s <c>--query</c>,
+/// <c>--out</c> or <c>--scrub</c>, is written only where a message may print it
 /// (<see cref="UsageValue.MayBePrintedAsPath" />).  A value of <c>--query</c> is tested whole, so a <c>=</c> or a
-/// <c>;</c> in its file or in its name replaces it.  A <c>--database</c> value and a <c>--connection</c> value are
-/// never written: <c>run.start</c> comes before the plan, which decides whether such a name would be printed.  The
-/// <c>database</c> events and <c>run.end</c> name every selected database, and <c>connectionSource</c> says which got
-/// its connection from <c>--connection</c>.
+/// <c>;</c> in its file or in its name replaces it.  A path of <c>--log</c>, <c>--manifest</c> or <c>--env-file</c>
+/// is written as it was given: one that holds <c>=</c> or <c>;</c> is refused unless the run is under
+/// <c>--online</c>, whose paths the build wrote and are no secret.  A <c>--database</c> value and a
+/// <c>--connection</c> value are never written: <c>run.start</c> comes before the plan, which decides whether such a
+/// name would be printed.  The <c>database</c> events and <c>run.end</c> name every selected database, and
+/// <c>connectionSource</c> says which got its connection from <c>--connection</c>.
 /// </para>
 /// </remarks>
 internal static class LoggedArguments
@@ -46,8 +48,6 @@ internal static class LoggedArguments
             DescribeCommand.DatabaseOption or DescribeCommand.ConnectionOption => true,
             null
             or DescribeCommand.ProjectOption
-            or DescribeCommand.LogOption
-            or DescribeCommand.ManifestOption
             or DiagnoseCommand.QueryOption
             or DiagnoseCommand.OutOption
             or DiagnoseCommand.ScrubOption => !value.MayBePrintedAsPath,

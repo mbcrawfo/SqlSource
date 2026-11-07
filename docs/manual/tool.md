@@ -486,7 +486,7 @@ A relative path is taken from the current folder.
 | `--verbose` | Prints what the run decides as it goes: see [`--verbose`](#verbose) |
 | `--log <path>` | Writes a record of the run to a file; a path that holds `=` or `;` is refused: see [logs](#logs) |
 | `--manifest <path>` | For the build's use: describes the project that the build's record of it names, without reading the project again.  It takes no project or solution, `.sql` path, `--project`, `--database` or `--watch`.  See [running in the build](#running-in-the-build) |
-| `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest`, `--log` or `--env-file` path that holds `=` or `;`, as the build's own may, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](#running-in-the-build) |
+| `--online <auto\|true>` | For the build's use, with `--manifest`: takes a `--manifest`, `--log` or `--env-file` path that holds `=` or `;`, as the build's own may, and prints and logs it in full, writes each error on one line, writes no log for `SQLSOURCE_LOG`, and under `auto` says it is offline, and exits with `0`, when no database with a query to describe has a connection.  See [running in the build](#running-in-the-build) |
 | `--watch` | Describes once, then again each time a file of the run changes, until stopped: see [describe on save](#describe-on-save).  Not with `--check` or `--manifest` |
 
 A run with `--project`, `--database` or a `.sql` path writes only the sidecars of the files whose queries it selected, and deletes none.

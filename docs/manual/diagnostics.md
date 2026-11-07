@@ -1388,7 +1388,7 @@ $ dotnet sqlsource describe
 
 The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool --prerelease`.  The two are released together under one version number.
 
-When the build runs the tool, the message names the manifest file the build wrote, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, or, when its path holds `=` or `;`, its position on the command line, as `The project manifest at position 3 cannot be read`, with no reason from the operating system, which would quote it.
+When the build runs the tool, the message names the manifest file the build wrote by its full path, as `The project manifest '/work/App/obj/Debug/net8.0/App.csproj.SqlSource.manifest' cannot be read`, whatever the path holds.
 
 Any other reason, one that names a line for one, means that the package wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
@@ -1599,7 +1599,6 @@ For a log:
 - **The log cannot be made or emptied as the run starts**, because its folder is not there, it is a folder, or the system will not let the tool write it.  Nothing runs and the exit code is 1.  Give a path that can be written, or run the command from another folder.
 - **The path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`, touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file.  Give the log a name of its own.
 - **The log stops being writable while the run goes on**, as when the disk is full.  The run finishes and writes its sidecars, the error is reported once at the end, and the exit code is 1.  The log holds what was written before it stopped.
-- **The log of a build whose path holds `=` or `;`**, which the name of a project can give it, is named by its position on the command line, as `The path at position 7 could not be written: the system would not write it`, since the operating system's reason would quote the path.
 
 For a bundle of `diagnose`:
 

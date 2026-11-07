@@ -146,14 +146,20 @@ public sealed class ManifestRunTests : IDisposable
         File.Exists(SidecarFormat.PathFor(_invoices)).ShouldBeTrue();
     }
 
-    [Fact]
-    public async Task Run_OnlineWithALogPathThatHoldsASemicolon_WritesTheLogAndLeavesThePathOutOfIt()
+    // The build writes the paths of --manifest, --log and --env-file, and the owner ruled that such a path is no
+    // secret, so the log's run.start holds them as they were given under --online, whatever they hold.
+    [Theory]
+    [InlineData(";")]
+    [InlineData("=")]
+    public async Task Run_OnlineWithBuildPathsThatHoldASemicolonOrAnEqualsSign_WritesThemInTheLog(string character)
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
-        var manifest = WriteManifest(_scene.Project.ManifestText());
-        var log = _scene.Run.Folder.PathOf("obj/a;b.csproj.SqlSource.log");
+        var manifest = _scene.Run.Folder.WriteFile($"obj/a{character}b.manifest", _scene.Project.ManifestText());
+        var log = _scene.Run.Folder.PathOf($"obj/a{character}b.csproj.SqlSource.log");
+        var envFile = _scene.Run.Folder.PathOf($"a{character}b.env");
+        string[] args = ["describe", "--manifest", manifest, "--online", "auto", "--env-file", envFile, "--log", log];
 
-        var result = await _scene.DescribeAsync("--manifest", manifest, "--online", "auto", "--log", log);
+        var result = await _scene.DescribeAsync(args[1..]);
 
         result.ShouldBe(
             new CliResult(0, "sqlsource: summary: billing (postgres): 1 described, 0 skipped, 0 failed\n", "")
@@ -163,20 +169,23 @@ public sealed class ManifestRunTests : IDisposable
             .GetProperty("arguments")
             .EnumerateArray()
             .Select(item => item.GetString())
-            .ShouldBe(["describe", "--manifest", manifest, "--online", "auto", "--log", "***"]);
+            .ShouldBe(args);
     }
 
     [Theory]
     [InlineData("--manifest", "obj/a;" + Secrets.Word + ".manifest")]
     [InlineData("--manifest", "obj/a=" + Secrets.Word + ".manifest")]
     [InlineData("--log", "obj/a;" + Secrets.Word + ".log")]
+    [InlineData("--log", "obj/a=" + Secrets.Word + ".log")]
+    [InlineData("--env-file", "a;" + Secrets.Word + ".env")]
+    [InlineData("--env-file", "a=" + Secrets.Word + ".env")]
     public async Task Run_PathThatHoldsASemicolonOrAnEqualsSignWithoutOnline_IsRefusedByItsPosition(
         string option,
         string path
     )
     {
         var manifest = WriteManifest(_scene.Project.ManifestText());
-        string[] args = option == "--log" ? ["--manifest", manifest, "--log", path] : ["--manifest", path];
+        string[] args = option == "--manifest" ? ["--manifest", path] : ["--manifest", manifest, option, path];
 
         var result = await _scene.DescribeAsync(args);
 
@@ -186,24 +195,49 @@ public sealed class ManifestRunTests : IDisposable
         _scene.Describer.Opened.ShouldBeEmpty();
     }
 
-    // A path that holds "=" or ";" may still be a secret typed by hand, so a message names it by its position, and
-    // leaves out the system's reason, which quotes it.
-    [Fact]
-    public async Task Run_OnlineWithAManifestThatHoldsASemicolonAndDoesNotExist_IsSqlsrc206ByItsPosition()
+    // Under --online a message prints the build's paths in full, whatever they hold, with the system's reason: the
+    // owner ruled that a path the build writes is no secret.  The same tokens without --online are refused above.
+    [Theory]
+    [InlineData("--manifest", ";")]
+    [InlineData("--manifest", "=")]
+    [InlineData("--log", ";")]
+    [InlineData("--log", "=")]
+    [InlineData("--env-file", ";")]
+    [InlineData("--env-file", "=")]
+    public async Task Run_OnlineWithABuildPathThatHoldsASemicolonOrAnEqualsSign_PrintsItInFull(
+        string option,
+        string character
+    )
     {
-        var manifest = _scene.Run.Folder.PathOf("obj/a;" + Secrets.Word + ".manifest");
+        var manifest = WriteManifest(_scene.Project.ManifestText());
+        var path = _scene.Run.Folder.PathOf($"no-such-folder/a{character}b.{option[2..]}");
+        string[] args =
+            option == "--manifest"
+                ? ["--manifest", path, "--online", "true"]
+                : ["--manifest", manifest, "--online", "true", option, path];
 
-        var result = await _scene.DescribeAsync("--manifest", manifest, "--online", "auto");
+        var result = await _scene.DescribeAsync(args);
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldStartWith(
-            "sqlsource : error SQLSRC206: The project manifest at position 3 cannot be read: there is no such file"
+            option switch
+            {
+                "--manifest" =>
+                    $"{path} : error SQLSRC206: The project manifest '{path}' cannot be read: there is no such file",
+                "--log" => $"{path} : error SQLSRC218: '{path}' could not be written: ",
+                _ => $"{_invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'; ",
+            }
         );
-        result.Error.ShouldNotContain(Secrets.Word);
+        result.Error.ShouldNotContain("position");
+        result.Error.ShouldNotContain("the system would not");
+        if (option == "--env-file")
+        {
+            result.Error.ShouldContain($"in the environment or in {path}.  The run reads that file alone");
+        }
     }
 
     [Fact]
-    public async Task Run_OnlineWithAManifestThatHoldsASemicolonAndCannotBeOpened_LeavesOutTheSystemsReason()
+    public async Task Run_OnlineWithAManifestThatHoldsASemicolonAndCannotBeOpened_IsSqlsrc206WithTheSystemsReason()
     {
         var manifest = _scene.Run.Folder.WriteFile(
             "obj/a;" + Secrets.Word + ".manifest",
@@ -215,25 +249,7 @@ public sealed class ManifestRunTests : IDisposable
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldStartWith(
-            "sqlsource : error SQLSRC206: The project manifest at position 3 cannot be read: the system would not "
-                + "read it"
+            $"{manifest} : error SQLSRC206: The project manifest '{manifest}' cannot be read: '{manifest}' is gone"
         );
-        result.Error.ShouldNotContain(Secrets.Word);
-    }
-
-    [Fact]
-    public async Task Run_OnlineWithALogThatHoldsASemicolonAndCannotBeMade_IsSqlsrc218ByItsPosition()
-    {
-        var manifest = WriteManifest(_scene.Project.ManifestText());
-        var log = _scene.Run.Folder.PathOf("no-such-folder/a;" + Secrets.Word + ".log");
-
-        var result = await _scene.DescribeAsync("--manifest", manifest, "--online", "auto", "--log", log);
-
-        result.ExitCode.ShouldBe(1);
-        result.Error.ShouldStartWith(
-            "sqlsource : error SQLSRC218: The path at position 7 could not be written: the system would not write it"
-        );
-        result.Error.ShouldNotContain(Secrets.Word);
-        _scene.Describer.Opened.ShouldBeEmpty();
     }
 }

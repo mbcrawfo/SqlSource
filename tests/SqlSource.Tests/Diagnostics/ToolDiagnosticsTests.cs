@@ -222,8 +222,8 @@ public sealed class ToolDiagnosticsTests
             )
             .ShouldBe("MSBuild could not evaluate '/work/App.csproj'");
 
-    // The manifest MSBuild wrote for a project is named by the project, and the file of --manifest by itself or, when
-    // its path holds "=" or ";", by its position.
+    // The manifest MSBuild wrote for a project is named by the project, and the file of --manifest by itself, which
+    // is printed in full: one that holds "=" or ";" is refused unless the build wrote it, under --online.
     [Theory]
     [InlineData(
         "of '/work/App.csproj'",
@@ -233,7 +233,6 @@ public sealed class ToolDiagnosticsTests
         "'/work/obj/App.manifest'",
         "The project manifest '/work/obj/App.manifest' cannot be read: it names no project"
     )]
-    [InlineData("at position 3", "The project manifest at position 3 cannot be read: it names no project")]
     public void ManifestCannotBeRead_Message_HoldsWhatItNamesAndTheReason(string named, string expected) =>
         string.Format(
                 CultureInfo.InvariantCulture,
@@ -394,11 +393,10 @@ public sealed class ToolDiagnosticsTests
                 "The sidecar of '/work/Users.sql' was not written, because not every query of the file has an entry"
             );
 
-    // The file is named in quotes, or by its position when it is a log whose path holds "=" or ";".
+    // The file is named in quotes.
     [Theory]
     [InlineData("'/work/Users.sql.json'", "written")]
     [InlineData("'/work/Users.sql.json'", "deleted")]
-    [InlineData("The path at position 7", "written")]
     public void FileCannotBeChanged_Message_HoldsTheFileWhatWasTriedAndTheReason(string named, string tried) =>
         string.Format(
                 CultureInfo.InvariantCulture,
