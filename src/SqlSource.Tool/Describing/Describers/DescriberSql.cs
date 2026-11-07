@@ -6,6 +6,11 @@ namespace SqlSource.Tool.Describing.Describers;
 /// <summary>The user's SQL as the generator's lexer reads it for a describer's dialect.</summary>
 internal static class DescriberSql
 {
+    /// <summary>Whether the lexeme is a comment, or a hint, which is a comment to the server.</summary>
+    /// <param name="kind">The kind of the lexeme.</param>
+    public static bool IsCommentOrHint(SqlLexemeKind kind) =>
+        kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment or SqlLexemeKind.Hint;
+
     /// <summary>The lexemes of the SQL.</summary>
     /// <param name="sql">The SQL of a query.</param>
     /// <param name="rules">The rules of the engine's dialect.</param>

@@ -102,10 +102,7 @@ internal static class UncastParameters
 
             if (PostgresIdentifiers.IsWordPart(text[index]))
             {
-                while (index < text.Length && PostgresIdentifiers.IsWordPart(text[index]))
-                {
-                    index++;
-                }
+                index = PostgresIdentifiers.WordEnd(text, index);
             }
             else
             {

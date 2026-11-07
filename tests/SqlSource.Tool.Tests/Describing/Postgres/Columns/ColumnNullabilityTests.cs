@@ -238,4 +238,14 @@ public sealed class ColumnNullabilityTests
         ColumnNullability
             .Of(Origin("r", notNull: true, hasInsteadRule: true), gated: true)
             .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
+
+    [Theory]
+    [InlineData("r", true)]
+    [InlineData("p", true)]
+    [InlineData("v", false)]
+    [InlineData("m", false)]
+    [InlineData("f", false)]
+    [InlineData("c", false)]
+    public void IsTable_OfEachRelkind_IsTrueOnlyForATableAndAPartitionedTable(string relkind, bool expected) =>
+        ColumnNullability.IsTable(Origin(relkind, true).Table).ShouldBe(expected);
 }

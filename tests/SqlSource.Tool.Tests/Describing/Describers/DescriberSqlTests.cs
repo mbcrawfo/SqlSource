@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
@@ -42,4 +43,15 @@ public sealed class DescriberSqlTests
         Should
             .Throw<InvalidOperationException>(() => DescriberSql.Lex("SELECT [open", SqlDialectRules.SqlServer))
             .Message.ShouldBe(DoesNotLex);
+
+    [Fact]
+    public void IsCommentOrHint_OfEachKind_IsTrueOnlyForCommentsAndHints()
+    {
+        var commentsAndHints = new[] { SqlLexemeKind.LineComment, SqlLexemeKind.BlockComment, SqlLexemeKind.Hint };
+
+        foreach (var kind in Enum.GetValues<SqlLexemeKind>())
+        {
+            DescriberSql.IsCommentOrHint(kind).ShouldBe(commentsAndHints.Contains(kind), kind.ToString());
+        }
+    }
 }

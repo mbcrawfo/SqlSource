@@ -251,7 +251,8 @@ internal static partial class NullabilityWalk
         for (var index = 0; index < origins.Count; index++)
         {
             if (
-                origins[index] is { Table.Relkind: "r" or "p" } origin
+                origins[index] is { } origin
+                && ColumnNullability.IsTable(origin.Table)
                 && OutputReference.Parse(entries[index]) is { } reference
                 && (
                     reference.Alias is { } alias
