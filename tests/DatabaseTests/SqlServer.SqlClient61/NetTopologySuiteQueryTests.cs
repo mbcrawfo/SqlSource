@@ -1,6 +1,4 @@
 using System;
-using System.Data.Common;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using NetTopologySuite.Geometries;
@@ -43,7 +41,7 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
 
-        await RolledBackAsync(
+        await EndToEndSources.RolledBackAsync(
             connection,
             async transaction =>
             {
@@ -80,7 +78,7 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
         GetSpatialOverridesDto? read = null;
         await using var connection = new SqlConnection(app.ConnectionString);
 
-        await RolledBackAsync(
+        await EndToEndSources.RolledBackAsync(
             connection,
             async transaction =>
             {
@@ -108,7 +106,7 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
         GetSpatialOverridesDto? overrides = null;
         await using var connection = new SqlConnection(app.ConnectionString);
 
-        await RolledBackAsync(
+        await EndToEndSources.RolledBackAsync(
             connection,
             async transaction =>
             {
@@ -154,7 +152,7 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
         GetSpatialValuesDto? read = null;
         await using var connection = new SqlConnection(app.ConnectionString);
 
-        await RolledBackAsync(
+        await EndToEndSources.RolledBackAsync(
             connection,
             async transaction =>
             {
@@ -181,7 +179,7 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
         await using var connection = new SqlConnection(app.ConnectionString);
 
         var thrown = await Should.ThrowAsync<ArgumentException>(() =>
-            RolledBackAsync(
+            EndToEndSources.RolledBackAsync(
                 connection,
                 transaction =>
                     connection.InsertSpatialValues(
@@ -204,7 +202,7 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
         await using var connection = new SqlConnection(app.ConnectionString);
 
         var thrown = await Should.ThrowAsync<SqlException>(() =>
-            RolledBackAsync(
+            EndToEndSources.RolledBackAsync(
                 connection,
                 transaction =>
                     connection.InsertSpatialValues(
@@ -284,17 +282,4 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
             new Coordinate(0, 4),
             new Coordinate(0, 0),
         ]);
-
-    // Opens the connection and runs the write in a transaction that is rolled back when it is disposed, given to every
-    // call, since SqlClient refuses a command on a connection whose transaction it is not given.
-    private static async Task RolledBackAsync(
-        SqlConnection connection,
-        Func<DbTransaction, Task> write,
-        CancellationToken cancellationToken
-    )
-    {
-        await connection.OpenAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await write(transaction);
-    }
 }

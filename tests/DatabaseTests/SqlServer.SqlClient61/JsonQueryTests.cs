@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
@@ -30,30 +29,40 @@ public sealed class JsonQueryTests(AppContainer app)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        using var document = JsonDocument.Parse("""{"doc": {"nested": [1, 2.5, "three"]}}""");
-        var row = EveryValue(201, document);
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                using var document = JsonDocument.Parse("""{"doc": {"nested": [1, 2.5, "three"]}}""");
+                var row = EveryValue(201, document);
 
-        var inserted = await connection.InsertJsonValues(row, transaction, cancellationToken: token);
-        var read = await connection.GetJsonValues(new GetJsonValuesArgs(row.Id), transaction, cancellationToken: token);
-        using var readDocument = read.Document;
+                var inserted = await connection.InsertJsonValues(row, transaction, cancellationToken: token);
+                var read = await connection.GetJsonValues(
+                    new GetJsonValuesArgs(row.Id),
+                    transaction,
+                    cancellationToken: token
+                );
+                using var readDocument = read.Document;
 
-        inserted.ShouldBe(1);
-        read.Id.ShouldBe(row.Id);
-        JsonElements.ShouldBeSame(read.Element, row.Element, nameof(read.Element));
-        JsonElements.ShouldBeSame(
-            readDocument.ShouldNotBeNull().RootElement,
-            document.RootElement,
-            nameof(read.Document)
+                inserted.ShouldBe(1);
+                read.Id.ShouldBe(row.Id);
+                JsonElements.ShouldBeSame(read.Element, row.Element, nameof(read.Element));
+                JsonElements.ShouldBeSame(
+                    readDocument.ShouldNotBeNull().RootElement,
+                    document.RootElement,
+                    nameof(read.Document)
+                );
+                JsonNode.DeepEquals(read.Node, row.Node).ShouldBeTrue(nameof(read.Node));
+                JsonNode.DeepEquals(read.Obj, row.Obj).ShouldBeTrue(nameof(read.Obj));
+                JsonNode.DeepEquals(read.Arr, row.Arr).ShouldBeTrue(nameof(read.Arr));
+                read.SettingsMeta.ShouldBe(row.SettingsMeta);
+                read.HeaderMeta.ShouldBe(row.HeaderMeta);
+                read.Tags.ShouldBe(row.Tags);
+                read.MarkerMeta.ShouldBe(row.MarkerMeta);
+                read.Camel.ShouldBe(row.Camel);
+            },
+            token
         );
-        JsonNode.DeepEquals(read.Node, row.Node).ShouldBeTrue(nameof(read.Node));
-        JsonNode.DeepEquals(read.Obj, row.Obj).ShouldBeTrue(nameof(read.Obj));
-        JsonNode.DeepEquals(read.Arr, row.Arr).ShouldBeTrue(nameof(read.Arr));
-        read.SettingsMeta.ShouldBe(row.SettingsMeta);
-        read.HeaderMeta.ShouldBe(row.HeaderMeta);
-        read.Tags.ShouldBe(row.Tags);
-        read.MarkerMeta.ShouldBe(row.MarkerMeta);
-        read.Camel.ShouldBe(row.Camel);
     }
 
     [Fact]
@@ -61,26 +70,36 @@ public sealed class JsonQueryTests(AppContainer app)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        var row = new InsertJsonValuesArgs(
-            Id: 202,
-            Element: null,
-            Document: null,
-            Node: null,
-            Obj: null,
-            Arr: null,
-            SettingsMeta: null,
-            HeaderMeta: null,
-            Tags: null,
-            MarkerMeta: null,
-            Camel: null
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                var row = new InsertJsonValuesArgs(
+                    Id: 202,
+                    Element: null,
+                    Document: null,
+                    Node: null,
+                    Obj: null,
+                    Arr: null,
+                    SettingsMeta: null,
+                    HeaderMeta: null,
+                    Tags: null,
+                    MarkerMeta: null,
+                    Camel: null
+                );
+
+                var inserted = await connection.InsertJsonValues(row, transaction, cancellationToken: token);
+                var read = await connection.GetJsonValues(
+                    new GetJsonValuesArgs(row.Id),
+                    transaction,
+                    cancellationToken: token
+                );
+
+                inserted.ShouldBe(1);
+                read.ShouldBe(new GetJsonValuesDto(202, null, null, null, null, null, null, null, null, null, null));
+            },
+            token
         );
-
-        var inserted = await connection.InsertJsonValues(row, transaction, cancellationToken: token);
-        var read = await connection.GetJsonValues(new GetJsonValuesArgs(row.Id), transaction, cancellationToken: token);
-
-        inserted.ShouldBe(1);
-        read.ShouldBe(new GetJsonValuesDto(202, null, null, null, null, null, null, null, null, null, null));
     }
 
     // A JSON null is no SQL NULL: a JsonElement holds it as a value of the kind Null, a JsonDocument as its root, and a
@@ -90,33 +109,43 @@ public sealed class JsonQueryTests(AppContainer app)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        await using (
-            var insert = new SqlCommand(
-                "INSERT INTO dbo.json_values (id, element, document, node, obj, arr, settings_meta, header_meta, tags, "
-                    + "marker_meta) VALUES (203, N'null', N'null', N'null', N'null', N'null', N'null', N'null', "
-                    + "N'null', N'null')",
-                connection,
-                transaction
-            )
-        )
-        {
-            _ = await insert.ExecuteNonQueryAsync(token);
-        }
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                await using (
+                    var insert = new SqlCommand(
+                        "INSERT INTO dbo.json_values (id, element, document, node, obj, arr, settings_meta, "
+                            + "header_meta, tags, marker_meta) VALUES (203, N'null', N'null', N'null', N'null', "
+                            + "N'null', N'null', N'null', N'null', N'null')",
+                        connection,
+                        (SqlTransaction)transaction
+                    )
+                )
+                {
+                    _ = await insert.ExecuteNonQueryAsync(token);
+                }
 
-        var read = await connection.GetJsonValues(new GetJsonValuesArgs(203), transaction, cancellationToken: token);
-        using var readDocument = read.Document;
+                var read = await connection.GetJsonValues(
+                    new GetJsonValuesArgs(203),
+                    transaction,
+                    cancellationToken: token
+                );
+                using var readDocument = read.Document;
 
-        read.Element.ShouldNotBeNull().ValueKind.ShouldBe(JsonValueKind.Null);
-        readDocument.ShouldNotBeNull().RootElement.ValueKind.ShouldBe(JsonValueKind.Null);
-        read.Node.ShouldBeNull();
-        read.Obj.ShouldBeNull();
-        read.Arr.ShouldBeNull();
-        read.SettingsMeta.ShouldBeNull();
-        read.HeaderMeta.ShouldBeNull();
-        read.Tags.ShouldBeNull();
-        read.MarkerMeta.ShouldBeNull();
-        read.Camel.ShouldBeNull();
+                read.Element.ShouldNotBeNull().ValueKind.ShouldBe(JsonValueKind.Null);
+                readDocument.ShouldNotBeNull().RootElement.ValueKind.ShouldBe(JsonValueKind.Null);
+                read.Node.ShouldBeNull();
+                read.Obj.ShouldBeNull();
+                read.Arr.ShouldBeNull();
+                read.SettingsMeta.ShouldBeNull();
+                read.HeaderMeta.ShouldBeNull();
+                read.Tags.ShouldBeNull();
+                read.MarkerMeta.ShouldBeNull();
+                read.Camel.ShouldBeNull();
+            },
+            token
+        );
     }
 
     // A JSON null in a column that the query says cannot be null throws at the read, a class's after the serializer
@@ -128,37 +157,43 @@ public sealed class JsonQueryTests(AppContainer app)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        await using (
-            var insert = new SqlCommand(
-                "INSERT INTO dbo.json_values (id, settings_meta, obj) VALUES (204, @settingsMeta, @obj)",
-                connection,
-                transaction
-            )
-        )
-        {
-            _ = insert.Parameters.AddWithValue(
-                "@settingsMeta",
-                column == "settings_meta"
-                    ? "null"
-                    : /*lang=json,strict*/
-                    """{"OrderId": 1, "Note": null}"""
-            );
-            _ = insert.Parameters.AddWithValue(
-                "@obj",
-                column == "obj"
-                    ? "null"
-                    : /*lang=json,strict*/
-                    """{"a": 1}"""
-            );
-            _ = await insert.ExecuteNonQueryAsync(token);
-        }
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                await using (
+                    var insert = new SqlCommand(
+                        "INSERT INTO dbo.json_values (id, settings_meta, obj) VALUES (204, @settingsMeta, @obj)",
+                        connection,
+                        (SqlTransaction)transaction
+                    )
+                )
+                {
+                    _ = insert.Parameters.AddWithValue(
+                        "@settingsMeta",
+                        column == "settings_meta"
+                            ? "null"
+                            : /*lang=json,strict*/
+                            """{"OrderId": 1, "Note": null}"""
+                    );
+                    _ = insert.Parameters.AddWithValue(
+                        "@obj",
+                        column == "obj"
+                            ? "null"
+                            : /*lang=json,strict*/
+                            """{"a": 1}"""
+                    );
+                    _ = await insert.ExecuteNonQueryAsync(token);
+                }
 
-        var thrown = await Should.ThrowAsync<InvalidCastException>(() =>
-            connection.GetRequiredJson(new GetRequiredJsonArgs(204), transaction, cancellationToken: token)
+                var thrown = await Should.ThrowAsync<InvalidCastException>(() =>
+                    connection.GetRequiredJson(new GetRequiredJsonArgs(204), transaction, cancellationToken: token)
+                );
+
+                thrown.Message.ShouldBe($"Column '{column}' holds a JSON null.");
+            },
+            token
         );
-
-        thrown.Message.ShouldBe($"Column '{column}' holds a JSON null.");
     }
 
     [Fact]
@@ -166,27 +201,33 @@ public sealed class JsonQueryTests(AppContainer app)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        await using (
-            var insert = new SqlCommand(
-                "INSERT INTO dbo.json_values (id, settings_meta, obj) "
-                    + """VALUES (205, N'{"OrderId": 1, "Note": "n"}', N'{"a": [1, "b"]}')""",
-                connection,
-                transaction
-            )
-        )
-        {
-            _ = await insert.ExecuteNonQueryAsync(token);
-        }
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                await using (
+                    var insert = new SqlCommand(
+                        "INSERT INTO dbo.json_values (id, settings_meta, obj) "
+                            + """VALUES (205, N'{"OrderId": 1, "Note": "n"}', N'{"a": [1, "b"]}')""",
+                        connection,
+                        (SqlTransaction)transaction
+                    )
+                )
+                {
+                    _ = await insert.ExecuteNonQueryAsync(token);
+                }
 
-        var read = await connection.GetRequiredJson(
-            new GetRequiredJsonArgs(205),
-            transaction,
-            cancellationToken: token
+                var read = await connection.GetRequiredJson(
+                    new GetRequiredJsonArgs(205),
+                    transaction,
+                    cancellationToken: token
+                );
+
+                read.SettingsMeta.ShouldBe(new OrderMetadata(1, "n"));
+                JsonNode.DeepEquals(read.Obj, new JsonObject { ["a"] = new JsonArray(1, "b") }).ShouldBeTrue();
+            },
+            token
         );
-
-        read.SettingsMeta.ShouldBe(new OrderMetadata(1, "n"));
-        JsonNode.DeepEquals(read.Obj, new JsonObject { ["a"] = new JsonArray(1, "b") }).ShouldBeTrue();
     }
 
     // The serializer's default options store a class's properties by their own names, at each place of the opt-in,
@@ -196,26 +237,32 @@ public sealed class JsonQueryTests(AppContainer app)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        using var document = JsonDocument.Parse("{}");
-
-        _ = await connection.InsertJsonValues(EveryValue(206, document), transaction, cancellationToken: token);
-        await using var command = new SqlCommand(
-            "SELECT JSON_VALUE(settings_meta, '$.OrderId'), JSON_VALUE(header_meta, '$.OrderId'), "
-                + "JSON_VALUE(marker_meta, '$.OrderId'), JSON_VALUE(tags, '$[1].Name'), "
-                + "JSON_VALUE(camel, '$.orderId'), JSON_VALUE(camel, '$.OrderId') "
-                + "FROM dbo.json_values WHERE id = 206",
+        await EndToEndSources.RolledBackAsync(
             connection,
-            transaction
-        );
-        string?[] stored;
-        await using (var reader = await command.ExecuteReaderAsync(token))
-        {
-            (await reader.ReadAsync(token)).ShouldBeTrue();
-            stored = [.. Enumerable.Range(0, 6).Select(i => reader.IsDBNull(i) ? null : reader.GetString(i))];
-        }
+            async transaction =>
+            {
+                using var document = JsonDocument.Parse("{}");
 
-        stored.ShouldBe(["7", "8", "10", "blue", "9", null]);
+                _ = await connection.InsertJsonValues(EveryValue(206, document), transaction, cancellationToken: token);
+                await using var command = new SqlCommand(
+                    "SELECT JSON_VALUE(settings_meta, '$.OrderId'), JSON_VALUE(header_meta, '$.OrderId'), "
+                        + "JSON_VALUE(marker_meta, '$.OrderId'), JSON_VALUE(tags, '$[1].Name'), "
+                        + "JSON_VALUE(camel, '$.orderId'), JSON_VALUE(camel, '$.OrderId') "
+                        + "FROM dbo.json_values WHERE id = 206",
+                    connection,
+                    (SqlTransaction)transaction
+                );
+                string?[] stored;
+                await using (var reader = await command.ExecuteReaderAsync(token))
+                {
+                    (await reader.ReadAsync(token)).ShouldBeTrue();
+                    stored = [.. Enumerable.Range(0, 6).Select(i => reader.IsDBNull(i) ? null : reader.GetString(i))];
+                }
+
+                stored.ShouldBe(["7", "8", "10", "blue", "9", null]);
+            },
+            token
+        );
     }
 
     // Without the opt-in and with no converter, a class on an nvarchar is asked of SqlClient itself, which cannot read
@@ -225,20 +272,27 @@ public sealed class JsonQueryTests(AppContainer app)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        await using (
-            var insert = new SqlCommand(
-                """INSERT INTO dbo.json_values (id, plain_meta) VALUES (207, N'{"OrderId": 1, "Note": null}')""",
-                connection,
-                transaction
-            )
-        )
-        {
-            _ = await insert.ExecuteNonQueryAsync(token);
-        }
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                await using (
+                    var insert = new SqlCommand(
+                        "INSERT INTO dbo.json_values (id, plain_meta) "
+                            + """VALUES (207, N'{"OrderId": 1, "Note": null}')""",
+                        connection,
+                        (SqlTransaction)transaction
+                    )
+                )
+                {
+                    _ = await insert.ExecuteNonQueryAsync(token);
+                }
 
-        _ = await Should.ThrowAsync<InvalidCastException>(() =>
-            connection.GetPlainMeta(new GetPlainMetaArgs(207), transaction, cancellationToken: token)
+                _ = await Should.ThrowAsync<InvalidCastException>(() =>
+                    connection.GetPlainMeta(new GetPlainMetaArgs(207), transaction, cancellationToken: token)
+                );
+            },
+            token
         );
     }
 
@@ -248,31 +302,37 @@ public sealed class JsonQueryTests(AppContainer app)
         app.SkipBelow(17, "SQL Server before 2025 has no json.");
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
-        var row = new InsertJsonColumnsArgs(
-            Id: 211,
-            Element: JsonElements.ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
-            Meta: new OrderMetadata(12, "json")
-        );
-
-        var inserted = await connection.InsertJsonColumns(row, transaction, cancellationToken: token);
-        var read = await connection.GetJsonColumns(
-            new GetJsonColumnsArgs(row.Id),
-            transaction,
-            cancellationToken: token
-        );
-        await using var command = new SqlCommand(
-            "SELECT JSON_VALUE(meta, '$.OrderId') FROM dbo.json_columns WHERE id = 211",
+        await EndToEndSources.RolledBackAsync(
             connection,
-            transaction
-        );
-        var stored = await command.ExecuteScalarAsync(token);
+            async transaction =>
+            {
+                var row = new InsertJsonColumnsArgs(
+                    Id: 211,
+                    Element: JsonElements.ElementOf("""{"b": [true, null, "x"], "a": 1}"""),
+                    Meta: new OrderMetadata(12, "json")
+                );
 
-        inserted.ShouldBe(1);
-        read.Id.ShouldBe(row.Id);
-        JsonElements.ShouldBeSame(read.Element, row.Element, nameof(read.Element));
-        read.Meta.ShouldBe(row.Meta);
-        stored.ShouldBe("12");
+                var inserted = await connection.InsertJsonColumns(row, transaction, cancellationToken: token);
+                var read = await connection.GetJsonColumns(
+                    new GetJsonColumnsArgs(row.Id),
+                    transaction,
+                    cancellationToken: token
+                );
+                await using var command = new SqlCommand(
+                    "SELECT JSON_VALUE(meta, '$.OrderId') FROM dbo.json_columns WHERE id = 211",
+                    connection,
+                    (SqlTransaction)transaction
+                );
+                var stored = await command.ExecuteScalarAsync(token);
+
+                inserted.ShouldBe(1);
+                read.Id.ShouldBe(row.Id);
+                JsonElements.ShouldBeSame(read.Element, row.Element, nameof(read.Element));
+                read.Meta.ShouldBe(row.Meta);
+                stored.ShouldBe("12");
+            },
+            token
+        );
     }
 
     [Fact]
@@ -281,17 +341,26 @@ public sealed class JsonQueryTests(AppContainer app)
         app.SkipBelow(17, "SQL Server before 2025 has no json.");
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                var inserted = await connection.InsertJsonColumns(
+                    new InsertJsonColumnsArgs(212, null, null),
+                    transaction,
+                    cancellationToken: token
+                );
+                var read = await connection.GetJsonColumns(
+                    new GetJsonColumnsArgs(212),
+                    transaction,
+                    cancellationToken: token
+                );
 
-        var inserted = await connection.InsertJsonColumns(
-            new InsertJsonColumnsArgs(212, null, null),
-            transaction,
-            cancellationToken: token
+                inserted.ShouldBe(1);
+                read.ShouldBe(new JsonColumnsDto(212, null, null));
+            },
+            token
         );
-        var read = await connection.GetJsonColumns(new GetJsonColumnsArgs(212), transaction, cancellationToken: token);
-
-        inserted.ShouldBe(1);
-        read.ShouldBe(new JsonColumnsDto(212, null, null));
     }
 
     // A JsonElement of the kind Null is sent as the text null, which json refuses as it refuses every scalar at its
@@ -302,17 +371,22 @@ public sealed class JsonQueryTests(AppContainer app)
         app.SkipBelow(17, "SQL Server before 2025 has no json.");
         var token = TestContext.Current.CancellationToken;
         await using var connection = Connection();
-        await using var transaction = await BeginAsync(connection, token);
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                var thrown = await Should.ThrowAsync<SqlException>(() =>
+                    connection.InsertJsonColumns(
+                        new InsertJsonColumnsArgs(213, JsonElements.ElementOf("null"), null),
+                        transaction,
+                        cancellationToken: token
+                    )
+                );
 
-        var thrown = await Should.ThrowAsync<SqlException>(() =>
-            connection.InsertJsonColumns(
-                new InsertJsonColumnsArgs(213, JsonElements.ElementOf("null"), null),
-                transaction,
-                cancellationToken: token
-            )
+                thrown.Number.ShouldBe(JsonScalarRefused, thrown.Message);
+            },
+            token
         );
-
-        thrown.Number.ShouldBe(JsonScalarRefused, thrown.Message);
     }
 
     [Fact]
@@ -370,11 +444,4 @@ public sealed class JsonQueryTests(AppContainer app)
 
     // The connection to "app" of the container.
     private SqlConnection Connection() => new(app.ConnectionString);
-
-    // Opens the connection and begins the transaction that the test gives to every call, which disposing it rolls back.
-    private static async Task<SqlTransaction> BeginAsync(SqlConnection connection, CancellationToken token)
-    {
-        await connection.OpenAsync(token);
-        return (SqlTransaction)await connection.BeginTransactionAsync(token);
-    }
 }
