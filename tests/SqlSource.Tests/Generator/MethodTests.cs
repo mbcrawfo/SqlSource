@@ -309,8 +309,8 @@ public sealed class MethodTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC009 /app/Repo/Users.sql(1,10)-(1,13): A query of 'Sample' cannot be named 'Sql', because its member "
-                    + "would have the name of the type that contains it",
+                "SQLSRC009 /app/Repo/Users.sql(1,10)-(1,13): A query of 'Sample' cannot be named 'Sql', because its "
+                    + "member would have the name of the type that contains it",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }

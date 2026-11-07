@@ -220,7 +220,8 @@ public sealed class TableModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC257 {GetBName}: The output model 'App.UsersDto' of the query 'GetB' is not the same as the output "
+                $"SQLSRC257 {GetBName}: The output model 'App.UsersDto' of the query 'GetB' is not the same as the "
+                    + $"output "
                     + "model of that name of the query 'GetA' in A.sql: the property 'Id' is 'long' here and 'int' "
                     + $"there.{Help257}",
             ]);
@@ -358,8 +359,8 @@ public sealed class TableModelTests
         run.Problems()
             .ShouldBe([
                 $"SQLSRC257 {GetBName.Replace("(1,10)-(1,14)", "(1,10)-(1,15)", StringComparison.Ordinal)}: The output "
-                    + "model 'App.UsersDto' of the query 'Users' is not the same as the output model of that name of the "
-                    + "query 'GetA' in A.sql: its property 1 is 'Name' here and 'Id' there."
+                    + "model 'App.UsersDto' of the query 'Users' is not the same as the output model of that name of "
+                    + "the query 'GetA' in A.sql: its property 1 is 'Name' here and 'Id' there."
                     + Help257,
             ]);
         ModelFiles(run).ShouldBe(["App.UsersDto-Model.g.cs"]);

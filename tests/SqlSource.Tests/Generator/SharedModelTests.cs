@@ -264,7 +264,8 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC257 {GetBName}: The output model 'App.GetBDto' of the query 'GetB' is not the same as the output "
+                $"SQLSRC257 {GetBName}: The output model 'App.GetBDto' of the query 'GetB' is not the same as the "
+                    + $"output "
                     + "model of that name of the query 'GetA' in A.sql: its property 1 is 'Name' here and 'Id' "
                     + $"there.{Help257}",
             ]);
@@ -290,8 +291,9 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC257 /app/Repo/B.sql(2,1)-(2,21): The input model 'App.User' of the query 'GetB' is not the same as "
-                    + "the output model of that name of the query 'GetA' in A.sql: one is an input model and the other an "
+                "SQLSRC257 /app/Repo/B.sql(2,1)-(2,21): The input model 'App.User' of the query 'GetB' is not the same "
+                    + "as the output model of that name of the query 'GetA' in A.sql: one is an input model and the "
+                    + "other an "
                     + $"output model.{Help257}",
             ]);
         ModelFiles(run).ShouldBe(["App.GetBDto-Model.g.cs", "App.User-Model.g.cs"]);
@@ -311,8 +313,10 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same as "
-                    + "the input model of that name of the query 'GetUser' in Users.sql, for the type App.Sample: one is "
+                $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same "
+                    + $"as "
+                    + "the input model of that name of the query 'GetUser' in Users.sql, for the type App.Sample: one "
+                    + "is "
                     + $"an input model and the other an output model.{Help257}",
             ]);
         ModelFiles(run).ShouldBe(["App.GetUserModel-Model.g.cs"]);
@@ -343,7 +347,8 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same as "
+                $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same "
+                    + $"as "
                     + "the input model of that name of the query 'GetUser' in Users.sql, for the type App.Repo: one is "
                     + $"an input model and the other an output model.{Help257}",
             ]);
@@ -371,8 +376,10 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same as "
-                    + "the input model of that name of the query 'GetUser' in Users.sql, for the type App.Repo<TKey>: one "
+                $"SQLSRC257 {GetUserName}: The output model 'App.GetUserModel' of the query 'GetUser' is not the same "
+                    + $"as "
+                    + "the input model of that name of the query 'GetUser' in Users.sql, for the type App.Repo<TKey>: "
+                    + "one "
                     + $"is an input model and the other an output model.{Help257}",
             ]);
         ModelFiles(run).ShouldBe(["App.GetUserModel-Model.g.cs"]);
@@ -561,10 +568,10 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC258 {GeneratorHarness.UsersPath}(1,10)-(1,14): The model 'App.Data' of the query 'GetA' cannot be "
-                    + $"generated: it is the namespace of another model.{Help258}",
-                $"SQLSRC258 {GeneratorHarness.UsersPath}(5,10)-(5,14): The model 'App.Data.Row' of the query 'GetB' cannot "
-                    + $"be generated: 'App.Data' is another model, and a part of its namespace.{Help258}",
+                $"SQLSRC258 {GeneratorHarness.UsersPath}(1,10)-(1,14): The model 'App.Data' of the query 'GetA' cannot "
+                    + $"be generated: it is the namespace of another model.{Help258}",
+                $"SQLSRC258 {GeneratorHarness.UsersPath}(5,10)-(5,14): The model 'App.Data.Row' of the query 'GetB' "
+                    + $"cannot be generated: 'App.Data' is another model, and a part of its namespace.{Help258}",
             ]);
         ModelFiles(run).ShouldBeEmpty();
     }
@@ -580,8 +587,8 @@ public sealed class SharedModelTests
         run.Problems()
             .ShouldBe(
                 new[] { (At: GetAName, Name: "GetA"), (At: GetBName, Name: "GetB") }.Select(query =>
-                    $"SQLSRC258 {query.At}: The model 'App.usersdto' of the query '{query.Name}' cannot be generated: the "
-                    + $"compiler warns on a type name of lower-case ASCII letters alone.{Help258}"
+                    $"SQLSRC258 {query.At}: The model 'App.usersdto' of the query '{query.Name}' cannot be generated: "
+                    + $"the compiler warns on a type name of lower-case ASCII letters alone.{Help258}"
                 )
             );
         run.SeverityOf("SQLSRC258").ShouldBe(DiagnosticSeverity.Error);
@@ -655,11 +662,13 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in {TheProjectFilePlace}, "
+                $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in "
+                    + $"{TheProjectFilePlace}, "
                     + "and that type is not public, and the model 'App.GetUserDto' is.  Make the type public, or make "
                     + "each type that claims the query's file internal.",
                 $"SQLSRC251 {GetUserName}: 'text' is mapped to 'MyApp.Secret' for column 'name', in "
-                    + $"{TheProjectFilePlace}, and that type is not public, and the model 'App.GetUserDto' is.  Make the "
+                    + $"{TheProjectFilePlace}, and that type is not public, and the model 'App.GetUserDto' is.  Make "
+                    + $"the "
                     + "type public, or make each type that claims the query's file internal.",
             ]);
         ModelFiles(run).ShouldBeEmpty();
@@ -688,8 +697,8 @@ public sealed class SharedModelTests
                     + "-- type-override: marker of the query, and that type is not public, and the model 'App.UserRow' "
                     + "is.  Make the type public, or make each type that claims the query's file internal.",
                 $"SQLSRC251 {GetBName}: 'text' is mapped to 'App.UserKey' for column 'Id', in {TheProjectFilePlace}, "
-                    + "and that type is not public, and the model 'App.UserRow' is.  Make the type public, or make each "
-                    + "type that claims the query's file internal.",
+                    + "and that type is not public, and the model 'App.UserRow' is.  Make the type public, or make "
+                    + "each type that claims the query's file internal.",
             ]);
         ModelFiles(run).ShouldBeEmpty();
     }
@@ -783,7 +792,8 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                $"SQLSRC257 {ModelsEventsName}: The output model 'App.ListEventsDto' of the query 'ListEvents' is not the "
+                $"SQLSRC257 {ModelsEventsName}: The output model 'App.ListEventsDto' of the query 'ListEvents' is not "
+                    + $"the "
                     + "same as the output model of that name of the query 'ListEvents' in A.sql: the property 'At' is "
                     + "'System.DateTime' here and 'NodaTime.Instant' there."
                     + Help257,
@@ -838,8 +848,8 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC257 /app/Repo/B.sql(2,1)-(2,23): The output model 'App.Event' of the query 'GetB' is not the same "
-                    + "as the output model of that name of the query 'GetA' in A.sql: the property 'At' is "
+                "SQLSRC257 /app/Repo/B.sql(2,1)-(2,23): The output model 'App.Event' of the query 'GetB' is not the "
+                    + "same as the output model of that name of the query 'GetA' in A.sql: the property 'At' is "
                     + $"'System.DateTime' here and 'NodaTime.Instant' there.{Help257}",
             ]);
         ModelFiles(run).ShouldBe(["App.Event-Model.g.cs"]);
@@ -870,7 +880,8 @@ public sealed class SharedModelTests
         run.Problems()
             .ShouldBe([
                 "SQLSRC257 /app/Repo/B.sql(2,1)-(2,25): The input model 'App.IdFilter' of the query 'FindB' is not the "
-                    + "same as the input model of that name of the query 'FindA' in A.sql: the property 'Ids' is 'int[]' "
+                    + "same as the input model of that name of the query 'FindA' in A.sql: the property 'Ids' is "
+                    + "'int[]' "
                     + $"here and 'System.Collections.Generic.IEnumerable<int>' there.{Help257}",
             ]);
         ModelFiles(run).ShouldBe(["App.IdFilter-Model.g.cs"]);
@@ -947,7 +958,8 @@ public sealed class SharedModelTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC257 /app/Repo/B.sql(2,1)-(2,25): The output model 'App.UserRow' of the query 'GetB' is not the same "
+                "SQLSRC257 /app/Repo/B.sql(2,1)-(2,25): The output model 'App.UserRow' of the query 'GetB' is not the "
+                    + "same "
                     + $"as the output model of that name of the query 'GetA' in A.sql: {message}.{Help257}",
             ]);
         run.SeverityOf("SQLSRC257").ShouldBe(DiagnosticSeverity.Error);
