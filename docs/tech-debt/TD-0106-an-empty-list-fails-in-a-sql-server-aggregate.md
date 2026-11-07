@@ -8,7 +8,7 @@ A query method sends an empty or a null list as one parameter in a subquery that
 - in a `GROUP BY` expression: Msg 144;
 - in an `OUTPUT` clause: Msg 10705.
 
-So the method throws `SqlException` for an empty or a null list, a null one on a property that cannot be null included, which is sent as empty, while every list that holds a value runs.  The build and the describe succeed, since the sample is `IN (@statuses)`.  A window aggregate, `PARTITION BY`, a `MERGE`'s `WHEN MATCHED AND` and an `UPDATE`'s `SET` accept the empty form.  PostgreSQL accepts it everywhere.
+So the method throws `SqlException` for an empty or a null list, a null one on a property that cannot be null included, which is sent as empty, while every list that holds a value runs.  The build and the describe succeed, since the sample is `IN (@statuses)`.  A window aggregate, `PARTITION BY`, a `MERGE`'s `WHEN MATCHED AND` and an `UPDATE`'s `SET` accept the empty form.  PostgreSQL accepts it everywhere but in the index predicate of `ON CONFLICT`, a limitation that [PostgreSQL's page](../manual/postgresql.md#parameters) documents.
 
 ## Why it exists
 
