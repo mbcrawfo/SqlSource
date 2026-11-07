@@ -6,7 +6,7 @@ namespace SqlSource.DatabaseTests.Postgres;
 
 // The PostgreSQL with PostGIS of the collection UsesPostgis, on the PostGIS image built on EngineImage.Postgres.Image,
 // the same PostgreSQL as PostgresDatabases runs: the database "gis" with its schema and seed, made once.  A container
-// of its own, which only the NetTopologySuite tests and the project check start, so that the other tests never wait
+// of its own, which only the tests on PostGIS start, so that the other tests never wait
 // for its image.
 public sealed class PostgisDatabases() : PostgisContainer(NpgsqlFactory.Instance, EngineImage.Postgres.Image)
 {
