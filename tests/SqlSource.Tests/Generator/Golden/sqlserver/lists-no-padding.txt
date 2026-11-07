@@ -93,7 +93,7 @@ namespace App
             }
 
             var sql = string.Create(
-                checked(37 + (count0 == 0 ? 27 : size0 * 7 + DigitsUpTo(size0))),
+                checked(37 + (count0 == 0 ? 8 : size0 * 7 + DigitsUpTo(size0))),
                 (count0, size0),
                 static (span, state) =>
                 {
@@ -101,8 +101,8 @@ namespace App
                     span = span.Slice(36);
                     if (state.Item1 == 0)
                     {
-                        "(SELECT @ids_0 WHERE 1 = 0)".CopyTo(span);
-                        span = span.Slice(27);
+                        "(@ids_0)".CopyTo(span);
+                        span = span.Slice(8);
                     }
                     else
                     {

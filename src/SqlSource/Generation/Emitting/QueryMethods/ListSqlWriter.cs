@@ -2,14 +2,16 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Parsing.Tokens;
 
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes each use of a list in the SQL that a query's method builds with <c>string.Create</c>, for
-/// <see cref="MethodWriter.AppendCreate" />: the list's values as <c>(@ids_0, @ids_1, …)</c> up to its size, or
-/// <c>(SELECT @ids_0 WHERE 1 = 0)</c> when it is empty or null.  The state of <c>string.Create</c> holds each list's
-/// count and size after the tokens' text, and the length counts each use's text from them.
+/// <see cref="MethodWriter.AppendCreate" />: the list's values as <c>(@ids_0, @ids_1, …)</c> up to its size, or, when
+/// it is empty or null, <c>(@ids_0)</c> for a use whose segment is <see cref="SqlSegment.EmptyIsNull" /> and
+/// <c>(SELECT @ids_0 WHERE 1 = 0)</c> for any other.  The state of <c>string.Create</c> holds each list's count and
+/// size after the tokens' text, and the length counts each use's text from them.
 /// </summary>
 internal static class ListSqlWriter
 {
@@ -35,11 +37,11 @@ internal static class ListSqlWriter
     internal static int CountPlaceOf(List<string> tokens, int list) => tokens.Count + (2 * list);
 
     /// <summary>
-    /// Appends the length of the uses of a list, ` + (...)`, with ` * uses` when it is used more than once: the empty
-    /// form's for a count of 0, and otherwise a parenthesis and a name for each value, a comma and a space between
-    /// two, and the digits of every index, which <see cref="ListLocals.DigitsUpTo" /> gives.
+    /// Appends the length of the uses of a list in one empty form, ` + (...)`, with ` * uses` when there is more than
+    /// one: the empty form's for a count of 0, and otherwise a parenthesis and a name for each value, a comma and a
+    /// space between two, and the digits of every index, which <see cref="ListLocals.DigitsUpTo" /> gives.
     /// </summary>
-    internal static void AppendLength(StringBuilder builder, ListLocals lists, int list, int uses)
+    internal static void AppendLength(StringBuilder builder, ListLocals lists, int list, int uses, bool emptyIsNull)
     {
         var locals = lists.Each[list];
         var prefix = locals.Parameter.ExpansionPrefix!;
@@ -47,7 +49,7 @@ internal static class ListSqlWriter
             .Append(" + (")
             .Append(locals.Count)
             .Append(" == 0 ? ")
-            .Append(EmptyOf('@', prefix).Length.ToString(CultureInfo.InvariantCulture))
+            .Append(EmptyOf('@', prefix, emptyIsNull).Length.ToString(CultureInfo.InvariantCulture))
             .Append(" : ")
             .Append(locals.Size)
             .Append(" * ")
@@ -72,6 +74,7 @@ internal static class ListSqlWriter
     /// <param name="lists">The method's lists.</param>
     /// <param name="list">The list's index in <see cref="ListLocals.Each" />.</param>
     /// <param name="use">The use as the SQL writes it, whose first character is the parameter's prefix.</param>
+    /// <param name="emptyIsNull">Whether the use is written empty as one <c>NULL</c>.</param>
     /// <param name="span">The name of the lambda's span.</param>
     /// <param name="count">The state's value of the list's count.</param>
     /// <param name="size">The state's value of the list's size.</param>
@@ -82,6 +85,7 @@ internal static class ListSqlWriter
         ListLocals lists,
         int list,
         string use,
+        bool emptyIsNull,
         string span,
         string count,
         string size,
@@ -89,7 +93,7 @@ internal static class ListSqlWriter
     )
     {
         var prefix = lists.Each[list].Parameter.ExpansionPrefix!;
-        var empty = EmptyOf(use[0], prefix);
+        var empty = EmptyOf(use[0], prefix, emptyIsNull);
         var first = "(" + use[0] + prefix + "0";
         var next = ", " + use[0] + prefix;
         var block = GeneratedText.Deeper(indent);
@@ -148,8 +152,11 @@ internal static class ListSqlWriter
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 
-    // The empty form, which compares with one NULL: IN matches no row, and NOT IN every row.
-    private static string EmptyOf(char marker, string prefix) => "(SELECT " + marker + prefix + "0 WHERE 1 = 0)";
+    // The empty forms.  The subquery has no row, so IN matches no row and NOT IN every row.  One NULL makes IN
+    // unknown, which matches no row where no NOT reaches it, and SQL Server takes it where it refuses a subquery: in
+    // an aggregate, a GROUP BY and an OUTPUT clause.
+    private static string EmptyOf(char marker, string prefix, bool emptyIsNull) =>
+        emptyIsNull ? "(" + marker + prefix + "0)" : "(SELECT " + marker + prefix + "0 WHERE 1 = 0)";
 
     private static void AppendCopy(StringBuilder builder, string indent, string span, string text, bool isLast)
     {

@@ -62,6 +62,7 @@ internal static class SqlFileReader
                     MemberLocationMarker = MarkerLocationOf(file.Path, text, block.MemberLocationMarker),
                     VisibilityMarker = MarkerLocationOf(file.Path, text, block.VisibilityMarker),
                     DeclaredVariables = block.DeclaredVariables,
+                    CodeGenErrors = DiagnosticsOf(file.Path, text, block.CodeGenErrors),
                 }
             );
         }
@@ -76,8 +77,8 @@ internal static class SqlFileReader
         );
     }
 
-    // The array is made only for problems: a query's kept form has none but in a rare file, and a file has no warning
-    // but in a rare one.
+    // The array is made only for problems: a query's kept form and its method have none but in a rare file, and a file
+    // has no warning but in a rare one.
     private static EquatableArray<DiagnosticInfo> DiagnosticsOf(
         string path,
         SourceText text,

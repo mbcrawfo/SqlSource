@@ -136,6 +136,13 @@ public sealed class SqlQueryHashTests
             );
     }
 
+    // printf 'mssql\nSELECT id FROM t WHERE a IN @ids;\n' | shasum -a 256.  The form a list is sent in when it is empty
+    // is no part of what is described, so it changes no hash.
+    [Fact]
+    public void Compute_SqlServerQueryWithAList_IsTheSha256OfItsText() =>
+        Hash("-- name: Q\nSELECT id FROM t WHERE a IN @ids;\n", SqlDialect.SqlServer)
+            .ShouldBe("dcca5cffdc7117122bff92a3f4d101d042e283ecd8fe7b79ca9a16d73a54ecd6");
+
     [Fact]
     public void Compute_AnyQuery_IsSixtyFourLowerCaseHexCharacters() => Hash(Simple).ShouldMatch("^[0-9a-f]{64}$");
 
