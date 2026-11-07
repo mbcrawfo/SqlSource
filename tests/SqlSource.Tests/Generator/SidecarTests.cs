@@ -26,15 +26,6 @@ public sealed class SidecarTests
     // The start of the sidecar of Users.
     private const string SidecarStart = $"{GeneratorHarness.UsersPath}.json(1,1)-(1,1)";
 
-    private const string Source = """
-        using SqlSource;
-
-        namespace App;
-
-        [SqlSourceGenerate(Source = ".")]
-        public partial class Sample;
-        """;
-
     [Fact]
     public void Run_MalformedSidecar_IsSqlsrc237AtTheError()
     {
@@ -458,11 +449,13 @@ public sealed class SidecarTests
     [Fact]
     public void Run_SidecarOfAFileNoTypeClaims_IsNotRead()
     {
-        var source = Source.Replace(
-            "[SqlSourceGenerate(Source = \".\")]",
-            "[SqlSourceGenerate(Source = \"Users.sql\")]",
-            StringComparison.Ordinal
-        );
+        var source = GeneratorHarness
+            .SampleSource(null)
+            .Replace(
+                "[SqlSourceGenerate(Source = \".\")]",
+                "[SqlSourceGenerate(Source = \"Users.sql\")]",
+                StringComparison.Ordinal
+            );
         var orders = new SqlFile("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
 
         var run = GeneratorHarness.Run(
@@ -615,7 +608,9 @@ public sealed class SidecarTests
     [Fact]
     public void Run_TypeWithAnErrorOfItsOwn_StillNeedsItsEntries()
     {
-        var source = Source.Replace("public partial class", "public class", StringComparison.Ordinal);
+        var source = GeneratorHarness
+            .SampleSource(null)
+            .Replace("public partial class", "public class", StringComparison.Ordinal);
         const string NotPartial =
             "SQLSRC001 /app/Repo/Sample.cs(6,14)-(6,20): 'Sample' must be declared partial so that SqlSource can add "
             + "members to it";
@@ -764,7 +759,7 @@ public sealed class SidecarTests
     private static GeneratorRun Run(OutputKind output, params SqlFile[] files) => Run(output, files, "postgres");
 
     private static GeneratorRun Run(OutputKind output, SqlFile[] files, string dialect) =>
-        GeneratorHarness.Run(output, [new SourceFile(GeneratorHarness.SourcePath, Source)], files, dialect: dialect);
+        GeneratorHarness.RunSample(output, files, dialect: dialect);
 
     // The text of a sidecar whose hash is a number, which makes it malformed: every other key is as it was.
     private static string WithHashAsANumber(string text) =>
