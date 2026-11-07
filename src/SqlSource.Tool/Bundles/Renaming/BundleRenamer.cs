@@ -23,9 +23,50 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// Every step that knows an engine asks the engine's part, and the renaming reads no file: the caller reads the raw
 /// bundle, makes the describer with its planner settings, and writes what this gives.
 /// </para>
+/// <para>
+/// A renaming whose mapping fell back, giving a spelling a replacement of its own
+/// (<see cref="NameMapping.FellBack" />), may be refused under one key and pass under another.  So the overload that
+/// takes a source of keys renames again with a new key while such a renaming is refused, at most
+/// <see cref="Attempts" /> times in all; any other refusal does not depend on the key, and is returned at once.
+/// </para>
 /// </remarks>
 internal static class BundleRenamer
 {
+    /// <summary>The most renamings of one bundle, each with a new key, while each is refused and fell back.</summary>
+    internal const int Attempts = 5;
+
+    /// <summary>
+    /// The renamed bundle and its mapping, or the refusal that says why it cannot be renamed safely, renamed with a
+    /// new key from <paramref name="nextKey" /> while the renaming is refused and its mapping fell back, at most
+    /// <see cref="Attempts" /> times: the last renaming's outcome.
+    /// </summary>
+    /// <param name="raw">The raw bundle, as the overload of one key takes it.</param>
+    /// <param name="engine">The engine's part of the renaming, of the bundle's engine.</param>
+    /// <param name="describer">The bundle's describer, as <c>BundleDescribers.For</c> makes it for a replay.</param>
+    /// <param name="nextKey">Gives each renaming's key.</param>
+    /// <param name="token">Ends the renaming.</param>
+    /// <exception cref="ArgumentException">As the overload of one key throws it.</exception>
+    public static async Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(
+        Bundle raw,
+        IEngineRenaming engine,
+        IQueryDescriber describer,
+        Func<RenamingKey> nextKey,
+        CancellationToken token
+    )
+    {
+        for (var attempt = 1; attempt < Attempts; attempt++)
+        {
+            var mapping = new NameMapping(nextKey(), engine.Fold, engine.Spelled);
+            var outcome = await RenameAsync(raw, engine, describer, mapping, token);
+            if (outcome.Succeeded || !mapping.FellBack)
+            {
+                return outcome;
+            }
+        }
+
+        return await RenameAsync(raw, engine, describer, nextKey(), token);
+    }
+
     /// <summary>The renamed bundle and its mapping, or the refusal that says why it cannot be renamed safely.</summary>
     /// <param name="raw">
     /// The raw bundle, with a <c>bundle.json</c> that says it is not renamed, and whose capture, query and expected
@@ -39,11 +80,20 @@ internal static class BundleRenamer
     /// The bundle has no <c>bundle.json</c>, is renamed already, or is of another engine than the part's, or its
     /// capture or its <c>expected.json</c> cannot be read.
     /// </exception>
-    public static async Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(
+    public static Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(
         Bundle raw,
         IEngineRenaming engine,
         IQueryDescriber describer,
         RenamingKey key,
+        CancellationToken token
+    ) => RenameAsync(raw, engine, describer, new NameMapping(key, engine.Fold, engine.Spelled), token);
+
+    // One renaming, into the mapping given, which is new.
+    private static async Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(
+        Bundle raw,
+        IEngineRenaming engine,
+        IQueryDescriber describer,
+        NameMapping mapping,
         CancellationToken token
     )
     {
@@ -63,7 +113,6 @@ internal static class BundleRenamer
             throw new ArgumentException($"The raw bundle is of the engine '{capture.Engine}'.", nameof(raw));
         }
 
-        var mapping = new NameMapping(key, engine.Fold);
         var calls = CaptureRenamer.CallsOf(capture);
 
         CaptureRenamer.Drop(engine, calls);

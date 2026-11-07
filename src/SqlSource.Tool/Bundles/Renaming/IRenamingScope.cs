@@ -8,8 +8,11 @@ internal interface IRenamingScope
 {
     /// <summary>
     /// The replacement of a name, made in the class given if the spelling has none yet; a spelling kept, or one that
-    /// <see cref="IEngineRenaming.IsEngineWord" /> keeps, is its own.  One spelling, as the engine folds it, has one
-    /// replacement throughout the bundle.
+    /// <see cref="IEngineRenaming.IsEngineWord" /> keeps, is its own.  One spelling, as the engine's
+    /// <see cref="IEngineRenaming.Spelled" /> gives it, has one replacement throughout the bundle.  Two spellings that
+    /// <see cref="IEngineRenaming.Fold" /> takes for one name and <c>Spelled</c> tells apart have replacements that
+    /// differ by case alone, unless the first replacement's letters cannot tell them apart
+    /// (<see cref="NameMapping.FellBack" />).
     /// </summary>
     string Name(string spelling, bool quoted, NameClass cls);
 

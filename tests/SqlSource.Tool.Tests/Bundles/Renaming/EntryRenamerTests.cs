@@ -11,7 +11,12 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming;
 public sealed class EntryRenamerTests
 {
     private static RenamingRun Run(FakeEngineRenaming engine, string query) =>
-        RenamingRun.For(engine, new NameMapping(RenamingBundles.Key(1), engine.Fold), query, RenamingCopies.None);
+        RenamingRun.For(
+            engine,
+            new NameMapping(RenamingBundles.Key(1), engine.Fold, engine.Spelled),
+            query,
+            RenamingCopies.None
+        );
 
     [Fact]
     public async Task Rename_HashIsOfTheRenamedQuery()

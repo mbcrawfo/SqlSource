@@ -38,6 +38,9 @@ internal sealed class PostgresRenaming : IEngineRenaming
     public string Fold(string spelling, bool quoted) => PostgresWords.Fold(spelling, quoted);
 
     /// <inheritdoc />
+    public string Spelled(string spelling, bool quoted) => PostgresWords.Fold(spelling, quoted);
+
+    /// <inheritdoc />
     public bool IsEngineWord(string spelling, bool quoted) => PostgresWords.IsEngineWord(spelling, quoted);
 
     /// <inheritdoc />

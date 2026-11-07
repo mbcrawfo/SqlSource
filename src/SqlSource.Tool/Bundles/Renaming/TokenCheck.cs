@@ -18,8 +18,10 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// The capture's strings are checked by their members' rules, then <c>query.sql</c>, then the entry's strings.  SQL, a
 /// type's spelling and <c>query.sql</c> are split by the generator's lexer and the engine's word rule, as the SQL
 /// renamer splits them; an engine's own string by <see cref="IEngineRenaming.WordsOf" />; a name, a parameter, a label
-/// and a whole name are one token, a name's nullability mark aside.  The tool's and the engine's fixed texts and
-/// closed codes are not checked, nor the tag of a dollar-quoted literal, which is the engine's text.
+/// and a whole name are one token, a name's nullability mark aside.  A name is asked about quoted or not as the
+/// renamer renamed it: a token's name, in a placeholder, a <c>-- token:</c> or a <c>-- token-ignore:</c>, quoted.  The
+/// tool's and the engine's fixed texts and closed codes are not checked, nor the tag of a dollar-quoted literal, which
+/// is the engine's text.
 /// </para>
 /// <para>
 /// The check reads the renamed bundle alone, and trusts nothing of the renaming but the mapping: a word the renaming

@@ -1,6 +1,8 @@
 using System;
+using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
+using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 
 namespace SqlSource.Tool.Bundles.Renaming;
@@ -88,8 +90,11 @@ internal sealed partial class TokenCheck
                 break;
             case SqlMarkerKind.Param:
             case SqlMarkerKind.Token:
-            case SqlMarkerKind.TokenIgnore:
                 Sql(value, place, queryFile: false);
+                break;
+            case SqlMarkerKind.TokenIgnore:
+                // A token's name, renamed as quoted.
+                Whole(IsSafe(value, quoted: true), place, value);
                 break;
             case SqlMarkerKind.Summary:
             case SqlMarkerKind.GeneratorParameters:
@@ -118,14 +123,21 @@ internal sealed partial class TokenCheck
     }
 
     // Plain text: numbers, white space and punctuation pass, a run from a digit that is no number is refused, and each
-    // word must be safe.
+    // word must be safe.  A token placeholder's name must be safe as quoted, as the SQL renamer reads one in every
+    // text.
     private void Words(string text, int start, int end, bool quoteFollows, string place)
     {
         var at = start;
         while (at < end)
         {
             var character = text[at];
-            if (char.IsAsciiDigit(character))
+            if (character == '{' && TokenNameAt(text, at, end) is { } name)
+            {
+                var token = text.Substring(name.Start, name.Length);
+                Whole(IsSafe(token, quoted: true), place, token);
+                at = name.End;
+            }
+            else if (char.IsAsciiDigit(character))
             {
                 var runEnd = SqlRenamer.NumberRunEnd(_engine, text, at, end);
                 if (!SqlRenamer.IsNumber(text.AsSpan(at, runEnd - at)))
@@ -159,6 +171,18 @@ internal sealed partial class TokenCheck
                 at += length;
             }
         }
+    }
+
+    // The name of the token placeholder at the index, as the SQL renamer reads one, or null when none is there.
+    private static TextSpan? TokenNameAt(string text, int at, int end)
+    {
+        if (!TokenScanner.TryReadToken(text, at, out _, out _, out _))
+        {
+            return null;
+        }
+
+        _ = TokenScanner.TryReadOpener(text, at, out var name, out _);
+        return name.End <= end ? name : null;
     }
 
     // A word: a literal's one-letter prefix passes, and SQL Server's @ and # before a name are punctuation.

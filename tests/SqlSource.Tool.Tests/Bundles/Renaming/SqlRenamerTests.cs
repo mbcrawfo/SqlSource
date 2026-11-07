@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -20,7 +21,7 @@ public sealed class SqlRenamerTests
     )
     {
         var engine = new FakeEngineRenaming(dialect);
-        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold);
+        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold, engine.Spelled);
         var parameters = new HashSet<string>(queryParameters, SqlParameterName.Comparer);
         return (new SqlRenamer(engine, mapping, parameters, RenamingCopies.None), mapping, []);
     }
@@ -35,8 +36,8 @@ public sealed class SqlRenamerTests
 
     private static string Of(NameMapping mapping, string spelling, bool quoted = false)
     {
-        mapping.TryGet(spelling, quoted, out var replacement).ShouldBeTrue(spelling);
-        return replacement;
+        mapping.IsMapped(spelling, quoted).ShouldBeTrue(spelling);
+        return mapping.Name(spelling, quoted, NameClass.Alias);
     }
 
     // The dialect of a theory's row, which names it as a query file does.
@@ -181,7 +182,7 @@ public sealed class SqlRenamerTests
     public void Rename_CopyOfAReusedParameter_IsRenamedThroughIt()
     {
         var engine = new FakeEngineRenaming(SqlDialect.SqlServer);
-        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold);
+        var mapping = new NameMapping(RenamingKey.Of(new byte[RenamingKey.Length]), engine.Fold, engine.Spelled);
         var request = new JsonObject
         {
             ["copies"] = FakeEngineRenaming.Copies(("before_1", "before", "_1"), ("Before__x", "before", "_2")),
@@ -256,8 +257,8 @@ public sealed class SqlRenamerTests
         var growth = renamed.Text.Length - Sql.Length;
         growth.ShouldBe("a_12345678".Length - "users".Length);
         renamed.MapPosition(1).ShouldBe(1);
-        renamed.MapPosition(Sql.IndexOf("users", System.StringComparison.Ordinal) + 1).ShouldBe(15);
-        renamed.MapPosition(Sql.IndexOf("WHERE", System.StringComparison.Ordinal) + 1).ShouldBe(21 + growth);
+        renamed.MapPosition(Sql.IndexOf("users", StringComparison.Ordinal) + 1).ShouldBe(15);
+        renamed.MapPosition(Sql.IndexOf("WHERE", StringComparison.Ordinal) + 1).ShouldBe(21 + growth);
         renamed.MapPosition(Sql.Length + 1).ShouldBe(renamed.Text.Length + 1);
     }
 
@@ -270,7 +271,7 @@ public sealed class SqlRenamerTests
         var renamed = renamer.Rename(Sql, NameClass.Alias, Place, refusals.Add);
 
         // The literal is one code point and two chars; FROM is the 12th code point and the 13th char.
-        renamed.MapPosition(12).ShouldBe(renamed.Text.IndexOf("FROM", System.StringComparison.Ordinal) + 1);
+        renamed.MapPosition(12).ShouldBe(renamed.Text.IndexOf("FROM", StringComparison.Ordinal) + 1);
         renamed.Offsets.Length.ShouldBe(Sql.Length);
     }
 
@@ -319,6 +320,23 @@ public sealed class SqlRenamerTests
         mapping.Names.ShouldContain(new MappedName(Of(mapping, "raw"), NameClass.Token, "raw"));
     }
 
+    // An ignored token reaches the SQL sent as written, in plain text or a hint: its name is renamed as a token's, as
+    // query.sql's is, so the two have one replacement.
+    [Theory]
+    [InlineData("SELECT 1 {{Extra}}")]
+    [InlineData("SELECT /*+ {{Extra}} */ 1")]
+    public void Rename_TokenPlaceholderInSql_IsRenamedAsATokensName(string sql)
+    {
+        var (renamer, mapping, refusals) = Renamer();
+
+        var renamed = renamer.Rename(sql, NameClass.Alias, Place, refusals.Add).Text;
+
+        refusals.ShouldBeEmpty();
+        var name = Of(mapping, "Extra", quoted: true);
+        renamed.ShouldBe(sql.Replace("Extra", name, StringComparison.Ordinal));
+        mapping.Names.ShouldHaveSingleItem().ShouldBe(new MappedName(name, NameClass.Token, "Extra"));
+    }
+
     [Theory]
     [InlineData("-- summary: Gets the users", "-- summary:")]
     [InlineData("-- output: codegen", "-- output:")]
@@ -337,6 +355,7 @@ public sealed class SqlRenamerTests
     [InlineData("-- dialect: postgres-ish")]
     [InlineData("-- param: id int")]
     [InlineData("-- token: {{filter}}")]
+    [InlineData("-- token-ignore: two words")]
     public void RenameQueryFile_MarkerThatDoesNotRead_IsRefused(string marker)
     {
         var (renamer, _, refusals) = Renamer();

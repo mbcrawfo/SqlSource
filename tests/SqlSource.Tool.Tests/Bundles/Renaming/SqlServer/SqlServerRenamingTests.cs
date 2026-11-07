@@ -37,6 +37,13 @@ public sealed class SqlServerRenamingTests
     }
 
     [Fact]
+    public void Spelled_IsTheSpellingAsWritten()
+    {
+        Engine.Spelled("EMAIL", false).ShouldBe("EMAIL");
+        Engine.Spelled("EMAIL", true).ShouldBe("EMAIL");
+    }
+
+    [Fact]
     public void Fold_IgnoresCaseAndQuoting()
     {
         Engine.Fold("Users", false).ShouldBe(Engine.Fold("USERS", true));
@@ -311,13 +318,14 @@ public sealed class SqlServerRenamingTests
     public void Sql_AMoneyLiteral_IsRenamedToAName()
     {
         const string Sql = "SELECT $12 AS price";
-        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold);
+        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold, Engine.Spelled);
         var run = RenamingRun.For(Engine, mapping, Sql, RenamingCopies.None);
 
         var renamed = run.At("query.sql").Sql(Sql, NameClass.Alias).Text;
 
         run.Refusal.ShouldBeNull();
-        mapping.TryGet("$12", quoted: false, out var money).ShouldBeTrue();
+        mapping.IsMapped("$12", quoted: false).ShouldBeTrue();
+        var money = mapping.Name("$12", quoted: false, NameClass.Alias);
         money.ShouldMatch("^a_[0-9a-f]{8}$");
         renamed.ShouldBe($"SELECT {money} AS {mapping.Name("price", quoted: false, NameClass.Alias)}");
     }
@@ -325,7 +333,7 @@ public sealed class SqlServerRenamingTests
     [Fact]
     public void RenameOwn_AMessage_IsItsParametersRenamed()
     {
-        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold);
+        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold, Engine.Spelled);
         var call = ParametersCall(("label", ["label_1", "label_2"]), ("before", ["before_1", "before_2"]));
         var copies = RenamingCopies.Of(
             Engine,
