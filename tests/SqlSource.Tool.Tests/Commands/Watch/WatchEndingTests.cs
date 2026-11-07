@@ -49,7 +49,7 @@ public sealed class WatchEndingTests : IAsyncDisposable
     public async Task Watch_DotEnvDeleted_NextPassReportsNoConnectionAndKeepsWatching()
     {
         _ = _watch.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
-        var dotEnv = _watch.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_POSTGRES=Host=db\n");
+        var dotEnv = _watch.Scene.WriteDotEnv("SQLSOURCE_CONNECTION_POSTGRES=Host=db\n");
         await _watch.StartAsync();
         _watch.Errors.ShouldBeEmpty();
         File.Delete(dotEnv);

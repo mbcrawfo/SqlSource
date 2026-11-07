@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -12,8 +13,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // the environment has none.
 public sealed class DotEnvRunTests : IDisposable
 {
-    private const string Invoices = "-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
-
     private const string Summary = "billing (postgres): 1 described, 0 skipped, 0 failed\n";
 
     private readonly DescribeScene _scene = new();
@@ -22,12 +21,10 @@ public sealed class DotEnvRunTests : IDisposable
     public DotEnvRunTests()
     {
         _scene.Run.Environment.Clear();
-        _invoices = _scene.Project.AddSql("Invoices.sql", Invoices);
+        _invoices = _scene.Project.AddSql("Invoices.sql", SqlTexts.GetInvoice);
     }
 
     public void Dispose() => _scene.Dispose();
-
-    private string DotEnvPath => _scene.Run.Folder.PathOf(".env");
 
     // The help of SQLSRC213 for "billing", up to what follows the file it names.
     private static string NoConnectionHelp(string file) =>
@@ -42,7 +39,7 @@ public sealed class DotEnvRunTests : IDisposable
     [Fact]
     public async Task Run_ValueOnlyInTheDotEnvFile_DescribesAndExitsZero()
     {
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=from-the-file\n");
+        _ = _scene.WriteDotEnv(DescribeScene.BillingFromTheFile);
 
         var result = await _scene.DescribeAsync();
 
@@ -54,7 +51,7 @@ public sealed class DotEnvRunTests : IDisposable
     public async Task Run_ValueInTheEnvironmentAndTheDotEnvFile_UsesTheEnvironments()
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = "Host=from-the-environment";
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=from-the-file\n");
+        _ = _scene.WriteDotEnv(DescribeScene.BillingFromTheFile);
 
         var result = await _scene.DescribeAsync();
 
@@ -67,7 +64,7 @@ public sealed class DotEnvRunTests : IDisposable
     public async Task Run_DatabaseWithALetterOutsideAscii_TakesItsConnectionFromTheDotEnvFile()
     {
         _ = _scene.Project.AddSql("Donnees.sql", "-- name: GetDonnee\n-- database: données\nSELECT 3;\n");
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_DONNÉES=Host=from-the-file\n");
+        _ = _scene.WriteDotEnv("SQLSOURCE_CONNECTION_DONNÉES=Host=from-the-file\n");
 
         var result = await _scene.DescribeAsync("--database", "données");
 
@@ -90,11 +87,11 @@ public sealed class DotEnvRunTests : IDisposable
             new CliResult(
                 1,
                 "billing (postgres): 0 described, 0 skipped, 1 failed\n",
-                $"{DotEnvPath}(2,1): error SQLSRC286: The line that sets 'SQLSOURCE_CONNECTION_REPORTS' cannot be "
-                    + "read: a quote is not closed\n"
+                $"{_scene.DotEnvPath}(2,1): error SQLSRC286: The line that sets 'SQLSOURCE_CONNECTION_REPORTS' "
+                    + "cannot be read: a quote is not closed\n"
                     + Expected.See("SQLSRC286")
                     + $"{_invoices}(1,10): error SQLSRC213: No connection is given for the database 'billing'\n"
-                    + NoConnectionHelpReadingAlone(DotEnvPath)
+                    + NoConnectionHelpReadingAlone(_scene.DotEnvPath)
                     + "\n"
                     + Expected.See("SQLSRC213")
                     + DescribeScene.RunAgain
@@ -118,7 +115,7 @@ public sealed class DotEnvRunTests : IDisposable
             new CliResult(
                 1,
                 Summary,
-                $"{DotEnvPath} : error SQLSRC285: '{DotEnvPath}' cannot be read: the disk is gone\n"
+                $"{_scene.DotEnvPath} : error SQLSRC285: '{_scene.DotEnvPath}' cannot be read: the disk is gone\n"
                     + Expected.See("SQLSRC285")
                     + DescribeScene.RunAgain
             )
@@ -130,7 +127,7 @@ public sealed class DotEnvRunTests : IDisposable
     public async Task Run_DotEnvFileOfOtherKeysAlone_SaysNothing()
     {
         _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = "Host=db";
-        _ = _scene.Run.Folder.WriteFile(".env", "DATABASE_URL=\"unclosed\nexport OTHER=1\nnot a line at all\n");
+        _ = _scene.WriteDotEnv("DATABASE_URL=\"unclosed\nexport OTHER=1\nnot a line at all\n");
 
         var result = await _scene.DescribeAsync();
 
@@ -143,19 +140,19 @@ public sealed class DotEnvRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(DotEnvPath) + "\n");
+        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(_scene.DotEnvPath) + "\n");
     }
 
     // The unit's own .env is read and has no value for the database: the run still says it reads that file alone.
     [Fact]
     public async Task Run_UnitsDotEnvFileWithoutTheVariable_HelpSaysTheRunReadsThatFileAlone()
     {
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_REPORTS=Host=db\n");
+        _ = _scene.WriteDotEnv("SQLSOURCE_CONNECTION_REPORTS=Host=db\n");
 
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(DotEnvPath) + "\n");
+        result.Error.ShouldContain("\n" + NoConnectionHelpReadingAlone(_scene.DotEnvPath) + "\n");
     }
 
     // A .env above the unit's folder is not read, though the folder above is the root of the repository.
@@ -163,7 +160,7 @@ public sealed class DotEnvRunTests : IDisposable
     public async Task Run_NoConnectionAndADotEnvFileAboveTheUnit_HelpNamesTheUnitsFile()
     {
         var project = Plans.Postgres(_scene.Run.Folder, directory: "repo/app").AnsweredBy(_scene.Run.Processes);
-        var invoices = project.AddSql("Invoices.sql", Invoices);
+        var invoices = project.AddSql("Invoices.sql", SqlTexts.GetInvoice);
         _ = _scene.Run.Folder.CreateFolder("repo/.git");
         _ = _scene.Run.Folder.WriteFile("repo/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
 
@@ -189,7 +186,7 @@ public sealed class DotEnvRunTests : IDisposable
         foreach (var name in names)
         {
             var project = Plans.Postgres(_scene.Run.Folder, name, name).AnsweredBy(_scene.Run.Processes);
-            _ = project.AddSql("Invoices.sql", Invoices);
+            _ = project.AddSql("Invoices.sql", SqlTexts.GetInvoice);
             _ = _scene.Run.Folder.WriteFile($"{name}/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
         }
 
@@ -208,8 +205,8 @@ public sealed class DotEnvRunTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain(
             "\n"
-                + NoConnectionHelp(DotEnvPath)
-                + $".  The run did not read {listed}: it reads {DotEnvPath} alone, and --env-file, or "
+                + NoConnectionHelp(_scene.DotEnvPath)
+                + $".  The run did not read {listed}: it reads {_scene.DotEnvPath} alone, and --env-file, or "
                 + "SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain("reads that file alone");
@@ -221,7 +218,7 @@ public sealed class DotEnvRunTests : IDisposable
     public async Task Run_SolutionWithProjectsOfTwoDatabases_HelpNamesOnlyTheFilesOfTheDatabasesOwnProjects()
     {
         var billing = Plans.Postgres(_scene.Run.Folder, "Billing", "Billing").AnsweredBy(_scene.Run.Processes);
-        _ = billing.AddSql("Invoices.sql", Invoices);
+        _ = billing.AddSql("Invoices.sql", SqlTexts.GetInvoice);
         var reports = Plans.Postgres(_scene.Run.Folder, "Reports", "Reports").AnsweredBy(_scene.Run.Processes);
         _ = reports.AddSql("Totals.sql", "-- name: GetTotal\n-- database: reports\nSELECT 4;\n");
         _ = _scene.Run.Folder.WriteFile("Billing/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
@@ -235,8 +232,8 @@ public sealed class DotEnvRunTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain(
             "    help: pass --connection reports=<connection string>, or set SQLSOURCE_CONNECTION_REPORTS in the "
-                + $"environment or in {DotEnvPath}.  The run did not read {reportsEnv}: it reads {DotEnvPath} alone, "
-                + "and --env-file, or SqlSourceEnvFile in a build, names another\n"
+                + $"environment or in {_scene.DotEnvPath}.  The run did not read {reportsEnv}: it reads "
+                + $"{_scene.DotEnvPath} alone, and --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
         result.Error.ShouldNotContain(_scene.Run.Folder.PathOf("Billing/.env"));
         result.Error.ShouldNotContain("reads that file alone");
@@ -245,7 +242,7 @@ public sealed class DotEnvRunTests : IDisposable
     [Fact]
     public async Task Run_EnvFileNamed_ReadsItAndNotTheUnitsOwn()
     {
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=wrong\n");
+        _ = _scene.WriteDotEnv("SQLSOURCE_CONNECTION_BILLING=Host=wrong\n");
         var named = _scene.Run.Folder.WriteFile("other/.env.local", "SQLSOURCE_CONNECTION_BILLING=Host=right\n");
 
         var result = await _scene.DescribeAsync("--env-file", "other/.env.local", "--verbose");
@@ -263,7 +260,7 @@ public sealed class DotEnvRunTests : IDisposable
     public async Task Run_EnvFileRelative_IsFromTheWorkingFolder()
     {
         var project = Plans.Postgres(_scene.Run.Folder, directory: "app").AnsweredBy(_scene.Run.Processes);
-        _ = project.AddSql("Invoices.sql", Invoices);
+        _ = project.AddSql("Invoices.sql", SqlTexts.GetInvoice);
         _ = _scene.Run.Folder.WriteFile("app/shared.env", "SQLSOURCE_CONNECTION_BILLING=Host=wrong\n");
         _ = _scene.Run.Folder.WriteFile("shared.env", "SQLSOURCE_CONNECTION_BILLING=Host=right\n");
 
@@ -280,7 +277,7 @@ public sealed class DotEnvRunTests : IDisposable
     [InlineData(" None ")]
     public async Task Run_EnvFileNone_ReadsNoFile_AndHelpSaysSo(string none)
     {
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
+        _ = _scene.WriteDotEnv("SQLSOURCE_CONNECTION_BILLING=Host=db\n");
 
         var result = await _scene.DescribeAsync("--env-file", none);
 
@@ -303,7 +300,7 @@ public sealed class DotEnvRunTests : IDisposable
     public async Task Run_EnvFileNoneInASolutionWithDotEnvFilesInItsProjectFolders_HelpNamesTheFilesNotRead()
     {
         var project = Plans.Postgres(_scene.Run.Folder, "Lib", "Lib").AnsweredBy(_scene.Run.Processes);
-        _ = project.AddSql("Invoices.sql", Invoices);
+        _ = project.AddSql("Invoices.sql", SqlTexts.GetInvoice);
         var notRead = _scene.Run.Folder.WriteFile("Lib/.env", "SQLSOURCE_CONNECTION_BILLING=Host=db\n");
         _ = _scene.Run.Folder.WriteFile("All.slnx", "<Solution><Project Path=\"Lib/Lib.csproj\" /></Solution>");
 
@@ -352,7 +349,7 @@ public sealed class DotEnvRunTests : IDisposable
     [Fact]
     public async Task Run_ValueInTheDotEnvFile_IsInNoVariableOfMsbuild()
     {
-        _ = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=" + Secrets.ConnectionWithMarker + "\n");
+        _ = _scene.WriteDotEnv("SQLSOURCE_CONNECTION_BILLING=" + Secrets.ConnectionWithMarker + "\n");
 
         var result = await _scene.DescribeAsync();
 

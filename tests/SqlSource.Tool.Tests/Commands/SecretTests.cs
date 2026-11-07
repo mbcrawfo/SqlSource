@@ -29,9 +29,6 @@ public sealed class SecretTests : IDisposable
 
     public void Dispose() => _scene.Dispose();
 
-    // Where the run looks for its .env file, which none of these tests writes.
-    private string DotEnvPath => _scene.Run.Folder.PathOf(".env");
-
     // A project with every error a describe run reports of its databases and sidecars but SQLSRC215, when "postgres"
     // has a connection:
     // a failure of the describer and SQLSRC217 in Users.sql, SQLSRC213 for "reports", SQLSRC214 for the two "app"
@@ -190,7 +187,7 @@ public sealed class SecretTests : IDisposable
     public async Task Run_ValueInTheDotEnvFileAndEveryError_IsNeverPrinted()
     {
         AddEveryError();
-        _ = WriteDotEnv(
+        _ = _scene.WriteDotEnv(
             $"SQLSOURCE_CONNECTION_POSTGRES={Secrets.ConnectionWithMarker}\n"
                 + $"SQLSOURCE_CONNECTION_APP_V2={Secrets.ConnectionWithMarker}\n"
         );
@@ -206,7 +203,7 @@ public sealed class SecretTests : IDisposable
     public async Task Run_ValueInTheDotEnvFileAndEveryErrorWithVerbose_IsNeverSaid()
     {
         AddEveryError();
-        var path = WriteDotEnv($"SQLSOURCE_CONNECTION_POSTGRES={Secrets.ConnectionWithMarker}\n");
+        var path = _scene.WriteDotEnv($"SQLSOURCE_CONNECTION_POSTGRES={Secrets.ConnectionWithMarker}\n");
 
         var result = await _scene.DescribeAsync("--verbose");
 
@@ -221,7 +218,7 @@ public sealed class SecretTests : IDisposable
     [Fact]
     public async Task Run_MalformedDotEnvLineThatHoldsTheValue_PrintsNothingOfIt()
     {
-        _ = WriteDotEnv(
+        _ = _scene.WriteDotEnv(
             $"SQLSOURCE_CONNECTION_POSTGRES=\"{Secrets.ConnectionWithMarker}\n"
                 + $"SQLSOURCE_CONNECTION_BILLING=\"{Secrets.ConnectionWithMarker}\" {Secrets.Marker}\n"
                 + $"SQLSOURCE_CONNECTION_REPORTS=\"Host=db;\\q{Secrets.Marker}\"\n"
@@ -234,8 +231,6 @@ public sealed class SecretTests : IDisposable
         (await ReadLogAsync()).ShouldNotContain(Secrets.Marker);
         _scene.Describer.Opened.ShouldBeEmpty();
     }
-
-    private string WriteDotEnv(string text) => _scene.Run.Folder.WriteFile(".env", text);
 
     private Task<string> ReadLogAsync() =>
         File.ReadAllTextAsync(_scene.Run.Folder.PathOf("run.log"), TestContext.Current.CancellationToken);
@@ -287,7 +282,7 @@ public sealed class SecretTests : IDisposable
         ShouldHold(result, "213");
         result.Error.ShouldContain(
             "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
-                + $"environment or in {DotEnvPath}.  "
+                + $"environment or in {_scene.DotEnvPath}.  "
                 + "The value of --connection at position 3 names no database of this run"
                 + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
@@ -307,7 +302,7 @@ public sealed class SecretTests : IDisposable
         ShouldHold(result, "213");
         result.Error.ShouldContain(
             "    help: pass --connection hosts=<connection string>, or set SQLSOURCE_CONNECTION_HOSTS in the "
-                + $"environment or in {DotEnvPath}.  "
+                + $"environment or in {_scene.DotEnvPath}.  "
                 + "--connection was given for Host, which is no database of this run"
                 + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
         );
@@ -330,7 +325,7 @@ public sealed class SecretTests : IDisposable
         ShouldHold(result, "213");
         result.Error.ShouldContain(
             "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the "
-                + $"environment or in {DotEnvPath}.  "
+                + $"environment or in {_scene.DotEnvPath}.  "
                 + "--connection was given for postgress, which is no database of this run.  "
                 + "The values of --connection at positions 3 and 7 name no databases of this run"
                 + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"

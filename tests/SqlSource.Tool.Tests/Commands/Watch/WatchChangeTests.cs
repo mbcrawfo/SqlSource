@@ -176,7 +176,7 @@ public sealed class WatchChangeTests : IAsyncDisposable
     public async Task Watch_DotEnvWritten_TheNextPassUsesItsValue()
     {
         _ = _watch.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
-        var dotEnv = _watch.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_POSTGRES=Host=first\n");
+        var dotEnv = _watch.Scene.WriteDotEnv("SQLSOURCE_CONNECTION_POSTGRES=Host=first\n");
         await _watch.StartAsync();
         var manifestRuns = _watch.ManifestRuns;
         await File.WriteAllTextAsync(

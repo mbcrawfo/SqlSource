@@ -26,9 +26,6 @@ public sealed class DescribeRunTests : IDisposable
 
     public void Dispose() => _scene.Dispose();
 
-    // Where the run looks for its .env file, which none of these tests writes.
-    private string DotEnvPath => _scene.Run.Folder.PathOf(".env");
-
     [Fact]
     public async Task Run_QueriesWithoutASidecar_AreDescribedAndTheSidecarIsWritten()
     {
@@ -313,7 +310,7 @@ public sealed class DescribeRunTests : IDisposable
                 "postgres (postgres): 0 described, 1 skipped, 1 failed\n",
                 $"{_users}(4,10): error SQLSRC213: No connection is given for the database 'postgres'\n"
                     + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES "
-                    + $"in the environment or in {DotEnvPath}"
+                    + $"in the environment or in {_scene.DotEnvPath}"
                     + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another\n"
                     + Expected.See("SQLSRC213")
                     + DescribeScene.RunAgain
