@@ -113,7 +113,7 @@ internal static class StatementShape
         string? previous = null;
         foreach (var lexeme in DescriberSql.Lex(sql, SqlDialectRules.PostgreSql))
         {
-            if (lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment or SqlLexemeKind.Hint)
+            if (DescriberSql.IsCommentOrHint(lexeme.Kind))
             {
                 continue;
             }
@@ -138,11 +138,7 @@ internal static class StatementShape
                 if (PostgresIdentifiers.IsWordPart(c))
                 {
                     var start = index;
-                    while (index < text.Length && PostgresIdentifiers.IsWordPart(text[index]))
-                    {
-                        index++;
-                    }
-
+                    index = PostgresIdentifiers.WordEnd(text, index);
                     var word = text[start..index].ToString();
                     if (first)
                     {

@@ -72,7 +72,7 @@ internal static class SqlServerTableMatcher
         }
 
         string[] origins = [.. columns.Select(static column => column.Origin!.Column!)];
-        SqlServerColumnRow[] visible = [.. table.Where(static row => !row.IsHidden)];
+        SqlServerColumnRow[] visible = [.. SqlServerColumns.Visible(table)];
         string?[] names = [.. visible.Select(static row => row.Name)];
         var result = TableMatchChecks.OfTheTable(
             // The name as the server returned it: an alias and an override suffix are each another name.
@@ -88,7 +88,7 @@ internal static class SqlServerTableMatcher
             () =>
                 columns
                     .Select(static column => column.Nullable)
-                    .SequenceEqual(visible.Select(static row => (bool?)(row.IsNullable ?? true)))
+                    .SequenceEqual(visible.Select(static row => (bool?)SqlServerColumns.NullableAsRecorded(row)))
         );
         return result == SidecarValues.TableMatch.Matched
             ? (new SidecarTable(found.Schema, found.Table), result)

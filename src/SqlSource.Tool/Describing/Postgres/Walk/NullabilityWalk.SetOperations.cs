@@ -134,16 +134,11 @@ internal static partial class NullabilityWalk
             walked.Add(
                 origins[index] switch
                 {
-                    null when branches.NotNullAt(root, index, types[index]) => new WalkedColumn(
-                        columns[index] with
-                        {
-                            Nullable = false,
-                            NullableSource = source,
-                        },
-                        entry,
-                        null,
+                    null when branches.NotNullAt(root, index, types[index]) => Answered(
+                        columns[index],
                         false,
-                        false
+                        source,
+                        entry
                     ),
                     { } origin when scope.Gated && entry is not null => ColumnOf(
                         columns[index],

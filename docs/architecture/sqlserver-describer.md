@@ -38,7 +38,9 @@ The folder [`Proofs/`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/) ho
 | [`SelectBody.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/SelectBody.cs) | The reader of one `SELECT`: its items, its `FROM` through its `WHERE`, its grouping, what may take a row away, whether its `FROM` is one table alone, and the one rule of depth |
 | [`SelectItem.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/SelectItem.cs) | One item of a select list: its expression and the name the server gives its column |
 | [`Proof.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/Proof.cs) | A proof: true from the text, never true, an operand to ask, or any or all of other proofs |
-| [`ExpressionProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.cs) | The forms that prove an expression not null, and the operands they leave to ask |
+| [`ExpressionProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.cs) | The proof of an expression not null, split into its pieces, and the operands it leaves to ask |
+| [`ExpressionProofs.Calls.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.Calls.cs) | The table of forms, a call read into its parts, and the proof of each form |
+| [`ExpressionProofs.Types.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.Types.cs) | The type walk: the proof that a value is of no CLR type, each form's read from the same table |
 | [`OperandsQuery.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/OperandsQuery.cs) | The text of `operands`, and the reading of its answer |
 | [`ColumnProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ColumnProofs.cs) | The proof of each column of a describe, the `PERSISTED NOT NULL` computed column read from its one table among them, and the columns and the rows of `table` as they correct them |
 
@@ -184,7 +186,7 @@ A query's columns are those of its first result set as `sys.dm_exec_describe_fir
 
 `SqlServerColumns.Build` makes the sidecar's columns from the rows of `columns`, in the order of their ordinals:
 
-1. A row with `is_hidden` is dropped before anything is built, so `ROWSTAT` is in no model.  `mssql.columns` and the capture keep every row.
+1. A row with `is_hidden` is dropped before anything is built, by `SqlServerColumns.Visible` wherever rows are read, so `ROWSTAT` is in no model.  `mssql.columns` and the capture keep every row.
 2. No visible row is a statement without a result set: an `UPDATE` with no `OUTPUT`, a `SELECT ... INTO` or an `OUTPUT ... INTO`.
 3. A visible row with no name, as `SELECT 1` has, is `SQLSRC266`, naming the column's place counted from one, through `SqlServerErrors.NoColumnName`.  Paths of an `IF` that differ only in a column's name are not refused as two shapes: the server gives that column no name, and it is `SQLSRC266`.  Two columns of one name are recorded, and the generator's `SQLSRC255` reports them, as for PostgreSQL.
 4. Each other row is a column: `name` as the server returned it, a `!` or `?` suffix kept; `ordinal`, its place among the visible columns; `type` by `SqlServerTypes.FromColumn`; `nullable` the server's `is_nullable`, true where it gives none, with the `nullableSource` `server`; `origin`, as [origins](#origins) says; and `identity` and `computed`, the server's `is_identity_column` and `is_computed_column`, null where it gives none.

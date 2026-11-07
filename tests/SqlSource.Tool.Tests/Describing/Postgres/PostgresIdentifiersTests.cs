@@ -99,4 +99,13 @@ public sealed class PostgresIdentifiersTests
     [InlineData("$99999999999", 0)]
     public void ParameterNumberAt_NoNumberThere_IsNull(string text, int at) =>
         PostgresIdentifiers.ParameterNumberAt(text, at).ShouldBeNull();
+
+    [Theory]
+    [InlineData("ab_1 x", 0, 4)]
+    [InlineData("ab", 2, 2)]
+    [InlineData("+a", 0, 0)]
+    [InlineData("a$1;b", 0, 3)]
+    [InlineData("x \u00E9\u4E2D y", 2, 4)]
+    public void WordEnd_AtAWordADigitAndASymbol_EndsAfterTheRun(string text, int from, int end) =>
+        PostgresIdentifiers.WordEnd(text, from).ShouldBe(end);
 }

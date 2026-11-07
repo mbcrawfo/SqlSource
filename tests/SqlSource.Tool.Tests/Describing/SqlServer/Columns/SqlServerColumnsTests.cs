@@ -283,4 +283,15 @@ public sealed class SqlServerColumnsTests
     [Fact]
     public void OriginOf_NoSessionDatabase_IsNone() =>
         SqlServerColumns.OriginOf(Id, null).ShouldBe((null, "another database"));
+
+    [Fact]
+    public void Visible_RowsWithAHiddenOne_KeepsTheOthersInOrder() =>
+        SqlServerColumns.Visible([Id, Rowstat, Email]).ShouldBe([Id, Email]);
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(null, true)]
+    public void NullableAsRecorded_OfTrueFalseAndNull_IsTrueFalseAndTrue(bool? isNullable, bool expected) =>
+        SqlServerColumns.NullableAsRecorded(Id with { IsNullable = isNullable }).ShouldBe(expected);
 }

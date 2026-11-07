@@ -137,15 +137,7 @@ internal static class PlanPartitions
         for (var index = 0; index < tokens.Count; index++)
         {
             var token = tokens[index];
-            string? name = null;
-            if (token.Kind == PlanTokens.Kind.Word)
-            {
-                name = entry[token.Start..token.End];
-            }
-            else if (token.Kind == PlanTokens.Kind.QuotedName)
-            {
-                name = PostgresIdentifiers.Unquote(entry.AsSpan(token.Start, token.End - token.Start));
-            }
+            var name = PlanTokens.NameOf(entry, token);
 
             var qualifies =
                 index + 1 < tokens.Count

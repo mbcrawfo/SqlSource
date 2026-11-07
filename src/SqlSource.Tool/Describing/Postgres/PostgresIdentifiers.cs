@@ -110,6 +110,24 @@ internal static class PostgresIdentifiers
     /// </summary>
     public static bool IsWordPart(char character) => QuoteReader.IsNameCharacterOfPostgreSql(character);
 
+    /// <summary>
+    /// The index after the run of word parts, as <see cref="IsWordPart" /> reads them, that starts at the index.  The
+    /// rule a reader of words uses.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="from">The index the run starts at.</param>
+    /// <returns>The index after the run, which is <paramref name="from" /> when no word part starts there.</returns>
+    public static int WordEnd(ReadOnlySpan<char> text, int from)
+    {
+        var end = from;
+        while (end < text.Length && IsWordPart(text[end]))
+        {
+            end++;
+        }
+
+        return end;
+    }
+
     /// <summary>The n of a <c>$n</c> that starts at the index, or null when there is none or n does not fit.</summary>
     public static int? ParameterNumberAt(string text, int at)
     {

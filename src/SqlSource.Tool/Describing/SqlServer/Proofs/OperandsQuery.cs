@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using SqlSource.Tool.Describing.SqlServer.Types;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
@@ -80,7 +81,7 @@ internal static class OperandsQuery
             return null;
         }
 
-        var visible = rows.Where(static row => !row.IsHidden).ToList();
+        var visible = SqlServerColumns.Visible(rows).ToList();
         if (visible.Count != count)
         {
             return null;
@@ -97,7 +98,10 @@ internal static class OperandsQuery
 
         return
         [
-            .. visible.Select(static row => new OperandFacts(row.IsNullable == false, !SqlServerTypes.MayBeClr(row))),
+            .. visible.Select(static row => new OperandFacts(
+                !SqlServerColumns.NullableAsRecorded(row),
+                !SqlServerTypes.MayBeClr(row)
+            )),
         ];
     }
 

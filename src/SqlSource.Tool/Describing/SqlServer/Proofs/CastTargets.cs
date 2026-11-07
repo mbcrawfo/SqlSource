@@ -69,24 +69,17 @@ internal static class CastTargets
             return true;
         }
 
-        if (
-            at + 1 >= range.End
-            || !tokens[at].IsSymbol("(")
-            || !(tokens[at + 1].Is("MAX") || IsInteger(tokens[at + 1]))
-        )
+        if (at + 1 >= range.End || !tokens[at].IsSymbol("(") || !(tokens[at + 1].Is("MAX") || tokens[at + 1].IsInteger))
         {
             return false;
         }
 
         at += 2;
-        if (at + 1 < range.End && tokens[at].IsSymbol(",") && IsInteger(tokens[at + 1]))
+        if (at + 1 < range.End && tokens[at].IsSymbol(",") && tokens[at + 1].IsInteger)
         {
             at += 2;
         }
 
         return at + 1 == range.End && tokens[at].IsSymbol(")");
     }
-
-    private static bool IsInteger(TsqlToken token) =>
-        token.Kind == TsqlTokenKind.Number && token.Text.AsSpan().IndexOfAnyExceptInRange('0', '9') < 0;
 }
