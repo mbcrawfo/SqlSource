@@ -20,9 +20,6 @@ namespace SqlSource.DatabaseTests.Postgres.Renaming;
 [Collection(UsesPostgres.Name)]
 public sealed class VocabularyTests(PostgresDatabases databases)
 {
-    // The oldest supported image, which CI runs and whose words the list holds beside the default's.
-    private const string FloorImage = "postgres:14.24";
-
     private const string RecordCommand =
         "SQLSOURCE_TESTS_POSTGRES_IMAGE=<image> dotnet test --project tests/DatabaseTests/Postgres -- --filter-class"
         + " \"SqlSource.DatabaseTests.Postgres.Renaming.VocabularyTests\" --explicit only";
@@ -62,7 +59,9 @@ public sealed class VocabularyTests(PostgresDatabases databases)
         "PostgreSQL's words, which the renaming of a bundle keeps verbatim: pg_get_keywords()' words, pg_catalog's",
         "functions, operators and types, information_schema's types and the system columns of pg_class, each folded,",
         "one a line, sorted by ordinal.  Made by the explicit test of",
-        "tests/DatabaseTests/Postgres/Renaming/VocabularyTests.cs on postgres:14.24 and on the default image,",
+        "tests/DatabaseTests/Postgres/Renaming/VocabularyTests.cs on "
+            + DefaultImages.PostgresFloor
+            + " and on the default image,",
         "merged as a union, never by hand; see \"The renaming's vocabulary\" in",
         "tests/DatabaseTests/Postgres/README.md.",
     ];
@@ -120,8 +119,8 @@ public sealed class VocabularyTests(PostgresDatabases databases)
     // The list holds the words of these two images alone, so the check means nothing on another.
     private static void SkipUnlessListed() =>
         Assert.SkipUnless(
-            EngineImage.Postgres.Image is FloorImage or DefaultImages.Postgres,
-            $"The vocabulary is made from {FloorImage} and {DefaultImages.Postgres} alone."
+            EngineImage.Postgres.Image is DefaultImages.PostgresFloor or DefaultImages.Postgres,
+            $"The vocabulary is made from {DefaultImages.PostgresFloor} and {DefaultImages.Postgres} alone."
         );
 
     [SuppressMessage(
