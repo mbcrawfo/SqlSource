@@ -335,6 +335,8 @@ public sealed class MethodWriterTests
     [InlineData("item")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("raisedLater")]
+    [InlineData("hasRow")]
     [InlineData("list0")]
     [InlineData("count0")]
     [InlineData("size0")]
@@ -435,6 +437,8 @@ public sealed class MethodWriterTests
     [InlineData("yield")]
     [InlineData("atRow")]
     [InlineData("exception")]
+    [InlineData("raisedLater")]
+    [InlineData("hasRow")]
     [InlineData("list0")]
     [InlineData("count0")]
     [InlineData("size0")]
@@ -489,6 +493,12 @@ public sealed class MethodWriterTests
                     ? "catch (global::System.Exception exception1) when (transaction is not null && exception1 is not"
                     : "catch (global::System.Exception exception) when (transaction is not null && exception is not"
             );
+        // The flag of a later error takes the name raisedLater unless a token has it, and then raisedLater1.
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(name == "raisedLater" ? "var raisedLater1 = false;" : "var raisedLater = false;");
+        // The local of a read takes the name hasRow unless a token has it, and then hasRow1.
+        sqlServer.Sources[MethodRuns.MethodsFile].ShouldContain(name == "hasRow" ? "bool hasRow1;" : "bool hasRow;");
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);

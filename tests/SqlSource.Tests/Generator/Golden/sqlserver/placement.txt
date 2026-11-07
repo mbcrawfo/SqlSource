@@ -197,7 +197,7 @@ namespace App
         /// <returns>The row.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.GetInternalPlacementDto> GetInternalPlacement(
             global::System.Data.Common.DbConnection connection,
             global::App.GetInternalPlacementParams parameters,
@@ -259,6 +259,31 @@ namespace App
 
                     return row;
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("GetInternalPlacement", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -294,7 +319,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamInternalPlacementDto> StreamInternalPlacement(
             global::System.Data.Common.DbConnection connection,
             global::App.StreamInternalPlacementParams parameters,
@@ -350,8 +375,44 @@ namespace App
                     var atRow = false;
                     try
                     {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        while (true)
                         {
+                            bool hasRow;
+                            try
+                            {
+                                hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamInternalPlacement", exception);
+                                }
+
+                                throw;
+                            }
+
+                            if (!hasRow)
+                            {
+                                break;
+                            }
+
                             global::App.StreamInternalPlacementDto row;
                             try
                             {
@@ -373,16 +434,72 @@ namespace App
                             atRow = false;
                         }
 
-                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        try
                         {
+                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamInternalPlacement", exception);
+                            }
+
+                            throw;
                         }
                     }
                     finally
                     {
                         if (atRow)
                         {
-                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            try
                             {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamInternalPlacement", exception);
+                                }
+
+                                throw;
                             }
                         }
                     }
@@ -439,7 +556,7 @@ namespace App
         /// <returns>The row.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.GetInternalSampleDto> GetInternalSample(
             this global::System.Data.Common.DbConnection connection,
             global::App.GetInternalSampleParams parameters,
@@ -501,6 +618,31 @@ namespace App
 
                     return row;
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("GetInternalSample", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -536,7 +678,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamInternalSampleDto> StreamInternalSample(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamInternalSampleParams parameters,
@@ -592,8 +734,44 @@ namespace App
                     var atRow = false;
                     try
                     {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        while (true)
                         {
+                            bool hasRow;
+                            try
+                            {
+                                hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamInternalSample", exception);
+                                }
+
+                                throw;
+                            }
+
+                            if (!hasRow)
+                            {
+                                break;
+                            }
+
                             global::App.StreamInternalSampleDto row;
                             try
                             {
@@ -615,16 +793,72 @@ namespace App
                             atRow = false;
                         }
 
-                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        try
                         {
+                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamInternalSample", exception);
+                            }
+
+                            throw;
                         }
                     }
                     finally
                     {
                         if (atRow)
                         {
-                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            try
                             {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamInternalSample", exception);
+                                }
+
+                                throw;
                             }
                         }
                     }
@@ -682,7 +916,7 @@ namespace App
             /// <returns>The row.</returns>
             /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
             /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-            /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+            /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
             public static async global::System.Threading.Tasks.Task<global::App.GetInnerDto> GetInner(
                 global::System.Data.Common.DbConnection connection,
                 global::App.GetInnerParams parameters,
@@ -744,6 +978,31 @@ namespace App
 
                         return row;
                     }
+                    catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                    {
+                        var raisedLater = false;
+                        try
+                        {
+                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException)
+                        {
+                            raisedLater = true;
+                        }
+                        catch (global::System.Exception)
+                        {
+                        }
+
+                        await reader.DisposeAsync().ConfigureAwait(false);
+                        if (raisedLater && transaction.Connection is null)
+                        {
+                            throw new global::SqlSource.TransactionRolledBackException("GetInner", exception);
+                        }
+
+                        throw;
+                    }
                     catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                     {
                         await reader.DisposeAsync().ConfigureAwait(false);
@@ -779,7 +1038,7 @@ namespace App
             /// <param name="cancellationToken">Cancels the query.</param>
             /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
             /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-            /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+            /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
             public static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamInnerDto> StreamInner(
                 global::System.Data.Common.DbConnection connection,
                 global::App.StreamInnerParams parameters,
@@ -835,8 +1094,44 @@ namespace App
                         var atRow = false;
                         try
                         {
-                            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                            while (true)
                             {
+                                bool hasRow;
+                                try
+                                {
+                                    hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                                }
+                                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                                {
+                                    var raisedLater = false;
+                                    try
+                                    {
+                                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                        {
+                                        }
+                                    }
+                                    catch (global::System.Data.Common.DbException)
+                                    {
+                                        raisedLater = true;
+                                    }
+                                    catch (global::System.Exception)
+                                    {
+                                    }
+
+                                    await reader.DisposeAsync().ConfigureAwait(false);
+                                    if (raisedLater && transaction.Connection is null)
+                                    {
+                                        throw new global::SqlSource.TransactionRolledBackException("StreamInner", exception);
+                                    }
+
+                                    throw;
+                                }
+
+                                if (!hasRow)
+                                {
+                                    break;
+                                }
+
                                 global::App.StreamInnerDto row;
                                 try
                                 {
@@ -858,16 +1153,72 @@ namespace App
                                 atRow = false;
                             }
 
-                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            try
                             {
+                                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamInner", exception);
+                                }
+
+                                throw;
                             }
                         }
                         finally
                         {
                             if (atRow)
                             {
-                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                try
                                 {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                                {
+                                    var raisedLater = false;
+                                    try
+                                    {
+                                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                        {
+                                        }
+                                    }
+                                    catch (global::System.Data.Common.DbException)
+                                    {
+                                        raisedLater = true;
+                                    }
+                                    catch (global::System.Exception)
+                                    {
+                                    }
+
+                                    await reader.DisposeAsync().ConfigureAwait(false);
+                                    if (raisedLater && transaction.Connection is null)
+                                    {
+                                        throw new global::SqlSource.TransactionRolledBackException("StreamInner", exception);
+                                    }
+
+                                    throw;
                                 }
                             }
                         }
@@ -927,7 +1278,7 @@ namespace App
         /// <returns>The row.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         private static async global::System.Threading.Tasks.Task<global::App.GetPrivatePlacementDto> GetPrivatePlacement(
             global::System.Data.Common.DbConnection connection,
             global::App.GetPrivatePlacementParams parameters,
@@ -989,6 +1340,31 @@ namespace App
 
                     return row;
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("GetPrivatePlacement", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -1024,7 +1400,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         private static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamPrivatePlacementDto> StreamPrivatePlacement(
             global::System.Data.Common.DbConnection connection,
             global::App.StreamPrivatePlacementParams parameters,
@@ -1080,8 +1456,44 @@ namespace App
                     var atRow = false;
                     try
                     {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        while (true)
                         {
+                            bool hasRow;
+                            try
+                            {
+                                hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamPrivatePlacement", exception);
+                                }
+
+                                throw;
+                            }
+
+                            if (!hasRow)
+                            {
+                                break;
+                            }
+
                             global::App.StreamPrivatePlacementDto row;
                             try
                             {
@@ -1103,16 +1515,72 @@ namespace App
                             atRow = false;
                         }
 
-                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        try
                         {
+                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamPrivatePlacement", exception);
+                            }
+
+                            throw;
                         }
                     }
                     finally
                     {
                         if (atRow)
                         {
-                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            try
                             {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamPrivatePlacement", exception);
+                                }
+
+                                throw;
                             }
                         }
                     }
@@ -1168,7 +1636,7 @@ namespace App
         /// <returns>The row.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         public static async global::System.Threading.Tasks.Task<global::App.GetPublicSampleDto> GetPublicSample(
             global::System.Data.Common.DbConnection connection,
             global::App.GetPublicSampleParams parameters,
@@ -1230,6 +1698,31 @@ namespace App
 
                     return row;
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("GetPublicSample", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -1265,7 +1758,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         public static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamPublicSampleDto> StreamPublicSample(
             global::System.Data.Common.DbConnection connection,
             global::App.StreamPublicSampleParams parameters,
@@ -1321,8 +1814,44 @@ namespace App
                     var atRow = false;
                     try
                     {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        while (true)
                         {
+                            bool hasRow;
+                            try
+                            {
+                                hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamPublicSample", exception);
+                                }
+
+                                throw;
+                            }
+
+                            if (!hasRow)
+                            {
+                                break;
+                            }
+
                             global::App.StreamPublicSampleDto row;
                             try
                             {
@@ -1344,16 +1873,72 @@ namespace App
                             atRow = false;
                         }
 
-                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        try
                         {
+                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamPublicSample", exception);
+                            }
+
+                            throw;
                         }
                     }
                     finally
                     {
                         if (atRow)
                         {
-                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            try
                             {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamPublicSample", exception);
+                                }
+
+                                throw;
                             }
                         }
                     }
@@ -1410,7 +1995,7 @@ namespace App
         /// <returns>The row.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.GetSampleDto> GetSample(
             this global::System.Data.Common.DbConnection connection,
             global::App.GetSampleParams parameters,
@@ -1472,6 +2057,31 @@ namespace App
 
                     return row;
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("GetSample", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -1507,7 +2117,7 @@ namespace App
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamSampleDto> StreamSample(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamSampleParams parameters,
@@ -1563,8 +2173,44 @@ namespace App
                     var atRow = false;
                     try
                     {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        while (true)
                         {
+                            bool hasRow;
+                            try
+                            {
+                                hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamSample", exception);
+                                }
+
+                                throw;
+                            }
+
+                            if (!hasRow)
+                            {
+                                break;
+                            }
+
                             global::App.StreamSampleDto row;
                             try
                             {
@@ -1586,16 +2232,72 @@ namespace App
                             atRow = false;
                         }
 
-                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        try
                         {
+                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamSample", exception);
+                            }
+
+                            throw;
                         }
                     }
                     finally
                     {
                         if (atRow)
                         {
-                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            try
                             {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamSample", exception);
+                                }
+
+                                throw;
                             }
                         }
                     }
@@ -1833,7 +2535,7 @@ internal static partial class GlobalSampleExtensions
     /// <returns>The row.</returns>
     /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned no rows, or more than one.</exception>
     /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-    /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+    /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
     internal static async global::System.Threading.Tasks.Task<global::GetGlobalSampleDto> GetGlobalSample(
         this global::System.Data.Common.DbConnection connection,
         global::GetGlobalSampleParams parameters,
@@ -1895,6 +2597,31 @@ internal static partial class GlobalSampleExtensions
 
                 return row;
             }
+            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+            {
+                var raisedLater = false;
+                try
+                {
+                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                    {
+                    }
+                }
+                catch (global::System.Data.Common.DbException)
+                {
+                    raisedLater = true;
+                }
+                catch (global::System.Exception)
+                {
+                }
+
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (raisedLater && transaction.Connection is null)
+                {
+                    throw new global::SqlSource.TransactionRolledBackException("GetGlobalSample", exception);
+                }
+
+                throw;
+            }
             catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
             {
                 await reader.DisposeAsync().ConfigureAwait(false);
@@ -1930,7 +2657,7 @@ internal static partial class GlobalSampleExtensions
     /// <param name="cancellationToken">Cancels the query.</param>
     /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
     /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-    /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+    /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
     internal static global::System.Collections.Generic.IAsyncEnumerable<global::StreamGlobalSampleDto> StreamGlobalSample(
         this global::System.Data.Common.DbConnection connection,
         global::StreamGlobalSampleParams parameters,
@@ -1986,8 +2713,44 @@ internal static partial class GlobalSampleExtensions
                 var atRow = false;
                 try
                 {
-                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    while (true)
                     {
+                        bool hasRow;
+                        try
+                        {
+                            hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamGlobalSample", exception);
+                            }
+
+                            throw;
+                        }
+
+                        if (!hasRow)
+                        {
+                            break;
+                        }
+
                         global::StreamGlobalSampleDto row;
                         try
                         {
@@ -2009,16 +2772,72 @@ internal static partial class GlobalSampleExtensions
                         atRow = false;
                     }
 
-                    while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                    try
                     {
+                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                    {
+                        var raisedLater = false;
+                        try
+                        {
+                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException)
+                        {
+                            raisedLater = true;
+                        }
+                        catch (global::System.Exception)
+                        {
+                        }
+
+                        await reader.DisposeAsync().ConfigureAwait(false);
+                        if (raisedLater && transaction.Connection is null)
+                        {
+                            throw new global::SqlSource.TransactionRolledBackException("StreamGlobalSample", exception);
+                        }
+
+                        throw;
                     }
                 }
                 finally
                 {
                     if (atRow)
                     {
-                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        try
                         {
+                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamGlobalSample", exception);
+                            }
+
+                            throw;
                         }
                     }
                 }
