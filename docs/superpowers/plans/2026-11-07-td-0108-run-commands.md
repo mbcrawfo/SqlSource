@@ -17,7 +17,7 @@
 - An AGENTS.md or `docs/architecture/` page that names a moved member is updated in the same commit (`docs/architecture/tool.md`, `docs/architecture/bundles.md`, `src/SqlSource.Tool/AGENTS.md`, `src/SqlSource.Tool/Planning/AGENTS.md`, `src/SqlSource.Tool/Bundles/AGENTS.md`).
 - Test changes are only what a changed signature forces; no test is renamed or rewritten otherwise (unit 109-tool refactors the tests after this one).
 - TD-0108 is shared by nine units.  Strike only items 5, 6, 16, 19, 20, in place, in both lists: the Problem item becomes `N. ~~<the item's text>~~  Fixed: <what is true now>.` and the Proposed fix item `N. ~~<the fix's text>~~  Done.` (add a short clause after `Done` only where the fix differs from the proposal).  Nothing is renumbered.  Do not touch the row in `docs/tech-debt/README.md` (other items stay open).
-- TD-0037 (`Logging/` and the run's steps refer to each other) must not get worse: nothing in `Logging/` may reference `RunContext`, `PlanSteps`, `SharedOptions` or `ToolCommand`.
+- TD-0037 (`Logging/` and the run's steps refer to each other) must not get worse: nothing in `Logging/` may reference `RunContext`, `PlanSteps` or `ToolCommand`.  (`Logging/LoggedArguments.cs` names `SharedOptions`' option constants, as it named `DescribeCommand`'s before: no new dependency.)
 - Before each commit: `./format.sh`, then `./pre-commit-validation.sh` must pass.  Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Tests to run while working: `dotnet test --project tests/SqlSource.Tool.Tests` (and `tests/SqlSource.Tests` for task 1).
 
