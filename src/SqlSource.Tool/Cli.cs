@@ -23,7 +23,7 @@ namespace SqlSource.Tool;
 public static class Cli
 {
     /// <summary>
-    /// What starts every line the tool writes of its own, which the build's <c>SqlSourceRunOnline</c> reads.
+    /// The prefix of the tool's own status lines, which the build's <c>SqlSourceRunOnline</c> reads.
     /// </summary>
     internal const string LinePrefix = "sqlsource: ";
 
