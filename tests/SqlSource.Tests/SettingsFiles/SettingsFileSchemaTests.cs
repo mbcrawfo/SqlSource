@@ -9,6 +9,7 @@ using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
 using SqlSource.SettingsFiles;
+using SqlSource.Tests.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.SettingsFiles;
@@ -17,8 +18,6 @@ namespace SqlSource.Tests.SettingsFiles;
 // keeps its keys, types and choices in step with the reader's.
 public sealed class SettingsFileSchemaTests
 {
-    private static readonly SettingPlace Place = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
     private static readonly string SchemaText = File.ReadAllText(
         Path.Combine(AppContext.BaseDirectory, "schemas", "settings-v1.schema.json")
     );
@@ -333,7 +332,7 @@ public sealed class SettingsFileSchemaTests
     }
 
     [Fact]
-    public void Schema_DesignsExample_IsValid() => Errors(SettingsFileReaderTests.DesignsExample).ShouldBeEmpty();
+    public void Schema_DesignsExample_IsValid() => Errors(SettingsFileExamples.Design).ShouldBeEmpty();
 
     // The reader trims a value, ignores case and, in a choice, hyphens, spaces and tabs anywhere; a blank value sets
     // nothing and is no error.  The schema's patterns must accept each such spelling.
@@ -403,7 +402,7 @@ public sealed class SettingsFileSchemaTests
         var text = $$"""{"{{key}}": {{value}}}""";
 
         Errors(text).ShouldBeEmpty();
-        SettingsFileReader.Read(text, Place).Errors.ShouldBeEmpty();
+        SettingsFileReader.Read(text, TestPlaces.SettingsFile).Errors.ShouldBeEmpty();
     }
 
     [Theory]
@@ -521,7 +520,7 @@ public sealed class SettingsFileSchemaTests
     public void Schema_FileTheReaderRejects_IsNotValid(string text)
     {
         Errors(text).ShouldNotBeEmpty();
-        SettingsFileReader.Read(text, Place).Errors.ShouldNotBeEmpty();
+        SettingsFileReader.Read(text, TestPlaces.SettingsFile).Errors.ShouldNotBeEmpty();
     }
 
     private static JsonElement ReadProperties()

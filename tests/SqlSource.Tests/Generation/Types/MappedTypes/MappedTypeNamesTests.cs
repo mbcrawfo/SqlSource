@@ -10,13 +10,13 @@ using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 
 namespace SqlSource.Tests.Generation.Types.MappedTypes;
 
 public sealed class MappedTypeNamesTests
 {
     // The places of a farther and of a nearer settings file.
-    private static readonly SettingPlace Farther = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
 
     private static readonly SettingPlace Nearer = SettingPlace.OfSettingsFile("/app/Repo/sqlsource.json", 2);
 
@@ -36,7 +36,7 @@ public sealed class MappedTypeNamesTests
         var files = TestSidecars.Of(
             new FileLevel(
                 "app/Other.sql",
-                Level(new TypeOverride("int4", "long", Farther), new TypeOverride("uuid", null, Farther))
+                Level(new TypeOverride("int4", "long", SettingsFile), new TypeOverride("uuid", null, SettingsFile))
             ),
             new FileLevel(
                 GeneratorHarness.UsersNormalizedPath,
@@ -67,11 +67,11 @@ public sealed class MappedTypeNamesTests
                 {
                     TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
                         DatabaseEngine.PostgreSql,
-                        TestSidecars.Of(new TypeOverride("int4", "long", Farther))
+                        TestSidecars.Of(new TypeOverride("int4", "long", SettingsFile))
                     ),
                     ColumnTypes = TestSidecars.Of(
-                        new ColumnType("posts.id", null, Farther),
-                        new ColumnType("users.id", "UserId", Farther)
+                        new ColumnType("posts.id", null, SettingsFile),
+                        new ColumnType("users.id", "UserId", SettingsFile)
                     ),
                 }
             ),
@@ -98,7 +98,7 @@ public sealed class MappedTypeNamesTests
         {
             TypeOverrides = PerEngine.Only<EquatableArray<TypeOverride>?>(
                 DatabaseEngine.PostgreSql,
-                TestSidecars.Of(new TypeOverride("int4", "long", Farther))
+                TestSidecars.Of(new TypeOverride("int4", "long", SettingsFile))
             ),
         };
         var files = TestSidecars.Of(

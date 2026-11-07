@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.SettingsFiles;
+using SqlSource.Tests.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.SettingsFiles;
@@ -12,16 +13,14 @@ namespace SqlSource.Tests.SettingsFiles;
 // exception in the generator costs every type its generated code.
 public sealed class SettingsFileReaderRobustnessTests
 {
-    private static readonly SettingPlace Place = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
     [Fact]
     public void Read_DesignsExampleCutShortAnywhere_ReturnsWithAnError()
     {
-        var text = SettingsFileReaderTests.DesignsExample.Trim();
+        var text = SettingsFileExamples.Design.Trim();
 
         for (var length = 0; length < text.Length; length++)
         {
-            var file = SettingsFileReader.Read(text[..length], Place);
+            var file = SettingsFileReader.Read(text[..length], TestPlaces.SettingsFile);
 
             file.Root.ShouldBeNull($"at length {length}");
             file.Errors.Select(static error => error.Kind)
@@ -33,13 +32,16 @@ public sealed class SettingsFileReaderRobustnessTests
     public void Read_DesignsExampleWithACharacterReplacedAnywhere_Returns()
     {
         const string Replacements = "{}[]\",:/*\\1a\0";
-        var text = SettingsFileReaderTests.DesignsExample;
+        var text = SettingsFileExamples.Design;
 
         for (var offset = 0; offset < text.Length; offset++)
         {
             foreach (var replacement in Replacements)
             {
-                var file = SettingsFileReader.Read(text[..offset] + replacement + text[(offset + 1)..], Place);
+                var file = SettingsFileReader.Read(
+                    text[..offset] + replacement + text[(offset + 1)..],
+                    TestPlaces.SettingsFile
+                );
 
                 var unread = file.Errors.Any(static error =>
                     error.Kind is SettingsFileErrorKind.InvalidJson or SettingsFileErrorKind.NotAnObject
@@ -54,7 +56,7 @@ public sealed class SettingsFileReaderRobustnessTests
     {
         var text = "{\"x\": " + new string('[', 10_000) + "}";
 
-        var file = SettingsFileReader.Read(text, Place);
+        var file = SettingsFileReader.Read(text, TestPlaces.SettingsFile);
 
         file.Root.ShouldBeNull();
         file.Errors.ShouldHaveSingleItem().Kind.ShouldBe(SettingsFileErrorKind.InvalidJson);
@@ -71,8 +73,8 @@ public sealed class SettingsFileReaderRobustnessTests
             + Nested(62)
             + ", \"sort-input\"], \"output\": \"models\"}";
 
-        var underUnknown = SettingsFileReader.Read(unknown, Place);
-        var asElement = SettingsFileReader.Read(element, Place);
+        var underUnknown = SettingsFileReader.Read(unknown, TestPlaces.SettingsFile);
+        var asElement = SettingsFileReader.Read(element, TestPlaces.SettingsFile);
 
         underUnknown.Root.ShouldBe(false);
         underUnknown.Level.Output.ShouldBe(OutputKind.Models);
