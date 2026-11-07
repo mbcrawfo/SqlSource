@@ -1,9 +1,13 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -154,5 +158,65 @@ public sealed class DiagnoseScrubTests : IDisposable
         (await File.ReadAllTextAsync(_scene.PathOf("Users.sql"), TestContext.Current.CancellationToken)).ShouldBe(
             _scene.Case("select-plain").Query
         );
+    }
+
+    // A raw bundle that another version made, whose capture does not answer what this version asks, is replay's
+    // SQLSRC290 and is not renamed: here SQL Server's parameters request of a reused parameter without its reused
+    // record, as a version before that record wrote it.
+    [Fact]
+    public async Task Diagnose_ScrubOfABundleThatAnotherVersionMade_IsSQLSRC290()
+    {
+        using var run = new CliRun { ReleasedDescribers = true };
+        var folder = run.Folder.CreateFolder("old");
+        foreach (
+            var file in Directory.GetFiles(
+                FixtureCases.Of("mssql").Single(found => found.Name == "update-copies-agree").Folder
+            )
+        )
+        {
+            File.Copy(file, Path.Combine(folder, Path.GetFileName(file)));
+        }
+
+        var info = new BundleInfo(
+            BundleVersion: 1,
+            Renamed: false,
+            ToolVersion: "1.4.0",
+            FormatVersion: SidecarFormat.Version,
+            Engine: "mssql",
+            ServerVersion: "17.0.1000.7",
+            DriverVersion: null,
+            Runtime: ".NET 8.0.11",
+            OperatingSystem: "Linux 6.8",
+            Outcome: BundleOutcome.Entry
+        );
+        await File.WriteAllTextAsync(
+            Path.Combine(folder, BundleFiles.Info),
+            BundleJson.Write(info),
+            TestContext.Current.CancellationToken
+        );
+        var path = Path.Combine(folder, BundleFiles.Capture);
+        var capture = JsonNode
+            .Parse(await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken))
+            .ShouldNotBeNull();
+        var parameters = capture["calls"]
+            .ShouldNotBeNull()
+            .AsArray()
+            .Select(static call => call.ShouldNotBeNull())
+            .Single(static call => call["method"]?.GetValue<string>() == "parameters");
+        parameters["request"].ShouldNotBeNull().AsObject().Remove("reused").ShouldBeTrue();
+        await File.WriteAllTextAsync(path, capture.ToJsonString(), TestContext.Current.CancellationToken);
+
+        var result = await run.RunAsync("diagnose", "--scrub", "old", "--out", "report.zip");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"{folder} : error SQLSRC290: The bundle has no answer to 'parameters' that the query asks: it was "
+                    + $"made by sqlsource 1.4.0, and this is sqlsource {Cli.Version}\n"
+                    + Expected.See("SQLSRC290")
+            )
+        );
+        File.Exists(run.Folder.PathOf("report.zip")).ShouldBeFalse();
     }
 }

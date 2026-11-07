@@ -205,6 +205,23 @@ internal static class DiagnoseRun
             return;
         }
 
+        // A bundle that another version made may ask what this version does not: replay's error, and no renaming,
+        // whose proof would miss the same call and blame the renaming.
+        var replayed = await BundleReplay.RunAsync(
+            planned.Value.Query,
+            dialect,
+            capture.Value,
+            describer.Value,
+            NullRunLog.Instance,
+            host.Time,
+            cancellationToken
+        );
+        if (replayed is ReplayOutcome.Missed missed)
+        {
+            Report(BundleErrors.CallMissing(path, missed.Method, BundleErrors.MadeBy(bundle.Info.ToolVersion)));
+            return;
+        }
+
         await RenameAndWriteAsync(bundle, describer.Value, dialect, outPath, host, reporter, cancellationToken);
     }
 

@@ -110,7 +110,7 @@ flowchart LR
 
 ### The run of `--scrub`
 
-`--out` is refused as above.  Then the bundle is read and checked by the steps `replay` takes, `BundleReader.Read`, `BundleReplay.CaptureOf`, `EngineOf` and `Plan`, `BundleDescribers.For` and `ExpectedOf`, each error at the bundle and named as `replay` names it (`ReplayCommand.AsNamed`).  A bundle whose `bundle.json` says it is renamed, or that has none, is `SQLSRC295` (`BundleErrors.NotRaw`), since only a bundle that `diagnose` wrote raw says what made it.  The rest is step 7 above.  No database, project or MSBuild is asked: `DiagnoseScrubTests` checks that the process runner gets no new request, under an exchange that throws if it is asked.
+`--out` is refused as above.  Then the bundle is read and checked by the steps `replay` takes, `BundleReader.Read`, `BundleReplay.CaptureOf`, `EngineOf` and `Plan`, `BundleDescribers.For` and `ExpectedOf`, each error at the bundle and named as `replay` names it (`ReplayCommand.AsNamed`).  A bundle whose `bundle.json` says it is renamed, or that has none, is `SQLSRC295` (`BundleErrors.NotRaw`), since only a bundle that `diagnose` wrote raw says what made it.  Then the raw bundle is replayed through `BundleReplay.RunAsync`, and a question its capture does not answer is `replay`'s `SQLSRC290` (`BundleErrors.CallMissing`), naming the version that made it, before any renaming: the renaming's proof would miss the same call and report it as `SQLSRC293`, a fault of the renaming.  A bundle that this version made never misses.  The rest is step 7 above.  No database, project or MSBuild is asked: `DiagnoseScrubTests` checks that the process runner gets no new request, under an exchange that throws if it is asked.
 
 ### Writing and printing
 
