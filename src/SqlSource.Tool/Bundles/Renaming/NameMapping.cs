@@ -17,10 +17,12 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// case: the first has the lower-case replacement, and the k-th has the letters of it, the prefix's and each hex
 /// letter <c>a</c> to <c>f</c>, left to right, upper-cased where bit i of k is set.  When the letters cannot tell
 /// another spelling apart, it gets a replacement of its own, made from the class word, the folded spelling and the
-/// spelling, which differs from the rest ignoring case too.  A spelling that is kept maps to the spelling first kept
-/// with its <c>spelled</c>, wins over a later <see cref="Name" /> and carries no class; one that already has a
-/// replacement keeps it.  Only a spelling kept from a row of the engine's is kept for the token check, which trusts no
-/// other.  The renaming starts at eight digits; a test gives a shorter <c>firstLength</c> to force a collision.
+/// spelling, which differs from the rest ignoring case too, and <see cref="FellBack" /> is true: such a replacement
+/// may change an answer where the pipeline ignores case, so a refused renaming whose mapping fell back is tried again
+/// with another key.  A spelling that is kept maps to the spelling first kept with its <c>spelled</c>, wins over a
+/// later <see cref="Name" /> and carries no class; one that already has a replacement keeps it.  Only a spelling kept
+/// from a row of the engine's is kept for the token check, which trusts no other.  The renaming starts at eight
+/// digits; a test gives a shorter <c>firstLength</c> to force a collision.
 /// </remarks>
 internal sealed class NameMapping(
     RenamingKey key,
@@ -53,6 +55,12 @@ internal sealed class NameMapping(
 
     /// <summary>The names made, in the order they were made; a kept name is left out.</summary>
     public IReadOnlyList<MappedName> Names => _names;
+
+    /// <summary>
+    /// Whether a spelling got a replacement of its own because the letters of its name's first replacement could not
+    /// tell it apart by case.
+    /// </summary>
+    public bool FellBack { get; private set; }
 
     /// <summary>The replacement of a spelling, made in the class given if it has none yet.</summary>
     public string Name(string spelling, bool quoted, NameClass cls)
@@ -185,6 +193,7 @@ internal sealed class NameMapping(
         var variant = found.Replacements.Count;
         if (variant >= 1L << letters.Count)
         {
+            FellBack = true;
             return Make(found.First.Class, folded + ":" + exact);
         }
 

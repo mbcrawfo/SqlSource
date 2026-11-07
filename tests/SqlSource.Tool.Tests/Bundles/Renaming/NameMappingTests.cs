@@ -217,6 +217,32 @@ public sealed class NameMappingTests
     }
 
     [Fact]
+    public void FellBack_SpellingsTheCaseTellsApart_IsFalse()
+    {
+        var mapping = CaseKeeping();
+
+        _ = mapping.Name("email", false, NameClass.Column);
+        _ = mapping.Name("EMAIL", false, NameClass.Column);
+        _ = mapping.Name("users", false, NameClass.Table);
+
+        mapping.FellBack.ShouldBeFalse();
+    }
+
+    // firstLength 1, as above: the fifth spelling of one name at the latest has a replacement of its own.
+    [Fact]
+    public void FellBack_MoreSpellingsThanTheCaseCanTellApart_IsTrue()
+    {
+        var mapping = CaseKeeping(firstLength: 1);
+
+        foreach (var spelling in (string[])["abc", "abC", "aBc", "aBC", "Abc"])
+        {
+            _ = mapping.Name(spelling, false, NameClass.Column);
+        }
+
+        mapping.FellBack.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Keep_SpellingsTheEngineTellsApart_KeepEachAsWritten()
     {
         var mapping = CaseKeeping();

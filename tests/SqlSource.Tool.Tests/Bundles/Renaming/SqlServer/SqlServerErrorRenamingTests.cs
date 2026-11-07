@@ -652,26 +652,26 @@ public sealed partial class SqlServerErrorRenamingTests
         };
     }
 
-    private static async Task<RenamedBundle> RenamedAsync(Bundle raw)
+    private static async Task<RenamedBundle> RenamedAsync(Bundle raw, RenamingKey? key = null)
     {
-        var renamed = await RenameAsync(raw);
+        var renamed = await RenameAsync(raw, key);
         renamed.Failure.ShouldBeNull();
         return renamed.Value.ShouldNotBeNull();
     }
 
-    private static async Task<RenamingRefusal> RefusedAsync(Bundle raw)
+    private static async Task<RenamingRefusal> RefusedAsync(Bundle raw, RenamingKey? key = null)
     {
-        var renamed = await RenameAsync(raw);
+        var renamed = await RenameAsync(raw, key);
         renamed.Value.ShouldBeNull();
         return renamed.Failure.ShouldNotBeNull();
     }
 
-    private static Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(Bundle raw) =>
+    private static Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(Bundle raw, RenamingKey? key = null) =>
         BundleRenamer.RenameAsync(
             raw,
             Part,
             new SqlServerDescriber(),
-            RenamingBundles.Key(1),
+            key ?? RenamingBundles.Key(1),
             TestContext.Current.CancellationToken
         );
 
