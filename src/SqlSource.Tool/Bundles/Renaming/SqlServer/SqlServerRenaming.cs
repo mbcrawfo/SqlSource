@@ -18,9 +18,11 @@ namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
 /// </summary>
 /// <remarks>
 /// A name folds ignoring case whatever the database's collation, and each spelling keeps a case of its own through
-/// <see cref="Spelled" />, so the pipeline's comparisons by ordinal and ignoring case both keep their answers.  SQL
-/// Server has no plan and the describer asks no list in name order, so it registers and derives nothing: the tool's
-/// <c>AS [1]</c> is kept as its word, and a copy of a reused parameter comes through <see cref="CopiesIn" />.
+/// <see cref="Spelled" />, so the pipeline's comparisons by ordinal and ignoring case both keep their answers, unless
+/// the first replacement's letters cannot tell the spellings apart (<see cref="NameMapping.FellBack" />), when a
+/// changed answer is refused and the renaming tried again with a new key.  SQL Server has no plan and the describer
+/// asks no list in name order, so it registers and derives nothing: the tool's <c>AS [1]</c> is kept as its word, and
+/// a copy of a reused parameter comes through <see cref="CopiesIn" />.
 /// </remarks>
 internal sealed class SqlServerRenaming : IEngineRenaming
 {
