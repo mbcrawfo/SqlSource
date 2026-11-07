@@ -37,10 +37,7 @@ internal static partial class PlanExpression
                     return false;
                 }
 
-                var outside = EnterGroup(from, to);
-                var form = Form(from + 1, to - 1) ?? (Proved(from, to) is null ? null : false);
-                _groupsHaveRows = outside;
-                return form;
+                return InGroup(from, to, () => Form(from + 1, to - 1) ?? (Proved(from, to) is null ? null : false));
             }
 
             if (Constant(from, to) is { } constant)
@@ -84,7 +81,7 @@ internal static partial class PlanExpression
 
         // Whether an argument, between the commas of depth zero of [from, to), cannot be NULL.
         private bool AnyArgumentIsNotNull(int from, int to) =>
-            ArgumentSpans(from, to).Any(argument => IsNotNull(argument.From, argument.To));
+            ArgumentSpans(from, to, emptyHasOne: true).Any(argument => IsNotNull(argument.From, argument.To));
 
         // The types of the plain references among the arguments of [from, to) that the walk proves on a side of the
         // full join that computes the entry, when one is on each side; or null.  A row of a full join has a row of one
@@ -100,7 +97,7 @@ internal static partial class PlanExpression
             var types = new List<long>();
             var outer = false;
             var inner = false;
-            foreach (var (start, end) in ArgumentSpans(from, to))
+            foreach (var (start, end) in ArgumentSpans(from, to, emptyHasOne: true))
             {
                 if (
                     end > start
@@ -117,10 +114,16 @@ internal static partial class PlanExpression
             return outer && inner ? types : null;
         }
 
-        // The arguments of [from, to), each between the commas of depth zero: one empty span for an empty span.
-        private List<(int From, int To)> ArgumentSpans(int from, int to)
+        // The arguments of [from, to), each between the commas of depth zero, an empty last one after a trailing comma
+        // included.  An empty span has one empty argument when emptyHasOne, and none otherwise.
+        private List<(int From, int To)> ArgumentSpans(int from, int to, bool emptyHasOne)
         {
             var arguments = new List<(int From, int To)>();
+            if (to <= from && !emptyHasOne)
+            {
+                return arguments;
+            }
+
             var start = from;
             for (var at = from; at < to; at = Next(at))
             {

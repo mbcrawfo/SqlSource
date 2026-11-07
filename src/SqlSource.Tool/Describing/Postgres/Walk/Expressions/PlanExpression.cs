@@ -191,16 +191,7 @@ internal static partial class PlanExpression
         foreach (var token in tokens)
         {
             var text = entry[token.Start..token.End];
-            string? named = null;
-            if (token.Kind == Kind.Word)
-            {
-                named = text;
-            }
-            else if (token.Kind == Kind.QuotedName)
-            {
-                named = PostgresIdentifiers.Unquote(text);
-            }
-
+            var named = PlanTokens.NameOf(entry, token);
             if (
                 string.Equals(named, column, StringComparison.Ordinal)
                 || (token.Kind == Kind.Other && text.Contains('$', StringComparison.Ordinal))
@@ -299,9 +290,8 @@ internal static partial class PlanExpression
         private bool Vetoed(int from, int to) =>
             (from > 0 || to < _tokens.Count) && _context.GroupPreserved?.Invoke(Inside(from, to)) == false;
 
-        // Marks the aggregates inside the group unread when a child of the node printed it, and returns what to
-        // restore once the group is read.
-        private bool EnterGroup(int from, int to)
+        // Reads the group with its aggregates unread when a child of the node printed it, then restores the state.
+        private T InGroup<T>(int from, int to, Func<T> read)
         {
             var outside = _groupsHaveRows;
             if (outside && _context.GroupFromChild?.Invoke(Inside(from, to)) == true)
@@ -309,7 +299,14 @@ internal static partial class PlanExpression
                 _groupsHaveRows = false;
             }
 
-            return outside;
+            try
+            {
+                return read();
+            }
+            finally
+            {
+                _groupsHaveRows = outside;
+            }
         }
 
         // The text inside the group's parentheses.
