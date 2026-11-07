@@ -99,6 +99,30 @@ FROM dbo.accounts
 ORDER BY id;
 SELECT CAST(300 AS tinyint);
 
+-- name: StreamFailingAtSecondThenFailConversion
+-- summary: Every account with 10 divided by its id less 2, which fails at the second, and then a conversion that
+-- fails.
+-- ListFailingAtSecondThenFailConversion of Methods.sql, streamed: the divide by zero is the database's error, at the
+-- read of the second row or at the drain of a break at the first, and the iterator reads the failed conversion after
+-- it, which with XACT_ABORT off rolls back a transaction: its tests pin that the loop throws the rollback, with the
+-- divide by zero inside it.
+SELECT id, 10 / (id - 2) AS quotient
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
+-- name: StreamThenOverflowThenFailConversion
+-- summary: The accounts, then an overflow, which the loop throws after the rows, and then a conversion that fails.
+-- ListThenOverflowThenFailConversion of Methods.sql, streamed: the overflow is the error that the drain after the loop
+-- throws, and the failed conversion after it rolls back a transaction with XACT_ABORT off: its test pins that the loop
+-- throws the rollback, with the overflow inside it.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST(300 AS tinyint);
+SELECT CAST('x' AS int);
+
 -- name: StreamNumbersThenMark
 -- summary: The numbers from 1 to a count, and then a statement that marks the session once the numbers are read.
 -- This is StreamNumbers with the mark after it, and the two are meant to match.

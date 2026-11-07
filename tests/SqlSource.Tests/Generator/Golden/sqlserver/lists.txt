@@ -353,7 +353,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListIdsDto[]> ListIds(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListIdsParams parameters,
@@ -497,6 +497,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListIds", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -567,7 +592,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListExceptDto[]> ListExcept(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListExceptParams parameters,
@@ -711,6 +736,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListExcept", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -781,7 +831,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListTwoListsDto[]> ListTwoLists(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListTwoListsParams parameters,
@@ -998,6 +1048,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListTwoLists", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -1068,7 +1143,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListUsedTwiceDto[]> ListUsedTwice(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListUsedTwiceParams parameters,
@@ -1232,6 +1307,31 @@ namespace App
                     }
 
                     return rows.ToArray();
+                }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListUsedTwice", exception);
+                    }
+
+                    throw;
                 }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
@@ -1538,7 +1638,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListOptionalDto[]> ListOptional(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListOptionalParams parameters,
@@ -1698,6 +1798,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListOptional", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -1769,7 +1894,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListWithTokenDto[]> ListWithToken(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListWithTokenParams parameters,
@@ -1919,6 +2044,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListWithToken", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -1989,7 +2139,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListBesideItsExpansionNameDto[]> ListBesideItsExpansionName(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListBesideItsExpansionNameParams parameters,
@@ -2141,6 +2291,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListBesideItsExpansionName", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -2211,7 +2386,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListKeepsCommentsDto[]> ListKeepsComments(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListKeepsCommentsParams parameters,
@@ -2355,6 +2530,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListKeepsComments", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -2425,7 +2625,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamIdsDto> StreamIds(
             this global::System.Data.Common.DbConnection connection,
             global::App.StreamIdsParams parameters,
@@ -2567,8 +2767,44 @@ namespace App
                     var atRow = false;
                     try
                     {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        while (true)
                         {
+                            bool hasRow;
+                            try
+                            {
+                                hasRow = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamIds", exception);
+                                }
+
+                                throw;
+                            }
+
+                            if (!hasRow)
+                            {
+                                break;
+                            }
+
                             global::App.StreamIdsDto row;
                             try
                             {
@@ -2590,16 +2826,72 @@ namespace App
                             atRow = false;
                         }
 
-                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        try
                         {
+                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                            }
+                        }
+                        catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                        {
+                            var raisedLater = false;
+                            try
+                            {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException)
+                            {
+                                raisedLater = true;
+                            }
+                            catch (global::System.Exception)
+                            {
+                            }
+
+                            await reader.DisposeAsync().ConfigureAwait(false);
+                            if (raisedLater && transaction.Connection is null)
+                            {
+                                throw new global::SqlSource.TransactionRolledBackException("StreamIds", exception);
+                            }
+
+                            throw;
                         }
                     }
                     finally
                     {
                         if (atRow)
                         {
-                            while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                            try
                             {
+                                while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                {
+                                }
+                            }
+                            catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                            {
+                                var raisedLater = false;
+                                try
+                                {
+                                    while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                                    {
+                                    }
+                                }
+                                catch (global::System.Data.Common.DbException)
+                                {
+                                    raisedLater = true;
+                                }
+                                catch (global::System.Exception)
+                                {
+                                }
+
+                                await reader.DisposeAsync().ConfigureAwait(false);
+                                if (raisedLater && transaction.Connection is null)
+                                {
+                                    throw new global::SqlSource.TransactionRolledBackException("StreamIds", exception);
+                                }
+
+                                throw;
                             }
                         }
                     }
@@ -2664,7 +2956,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListConvertedDto[]> ListConverted(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListConvertedParams parameters,
@@ -2887,6 +3179,31 @@ namespace App
 
                     return rows.ToArray();
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListConverted", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -2958,7 +3275,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListOneShapeDto?> ListOneShape(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListOneShapeParams parameters,
@@ -3111,6 +3428,31 @@ namespace App
 
                     return row;
                 }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListOneShape", exception);
+                    }
+
+                    throw;
+                }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {
                     await reader.DisposeAsync().ConfigureAwait(false);
@@ -3181,7 +3523,7 @@ namespace App
         /// <exception cref="global::System.ArgumentException">The lists of <paramref name="parameters" /> hold more values than SQL Server accepts in one query.</exception>
         /// <exception cref="global::System.InvalidOperationException">A list of <paramref name="parameters" /> changed between the call and the time its values were sent.</exception>
         /// <exception cref="global::System.InvalidOperationException">The transaction has completed: it was committed or rolled back before the query ran.</exception>
-        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, its inner exception, and an error that the rest of the query raised rolled back the transaction.</exception>
+        /// <exception cref="T:SqlSource.TransactionRolledBackException">The query threw an exception of its own, or the database raised an error, its inner exception, and an error that the rest of the query raised then rolled back the transaction.</exception>
         internal static async global::System.Threading.Tasks.Task<global::App.ListAmountsDto[]> ListAmounts(
             this global::System.Data.Common.DbConnection connection,
             global::App.ListAmountsParams parameters,
@@ -3332,6 +3674,31 @@ namespace App
                     }
 
                     return rows.ToArray();
+                }
+                catch (global::System.Data.Common.DbException exception) when (transaction is not null)
+                {
+                    var raisedLater = false;
+                    try
+                    {
+                        while (await reader.NextResultAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false))
+                        {
+                        }
+                    }
+                    catch (global::System.Data.Common.DbException)
+                    {
+                        raisedLater = true;
+                    }
+                    catch (global::System.Exception)
+                    {
+                    }
+
+                    await reader.DisposeAsync().ConfigureAwait(false);
+                    if (raisedLater && transaction.Connection is null)
+                    {
+                        throw new global::SqlSource.TransactionRolledBackException("ListAmounts", exception);
+                    }
+
+                    throw;
                 }
                 catch (global::System.Exception exception) when (transaction is not null && exception is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))
                 {

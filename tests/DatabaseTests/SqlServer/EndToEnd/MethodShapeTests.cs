@@ -16,8 +16,10 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // rowcount read no rows, and a shape that reads them reads the results after them before it returns.  When a shape
 // that reads rows throws an exception of its own, the reader's disposal reads those results and drops their error, and
 // when that error rolled back the caller's transaction the method throws TransactionRolledBackException, with its own
-// exception inside; a database error at a row is thrown as it is, and what that leaves is pinned too.  A transaction
-// that has completed, committed or rolled back by an earlier error, is refused before anything runs.
+// exception inside.  A database error at a row or after the rows, in a transaction, reads the rest of the batch, and
+// when a later error there rolled the transaction back the method throws TransactionRolledBackException, with the
+// database's error inside; otherwise it throws the database's error as it is.  A transaction that has completed,
+// committed or rolled back by an earlier error, is refused before anything runs.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
 {
@@ -26,6 +28,9 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
 
     // The number of SQL Server's error "Divide by zero error encountered.".
     private const int DivideByZero = 8134;
+
+    // The number of SQL Server's error "Arithmetic overflow error for data type tinyint, value = 300.".
+    private const int Overflow = 220;
 
     [Fact]
     public async Task TouchAccount_NoRows_IsRowCountByDefault()
@@ -412,16 +417,34 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
     }
 
     // What is observed, on 2025 and on 2017: the server sends the first row, then raises the divide by zero at the
-    // second, error 8134, which SqlClient's read throws.  That is the database's error, which the method throws as it
-    // is, and the reader's disposal reads the failed conversion after the rows and drops it.  With XACT_ABORT off the
-    // divide by zero alone leaves the transaction open, but the conversion rolls it back, so the caller gets the
-    // divide by zero, the transaction's Connection is null and the commit throws: nothing reports the rollback
-    // (TD-0090).
+    // second, error 8134, which SqlClient's read throws.  With XACT_ABORT off the divide by zero alone leaves the
+    // transaction open, and the method reads the rest of the batch, whose failed conversion raises error 245 and rolls
+    // it back, so the method throws the rollback, with the divide by zero inside it.
     [Fact]
-    public async Task ListFailingAtSecondThenFailConversion_InATransaction_ThrowsTheDivideByZeroAndRollsBack()
+    public async Task ListFailingAtSecondThenFailConversion_InATransaction_ThrowsTheRollbackWithTheDivideByZeroInside()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(() =>
+            session.Connection.ListFailingAtSecondThenFailConversion(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.QueryName.ShouldBe("ListFailingAtSecondThenFailConversion");
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(DivideByZero);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // Under SET XACT_ABORT ON the divide by zero itself rolls the transaction back and ends the batch, so nothing after
+    // it raises an error, and the method throws the divide by zero as it is.
+    [Fact]
+    public async Task ListFailingAtSecondThenFailConversion_InATransactionUnderXactAbort_ThrowsTheDivideByZero()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
 
         var thrown = await Should.ThrowAsync<SqlException>(() =>
             session.Connection.ListFailingAtSecondThenFailConversion(
@@ -431,6 +454,103 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
         );
 
         thrown.Number.ShouldBe(DivideByZero);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // With no transaction there is none to check, and the method throws the divide by zero as it is.
+    [Fact]
+    public async Task ListFailingAtSecondThenFailConversion_NoTransaction_ThrowsTheDivideByZero()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            connection.ListFailingAtSecondThenFailConversion(cancellationToken: TestContext.Current.CancellationToken)
+        );
+
+        thrown.Number.ShouldBe(DivideByZero);
+    }
+
+    // The overflow after the rows raises an error, but with XACT_ABORT off it leaves the transaction open, so the
+    // method throws the divide by zero as it is, and the commit after it commits what the transaction did.
+    [Fact]
+    public async Task ListFailingAtSecondThenOverflow_InATransaction_ThrowsTheDivideByZeroAndCommits()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session.Connection.ListFailingAtSecondThenOverflow(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.Number.ShouldBe(DivideByZero);
+        await session.ShouldCommitAsync(token);
+    }
+
+    // The drain before the return throws the overflow, error 220, a database error after the rows, and the failed
+    // conversion after it rolls back the transaction with XACT_ABORT off: the method throws the rollback, with the
+    // overflow inside it.
+    [Fact]
+    public async Task ListThenOverflowThenFailConversion_InATransaction_ThrowsTheRollbackWithTheOverflowInside()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(() =>
+            session.Connection.ListThenOverflowThenFailConversion(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.QueryName.ShouldBe("ListThenOverflowThenFailConversion");
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(Overflow);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // A method of one throws the divide by zero at its second read, and the failed conversion after it rolls back the
+    // transaction, as for ListFailingAtSecondThenFailConversion: the method throws the rollback, with the divide by
+    // zero inside it.
+    [Fact]
+    public async Task GetFailingAtSecondThenFailConversion_InATransaction_ThrowsTheRollbackWithTheDivideByZeroInside()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(() =>
+            session.Connection.GetFailingAtSecondThenFailConversion(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.QueryName.ShouldBe("GetFailingAtSecondThenFailConversion");
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(DivideByZero);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // What is observed, on 2025 and on 2017: the divide by zero is raised before the first result set, so
+    // ExecuteReaderAsync throws it and no reader is left to read the rest.  The failed conversion after the rows rolls
+    // back the transaction, and with so few rows SqlClient's exception lists the divide by zero alone.  The method has
+    // no way to tell that from a divide by zero that rolled the transaction back itself, so it throws it as it is, and
+    // the caller learns of the rollback only from the transaction's Connection, as the manual's known issue says.
+    [Fact]
+    public async Task ListFailingBeforeTheRowsThenFailConversion_InATransaction_ThrowsTheDivideByZeroAndRollsBack()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session.Connection.ListFailingBeforeTheRowsThenFailConversion(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.Number.ShouldBe(DivideByZero);
+        thrown.Errors.Count.ShouldBe(1);
         await session.ShouldHaveRolledBackAsync(token);
     }
 
