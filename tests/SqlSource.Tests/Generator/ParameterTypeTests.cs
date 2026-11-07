@@ -80,21 +80,36 @@ public sealed class ParameterTypeTests
         run.Sources[ParamsModel].ShouldContain("global::App.UserId Author");
     }
 
-    // The marker is over the type override of the query and of the project's settings file, and leaves the other
-    // parameters to it.
-    [Fact]
-    public void Run_ParamMarker_WinsOverTheTypeOverride()
+    // The levels that give a type override.
+    public static TheoryData<SettingLevel> Levels =>
+        [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
+
+    // The marker is over the type override of the level, whichever of the four it is, and leaves the other
+    // parameters to the override.
+    [Theory]
+    [MemberData(nameof(Levels))]
+    public void Run_ParamMarker_WinsOverTheTypeOverride(SettingLevel level)
     {
-        var file = new SqlFile(
+        var baseFile = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: ListPosts\n-- type-override: int8=long\n-- param: @author -> UserId\n"
+            "-- name: ListPosts\n-- param: @author -> UserId\n"
                 + "SELECT id FROM posts WHERE author_id = @author AND editor_id = @editor;\n"
         );
+        var settings = new LevelSettings().At(
+            level,
+            Setting.TypeOverrides,
+            LevelSettings.IsFile(level)
+                ? /*lang=json,strict*/
+                """{"int8": "decimal"}"""
+                : "int8 = decimal"
+        );
+        var files = settings.Files(baseFile, "ListPosts");
+        var file = files[0];
 
         var run = Run(
             UserIdSource,
             [
-                file,
+                .. files,
                 Sidecars.Of(
                     file,
                     Entry(
@@ -105,14 +120,13 @@ public sealed class ParameterTypeTests
                     )
                 ),
             ],
-            settings: /*lang=json,strict*/
-            """{"typeOverrides": {"int8": "long"}}"""
+            settings: settings.ProjectSettings
         );
 
         run.ShouldBeClean();
         var model = run.Sources[ParamsModel];
         model.ShouldContain("global::App.UserId Author");
-        model.ShouldContain("long Editor");
+        model.ShouldContain("decimal Editor");
     }
 
     [Fact]

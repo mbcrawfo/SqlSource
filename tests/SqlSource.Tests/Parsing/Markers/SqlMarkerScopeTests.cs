@@ -97,8 +97,9 @@ public sealed class SqlMarkerScopeTests
             ]);
     }
 
-    // The member location and the visibility carry the place of their scope; the spans of the markers are
-    // Read_PlacementMarkers_AreTheSpansOfTheFirstMarkerThatSetThem's.  A file with no name marker is one query.
+    // The member location and the visibility carry the place of their scope; the spans of the markers
+    // are Read_PlacementMarkers_AreTheSpansOfTheFirstMarkerThatSetThem's, in each kind of scope.
+    // A file with no name marker is one query.
     // An internal enum cannot be the parameter of a public test method, so a row gives the names.
     [Theory]
     [InlineData("Preamble", "FileHeader")]
@@ -135,13 +136,16 @@ public sealed class SqlMarkerScopeTests
         scope.Level.MemberLocation.ShouldNotBeNull().Value.ShouldBe(expected);
     }
 
-    [Fact]
-    public void Read_PlacementMarkers_AreTheSpansOfTheFirstMarkerThatSetThem()
+    [Theory]
+    [InlineData("Preamble")]
+    [InlineData("Query")]
+    [InlineData("WholeFile")]
+    public void Read_PlacementMarkers_AreTheSpansOfTheFirstMarkerThatSetThem(string kind)
     {
         const string First = "-- member-location: class";
         const string Second = "-- member-location: Class";
         const string Third = "-- visibility: internal";
-        var (scope, errors) = Scope(SqlScopeKind.Query, First, Second, "-- nested-class: A", Third);
+        var (scope, errors) = Scope(Enum.Parse<SqlScopeKind>(kind), First, Second, "-- nested-class: A", Third);
 
         errors.ShouldBeEmpty();
         scope.MemberLocationMarker.ShouldBe(new TextSpan(0, First.Length));
@@ -150,10 +154,13 @@ public sealed class SqlMarkerScopeTests
         );
     }
 
-    [Fact]
-    public void Read_ScopeWithoutPlacementMarkers_HasNoSpan()
+    [Theory]
+    [InlineData("Preamble")]
+    [InlineData("Query")]
+    [InlineData("WholeFile")]
+    public void Read_ScopeWithoutPlacementMarkers_HasNoSpan(string kind)
     {
-        var (scope, _) = Scope(SqlScopeKind.Query, "-- output: sql");
+        var (scope, _) = Scope(Enum.Parse<SqlScopeKind>(kind), "-- output: sql");
 
         scope.MemberLocationMarker.ShouldBeNull();
         scope.VisibilityMarker.ShouldBeNull();

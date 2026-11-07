@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
@@ -16,7 +15,7 @@ internal sealed class TestOptionsProvider(IReadOnlyDictionary<string, string?>? 
 {
     private const string PropertyPrefix = "build_property.";
 
-    private static readonly Options None = new([]);
+    private static readonly TestAnalyzerConfigOptions None = new(new Dictionary<string, string?>());
 
     public override AnalyzerConfigOptions GlobalOptions { get; } = CreateGlobal(properties);
 
@@ -24,7 +23,7 @@ internal sealed class TestOptionsProvider(IReadOnlyDictionary<string, string?>? 
 
     public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => None;
 
-    private static Options CreateGlobal(IReadOnlyDictionary<string, string?>? properties)
+    private static TestAnalyzerConfigOptions CreateGlobal(IReadOnlyDictionary<string, string?>? properties)
     {
         var values = new Dictionary<string, string?>();
         foreach (var pair in properties ?? new Dictionary<string, string?>())
@@ -32,12 +31,6 @@ internal sealed class TestOptionsProvider(IReadOnlyDictionary<string, string?>? 
             values[PropertyPrefix + pair.Key] = pair.Value;
         }
 
-        return new Options(values);
-    }
-
-    private sealed class Options(Dictionary<string, string?> values) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) =>
-            values.TryGetValue(key, out value) && value is not null;
+        return new TestAnalyzerConfigOptions(values);
     }
 }

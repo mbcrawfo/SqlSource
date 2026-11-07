@@ -111,9 +111,7 @@ public sealed class SettingLevelTests
         );
 
         plain.Diagnostics.ShouldBe(plainDiagnostics);
-        run.Diagnostics.ShouldBe(markedDiagnostics);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems().ShouldBe(markedDiagnostics);
 
         // The query has its constant or token method, so the comparison of the two files compares a member.
         plain.Sources[GeneratorHarness.SampleFile].ShouldMatch(@"public (const string Q = |static string Q\()");

@@ -234,9 +234,7 @@ public sealed class MethodTests
 
         var run = MethodRuns.Run(MethodRuns.Source, users, Sidecars.Of(users, EntriesOf(users)), other);
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 /app/Repo/Zed.sql(");
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 /app/Repo/Zed.sql(");
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("class GetUserAsync");
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("SELECT 2;");
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
@@ -309,17 +307,16 @@ public sealed class MethodTests
 
         var run = MethodRuns.Run(file, [Entry(file, "GetUser", [], [Column("id")])]);
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC009 /app/Repo/Users.sql(1,10)-(1,13): A query of 'Sample' cannot be named 'Sql', because its member "
-                + "would have the name of the type that contains it",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC009 /app/Repo/Users.sql(1,10)-(1,13): A query of 'Sample' cannot be named 'Sql', because its "
+                    + "member would have the name of the type that contains it",
+            ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
     // One file of a query at each output, by its marker, under the run's member location class, so the constants are
-    // public members of the public type and the method is in the methods file.
+    // public members of the public type and the method is a public static method of the type in the methods file.
     [Fact]
     public void Run_MixedType_HasConstantsMethodsAndModels()
     {
@@ -351,7 +348,10 @@ public sealed class MethodTests
         type.ShouldContain("public const string GetEmail = \"SELECT email FROM users WHERE id = @id;\";\n");
         type.ShouldNotContain("GetUser");
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain(" GetUser(\n");
+        methods.ShouldStartWith(GeneratedFile.Header + "\nnamespace App\n{\n    partial class Sample\n    {\n");
+        methods.ShouldContain(
+            "        public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
+        );
         methods.ShouldNotContain("GetName");
         methods.ShouldNotContain("GetEmail");
         ModelFiles(run)

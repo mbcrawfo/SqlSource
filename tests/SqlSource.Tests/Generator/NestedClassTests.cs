@@ -305,7 +305,6 @@ public sealed class NestedClassTests
             [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])]
         );
 
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
         run.ShouldBeClean();
         var type = run.Sources[GeneratorHarness.SampleFile];
         type.ShouldContain("        private static partial class " + name + "\n");

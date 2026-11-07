@@ -1,9 +1,8 @@
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Shouldly;
 using SqlSource.Generation.Chains;
 using SqlSource.Generation.Paths;
+using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
@@ -17,8 +16,8 @@ public sealed class BuildFoldersTests
     public void Read_Property_GivesEachFolderNormalised()
     {
         var folders = BuildFolders.Read(
-            new Options(
-                new Dictionary<string, string>
+            new TestAnalyzerConfigOptions(
+                new Dictionary<string, string?>
                 {
                     ["build_property.SqlSourceBuildFolders"] = @"/repo/artifacts/obj/App/|C:\repo\artifacts\bin\App\",
                 }
@@ -29,7 +28,10 @@ public sealed class BuildFoldersTests
     }
 
     [Fact]
-    public void Read_NoProperty_IsNone() => BuildFolders.Read(new Options([])).ShouldBeSameAs(BuildFolders.None);
+    public void Read_NoProperty_IsNone() =>
+        BuildFolders
+            .Read(new TestAnalyzerConfigOptions(new Dictionary<string, string?>()))
+            .ShouldBeSameAs(BuildFolders.None);
 
     // MSBuild's NormalizeDirectory ends a full path with a separator.  The compiler cuts a value at a # or a ;, so an
     // unescaped /repo/App#1/obj/ would arrive as /repo/App; the targets escape both, and a value that is not a rooted
@@ -138,10 +140,4 @@ public sealed class BuildFoldersTests
         BuildFolders.None.ReachingPaths([@"C:\repo\A.cs"]).ShouldBe([SqlPath.Normalize(@"C:\repo\A.cs")]);
 
     private static BuildFolders Of(params string[] folders) => new(TestSidecars.Of(folders));
-
-    private sealed class Options(Dictionary<string, string> values) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) =>
-            values.TryGetValue(key, out value);
-    }
 }

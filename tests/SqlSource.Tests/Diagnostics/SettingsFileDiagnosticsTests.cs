@@ -5,10 +5,10 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
-using SqlSource.Settings;
 using SqlSource.SettingsFiles;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Tests.Parsing;
+using SqlSource.Tests.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;
@@ -16,8 +16,6 @@ namespace SqlSource.Tests.Diagnostics;
 public sealed class SettingsFileDiagnosticsTests
 {
     private const string Path = "Queries/sqlsource.json";
-
-    private static readonly SettingPlace SettingsFile = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
 
     [Theory]
     [InlineData(nameof(SettingsFileErrorKind.InvalidJson), "SQLSRC015")]
@@ -45,7 +43,7 @@ public sealed class SettingsFileDiagnosticsTests
     {
         const string Text = /*lang=json,strict*/
             "{\n    \"outptu\": \"sql\"\n}";
-        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         var location = SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)).Location;
 
@@ -80,7 +78,7 @@ public sealed class SettingsFileDiagnosticsTests
     {
         const string Text = /*lang=json,strict*/
             """{ "generatorParameters": ["keep-comments", "keep-comments=off"] }""";
-        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         var diagnostic = SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text));
 
@@ -97,7 +95,7 @@ public sealed class SettingsFileDiagnosticsTests
         SettingsFileReader
             .Read( /*lang=json,strict*/
                 """{ "generatorParameters": ["keep-comments", "Default"] }""",
-                SettingsFile
+                TestPlaces.SettingsFile
             )
             .Errors.ShouldBeEmpty();
 
@@ -111,7 +109,7 @@ public sealed class SettingsFileDiagnosticsTests
     {
         const string Text = /*lang=json,strict*/
             """{ "typeOverrides": { "[dbo].[Email]": "MyApp.Email" } }""";
-        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         var message = Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)));
 
@@ -130,7 +128,7 @@ public sealed class SettingsFileDiagnosticsTests
     {
         const string Text = /*lang=json,strict*/
             """{ "libraryTypes": { "nodaTime": "maybe" } }""";
-        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
             .ShouldBe(
@@ -144,7 +142,7 @@ public sealed class SettingsFileDiagnosticsTests
     {
         const string Text = /*lang=json,strict*/
             """{ "typeOverrides": { " int4 ": " int? " } }""";
-        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
             .ShouldBe("'int4: int?' is not a valid value of typeOverrides");
@@ -171,7 +169,7 @@ public sealed class SettingsFileDiagnosticsTests
     )]
     public void Create_ColumnTypeObjectThatIsNotOne_SaysWhatTheObjectFormTakes(string text, string quoted)
     {
-        var error = SettingsFileReader.Read(text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(text)))
             .ShouldBe(
@@ -187,7 +185,7 @@ public sealed class SettingsFileDiagnosticsTests
     {
         const string Text = /*lang=json,strict*/
             """{ "columnTypes": { "orders.metadata": "int?" } }""";
-        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
             .ShouldBe("'orders.metadata: int?' is not a valid value of columnTypes");
@@ -215,7 +213,7 @@ public sealed class SettingsFileDiagnosticsTests
             { "typeOverrides": { " ": "int", "int4": "" }, "columnTypes": { "users.id": " " }, "output": " " }
             """;
 
-        var errors = SettingsFileReader.Read(Text, SettingsFile).Errors;
+        var errors = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors;
 
         errors
             .Select(error => Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text))))
@@ -254,7 +252,7 @@ public sealed class SettingsFileDiagnosticsTests
     {
         const string Text = /*lang=json,strict*/
             """{ "typeOverrides": { "integer": "long", "int4": "int" } }""";
-        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+        var error = SettingsFileReader.Read(Text, TestPlaces.SettingsFile).Errors.ShouldHaveSingleItem();
 
         Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
             .ShouldBe("'int4' is the same key as 'integer' in typeOverrides, and the first applies");

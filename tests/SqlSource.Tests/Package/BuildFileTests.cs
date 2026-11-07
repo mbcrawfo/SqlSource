@@ -95,11 +95,11 @@ public sealed partial class BuildFileTests
     // The item of SqlSourceFindBuildFolders that holds the NuGet package folders other than the global packages folder.
     private const string PackageFolder = "SqlSourcePackageFolder";
 
-    private static readonly XDocument Props = Load("SqlSource.props");
+    private static readonly XDocument Props = Load("build", "SqlSource.props");
 
-    private static readonly XDocument Targets = Load("SqlSource.targets");
+    private static readonly XDocument Targets = Load("build", "SqlSource.targets");
 
-    private static readonly XDocument AfterSdk = Load("SqlSource.AfterSdk.targets");
+    private static readonly XDocument AfterSdk = Load("build", "SqlSource.AfterSdk.targets");
 
     // What the search for settings files and the hash of AdditionalFiles hook in a build where
     // SqlSource.AfterSdk.targets is not imported.
@@ -757,7 +757,7 @@ public sealed partial class BuildFileTests
     [InlineData("SqlSource.targets")]
     [InlineData("SqlSource.AfterSdk.targets")]
     [InlineData("buildMultiTargeting/SqlSource.targets")]
-    public void BuildFile_EveryPropertyOfThePackage_StartsWithSqlSource(string file)
+    public void BuildFiles_EveryPropertyOfThePackage_StartsWithSqlSource(string file)
     {
         var document = file switch
         {
@@ -803,7 +803,8 @@ public sealed partial class BuildFileTests
     private static string OnOneLine(string property) =>
         $@"$([System.Text.RegularExpressions.Regex]::Replace($({property}), '\s+', ' ').Trim())";
 
-    private static XDocument Load(string file) => XDocument.Load(Path.Combine(AppContext.BaseDirectory, "build", file));
+    private static XDocument Load(string folder, string file) =>
+        XDocument.Load(Path.Combine(AppContext.BaseDirectory, folder, file));
 
     private static IEnumerable<string> PropertiesSet(XDocument document) =>
         document.Descendants("PropertyGroup").Elements().Select(element => element.Name.LocalName);

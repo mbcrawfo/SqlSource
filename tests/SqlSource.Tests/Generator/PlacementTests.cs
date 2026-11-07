@@ -540,9 +540,7 @@ public sealed class PlacementTests
             )
         );
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC103 ");
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC103 ");
         run.Sources[GeneratorHarness.SampleFile]
             .ShouldContain(
                 "    partial class Sample\n    {\n        private static partial class Queries\n        {\n        }\n"

@@ -1,6 +1,9 @@
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Methods;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
@@ -55,6 +58,30 @@ internal static class MethodRuns
             references: [NpgsqlReferences.Npgsql10],
             dialect: "postgres"
         );
+
+    // The first of the files, a .sql file, with its sidecar, and the others, at CodeGen under postgres on Npgsql 10, on
+    // App.Sample, with the generator parameters of the project's settings file.  The entry of ListUsers has the rows id
+    // and name, or none.
+    public static GeneratorRun ListUsers(SqlFile[] files, string? generatorParameters, bool hasRows = true)
+    {
+        var file = files[0];
+        SidecarColumn[]? rows = hasRows
+            ? [ModelRuns.Column("id"), ModelRuns.Column("name", ModelRuns.Text, nullable: true)]
+            : null;
+
+        return GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [.. files, Sidecars.Of(file, ModelRuns.Entry(file, "ListUsers", [], rows))],
+            references: [NpgsqlReferences.Npgsql10],
+            generatorParameters: generatorParameters,
+            dialect: "postgres"
+        );
+    }
+
+    // The one method the run planned for App.Sample.
+    public static QueryMethod SingleMethod(GeneratorRun run) =>
+        StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods).Methods.ShouldHaveSingleItem();
 
     // The first Run under mssql, on SqlClient 7 unless the references are given.
     public static GeneratorRun RunSqlServer(

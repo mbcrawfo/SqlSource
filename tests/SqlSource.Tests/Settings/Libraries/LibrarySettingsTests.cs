@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
 using Xunit;
+using static SqlSource.Tests.Settings.TestPlaces;
 
 namespace SqlSource.Tests.Settings.Libraries;
 
@@ -10,15 +11,13 @@ public sealed class LibrarySettingsTests
 {
     private static readonly SettingPlace Near = SettingPlace.OfSettingsFile("/app/Queries/sqlsource.json", 2);
 
-    private static readonly SettingPlace Far = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
-
     [Fact]
     public void Over_BothNull_IsNull() => LibrarySettings.Over(null, null).ShouldBeNull();
 
     [Fact]
     public void Over_OneNull_IsTheOtherItself()
     {
-        var entries = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, Far)]);
+        var entries = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, SettingsFile)]);
 
         LibrarySettings.Over(entries, null).ShouldBe(entries);
         LibrarySettings.Over(null, entries).ShouldBe(entries);
@@ -28,17 +27,17 @@ public sealed class LibrarySettingsTests
     public void Over_ReplacesOnlyTheLibrariesTheNearLevelNames()
     {
         var off = new EquatableArray<LibrarySetting>([Entry(LibraryState.Off, Near)]);
-        var on = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, Far)]);
+        var on = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, SettingsFile)]);
 
         LibrarySettings.Over(off, on).ShouldNotBeNull().ShouldBe([Entry(LibraryState.Off, Near)]);
-        LibrarySettings.Over(on, off).ShouldNotBeNull().ShouldBe([Entry(LibraryState.On, Far)]);
+        LibrarySettings.Over(on, off).ShouldNotBeNull().ShouldBe([Entry(LibraryState.On, SettingsFile)]);
     }
 
     [Fact]
     public void Over_KeepsADefaultEntry()
     {
         var near = new EquatableArray<LibrarySetting>([Entry(LibraryState.Default, Near)]);
-        var far = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, Far)]);
+        var far = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, SettingsFile)]);
 
         var merged = LibrarySettings.Over(near, far).ShouldNotBeNull();
 

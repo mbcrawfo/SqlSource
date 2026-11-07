@@ -10,6 +10,7 @@ using NpgsqlTypes;
 using Shouldly;
 using SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
 using SqlSource.DatabaseTests.TestHarness.EndToEnd;
+using SqlSource.Generation;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
@@ -40,7 +41,7 @@ public sealed class ModelShapeTests
 
     [Fact]
     public void Build_Project_DeclaresTheGeneratorsAttribute() =>
-        _ = typeof(ModelShapeTests).Assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull();
+        _ = typeof(ModelShapeTests).Assembly.GetType(AttributeSource.AttributeMetadataName).ShouldNotBeNull();
 
     [Fact]
     public void Build_ProjectFileSettings_GiveARecordInputAndASealedRecordOutput()

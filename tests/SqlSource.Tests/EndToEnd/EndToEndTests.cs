@@ -175,7 +175,7 @@ public sealed class EndToEndTests
     public void Attribute_OnAGeneratedType_IsNotInItsMetadata(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)
-            .ShouldNotContain("SqlSource.SqlSourceGenerateAttribute");
+            .ShouldNotContain(AttributeSource.AttributeMetadataName);
 
     [Fact]
     public void Attributes_OfTheConsumingAssembly_AreInternalTypes()
