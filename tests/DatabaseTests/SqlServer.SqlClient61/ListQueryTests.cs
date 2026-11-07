@@ -232,20 +232,34 @@ public sealed class ListQueryTests(AppContainer app)
         counts.ShouldBe([new CountAccountsExceptAndBeforeDto(3, 0)]);
     }
 
-    // The known issue's workaround: the test in a WITH query, and the aggregate over its result, runs for an empty
-    // list, which matches no account.
+    // SQLSRC127's workaround: a list after a NOT, tested in a WITH query and the aggregate over its result, runs for
+    // an empty list, which every account is outside.
     [Fact]
-    public async Task CountStatusesTestedFirst_Empty_CountsNone()
+    public async Task CountWithoutStatusesTestedFirst_Empty_CountsEveryAccount()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
 
-        var counts = await connection.CountAccountsWithStatusesTestedFirst(
-            new CountAccountsWithStatusesTestedFirstArgs([]),
+        var counts = await connection.CountAccountsWithoutStatusesTestedFirst(
+            new CountAccountsWithoutStatusesTestedFirstArgs([]),
             cancellationToken: token
         );
 
-        counts.ShouldBe([new CountAccountsWithStatusesTestedFirstDto(0)]);
+        counts.ShouldBe([new CountAccountsWithoutStatusesTestedFirstDto(3)]);
+    }
+
+    [Fact]
+    public async Task CountWithoutStatusesTestedFirst_Statuses_CountsTheOthers()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var counts = await connection.CountAccountsWithoutStatusesTestedFirst(
+            new CountAccountsWithoutStatusesTestedFirstArgs(["active", "closed"]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithoutStatusesTestedFirstDto(1)]);
     }
 
     [Fact]

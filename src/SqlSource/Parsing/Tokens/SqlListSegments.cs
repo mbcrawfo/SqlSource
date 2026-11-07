@@ -140,9 +140,11 @@ internal static class SqlListSegments
         return false;
     }
 
-    // The kind of the segment of a use, or null for a use that stays in its literal: a value, or a use of a parameter
-    // that is no list, such as a name the SQL declares as a local variable, which the list leaves out.
-    private static SqlSegmentKind? KindOf(
+    /// <summary>
+    /// The kind of the segment of a use, or null for a use that stays in its literal: a value, or a use of a parameter
+    /// that is no list, such as a name the SQL declares as a local variable, which the list leaves out.
+    /// </summary>
+    public static SqlSegmentKind? KindOf(
         SqlParameterUse use,
         TextSpan span,
         string text,

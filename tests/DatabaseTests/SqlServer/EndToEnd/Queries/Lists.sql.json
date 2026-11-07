@@ -821,8 +821,8 @@
         }
       ]
     },
-    "CountAccountsWithStatusesTestedFirst": {
-      "hash": "33ffd3a5cc87c2df7032be21132a9de80b525a6a297137baf71c632241c9c0e1",
+    "CountAccountsWithoutStatusesTestedFirst": {
+      "hash": "6040fc317c3ebc0d1a26b038b1340e43e1805272f9c3761a9f82450c6437e3ee",
       "toolVersion": "0.1.0",
       "database": "app",
       "engine": "mssql",
@@ -848,7 +848,7 @@
       "columns": [
         {
           "ordinal": 0,
-          "name": "matching",
+          "name": "outside",
           "type": {
             "name": "int",
             "maxLength": 4,

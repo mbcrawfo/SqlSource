@@ -274,6 +274,7 @@ internal static class SqlFileParser
                     MemberLocationMarker = scope?.MemberLocationMarker,
                     VisibilityMarker = scope?.VisibilityMarker,
                     DeclaredVariables = query.DeclaredVariables,
+                    CodeGenErrors = FindRefusedEmptyLists(query),
                 }
             );
         }
@@ -386,6 +387,62 @@ internal static class SqlFileParser
                 places,
                 variables?.ToNames() ?? EquatableArray<string>.Empty
             );
+        }
+
+        // A list that a NOT reaches is sent empty as a subquery, which SQL Server refuses inside an aggregate, a GROUP
+        // BY and an OUTPUT clause, so the method would throw for an empty list there.  Only a method sends a list, so
+        // these are errors of the CodeGen output alone, which the method planner reports.  The places are read for SQL
+        // Server alone, and are None for a use that is not a list.
+        private static EquatableArray<SqlParseError> FindRefusedEmptyLists(BuiltQuery query)
+        {
+            // Created at the first error: most queries have none.
+            ImmutableArray<SqlParseError>.Builder? errors = null;
+            var sql = query.Sql;
+            for (var position = 0; position < query.Places.Length; position++)
+            {
+                var place = query.Places[position];
+                if ((place & SqlListPlace.UnderNot) == SqlListPlace.None || PlaceName(place) is not { } name)
+                {
+                    continue;
+                }
+
+                var span = sql.Parameters[position];
+                if (
+                    SqlListSegments.KindOf(query.Uses[position], span, sql.Text, query.Parameters)
+                    == SqlSegmentKind.List
+                )
+                {
+                    (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
+                        SqlParseError.Create(
+                            SqlParseErrorKind.NegatedListRefusedEmpty,
+                            sql.ToSourceSpan(span),
+                            sql.Text.Substring(span.Start, span.Length),
+                            name
+                        )
+                    );
+                }
+            }
+
+            return errors is null
+                ? EquatableArray<SqlParseError>.Empty
+                : new EquatableArray<SqlParseError>(errors.ToImmutable());
+        }
+
+        // Where a list stands, as SQLSRC127 names it, or null when it stands where SQL Server takes the subquery.  An
+        // aggregate is named before the clause around it.
+        private static string? PlaceName(SqlListPlace place)
+        {
+            if ((place & SqlListPlace.InAggregate) != SqlListPlace.None)
+            {
+                return "inside an aggregate";
+            }
+
+            if ((place & SqlListPlace.InGroupBy) != SqlListPlace.None)
+            {
+                return "in a GROUP BY";
+            }
+
+            return (place & SqlListPlace.InOutput) != SqlListPlace.None ? "in an OUTPUT clause" : null;
         }
 
         // A comment is gone from the SQL that the tokens are found in, and so is any "}}" it holds: in a default, that

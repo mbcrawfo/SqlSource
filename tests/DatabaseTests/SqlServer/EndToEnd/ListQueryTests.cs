@@ -12,9 +12,9 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // The queries of Queries/Lists.sql, run on the seed of "app" through the methods that ListQueries gets, each of which
 // sends a parameter for each value of a list: every kind of collection, the counts on each side of the padded sizes,
 // an empty list and a null one, two lists, a list used twice, a list inside an aggregate, a GROUP BY and an OUTPUT
-// clause, full and empty, one used after a NOT and inside an aggregate, the test in a WITH query, a list sent at its
-// own count, and the counts at the most parameters a query sends SQL Server and past it, which the method refuses
-// before it sends.  The lists of the limit are of ids that no account has, around the seed's own.
+// clause, full and empty, one used after a NOT and inside an aggregate, one after a NOT tested in a WITH query, a list
+// sent at its own count, and the counts at the most parameters a query sends SQL Server and past it, which the method
+// refuses before it sends.  The lists of the limit are of ids that no account has, around the seed's own.
 [Collection(UsesSqlServer.Name)]
 public sealed class ListQueryTests(SqlServerDatabases sqlServer)
 {
@@ -233,20 +233,34 @@ public sealed class ListQueryTests(SqlServerDatabases sqlServer)
         counts.ShouldBe([new CountAccountsExceptAndBeforeDto(3, 0)]);
     }
 
-    // The known issue's workaround: the test in a WITH query, and the aggregate over its result, runs for an empty
-    // list, which matches no account.
+    // SQLSRC127's workaround: a list after a NOT, tested in a WITH query and the aggregate over its result, runs for
+    // an empty list, which every account is outside.
     [Fact]
-    public async Task CountStatusesTestedFirst_Empty_CountsNone()
+    public async Task CountWithoutStatusesTestedFirst_Empty_CountsEveryAccount()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var counts = await connection.CountAccountsWithStatusesTestedFirst(
-            new CountAccountsWithStatusesTestedFirstArgs([]),
+        var counts = await connection.CountAccountsWithoutStatusesTestedFirst(
+            new CountAccountsWithoutStatusesTestedFirstArgs([]),
             cancellationToken: token
         );
 
-        counts.ShouldBe([new CountAccountsWithStatusesTestedFirstDto(0)]);
+        counts.ShouldBe([new CountAccountsWithoutStatusesTestedFirstDto(3)]);
+    }
+
+    [Fact]
+    public async Task CountWithoutStatusesTestedFirst_Statuses_CountsTheOthers()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var counts = await connection.CountAccountsWithoutStatusesTestedFirst(
+            new CountAccountsWithoutStatusesTestedFirstArgs(["active", "closed"]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithoutStatusesTestedFirstDto(1)]);
     }
 
     [Fact]

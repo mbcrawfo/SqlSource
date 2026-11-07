@@ -1,16 +1,19 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
 // The problems of one type's methods: a shape that needs rows on a statement that has none (SQLSRC272), a token named
-// as a fixed argument (SQLSRC275), and a method's name that something else takes (SQLSRC274).  A query with one gets
-// no method, and the rest of the project still compiles with no warning in what is generated.  Each run is at CodeGen
-// under postgres on Npgsql 10.
+// as a fixed argument (SQLSRC275), a method's name that something else takes (SQLSRC274), and a list after a NOT where
+// SQL Server refuses an empty one (SQLSRC127).  A query with one gets no method, and the rest of the project still
+// compiles with no warning in what is generated.  Each run is at CodeGen, under postgres on Npgsql 10 but for those of
+// SQLSRC127, under mssql on SqlClient 7.
 public sealed class MethodDiagnosticsTests
 {
     private const string Path = GeneratorHarness.UsersPath;
@@ -129,6 +132,60 @@ public sealed class MethodDiagnosticsTests
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
+
+    // The SQL of SQLSRC127's runs: a list after a NOT inside an aggregate.
+    private const string CountOthers =
+        "-- name: CountOthers\nSELECT COUNT(IIF(id NOT IN @ids, 1, NULL)) AS c FROM dbo.users;\n";
+
+    private const string RefusedEmpty =
+        "SQLSRC127 /app/Repo/Users.sql(2,28)-(2,32): The list '@ids' stands after a NOT inside an aggregate, where "
+        + "SQL Server refuses the form an empty list is sent in.  Test the list in a WITH query, or a subquery in "
+        + "FROM, and use its result here.";
+
+    [Fact]
+    public void RunSqlServer_NegatedListInsideAnAggregate_IsSqlsrc127()
+    {
+        var file = new SqlFile(Path, CountOthers);
+
+        var run = MethodRuns.RunSqlServer(file, [CountOthersEntry(file)]);
+
+        run.Problems().ShouldBe([RefusedEmpty]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // The error is in the SQL, so it is known before the query is described.
+    [Fact]
+    public void RunSqlServer_NegatedListInsideAnAggregateWithoutAnEntry_IsSqlsrc127BesideTheMissingEntry()
+    {
+        var file = new SqlFile(Path, CountOthers);
+
+        var run = MethodRuns.RunSqlServer(file, []);
+
+        run.Problems().ShouldContain(RefusedEmpty);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // Only a method sends a list, so the SQL is no problem under the other outputs.  A query under sql needs no entry.
+    [Theory]
+    [InlineData("sql")]
+    [InlineData("models")]
+    public void RunSqlServer_NegatedListInsideAnAggregateUnderAnotherOutput_IsNoProblem(string output)
+    {
+        var file = new SqlFile(Path, "-- output: " + output + "\n\n" + CountOthers);
+
+        var run = MethodRuns.RunSqlServer(file, output == "sql" ? [] : [CountOthersEntry(file)]);
+
+        run.ShouldBeClean();
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    private static SidecarEntry CountOthersEntry(SqlFile file) =>
+        MethodRuns.SqlServerEntry(
+            file,
+            "CountOthers",
+            [TestSidecars.Parameter(0, "ids", TestSidecars.SqlServer(), false)],
+            [TestSidecars.Column(0, "c", TestSidecars.SqlServer())]
+        );
 
     // An instance member of the connection is found before an extension method of its name.
     [Theory]

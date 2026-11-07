@@ -833,4 +833,88 @@ public sealed class SqlFileParserParameterTests
             .Blocks.ShouldHaveSingleItem()
             .Parameters.ShouldBe([new SqlQueryParameter("ids", null, null, false, IsList: true, HasNullTest: true)]);
     }
+
+    private static SqlParseError RefusedEmpty(TextSpan span, string parameter, string place) =>
+        SqlParseError.Create(SqlParseErrorKind.NegatedListRefusedEmpty, span, parameter, place);
+
+    // A list that a NOT reaches is sent empty as a subquery, which SQL Server refuses inside an aggregate.  Only a
+    // method sends a list, so the error is the method's, and the file still parses.
+    [Fact]
+    public void Parse_SqlServerNegatedListInAnAggregate_HasACodeGenError()
+    {
+        const string Text = "-- name: Q\nSELECT COUNT(IIF(id NOT IN @ids, 1, NULL)) AS c FROM t\n";
+
+        Blocks(Text, dialect: SqlDialect.SqlServer)
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBe([RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate")]);
+    }
+
+    // The error names where the list stands, and an aggregate before the clause around it.
+    [Theory]
+    [InlineData("SELECT COUNT(*) AS c FROM t GROUP BY CASE WHEN id NOT IN @ids THEN 1 END", "in a GROUP BY")]
+    [InlineData("SELECT COUNT(*) AS c FROM t GROUP BY ROLLUP (CASE WHEN NOT (id IN @ids) THEN 1 END)", "in a GROUP BY")]
+    [InlineData(
+        "UPDATE t SET s = 'x' OUTPUT CASE WHEN inserted.id NOT IN @ids THEN 1 END AS f WHERE id = 1",
+        "in an OUTPUT clause"
+    )]
+    [InlineData("SELECT g FROM t GROUP BY g, (SELECT SUM(IIF(id NOT IN @ids, 1, 0)) FROM u)", "inside an aggregate")]
+    public void Parse_SqlServerNegatedListWhereAnEmptyListIsRefused_NamesThePlace(string sql, string place)
+    {
+        var text = "-- name: Q\n" + sql + "\n";
+
+        Blocks(text, dialect: SqlDialect.SqlServer)
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBe([RefusedEmpty(TextSpans.Of(text, "@ids"), "@ids", place)]);
+    }
+
+    [Fact]
+    public void Parse_SqlServerNegatedListInAnAggregateTwice_IsReportedAtEachUseAsWritten()
+    {
+        const string Text =
+            "-- name: Q\nSELECT SUM(IIF(id NOT IN @ids, 1, 0)) AS a, SUM(IIF(id + 1 NOT IN @IDS, 1, 0)) AS b FROM t\n";
+
+        Blocks(Text, dialect: SqlDialect.SqlServer)
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBe([
+                RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate"),
+                RefusedEmpty(TextSpans.Of(Text, "@IDS"), "@IDS", "inside an aggregate"),
+            ]);
+    }
+
+    // SQL Server takes the subquery in a windowed aggregate, and the one NULL of a list that no NOT reaches anywhere.
+    [Theory]
+    [InlineData("SELECT SUM(CASE WHEN s NOT IN @ids THEN 1 END) OVER (PARTITION BY g) AS c FROM t")]
+    [InlineData("SELECT SUM(x) OVER (PARTITION BY CASE WHEN s NOT IN @ids THEN 1 END) AS c FROM t")]
+    public void Parse_SqlServerNegatedListInAWindowedAggregate_HasNone(string sql) =>
+        Blocks("-- name: Q\n" + sql + "\n", dialect: SqlDialect.SqlServer)
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBeEmpty();
+
+    [Theory]
+    [InlineData("SELECT COUNT(IIF(id IN @ids, 1, NULL)) AS c FROM t")]
+    [InlineData("SELECT COUNT(*) AS c FROM t GROUP BY CASE WHEN id IN @ids THEN 1 END")]
+    [InlineData("SELECT COUNT(*) AS c FROM t WHERE id NOT IN @ids")]
+    public void Parse_SqlServerListThatTakesAnEmptyForm_HasNone(string sql) =>
+        Blocks("-- name: Q\n" + sql + "\n", dialect: SqlDialect.SqlServer)
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBeEmpty();
+
+    // A name the query declares is a variable of the batch, and no list.
+    [Fact]
+    public void Parse_DeclaredVariableNegatedInAnAggregate_HasNone() =>
+        Blocks(
+                "-- name: Q\nDECLARE @ids int = 1;\nSELECT COUNT(IIF(id NOT IN @ids, 1, NULL)) AS c FROM t\n",
+                dialect: SqlDialect.SqlServer
+            )
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBeEmpty();
+
+    [Fact]
+    public void Parse_PostgresNegatedListInAnAggregate_HasNone() =>
+        Blocks(
+                "-- name: Q\nSELECT COUNT(CASE WHEN id NOT IN @ids THEN 1 END) AS c FROM t\n",
+                dialect: SqlDialect.PostgreSql
+            )
+            .ShouldHaveSingleItem()
+            .CodeGenErrors.ShouldBeEmpty();
 }

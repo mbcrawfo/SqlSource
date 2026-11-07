@@ -87,12 +87,12 @@ SELECT COUNT(*) AS outside, SUM(CASE WHEN id + 1 IN @ids THEN 1 ELSE 0 END) AS b
 FROM dbo.accounts
 WHERE id NOT IN @ids;
 
--- name: CountAccountsWithStatusesTestedFirst
--- summary: CountAccountsWithStatuses, with the test in a WITH query and the aggregate over its result, which SQL Server
--- summary: runs for an empty list too.
+-- name: CountAccountsWithoutStatusesTestedFirst
+-- summary: How many accounts have a status that is not in a list, with the test after a NOT in a WITH query and the
+-- summary: aggregate over its result, which SQL Server runs for an empty list too.
 WITH tested AS (
-    SELECT CASE WHEN status IN @statuses THEN 1 ELSE 0 END AS hit
+    SELECT CASE WHEN status NOT IN @statuses THEN 1 ELSE 0 END AS hit
     FROM dbo.accounts
 )
-SELECT SUM(hit) AS matching
+SELECT SUM(hit) AS outside
 FROM tested;
