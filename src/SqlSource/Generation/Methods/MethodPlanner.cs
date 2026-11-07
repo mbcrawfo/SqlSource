@@ -17,8 +17,9 @@ namespace SqlSource.Generation.Methods;
 
 /// <summary>
 /// Decides which queries of one type get a method, and what each method is written from, with the problems of those
-/// that cannot have one: <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, the errors of a query's SQL that
-/// are only a method's (<see cref="SqlQuery.CodeGenErrors" />), and, from
+/// that cannot have one: <c>SQLSRC123</c> for a method that cannot take or return its internal models,
+/// <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, the errors of a query's SQL that are only a method's
+/// (<see cref="SqlQuery.CodeGenErrors" />), and, from
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
@@ -176,7 +177,7 @@ internal static class MethodPlanner
             var context = new QueryContext(input, key, file, engine, usable);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
             var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
-            if (Plan(context, written, nestedClasses, target, served.Of(target), ref usedLibraries) is { } plan)
+            if (Plan(context, written, queries, target, served.Of(target), ref usedLibraries) is { } plan)
             {
                 planned.Add(plan);
             }
@@ -220,14 +221,14 @@ internal static class MethodPlanner
         };
 
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
-    // problem of its SQL, of SQLSRC272, SQLSRC275, SQLSRC274 and of its converters that the query has is reported, and
-    // any one leaves it no method.  Its conversions see the converters of the type's slice that serve its target.  The
-    // libraries it uses are added to the type's, and one older than its floor leaves it no method, beside its problems,
-    // which stay true once the library is updated.
+    // problem of its SQL, of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC274 and of its converters that the query has is
+    // reported, and any one leaves it no method.  Its conversions see the converters of the type's slice that serve
+    // its target.  The libraries it uses are added to the type's, and one older than its floor leaves it no method,
+    // beside its problems, which stay true once the library is updated.
     private static Planned? Plan(
         QueryContext context,
         HashSet<(string? NestedClass, string Name)> written,
-        IReadOnlyList<NestedClassPlacement> nestedClasses,
+        UsableQuerySequence queries,
         ConverterTargets target,
         EquatableArray<Converter> converters,
         ref HashSet<LibraryUse>? usedLibraries
@@ -245,6 +246,18 @@ internal static class MethodPlanner
         }
 
         var problems = new List<DiagnosticInfo>(query.CodeGenErrors);
+        // Its models' assignments are looked for only where its visibility needs them public, so a method that is not
+        // refused costs one switch.
+        var type = input.Type.Type.Type;
+        if (
+            PlacementChecks.MethodModelsReason(type, placement.Location, placement.Visibility) is { } modelsReason
+            && HasInternalModel(context, models)
+            && ModelsNotFit(type, usable, queries, modelsReason) is { } refusal
+        )
+        {
+            problems.Add(refusal);
+        }
+
         var shape = query.Shape ?? (models.Output is null ? ResultShape.RowCount : ResultShape.Many);
         if ((shape is ResultShape.One or ResultShape.OneOptional or ResultShape.Many) && models.Output is null)
         {
@@ -261,7 +274,7 @@ internal static class MethodPlanner
         problems.AddRange(FindTokenProblems(query));
         var name = query.Name + ((settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0 ? AsyncSuffix : "");
         var host = HostOf(placement);
-        var reason = FindTakenReason(input, name, host, written, nestedClasses);
+        var reason = FindTakenReason(input, name, host, written, queries.Placement.NestedClasses);
         if (reason is not null)
         {
             problems.Add(
@@ -319,6 +332,83 @@ internal static class MethodPlanner
             isUsable,
             WarningIdsOf(models, methodInput, methodOutput)
         );
+    }
+
+    // Whether the query's input or output model, when it has one, is internal.  A model with no assignment is not: its
+    // query has its own error already.
+    private static bool HasInternalModel(QueryContext context, QueryModels models)
+    {
+        var (input, key, file, _, usable) = context;
+        return (
+                models.Input is not null
+                && FindAssignment(input.Assignments, key, file.NormalizedPath, usable.QueryIndex, ModelRole.Input)
+                    is { IsPublic: false }
+            )
+            || (
+                models.Output is not null
+                && FindAssignment(input.Assignments, key, file.NormalizedPath, usable.QueryIndex, ModelRole.Output)
+                    is { IsPublic: false }
+            );
+    }
+
+    // SQLSRC123 for a method that cannot take or return its internal models, at the marker that wrote its visibility,
+    // else at its member location's, else at its name.  A nested class's visibility that another query wrote names the
+    // first usable query of the class that writes one, as the placement takes it.  The default of a location is never
+    // refused, so a query that writes none is in such a class, and the null for one that is not is never given.
+    private static DiagnosticInfo? ModelsNotFit(
+        TargetType type,
+        UsableQuery usable,
+        UsableQuerySequence queries,
+        string reason
+    )
+    {
+        var (_, _, query, settings, placement) = usable;
+        string place;
+        LocationInfo location;
+        if (settings.WrittenVisibility is { } written)
+        {
+            place = PlaceText.Of(written.Place);
+            location = query.VisibilityMarker ?? query.MemberLocationMarker ?? query.NameLocation;
+        }
+        else if (WriterOf(queries, placement.NestedClass) is { } writer)
+        {
+            place = writer;
+            location = query.MemberLocationMarker ?? query.NameLocation;
+        }
+        else
+        {
+            return null;
+        }
+
+        return DiagnosticInfo.Create(
+            SqlDiagnostics.VisibilityNotFit,
+            location,
+            query.Name,
+            PlacementChecks.NameOf(type),
+            PlacementChecks.KeywordOf(placement.Visibility),
+            place,
+            PlacementChecks.TextOf(placement.Location),
+            reason
+        );
+    }
+
+    // The place that wrote the nested class's visibility, with the query that wrote it: the first usable query of the
+    // class that writes one, in their order, or null when none does.
+    private static string? WriterOf(UsableQuerySequence queries, string? nestedClass)
+    {
+        foreach (var other in queries)
+        {
+            if (
+                other.Placement.Location == MemberLocation.NestedClass
+                && string.Equals(other.Placement.NestedClass, nestedClass, StringComparison.Ordinal)
+                && other.Settings.WrittenVisibility is { } written
+            )
+            {
+                return PlaceText.Of(written.Place) + " for the query '" + other.Query.Name + "'";
+            }
+        }
+
+        return null;
     }
 
     // SQLSRC281 for each entry that turns a library on for the query whose assemblies the project does not reference

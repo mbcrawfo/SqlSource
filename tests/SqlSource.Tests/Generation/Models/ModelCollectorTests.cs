@@ -62,7 +62,8 @@ public sealed class ModelCollectorTests
                 0,
                 ModelRole.Output,
                 "global::App.GetUserDto",
-                ModelKind.Record
+                ModelKind.Record,
+                true
             ),
             new ModelAssignment(
                 "App.B",
@@ -70,9 +71,33 @@ public sealed class ModelCollectorTests
                 0,
                 ModelRole.Output,
                 "global::App.GetUserDto",
-                ModelKind.Record
+                ModelKind.Record,
+                true
             ),
         ]);
+    }
+
+    [Fact]
+    public void Resolve_ModelSharedByAPublicAndAnInternalType_AssignsItPublicToBoth()
+    {
+        var requests = ImmutableArray.Create(
+            Request("GetUserDto", ModelRole.Output, "app/Users.sql", 0, "App.A", isPublic: false),
+            Request("GetUserDto", ModelRole.Output, "app/Users.sql", 0, "App.B")
+        );
+
+        var set = Resolve(requests);
+
+        set.Assignments.Select(assignment => assignment.IsPublic).ShouldBe([true, true]);
+    }
+
+    [Fact]
+    public void Resolve_ModelOfAnInternalType_AssignsItInternal()
+    {
+        var requests = ImmutableArray.Create(
+            Request("GetUserDto", ModelRole.Output, "app/Users.sql", 0, "App.A", isPublic: false)
+        );
+
+        Resolve(requests).Assignments.ShouldHaveSingleItem().IsPublic.ShouldBeFalse();
     }
 
     [Fact]
@@ -160,7 +185,8 @@ public sealed class ModelCollectorTests
         string claimingType,
         string @namespace = "App",
         ModelKind kind = ModelKind.Record,
-        string propertyName = "Id"
+        string propertyName = "Id",
+        bool isPublic = true
     )
     {
         var location = new LocationInfo(path, new TextSpan(0, 1), new LinePositionSpan(default, default));
@@ -171,7 +197,7 @@ public sealed class ModelCollectorTests
             role,
             kind,
             false,
-            true,
+            isPublic,
             null,
             TestSidecars.Of(
                 new ModelProperty(
