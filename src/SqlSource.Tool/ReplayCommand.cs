@@ -49,8 +49,6 @@ internal static class ReplayCommand
 
     private const string VerboseOption = "--verbose";
 
-    private const string Prefix = "sqlsource: ";
-
     private static readonly JsonSerializerOptions EntryOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -141,7 +139,7 @@ internal static class ReplayCommand
         var messages = new List<string>();
         if (usage.Arguments.Count == 0 && !usage.Flags.Any(static flag => flag is HelpOption))
         {
-            messages.Add($"sqlsource: command '{Name}' needs the path of a {BundleArgument}");
+            messages.Add($"{Cli.LinePrefix}command '{Name}' needs the path of a {BundleArgument}");
         }
 
         messages.AddRange(
@@ -207,7 +205,7 @@ internal static class ReplayCommand
         var bundle = read.Value;
         if (bundle.Info is { Renamed: false })
         {
-            await host.Out.WriteLineAsync(Prefix + "this bundle is not renamed, and must not be posted");
+            await host.Out.WriteLineAsync(Cli.LinePrefix + "this bundle is not renamed, and must not be posted");
         }
 
         var capture = BundleReplay.CaptureOf(bundle, path);
@@ -269,27 +267,27 @@ internal static class ReplayCommand
     {
         if (expected is null)
         {
-            await output.WriteLineAsync(Prefix + "replayed: " + OneLine.Of(TextOf(replayed)));
+            await output.WriteLineAsync(Cli.LinePrefix + "replayed: " + OneLine.Of(TextOf(replayed)));
             return 0;
         }
 
         var differences = DifferencesOf(expected, replayed);
         if (differences.Count == 0)
         {
-            await output.WriteLineAsync(Prefix + "reproduced: the pipeline gives this answer");
+            await output.WriteLineAsync(Cli.LinePrefix + "reproduced: the pipeline gives this answer");
             return 0;
         }
 
-        await output.WriteLineAsync(Prefix + "not reproduced");
+        await output.WriteLineAsync(Cli.LinePrefix + "not reproduced");
         foreach (var difference in differences)
         {
-            await output.WriteLineAsync(Prefix + "  " + BundleText.Of(difference));
+            await output.WriteLineAsync(Cli.LinePrefix + "  " + BundleText.Of(difference));
         }
 
         if (info is not null)
         {
             await output.WriteLineAsync(
-                Prefix
+                Cli.LinePrefix
                     + $"the bundle was made by sqlsource {BundleText.Of(info.ToolVersion)}, sidecar format "
                     + $"{info.FormatVersion}; this is sqlsource {OneLine.Of(Cli.Version)}, sidecar format "
                     + $"{SidecarFormat.Version}"

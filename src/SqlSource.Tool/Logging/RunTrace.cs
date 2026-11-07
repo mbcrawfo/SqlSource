@@ -14,8 +14,6 @@ namespace SqlSource.Tool.Logging;
 /// <param name="secret">A connection's secret that is removed from every line, or null.</param>
 internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, ConnectionSecret? secret = null)
 {
-    private const string Prefix = "sqlsource: ";
-
     public IRunLog Log => log;
 
     /// <summary>
@@ -25,7 +23,7 @@ internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, Connecti
     /// </summary>
     /// <param name="text">The line, without its prefix.</param>
     public void Say(string text) =>
-        verbose?.WriteLine(Prefix + (secret is null ? OneLine.Of(text) : Redaction.AsPrinted(text, secret)));
+        verbose?.WriteLine(Cli.LinePrefix + (secret is null ? OneLine.Of(text) : Redaction.AsPrinted(text, secret)));
 
     /// <summary>
     /// The same trace with one connection's secret removed from everything said through it.  What the run says of

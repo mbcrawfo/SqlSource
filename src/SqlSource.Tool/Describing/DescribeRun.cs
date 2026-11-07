@@ -23,7 +23,7 @@ internal static class DescribeRun
     /// <summary>
     /// What starts each line of the summary under <c>--online</c>, which the build's <c>SqlSourceRunOnline</c> reads.
     /// </summary>
-    internal const string SummaryPrefix = "sqlsource: summary: ";
+    internal const string SummaryPrefix = Cli.LinePrefix + "summary: ";
 
     /// <summary>
     /// Runs the steps in order, reports their errors and writes the summary.
@@ -140,7 +140,7 @@ internal static class DescribeRun
         {
             // In place of the summary: the build reads this line to know that the tool ran and found no database.
             await host.Out.WriteLineAsync(
-                $"sqlsource: offline: no connection for {string.Join(", ", offline.Select(OneLine.Of))}; "
+                $"{Cli.LinePrefix}offline: no connection for {string.Join(", ", offline.Select(OneLine.Of))}; "
                     + "the build uses the committed sidecars"
             );
             return;
@@ -150,7 +150,7 @@ internal static class DescribeRun
         // did not start.
         if (lines.IsEmpty && options.Online != OnlineMode.Off)
         {
-            await host.Out.WriteLineAsync("sqlsource: online: nothing to describe");
+            await host.Out.WriteLineAsync(Cli.LinePrefix + "online: nothing to describe");
         }
 
         // The build's Exec reads a line that starts "error " or "warning " as one of the build, and a database may be

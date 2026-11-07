@@ -277,7 +277,7 @@ internal static class DescribeCommand
             && usage.Flags.Any(static flag => flag.Name == CheckOption)
         )
         {
-            messages.Add($"sqlsource: options '{WatchOption}' and '{CheckOption}' cannot be used together");
+            messages.Add($"{Cli.LinePrefix}options '{WatchOption}' and '{CheckOption}' cannot be used together");
         }
 
         var units = 0;
@@ -294,13 +294,13 @@ internal static class DescribeCommand
                 }
                 else if (!SqlPath.IsSqlFile(value.Text) && ++units > 1)
                 {
-                    messages.Add($"sqlsource: unexpected argument at position {value.Position}");
+                    messages.Add($"{Cli.LinePrefix}unexpected argument at position {value.Position}");
                 }
             }
             else if (value.Option.Name == DatabaseOption && !SettingValue.IsDatabaseName(value.Text))
             {
                 messages.Add(
-                    $"sqlsource: the value of option '{DatabaseOption}' at position {value.Position} is not a "
+                    $"{Cli.LinePrefix}the value of option '{DatabaseOption}' at position {value.Position} is not a "
                         + "database name"
                 );
             }
@@ -335,8 +335,8 @@ internal static class DescribeCommand
     /// </summary>
     internal static string? SplitConnectionOf(UsageValue argument) =>
         argument.Text.AsSpan().IndexOfAny('=', ';') >= 0
-            ? $"sqlsource: the argument at position {argument.Position} looks like a part of a connection string; put "
-                + $"the value of '{ConnectionOption}' in quotes"
+            ? $"{Cli.LinePrefix}the argument at position {argument.Position} looks like a part of a connection string; "
+                + $"put the value of '{ConnectionOption}' in quotes"
             : null;
 
     /// <summary>
@@ -349,13 +349,14 @@ internal static class DescribeCommand
     {
         if (!ConnectionArgument.TryParse(value.Text, out var connection))
         {
-            return $"sqlsource: the value of option '{ConnectionOption}' at position {value.Position} is not "
+            return $"{Cli.LinePrefix}the value of option '{ConnectionOption}' at position {value.Position} is not "
                 + "<name>=<connection string>";
         }
 
         return named.Add(connection.Name)
             ? null
-            : $"sqlsource: option '{ConnectionOption}' at position {value.Position} names a database that an earlier "
+            : $"{Cli.LinePrefix}option '{ConnectionOption}' at position {value.Position} names a database that an "
+                + "earlier "
                 + "one names";
     }
 
@@ -374,14 +375,14 @@ internal static class DescribeCommand
                     .Values.Select(static value => (value.Position, Kind: WhatIsNamedBy(value)))
                     .Where(static named => named.Kind is not null)
                     .Select(named =>
-                        $"sqlsource: option '{ManifestOption}' takes no {named.Kind} (position {named.Position})"
+                        $"{Cli.LinePrefix}option '{ManifestOption}' takes no {named.Kind} (position {named.Position})"
                     )
             );
 
             // A watch evaluates the projects again after a change, and a run from a manifest evaluates none.
             if (usage.Flags.Any(static flag => flag.Name == WatchOption))
             {
-                messages.Add($"sqlsource: option '{ManifestOption}' takes no '{WatchOption}'");
+                messages.Add($"{Cli.LinePrefix}option '{ManifestOption}' takes no '{WatchOption}'");
             }
         }
 
@@ -390,14 +391,14 @@ internal static class DescribeCommand
             onlines
                 .Where(static online => OnlineModeOf(online.Text) is null)
                 .Select(online =>
-                    $"sqlsource: the value of option '{OnlineOption}' at position {online.Position} is not "
+                    $"{Cli.LinePrefix}the value of option '{OnlineOption}' at position {online.Position} is not "
                     + $"'{OnlineAuto}' or '{OnlineTrue}'"
                 )
         );
 
         if (manifests.Length == 0 && onlines.Length > 0)
         {
-            messages.Add($"sqlsource: option '{OnlineOption}' needs '{ManifestOption}'");
+            messages.Add($"{Cli.LinePrefix}option '{OnlineOption}' needs '{ManifestOption}'");
         }
     }
 
@@ -444,14 +445,14 @@ internal static class DescribeCommand
         // What --log "$UNSET" gives.
         if (string.IsNullOrWhiteSpace(value.Text))
         {
-            return $"sqlsource: the value of option '{option}' at position {value.Position} is not a path";
+            return $"{Cli.LinePrefix}the value of option '{option}' at position {value.Position} is not a path";
         }
 
         // "=" and ";" are what a connection string is made of: the value may be one typed after the option.  The
         // build's paths may hold them, as a project's name may, and the owner ruled that a path the build writes is
         // no secret, so under --online a message prints such a path in full.
         return !isOnline && !value.MayBePrintedAsPath
-            ? $"sqlsource: the value of option '{option}' at position {value.Position} holds '=' or ';', which "
+            ? $"{Cli.LinePrefix}the value of option '{option}' at position {value.Position} holds '=' or ';', which "
                 + $"{ofWhat} may not"
             : null;
     }
@@ -462,11 +463,13 @@ internal static class DescribeCommand
     {
         if (string.IsNullOrWhiteSpace(manifest.Text))
         {
-            return $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} is not a path";
+            return $"{Cli.LinePrefix}the value of option '{ManifestOption}' at position {manifest.Position} "
+                + "is not a path";
         }
 
         return !isOnline && !manifest.MayBePrintedAsPath
-            ? $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} holds '=' or ';', "
+            ? $"{Cli.LinePrefix}the value of option '{ManifestOption}' at position {manifest.Position} holds "
+                + "'=' or ';', "
                 + "which a manifest's path may not"
             : null;
     }
@@ -817,7 +820,9 @@ internal static class DescribeCommand
             if (reporter.Count == 0)
             {
                 // A run that found nothing to do must not look like one that did it.
-                await host.Out.WriteLineAsync($"sqlsource: no project of '{OneLine.Of(unit.Path)}' uses SqlSource");
+                await host.Out.WriteLineAsync(
+                    $"{Cli.LinePrefix}no project of '{OneLine.Of(unit.Path)}' uses SqlSource"
+                );
             }
 
             return null;

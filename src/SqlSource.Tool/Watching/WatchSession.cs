@@ -43,10 +43,10 @@ namespace SqlSource.Tool.Watching;
 internal sealed class WatchSession
 {
     /// <summary>What the session writes to standard output before every pass after the first.</summary>
-    internal const string ChangeDetectedMarker = "sqlsource: change detected; describing";
+    internal const string ChangeDetectedMarker = Cli.LinePrefix + "change detected; describing";
 
     /// <summary>What the session writes to standard output after every pass.</summary>
-    internal const string WatchingMarker = "sqlsource: watching for changes; press Ctrl+C to stop";
+    internal const string WatchingMarker = Cli.LinePrefix + "watching for changes; press Ctrl+C to stop";
 
     /// <summary>How long a pass waits after the last change it covers: an editor's save is several events.</summary>
     internal static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(300);

@@ -45,8 +45,6 @@ namespace SqlSource.Tool.Bundles;
 /// </remarks>
 internal static class DiagnoseRun
 {
-    private const string Prefix = "sqlsource: ";
-
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>Describes the query again and writes its bundle, renamed or raw.</summary>
@@ -86,7 +84,7 @@ internal static class DiagnoseRun
 
         if (described.Failure is { } failure)
         {
-            await host.Out.WriteLineAsync(Prefix + "the query was refused: " + failure.Descriptor.Id);
+            await host.Out.WriteLineAsync(Cli.LinePrefix + "the query was refused: " + failure.Descriptor.Id);
         }
 
         var file = planned.File;
@@ -106,9 +104,9 @@ internal static class DiagnoseRun
         {
             if (Write(outPath, stream => BundleWriter.Write(bundle, stream), host, reporter))
             {
-                await host.Out.WriteLineAsync(Prefix + $"raw bundle {UsageValue.Quoted(outPath)} written");
+                await host.Out.WriteLineAsync(Cli.LinePrefix + $"raw bundle {UsageValue.Quoted(outPath)} written");
                 await host.Out.WriteLineAsync(
-                    Prefix
+                    Cli.LinePrefix
                         + "this bundle holds your own names and SQL, and must not be posted: open an issue that says a "
                         + "raw bundle is ready, without attaching it, and a maintainer will say how to send it"
                 );
@@ -378,7 +376,7 @@ internal static class DiagnoseRun
             return;
         }
 
-        await host.Out.WriteLineAsync(Prefix + $"bundle {UsageValue.Quoted(outPath)} written");
+        await host.Out.WriteLineAsync(Cli.LinePrefix + $"bundle {UsageValue.Quoted(outPath)} written");
         var mappingPath = outPath + BundleFiles.MappingSuffix;
         var text = Utf8.GetBytes(MappingFile.Write(mapping));
         if (!Write(mappingPath, stream => stream.Write(text, 0, text.Length), host, reporter))
@@ -386,9 +384,9 @@ internal static class DiagnoseRun
             return;
         }
 
-        await host.Out.WriteLineAsync(Prefix + $"mapping {UsageValue.Quoted(mappingPath)} written");
+        await host.Out.WriteLineAsync(Cli.LinePrefix + $"mapping {UsageValue.Quoted(mappingPath)} written");
         await host.Out.WriteLineAsync(
-            Prefix
+            Cli.LinePrefix
                 + "the mapping holds your own names: keep it private, outside your project's folder, since a build "
                 + "may copy a .json file into its output"
         );
@@ -414,8 +412,7 @@ internal static class DiagnoseRun
             write(stream);
             return true;
         }
-        catch (Exception exception)
-            when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
             reporter.Report(ToolDiagnostic.NotChanged(path, "written", exception.Message));
             return false;

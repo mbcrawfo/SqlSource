@@ -198,12 +198,12 @@ internal static class DiagnoseCommand
         var scrubs = DescribeCommand.ValuesOf(usage, ScrubOption);
         if (!helps && queries.IsEmpty && scrubs.IsEmpty)
         {
-            messages.Add($"sqlsource: command '{Name}' needs {QueryOption} or {ScrubOption}");
+            messages.Add($"{Cli.LinePrefix}command '{Name}' needs {QueryOption} or {ScrubOption}");
         }
 
         if (!helps && DescribeCommand.ValuesOf(usage, OutOption).IsEmpty)
         {
-            messages.Add($"sqlsource: option '{OutOption}' is required");
+            messages.Add($"{Cli.LinePrefix}option '{OutOption}' is required");
         }
 
         if (!scrubs.IsEmpty)
@@ -229,7 +229,7 @@ internal static class DiagnoseCommand
     {
         if (!hasNoQuery)
         {
-            messages.Add($"sqlsource: options '{QueryOption}' and '{ScrubOption}' cannot be used together");
+            messages.Add($"{Cli.LinePrefix}options '{QueryOption}' and '{ScrubOption}' cannot be used together");
         }
 
         var others =
@@ -237,7 +237,7 @@ internal static class DiagnoseCommand
             || usage.Flags.Any(static flag => flag is not HelpOption);
         if (others)
         {
-            messages.Add($"sqlsource: option '{ScrubOption}' takes no other option but '{OutOption}'");
+            messages.Add($"{Cli.LinePrefix}option '{ScrubOption}' takes no other option but '{OutOption}'");
         }
     }
 
@@ -247,7 +247,7 @@ internal static class DiagnoseCommand
         {
             null when hasConnection && DescribeCommand.SplitConnectionOf(value) is { } split => split,
             null when SqlPath.IsSqlFile(value.Text) =>
-                $"sqlsource: the argument at position {value.Position} is a .sql path: name the query with "
+                $"{Cli.LinePrefix}the argument at position {value.Position} is a .sql path: name the query with "
                     + $"'{QueryOption} <file>:<name>'",
             QueryOption => ProblemOfQuery(value),
             OutOption => DescribeCommand.ProblemOfPath(value, OutOption, "a bundle's path", isOnline: false),
@@ -262,12 +262,13 @@ internal static class DiagnoseCommand
     {
         if (QueryName.Of(value) is not { } named)
         {
-            return $"sqlsource: the value of option '{QueryOption}' at position {value.Position} is not <file>:<name>";
+            return $"{Cli.LinePrefix}the value of option '{QueryOption}' at position {value.Position} "
+                + "is not <file>:<name>";
         }
 
         return SqlPath.IsSqlFile(named.File.Text)
             ? null
-            : $"sqlsource: the file of option '{QueryOption}' at position {value.Position} is not a .sql path";
+            : $"{Cli.LinePrefix}the file of option '{QueryOption}' at position {value.Position} is not a .sql path";
     }
 
     /// <summary>

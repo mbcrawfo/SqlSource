@@ -22,6 +22,11 @@ namespace SqlSource.Tool;
 public static class Cli
 {
     /// <summary>
+    /// What starts every line the tool writes of its own, which the build's <c>SqlSourceRunOnline</c> reads.
+    /// </summary>
+    internal const string LinePrefix = "sqlsource: ";
+
+    /// <summary>
     /// The name of the environment variable that adds the stack trace to <c>SQLSRC200</c>.
     /// </summary>
     internal const string DebugVariable = "SQLSOURCE_DEBUG";
@@ -32,7 +37,7 @@ public static class Cli
     /// under each error, and this one line says how to get a record of the run.  A test that compares the whole of
     /// standard error of such a run ends its text with <c>DescribeScene.RunAgain</c>.
     /// </summary>
-    internal const string RunAgainLine = "sqlsource: run again with --log <file> for a record of what the run did";
+    internal const string RunAgainLine = LinePrefix + "run again with --log <file> for a record of what the run did";
 
     /// <summary>
     /// How System.CommandLine reads a command line for the tool.
@@ -254,7 +259,7 @@ public static class Cli
             // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
             // it may repeat a token.  The values of the options that take one are held too: the run reads them
             // from Usage, and the log's arguments is redacted from it, while System.CommandLine gives the log's path.
-            await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
+            await host.Error.WriteLineAsync(LinePrefix + "the command line is not valid");
             return null;
         }
 

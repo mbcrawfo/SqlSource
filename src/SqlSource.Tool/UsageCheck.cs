@@ -56,7 +56,7 @@ internal static class UsageCheck
         {
             if (option.Arity.MaximumNumberOfValues == 1 && !givenOnce.Add(option))
             {
-                messages.Add($"sqlsource: option '{name}' is given more than once");
+                messages.Add($"{Cli.LinePrefix}option '{name}' is given more than once");
                 return;
             }
 
@@ -78,8 +78,8 @@ internal static class UsageCheck
                     // found before it is reported beside it.  The token itself may be a secret typed as an option,
                     // as -pS3cret is, so it is named only when it is a misspelling of an option of the tool.
                     var line = IsNearAnOption(root, name)
-                        ? $"sqlsource: unknown option '{OneLine.Of(name)}'"
-                        : $"sqlsource: unknown option at position {index}";
+                        ? $"{Cli.LinePrefix}unknown option '{OneLine.Of(name)}'"
+                        : $"{Cli.LinePrefix}unknown option at position {index}";
                     return new Usage(command, arguments, [], [line]) { Flags = flags };
                 }
 
@@ -93,7 +93,7 @@ internal static class UsageCheck
 
                     if (hasSeparator)
                     {
-                        messages.Add($"sqlsource: option '{name}' takes no value");
+                        messages.Add($"{Cli.LinePrefix}option '{name}' takes no value");
                     }
                 }
                 else if (hasSeparator)
@@ -102,7 +102,7 @@ internal static class UsageCheck
                     // value and takes the next token for one, so every token after it would be read one place off.
                     if (token.Length == name.Length + 1)
                     {
-                        messages.Add($"sqlsource: option '{name}' needs a value");
+                        messages.Add($"{Cli.LinePrefix}option '{name}' needs a value");
                     }
                     else
                     {
@@ -115,7 +115,7 @@ internal static class UsageCheck
                     // command or is "--": System.CommandLine takes neither for a value.
                     if (index == args.Count || IsOption(args[index], options))
                     {
-                        messages.Add($"sqlsource: option '{name}' needs a value");
+                        messages.Add($"{Cli.LinePrefix}option '{name}' needs a value");
                     }
                     else
                     {
@@ -136,7 +136,7 @@ internal static class UsageCheck
             }
             else
             {
-                messages.Add($"sqlsource: unexpected argument at position {index}");
+                messages.Add($"{Cli.LinePrefix}unexpected argument at position {index}");
             }
         }
 
