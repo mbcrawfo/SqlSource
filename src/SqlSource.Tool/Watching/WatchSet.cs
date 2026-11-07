@@ -90,8 +90,8 @@ internal sealed class WatchSet
     /// exists above it in the project's repository, with their folders below; and each other folder that holds a listed
     /// file, or may hold a settings file of one, the run's <c>.env</c> file or a <c>Directory.*</c> file, or is above
     /// the unit's folder or an assets file's folder in its repository, alone.  So each folder above one of these, up to
-    /// the root of its repository, is watched too, and under the system's events sees it deleted or made, which a
-    /// poller of a folder alone does not; outside a repository the folder above each is watched alone.  None is below
+    /// the root of its repository, is watched too, and sees it deleted or made, a poller of a folder alone included;
+    /// outside a repository the folder above each is watched alone.  None is below
     /// another that is watched with its folders below, but the folder of the run's <c>.env</c> file when it is below a
     /// <c>bin</c>, <c>obj</c> or <c>.git</c> folder of one, which a poller does not list; and none is there twice.  A
     /// folder may not exist, which the session skips.

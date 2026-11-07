@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Testing;
+using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 
@@ -347,14 +348,14 @@ public sealed class WatchFolderTests : IAsyncDisposable
         var polled = PollAllButTheProject();
         await StartAsync();
         var pollers = _watch.Clock.PendingTimers;
-        polled.ShouldBe([_watch.Run.Folder.Path]);
+        FoldersOf(polled).ShouldBe([_watch.Run.Folder.Path]);
 
         _ = Directory.CreateDirectory(_shared);
         WriteSettings();
         _watch.Clock.Advance(PollingFolderWatcher.Interval);
         await PassAsync(_watch, pollers, 2);
 
-        polled.ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
+        FoldersOf(polled).ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
         File.SetLastWriteTimeUtc(_settings, File.GetLastWriteTimeUtc(_settings).AddMinutes(1));
         _watch.Clock.Advance(PollingFolderWatcher.Interval);
         await PassAsync(_watch, pollers: 3, 3);
@@ -373,7 +374,7 @@ public sealed class WatchFolderTests : IAsyncDisposable
         var polled = PollAllButTheProject();
         await StartAsync();
         var pollers = _watch.Clock.PendingTimers;
-        polled.ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
+        FoldersOf(polled).ShouldBe([_watch.Run.Folder.Path, _libs, _shared]);
 
         Directory.Delete(_shared, recursive: true);
         _watch.Clock.Advance(PollingFolderWatcher.Interval);
@@ -385,13 +386,69 @@ public sealed class WatchFolderTests : IAsyncDisposable
         WatchTests.PassStarts(LogPath)[1].Evaluated.ShouldBeTrue();
     }
 
+    // Under polling, a folder deleted together with the folder above it: the root's watch sees the topmost folder
+    // deleted, so the failed listing of the folder below is no error, even when it comes during the evaluation that the
+    // deletion starts, which closes both their watches before the loop reports.  Each poller lists when the test says,
+    // since the clock never reaches their interval.
+    [Fact]
+    public async Task Watch_PolledFolderDeletedWithTheFolderAboveIt_ReportsNoError()
+    {
+        WriteSettings();
+        var polled = PollAllButTheProject();
+        await StartAsync();
+        var pollers = _watch.Clock.PendingTimers;
+        var gate = new ProcessGate();
+        _watch.Run.Processes.BeforeAnswer = gate.PassAsync;
+
+        Directory.Delete(_libs, recursive: true);
+        PollerOf(polled, _watch.Run.Folder.Path).Poll();
+        await Eventually.TrueAsync(() => _watch.Clock.PendingTimers > pollers, "The watch did not begin to wait.");
+        _watch.Clock.Advance(WatchSession.Debounce);
+        var request = await gate.ArrivalAsync();
+        while (!FakeProcessRunner.IsManifestRun(request))
+        {
+            gate.Release(request);
+            request = await gate.ArrivalAsync();
+        }
+
+        PollerOf(polled, _shared).Poll();
+        gate.Open();
+        await _watch.PassesAsync(2);
+
+        _watch.Errors.ShouldNotContain("SQLSRC287");
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
+    // Under polling, a folder watched alone below a folder watched with its folders below, as the folder of a .env file
+    // in bin is, is reported when it is deleted: that watch lists nothing of bin, so nothing else sees the deletion.
+    [Fact]
+    public async Task Watch_PolledFolderGoneBelowAFolderWatchedWithItsFolders_IsReported()
+    {
+        var bin = _watch.Run.Folder.CreateFolder("App/bin");
+        _ = _watch.Run.Folder.WriteFile("App/bin/.env", "");
+        var polled = PollAllButTheProject();
+        await _watch.StartAsync("App/App.csproj", "--log", "run.log", "--env-file", "App/bin/.env");
+        var pollers = _watch.Clock.PendingTimers;
+        FoldersOf(polled).ShouldContain(bin);
+
+        Directory.Delete(bin, recursive: true);
+        PollerOf(polled, bin).Poll();
+        await PassAsync(_watch, pollers, 2);
+
+        _watch
+            .Errors.Split('\n')
+            .Count(line => line.Contains($"error SQLSRC287: watching '{bin}'", StringComparison.Ordinal))
+            .ShouldBe(1);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     // Polls every folder on the test's clock but the project's, which each evaluation of the scene writes a settings
-    // file in, and gives the folders polled, in the order their watches were made.
-    private List<string> PollAllButTheProject()
+    // file in, and gives the pollers, in the order their watches were made.
+    private List<(string Folder, PollingFolderWatcher Poller)> PollAllButTheProject()
     {
         _watch.Run.Environment[WatchSession.PollingVariable] = "true";
         var project = Path.GetDirectoryName(_watch.Project.ProjectPath);
-        var polled = new List<string>();
+        var polled = new List<(string Folder, PollingFolderWatcher Poller)>();
         _watch.Run.Watch = request =>
         {
             if (request.Folder == project)
@@ -399,11 +456,20 @@ public sealed class WatchFolderTests : IAsyncDisposable
                 return _watch.Watcher.Watch(request);
             }
 
-            polled.Add(request.Folder);
-            return new PollingFolderWatcher(request, _watch.Clock, PollingFolderWatcher.Interval);
+            var poller = new PollingFolderWatcher(request, _watch.Clock, PollingFolderWatcher.Interval);
+            polled.Add((request.Folder, poller));
+            return poller;
         };
         return polled;
     }
+
+    private static string[] FoldersOf(List<(string Folder, PollingFolderWatcher Poller)> polled) =>
+        [.. polled.Select(entry => entry.Folder)];
+
+    private static PollingFolderWatcher PollerOf(
+        List<(string Folder, PollingFolderWatcher Poller)> polled,
+        string folder
+    ) => polled.Last(entry => entry.Folder == folder).Poller;
 
     // A stale poller closed while it reports a change: its report waits for the session's lock, and closing it waits
     // for its report, so the session must not hold the lock while it closes a watch.  The poll is held inside its

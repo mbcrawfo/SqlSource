@@ -134,7 +134,8 @@ internal sealed class PollingFolderWatcher : IDisposable
             if (info is DirectoryInfo directory)
             {
                 // A watch of the folder alone lists the name of each folder in it, whatever its name, and nothing it
-                // holds: an artifacts layout watches artifacts alone until a restore makes obj in it.
+                // holds, as the system's watch tells of them: artifacts, watched alone above an assets folder
+                // artifacts/obj/App, sees obj deleted.
                 if (!_request.Recursive)
                 {
                     listing[directory.FullName] = Entry.OfFolder;

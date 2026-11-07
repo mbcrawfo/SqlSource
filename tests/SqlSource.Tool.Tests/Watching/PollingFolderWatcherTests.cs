@@ -187,7 +187,7 @@ public sealed class PollingFolderWatcherTests
         scene.Seen.ShouldBe([new FileChange(FileChangeKind.Deleted, queries, IsFolder: false)]);
     }
 
-    // A folder of any name, since an artifacts layout watches artifacts alone until a restore makes obj in it.
+    // A folder of any name: artifacts, watched alone above an assets folder artifacts/obj/App, sees obj deleted.
     [Theory]
     [InlineData("bin")]
     [InlineData("obj")]

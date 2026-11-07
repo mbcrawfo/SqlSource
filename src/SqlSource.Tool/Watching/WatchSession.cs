@@ -475,18 +475,30 @@ internal sealed class WatchSession
         }
     }
 
-    // True for the failure of a folder that is gone, below a folder with a watch of its own alone: that watch sees the
-    // deletion, which asks what it must, so the failure, as a poller's failed listing of its folder, is no error of its
-    // own; the system's events take the same deletion without a word.  Its order with the deletion is not known, since
-    // each poller lists on a timer of its own, so the disk decides.  A folder that is there but cannot be read, or one
-    // with no such watch above it, is still reported.  On the loop, which alone reads _watches.
+    // True for the failure of a folder that is gone, whose nearest folder above that is there has a watch of its own
+    // alone: that watch lists every folder in it, so it sees the topmost folder deleted, which asks what it must, and
+    // the failure is no error of its own.  It is a poller's failed listing of its folder, or on macOS the error of the
+    // system's watch of a deleted folder; on Linux that watch says nothing.  Its order with the deletion is not known,
+    // since each poller lists on a timer of its own and the evaluation that the deletion starts closes the watches
+    // below, so the disk decides.  A folder that is there but cannot be read, or one with no such watch above it, is
+    // still reported.  On the loop, which alone reads _watches.
     private bool SeenFromAbove(WatchFailure failure)
     {
         var folder = Path.TrimEndingDirectorySeparator(failure.Folder);
-        return Path.GetDirectoryName(folder) is { } above
+        if (Directory.Exists(folder))
+        {
+            return false;
+        }
+
+        var above = Path.GetDirectoryName(folder);
+        while (above is not null && !Directory.Exists(above))
+        {
+            above = Path.GetDirectoryName(above);
+        }
+
+        return above is not null
             && _watches.TryGetValue(above, out var watch)
-            && watch is { Recursive: false, Watch: not null }
-            && !Directory.Exists(folder);
+            && watch is { Recursive: false, Watch: not null };
     }
 
     // Under _gate.  A change held through an evaluation keeps the time it came, which may be before the last one kept.
