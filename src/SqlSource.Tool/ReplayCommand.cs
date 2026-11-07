@@ -47,37 +47,41 @@ internal static class ReplayCommand
 
     private const string BundleArgument = "bundle";
 
-    private const string VerboseOption = "--verbose";
-
     private static readonly JsonSerializerOptions EntryOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    /// <summary>
+    /// The command as <see cref="Cli" /> runs it: it always reads <c>SQLSOURCE_LOG</c>, writes its errors as they are,
+    /// and never ends with <c>Cli.RunAgainLine</c>.
+    /// </summary>
+    public static ToolCommand Entry =>
+        new()
+        {
+            Name = Name,
+            Create = Create,
+            CheckUsage = CheckUsage,
+            ReadsValuesAs = ReadsValuesAs,
+            ReadsLogVariable = static _ => true,
+            WritesOneLine = static _ => false,
+            MayPoint = static _ => false,
+            Bind = static (parsed, usage, host, reporter, _) => Bind(parsed, usage, host, reporter),
+        };
+
     public static Command Create()
     {
-        // The rules of DescribeCommand.Create hold: a flag has Arity = ArgumentArity.Zero, and an option that takes a
-        // value takes exactly one.  --log is describe's, with its name, its variable and its rules.
+        // The rules of SharedOptions hold, and --log is the one of SharedOptions, with its variable and its rules.
         var bundle = new Argument<string>(BundleArgument)
         {
             Description = "A bundle: the zip, or the folder it was unzipped to.",
             Arity = ArgumentArity.ExactlyOne,
         };
 
-        var verbose = new Option<bool>(VerboseOption)
-        {
-            Description = "Print every event of the replay, not only the decisions of the walk and the table match.",
-            Arity = ArgumentArity.Zero,
-        };
-
-        var log = new Option<string>(DescribeCommand.LogOption)
-        {
-            Description =
-                "Write what the run did to this file, one JSON object on a line.  The file is overwritten.  "
-                + $"{DescribeCommand.LogVariable} gives the path when the option does not.",
-            HelpName = "path",
-            Arity = ArgumentArity.ExactlyOne,
-        };
+        var verbose = SharedOptions.VerboseOption(
+            "Print every event of the replay, not only the decisions of the walk and the table match."
+        );
+        var log = SharedOptions.LogOption();
 
         return new Command(
             Name,
@@ -91,43 +95,13 @@ internal static class ReplayCommand
     }
 
     /// <summary>
-    /// Whether the command line runs <c>replay</c>: the command is named, and it is its own action that runs and not
-    /// the help's, as <see cref="DescribeCommand.Runs" /> says it of <c>describe</c>.
-    /// </summary>
-    public static bool Runs(ParseResult parsed) =>
-        parsed.CommandResult.Command.Name == Name
-        && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
-
-    /// <summary>Whether a <c>replay</c> that runs was given <c>--verbose</c>.</summary>
-    public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
-
-    /// <summary>
-    /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when the
-    /// run has none, as <see cref="DescribeCommand.LogPathOf" /> reads it for <c>describe</c>.
-    /// </summary>
-    public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
-    {
-        if (!Runs(parsed))
-        {
-            return null;
-        }
-
-        if (parsed.GetValue<string>(DescribeCommand.LogOption) is { } option)
-        {
-            return option;
-        }
-
-        var variable = getEnvironmentVariable(DescribeCommand.LogVariable);
-        return string.IsNullOrWhiteSpace(variable) ? null : variable;
-    }
-
-    /// <summary>
     /// What is wrong with a command line of <c>replay</c> by the command's own rules, each a whole line to write.
     /// Empty for another command.
     /// </summary>
     /// <remarks>
     /// System.CommandLine needs the bundle and says so with a message of its own, so the line that asks for it is
-    /// written here, unless the help is asked for.  A value of <c>--log</c> is held to <c>describe</c>'s rule.
+    /// written here, unless the help is asked for.  A value of <c>--log</c> is held to the rule of
+    /// <see cref="SharedOptions.ProblemOfLogPath" /> without <c>--online</c>.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -143,7 +117,10 @@ internal static class ReplayCommand
         }
 
         messages.AddRange(
-            LogsOf(usage).Select(static log => DescribeCommand.ProblemOfLogPath(log, isOnline: false)).OfType<string>()
+            SharedOptions
+                .ValuesOf(usage, SharedOptions.Log)
+                .Select(static log => SharedOptions.ProblemOfLogPath(log, isOnline: false))
+                .OfType<string>()
         );
         return messages;
     }
@@ -153,18 +130,12 @@ internal static class ReplayCommand
     /// other than <c>replay</c>.
     /// </summary>
     public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
-        usage.Command.Name != Name
-        || LogsOf(usage)
-            .Select(static value => value.Text)
-            .SequenceEqual(
-                parsed.GetValue<string>(DescribeCommand.LogOption) is { } log ? [log] : [],
-                StringComparer.Ordinal
-            );
+        usage.Command.Name != Name || SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Log);
 
     /// <summary>
     /// Gives the <c>replay</c> that a command line runs its action, once the run has its reporter.
     /// </summary>
-    /// <param name="parsed">A command line for which <see cref="Runs" /> is true.</param>
+    /// <param name="parsed">A command line that runs <c>replay</c>, by <see cref="SharedOptions.Runs" />.</param>
     /// <param name="usage">The same command line as <see cref="UsageCheck" /> read it, which gives the bundle.</param>
     /// <param name="host">What the run takes from outside.</param>
     /// <param name="reporter">
@@ -175,7 +146,7 @@ internal static class ReplayCommand
             (command, cancellationToken) =>
                 ReplayAsync(
                     usage.Values.Single(static value => value.Option is null),
-                    IsVerbose(command),
+                    SharedOptions.IsVerbose(command, Name),
                     host,
                     reporter,
                     cancellationToken
@@ -334,8 +305,4 @@ internal static class ReplayCommand
         ];
         return ToolDiagnostic.Create(error.Descriptor, arguments).WithLines(new ContinuationLine("bundle", named));
     }
-
-    // The values of --log, in order.
-    private static UsageValue[] LogsOf(Usage usage) =>
-        [.. usage.Values.Where(static value => value.Option?.Name == DescribeCommand.LogOption)];
 }

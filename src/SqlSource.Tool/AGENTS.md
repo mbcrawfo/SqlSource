@@ -52,6 +52,6 @@ Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 - **A wrong command line is reported by `UsageCheck.cs`, before System.CommandLine reads it, and never repeats a token's text**, since a token can be a secret ([reading a command line](../../docs/architecture/tool.md#reading-a-command-line)).  Its lines have no id and do not go through the reporter.
 - **`UsageCheck` and System.CommandLine must read a command line the same way**, or `Cli` runs nothing.  The remarks of `UsageCheck.cs` name the tests that hold them together, which a new option joins.
 - **A command's own rules for its values are in the command**, as `DescribeCommand.CheckUsage`, whose lines name a position and never a token.
-- **An option is declared by the rules at the top of `DescribeCommand.Create`**, so that `UsageCheck` reads it right.
+- **An option is declared by the rules in the remarks of `SharedOptions`**, so that `UsageCheck` reads it right.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

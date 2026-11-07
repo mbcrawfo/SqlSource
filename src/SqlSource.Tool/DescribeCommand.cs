@@ -31,21 +31,11 @@ internal static class DescribeCommand
 
     private const string PathArgument = "path";
 
-    internal const string ProjectOption = "--project";
-
     internal const string DatabaseOption = "--database";
-
-    internal const string ConnectionOption = "--connection";
 
     private const string ForceOption = "--force";
 
     private const string CheckOption = "--check";
-
-    private const string VerboseOption = "--verbose";
-
-    internal const string LogOption = "--log";
-
-    internal const string EnvFileOption = "--env-file";
 
     internal const string ManifestOption = "--manifest";
 
@@ -56,18 +46,26 @@ internal static class DescribeCommand
     private const string OnlineTrue = "true";
     internal const string WatchOption = "--watch";
 
-    /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
-    internal const string LogVariable = "SQLSOURCE_LOG";
+    /// <summary>
+    /// The command as <see cref="Cli" /> runs it.  Under <c>--online</c> it reads no <c>SQLSOURCE_LOG</c>, writes
+    /// each error on one line and never ends with <c>Cli.RunAgainLine</c>, and a watch never ends with it either.
+    /// </summary>
+    public static ToolCommand Entry =>
+        new()
+        {
+            Name = Name,
+            Create = Create,
+            CheckUsage = CheckUsage,
+            ReadsValuesAs = ReadsValuesAs,
+            ReadsLogVariable = static parsed => OnlineOf(parsed) == OnlineMode.Off,
+            WritesOneLine = static parsed => OnlineOf(parsed) != OnlineMode.Off,
+            MayPoint = static parsed => OnlineOf(parsed) == OnlineMode.Off && !Watches(parsed),
+            Bind = Bind,
+        };
 
     public static Command Create()
     {
-        // Every option is declared so that UsageCheck reads it right.  A flag has Arity = ArgumentArity.Zero:
-        // System.CommandLine's default for a bool takes an optional value, and the token after the flag would be read
-        // as that value.  An option that takes a value takes exactly one each time it is given: ExactlyOne when it is
-        // given once, and an array with OneOrMore when it may be repeated, since System.CommandLine rejects a second
-        // ExactlyOne.  UsageCheck rejects that second one itself, since System.CommandLine's message repeats the
-        // value.  An option is added to --help in the change that gives it an effect, not before: one that is read
-        // and checked earlier is Hidden until then.
+        // The rules of SharedOptions hold: every option is declared so that UsageCheck reads it right.
 
         // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
         var path = new Argument<string[]>(PathArgument)
@@ -78,15 +76,7 @@ internal static class DescribeCommand
             Arity = ArgumentArity.ZeroOrMore,
         };
 
-        // One value each time it is given, and it may be given several times: UsageCheck reads the token after it as
-        // its value and no further.
-        var project = new Option<string[]>(ProjectOption)
-        {
-            Description = "A project to run on, of the solution.  May be given several times.",
-            HelpName = "path",
-            Arity = ArgumentArity.OneOrMore,
-            AllowMultipleArgumentsPerToken = false,
-        };
+        var project = SharedOptions.ProjectOption();
 
         // It selects queries: what is described, what is written, and what the summary counts.
         var database = new Option<string[]>(DatabaseOption)
@@ -97,15 +87,7 @@ internal static class DescribeCommand
             AllowMultipleArgumentsPerToken = false,
         };
 
-        // Always a name, "=" and a value.  CheckUsage holds each to that, and a message never repeats one.
-        var connection = new Option<string[]>(ConnectionOption)
-        {
-            Description =
-                "The connection string of a database, as <name>=<connection string>.  May be given several times.",
-            HelpName = "name=value",
-            Arity = ArgumentArity.OneOrMore,
-            AllowMultipleArgumentsPerToken = false,
-        };
+        var connection = SharedOptions.ConnectionOption();
 
         var force = new Option<bool>(ForceOption)
         {
@@ -123,29 +105,11 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
-        var verbose = new Option<bool>(VerboseOption)
-        {
-            Description = "Say what the run decides for each project, file, database and query, as it goes.",
-            Arity = ArgumentArity.Zero,
-        };
-
-        var log = new Option<string>(LogOption)
-        {
-            Description =
-                "Write what the run did to this file, one JSON object on a line.  The file is overwritten.  "
-                + $"{LogVariable} gives the path when the option does not.",
-            HelpName = "path",
-            Arity = ArgumentArity.ExactlyOne,
-        };
-
-        var envFile = new Option<string>(EnvFileOption)
-        {
-            Description =
-                "Read the connections from this .env file instead of the one in the folder of the solution or "
-                + "project; 'none' reads none.",
-            HelpName = "path",
-            Arity = ArgumentArity.ExactlyOne,
-        };
+        var verbose = SharedOptions.VerboseOption(
+            "Say what the run decides for each project, file, database and query, as it goes."
+        );
+        var log = SharedOptions.LogOption();
+        var envFile = SharedOptions.EnvFileOption();
 
         // The two options of the build that calls the tool.  Each takes exactly one value, given once.
         var manifest = new Option<string>(ManifestOption)
@@ -282,13 +246,13 @@ internal static class DescribeCommand
 
         var units = 0;
         var connections = new HashSet<string>(DatabaseName.Comparer);
-        var hasConnection = usage.Values.Any(static value => value.Option?.Name == ConnectionOption);
+        var hasConnection = usage.Values.Any(static value => value.Option?.Name == SharedOptions.Connection);
         var isOnline = IsOnline(usage);
         foreach (var value in usage.Values)
         {
             if (value.Option is null)
             {
-                if (hasConnection && SplitConnectionOf(value) is { } split)
+                if (hasConnection && SharedOptions.SplitConnectionOf(value) is { } split)
                 {
                     messages.Add(split);
                 }
@@ -304,21 +268,24 @@ internal static class DescribeCommand
                         + "database name"
                 );
             }
-            else if (value.Option.Name == LogOption)
+            else if (value.Option.Name == SharedOptions.Log)
             {
-                if (ProblemOfLogPath(value, isOnline) is { } problem)
+                if (SharedOptions.ProblemOfLogPath(value, isOnline) is { } problem)
                 {
                     messages.Add(problem);
                 }
             }
-            else if (value.Option.Name == EnvFileOption)
+            else if (value.Option.Name == SharedOptions.EnvFile)
             {
-                if (ProblemOfEnvFile(value, isOnline) is { } problem)
+                if (SharedOptions.ProblemOfEnvFile(value, isOnline) is { } problem)
                 {
                     messages.Add(problem);
                 }
             }
-            else if (value.Option.Name == ConnectionOption && ProblemOfConnection(value, connections) is { } problem)
+            else if (
+                value.Option.Name == SharedOptions.Connection
+                && SharedOptions.ProblemOfConnection(value, connections) is { } problem
+            )
             {
                 messages.Add(problem);
             }
@@ -328,43 +295,11 @@ internal static class DescribeCommand
         return messages;
     }
 
-    /// <summary>
-    /// What is wrong with an argument on a line with a <c>--connection</c>, as a whole line, or null: one that holds
-    /// <c>=</c> or <c>;</c> is taken for the rest of a value that the shell split.  <c>diagnose</c> holds its
-    /// arguments to the same rule.
-    /// </summary>
-    internal static string? SplitConnectionOf(UsageValue argument) =>
-        argument.Text.AsSpan().IndexOfAny('=', ';') >= 0
-            ? $"{Cli.LinePrefix}the argument at position {argument.Position} looks like a part of a connection string; "
-                + $"put the value of '{ConnectionOption}' in quotes"
-            : null;
-
-    /// <summary>
-    /// What is wrong with a value of <c>--connection</c>, as a whole line, or null: it is not a name, <c>=</c> and a
-    /// value, or it names a database that an earlier one names.  <c>diagnose</c> holds its values to the same rule.
-    /// </summary>
-    /// <param name="value">The value.</param>
-    /// <param name="named">The names of the earlier values, which gains this one's.</param>
-    internal static string? ProblemOfConnection(UsageValue value, HashSet<string> named)
-    {
-        if (!ConnectionArgument.TryParse(value.Text, out var connection))
-        {
-            return $"{Cli.LinePrefix}the value of option '{ConnectionOption}' at position {value.Position} is not "
-                + "<name>=<connection string>";
-        }
-
-        return named.Add(connection.Name)
-            ? null
-            : $"{Cli.LinePrefix}option '{ConnectionOption}' at position {value.Position} names a database that an "
-                + "earlier "
-                + "one names";
-    }
-
     // The rules of --manifest and --online.  A run from a manifest is on the one project the manifest names, so
     // nothing else names what to run, and --online is the build's word about that run.
     private static void CheckManifestUsage(Usage usage, List<string> messages)
     {
-        var manifests = ValuesOf(usage, ManifestOption);
+        var manifests = SharedOptions.ValuesOf(usage, ManifestOption);
         var isOnline = IsOnline(usage);
         messages.AddRange(manifests.Select(manifest => ProblemOfManifestPath(manifest, isOnline)).OfType<string>());
 
@@ -386,7 +321,7 @@ internal static class DescribeCommand
             }
         }
 
-        var onlines = ValuesOf(usage, OnlineOption);
+        var onlines = SharedOptions.ValuesOf(usage, OnlineOption);
         messages.AddRange(
             onlines
                 .Where(static online => OnlineModeOf(online.Text) is null)
@@ -408,54 +343,10 @@ internal static class DescribeCommand
     // What --online said, as OnlineOf(ParseResult) reads it, for the steps that have only the usage, a watch's passes
     // among them.  A watch is never online: --online needs --manifest, which takes no --watch.
     private static OnlineMode OnlineOf(Usage usage) =>
-        ValuesOf(usage, OnlineOption) is [{ } online]
+        SharedOptions.ValuesOf(usage, OnlineOption) is [{ } online]
             ? OnlineModeOf(online.Text)
                 ?? throw new InvalidOperationException("An --online that is no mode was let through.")
             : OnlineMode.Off;
-
-    /// <summary>
-    /// What is wrong with a value of <c>--log</c> as a path, as a whole line, or null: it is no path, or, without
-    /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.  <c>replay</c> and <c>diagnose</c> hold their <c>--log</c> to
-    /// the same rule.
-    /// </summary>
-    /// <param name="log">The value of <c>--log</c>.</param>
-    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
-    internal static string? ProblemOfLogPath(UsageValue log, bool isOnline) =>
-        ProblemOfPath(log, LogOption, "a log's path", isOnline);
-
-    /// <summary>
-    /// What is wrong with a value of <c>--env-file</c> as a path, as a whole line, or null, by the rule of
-    /// <c>--log</c>.  <c>diagnose</c> holds its <c>--env-file</c> to the same rule.
-    /// </summary>
-    /// <param name="envFile">The value of <c>--env-file</c>.</param>
-    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
-    internal static string? ProblemOfEnvFile(UsageValue envFile, bool isOnline) =>
-        ProblemOfPath(envFile, EnvFileOption, "a .env file's path", isOnline);
-
-    /// <summary>
-    /// What is wrong with the value of an option that is a path, as a whole line, or null: it is no path, or, without
-    /// <c>--online</c>, it holds <c>=</c> or <c>;</c>.
-    /// </summary>
-    /// <param name="value">The value.</param>
-    /// <param name="option">The option's name.</param>
-    /// <param name="ofWhat">What the path is of, as the line names it: <c>a log's path</c>.</param>
-    /// <param name="isOnline">Whether the run is the build's, under <c>--online</c>, whose paths are its own.</param>
-    internal static string? ProblemOfPath(UsageValue value, string option, string ofWhat, bool isOnline)
-    {
-        // What --log "$UNSET" gives.
-        if (string.IsNullOrWhiteSpace(value.Text))
-        {
-            return $"{Cli.LinePrefix}the value of option '{option}' at position {value.Position} is not a path";
-        }
-
-        // "=" and ";" are what a connection string is made of: the value may be one typed after the option.  The
-        // build's paths may hold them, as a project's name may, and the owner ruled that a path the build writes is
-        // no secret, so under --online a message prints such a path in full.
-        return !isOnline && !value.MayBePrintedAsPath
-            ? $"{Cli.LinePrefix}the value of option '{option}' at position {value.Position} holds '=' or ';', which "
-                + $"{ofWhat} may not"
-            : null;
-    }
 
     // What is wrong with the value of --manifest as a path, as a whole line, or null.  Without --online a path that
     // holds "=" or ";" is refused, as one of --log is: it may be a connection string typed after the option.
@@ -491,7 +382,7 @@ internal static class DescribeCommand
         value.Option?.Name switch
         {
             null => SqlPath.IsSqlFile(value.Text) ? ".sql path" : "path",
-            ProjectOption => $"'{ProjectOption}'",
+            SharedOptions.Project => $"'{SharedOptions.Project}'",
             DatabaseOption => $"'{DatabaseOption}'",
             _ => null,
         };
@@ -507,48 +398,12 @@ internal static class DescribeCommand
             : OnlineMode.Off;
 
     /// <summary>
-    /// Whether the command line runs <c>describe</c>: the command is named, and it is its own action that runs
-    /// and not the help's.  Until <see cref="Bind" /> gives the command its action it has none, and neither has a
-    /// command line that runs it, so the answer is the same before and after.
+    /// Whether the command line runs <c>describe</c>, and not its help, by <see cref="SharedOptions.Runs" />.
     /// </summary>
-    public static bool Runs(ParseResult parsed) =>
-        parsed.CommandResult.Command.Name == Name
-        && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
-
-    /// <summary>Whether a <c>describe</c> that runs was given <c>--verbose</c>.</summary>
-    public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
+    public static bool Runs(ParseResult parsed) => SharedOptions.Runs(parsed, Name);
 
     /// <summary>Whether a <c>describe</c> that runs was given <c>--watch</c>.</summary>
     public static bool Watches(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(WatchOption);
-
-    /// <summary>
-    /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when
-    /// the run has none.  A command line that does not run <c>describe</c> has none: the help must not empty the
-    /// log of the last run.  A variable that is empty or white space is not set, and a run under <c>--online</c>
-    /// does not read it.
-    /// </summary>
-    public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
-    {
-        if (!Runs(parsed))
-        {
-            return null;
-        }
-
-        if (parsed.GetValue<string>(LogOption) is { } option)
-        {
-            return option;
-        }
-
-        // The build passes --log, with a path of its own for each project and framework, when SQLSOURCE_LOG asks for
-        // logs.  Read here too, the projects built at once would open one file.
-        if (OnlineOf(parsed) != OnlineMode.Off)
-        {
-            return null;
-        }
-
-        var variable = getEnvironmentVariable(LogVariable);
-        return string.IsNullOrWhiteSpace(variable) ? null : variable;
-    }
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
@@ -564,36 +419,14 @@ internal static class DescribeCommand
     public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
         usage.Command.Name != Name
         || (
-            ReadsAs(usage, parsed, ProjectOption)
-            && ReadsAs(usage, parsed, DatabaseOption)
-            && ReadsAs(usage, parsed, ConnectionOption)
-            && ReadsAsOne(usage, parsed, LogOption)
-            && ReadsAsOne(usage, parsed, EnvFileOption)
-            && ReadsAsOne(usage, parsed, ManifestOption)
-            && ReadsAsOne(usage, parsed, OnlineOption)
+            SharedOptions.ReadsAs(usage, parsed, SharedOptions.Project)
+            && SharedOptions.ReadsAs(usage, parsed, DatabaseOption)
+            && SharedOptions.ReadsAs(usage, parsed, SharedOptions.Connection)
+            && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.Log)
+            && SharedOptions.ReadsAsOne(usage, parsed, SharedOptions.EnvFile)
+            && SharedOptions.ReadsAsOne(usage, parsed, ManifestOption)
+            && SharedOptions.ReadsAsOne(usage, parsed, OnlineOption)
         );
-
-    /// <summary>
-    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave an option that may be repeated the same values,
-    /// in the same order.
-    /// </summary>
-    internal static bool ReadsAs(Usage usage, ParseResult parsed, string option) =>
-        ValuesOf(usage, option)
-            .Select(static value => value.Text)
-            .SequenceEqual(parsed.GetValue<string[]>(option) ?? [], StringComparer.Ordinal);
-
-    /// <summary>
-    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave an option that takes one value, given once, the
-    /// same value.
-    /// </summary>
-    internal static bool ReadsAsOne(Usage usage, ParseResult parsed, string option) =>
-        ValuesOf(usage, option)
-            .Select(static value => value.Text)
-            .SequenceEqual(parsed.GetValue<string>(option) is { } text ? [text] : [], StringComparer.Ordinal);
-
-    /// <summary>The values of an option, in order.</summary>
-    internal static ImmutableArray<UsageValue> ValuesOf(Usage usage, string option) =>
-        [.. usage.Values.Where(value => value.Option?.Name == option)];
 
     // The arguments of the command: the unit, and the .sql paths.
     private static ImmutableArray<UsageValue> ArgumentsOf(Usage usage) =>
@@ -605,7 +438,9 @@ internal static class DescribeCommand
     private static DescribeOptions OptionsOf(Usage usage, RunUnit unit, RunPlan plan, RunMode mode, ToolHost host) =>
         new(
             mode,
-            ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
+            SharedOptions.ValuesOf(usage, SharedOptions.Project).Length > 0
+                || !plan.Filters.Files.IsEmpty
+                || !plan.Filters.Databases.IsEmpty,
             ConnectionsOf(usage),
             plan.Filters.Databases,
             UnitFolderOf(unit),
@@ -625,7 +460,7 @@ internal static class DescribeCommand
     /// <param name="host">The working folder, which a relative path is from.</param>
     internal static string? EnvFileOf(Usage usage, string unitFolder, ToolHost host) =>
         DotEnvSearch.FileOf(
-            ValuesOf(usage, EnvFileOption) is [{ } value] ? value.Text : null,
+            SharedOptions.ValuesOf(usage, SharedOptions.EnvFile) is [{ } value] ? value.Text : null,
             unitFolder,
             host.WorkingDirectory
         );
@@ -637,7 +472,7 @@ internal static class DescribeCommand
     internal static ImmutableArray<ConnectionArgument> ConnectionsOf(Usage usage)
     {
         var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
-        foreach (var value in ValuesOf(usage, ConnectionOption))
+        foreach (var value in SharedOptions.ValuesOf(usage, SharedOptions.Connection))
         {
             connections.Add(
                 ConnectionArgument.TryParse(value.Text, out var connection)
@@ -695,7 +530,7 @@ internal static class DescribeCommand
     {
         RunUnit unit;
         ImmutableArray<ProjectManifest> manifests;
-        if (ValuesOf(usage, ManifestOption) is [{ } manifestValue])
+        if (SharedOptions.ValuesOf(usage, ManifestOption) is [{ } manifestValue])
         {
             // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
             manifests = await RunProjects.FromManifestAsync(
@@ -756,7 +591,14 @@ internal static class DescribeCommand
         ToolHost host,
         Reporter reporter,
         CancellationToken cancellationToken
-    ) => RunProjects.FindAsync(unit, ValuesOf(usage, ProjectOption), host, reporter, cancellationToken);
+    ) =>
+        RunProjects.FindAsync(
+            unit,
+            SharedOptions.ValuesOf(usage, SharedOptions.Project),
+            host,
+            reporter,
+            cancellationToken
+        );
 
     /// <summary>
     /// The plan of the manifests, which <c>--database</c> and the <c>.sql</c> paths narrow, with what is wrong with it
@@ -775,7 +617,7 @@ internal static class DescribeCommand
             manifests,
             RunFilters.Create(
                 ArgumentsOf(usage).Where(static path => SqlPath.IsSqlFile(path.Text)),
-                ValuesOf(usage, DatabaseOption),
+                SharedOptions.ValuesOf(usage, DatabaseOption),
                 host.WorkingDirectory
             ),
             IsOnline(usage),
