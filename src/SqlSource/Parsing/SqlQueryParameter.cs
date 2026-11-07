@@ -30,9 +30,10 @@ namespace SqlSource.Parsing;
 /// list.  It follows from the SQL too.
 /// </param>
 /// <param name="HasNegatedUse">
-/// Whether a use of a list is one that a <c>NOT</c> negates, <c>id NOT IN @ids</c>, as <see cref="SqlListUses" />
-/// reads one.  An empty list makes such a use true of a row whose value is <c>NULL</c>, which the one value it is
-/// described as does not, so PostgreSQL's describer trusts no join the planner makes inner for it.  Never true of a
+/// Whether a use of a list is one that a <c>NOT</c> negates, <c>id NOT IN @ids</c>, or one whose truth is used as a
+/// value, <c>(id IN @ids) IS FALSE</c>, as <see cref="SqlListUses" /> reads them.  An empty list can make such a use
+/// true of a row whose value is <c>NULL</c>, which the one value it is described as does not, so PostgreSQL's describer
+/// trusts no join the planner makes inner for it.  Never true of a
 /// parameter that is no list.  It follows from the SQL too.
 /// </param>
 internal sealed record SqlQueryParameter(
