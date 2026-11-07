@@ -76,30 +76,19 @@ public sealed class OperandsQueryTests
     }
 
     // A CLR type, by its assembly or by the name of one of the system's, and a row of no type, may be a CLR type; an
-    // alias type such as sysname is none.  Each row here is of an operand answered not null.
+    // alias type such as sysname is none.  Each row is run with the operand answered null and not null.
     [Theory]
-    [InlineData(
-        "geometry",
-        "sys",
-        "geometry",
-        "Microsoft.SqlServer.Types.SqlGeometry, Microsoft.SqlServer.Types",
-        false
-    )]
-    [InlineData("dbo.Point", "dbo", "Point", "Shapes.Point, Shapes", false)]
-    [InlineData("geography", null, null, null, false)]
-    [InlineData("HierarchyId", null, null, null, false)]
-    [InlineData(null, null, null, null, false)]
-    [InlineData("nvarchar(128)", "sys", "sysname", null, true)]
-    [InlineData("int", null, null, null, true)]
+    [MemberData(nameof(ClrTypeRows))]
     public void AnswersOf_Type_NotClrAsTheRowSays(
         string? systemType,
         string? userSchema,
         string? userName,
         string? assembly,
-        bool notClr
+        bool notClr,
+        bool nullable
     )
     {
-        var row = OperandRow(1, nullable: false) with
+        var row = OperandRow(1, nullable: nullable) with
         {
             SystemTypeName = systemType,
             UserTypeSchema = userSchema,
@@ -109,7 +98,29 @@ public sealed class OperandsQueryTests
 
         OperandsQuery
             .AnswersOf(new SqlServerColumnsAnswer([row], null, null), 1)
-            .ShouldBe([new OperandFacts(NotNull: true, notClr)]);
+            .ShouldBe([new OperandFacts(NotNull: !nullable, notClr)]);
+    }
+
+    public static TheoryData<string?, string?, string?, string?, bool, bool> ClrTypeRows()
+    {
+        (string? SystemType, string? UserSchema, string? UserName, string? Assembly, bool NotClr)[] rows =
+        [
+            ("geometry", "sys", "geometry", "Microsoft.SqlServer.Types.SqlGeometry, Microsoft.SqlServer.Types", false),
+            ("dbo.Point", "dbo", "Point", "Shapes.Point, Shapes", false),
+            ("geography", null, null, null, false),
+            ("HierarchyId", null, null, null, false),
+            (null, null, null, null, false),
+            ("nvarchar(128)", "sys", "sysname", null, true),
+            ("int", null, null, null, true),
+        ];
+        var data = new TheoryData<string?, string?, string?, string?, bool, bool>();
+        foreach (var (systemType, userSchema, userName, assembly, notClr) in rows)
+        {
+            data.Add(systemType, userSchema, userName, assembly, notClr, true);
+            data.Add(systemType, userSchema, userName, assembly, notClr, false);
+        }
+
+        return data;
     }
 
     // Each answer that proves no operand of two, by why.

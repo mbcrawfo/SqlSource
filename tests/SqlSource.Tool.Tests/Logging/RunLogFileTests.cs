@@ -224,10 +224,14 @@ public sealed class RunLogFileTests : IDisposable
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("no-such-folder/run.log")]
-    [InlineData("folder")]
-    public void Open_PathThatCannotBeWritten_GivesNoLogAndTheErrorWithTheReason(string given)
+    // An empty path names the folder it is resolved against, itself a full path.
+    [InlineData("", "")]
+    [InlineData("no-such-folder/run.log", "no-such-folder/run.log")]
+    [InlineData("folder", "folder")]
+    public void Open_PathThatCannotBeWritten_GivesNoLogAndTheErrorWithTheReason(
+        string given,
+        string expectedUnderFolder
+    )
     {
         _ = _folder.CreateFolder("folder");
 
@@ -237,6 +241,7 @@ public sealed class RunLogFileTests : IDisposable
         opened.Succeeded.ShouldBeFalse();
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.ShouldBeSameAs(ToolDiagnostics.FileCannotBeChanged);
+        failure.Path.ShouldBe(Path.Combine(_folder.Path, expectedUnderFolder));
         // The error quotes its path first.
         failure.Arguments[0].ShouldBe($"'{failure.Path}'");
         failure.Arguments[1].ShouldBe("written");
