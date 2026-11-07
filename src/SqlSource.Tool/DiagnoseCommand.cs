@@ -252,11 +252,13 @@ internal static class DiagnoseCommand
         parsed.CommandResult.Command.SetAction(
             async (command, cancellationToken) =>
             {
+                var context = new RunContext(host, reporter, cancellationToken);
+
                 // CheckUsage has held the command line to one of the two forms, each with its --out.
                 var output = SharedOptions.ValuesOf(usage, OutOption).Single();
                 if (SharedOptions.ValuesOf(usage, ScrubOption) is [{ } scrub])
                 {
-                    await DiagnoseRun.ScrubAsync(scrub, output, host, reporter, cancellationToken);
+                    await DiagnoseRun.ScrubAsync(scrub, output, context);
                 }
                 else
                 {
@@ -268,9 +270,7 @@ internal static class DiagnoseCommand
                         query,
                         output,
                         command.GetValue<bool>(NoObfuscateOption),
-                        host,
-                        reporter,
-                        cancellationToken
+                        context
                     );
                 }
 

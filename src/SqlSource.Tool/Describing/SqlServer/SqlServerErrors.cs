@@ -400,8 +400,7 @@ internal static class SqlServerErrors
     ) =>
         DescribeFailures.DeclaredType(
             query,
-            Written(parameter.Name),
-            parameter.Type,
+            new DeclaredParameter(Written(parameter.Name), parameter.Type),
             reason,
             DescribeStep.ResolveType,
             serverLines,

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
@@ -30,23 +29,14 @@ internal static class PlanSteps
     /// The summary of a run prints counts for each selected database and not which queries it selected, so a test
     /// reads the plan from here, and the run goes on from it.
     /// </remarks>
-    internal static async Task<RunPlan?> PlanAsync(
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    ) => (await PlanUnitAsync(usage, host, reporter, cancellationToken))?.Plan;
+    internal static async Task<RunPlan?> PlanAsync(Usage usage, RunContext context) =>
+        (await PlanUnitAsync(usage, context))?.Plan;
 
     /// <summary>
     /// The plan, as <see cref="PlanAsync" /> builds it, with the unit it was built for, whose folder holds the run's
     /// <c>.env</c>.
     /// </summary>
-    internal static async Task<(RunUnit Unit, RunPlan Plan)?> PlanUnitAsync(
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
+    internal static async Task<(RunUnit Unit, RunPlan Plan)?> PlanUnitAsync(Usage usage, RunContext context)
     {
         RunUnit unit;
         ImmutableArray<ProjectManifest> manifests;
@@ -54,10 +44,8 @@ internal static class PlanSteps
         {
             // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
             manifests = await RunProjects.FromManifestAsync(
-                Path.GetFullPath(manifestValue.Text, host.WorkingDirectory),
-                host,
-                reporter,
-                cancellationToken
+                Path.GetFullPath(manifestValue.Text, context.Host.WorkingDirectory),
+                context
             );
             if (manifests.IsEmpty)
             {
@@ -65,39 +53,37 @@ internal static class PlanSteps
             }
 
             unit = new RunUnit(RunUnitKind.Project, manifests[0].ProjectPath);
-            RunEvents.Unit(reporter.Trace, unit, wasGiven: true);
+            RunEvents.Unit(context.Reporter.Trace, unit, wasGiven: true);
         }
-        else if (FindUnit(usage, host, reporter) is { } found)
+        else if (FindUnit(usage, context) is { } found)
         {
             unit = found;
-            manifests = (await FindManifestsAsync(unit, usage, host, reporter, cancellationToken)).Manifests;
+            manifests = (await FindManifestsAsync(unit, usage, context)).Manifests;
         }
         else
         {
             return null;
         }
 
-        return await PlanFromAsync(unit, manifests, usage, host, reporter, cancellationToken) is { } plan
-            ? (unit, plan)
-            : null;
+        return await PlanFromAsync(unit, manifests, usage, context) is { } plan ? (unit, plan) : null;
     }
 
     /// <summary>
     /// The unit that a command line runs on, from its path or from the working directory.  Null when there is none,
     /// which is reported.
     /// </summary>
-    internal static RunUnit? FindUnit(Usage usage, ToolHost host, Reporter reporter)
+    internal static RunUnit? FindUnit(Usage usage, RunContext context)
     {
         // With file filters and no unit, the unit is found from the working directory, not from the files.
         var unitPath = ArgumentsOf(usage).FirstOrDefault(static path => !SqlPath.IsSqlFile(path.Text));
-        var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
+        var found = RunUnitFinder.Find(unitPath, context.Host.WorkingDirectory);
         if (!found.Succeeded)
         {
-            reporter.Report(found.Failure);
+            context.Reporter.Report(found.Failure);
             return null;
         }
 
-        RunEvents.Unit(reporter.Trace, found.Value, wasGiven: unitPath is not null);
+        RunEvents.Unit(context.Reporter.Trace, found.Value, wasGiven: unitPath is not null);
         return found.Value;
     }
 
@@ -105,20 +91,8 @@ internal static class PlanSteps
     /// The projects of the unit that the command line runs, which <c>--project</c> narrows, and their manifests: the
     /// evaluation of each, and its manifest target.  A project with an error is reported and has no manifest.
     /// </summary>
-    internal static Task<FoundProjects> FindManifestsAsync(
-        RunUnit unit,
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    ) =>
-        RunProjects.FindAsync(
-            unit,
-            SharedOptions.ValuesOf(usage, SharedOptions.Project),
-            host,
-            reporter,
-            cancellationToken
-        );
+    internal static Task<FoundProjects> FindManifestsAsync(RunUnit unit, Usage usage, RunContext context) =>
+        RunProjects.FindAsync(unit, SharedOptions.ValuesOf(usage, SharedOptions.Project), context);
 
     /// <summary>
     /// The plan of the manifests, which <c>--database</c> and the <c>.sql</c> paths narrow, with what is wrong with it
@@ -128,9 +102,7 @@ internal static class PlanSteps
         RunUnit unit,
         ImmutableArray<ProjectManifest> manifests,
         Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
+        RunContext context
     )
     {
         var isOnline = DescribeCommand.IsOnline(usage);
@@ -140,12 +112,10 @@ internal static class PlanSteps
             RunFilters.Create(
                 ArgumentsOf(usage).Where(static path => SqlPath.IsSqlFile(path.Text)),
                 SharedOptions.ValuesOf(usage, DescribeCommand.DatabaseOption),
-                host.WorkingDirectory
+                context.Host.WorkingDirectory
             ),
             (_, error) => isOnline && IsReportedByTheCompiler(error),
-            host,
-            reporter,
-            cancellationToken
+            context
         );
     }
 
@@ -164,25 +134,22 @@ internal static class PlanSteps
     /// <c>describe</c> prints it.  <c>diagnose</c>'s error at a named file, at a settings file or a C# file, or at no
     /// file, is written.
     /// </param>
-    /// <param name="host">Standard output.</param>
-    /// <param name="reporter">Where the errors go, with the run's trace.</param>
-    /// <param name="cancellationToken">Ends the plan.</param>
+    /// <param name="context">Standard output, where the errors go with the run's trace, and what ends the plan.</param>
     internal static async Task<RunPlan?> PlanFromAsync(
         RunUnit unit,
         ImmutableArray<ProjectManifest> manifests,
         RunFilters filters,
         Func<RunPlan, ToolDiagnostic, bool> isLoggedOnly,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
+        RunContext context
     )
     {
+        var reporter = context.Reporter;
         if (manifests.IsEmpty)
         {
             if (reporter.Count == 0)
             {
                 // A run that found nothing to do must not look like one that did it.
-                await host.Out.WriteLineAsync(
+                await context.Host.Out.WriteLineAsync(
                     $"{Cli.LinePrefix}no project of '{OneLine.Of(unit.Path)}' uses SqlSource"
                 );
             }
@@ -190,7 +157,7 @@ internal static class PlanSteps
             return null;
         }
 
-        var result = RunPlanner.Plan(manifests, filters, cancellationToken);
+        var result = RunPlanner.Plan(manifests, filters, context.CancellationToken);
         for (var index = 0; index < manifests.Length; index++)
         {
             RunEvents.Unclaimed(reporter.Trace, manifests[index].ProjectPath, result.Unclaimed[index]);
@@ -271,6 +238,20 @@ internal static class PlanSteps
     /// </summary>
     internal static string UnitFolderOf(RunUnit unit) =>
         Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file in a folder.");
+
+    /// <summary>
+    /// Where a run on the unit looks for its connections: the values of <c>--connection</c>, by
+    /// <see cref="ConnectionsOf" />, the unit's folder, and the <c>.env</c> file of <see cref="EnvFileOf" />.
+    /// <c>describe</c>, each pass of a watch and <c>diagnose</c> take them here.
+    /// </summary>
+    /// <param name="usage">The command line.</param>
+    /// <param name="unit">The run's unit.</param>
+    /// <param name="host">The working folder, which a relative path of <c>--env-file</c> is from.</param>
+    internal static ConnectionSources SourcesOf(Usage usage, RunUnit unit, ToolHost host)
+    {
+        var unitFolder = UnitFolderOf(unit);
+        return new ConnectionSources(ConnectionsOf(usage), unitFolder, EnvFileOf(usage, unitFolder, host));
+    }
 
     // The arguments of the command: the unit, and the .sql paths.
     private static ImmutableArray<UsageValue> ArgumentsOf(Usage usage) =>

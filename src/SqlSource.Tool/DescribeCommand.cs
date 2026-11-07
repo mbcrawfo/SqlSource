@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.CommandLine;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using SqlSource.Generation.Paths;
@@ -169,39 +168,24 @@ internal static class DescribeCommand
         parsed.CommandResult.Command.SetAction(
             async (command, cancellationToken) =>
             {
+                var context = new RunContext(host, reporter, cancellationToken);
+
                 // A watch runs a pass after each change, until it is stopped, and ends only by its token.  A unit that
                 // cannot be found ends it before the first pass.
                 if (Watches(command))
                 {
-                    if (PlanSteps.FindUnit(usage, host, reporter) is { } watched)
+                    if (PlanSteps.FindUnit(usage, context) is { } watched)
                     {
-                        await WatchSession.RunAsync(
-                            watched,
-                            usage,
-                            command,
-                            host,
-                            reporter,
-                            counted,
-                            cancellationToken
-                        );
+                        await WatchSession.RunAsync(watched, usage, command, context, counted);
                     }
 
                     return 0;
                 }
 
                 // An error is in the reporter, where the exit code is taken.
-                if (await PlanSteps.PlanUnitAsync(usage, host, reporter, cancellationToken) is { } planned)
+                if (await PlanSteps.PlanUnitAsync(usage, context) is { } planned)
                 {
-                    await DescribePlanAsync(
-                        planned.Plan,
-                        usage,
-                        planned.Unit,
-                        ModeOf(command),
-                        host,
-                        reporter,
-                        counted,
-                        cancellationToken
-                    );
+                    await DescribePlanAsync(planned.Plan, usage, planned.Unit, ModeOf(command), context, counted);
                 }
 
                 return 0;
@@ -436,10 +420,8 @@ internal static class DescribeCommand
             SharedOptions.ValuesOf(usage, SharedOptions.Project).Length > 0
                 || !plan.Filters.Files.IsEmpty
                 || !plan.Filters.Databases.IsEmpty,
-            PlanSteps.ConnectionsOf(usage),
+            PlanSteps.SourcesOf(usage, unit, host),
             plan.Filters.Databases,
-            PlanSteps.UnitFolderOf(unit),
-            PlanSteps.EnvFileOf(usage, PlanSteps.UnitFolderOf(unit), host),
             OnlineOf(usage)
         );
 
@@ -464,17 +446,7 @@ internal static class DescribeCommand
         Usage usage,
         RunUnit unit,
         RunMode mode,
-        ToolHost host,
-        Reporter reporter,
-        Action<LogValue> counted,
-        CancellationToken cancellationToken
-    ) =>
-        DescribeRun.RunAsync(
-            plan,
-            OptionsOf(usage, unit, plan, mode, host),
-            host,
-            reporter,
-            counted,
-            cancellationToken
-        );
+        RunContext context,
+        Action<LogValue> counted
+    ) => DescribeRun.RunAsync(plan, OptionsOf(usage, unit, plan, mode, context.Host), context, counted);
 }

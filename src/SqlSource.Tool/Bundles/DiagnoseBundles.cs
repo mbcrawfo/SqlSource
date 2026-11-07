@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 
@@ -23,9 +22,10 @@ internal static class DiagnoseBundles
     /// <param name="query">The query, as the plan holds it.</param>
     /// <param name="fileText">The text of its file, as the plan read it.</param>
     /// <param name="dialect">The dialect the file was read by.</param>
-    /// <param name="capture">What the run kept of its session, which opened and closed.</param>
-    /// <param name="entry">The query's entry, when it was described.</param>
-    /// <param name="failure">The describer's refusal, when it was not.</param>
+    /// <param name="described">
+    /// What describing the query gave: the capture of its session, which opened and closed, and the entry or the
+    /// describer's refusal.
+    /// </param>
     /// <param name="host">Where the tool runs, which <c>bundle.json</c> names.</param>
     /// <exception cref="ArgumentException">
     /// Neither an entry nor a failure, or both, are given; the session did not open or did not close; or the text is
@@ -35,20 +35,22 @@ internal static class DiagnoseBundles
         PlannedQuery query,
         string fileText,
         SqlDialect dialect,
-        RunCapture capture,
-        SidecarEntry? entry,
-        DescribeFailure? failure,
+        DescribedQuery described,
         ToolHost host
     )
     {
+        var (capture, entry, failure) = described;
         if ((entry is null) == (failure is null))
         {
-            throw new ArgumentException("A described query has an entry or a failure, and only one.", nameof(entry));
+            throw new ArgumentException(
+                "A described query has an entry or a failure, and only one.",
+                nameof(described)
+            );
         }
 
         var server =
-            capture.Server ?? throw new ArgumentException("The run's session was never opened.", nameof(capture));
-        var text = capture.Text ?? throw new ArgumentException("The run's session did not close.", nameof(capture));
+            capture.Server ?? throw new ArgumentException("The run's session was never opened.", nameof(described));
+        var text = capture.Text ?? throw new ArgumentException("The run's session did not close.", nameof(described));
         var engine = capture.Capture.Engine;
         var outcome = failure is null ? BundleOutcome.Entry : OutcomeOf(failure);
         var info = new BundleInfo(

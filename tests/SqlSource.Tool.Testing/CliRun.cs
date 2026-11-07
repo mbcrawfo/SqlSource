@@ -126,7 +126,10 @@ internal sealed class CliRun : IDisposable
         var reporter = new Reporter(host.Error);
         var usage = UsageCheck.Check(Cli.BuildCommands(), args);
 
-        var plan = await PlanSteps.PlanAsync(usage, host, reporter, TestContext.Current.CancellationToken);
+        var plan = await PlanSteps.PlanAsync(
+            usage,
+            new RunContext(host, reporter, TestContext.Current.CancellationToken)
+        );
 
         return (plan, new CliResult(reporter.Count > 0 ? 1 : 0, output.ToString(), error.ToString()));
     }

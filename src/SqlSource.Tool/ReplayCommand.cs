@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
@@ -147,22 +146,15 @@ internal static class ReplayCommand
                 ReplayAsync(
                     usage.Values.Single(static value => value.Option is null),
                     SharedOptions.IsVerbose(command, Name),
-                    host,
-                    reporter,
-                    cancellationToken
+                    new RunContext(host, reporter, cancellationToken)
                 )
         );
 
     // The replay of the bundle at the argument.  An error is in the reporter, where the exit code is taken; the
     // command gives 2 for an answer that is not the bundle's.
-    private static async Task<int> ReplayAsync(
-        UsageValue argument,
-        bool verbose,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
+    private static async Task<int> ReplayAsync(UsageValue argument, bool verbose, RunContext context)
     {
+        var (host, reporter, cancellationToken) = context;
         var path = Path.GetFullPath(argument.Text, host.WorkingDirectory);
         void Report(ToolDiagnostic error) => reporter.Report(AsNamed(error, argument, path));
 

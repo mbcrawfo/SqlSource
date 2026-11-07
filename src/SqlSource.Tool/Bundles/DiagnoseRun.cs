@@ -4,12 +4,10 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
@@ -52,30 +50,27 @@ internal static class DiagnoseRun
     /// <param name="query">The file and the name of the query.</param>
     /// <param name="output">The value of <c>--out</c>, which may be printed.</param>
     /// <param name="raw">Whether the bundle is written raw, under <c>--no-obfuscate</c>.</param>
-    /// <param name="host">What the run takes from outside.</param>
-    /// <param name="reporter">Where the errors go, with the run's trace.</param>
-    /// <param name="cancellationToken">Ends the run.</param>
+    /// <param name="context">What the run takes from outside, where the errors go, and what ends the run.</param>
     public static async Task QueryAsync(
         Usage usage,
         DiagnoseCommand.QueryName query,
         UsageValue output,
         bool raw,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
+        RunContext context
     )
     {
-        if (OutPathOf(output, host, reporter) is not { } outPath)
+        var (host, reporter, _) = context;
+        if (OutPathOf(output, context) is not { } outPath)
         {
             return;
         }
 
-        if (await PlanAsync(usage, query, host, reporter, cancellationToken) is not { } planned)
+        if (await PlanAsync(usage, query, context) is not { } planned)
         {
             return;
         }
 
-        if (await DescribeAsync(planned, usage, host, reporter, cancellationToken) is not { } described)
+        if (await DescribeAsync(planned, usage, context) is not { } described)
         {
             return;
         }
@@ -89,18 +84,10 @@ internal static class DiagnoseRun
         var text =
             FileText.Read(file.Path)?.Text.ToString()
             ?? throw new InvalidOperationException($"The file '{file.Path}' could not be read again.");
-        var bundle = DiagnoseBundles.Raw(
-            planned.Query,
-            text,
-            file.Dialect,
-            described.Capture,
-            described.Entry,
-            described.Failure,
-            host
-        );
+        var bundle = DiagnoseBundles.Raw(planned.Query, text, file.Dialect, described, host);
         if (raw)
         {
-            if (Write(outPath, stream => BundleWriter.Write(bundle, stream), host, reporter))
+            if (Write(outPath, stream => BundleWriter.Write(bundle, stream), context))
             {
                 await host.Out.WriteLineAsync(Cli.LinePrefix + $"raw bundle {UsageValue.Quoted(outPath)} written");
                 await host.Out.WriteLineAsync(
@@ -127,7 +114,7 @@ internal static class DiagnoseRun
             return;
         }
 
-        await RenameAndWriteAsync(bundle, describer.Value, file.Dialect, outPath, host, reporter, cancellationToken);
+        await RenameAndWriteAsync(bundle, describer.Value, file.Dialect, outPath, context);
     }
 
     /// <summary>
@@ -135,18 +122,11 @@ internal static class DiagnoseRun
     /// </summary>
     /// <param name="scrub">The value of <c>--scrub</c>: the bundle, a zip or a folder.</param>
     /// <param name="output">The value of <c>--out</c>, which may be printed.</param>
-    /// <param name="host">What the run takes from outside.</param>
-    /// <param name="reporter">Where the errors go, with the run's trace.</param>
-    /// <param name="cancellationToken">Ends the run.</param>
-    public static async Task ScrubAsync(
-        UsageValue scrub,
-        UsageValue output,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
+    /// <param name="context">What the run takes from outside, where the errors go, and what ends the run.</param>
+    public static async Task ScrubAsync(UsageValue scrub, UsageValue output, RunContext context)
     {
-        if (OutPathOf(output, host, reporter) is not { } outPath)
+        var (host, reporter, cancellationToken) = context;
+        if (OutPathOf(output, context) is not { } outPath)
         {
             return;
         }
@@ -176,15 +156,7 @@ internal static class DiagnoseRun
             return;
         }
 
-        await RenameAndWriteAsync(
-            bundle,
-            prepared.Value.Describer,
-            prepared.Value.Dialect,
-            outPath,
-            host,
-            reporter,
-            cancellationToken
-        );
+        await RenameAndWriteAsync(bundle, prepared.Value.Describer, prepared.Value.Dialect, outPath, context);
     }
 
     // The plan with the query's file as its one filter, and the query of the file it names, or null when the plan or
@@ -192,28 +164,18 @@ internal static class DiagnoseRun
     private static async Task<PlannedTarget?> PlanAsync(
         Usage usage,
         DiagnoseCommand.QueryName query,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
+        RunContext context
     )
     {
-        if (PlanSteps.FindUnit(usage, host, reporter) is not { } unit)
+        if (PlanSteps.FindUnit(usage, context) is not { } unit)
         {
             return null;
         }
 
-        var manifests = (await PlanSteps.FindManifestsAsync(unit, usage, host, reporter, cancellationToken)).Manifests;
-        var filters = RunFilters.Create([query.File], [], host.WorkingDirectory);
+        var manifests = (await PlanSteps.FindManifestsAsync(unit, usage, context)).Manifests;
+        var filters = RunFilters.Create([query.File], [], context.Host.WorkingDirectory);
         if (
-            await PlanSteps.PlanFromAsync(
-                unit,
-                manifests,
-                filters,
-                PlanSteps.IsAtAFileNotNamed,
-                host,
-                reporter,
-                cancellationToken
-            )
+            await PlanSteps.PlanFromAsync(unit, manifests, filters, PlanSteps.IsAtAFileNotNamed, context)
             is not { } plan
         )
         {
@@ -238,14 +200,14 @@ internal static class DiagnoseRun
         );
         if (queryIndex < 0)
         {
-            reporter.Report(NotInFile(query, found, "the file has no query of that name"));
+            context.Reporter.Report(NotInFile(query, found, "the file has no query of that name"));
             return null;
         }
 
         var target = found.Queries[queryIndex];
         if (!target.NeedsEntry)
         {
-            reporter.Report(NotInFile(query, found, "the query's output is sql, which needs no description"));
+            context.Reporter.Report(NotInFile(query, found, "the query's output is sql, which needs no description"));
             return null;
         }
 
@@ -255,14 +217,9 @@ internal static class DiagnoseRun
 
     // Describes the one query, every other left out, through an exchange that records the session.  Null when the
     // query was not described or refused: an error of the run, which is reported.
-    private static async Task<DescribedTarget?> DescribeAsync(
-        PlannedTarget target,
-        Usage usage,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
-    )
+    private static async Task<DescribedQuery?> DescribeAsync(PlannedTarget target, Usage usage, RunContext context)
     {
+        var reporter = context.Reporter;
         // Whatever its hash, as --force describes it.  A sidecar of a newer tool is SQLSRC221 here too.
         var errors = new List<ToolDiagnostic>();
         var files = RunDecisions.Decide(target.Plan, RunMode.Force, errors);
@@ -293,11 +250,8 @@ internal static class DiagnoseRun
             target.Plan,
             selected,
             selected,
-            PlanSteps.ConnectionsOf(usage),
-            PlanSteps.UnitFolderOf(target.Unit),
-            PlanSteps.EnvFileOf(usage, PlanSteps.UnitFolderOf(target.Unit), host),
-            host,
-            reporter
+            PlanSteps.SourcesOf(usage, target.Unit, context.Host),
+            context
         );
         // An error written by now, of the query's file, a settings file, a project, a C# file or the .env file, may
         // change the query, so no bundle is made of it: the exit code is 0 exactly when a bundle is written.  An error
@@ -308,7 +262,13 @@ internal static class DiagnoseRun
         }
 
         var capture = new RunCapture(SqlDialectName.Canonical(database.Dialect));
-        await DatabaseRuns.RunAsync(selected, files, connections, host, reporter, cancellationToken, capture: capture);
+        await DatabaseRuns.RunAsync(
+            selected,
+            files,
+            connections,
+            context,
+            new DatabaseMode(OnlineMode.Off, Offline: false, capture)
+        );
 
         // A session that did not open, or a query that failed before the describer was asked, was reported.
         if (capture.Server is null || capture.Text is null)
@@ -318,8 +278,8 @@ internal static class DiagnoseRun
 
         return work switch
         {
-            { State: QueryState.Described, Entry: { } entry } => new DescribedTarget(capture, entry, null),
-            { State: QueryState.Failed, Failure: { } failure } => new DescribedTarget(capture, null, failure),
+            { State: QueryState.Described, Entry: { } entry } => new DescribedQuery(capture, entry, null),
+            { State: QueryState.Failed, Failure: { } failure } => new DescribedQuery(capture, null, failure),
             _ => null,
         };
     }
@@ -330,11 +290,10 @@ internal static class DiagnoseRun
         IQueryDescriber describer,
         SqlDialect dialect,
         string outPath,
-        ToolHost host,
-        Reporter reporter,
-        CancellationToken cancellationToken
+        RunContext context
     )
     {
+        var (host, reporter, cancellationToken) = context;
         var renamed = await BundleRenamer.RenameAsync(
             raw,
             EngineRenamings.For(SqlDescribableDialects.EngineOf(dialect)),
@@ -349,7 +308,7 @@ internal static class DiagnoseRun
         }
 
         var (bundle, mapping) = renamed.Value;
-        if (!Write(outPath, stream => BundleWriter.Write(bundle, stream), host, reporter))
+        if (!Write(outPath, stream => BundleWriter.Write(bundle, stream), context))
         {
             return;
         }
@@ -357,7 +316,7 @@ internal static class DiagnoseRun
         await host.Out.WriteLineAsync(Cli.LinePrefix + $"bundle {UsageValue.Quoted(outPath)} written");
         var mappingPath = outPath + BundleFiles.MappingSuffix;
         var text = Utf8.GetBytes(MappingFile.Write(mapping));
-        if (!Write(mappingPath, stream => stream.Write(text, 0, text.Length), host, reporter))
+        if (!Write(mappingPath, stream => stream.Write(text, 0, text.Length), context))
         {
             return;
         }
@@ -371,15 +330,15 @@ internal static class DiagnoseRun
     }
 
     // The full path of --out, or null when it names a file of the run, which is reported.
-    private static string? OutPathOf(UsageValue output, ToolHost host, Reporter reporter)
+    private static string? OutPathOf(UsageValue output, RunContext context)
     {
-        var outPath = Path.GetFullPath(output.Text, host.WorkingDirectory);
+        var outPath = Path.GetFullPath(output.Text, context.Host.WorkingDirectory);
         if (RefusedOutOf(outPath) is not { } refused)
         {
             return outPath;
         }
 
-        reporter.Report(refused);
+        context.Reporter.Report(refused);
         return null;
     }
 
@@ -395,17 +354,17 @@ internal static class DiagnoseRun
 
     // Makes the file, or empties the one that is there, and writes it.  False when the system would not, which is
     // SQLSRC218 at the file.
-    private static bool Write(string path, Action<Stream> write, ToolHost host, Reporter reporter)
+    private static bool Write(string path, Action<Stream> write, RunContext context)
     {
         try
         {
-            using var stream = host.CreateFile(path);
+            using var stream = context.Host.CreateFile(path);
             write(stream);
             return true;
         }
         catch (Exception exception) when (FileErrors.IsPathError(exception))
         {
-            reporter.Report(ToolDiagnostic.NotChanged(path, "written", exception.Message));
+            context.Reporter.Report(ToolDiagnostic.NotChanged(path, "written", exception.Message));
             return false;
         }
     }
@@ -443,7 +402,4 @@ internal static class DiagnoseRun
 
         public PlannedQuery Query => File.Queries[QueryIndex];
     }
-
-    // What describing the query gave: the session's capture, and the entry or the describer's refusal.
-    private sealed record DescribedTarget(RunCapture Capture, SidecarEntry? Entry, DescribeFailure? Failure);
 }

@@ -105,7 +105,7 @@ internal sealed class WatchSession
     private WatchSession(RunUnit unit, Usage usage, ToolHost host, Reporter session, Action<LogValue> counted)
     {
         _unit = unit;
-        _unitFolder = Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file.");
+        _unitFolder = PlanSteps.UnitFolderOf(unit);
         _usage = usage;
         _host = host;
         _envFile = PlanSteps.EnvFileOf(usage, _unitFolder, host);
@@ -122,25 +122,24 @@ internal sealed class WatchSession
     /// <param name="parsed">
     /// The command line as System.CommandLine read it: <c>--force</c> forces the first pass.
     /// </param>
-    /// <param name="host">What the session takes from outside, its watches and its clock included.</param>
-    /// <param name="session">The run's reporter, whose trace every pass shares.</param>
+    /// <param name="context">
+    /// What the session takes from outside, its watches and its clock included; the run's reporter, whose trace every
+    /// pass shares; and the token that stops the pass under way and ends the session.
+    /// </param>
     /// <param name="counted">Given the counts of each selected database after each pass.</param>
-    /// <param name="cancellationToken">Stops the pass under way and ends the session.</param>
     /// <returns>Never: it ends by an <see cref="OperationCanceledException" /> of the token.</returns>
     internal static async Task RunAsync(
         RunUnit unit,
         Usage usage,
         ParseResult parsed,
-        ToolHost host,
-        Reporter session,
-        Action<LogValue> counted,
-        CancellationToken cancellationToken
+        RunContext context,
+        Action<LogValue> counted
     )
     {
-        var watch = new WatchSession(unit, usage, host, session, counted);
+        var watch = new WatchSession(unit, usage, context.Host, context.Reporter, counted);
         try
         {
-            await watch.LoopAsync(DescribeCommand.ModeOf(parsed), cancellationToken);
+            await watch.LoopAsync(DescribeCommand.ModeOf(parsed), context.CancellationToken);
         }
         finally
         {
@@ -181,29 +180,19 @@ internal sealed class WatchSession
     {
         var pass = ++_pass;
         var reporter = new Reporter(_host.Error, _session.Trace);
+        var context = new RunContext(_host, reporter, cancellationToken);
         var started = _host.Time.GetTimestamp();
         RunEvents.PassStarted(_session.Trace, pass, changes, evaluate);
         try
         {
             if (evaluate)
             {
-                await EvaluateAsync(reporter, cancellationToken);
+                await EvaluateAsync(context);
             }
 
-            if (
-                await PlanSteps.PlanFromAsync(_unit, _manifests, _usage, _host, reporter, cancellationToken) is { } plan
-            )
+            if (await PlanSteps.PlanFromAsync(_unit, _manifests, _usage, context) is { } plan)
             {
-                await DescribeCommand.DescribePlanAsync(
-                    plan,
-                    _usage,
-                    _unit,
-                    mode,
-                    _host,
-                    reporter,
-                    _counted,
-                    cancellationToken
-                );
+                await DescribeCommand.DescribePlanAsync(plan, _usage, _unit, mode, context, _counted);
             }
         }
         catch (DescriberFaultException fault)
@@ -223,11 +212,11 @@ internal sealed class WatchSession
 
     // Runs the manifest targets again, and keeps what they gave: the manifests, the set that the changes are read by,
     // and whether the evaluation reported an error, which makes the next pass evaluate again.  Then watches the folders
-    // of the new set, before the pass reads a file.
-    private async Task EvaluateAsync(Reporter reporter, CancellationToken cancellationToken)
+    // of the new set, before the pass reads a file.  The context is the pass's, with its reporter.
+    private async Task EvaluateAsync(RunContext pass)
     {
         _evaluationFailed = true;
-        var errors = reporter.Count;
+        var errors = pass.Reporter.Count;
         lock (_gate)
         {
             _duringEvaluation = [];
@@ -236,9 +225,9 @@ internal sealed class WatchSession
         WatchSet? set = null;
         try
         {
-            var found = await PlanSteps.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
+            var found = await PlanSteps.FindManifestsAsync(_unit, _usage, pass);
             _manifests = found.Manifests;
-            _evaluationFailed = reporter.Count > errors;
+            _evaluationFailed = pass.Reporter.Count > errors;
             set = WatchSet.Of(_unit.Path, _unitFolder, _envFile, found);
         }
         finally

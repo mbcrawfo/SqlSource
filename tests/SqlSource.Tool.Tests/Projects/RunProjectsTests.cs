@@ -65,9 +65,11 @@ public sealed class RunProjectsTests : IDisposable
         RunProjects.FindAsync(
             unit,
             named,
-            Hosts.Create(_folder.Path, _runner, _folder.CreateFolder("tmp")),
-            new Reporter(_error),
-            TestContext.Current.CancellationToken
+            new RunContext(
+                Hosts.Create(_folder.Path, _runner, _folder.CreateFolder("tmp")),
+                new Reporter(_error),
+                TestContext.Current.CancellationToken
+            )
         );
 
     private Task<ImmutableArray<ProjectManifest>> FindInSolutionAsync(params string[] named) =>
