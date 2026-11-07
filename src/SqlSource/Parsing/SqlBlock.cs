@@ -80,4 +80,11 @@ internal sealed record SqlBlock(
     /// declares none.
     /// </summary>
     public EquatableArray<string> DeclaredVariables { get; init; }
+
+    /// <summary>
+    /// The errors of the query's SQL that are errors only for a query whose output is <c>CodeGen</c>, as offsets into
+    /// the file's text: a list that its method would send in a form the database refuses.  The method planner reports
+    /// them and gives the query no method.  Empty when there are none.
+    /// </summary>
+    public EquatableArray<SqlParseError> CodeGenErrors { get; init; }
 }

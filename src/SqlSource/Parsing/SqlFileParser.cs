@@ -274,6 +274,7 @@ internal static class SqlFileParser
                     MemberLocationMarker = scope?.MemberLocationMarker,
                     VisibilityMarker = scope?.VisibilityMarker,
                     DeclaredVariables = query.DeclaredVariables,
+                    CodeGenErrors = FindRefusedEmptyLists(query),
                 }
             );
         }
@@ -349,10 +350,23 @@ internal static class SqlFileParser
             // no use to classify.
             var variables =
                 sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
-            var uses =
-                sql.Parameters.Length == 0
-                    ? ImmutableArray<SqlParameterUse>.Empty
-                    : SqlListUses.Find(text, lexemes, start, end, rules);
+            // Where each list stands is read for SQL Server alone: a list there that no NOT reaches is sent empty as
+            // one NULL, which SQL Server takes where it refuses a subquery.
+            var places = ImmutableArray<SqlListPlace>.Empty;
+            ImmutableArray<SqlParameterUse> uses;
+            if (sql.Parameters.Length == 0)
+            {
+                uses = ImmutableArray<SqlParameterUse>.Empty;
+            }
+            else if (rules.Dialect == SqlDialect.SqlServer)
+            {
+                uses = SqlListUses.Find(text, lexemes, start, end, rules, out places);
+            }
+            else
+            {
+                uses = SqlListUses.Find(text, lexemes, start, end, rules);
+            }
+
             var parameters = SqlParameterList.Create(
                 rules,
                 new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables, uses),
@@ -362,7 +376,7 @@ internal static class SqlFileParser
                 _warnings
             );
 
-            var segments = SqlListSegments.Split(scanned.Segments, scanned.Occurrences, sql, uses, parameters);
+            var segments = SqlListSegments.Split(scanned.Segments, scanned.Occurrences, sql, uses, places, parameters);
             return new BuiltQuery(
                 sql,
                 segments,
@@ -370,8 +384,65 @@ internal static class SqlFileParser
                 tokens,
                 parameters,
                 uses,
+                places,
                 variables?.ToNames() ?? EquatableArray<string>.Empty
             );
+        }
+
+        // A list that a NOT reaches is sent empty as a subquery, which SQL Server refuses inside an aggregate, a GROUP
+        // BY and an OUTPUT clause, so the method would throw for an empty list there.  Only a method sends a list, so
+        // these are errors of the CodeGen output alone, which the method planner reports.  The places are read for SQL
+        // Server alone, and are None for a use that is not a list.
+        private static EquatableArray<SqlParseError> FindRefusedEmptyLists(BuiltQuery query)
+        {
+            // Created at the first error: most queries have none.
+            ImmutableArray<SqlParseError>.Builder? errors = null;
+            var sql = query.Sql;
+            for (var position = 0; position < query.Places.Length; position++)
+            {
+                var place = query.Places[position];
+                if ((place & SqlListPlace.UnderNot) == SqlListPlace.None || PlaceName(place) is not { } name)
+                {
+                    continue;
+                }
+
+                var span = sql.Parameters[position];
+                if (
+                    SqlListSegments.KindOf(query.Uses[position], span, sql.Text, query.Parameters)
+                    == SqlSegmentKind.List
+                )
+                {
+                    (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
+                        SqlParseError.Create(
+                            SqlParseErrorKind.NegatedListRefusedEmpty,
+                            sql.ToSourceSpan(span),
+                            sql.Text.Substring(span.Start, span.Length),
+                            name
+                        )
+                    );
+                }
+            }
+
+            return errors is null
+                ? EquatableArray<SqlParseError>.Empty
+                : new EquatableArray<SqlParseError>(errors.ToImmutable());
+        }
+
+        // Where a list stands, as SQLSRC127 names it, or null when it stands where SQL Server takes the subquery.  An
+        // aggregate is named before the clause around it.
+        private static string? PlaceName(SqlListPlace place)
+        {
+            if ((place & SqlListPlace.InAggregate) != SqlListPlace.None)
+            {
+                return "inside an aggregate";
+            }
+
+            if ((place & SqlListPlace.InGroupBy) != SqlListPlace.None)
+            {
+                return "in a GROUP BY";
+            }
+
+            return (place & SqlListPlace.InOutput) != SqlListPlace.None ? "in an OUTPUT clause" : null;
         }
 
         // A comment is gone from the SQL that the tokens are found in, and so is any "}}" it holds: in a default, that
@@ -452,12 +523,14 @@ internal static class SqlFileParser
             FindOpenedDefaults(kept, start, end, ref errors);
 
             // Both forms are built from the same lexemes, so each holds the same parameters in the same order, and the
-            // uses read from those lexemes are this form's too.  The split finds each at this form's places.
+            // uses read from those lexemes, and where they stand, are this form's too.  The split finds each at this
+            // form's offsets.
             var segments = SqlListSegments.Split(
                 scanned.Segments,
                 scanned.Occurrences,
                 kept,
                 query.Uses,
+                query.Places,
                 query.Parameters
             );
             if (errors is null)
@@ -669,7 +742,8 @@ internal static class SqlFileParser
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
             _errors.Add(SqlParseError.Create(kind, span, arguments));
 
-        // What step two gives.  Uses is what each parameter of Sql is used as, or empty when no use is a list.
+        // What step two gives.  Uses is what each parameter of Sql is used as, or empty when no use is a list, and
+        // Places where each use stands, or empty when they were not read.
         private readonly record struct BuiltQuery(
             SqlBlockText Sql,
             EquatableArray<SqlSegment> Segments,
@@ -677,6 +751,7 @@ internal static class SqlFileParser
             EquatableArray<SqlToken> Tokens,
             EquatableArray<SqlQueryParameter> Parameters,
             ImmutableArray<SqlParameterUse> Uses,
+            ImmutableArray<SqlListPlace> Places,
             EquatableArray<string> DeclaredVariables
         );
     }

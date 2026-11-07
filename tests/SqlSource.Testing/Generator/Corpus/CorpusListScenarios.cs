@@ -9,12 +9,13 @@ namespace SqlSource.Testing.Generator.Corpus;
 // references this library.
 internal static partial class QueryMethodCorpus
 {
-    // A list after IN and after NOT IN; two lists; one list used twice; a list with a null test beside a parameter
-    // that is no list; a list beside a token; a list beside a parameter named as the list's first value would be; a
-    // list whose comments are kept; a stream; lists of a value type and of a class each bound through a converter; a
-    // list in a one-optional query; and a list of decimals, whose values SQL Server rounds to its scale of 0 and whose
-    // empty form's null it does not.  Each list's entry describes its element, as the tool writes it, with the name a
-    // PostgreSQL binding sets.
+    // A list after IN and after NOT IN; two lists; one list used twice, and used twice with one use after a NOT, whose
+    // two uses SQL Server sends empty in two forms; a list with a null test beside a parameter that is no list; a list
+    // beside a token; a list beside a parameter named as the list's first value would be; a list whose comments are
+    // kept; a stream; lists of a value type and of a class each bound through a converter; a list in a one-optional
+    // query; and a list of decimals, whose values SQL Server rounds to its scale of 0 and whose empty form's null it
+    // does not.  Each list's entry describes its element, as the tool writes it, with the name a PostgreSQL binding
+    // sets.
     private static GeneratorRun Lists(CorpusEngine engine)
     {
         var file = new SqlFile(
@@ -23,6 +24,8 @@ internal static partial class QueryMethodCorpus
                 + "-- name: ListExcept\nSELECT id FROM accounts WHERE id NOT IN @ids;\n"
                 + "-- name: ListTwoLists\nSELECT id FROM accounts WHERE id IN @ids AND owner_id IN @owners;\n"
                 + "-- name: ListUsedTwice\nSELECT id FROM accounts WHERE id IN @ids OR owner_id IN @ids;\n"
+                + "-- name: ListUsedTwiceOnceNegated\n"
+                + "SELECT id FROM accounts WHERE id NOT IN @ids OR owner_id IN @ids;\n"
                 + "-- name: ListOptional\n"
                 + "SELECT id FROM accounts WHERE (@ids IS NULL OR id IN @ids) AND owner_id = @owner;\n"
                 + "-- name: ListWithToken\n-- token: {{table:accounts}}\n"
@@ -59,6 +62,7 @@ internal static partial class QueryMethodCorpus
                         columns
                     ),
                     engine.Entry(file, "ListUsedTwice", justIds, columns),
+                    engine.Entry(file, "ListUsedTwiceOnceNegated", justIds, columns),
                     engine.Entry(
                         file,
                         "ListOptional",

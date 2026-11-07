@@ -45,7 +45,7 @@ public sealed class ModelAssignmentTests
             {
                 foreach (var role in (ModelRole[])[ModelRole.Input, ModelRole.Output])
                 {
-                    assignments.Add(new(type, path, 3, role, "global::App.Dto", ModelKind.Record));
+                    assignments.Add(new(type, path, 3, role, "global::App.Dto", ModelKind.Record, true));
                 }
             }
         }
@@ -92,7 +92,8 @@ public sealed class ModelAssignmentTests
                         index,
                         ModelRole.Output,
                         "global::App.Dto",
-                        ModelKind.Record
+                        ModelKind.Record,
+                        true
                     )
             ),
         ]);

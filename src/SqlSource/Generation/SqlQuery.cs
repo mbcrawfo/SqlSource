@@ -84,4 +84,11 @@ internal sealed record SqlQuery(
     /// <see cref="Parameters" /> and which no parameter its method sends may take.  Empty when it declares none.
     /// </summary>
     public EquatableArray<string> DeclaredVariables { get; init; }
+
+    /// <summary>
+    /// The errors of the query's SQL that are errors only when its output is <see cref="OutputKind.CodeGen" />: a list
+    /// that its method would send in a form the database refuses.  <c>MethodPlanner</c> reports them and gives the
+    /// query no method.  Empty when there are none.
+    /// </summary>
+    public EquatableArray<DiagnosticInfo> CodeGenErrors { get; init; }
 }
