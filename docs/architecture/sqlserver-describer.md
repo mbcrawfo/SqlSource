@@ -38,7 +38,9 @@ The folder [`Proofs/`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/) ho
 | [`SelectBody.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/SelectBody.cs) | The reader of one `SELECT`: its items, its `FROM` through its `WHERE`, its grouping, what may take a row away, whether its `FROM` is one table alone, and the one rule of depth |
 | [`SelectItem.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/SelectItem.cs) | One item of a select list: its expression and the name the server gives its column |
 | [`Proof.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/Proof.cs) | A proof: true from the text, never true, an operand to ask, or any or all of other proofs |
-| [`ExpressionProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.cs) | The forms that prove an expression not null, and the operands they leave to ask |
+| [`ExpressionProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.cs) | The proof of an expression not null, split into its pieces, and the operands it leaves to ask |
+| [`ExpressionProofs.Calls.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.Calls.cs) | The table of forms, a call read into its parts, and the proof of each form |
+| [`ExpressionProofs.Types.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ExpressionProofs.Types.cs) | The type walk: the proof that a value is of no CLR type, each form's read from the same table |
 | [`OperandsQuery.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/OperandsQuery.cs) | The text of `operands`, and the reading of its answer |
 | [`ColumnProofs.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/ColumnProofs.cs) | The proof of each column of a describe, the `PERSISTED NOT NULL` computed column read from its one table among them, and the columns and the rows of `table` as they correct them |
 
