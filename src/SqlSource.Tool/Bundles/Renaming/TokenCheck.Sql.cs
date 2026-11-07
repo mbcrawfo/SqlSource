@@ -10,8 +10,8 @@ namespace SqlSource.Tool.Bundles.Renaming;
 internal sealed partial class TokenCheck
 {
     // SQL, lexeme by lexeme and word by word as the SQL renamer reads it.  In query.sql a marker's value is checked by
-    // its kind, and a token placeholder's name, as in a -- token: marker's value, as quoted, as the renamer renames it.
-    private void Sql(string text, string place, bool queryFile, bool tokens = false)
+    // its kind.
+    private void Sql(string text, string place, bool queryFile)
     {
         var lexed = SqlLexer.Lex(text, _rules);
         if (lexed.Error is { } error)
@@ -29,7 +29,7 @@ internal sealed partial class TokenCheck
             {
                 case SqlLexemeKind.Text:
                     var quoteFollows = index + 1 < lexemes.Count && lexemes[index + 1].Kind == SqlLexemeKind.Quoted;
-                    Words(text, start, end, quoteFollows, place, tokens || queryFile);
+                    Words(text, start, end, quoteFollows, place);
                     break;
                 case SqlLexemeKind.Quoted:
                     Quoted(text, start, end, place);
@@ -89,10 +89,8 @@ internal sealed partial class TokenCheck
                 Name(value, NameClass.Database, place);
                 break;
             case SqlMarkerKind.Param:
-                Sql(value, place, queryFile: false);
-                break;
             case SqlMarkerKind.Token:
-                Sql(value, place, queryFile: false, tokens: true);
+                Sql(value, place, queryFile: false);
                 break;
             case SqlMarkerKind.TokenIgnore:
                 // A token's name, renamed as quoted.
@@ -125,14 +123,15 @@ internal sealed partial class TokenCheck
     }
 
     // Plain text: numbers, white space and punctuation pass, a run from a digit that is no number is refused, and each
-    // word must be safe.  Where tokens are read, a token placeholder's name must be safe as quoted.
-    private void Words(string text, int start, int end, bool quoteFollows, string place, bool tokens = false)
+    // word must be safe.  A token placeholder's name must be safe as quoted, as the SQL renamer reads one in every
+    // text.
+    private void Words(string text, int start, int end, bool quoteFollows, string place)
     {
         var at = start;
         while (at < end)
         {
             var character = text[at];
-            if (tokens && character == '{' && TokenNameAt(text, at, end) is { } name)
+            if (character == '{' && TokenNameAt(text, at, end) is { } name)
             {
                 var token = text.Substring(name.Start, name.Length);
                 Whole(IsSafe(token, quoted: true), place, token);

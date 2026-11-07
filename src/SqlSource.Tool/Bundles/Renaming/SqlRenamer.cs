@@ -13,7 +13,10 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// <remarks>
 /// A word, quoted name or parameter that <see cref="IEngineRenaming.IsEngineWord" /> keeps stays verbatim wherever it
 /// stands, a user's name spelled as the engine's word too.  A refusal is reported and the renaming goes on, so that
-/// every refusal of a text is reported; the text of a renaming that refused is not to be used.
+/// every refusal of a text is reported; the text of a renaming that refused is not to be used.  A token placeholder
+/// is read in every text, a capture's SQL as much as <c>query.sql</c>, since an ignored token reaches the SQL sent as
+/// it is written and must have the replacement it has in the file: neither engine's SQL holds <c>{{</c> outside a
+/// literal, a quoted name or a comment, which are other lexemes.
 /// </remarks>
 internal sealed partial class SqlRenamer(
     IEngineRenaming engine,
@@ -140,9 +143,9 @@ internal sealed partial class SqlRenamer(
 
     /// <summary>
     /// The SQL renamed.  A new word is of the class given, or a function before <c>(</c> unless the class is
-    /// <see cref="NameClass.Type" />.  SQL that does not lex, a character that is no word, number, white space or
-    /// punctuation, or a run from a digit that is no number, is a refusal of <see cref="RefusalStep.Token" /> at the
-    /// place.
+    /// <see cref="NameClass.Type" />, and a token placeholder's name is renamed as a token.  SQL that does not lex, a
+    /// character that is no word, number, white space or punctuation, or a run from a digit that is no number, is a
+    /// refusal of <see cref="RefusalStep.Token" /> at the place.
     /// </summary>
     /// <param name="sql">The SQL.</param>
     /// <param name="newWords">The class of a name that the mapping does not hold yet.</param>
@@ -153,7 +156,7 @@ internal sealed partial class SqlRenamer(
 
     /// <summary>
     /// A query file renamed: as <see cref="Rename" />, new words being aliases, and each marker kept with its value
-    /// renamed, and each token placeholder with its name renamed as a token.  A marker that a bundle's
+    /// renamed.  A marker that a bundle's
     /// <c>query.sql</c> does not hold, or one that does not read, is a refusal at the file.
     /// </summary>
     /// <param name="text">The file's text.</param>
@@ -277,7 +280,7 @@ internal sealed partial class SqlRenamer(
             while (at < end)
             {
                 var character = text[at];
-                if (queryFile && character == '{' && TryToken(at, end, out var after))
+                if (character == '{' && TryToken(at, end, out var after))
                 {
                     at = after;
                 }

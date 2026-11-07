@@ -299,10 +299,26 @@ public sealed class TokenCheckTests
     // A token's name is renamed as quoted, so it is checked as quoted: SELECT is the fake's word only once folded.
     [Theory]
     [InlineData("SELECT 1 {{SELECT}}")]
+    [InlineData("SELECT /*+ {{SELECT}} */ 1")]
     [InlineData("-- token: {{SELECT:}}\nSELECT 1")]
     [InlineData("-- token-ignore: SELECT\nSELECT 1")]
     public void Check_TokenNamedAsAnEngineWordOnceFolded_IsRefused(string sql) =>
         CheckQuery(sql).ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "SELECT"));
+
+    // A placeholder in a call's SQL, as an ignored token reaches the SQL sent, is checked as query.sql's is.
+    [Fact]
+    public void Check_TokenPlaceholderInACallsSql_IsCheckedAsQuoted()
+    {
+        var (engine, mapping) = Mapping();
+        var query = mapping.Name("GetUsers", quoted: false, NameClass.Query);
+        var call = Describe(new JsonObject { ["name"] = query, ["sql"] = "SELECT 1 {{SELECT}}" });
+
+        var refusal = TokenCheck.Check(engine, mapping, [call], $"-- name: {query}\nSELECT 1", expected: null);
+
+        refusal.ShouldBe(
+            new RenamingRefusal(RefusalStep.Token, "capture.json call 0 'describe' request.sql", "SELECT")
+        );
+    }
 
     // Braces around what is not a name and a default are no token, and their words are plain words.
     [Fact]

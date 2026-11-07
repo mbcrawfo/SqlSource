@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -256,8 +257,8 @@ public sealed class SqlRenamerTests
         var growth = renamed.Text.Length - Sql.Length;
         growth.ShouldBe("a_12345678".Length - "users".Length);
         renamed.MapPosition(1).ShouldBe(1);
-        renamed.MapPosition(Sql.IndexOf("users", System.StringComparison.Ordinal) + 1).ShouldBe(15);
-        renamed.MapPosition(Sql.IndexOf("WHERE", System.StringComparison.Ordinal) + 1).ShouldBe(21 + growth);
+        renamed.MapPosition(Sql.IndexOf("users", StringComparison.Ordinal) + 1).ShouldBe(15);
+        renamed.MapPosition(Sql.IndexOf("WHERE", StringComparison.Ordinal) + 1).ShouldBe(21 + growth);
         renamed.MapPosition(Sql.Length + 1).ShouldBe(renamed.Text.Length + 1);
     }
 
@@ -270,7 +271,7 @@ public sealed class SqlRenamerTests
         var renamed = renamer.Rename(Sql, NameClass.Alias, Place, refusals.Add);
 
         // The literal is one code point and two chars; FROM is the 12th code point and the 13th char.
-        renamed.MapPosition(12).ShouldBe(renamed.Text.IndexOf("FROM", System.StringComparison.Ordinal) + 1);
+        renamed.MapPosition(12).ShouldBe(renamed.Text.IndexOf("FROM", StringComparison.Ordinal) + 1);
         renamed.Offsets.Length.ShouldBe(Sql.Length);
     }
 
@@ -317,6 +318,23 @@ public sealed class SqlRenamerTests
         mapping.Names.ShouldContain(new MappedName(filter, NameClass.Token, "filter"));
         mapping.Names.ShouldContain(new MappedName(Of(mapping, "other"), NameClass.Token, "other"));
         mapping.Names.ShouldContain(new MappedName(Of(mapping, "raw"), NameClass.Token, "raw"));
+    }
+
+    // An ignored token reaches the SQL sent as written, in plain text or a hint: its name is renamed as a token's, as
+    // query.sql's is, so the two have one replacement.
+    [Theory]
+    [InlineData("SELECT 1 {{Extra}}")]
+    [InlineData("SELECT /*+ {{Extra}} */ 1")]
+    public void Rename_TokenPlaceholderInSql_IsRenamedAsATokensName(string sql)
+    {
+        var (renamer, mapping, refusals) = Renamer();
+
+        var renamed = renamer.Rename(sql, NameClass.Alias, Place, refusals.Add).Text;
+
+        refusals.ShouldBeEmpty();
+        var name = Of(mapping, "Extra", quoted: true);
+        renamed.ShouldBe(sql.Replace("Extra", name, StringComparison.Ordinal));
+        mapping.Names.ShouldHaveSingleItem().ShouldBe(new MappedName(name, NameClass.Token, "Extra"));
     }
 
     [Theory]
