@@ -46,9 +46,7 @@ public sealed partial class BuildFileTests
         "$([System.String]::IsNullOrWhiteSpace("
         + "$([System.Environment]::GetEnvironmentVariable('SQLSOURCE_CONNECTION'))))";
 
-    private static readonly XDocument Outer = XDocument.Load(
-        Path.Combine(AppContext.BaseDirectory, "buildMultiTargeting", "SqlSource.targets")
-    );
+    private static readonly XDocument Outer = Load("buildMultiTargeting", "SqlSource.targets");
 
     // The properties that the outer build's file defines, which build/SqlSource.targets defines too.
     private static readonly string[] SharedOnlineProperties =
@@ -233,7 +231,7 @@ public sealed partial class BuildFileTests
             }
         )
         {
-            Attributes(call)
+            AttributesOf(call)
                 .ShouldBe(
                     new Dictionary<string, string>
                     {
@@ -243,7 +241,7 @@ public sealed partial class BuildFileTests
                         ["Condition"] = "'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''",
                     }
                 );
-            Attributes(call.Elements().ShouldHaveSingleItem())
+            AttributesOf(call.Elements().ShouldHaveSingleItem())
                 .ShouldBe(
                     new Dictionary<string, string> { ["TaskParameter"] = "TargetOutputs", ["ItemName"] = itemName }
                 );
@@ -290,7 +288,7 @@ public sealed partial class BuildFileTests
     {
         var target = Target(CreatedSidecarsTarget);
 
-        Attributes(target)
+        AttributesOf(target)
             .ShouldBe(
                 new Dictionary<string, string>
                 {
@@ -376,7 +374,7 @@ public sealed partial class BuildFileTests
             ]);
         target
             .Elements("WriteLinesToFile")
-            .Select(Attributes)
+            .Select(AttributesOf)
             .ShouldBe([
                 WrittenWhenItChanges("$(SqlSourceSidecarList)", "@(SqlSourceSidecarListed)"),
                 WrittenWhenItChanges("$(SqlSourceOnlineValueFile)", "@(SqlSourceOnlineValueLine)"),
@@ -426,7 +424,7 @@ public sealed partial class BuildFileTests
         var target = Target(RunOnlineTarget);
         var exec = target.Elements("Exec").ShouldHaveSingleItem();
 
-        Attributes(exec)
+        AttributesOf(exec)
             .ShouldBe(
                 new Dictionary<string, string>
                 {
@@ -440,7 +438,7 @@ public sealed partial class BuildFileTests
                 }
             );
         exec.Elements("Output")
-            .Select(Attributes)
+            .Select(AttributesOf)
             .ShouldBe([
                 new Dictionary<string, string>
                 {
@@ -594,10 +592,10 @@ public sealed partial class BuildFileTests
                     "Include=@(SqlSourceSidecarAfterRun->Distinct()) Exclude=@(SqlSourceSidecarListed)"
                 ),
             ]);
-        Attributes(target.Element("WriteLinesToFile")!)
+        AttributesOf(target.Element("WriteLinesToFile")!)
             .ShouldBe(WrittenWhenItChanges("$(SqlSourceSidecarList)", "@(SqlSourceSidecarAfterRun)"));
         target.Element("WriteLinesToFile")!.IsAfter(exec).ShouldBeTrue();
-        Attributes(target.Element("Touch")!)
+        AttributesOf(target.Element("Touch")!)
             .ShouldBe(
                 new Dictionary<string, string>
                 {
@@ -708,7 +706,7 @@ public sealed partial class BuildFileTests
                     ["Condition"] = "'$(TargetFramework)' == '' and '$(TargetFrameworks)' != '' and " + RunCondition,
                 }
             );
-        Attributes(target.Elements().ShouldHaveSingleItem())
+        AttributesOf(target.Elements().ShouldHaveSingleItem())
             .ShouldBe(
                 new Dictionary<string, string>
                 {
@@ -768,9 +766,6 @@ public sealed partial class BuildFileTests
             ["Overwrite"] = "true",
             ["WriteOnlyWhenDifferent"] = "true",
         };
-
-    private static Dictionary<string, string> Attributes(XElement element) =>
-        element.Attributes().ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value);
 
     // A path escaped for the shell that Exec runs the command in.
     private static string ShellEscaped(string path) =>
