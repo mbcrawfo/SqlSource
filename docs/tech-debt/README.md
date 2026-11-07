@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0114`
+Next id: `TD-0115`
 
 ## Active items
 
@@ -48,6 +48,7 @@ Next id: `TD-0114`
 | [TD-0108](TD-0108-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-11-06 | Medium | Duplicated logic and uneven conventions in `src/`, most in the bug-report bundles: the renaming copies readings of the describer and the generator, the two engines' rule tables are spelled and pinned differently, and the commands and the run's context are copied by hand |
 | [TD-0109](TD-0109-duplicated-arrangements-and-uneven-conventions-in-tests.md) | Open | 2026-11-06 | Medium | Duplicated arrangements and uneven conventions in `tests/`, most in the bundle and renaming tests, and 22 tests whose comment said more than their assertions check |
 | [TD-0110](TD-0110-a-poller-of-a-folder-alone-sees-no-folder-made-in-it.md) | Open | 2026-11-06 | Low | Under `DOTNET_USE_POLLING_FILE_WATCHER`, a watch of a folder alone sees no folder made or deleted in it, so `describe --watch` misses a new folder outside the folders it watches with their folders below, and reports the deletion of such a folder as `SQLSRC287` |
+| [TD-0114](TD-0114-an-empty-list-fails-in-a-postgresql-index-predicate.md) | Open | 2026-11-06 | Low | On PostgreSQL, a query method whose list is inside the index predicate of `ON CONFLICT (...) WHERE` throws `PostgresException` (`0A000`) when the list is empty or null, since its empty form is a subquery, which PostgreSQL refuses there |
 
 ## Columns
 
