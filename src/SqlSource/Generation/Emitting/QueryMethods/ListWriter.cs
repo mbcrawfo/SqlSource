@@ -15,9 +15,9 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// is counted and then enumerated, and any other sequence is copied into an array first.  A list sends its count of
 /// parameters, padded under <see cref="QueryMethod.PadsLists" /> to the next of 1, 2, 4, … 512 and then to the next
 /// multiple of 512, with its last value repeated, so that a few forms of the statement serve every count; an empty or
-/// null list sends one, a typed <c>NULL</c>, for <c>(SELECT @ids_0 WHERE 1 = 0)</c>.  Padding never makes the
-/// method pass the engine's limit: if the padded total would, the method sends the counts as they are, and it throws
-/// <c>ArgumentException</c> when those pass the limit too.
+/// null list sends one, a typed <c>NULL</c>, for <c>(@ids_0)</c> or <c>(SELECT @ids_0 WHERE 1 = 0)</c>.  Padding
+/// never makes the method pass the engine's limit: if the padded total would, the method sends the counts as they
+/// are, and it throws <c>ArgumentException</c> when those pass the limit too.
 /// </remarks>
 internal static class ListWriter
 {

@@ -127,35 +127,139 @@ public sealed class ListQueryTests(AppContainer app)
         counts.ShouldBe([new CountAccountsWithStatusesDto(1)]);
     }
 
-    // An empty list is sent as a subquery, which SQL Server refuses inside an aggregate: Msg 130, a known issue of the
-    // manual's sqlserver.md (TD-0106).
+    // An empty list is sent as one NULL, which SQL Server takes inside an aggregate, and which matches no account.
     [Fact]
-    public async Task CountStatuses_Empty_IsRefusedByTheServer()
+    public async Task CountStatuses_Empty_CountsNone()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
 
-        var thrown = await Should.ThrowAsync<SqlException>(() =>
-            connection.CountAccountsWithStatuses(new CountAccountsWithStatusesArgs([]), cancellationToken: token)
-        );
-
-        thrown.Number.ShouldBe(130);
-    }
-
-    // The known issue's workaround: the test in a WITH query, and the aggregate over its result, runs for an empty
-    // list, which matches no account.
-    [Fact]
-    public async Task CountStatusesTestedFirst_Empty_CountsNone()
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var connection = new SqlConnection(app.ConnectionString);
-
-        var counts = await connection.CountAccountsWithStatusesTestedFirst(
-            new CountAccountsWithStatusesTestedFirstArgs([]),
+        var counts = await connection.CountAccountsWithStatuses(
+            new CountAccountsWithStatusesArgs([]),
             cancellationToken: token
         );
 
-        counts.ShouldBe([new CountAccountsWithStatusesTestedFirstDto(0)]);
+        counts.ShouldBe([new CountAccountsWithStatusesDto(0)]);
+    }
+
+    // A list in a GROUP BY: carol alone is suspended, so alice and bob are one group and carol the other.
+    [Fact]
+    public async Task GroupedByStatuses_List_GroupsByTheTest()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var groups = await connection.CountAccountsGroupedByStatuses(
+            new CountAccountsGroupedByStatusesArgs(["suspended"]),
+            cancellationToken: token
+        );
+
+        groups.ShouldBe([new CountAccountsGroupedByStatusesDto(1, 2), new CountAccountsGroupedByStatusesDto(3, 1)]);
+    }
+
+    // An empty list in a GROUP BY matches no account, so every account is in one group.
+    [Fact]
+    public async Task GroupedByStatuses_Empty_IsOneGroupOfEveryAccount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var groups = await connection.CountAccountsGroupedByStatuses(
+            new CountAccountsGroupedByStatusesArgs([]),
+            cancellationToken: token
+        );
+
+        groups.ShouldBe([new CountAccountsGroupedByStatusesDto(1, 3)]);
+    }
+
+    // A list in an OUTPUT clause marks bob alone.
+    [Fact]
+    public async Task MarkIds_List_MarksTheListedAccounts()
+    {
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var marks = await MarkRolledBackAsync(connection, [2]);
+
+        marks.ShouldBe([
+            new MarkAccountsWithIdsDto(1, 0),
+            new MarkAccountsWithIdsDto(2, 1),
+            new MarkAccountsWithIdsDto(3, 0),
+        ]);
+    }
+
+    // An empty list in an OUTPUT clause matches no account, so none is marked.
+    [Fact]
+    public async Task MarkIds_Empty_MarksNone()
+    {
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var marks = await MarkRolledBackAsync(connection, []);
+
+        marks.ShouldBe([
+            new MarkAccountsWithIdsDto(1, 0),
+            new MarkAccountsWithIdsDto(2, 0),
+            new MarkAccountsWithIdsDto(3, 0),
+        ]);
+    }
+
+    // The list's two uses: alice and carol are not in it, and alice's next id, bob's, is.
+    [Fact]
+    public async Task ExceptAndBefore_List_CountsBoth()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var counts = await connection.CountAccountsExceptAndBefore(
+            new CountAccountsExceptAndBeforeArgs([2]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsExceptAndBeforeDto(2, 1)]);
+    }
+
+    // Empty, the use after a NOT matches every account, and the one inside the aggregate none, each in its own form.
+    [Fact]
+    public async Task ExceptAndBefore_Empty_CountsEveryAccountAndNoneBefore()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var counts = await connection.CountAccountsExceptAndBefore(
+            new CountAccountsExceptAndBeforeArgs([]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsExceptAndBeforeDto(3, 0)]);
+    }
+
+    // SQLSRC127's workaround: a list after a NOT, tested in a WITH query and the aggregate over its result, runs for
+    // an empty list, which every account is outside.
+    [Fact]
+    public async Task CountWithoutStatusesTestedFirst_Empty_CountsEveryAccount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var counts = await connection.CountAccountsWithoutStatusesTestedFirst(
+            new CountAccountsWithoutStatusesTestedFirstArgs([]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithoutStatusesTestedFirstDto(3)]);
+    }
+
+    [Fact]
+    public async Task CountWithoutStatusesTestedFirst_Statuses_CountsTheOthers()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var counts = await connection.CountAccountsWithoutStatusesTestedFirst(
+            new CountAccountsWithoutStatusesTestedFirstArgs(["active", "closed"]),
+            cancellationToken: token
+        );
+
+        counts.ShouldBe([new CountAccountsWithoutStatusesTestedFirstDto(1)]);
     }
 
     [Fact]
@@ -421,6 +525,22 @@ public sealed class ListQueryTests(AppContainer app)
         var exception = await Should.ThrowAsync<InvalidOperationException>(() => stream.ToListAsync(token).AsTask());
 
         exception.Message.ShouldBe("The list 'Ids' changed after the query counted it.");
+    }
+
+    // The marks of MarkAccountsWithIds, by id, in a transaction that is rolled back.
+    private static async Task<MarkAccountsWithIdsDto[]> MarkRolledBackAsync(SqlConnection connection, int[] ids)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await connection.OpenAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+
+        var marks = await connection.MarkAccountsWithIds(
+            new MarkAccountsWithIdsArgs(ids),
+            transaction: transaction,
+            cancellationToken: token
+        );
+
+        return [.. marks.OrderBy(static mark => mark.Id)];
     }
 
     // The values in a collection of the kind, or in a lazy sequence that is none.

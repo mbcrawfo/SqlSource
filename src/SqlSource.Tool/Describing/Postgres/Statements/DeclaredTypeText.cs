@@ -12,9 +12,9 @@ namespace SqlSource.Tool.Describing.Postgres.Statements;
 /// <para>
 /// A marker's type is everything to the end of its line, and the tool interpolates it into SQL it sends.  So
 /// nothing leaves the tool that is not written as a type: a name, one bare identifier or one quoted one, or two
-/// joined by a dot; then any of PostgreSQL's own type words, with one modifier in parentheses before, among or
-/// after them; then any number of <c>[]</c>.  A comment, a <c>;</c>, a quote left open, a <c>)</c> without its
-/// <c>(</c> and any other bare word are refused.
+/// joined by a dot; then any of PostgreSQL's own type words, with one modifier in parentheses, of numbers and
+/// bare words, before, among or after them; then any number of <c>[]</c>.  A comment, a <c>;</c>, a quote left
+/// open, a <c>)</c> without its <c>(</c> and any other bare word are refused.
 /// </para>
 /// <para>
 /// It does not say whether the database has the type: the server does, and checks it against every use.
@@ -116,10 +116,12 @@ internal static class DeclaredTypeText
         }
     }
 
-    // "(" with digits, commas and spaces up to ")".  A "-" stands before a digit, so that two cannot start a comment.
+    // "(" with signed integers and bare ASCII words, separated by commas and spaces, up to ")".  A "-" stands before
+    // a digit, so that two cannot start a comment; a word is ASCII, as PostGIS's are.
     private static bool TryReadModifier(string text, ref int position)
     {
-        for (var index = position + 1; index < text.Length; index++)
+        var index = position + 1;
+        while (index < text.Length)
         {
             var value = text[index];
             if (value == ')')
@@ -128,8 +130,35 @@ internal static class DeclaredTypeText
                 return true;
             }
 
-            var isSign = value == '-' && index + 1 < text.Length && char.IsAsciiDigit(text[index + 1]);
-            if (!char.IsAsciiDigit(value) && value is not (',' or ' ') && !isSign)
+            if (value is ',' or ' ')
+            {
+                index++;
+            }
+            else if (
+                char.IsAsciiDigit(value)
+                || (value == '-' && index + 1 < text.Length && char.IsAsciiDigit(text[index + 1]))
+            )
+            {
+                index++;
+                while (index < text.Length && char.IsAsciiDigit(text[index]))
+                {
+                    index++;
+                }
+
+                // A number ends before a letter or a "_", so that "4326Point" and "4326_point" are neither.
+                if (index < text.Length && IsAsciiWordPart(text[index]) && !char.IsAsciiDigit(text[index]))
+                {
+                    return false;
+                }
+            }
+            else if (char.IsAsciiLetter(value) || value == '_')
+            {
+                while (index < text.Length && IsAsciiWordPart(text[index]))
+                {
+                    index++;
+                }
+            }
+            else
             {
                 return false;
             }
@@ -137,6 +166,8 @@ internal static class DeclaredTypeText
 
         return false;
     }
+
+    private static bool IsAsciiWordPart(char value) => char.IsAsciiLetterOrDigit(value) || value == '_';
 
     // Any number of "[]", and then the end.
     private static bool TryReadArrayMarks(string text, ref int position)

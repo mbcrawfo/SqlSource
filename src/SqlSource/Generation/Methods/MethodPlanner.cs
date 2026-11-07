@@ -18,7 +18,8 @@ namespace SqlSource.Generation.Methods;
 /// <summary>
 /// Decides which queries of one type get a method, and what each method is written from, with the problems of those
 /// that cannot have one: <c>SQLSRC123</c> for a method that cannot take or return its internal models,
-/// <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, and, from
+/// <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, the errors of a query's SQL that are only a method's
+/// (<see cref="SqlQuery.CodeGenErrors" />), and, from
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
@@ -220,10 +221,10 @@ internal static class MethodPlanner
         };
 
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
-    // problem of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any
-    // one leaves it no method.  Its conversions see the converters of the type's slice that serve its target.  The
-    // libraries it uses are added to the type's, and one older than its floor leaves it no method, beside its
-    // problems, which stay true once the library is updated.
+    // problem of its SQL, of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC274 and of its converters that the query has is
+    // reported, and any one leaves it no method.  Its conversions see the converters of the type's slice that serve
+    // its target.  The libraries it uses are added to the type's, and one older than its floor leaves it no method,
+    // beside its problems, which stay true once the library is updated.
     private static Planned? Plan(
         QueryContext context,
         HashSet<(string? NestedClass, string Name)> written,
@@ -235,13 +236,16 @@ internal static class MethodPlanner
     {
         var (input, _, file, engine, usable) = context;
         var (_, queryIndex, query, settings, placement) = usable;
-        // A query without models has its own error already, reported by its file.
+        // A query without models has its own error already, reported by its file.  Its SQL's own errors need no
+        // models, so it gets them before it is described.
         if (input.Files[usable.FileIndex].Find(queryIndex, query.Name) is not { } models)
         {
-            return null;
+            return query.CodeGenErrors.Count == 0
+                ? null
+                : new Planned([.. query.CodeGenErrors], query.Name, query.NameLocation, [], false, []);
         }
 
-        var problems = new List<DiagnosticInfo>();
+        var problems = new List<DiagnosticInfo>(query.CodeGenErrors);
         // Its models' assignments are looked for only where its visibility needs them public, so a method that is not
         // refused costs one switch.
         var type = input.Type.Type.Type;

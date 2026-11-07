@@ -618,6 +618,20 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the list, with its prefix, as written where it is reported, and {1} where it stands.  Reported at the use,
+    // for a query whose output is CodeGen alone.
+    public static readonly DiagnosticDescriptor NegatedListRefusedEmpty = new(
+        id: "SQLSRC127",
+        title: "Negated list stands where SQL Server refuses an empty list",
+        messageFormat: "The list '{0}' stands after a NOT {1}, where SQL Server refuses the form an empty list is sent "
+            + "in.  Test the list in a WITH query, or a subquery in FROM, and use its result here.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc127",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor SidecarMalformed = new(
         id: "SQLSRC237",
         title: "Sidecar cannot be read",
@@ -1256,6 +1270,7 @@ internal static class SqlDiagnostics
             NestedClassVisibilities,
             MemberNameTaken,
             ListParameterMisused,
+            NegatedListRefusedEmpty,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,
@@ -1328,6 +1343,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.TokenCrossesComment => TokenCrossesComment,
             SqlParseErrorKind.ParameterInTwoSpellings => ParameterInTwoSpellings,
             SqlParseErrorKind.ListParameterMisused => ListParameterMisused,
+            SqlParseErrorKind.NegatedListRefusedEmpty => NegatedListRefusedEmpty,
             _ => throw UnexpectedEnumValueException.Of(kind),
         };
 }

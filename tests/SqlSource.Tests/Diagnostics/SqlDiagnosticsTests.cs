@@ -134,6 +134,18 @@ public sealed class SqlDiagnosticsTests
             );
 
     [Fact]
+    public void ForParseError_NegatedListRefusedEmpty_IsSqlsrc127() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.NegatedListRefusedEmpty).Id.ShouldBe("SQLSRC127");
+
+    [Fact]
+    public void NegatedListRefusedEmpty_Message_HoldsTheListAndWhereItStands() =>
+        Format(SqlDiagnostics.NegatedListRefusedEmpty, "@ids", "in a GROUP BY")
+            .ShouldBe(
+                "The list '@ids' stands after a NOT in a GROUP BY, where SQL Server refuses the form an empty list is "
+                    + "sent in.  Test the list in a WITH query, or a subquery in FROM, and use its result here."
+            );
+
+    [Fact]
     public void SidecarMalformed_Message_HoldsTheReason() =>
         Format(SqlDiagnostics.SidecarMalformed, "'hash' is missing")
             .ShouldBe(

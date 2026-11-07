@@ -216,9 +216,10 @@ internal static class MethodWriter
     }
 
     // The length of the result: the literal text as one number, then each parameter's length, times how often its
-    // token appears, and then the length of each list's uses.  A sum or a product is checked: unchecked, a total above
-    // the largest int wraps around, and one that wraps to zero or a small number would give a short string and not an
-    // exception.  A query with a list has literal text before its first use, so its length starts with a number.
+    // token appears, and then the length of each list's uses in each of their empty forms.  A sum or a product is
+    // checked: unchecked, a total above the largest int wraps around, and one that wraps to zero or a small number
+    // would give a short string and not an exception.  A query with a list has literal text before its first use, so
+    // its length starts with a number.
     private static void AppendLength(
         StringBuilder builder,
         EquatableArray<SqlSegment> segments,
@@ -230,6 +231,7 @@ internal static class MethodWriter
         var literalLength = 0;
         var uses = new int[parameters.Count];
         var listUses = new int[lists?.Each.Count ?? 0];
+        var nullUses = new int[listUses.Length];
         foreach (var segment in segments)
         {
             if (IsText(segment.Kind, lists is not null))
@@ -242,7 +244,7 @@ internal static class MethodWriter
             }
             else
             {
-                listUses[lists!.IndexOf(segment.Text)]++;
+                (segment.EmptyIsNull ? nullUses : listUses)[lists!.IndexOf(segment.Text)]++;
             }
         }
 
@@ -274,7 +276,12 @@ internal static class MethodWriter
         {
             if (listUses[index] > 0)
             {
-                ListSqlWriter.AppendLength(builder, lists!, index, listUses[index]);
+                ListSqlWriter.AppendLength(builder, lists!, index, listUses[index], emptyIsNull: false);
+            }
+
+            if (nullUses[index] > 0)
+            {
+                ListSqlWriter.AppendLength(builder, lists!, index, nullUses[index], emptyIsNull: true);
             }
         }
 
@@ -334,6 +341,7 @@ internal static class MethodWriter
                     lists,
                     list,
                     segment.Text,
+                    segment.EmptyIsNull,
                     span,
                     StateItem(state, stateCount, count),
                     StateItem(state, stateCount, count + 1),
