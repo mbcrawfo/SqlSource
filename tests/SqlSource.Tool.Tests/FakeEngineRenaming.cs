@@ -111,6 +111,8 @@ internal sealed class FakeEngineRenaming(
 
     public SqlDialect Dialect => dialect;
 
+    public bool IsNumberStart(string text, int at, int end) => char.IsAsciiDigit(text[at]);
+
     public bool IsWordStart(char character) =>
         dialect == SqlDialect.SqlServer
             ? QuoteReader.IsNameCharacterOfSqlServer(character) && !char.IsDigit(character)

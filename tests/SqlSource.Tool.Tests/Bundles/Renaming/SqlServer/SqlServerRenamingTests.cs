@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Text.Json.Nodes;
 using Shouldly;
@@ -312,22 +313,92 @@ public sealed class SqlServerRenamingTests
         Engine.CopiesIn("parameters", call).ShouldBe([new ParameterCopy("before_1", "before", "_1")]);
     }
 
-    // A money literal starts with $, which starts a word by the engine's word rule, so it is renamed to a name.  This
-    // is TD-0103.
-    [Fact]
-    public void Sql_AMoneyLiteral_IsRenamedToAName()
+    [Theory]
+    [InlineData("1", 0, true)]
+    [InlineData("$12", 0, true)]
+    [InlineData("$", 0, true)]
+    [InlineData("$ 1", 0, true)]
+    [InlineData("$-1", 0, true)]
+    [InlineData("$.5", 0, true)]
+    [InlineData("$a", 0, false)]
+    [InlineData("$_", 0, false)]
+    [InlineData("$@", 0, false)]
+    [InlineData("$#", 0, false)]
+    [InlineData("$$", 0, false)]
+    [InlineData("a", 0, false)]
+    public void IsNumberStart_IsADigitOrTheSignOfAMoneyLiteral(string text, int at, bool expected) =>
+        Engine.IsNumberStart(text, at, text.Length).ShouldBe(expected);
+
+    // The server reads each of these as money, so the renaming keeps it as it keeps 12.
+    [Theory]
+    [InlineData("SELECT $12 AS price")]
+    [InlineData("SELECT $12.50 AS price")]
+    [InlineData("SELECT $12. AS price")]
+    [InlineData("SELECT $ AS price")]
+    [InlineData("SELECT $ 12 AS price")]
+    [InlineData("SELECT $-12 AS price")]
+    [InlineData("SELECT $+12 AS price")]
+    [InlineData("SELECT $.5 AS price")]
+    [InlineData("SELECT $-.5 AS price")]
+    public void Sql_AMoneyLiteral_IsKept(string sql)
     {
-        const string Sql = "SELECT $12 AS price";
+        var (renamed, mapping, refusal) = RenameQuery(sql);
+
+        refusal.ShouldBeNull();
+        renamed.ShouldBe(
+            sql.Replace("price", mapping.Name("price", quoted: false, NameClass.Alias), StringComparison.Ordinal)
+        );
+    }
+
+    // The server reads $1e5 as $1 AS e5, as it reads 12abc as 12 AS abc, so the run is refused whole as 12abc is.
+    [Theory]
+    [InlineData("SELECT $1e5", "$1e5")]
+    [InlineData("SELECT $1_000", "$1_000")]
+    [InlineData("SELECT $12abc", "$12abc")]
+    [InlineData("SELECT $1.2.3", "$1.2.3")]
+    public void Sql_AMoneyLiteralWithMore_IsRefused(string sql, string token)
+    {
+        var (_, _, refusal) = RenameQuery(sql);
+
+        refusal.ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", token));
+    }
+
+    [Fact]
+    public void Sql_ADollarThatAWordCharacterFollows_IsAWord()
+    {
+        var (renamed, mapping, refusal) = RenameQuery("SELECT $action, $secret, x$1 FROM t");
+
+        refusal.ShouldBeNull();
+        var secret = mapping.Name("$secret", quoted: false, NameClass.Alias);
+        var x = mapping.Name("x$1", quoted: false, NameClass.Alias);
+        var table = mapping.Name("t", quoted: false, NameClass.Alias);
+        renamed.ShouldBe($"SELECT $action, {secret}, {x} FROM {table}");
+    }
+
+    [Theory]
+    [InlineData("SELECT $")]
+    [InlineData("SELECT 1 /*+ $*/")]
+    public void Sql_ADollarAtTheEnd_IsKept(string sql)
+    {
+        var (renamed, _, refusal) = RenameQuery(sql);
+
+        refusal.ShouldBeNull();
+        renamed.ShouldBe(sql);
+    }
+
+    [Fact]
+    public void Check_AMoneyLiteral_PassesAsANumber()
+    {
         var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold, Engine.Spelled);
-        var run = RenamingRun.For(Engine, mapping, Sql, RenamingCopies.None);
+        var query = mapping.Name("GetPrice", quoted: false, NameClass.Query);
+        var price = mapping.Name("price", quoted: false, NameClass.Alias);
 
-        var renamed = run.At("query.sql").Sql(Sql, NameClass.Alias).Text;
-
-        run.Refusal.ShouldBeNull();
-        mapping.IsMapped("$12", quoted: false).ShouldBeTrue();
-        var money = mapping.Name("$12", quoted: false, NameClass.Alias);
-        money.ShouldMatch("^a_[0-9a-f]{8}$");
-        renamed.ShouldBe($"SELECT {money} AS {mapping.Name("price", quoted: false, NameClass.Alias)}");
+        TokenCheck
+            .Check(Engine, mapping, [], $"-- name: {query}\nSELECT $12.50 AS {price}, $-1", expected: null)
+            .ShouldBeNull();
+        TokenCheck
+            .Check(Engine, mapping, [], $"-- name: {query}\nSELECT $1e5", expected: null)
+            .ShouldBe(new RenamingRefusal(RefusalStep.Token, "query.sql", "$1e5"));
     }
 
     [Fact]
@@ -376,4 +447,13 @@ public sealed class SqlServerRenamingTests
             },
             ["answer"] = new JsonObject(),
         };
+
+    // The SQL renamed as query.sql's body, its mapping and the run's refusal.
+    private static (string Renamed, NameMapping Mapping, RenamingRefusal? Refusal) RenameQuery(string sql)
+    {
+        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold, Engine.Spelled);
+        var run = RenamingRun.For(Engine, mapping, sql, RenamingCopies.None);
+        var renamed = run.At("query.sql").Sql(sql, NameClass.Alias).Text;
+        return (renamed, mapping, run.Refusal);
+    }
 }

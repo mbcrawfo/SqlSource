@@ -397,6 +397,39 @@ public sealed partial class SqlServerErrorRenamingTests
             .ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task RenameAsync_AMoneyLiteral_IsKept()
+    {
+        const string Money = "LIKE @pattern AND credit > $12.50";
+        var raw = await EditedAsync(
+            "update-wide-types",
+            capture =>
+            {
+                foreach (var call in capture["calls"]!.AsArray().Select(static call => call!.AsObject()))
+                {
+                    if (call["request"]!["sql"] is { } sql)
+                    {
+                        call["request"]!["sql"] = WithMoney(sql.GetValue<string>());
+                    }
+                }
+            },
+            WithMoney
+        );
+        raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
+        raw.Query.ShouldContain(Money);
+
+        var renamed = await RenamedAsync(raw);
+
+        renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
+        renamed.Bundle.Query.ShouldContain("> $12.50");
+        renamed.Mapping.ShouldNotContain(static name => name.Original.Contains('$', StringComparison.Ordinal));
+        BundleLeaks
+            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+            .ShouldBeEmpty();
+
+        static string WithMoney(string text) => text.Replace("LIKE @pattern", Money, StringComparison.Ordinal);
+    }
+
     // The values' use of the parameter "@nickname" written in upper case, which its declaration and other uses are not.
     private static string WithUpperNickname(string text) =>
         text.Replace("@email, @nickname, @credit", "@email, @NICKNAME, @credit", StringComparison.Ordinal);

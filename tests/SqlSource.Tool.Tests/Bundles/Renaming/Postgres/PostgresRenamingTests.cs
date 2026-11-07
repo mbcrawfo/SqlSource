@@ -37,6 +37,14 @@ public sealed class PostgresRenamingTests
         PostgresRenaming.Instance.Spelled("Users", true).ShouldBe("Users");
     }
 
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData("$12", false)]
+    [InlineData("$", false)]
+    [InlineData("a", false)]
+    public void IsNumberStart_IsAnAsciiDigit(string text, bool expected) =>
+        PostgresRenaming.Instance.IsNumberStart(text, 0, text.Length).ShouldBe(expected);
+
     [Fact]
     public async Task RenameAsync_SelectDeclaredDomain_RenamesAndReplays()
     {

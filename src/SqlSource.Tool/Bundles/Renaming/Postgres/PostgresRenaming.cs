@@ -28,6 +28,11 @@ internal sealed class PostgresRenaming : IEngineRenaming
     /// <inheritdoc />
     public SqlDialect Dialect => SqlDialect.PostgreSql;
 
+    /// <summary>
+    /// An ASCII digit: a <c>$</c> before a digit is a parameter or a dollar quote, which the lexer reads apart.
+    /// </summary>
+    public bool IsNumberStart(string text, int at, int end) => char.IsAsciiDigit(text[at]);
+
     /// <inheritdoc />
     public bool IsWordStart(char character) => PostgresWords.IsWordStart(character);
 
