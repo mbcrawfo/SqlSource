@@ -418,7 +418,8 @@ public sealed partial class BuildFileTests
     // compiler's, ignores the exit code, which would add an error of Exec's own to the tool's, and keeps every line
     // for the target to read; the summary and the offline line are messages of low importance.  The paths are
     // escaped for the shell Exec runs the command in, which reads $, `, " and \ within quotes on Unix, each put in
-    // single quotes, since MSBuild turns a \ of a path into a /, and % in cmd, each doubled.
+    // single quotes, since MSBuild turns a \ of a path into a /, and % in cmd, each doubled.  On Windows the
+    // backslashes that end the .env file's path, a folder's, are doubled, or the tool would read its closing quote.
     [Fact]
     public void Targets_RunOnline_ExecsTheToolOnTheManifest()
     {
@@ -463,11 +464,18 @@ public sealed partial class BuildFileTests
                 ("SqlSourceShellSpecial", "'$(OS)' == 'Windows_NT'", "%"),
                 ("SqlSourceShellEscape", "'$(OS)' == 'Windows_NT'", "%$0"),
                 ("SqlSourceToolManifestArgument", null, ShellEscaped("$(SqlSourceManifestFile)")),
+                ("SqlSourceToolEnvFileArgument", null, ShellEscaped("$(SqlSourceEnvFilePath)")),
+                (
+                    "SqlSourceToolEnvFileArgument",
+                    "'$(OS)' == 'Windows_NT'",
+                    "$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceToolEnvFileArgument), '\\\\+$',"
+                        + " '$0$0'))"
+                ),
                 ("SqlSourceToolEnvFile", null, ""),
                 (
                     "SqlSourceToolEnvFile",
                     "'$(SqlSourceEnvFileValue)' != ''",
-                    " --env-file \"" + ShellEscaped("$(SqlSourceEnvFilePath)") + "\""
+                    " --env-file \"$(SqlSourceToolEnvFileArgument)\""
                 ),
                 ("SqlSourceToolEnvFile", "'$(SqlSourceEnvFileValue)' == 'none'", " --env-file none"),
                 ("SqlSourceToolLogFile", null, "$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log"),

@@ -152,7 +152,8 @@ public sealed class OnlineBuildTests : IDisposable
 
     // Under auto the build goes online exactly when the tool, given the command the build gives it, reads a file, and
     // that is the file the layout means, by its path from the folder of the copies.  A build under true shows the
-    // command when auto runs nothing.
+    // command when auto runs nothing.  A folder's path given with a trailing separator ends in a \ on Windows, which
+    // the tool would read with the closing quote as a path holding a ", and fail to read, unless the build doubles it.
     [Theory]
     [InlineData("the project's .env", "Online/.env")]
     [InlineData("a .env above", null)]
@@ -162,6 +163,8 @@ public sealed class OnlineBuildTests : IDisposable
     [InlineData("SqlSourceEnvFile missing", null)]
     [InlineData("a folder named .env", null)]
     [InlineData("SqlSourceEnvFile none with the project's .env", null)]
+    [InlineData("SqlSourceEnvFile names a folder with a trailing separator \\", null)]
+    [InlineData("SqlSourceEnvFile names a folder with a trailing separator /", null)]
     public async Task Build_EnvLayout_GoesOnlineExactlyWhenTheToolReadsAFile(string layout, string? expected)
     {
         var arguments = Lay(layout);
@@ -758,6 +761,12 @@ public sealed class OnlineBuildTests : IDisposable
             case "SqlSourceEnvFile none with the project's .env":
                 _ = _fixtures.WriteFile("Online/.env", DotEnvText);
                 return [FixtureProjects.PropertySwitch("SqlSourceEnvFile", " None ")];
+            case "SqlSourceEnvFile names a folder with a trailing separator \\":
+                _ = Directory.CreateDirectory(Path.Combine(_folder, "config"));
+                return ["-p:SqlSourceEnvFile=config\\"];
+            case "SqlSourceEnvFile names a folder with a trailing separator /":
+                _ = Directory.CreateDirectory(Path.Combine(_folder, "config"));
+                return ["-p:SqlSourceEnvFile=config/"];
             default:
                 throw new ArgumentOutOfRangeException(nameof(layout), layout, null);
         }

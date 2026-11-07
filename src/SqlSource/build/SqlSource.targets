@@ -632,7 +632,10 @@
         system's shell, /bin/sh or cmd, which reads some characters even within quotes, and a project's name, its obj
         folder or the .env file's path can hold them, so each path is escaped for that shell first.  For /bin/sh each
         $, `, " and \ is put in single quotes between the double ones, and not after a \: MSBuild on Unix turns each \
-        of a value that names a file that exists into a /.  For cmd each % is doubled, and no path there holds a ".
+        of a value that names a file that exists into a /.  For cmd each % is doubled, and no path there holds a ".  On
+        Windows the tool reads its arguments by the C runtime's rules, where a \ before a " escapes it, so the
+        backslashes that end the .env file's path, which SqlSourceEnvFile can give as a folder, are doubled before its
+        closing quote; the manifest's and the log's paths end in their file's name.
 
         When dotnet cannot start the tool, it prints its own words, which are localised, and its exit code is no guide,
         so a run that printed no line of the tool's own is a tool that did not start: a line starting sqlsource:, which
@@ -671,9 +674,12 @@
             <SqlSourceShellSpecial Condition="'$(OS)' == 'Windows_NT'">%</SqlSourceShellSpecial>
             <SqlSourceShellEscape Condition="'$(OS)' == 'Windows_NT'">%$0</SqlSourceShellEscape>
             <SqlSourceToolManifestArgument>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceManifestFile), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))</SqlSourceToolManifestArgument>
+            <SqlSourceToolEnvFileArgument>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceEnvFilePath), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))</SqlSourceToolEnvFileArgument>
+            <SqlSourceToolEnvFileArgument Condition="'$(OS)' == 'Windows_NT'"
+                >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceToolEnvFileArgument), '\\+$', '$0$0'))</SqlSourceToolEnvFileArgument>
             <SqlSourceToolEnvFile />
             <SqlSourceToolEnvFile Condition="'$(SqlSourceEnvFileValue)' != ''"
-                > --env-file &quot;$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceEnvFilePath), $(SqlSourceShellSpecial), $(SqlSourceShellEscape)))&quot;</SqlSourceToolEnvFile>
+                > --env-file &quot;$(SqlSourceToolEnvFileArgument)&quot;</SqlSourceToolEnvFile>
             <SqlSourceToolEnvFile Condition="'$(SqlSourceEnvFileValue)' == 'none'"
                 > --env-file none</SqlSourceToolEnvFile>
             <SqlSourceToolLogFile>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.log</SqlSourceToolLogFile>
