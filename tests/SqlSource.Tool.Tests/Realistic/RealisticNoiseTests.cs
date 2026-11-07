@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
@@ -77,20 +78,6 @@ public sealed class RealisticNoiseTests
     public void Verdict_CountUnderTheBudget_SaysToLowerTheBudgetOfTheMajor() =>
         RealisticNoise.Verdict(4, 5, 14, "h").ShouldNotBeNull().ShouldContain("lower the budget of 14 in Budgets to 4");
 
-    private static readonly PostgresType Integer = new(
-        "integer",
-        SidecarValues.Kind.Base,
-        "pg_catalog",
-        "int4",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-    );
-
     private static SidecarColumn Column(int ordinal, string name, bool? nullable) =>
-        new(ordinal, name, Integer, nullable, null, null, null, null);
+        TestSidecars.Column(ordinal, name, TestSidecars.Postgres(), nullable, nullableSource: null);
 }

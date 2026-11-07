@@ -33,12 +33,9 @@ public sealed class OnlineRunTests : IDisposable
 
     private string Sidecar => SidecarFormat.PathFor(_users);
 
-    // Where the run looks for its .env file, which none of these tests writes.
-    private string DotEnvPath => _scene.Run.Folder.PathOf(".env");
-
     private Task<CliResult> OnlineAsync(string mode, params string[] more)
     {
-        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
         return _scene.DescribeAsync(["--manifest", manifest, "--online", mode, .. more]);
     }
 
@@ -151,7 +148,7 @@ public sealed class OnlineRunTests : IDisposable
         );
         result.Error.ShouldContain(
             "; help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES "
-                + $"in the environment or in {DotEnvPath}"
+                + $"in the environment or in {_scene.DotEnvPath}"
                 + ".  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another; "
         );
         result.Error.ShouldContain("; see: " + Expected.See("SQLSRC213")[9..]);
@@ -189,7 +186,7 @@ public sealed class OnlineRunTests : IDisposable
         AddTwoDatabasesThatShareAVariable();
         if (inDotEnv)
         {
-            _ = _scene.Run.Folder.WriteFile(".env", $"SQLSOURCE_CONNECTION_APP_V2={Secrets.Connection}\n");
+            _ = _scene.WriteDotEnv($"SQLSOURCE_CONNECTION_APP_V2={Secrets.Connection}\n");
         }
         else
         {
@@ -336,7 +333,7 @@ public sealed class OnlineRunTests : IDisposable
     [Fact]
     public async Task Run_ErrorWithoutOnline_IsFollowedByTheRunAgainLine()
     {
-        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
 
         var result = await _scene.DescribeAsync("--manifest", manifest);
 
@@ -370,7 +367,7 @@ public sealed class OnlineRunTests : IDisposable
     public async Task Run_LogVariableWithoutOnline_StillOpensTheLog()
     {
         _scene.Run.Environment["SQLSOURCE_LOG"] = "variable.log";
-        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
 
         _ = await _scene.DescribeAsync("--manifest", manifest);
 
@@ -466,7 +463,7 @@ public sealed class OnlineRunTests : IDisposable
         var stale = AddAStaleSidecar();
         _ = ArrangeAnErrorTheCompilerReports(id);
         GiveBothConnections();
-        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
 
         var result = await _scene.DescribeAsync("--manifest", manifest);
 
@@ -583,7 +580,7 @@ public sealed class OnlineRunTests : IDisposable
             new EquatableArray<string>(["08006: the connection failed"]),
             "check that the database is running"
         );
-        var manifest = _scene.Run.Folder.WriteFile("obj/App.csproj.manifest", _scene.Project.ManifestText());
+        var manifest = _scene.WriteManifest();
 
         var result = await _scene.DescribeAsync("--manifest", manifest);
 

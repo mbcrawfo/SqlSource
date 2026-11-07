@@ -158,7 +158,7 @@ public sealed class RunLogRedactionTests : IDisposable
                 new("message", "cannot connect with '" + request.Connection + "'"),
                 new("list", LogValue.ListOf([LogValue.MapOf(new LogMember("deep", request.Connection))]))
             );
-        _ = _scene.Run.Folder.WriteFile(".env", $"SQLSOURCE_CONNECTION_POSTGRES='{Secrets.ConnectionWithMarker}'\n");
+        _ = _scene.WriteDotEnv($"SQLSOURCE_CONNECTION_POSTGRES='{Secrets.ConnectionWithMarker}'\n");
 
         _ = await _scene.DescribeAsync("--log", "run.log");
 

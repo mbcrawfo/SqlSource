@@ -1,6 +1,7 @@
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
@@ -56,9 +57,6 @@ public sealed class RealisticDescriptionsTests
                     + "server: hint: add casts\n"
             );
 
-    private static PostgresType Type(string name, string internalName) =>
-        new(name, SidecarValues.Kind.Base, "pg_catalog", internalName, null, null, null, null, null, null, null);
-
     private static SidecarColumn Column(int ordinal, string name) =>
-        new(ordinal, name, Type("integer", "int4"), null, null, null, null, null);
+        TestSidecars.Column(ordinal, name, TestSidecars.Postgres(), nullable: null, nullableSource: null);
 }
