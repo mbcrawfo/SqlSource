@@ -389,10 +389,9 @@ public sealed partial class SqlServerErrorRenamingTests
             )
             .Select(static name => name.Replacement)
             .ToList();
-        replacements.ShouldNotBeEmpty();
-        replacements.ShouldAllBe(replacement =>
-            string.Equals(replacement, replacements[0], StringComparison.OrdinalIgnoreCase)
-        );
+        replacements.Count.ShouldBe(2);
+        replacements.Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
+        string.Equals(replacements[0], replacements[1], StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
         BundleLeaks
             .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
             .ShouldBeEmpty();

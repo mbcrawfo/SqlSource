@@ -12,7 +12,7 @@
 
 ## Where the code differs from the spec
 
-- **The collation half of the proposed fix is not built** (pending the owner's answer to Q1).  With a case of its own for each spelling, every comparison the pipeline makes keeps its answer whatever the collation: one spelling has one replacement, so an ordinal comparison holds, and one fold has one set of letters, so a comparison ignoring case holds.  Folding by ordinal in a case-sensitive database would give `@Id` and `@id` two hashes, which `SqlParameterName.Comparer` takes for one parameter, so the proof would refuse more.  The contract still changes, by `Spelled` instead of a collation.
+- **The collation half of the proposed fix is not built** (owner, 2026-11-07, Q1: "agree").  With a case of its own for each spelling, every comparison the pipeline makes keeps its answer whatever the collation: one spelling has one replacement, so an ordinal comparison holds, and one fold has one set of letters, so a comparison ignoring case holds.  Folding by ordinal in a case-sensitive database would give `@Id` and `@id` two hashes, which `SqlParameterName.Comparer` takes for one parameter, so the proof would refuse more.  The contract still changes, by `Spelled` instead of a collation.
 - **The case follows the order spellings are met, not the original's pattern.**  The spec asks for "a case of its own for each spelling"; the first spelling keeps today's lower-case replacement, so every bundle with one spelling per name is renamed exactly as today on both engines.
 - **`NameMapping.TryGet` becomes `IsMapped`**: its replacement was never read, and a new spelling of a known fold would have to make one.
 
