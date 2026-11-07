@@ -69,11 +69,7 @@ internal static class PlanTokens
             }
             else if (PostgresIdentifiers.IsWordStart(character))
             {
-                while (at < entry.Length && PostgresIdentifiers.IsWordPart(entry[at]))
-                {
-                    at++;
-                }
-
+                at = PostgresIdentifiers.WordEnd(entry, at);
                 kind = Kind.Word;
             }
             else if (char.IsAsciiDigit(character))

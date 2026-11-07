@@ -39,7 +39,7 @@ Items 1 to 20 come from the first sweep of `src/`, items 21 to 28 from the sweep
 
 ## Impact
 
-Low each, Medium together: items 1, 2, 3, 8, 9, 10, 13, 14, 21 and 23 are copies that a change to one side leaves wrong without a failing test, where the renaming's safety, or a describer's answer, depends on the two sides agreeing; items 16 to 19 make the run's code harder to change.
+Low each, Medium together: items 1, 2, 3, 8, 9, 10, 13 and 14 are copies that a change to one side leaves wrong without a failing test, where the renaming's safety depends on the two sides agreeing; items 16, 18 and 19 make the run's code harder to change.
 
 ## Proposed fix
 

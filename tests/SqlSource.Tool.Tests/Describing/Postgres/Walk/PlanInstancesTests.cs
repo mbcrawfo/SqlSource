@@ -522,24 +522,28 @@ public sealed class PlanInstancesTests
         Find(Append(Member("p_1", "parts_1"), Member("p_2", "parts_2"))).HasSetOperation.ShouldBeTrue();
     }
 
-    // Each kind's factory leaves the members of the other kinds empty.
+    // A relation's factory leaves the members of the other kinds empty.
     [Fact]
-    public void Factories_EachKind_LeavesTheOtherKindsMembersEmpty()
+    public void OfRelation_OfASchemaAndAName_LeavesTheOtherKindsMembersEmpty()
     {
-        var child = Scan("u");
         var relation = PlanInstance.OfRelation(true, "public", "t");
-        var partitioned = PlanInstance.OfPartitionedTable(
-            false,
-            [16800],
-            [new PostgresRelationName("public", "parts_1")]
-        );
-        var plan = PlanInstance.OfPlan(true, child);
 
         (relation.Kind, relation.NullExtended, relation.Schema, relation.Relation, relation.Child).ShouldBe(
             (InstanceKind.Relation, true, "public", "t", null)
         );
         relation.Parents.ShouldBeEmpty();
         relation.Members.ShouldBeEmpty();
+    }
+
+    // A partitioned table's factory leaves the members of the other kinds empty.
+    [Fact]
+    public void OfPartitionedTable_OfParentsAndMembers_LeavesTheOtherKindsMembersEmpty()
+    {
+        var partitioned = PlanInstance.OfPartitionedTable(
+            false,
+            [16800],
+            [new PostgresRelationName("public", "parts_1")]
+        );
 
         (
             partitioned.Kind,
@@ -550,6 +554,14 @@ public sealed class PlanInstancesTests
         ).ShouldBe((InstanceKind.Partitioned, false, null, null, null));
         partitioned.Parents.ShouldBe([16800]);
         partitioned.Members.ShouldBe([new PostgresRelationName("public", "parts_1")]);
+    }
+
+    // A scan of another plan's factory leaves the members of the other kinds empty.
+    [Fact]
+    public void OfPlan_OfAChild_LeavesTheOtherKindsMembersEmpty()
+    {
+        var child = Scan("u");
+        var plan = PlanInstance.OfPlan(true, child);
 
         (plan.Kind, plan.NullExtended, plan.Schema, plan.Relation).ShouldBe((InstanceKind.Plan, true, null, null));
         plan.Child.ShouldBeSameAs(child);
