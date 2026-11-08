@@ -52,9 +52,6 @@ internal static class BundleReplay
     /// </summary>
     public const string NoPath = "";
 
-    private const string VersionKey = "captureVersion";
-    private const string EngineKey = "engine";
-
     /// <summary>
     /// The bundle's capture, or the error that says why it cannot be read: <c>SQLSRC289</c> for a
     /// <c>captureVersion</c> newer than this tool reads, and <c>SQLSRC288</c> for anything else, an engine other than
@@ -66,13 +63,13 @@ internal static class BundleReplay
     {
         // Before the capture is read, since a newer form may have changed its other members.
         if (
-            MemberOf(bundle.Capture, VersionKey) is { ValueKind: JsonValueKind.Number } version
+            MemberOf(bundle.Capture, CaptureJson.VersionKey) is { ValueKind: JsonValueKind.Number } version
             && version.TryGetInt32(out var number)
             && number > DescribeCapture.Version
         )
         {
             return Outcome<DescribeCapture, ToolDiagnostic>.Failed(
-                BundleErrors.OfNewerTool(path, VersionKey, number, DescribeCapture.Version)
+                BundleErrors.OfNewerTool(path, CaptureJson.VersionKey, number, DescribeCapture.Version)
             );
         }
 
@@ -98,7 +95,7 @@ internal static class BundleReplay
     public static string EngineOf(Bundle bundle) =>
         bundle.Info?.Engine
         ?? (
-            MemberOf(bundle.Capture, EngineKey) is { ValueKind: JsonValueKind.String } engine
+            MemberOf(bundle.Capture, CaptureJson.EngineKey) is { ValueKind: JsonValueKind.String } engine
                 ? engine.GetString() ?? string.Empty
                 : string.Empty
         );

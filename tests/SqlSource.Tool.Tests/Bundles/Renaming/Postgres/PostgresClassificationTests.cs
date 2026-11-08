@@ -83,7 +83,7 @@ public sealed partial class PostgresClassificationTests
         {
             JsonStrings.Visit(
                 JsonNode.Parse(call.Answer.GetRawText()),
-                CaptureRenamer.Answer,
+                CaptureJson.AnswerKey,
                 found =>
                 {
                     if (PostgresRenaming.Instance.RuleOf(call.Method, found.Path) is { Kind: FieldRuleKind.Name })

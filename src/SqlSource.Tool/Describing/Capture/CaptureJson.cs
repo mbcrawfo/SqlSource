@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,18 +20,23 @@ namespace SqlSource.Tool.Describing.Capture;
 /// </remarks>
 internal static class CaptureJson
 {
-    private const string VersionKey = "captureVersion";
-    private const string EngineKey = "engine";
-    private const string CallsKey = "calls";
-    private const string MethodKey = "method";
-    private const string RequestKey = "request";
-    private const string AnswerKey = "answer";
+    /// <summary>The key of the capture's version.</summary>
+    public const string VersionKey = "captureVersion";
 
-    private static readonly JsonWriterOptions FileOptions = new()
-    {
-        Indented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+    /// <summary>The key of the capture's engine.</summary>
+    public const string EngineKey = "engine";
+
+    /// <summary>The key of the capture's calls.</summary>
+    public const string CallsKey = "calls";
+
+    /// <summary>The key of a call's method.</summary>
+    public const string MethodKey = "method";
+
+    /// <summary>The key of a call's request, what was asked.</summary>
+    public const string RequestKey = "request";
+
+    /// <summary>The key of a call's answer, what was answered.</summary>
+    public const string AnswerKey = "answer";
 
     // A key is escaped as a request is written, so that a request with no null member has its own text for a key.
     private static readonly JsonWriterOptions KeyOptions = new()
@@ -99,10 +103,8 @@ internal static class CaptureJson
     public static string TextOf(JsonElement element) => JsonSerializer.Serialize(element, Options);
 
     /// <summary>The file of a capture, whatever it holds.</summary>
-    public static string Write(DescribeCapture capture)
-    {
-        using var stream = new MemoryStream();
-        using (var json = new Utf8JsonWriter(stream, FileOptions))
+    public static string Write(DescribeCapture capture) =>
+        JsonFile.Write(json =>
         {
             json.WriteStartObject();
             json.WriteNumber(VersionKey, DescribeCapture.Version);
@@ -121,12 +123,7 @@ internal static class CaptureJson
 
             json.WriteEndArray();
             json.WriteEndObject();
-        }
-
-        // The writer indents with the platform's line end.  A line break inside a value is written as an escape,
-        // so only the writer's own are replaced.
-        return Encoding.UTF8.GetString(stream.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
-    }
+        });
 
     /// <summary>
     /// The file of a capture, or the sentence that says it holds the connection's secret and so is not written.

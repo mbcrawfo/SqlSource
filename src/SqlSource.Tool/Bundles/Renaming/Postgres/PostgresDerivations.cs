@@ -48,9 +48,9 @@ internal static class PostgresDerivations
         switch (call.Method)
         {
             case PostgresCallNames.Relations:
-                if (Read<PostgresRelationsRequest>(call.Renamed[CaptureRenamer.Request]) is { } relations)
+                if (Read<PostgresRelationsRequest>(call.Renamed[CaptureJson.RequestKey]) is { } relations)
                 {
-                    call.Renamed[CaptureRenamer.Request] = Write(
+                    call.Renamed[CaptureJson.RequestKey] = Write(
                         relations with
                         {
                             Relations = PlanRelations.InOrder(relations.Relations),
@@ -60,9 +60,9 @@ internal static class PostgresDerivations
 
                 break;
             case PostgresCallNames.Partitions:
-                if (Read<PostgresPartitionsRequest>(call.Renamed[CaptureRenamer.Request]) is { } partitions)
+                if (Read<PostgresPartitionsRequest>(call.Renamed[CaptureJson.RequestKey]) is { } partitions)
                 {
-                    call.Renamed[CaptureRenamer.Request] = Write(
+                    call.Renamed[CaptureJson.RequestKey] = Write(
                         partitions with
                         {
                             Relations = PlanRelations.InOrder(partitions.Relations),
@@ -82,10 +82,10 @@ internal static class PostgresDerivations
     private static void DerivePosition(RenamingCall call, IRenamingScope scope)
     {
         if (
-            Read<PostgresPrepareAnswer>(call.Original[CaptureRenamer.Answer]) is not { Error.Position: { } position }
-            || Read<PostgresPrepareRequest>(call.Original[CaptureRenamer.Request]) is not { } original
-            || Read<PostgresPrepareRequest>(call.Renamed[CaptureRenamer.Request]) is not { } renamed
-            || call.Renamed[CaptureRenamer.Answer]?[ErrorMember] is not JsonObject error
+            Read<PostgresPrepareAnswer>(call.Original[CaptureJson.AnswerKey]) is not { Error.Position: { } position }
+            || Read<PostgresPrepareRequest>(call.Original[CaptureJson.RequestKey]) is not { } original
+            || Read<PostgresPrepareRequest>(call.Renamed[CaptureJson.RequestKey]) is not { } renamed
+            || call.Renamed[CaptureJson.AnswerKey]?[ErrorMember] is not JsonObject error
         )
         {
             return;

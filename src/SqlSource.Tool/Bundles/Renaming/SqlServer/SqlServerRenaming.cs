@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Quoting;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
 
 namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
@@ -115,7 +116,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
             "answer.rows[]" => (IsSystemSchema(row, "sourceSchema") || IsSystemResource(row, "sourceDatabase"))
                 && row["sourceServer"] is null
                 && IsUnaliased(row),
-            CaptureRenamer.Request => method == SqlServerCallNames.Table && IsSystemSchema(row, "schema"),
+            CaptureJson.RequestKey => method == SqlServerCallNames.Table && IsSystemSchema(row, "schema"),
             _ => false,
         };
     }
@@ -131,7 +132,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     {
         if (
             method != SqlServerCallNames.Parameters
-            || call[CaptureRenamer.Request] is not JsonObject request
+            || call[CaptureJson.RequestKey] is not JsonObject request
             || request["reused"] is not JsonArray reused
         )
         {

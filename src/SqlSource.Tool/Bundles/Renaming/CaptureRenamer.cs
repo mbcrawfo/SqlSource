@@ -14,12 +14,6 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// </summary>
 internal static class CaptureRenamer
 {
-    /// <summary>The member of a call that holds what was asked.</summary>
-    public const string Request = "request";
-
-    /// <summary>The member of a call that holds what was answered.</summary>
-    public const string Answer = "answer";
-
     /// <summary>A call as a refusal names it: <c>capture.json call &lt;n&gt; '&lt;method&gt;'</c>.</summary>
     public static string PlaceOf(RenamingCall call) => PlaceOf(call.Index, call.Method);
 
@@ -40,7 +34,11 @@ internal static class CaptureRenamer
         foreach (var call in calls)
         {
             capture.Add(
-                new CaptureCall(call.Method, ElementOf(call.Renamed[Request]), ElementOf(call.Renamed[Answer]))
+                new CaptureCall(
+                    call.Method,
+                    ElementOf(call.Renamed[CaptureJson.RequestKey]),
+                    ElementOf(call.Renamed[CaptureJson.AnswerKey])
+                )
             );
         }
 
@@ -66,7 +64,7 @@ internal static class CaptureRenamer
     /// </summary>
     public static void Register(IEngineRenaming engine, IReadOnlyList<RenamingCall> calls, RenamingRun run)
     {
-        foreach (var part in (string[])[Answer, Request])
+        foreach (var part in (string[])[CaptureJson.AnswerKey, CaptureJson.RequestKey])
         {
             foreach (var call in calls)
             {
@@ -100,7 +98,7 @@ internal static class CaptureRenamer
     {
         foreach (var call in calls)
         {
-            foreach (var part in (string[])[Request, Answer])
+            foreach (var part in (string[])[CaptureJson.RequestKey, CaptureJson.AnswerKey])
             {
                 JsonStrings.Visit(call.Renamed[part], part, found => Field(engine, call, found, run));
             }
@@ -174,8 +172,8 @@ internal static class CaptureRenamer
     private static JsonObject Of(CaptureCall call) =>
         new()
         {
-            [Request] = JsonNode.Parse(call.Request.GetRawText()),
-            [Answer] = JsonNode.Parse(call.Answer.GetRawText()),
+            [CaptureJson.RequestKey] = JsonNode.Parse(call.Request.GetRawText()),
+            [CaptureJson.AnswerKey] = JsonNode.Parse(call.Answer.GetRawText()),
         };
 
     private static JsonElement ElementOf(JsonNode? node)

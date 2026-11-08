@@ -42,12 +42,6 @@ internal static class PostgresPlanRenamer
 
     private static readonly JsonDocumentOptions ReadOptions = new() { MaxDepth = PlanNode.MaxDepth };
 
-    private static readonly JsonWriterOptions WriteOptions = new()
-    {
-        Indented = true,
-        Encoder = CaptureJson.Options.Encoder,
-    };
-
     // The kind of each key the walk reads.
     private static readonly FrozenDictionary<string, KeyKind> Kinds = new Dictionary<string, KeyKind>(
         StringComparer.Ordinal
@@ -118,7 +112,7 @@ internal static class PostgresPlanRenamer
     public static void Register(RenamingCall call, IRenamingScope scope)
     {
         if (
-            call.Renamed[CaptureRenamer.Answer] is not JsonObject answer
+            call.Renamed[CaptureJson.AnswerKey] is not JsonObject answer
             || answer[PlanMember] is not JsonValue value
             || !value.TryGetValue<string>(out var plan)
         )
@@ -478,8 +472,8 @@ internal static class PostgresPlanRenamer
                 return null;
             }
 
-            var buffer = new ArrayBufferWriter<byte>();
-            using (var writer = new Utf8JsonWriter(buffer, WriteOptions))
+            var refused = false;
+            var text = JsonFile.Text(writer =>
             {
                 writer.WriteStartArray();
                 foreach (var element in document.RootElement.EnumerateArray())
@@ -490,17 +484,16 @@ internal static class PostgresPlanRenamer
                     writer.WritePropertyName(PlanKeys.Plan);
                     if (!Node(writer, element.GetProperty(PlanKeys.Plan)))
                     {
-                        return null;
+                        refused = true;
+                        return;
                     }
 
                     writer.WriteEndObject();
                 }
 
                 writer.WriteEndArray();
-            }
-
-            // The writer ends a line as the platform does, and a string's own line break is always escaped.
-            return Encoding.UTF8.GetString(buffer.WrittenSpan).Replace("\r\n", "\n", StringComparison.Ordinal);
+            });
+            return refused ? null : text;
         }
 
         private bool Node(Utf8JsonWriter writer, JsonElement node)
