@@ -11,6 +11,27 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming;
 
 public sealed class SqlRenamerTests
 {
+    [Theory]
+    [InlineData("x 'it''s' y", 2, 9, "it's")]
+    [InlineData("\"a\"\"b\"", 0, 6, "a\"b")]
+    [InlineData("[a]]b]", 0, 6, "a]b")]
+    [InlineData("$q$it's$q$", 0, 10, "it's")]
+    [InlineData("$$x$$", 0, 5, "x")]
+    public void ContentOf_QuotedRegion_IsItsContentUnescaped(string text, int start, int end, string content) =>
+        SqlRenamer.ContentOf(text, start, end).ShouldBe(content);
+
+    [Fact]
+    public void ContentOf_OtherOpener_Throws() =>
+        Should.Throw<InvalidOperationException>(() => SqlRenamer.ContentOf("x", 0, 1));
+
+    [Theory]
+    [InlineData("--+ INDEX(t)", 3)]
+    [InlineData("/*+ x */", 3)]
+    [InlineData("/*! x */", 3)]
+    [InlineData("/*M! x */", 4)]
+    public void HintOpenerLength_Hint_IsItsOpenersLength(string hint, int length) =>
+        SqlRenamer.HintOpenerLength(hint, 0).ShouldBe(length);
+
     private const string Place = "capture.json call 1 'prepare' request.sql";
 
     private const string Hex = "[0-9a-f]{8}";

@@ -17,7 +17,7 @@ internal static class PropertyNames
     public static string PascalCase(string name)
     {
         var length = name.Length;
-        if (length > 0 && name[length - 1] is '!' or '?')
+        if (ColumnMarker.HasMark(name))
         {
             length--;
         }
@@ -102,7 +102,7 @@ internal static class PropertyNames
     // identifier.
     private static string? NameOfPart(string part)
     {
-        if (part.Length > 0 && part[part.Length - 1] is '!' or '?')
+        if (ColumnMarker.HasMark(part))
         {
             return null;
         }

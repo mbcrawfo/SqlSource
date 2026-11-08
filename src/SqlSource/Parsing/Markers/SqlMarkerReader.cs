@@ -1,4 +1,5 @@
 using System;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SqlSource.Parsing.Markers;
 
@@ -97,6 +98,32 @@ internal static class SqlMarkerReader
         return marker.ValueSpan.IsEmpty
             ? word
             : word + " " + text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
+    }
+
+    /// <summary>
+    /// A name marker's value, "Name" or "Name -> shape", split at its first arrow.  Allocates nothing.
+    /// </summary>
+    /// <param name="text">The text that holds the marker.</param>
+    /// <param name="value">The marker's value.</param>
+    /// <returns>
+    /// The span of the name, without the white space before the arrow, and the index in <paramref name="text" /> of the
+    /// first <c>-&gt;</c> in the value, or -1.  The shape is the text from <c>Arrow + 2</c> to the value's end.
+    /// </returns>
+    public static (TextSpan Name, int Arrow) SplitName(string text, TextSpan value)
+    {
+        var arrow = text.IndexOf("->", value.Start, value.Length, StringComparison.Ordinal);
+        if (arrow < 0)
+        {
+            return (value, -1);
+        }
+
+        var nameEnd = arrow;
+        while (nameEnd > value.Start && char.IsWhiteSpace(text[nameEnd - 1]))
+        {
+            nameEnd--;
+        }
+
+        return (TextSpan.FromBounds(value.Start, nameEnd), arrow);
     }
 
     // Only blanks may come before the comment on its line.  The lexer guarantees that a line break found this way is

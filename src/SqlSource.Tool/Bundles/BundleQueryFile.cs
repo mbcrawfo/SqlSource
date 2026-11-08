@@ -121,23 +121,48 @@ internal static class BundleQueryFile
 
     // The value of a -- param: marker as the generator reads it, without its C# type: the parameter, its type and
     // its nullability.  Null when the generator does not read it.
-    private static string? ParamOf(string text, SqlDialectRules rules, SqlMarker marker)
+    private static string? ParamOf(string text, SqlDialectRules rules, SqlMarker marker) =>
+        ReadMarker(text, rules, marker, static scope => scope.Declarations) is [var declaration]
+            ? WriteParam(rules.ParameterPrefix, declaration.Name, declaration.Type, declaration.Nullable)
+            : null;
+
+    /// <summary>
+    /// What the generator's scope of markers reads from one marker, read as the whole file's scope: the one read of a
+    /// marker, which the bundle's file and the renaming of it share.
+    /// </summary>
+    /// <typeparam name="T">What is read.</typeparam>
+    /// <param name="text">The text that holds the marker.</param>
+    /// <param name="rules">The rules of the file's dialect.</param>
+    /// <param name="marker">The marker.</param>
+    /// <param name="read">Takes what the scope read.</param>
+    /// <returns>What <paramref name="read" /> gives, or null when the scope reports an error.</returns>
+    internal static T? ReadMarker<T>(string text, SqlDialectRules rules, SqlMarker marker, Func<SqlMarkerScope, T> read)
+        where T : class
     {
         var errors = new List<SqlParseError>();
         var scope = new SqlMarkerScope(text, rules, SqlScopeKind.WholeFile, errors);
         scope.Read(marker);
-        if (errors.Count > 0 || scope.Declarations is not [var declaration])
-        {
-            return null;
-        }
+        return errors.Count == 0 ? read(scope) : null;
+    }
 
-        var value = new StringBuilder().Append(rules.ParameterPrefix).Append(declaration.Name);
-        if (declaration.Type is { } type)
+    /// <summary>
+    /// The value of a <c>-- param:</c> marker as the generator reads it: the prefixed name, then the type when there
+    /// is one, then <c>null</c> or <c>not null</c> when the nullability is given.  The one writer of it, which the
+    /// bundle's file and the renaming of it share.
+    /// </summary>
+    /// <param name="prefix">The dialect's parameter prefix.</param>
+    /// <param name="name">The parameter's name.</param>
+    /// <param name="type">The database type, or null.</param>
+    /// <param name="nullable">Whether the parameter is nullable, or null when the marker does not say.</param>
+    internal static string WriteParam(char prefix, string name, string? type, bool? nullable)
+    {
+        var value = new StringBuilder().Append(prefix).Append(name);
+        if (type is not null)
         {
             _ = value.Append(' ').Append(type);
         }
 
-        return declaration.Nullable switch
+        return nullable switch
         {
             true => value.Append(" null").ToString(),
             false => value.Append(" not null").ToString(),

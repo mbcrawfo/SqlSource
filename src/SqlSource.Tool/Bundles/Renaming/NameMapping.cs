@@ -211,6 +211,33 @@ internal sealed class NameMapping(
         return made;
     }
 
+    /// <summary>
+    /// Whether a text is shaped as a replacement: a lower-case ASCII letter, <c>_</c>, then eight or more lower-case
+    /// hex digits, what <c>Make</c> gives at the renaming's first length.
+    /// </summary>
+    /// <remarks>
+    /// A variant that differs by case is not, and PostgreSQL, whose spelled form is its fold, never has one; a test's
+    /// shorter <c>firstLength</c> is not.
+    /// </remarks>
+    /// <param name="text">The text.</param>
+    internal static bool IsShapedAsReplacement(ReadOnlySpan<char> text)
+    {
+        if (text.Length < 2 + FirstLength || !char.IsAsciiLetterLower(text[0]) || text[1] != '_')
+        {
+            return false;
+        }
+
+        foreach (var character in text[2..])
+        {
+            if (!char.IsAsciiHexDigitLower(character))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private string Make(NameClass cls, string folded)
     {
         var hex = HexOf(key.Hash(Encoding.UTF8.GetBytes(NameClasses.WordOf(cls) + ":" + folded)));

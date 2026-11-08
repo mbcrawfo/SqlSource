@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
@@ -24,7 +23,7 @@ internal sealed partial class SqlRenamer
             var value = text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
             var renamed = marker.Kind switch
             {
-                SqlMarkerKind.Name => NameMarker(value),
+                SqlMarkerKind.Name => NameMarker(marker),
                 SqlMarkerKind.Dialect => SqlDialectMarker.TryRead(text, marker, out _) ? value : null,
                 SqlMarkerKind.Database => DatabaseMarker(value),
                 SqlMarkerKind.Param => ParamMarker(marker),
@@ -70,19 +69,23 @@ internal sealed partial class SqlRenamer
         }
 
         // "Name" or "Name -> shape", read as the parser reads it: the name a query's, the shape kept.
-        private string? NameMarker(string value)
+        private string? NameMarker(SqlMarker marker)
         {
-            var arrow = value.IndexOf("->", StringComparison.Ordinal);
-            var name = arrow < 0 ? value : value[..arrow].TrimEnd();
+            var value = marker.ValueSpan;
+            var (name, arrow) = SqlMarkerReader.SplitName(text, value);
             if (
-                name.Length == 0
-                || (arrow >= 0 && !SettingValue.TryReadChoice<ResultShape>(value.AsSpan(arrow + 2), out _))
+                name.IsEmpty
+                || (
+                    arrow >= 0
+                    && !SettingValue.TryReadChoice<ResultShape>(text.AsSpan(arrow + 2, value.End - arrow - 2), out _)
+                )
             )
             {
                 return null;
             }
 
-            return renamer.NameOf(name, quoted: false, NameClass.Query) + value[name.Length..];
+            var written = text.Substring(name.Start, name.Length);
+            return renamer.NameOf(written, quoted: false, NameClass.Query) + text[name.End..value.End];
         }
 
         // The logical database, kept when it is the dialect's name, which is the tool's word.
@@ -102,31 +105,35 @@ internal sealed partial class SqlRenamer
         // its nullability kept and its C# type dropped.
         private string? ParamMarker(SqlMarker marker)
         {
-            var declarations = Read(marker, scope => scope.Declarations);
+            var declarations = BundleQueryFile.ReadMarker(
+                text,
+                renamer._rules,
+                marker,
+                static scope => scope.Declarations
+            );
             if (declarations is not [var declaration])
             {
                 return null;
             }
 
-            var renamed = renamer._rules.ParameterPrefix + renamer.ParameterName(declaration.Name);
-            if (declaration.Type is { } type)
-            {
-                renamed += " " + Nested(type, NameClass.Type);
-            }
-
-            return declaration.Nullable switch
-            {
-                true => renamed + " null",
-                false => renamed + " not null",
-                null => renamed,
-            };
+            return BundleQueryFile.WriteParam(
+                renamer._rules.ParameterPrefix,
+                renamer.ParameterName(declaration.Name),
+                declaration.Type is { } type ? Nested(type, NameClass.Type) : null,
+                declaration.Nullable
+            );
         }
 
         // "{{name:default}}": the name a token's, quoted, since the generator compares it as written, and the default
         // renamed as SQL.
         private string? TokenMarker(SqlMarker marker)
         {
-            var defaults = Read(marker, scope => scope.TokenDefaults);
+            var defaults = BundleQueryFile.ReadMarker(
+                text,
+                renamer._rules,
+                marker,
+                static scope => scope.TokenDefaults
+            );
             if (defaults is not [var token])
             {
                 return null;
@@ -138,19 +145,10 @@ internal sealed partial class SqlRenamer
 
         // "name": a token's name, quoted, as the token it keeps is.
         private string? TokenIgnoreMarker(SqlMarker marker) =>
-            Read(marker, scope => scope.IgnoredTokens) is { Count: 1 } names
+            BundleQueryFile.ReadMarker(text, renamer._rules, marker, static scope => scope.IgnoredTokens)
+                is { Count: 1 } names
                 ? renamer.NameOf(names.Single(), quoted: true, NameClass.Token)
                 : null;
-
-        // What the generator's scope of markers reads from one marker, or null when it reports an error.
-        private T? Read<T>(SqlMarker marker, Func<SqlMarkerScope, T> read)
-            where T : class
-        {
-            var errors = new List<SqlParseError>();
-            var scope = new SqlMarkerScope(text, renamer._rules, SqlScopeKind.WholeFile, errors);
-            scope.Read(marker);
-            return errors.Count == 0 ? read(scope) : null;
-        }
 
         // A part of a marker renamed as SQL at the same place, its refusals this pass's.
         private string Nested(string sql, NameClass newWords) => renamer.Rename(sql, newWords, place, refuse).Text;

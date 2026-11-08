@@ -424,21 +424,42 @@ internal static class SqlServerErrors
         var named = new HashSet<string>(SqlParameterName.Comparer);
         foreach (var message in error.Errors.Select(static row => row.Message))
         {
-            var at = message.IndexOf('@', StringComparison.Ordinal);
-            while (at >= 0)
+            foreach (var name in NamesIn(message))
             {
-                var end = at + 1;
-                while (end < message.Length && QuoteReader.IsNameCharacterOfSqlServer(message[end]))
-                {
-                    end++;
-                }
-
-                var name = message[(at + 1)..end];
                 _ = named.Add(copied.ParameterOfCopy.TryGetValue(name, out var parameter) ? parameter : name);
-                at = end < message.Length ? message.IndexOf('@', end) : -1;
             }
         }
 
         return named;
+    }
+
+    /// <summary>
+    /// The names a message gives as <c>@name</c>, in order and without the <c>@</c>, each read as a whole token.
+    /// </summary>
+    /// <remarks>
+    /// The renaming reads a message through this method too, so that the two cannot disagree.  An <c>@</c> that no name
+    /// follows and a global variable, <c>@@ROWCOUNT</c>, give nothing: neither an empty name nor one starting with
+    /// <c>@</c> can be a parameter or a copy's name, so leaving them out changes no parameter that is chosen.
+    /// </remarks>
+    /// <param name="message">The text of a server's message.</param>
+    internal static IEnumerable<string> NamesIn(string message)
+    {
+        var at = message.IndexOf('@', StringComparison.Ordinal);
+        while (at >= 0)
+        {
+            var end = at + 1;
+            while (end < message.Length && QuoteReader.IsNameCharacterOfSqlServer(message[end]))
+            {
+                end++;
+            }
+
+            var name = message[(at + 1)..end];
+            if (name.Length > 0 && name[0] != '@')
+            {
+                yield return name;
+            }
+
+            at = end < message.Length ? message.IndexOf('@', end) : -1;
+        }
     }
 }

@@ -54,7 +54,7 @@ internal sealed partial class TokenCheck
                     break;
                 case SqlLexemeKind.Hint:
                     var isLine = text[start] == '-';
-                    var opener = !isLine && text[start + 2] == 'M' ? 4 : 3;
+                    var opener = SqlRenamer.HintOpenerLength(text, start);
                     Words(text, start + opener, end - (isLine ? 0 : 2), quoteFollows: false, place);
                     break;
                 default:
@@ -71,12 +71,12 @@ internal sealed partial class TokenCheck
         {
             case SqlMarkerKind.Name:
                 // The result's shape after the arrow is a closed word, which must read as the generator reads it.
-                var arrow = value.IndexOf("->", StringComparison.Ordinal);
-                var name = arrow < 0 ? value : value[..arrow].TrimEnd();
+                var (nameSpan, arrow) = SqlMarkerReader.SplitName(text, marker.ValueSpan);
+                var name = text.Substring(nameSpan.Start, nameSpan.Length);
                 Whole(IsSafe(name, quoted: false), place, name);
                 if (arrow >= 0)
                 {
-                    var shape = value[(arrow + 2)..];
+                    var shape = text[(arrow + 2)..marker.ValueSpan.End];
                     Whole(SettingValue.TryReadChoice<ResultShape>(shape.AsSpan(), out _), place, shape.Trim());
                 }
 
@@ -209,19 +209,18 @@ internal sealed partial class TokenCheck
         switch (text[start])
         {
             case '\'':
-                var content = text[(start + 1)..(end - 1)].Replace("''", "'", StringComparison.Ordinal);
+                var content = SqlRenamer.ContentOf(text, start, end);
                 Whole(_mapping.IsReplacement(content), place, content);
                 break;
             case '$':
-                var tag = text[start..(text.IndexOf('$', start + 1) + 1)];
-                var inner = text[(start + tag.Length)..(end - tag.Length)];
+                var inner = SqlRenamer.ContentOf(text, start, end);
                 Whole(_mapping.IsReplacement(inner), place, inner);
                 break;
             case '"':
-                QuotedName(text[(start + 1)..(end - 1)].Replace("\"\"", "\"", StringComparison.Ordinal), place);
+                QuotedName(SqlRenamer.ContentOf(text, start, end), place);
                 break;
             case '[':
-                QuotedName(text[(start + 1)..(end - 1)].Replace("]]", "]", StringComparison.Ordinal), place);
+                QuotedName(SqlRenamer.ContentOf(text, start, end), place);
                 break;
             default:
                 Refuse(place, text[start].ToString());

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using SqlSource.Parsing.Quoting;
 using SqlSource.Tool.Describing.SqlServer;
 
 namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
@@ -11,9 +10,10 @@ namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
 /// renamed, and nothing else.
 /// </summary>
 /// <remarks>
-/// No decision of the pipeline compares a message's text.  <c>SqlServerErrors.NamedIn</c> reads only the
-/// <c>@name</c>s of a message, a copy of a parameter as the parameter, so the renamed message holds those names alone,
-/// each read as it reads them, and a text of <see cref="ConnectionErrors" />, which names none, becomes empty.
+/// No decision of the pipeline compares a message's text.  <c>SqlServerErrors.NamesIn</c>, which the describer reads a
+/// message through, gives only the <c>@name</c>s of a message, a copy of a parameter as the parameter, so the renamed
+/// message holds those names alone, each read as the describer reads them, and a text of
+/// <see cref="ConnectionErrors" />, which names none, becomes empty.
 /// </remarks>
 internal static class SqlServerMessages
 {
@@ -28,26 +28,10 @@ internal static class SqlServerMessages
     /// <param name="scope">The scope of the message's place.</param>
     public static string Rename(string message, IRenamingScope scope)
     {
-        List<string> names = [];
-        var at = message.IndexOf(Prefix, StringComparison.Ordinal);
-        while (at >= 0)
-        {
-            var end = at + 1;
-            while (end < message.Length && QuoteReader.IsNameCharacterOfSqlServer(message[end]))
-            {
-                end++;
-            }
-
-            var name = message[(at + 1)..end];
-            if (name.Length > 0 && name[0] != Prefix)
-            {
-                names.Add(Prefix + scope.Parameter(scope.ParameterOf(name)));
-            }
-
-            at = end < message.Length ? message.IndexOf(Prefix, end) : -1;
-        }
-
-        return string.Join(' ', names);
+        return string.Join(
+            ' ',
+            SqlServerErrors.NamesIn(message).Select(name => Prefix + scope.Parameter(scope.ParameterOf(name)))
+        );
     }
 
     /// <summary>

@@ -13,7 +13,7 @@ How a bundle, `replay` and the renaming work: [`bundles.md`](../../../docs/archi
 
 ## The raw bundle
 
-- **`BundleQueryFile.cs` writes only the markers that `Renaming/SqlRenamer.QueryFile.cs` renames, and carries every setting that changes what `BundleReplay.Plan` gives**: a marker the renamer does not hold refuses every bundle, and a setting dropped makes `query.sql` plan another query than the one described ([why](../../../docs/architecture/bundles.md#the-raw-bundle-of-a-described-query)).
+- **`BundleQueryFile.cs` writes only the markers that `Renaming/SqlRenamer.QueryFile.cs` renames, and carries every setting that changes what `BundleReplay.Plan` gives**: a marker the renamer does not hold refuses every bundle, and a setting dropped makes `query.sql` plan another query than the one described ([why](../../../docs/architecture/bundles.md#the-raw-bundle-of-a-described-query)).  The theory in `BundleQueryFileTests` holds it, `Renaming/SqlRenamer.QueryFile.cs` and `Renaming/TokenCheck.Sql.cs` together, kind by kind: a new `SqlMarkerKind` needs its sample line there.
 
 ## `diagnose`
 
