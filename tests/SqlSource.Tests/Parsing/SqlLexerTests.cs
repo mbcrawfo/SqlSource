@@ -826,6 +826,13 @@ public sealed class SqlLexerTests
     public void Lex_ParameterUnderSqlServer_EndsAtACharacterTheServerRefuses(string text, string rest) =>
         Lex(text, Rules("SqlServer")).ShouldBe(["Parameter:@a", rest]);
 
+    // SQL Server reads a zero-width space as a space, beside a name and before its "@", as Unicode 3.2 classed it.
+    [Theory]
+    [InlineData("SELECT @id\u200B + 1", new[] { "Text:SELECT ", "Parameter:@id", "Text:\u200B + 1" })]
+    [InlineData("SELECT 1 +\u200B@a", new[] { "Text:SELECT 1 +\u200B", "Parameter:@a" })]
+    public void Lex_ParameterUnderSqlServer_StopsAtAZeroWidthSpace(string text, string[] expected) =>
+        Lex(text, Rules("SqlServer")).ShouldBe(expected);
+
     [Theory]
     [InlineData("Ansi")]
     [InlineData("PostgreSql")]

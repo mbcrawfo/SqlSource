@@ -42,7 +42,8 @@ internal abstract class QuoteReader
 
     /// <summary>
     /// True for a character that can be part of a name as SQL Server reads one after its first character: a letter or
-    /// a digit of any script, a combining mark, a letter number, a format character, a connector such as <c>‿</c>,
+    /// a digit of any script, a combining mark, a letter number, a format character but the zero-width space, a
+    /// connector such as <c>‿</c>,
     /// <c>_</c>, <c>@</c>, <c>#</c> or <c>$</c>.  SQL Server 2017 and 2025 take <c>Größe</c>, <c>名前</c>, <c>x٣</c>,
     /// the full-width <c>Ａbc</c>, <c>x</c> with a combining acute accent and <c>xⅠ</c> in a name, and refuse a currency
     /// sign, a superscript digit, a circled digit and a middle dot (<c>€</c>, <c>²</c>, <c>①</c>, <c>·</c>) with error
@@ -51,13 +52,16 @@ internal abstract class QuoteReader
     /// <remarks>
     /// The server reads a name by the tables of Unicode 3.2, and this rule by the current ones of .NET, so a character
     /// added or recategorised since can differ: <c>ꞔ</c> is taken here and refused by the server, and <c>・</c> after
-    /// the first character is refused here and taken by the server.
+    /// the first character is refused here and taken by the server.  The zero-width space, U+200B, is the one format
+    /// character left out: Unicode 3.2 made it a space, and the server reads it as one, beside a variable's name and
+    /// a type's, so text pasted with one still reads as written.
     /// </remarks>
     internal static bool IsNameCharacterOfSqlServer(char value) =>
         char.IsLetterOrDigit(value)
         || value is '_' or '@' or '#' or '$'
         || (
             value > '\u007F'
+            && value != '\u200B'
             && char.GetUnicodeCategory(value)
                 is UnicodeCategory.NonSpacingMark
                     or UnicodeCategory.SpacingCombiningMark
