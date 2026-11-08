@@ -16,6 +16,14 @@ internal static class FixtureCases
     // The cases of an engine in the order of their names.  An engine with no folder has none.
     public static IReadOnlyList<FixtureCase> Of(string engine) => InFolder(Path.Combine(Root, engine));
 
+    // The case of an engine by its name.  An engine with no such case fails the test that asks.
+    public static FixtureCase Named(string engine, string name) =>
+        Of(engine).SingleOrDefault(found => found.Name == name)
+        ?? throw new InvalidOperationException($"The fixtures of {engine} have no case {name}.");
+
+    // The schema.sql of an engine's cases, which is no case.
+    public static string SchemaOf(string engine) => Path.Combine(Root, engine, "schema.sql");
+
     // The same in another engine's folder, whose name is the engine: a test's own, or the repository's, which the
     // container projects read and record in.
     public static IReadOnlyList<FixtureCase> InFolder(string engineFolder)

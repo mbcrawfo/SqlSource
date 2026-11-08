@@ -236,7 +236,7 @@ public sealed class BundleReplayTests
     [Fact]
     public void Plan_Case_IsAsTheFixturesPlanIt()
     {
-        var fixture = FixtureCases.Of("postgres").Single(static found => found.Name == "select-left-join");
+        var fixture = FixtureCases.Named("postgres", "select-left-join");
         var token = TestContext.Current.CancellationToken;
 
         var planned = BundleReplay.Plan(BundleReplays.Read(fixture.Folder), "postgres", Path, token);

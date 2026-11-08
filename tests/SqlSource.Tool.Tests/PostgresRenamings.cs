@@ -1,5 +1,4 @@
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
@@ -24,9 +23,9 @@ internal static class PostgresRenamings
     private const string BundlePath = "/work/report.zip";
 
     // The schema every case of the fixtures is recorded against.
-    public static string Schema => File.ReadAllText(Path.Combine(FixtureCases.Root, Engine, "schema.sql"));
+    public static string Schema => File.ReadAllText(FixtureCases.SchemaOf(Engine));
 
-    public static FixtureCase Fixture(string name) => FixtureCases.Of(Engine).Single(found => found.Name == name);
+    public static FixtureCase Fixture(string name) => FixtureCases.Named(Engine, name);
 
     public static async Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(Bundle raw, byte key = Key)
     {

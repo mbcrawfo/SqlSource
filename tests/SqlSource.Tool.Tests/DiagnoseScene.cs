@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Bundles;
@@ -55,7 +54,7 @@ internal sealed class DiagnoseScene : IDisposable
     public TestProject Project { get; }
 
     // A case of the engine's fixtures.
-    public FixtureCase Case(string name) => FixtureCases.Of(Engine).Single(found => found.Name == name);
+    public FixtureCase Case(string name) => FixtureCases.Named(Engine, name);
 
     // Puts the case's query in the project's file, or the text given, and answers every call from its capture.
     public string AddCase(FixtureCase fixture, string? fileText = null)

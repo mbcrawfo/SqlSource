@@ -61,7 +61,7 @@ public sealed class ReplayTests : IDisposable
     // Copies a case of the fixtures into a folder of the run, and gives the folder's full path.
     private string CopyCase(string engine, string name, string folder = "case")
     {
-        var source = FixtureCases.Of(engine).Single(found => found.Name == name).Folder;
+        var source = FixtureCases.Named(engine, name).Folder;
         var target = _run.Folder.CreateFolder(folder);
         foreach (var file in Directory.GetFiles(source))
         {

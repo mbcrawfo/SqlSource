@@ -55,10 +55,7 @@ public sealed class SqlServerFixtureRenamingTests
     public async Task RenameAsync_Fixture_LeaksNoNameOrLiteralOfTheUsers(string name)
     {
         var raw = RawOf(name);
-        var schema = await File.ReadAllTextAsync(
-            Path.Combine(FixtureCases.Root, Engine, "schema.sql"),
-            TestContext.Current.CancellationToken
-        );
+        var schema = await File.ReadAllTextAsync(FixtureCases.SchemaOf(Engine), TestContext.Current.CancellationToken);
 
         var renamed = await RenamedAsync(raw, key: 1);
 
@@ -102,8 +99,7 @@ public sealed class SqlServerFixtureRenamingTests
         renamed.Bundle.Query.ShouldContain("database_id");
     }
 
-    private static Bundle RawOf(string name) =>
-        RawBundles.OfFixture(FixtureCases.Of(Engine).Single(found => found.Name == name));
+    private static Bundle RawOf(string name) => RawBundles.OfFixture(FixtureCases.Named(Engine, name));
 
     private static async Task<RenamedBundle> RenamedAsync(Bundle raw, byte key)
     {

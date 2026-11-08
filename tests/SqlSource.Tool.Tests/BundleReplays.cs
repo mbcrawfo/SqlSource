@@ -30,8 +30,7 @@ internal static class BundleReplays
     }
 
     // The bundle of a recorded case of the describers' fixtures.
-    public static Bundle OfCase(string engine, string name) =>
-        Read(FixtureCases.Of(engine).Single(found => found.Name == name).Folder);
+    public static Bundle OfCase(string engine, string name) => Read(FixtureCases.Named(engine, name).Folder);
 
     // The bundle with its capture.json replaced by the text of another capture.
     public static Bundle WithCapture(Bundle bundle, DescribeCapture capture) =>

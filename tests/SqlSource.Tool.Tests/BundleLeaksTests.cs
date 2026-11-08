@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Tool.Bundles;
@@ -30,8 +29,7 @@ public sealed class BundleLeaksTests
     private static bool IsEngineWord(string word, bool quoted) =>
         PostgresWords.Fold(word, quoted) is "select" or "from" or "where" or "and" or "as" or "order" or "by";
 
-    private static Bundle RawOf(string name) =>
-        RawBundles.OfFixture(FixtureCases.Of(Engine).Single(found => found.Name == name));
+    private static Bundle RawOf(string name) => RawBundles.OfFixture(FixtureCases.Named(Engine, name));
 
     private static Bundle BundleOf(string query, string capture) => new(null, query, capture, null, []);
 

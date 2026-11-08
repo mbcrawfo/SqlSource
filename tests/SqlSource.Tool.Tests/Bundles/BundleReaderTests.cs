@@ -38,7 +38,7 @@ public sealed class BundleReaderTests : IDisposable
     [Fact]
     public void Read_FolderOfAFixture_GivesItsFiles()
     {
-        var fixture = FixtureCases.Of("postgres").Single(static found => found.Name == "walk-left-hash");
+        var fixture = FixtureCases.Named("postgres", "walk-left-hash");
 
         var read = Read(fixture.Folder);
 

@@ -170,10 +170,7 @@ public sealed partial class SqlServerErrorRenamingTests
         var raw = await EditedAsync("select-left-join", capture => WithDatabase(capture, Session, database));
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
         raw.Capture.ShouldNotContain(Session);
-        var schema = await File.ReadAllTextAsync(
-            Path.Combine(FixtureCases.Root, Engine, "schema.sql"),
-            TestContext.Current.CancellationToken
-        );
+        var schema = await File.ReadAllTextAsync(FixtureCases.SchemaOf(Engine), TestContext.Current.CancellationToken);
 
         var renamed = await RenamedAsync(raw);
 
@@ -311,8 +308,7 @@ public sealed partial class SqlServerErrorRenamingTests
         const string Column = "email";
         const string Upper = "EMAIL";
         const string Fixture = "select-computed-not-null";
-        TableMatchOf(RawBundles.OfFixture(FixtureCases.Of(Engine).Single(found => found.Name == Fixture)))
-            .ShouldBe("matched");
+        TableMatchOf(RawBundles.OfFixture(FixtureCases.Named(Engine, Fixture))).ShouldBe("matched");
         var raw = await EditedAsync(
             Fixture,
             capture =>
@@ -585,13 +581,10 @@ public sealed partial class SqlServerErrorRenamingTests
         return kept;
     }
 
-    private static FixtureCase FixtureOf(string name) => FixtureCases.Of(Engine).Single(found => found.Name == name);
+    private static FixtureCase FixtureOf(string name) => FixtureCases.Named(Engine, name);
 
     private static Task<string> SchemaAsync() =>
-        File.ReadAllTextAsync(
-            Path.Combine(FixtureCases.Root, Engine, "schema.sql"),
-            TestContext.Current.CancellationToken
-        );
+        File.ReadAllTextAsync(FixtureCases.SchemaOf(Engine), TestContext.Current.CancellationToken);
 
     // Every database member of the node and its children, "database" of open and "sourceDatabase" of a row, that
     // names the database given, named as the other.
@@ -641,7 +634,7 @@ public sealed partial class SqlServerErrorRenamingTests
         Func<string, string>? query = null
     )
     {
-        var fixture = RawBundles.OfFixture(FixtureCases.Of(Engine).Single(found => found.Name == name));
+        var fixture = RawBundles.OfFixture(FixtureCases.Named(Engine, name));
         var edited = Parse(fixture.Capture);
         capture(edited);
         var read = CaptureJson.Read(edited.ToJsonString());

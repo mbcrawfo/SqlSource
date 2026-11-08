@@ -278,7 +278,7 @@ public sealed class DiagnoseScrubTests : IDisposable
     private static async Task<string> OlderRawBundleAsync(CliRun run, string name)
     {
         var folder = run.Folder.CreateFolder("old");
-        foreach (var file in Directory.GetFiles(FixtureCases.Of("mssql").Single(found => found.Name == name).Folder))
+        foreach (var file in Directory.GetFiles(FixtureCases.Named("mssql", name).Folder))
         {
             File.Copy(file, Path.Combine(folder, Path.GetFileName(file)));
         }
