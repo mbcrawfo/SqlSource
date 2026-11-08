@@ -125,6 +125,8 @@ internal sealed class FakeEngineRenaming(
     public string Fold(string spelling, bool quoted) =>
         quoted ? spelling : string.Concat(spelling.Select(char.ToLowerInvariant));
 
+    public string Spelled(string spelling, bool quoted) => Fold(spelling, quoted);
+
     public bool IsEngineWord(string spelling, bool quoted) => Vocabulary.Contains(Fold(spelling, quoted));
 
     public FieldRule? RuleOf(string method, string path)
