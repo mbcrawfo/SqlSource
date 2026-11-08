@@ -290,28 +290,9 @@ internal static class PostgresPlanRenamer
         return (spelling[..underscore], spelling[underscore..]);
     }
 
-    // A lower-case letter, "_" and eight or more lower-case hex digits, as NameMapping makes a replacement.
-    private static bool IsReplacementShaped(string stem)
-    {
-        if (stem.Length < 10 || !char.IsAsciiLetterLower(stem[0]) || stem[1] != '_')
-        {
-            return false;
-        }
-
-        foreach (var character in stem.AsSpan(2))
-        {
-            if (!char.IsAsciiHexDigitLower(character))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     // The stem of <stem>_<n> when the stem is shaped as a replacement, whose _<n> is the planner's; else null.
     private static string? StemOfChild(string spelling) =>
-        ChildOf(spelling) is var (stem, _) && IsReplacementShaped(stem) ? stem : null;
+        ChildOf(spelling) is var (stem, _) && NameMapping.IsShapedAsReplacement(stem) ? stem : null;
 
     // A spelling as the token check reads it: a child of a replacement by its stem, else the spelling whole.
     private static string CheckedSpelling(string spelling) => StemOfChild(spelling) ?? spelling;

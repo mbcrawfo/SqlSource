@@ -33,6 +33,30 @@ public sealed class NameMappingTests
         );
     }
 
+    // Every class's replacement, a literal's too, is shaped as one: the plan renamer reads a child of one by it.
+    [Fact]
+    public void IsShapedAsReplacement_OfEveryClassAndALiteral_IsTrue()
+    {
+        var mapping = Mapping();
+        foreach (var cls in Enum.GetValues<NameClass>().Where(static c => c != NameClass.Literal))
+        {
+            NameMapping.IsShapedAsReplacement(mapping.Name("x" + cls, quoted: false, cls)).ShouldBeTrue();
+        }
+
+        NameMapping.IsShapedAsReplacement(mapping.Literal("v")).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("t_1234abcd", true)]
+    [InlineData("t_1234abcdef", true)]
+    [InlineData("t_1234abc", false)]
+    [InlineData("T_1234abcd", false)]
+    [InlineData("t_1234ABCD", false)]
+    [InlineData("tt1234abcd", false)]
+    [InlineData("t_1234abcg", false)]
+    public void IsShapedAsReplacement_Text_IsALetterUnderscoreAndEightHexDigits(string text, bool shaped) =>
+        NameMapping.IsShapedAsReplacement(text).ShouldBe(shaped);
+
     [Fact]
     public void Name_SameKeyAndSpelling_GivesTheSameName() =>
         Mapping().Name("users", false, NameClass.Table).ShouldBe(Mapping().Name("users", false, NameClass.Table));
