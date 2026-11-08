@@ -30,6 +30,22 @@ public sealed class PostgresRenamingTests
     // A word of the engine's vocabulary only as written, since its unquoted fold is not.
     private const string QuotedEngineWord = "RI_FKey_check_ins";
 
+    // A member the table gives the rule Own that RenameOwn does not know would throw at a bundle that holds it.
+    [Fact]
+    public void OwnOf_EveryMemberTheTableRulesOwn_IsOneOfPostgresqlsOwnStrings()
+    {
+        var owns = PostgresFieldRules
+            .Members.Select(static member => member.Split(' ', 2))
+            .Where(static parts => PostgresFieldRules.RuleOf(parts[0], parts[1]) is { Kind: FieldRuleKind.Own })
+            .ToList();
+
+        owns.ShouldNotBeEmpty();
+        foreach (var parts in owns)
+        {
+            _ = Should.NotThrow(() => PostgresRenaming.OwnOf(parts[0], parts[1]), parts[0] + " " + parts[1]);
+        }
+    }
+
     [Fact]
     public void Spelled_IsTheFold()
     {

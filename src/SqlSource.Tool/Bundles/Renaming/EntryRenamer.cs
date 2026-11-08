@@ -23,8 +23,10 @@ internal static class EntryRenamer
     /// <summary>The place of the entry's members, as a refusal names it before a member's path.</summary>
     public const string Place = BundleFiles.Expected;
 
-    // Where the type records are; each holds members of the engine's.
-    private static readonly string[] TypeRecords =
+    /// <summary>
+    /// Where the type records are, as paths from the entry each followed by a dot; each holds members of the engine's.
+    /// </summary>
+    public static IReadOnlyList<string> TypeRecords { get; } =
     [
         JsonStrings.MemberOf(JsonStrings.ElementOf(SidecarKeys.Parameters), SidecarKeys.Type) + ".",
         JsonStrings.MemberOf(JsonStrings.ElementOf(SidecarKeys.Columns), SidecarKeys.Type) + ".",
@@ -106,26 +108,24 @@ internal static class EntryRenamer
             return null;
         }
 
-        var bundle = new Bundle(null, query, string.Empty, null, []);
-        var engineName = SqlDialectName.Canonical(engine.Dialect);
-        var planned = BundleReplay.Plan(bundle, engineName, RenamingProof.NoPath, token);
-        if (!planned.Succeeded)
-        {
-            run.Refuse(RenamingProof.Unreadable(BundleFiles.Query, planned.Failure));
-            return null;
-        }
-
         var renamed =
             SidecarReader.Read(root.ToJsonString()).Sidecar?.Queries.Single()
             ?? throw new InvalidOperationException("The renamed entry is no longer a sidecar's.");
-        var hash = planned.Value.Query.Hash ?? throw new InvalidOperationException("The renamed query has no hash.");
-        return SidecarWriter.Write(
-            new Sidecar(
-                raw.FormatVersion,
-                raw.ToolVersion,
-                new EquatableArray<SidecarEntry>([renamed with { Hash = hash }])
-            )
+        var written = ExpectedFile.Of(
+            query,
+            SqlDialectName.Canonical(engine.Dialect),
+            renamed,
+            raw.FormatVersion,
+            raw.ToolVersion,
+            token
         );
+        if (!written.Succeeded)
+        {
+            run.Refuse(RenamingProof.Unreadable(BundleFiles.Query, written.Failure));
+            return null;
+        }
+
+        return written.Value;
     }
 
     private static string? Member(IEngineRenaming engine, RenamingRun run, JsonString found)

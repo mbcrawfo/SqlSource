@@ -120,9 +120,9 @@ public sealed class SqlServerRenamingTests
 
     [Theory]
     [InlineData("columns", "master", "sys")]
-    [InlineData("columns", "fixtures", "Sys")]
+    [InlineData("columns", "fixtures", "sys")]
     [InlineData("operands", "fixtures", "INFORMATION_SCHEMA")]
-    [InlineData("table", "msdb", "information_schema")]
+    [InlineData("table", "msdb", "INFORMATION_SCHEMA")]
     [InlineData("columns", "mssqlsystemresource", "sys")]
     [InlineData("operands", "MSSQLSystemResource", "dbo")]
     [InlineData("table", "mssqlsystemresource", "sales")]
@@ -228,6 +228,28 @@ public sealed class SqlServerRenamingTests
         Engine
             .IsEngineRow("table", "request", new JsonObject { ["schema"] = schema, ["table"] = "objects" })
             .ShouldBeTrue();
+
+    // In a case-sensitive database a user can make a schema spelled as one of the server's in another case.
+    [Theory]
+    [InlineData("columns", "SYS")]
+    [InlineData("operands", "Sys")]
+    [InlineData("table", "information_schema")]
+    [InlineData("columns", "Information_Schema")]
+    public void IsEngineRow_AUsersSchemaSpelledAsTheServersInAnotherCase_IsFalse(string method, string schema)
+    {
+        var row = new JsonObject
+        {
+            ["name"] = "secret_col",
+            ["sourceDatabase"] = "cs",
+            ["sourceSchema"] = schema,
+            ["sourceTable"] = "secret_orders",
+            ["sourceColumn"] = "secret_col",
+        };
+        Engine.IsEngineRow(method, "answer.rows[]", row).ShouldBeFalse(schema);
+        Engine
+            .IsEngineRow("table", "request", new JsonObject { ["schema"] = schema, ["table"] = "secret_orders" })
+            .ShouldBeFalse(schema);
+    }
 
     [Fact]
     public void IsEngineRow_AnyOtherRow_IsFalse()

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Quoting;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
 
 namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
@@ -38,16 +39,10 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     private static readonly string[] ClrTypes = ["GEOMETRY", "GEOGRAPHY", "HIERARCHYID"];
 
-    // The methods whose rows are the columns of a result set, with their sources.
-    private static readonly string[] ColumnMethods =
-    [
-        SqlServerCallNames.Columns,
-        SqlServerCallNames.Operands,
-        SqlServerCallNames.Table,
-    ];
-
-    // The schemas whose relations are the server's own, folded.
-    private static readonly string[] SystemSchemas = ["SYS", "INFORMATION_SCHEMA"];
+    // The schemas whose relations are the server's own, as it reports them, compared by ordinal: in a case-sensitive
+    // database a user can make a schema SYS or information_schema, which is no schema of the server's
+    // (SystemSchemas.IsSqlServer).
+    private static readonly string[] EngineSchemas = [SystemSchemas.SqlServer, "INFORMATION_SCHEMA"];
 
     private SqlServerRenaming() { }
 
@@ -95,6 +90,12 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     /// user's, since a user's tables are there when the connection names that database.
     /// </para>
     /// <para>
+    /// A schema is the server's only when it is spelled as the server reports its own, <c>sys</c> or
+    /// <c>INFORMATION_SCHEMA</c>, by ordinal.  The server reports a system view's schema so whatever the query's
+    /// spelling and the database's collation, and in a case-sensitive database a user can make a schema
+    /// <c>SYS</c>, <c>Sys</c> or <c>information_schema</c>, whose names are the user's.
+    /// </para>
+    /// <para>
     /// A row's <c>name</c> is the column's alias, which is the user's, and the renaming keeps every name of a row of
     /// the engine's, an alias too, and every spelling of it in the bundle.  So a column of the server's is the
     /// engine's only when its name, without a nullability mark and folded, is its <c>sourceColumn</c> folded, is the
@@ -105,17 +106,20 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     /// </remarks>
     public bool IsEngineRow(string method, string path, JsonObject row)
     {
-        if (!ColumnMethods.Contains(method, StringComparer.Ordinal))
+        if (!SqlServerFields.ColumnMethods.Contains(method, StringComparer.Ordinal))
         {
             return false;
         }
 
         return path switch
         {
-            "answer.rows[]" => (IsSystemSchema(row, "sourceSchema") || IsSystemResource(row, "sourceDatabase"))
-                && row["sourceServer"] is null
+            SqlServerFields.Rows => (
+                IsSystemSchema(row, SqlServerFields.SourceSchema)
+                || IsSystemResource(row, SqlServerFields.SourceDatabase)
+            )
+                && row[SqlServerFields.SourceServer] is null
                 && IsUnaliased(row),
-            CaptureRenamer.Request => method == SqlServerCallNames.Table && IsSystemSchema(row, "schema"),
+            CaptureJson.RequestKey => method == SqlServerCallNames.Table && IsSystemSchema(row, SqlServerFields.Schema),
             _ => false,
         };
     }
@@ -131,8 +135,8 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     {
         if (
             method != SqlServerCallNames.Parameters
-            || call[CaptureRenamer.Request] is not JsonObject request
-            || request["reused"] is not JsonArray reused
+            || call[CaptureJson.RequestKey] is not JsonObject request
+            || request[SqlServerFields.Reused] is not JsonArray reused
         )
         {
             yield break;
@@ -142,8 +146,8 @@ internal sealed class SqlServerRenaming : IEngineRenaming
         {
             if (
                 entry is not JsonObject found
-                || StringOf(found, "name") is not { } parameter
-                || found["copies"] is not JsonArray copies
+                || StringOf(found, SqlServerFields.Name) is not { } parameter
+                || found[SqlServerFields.Copies] is not JsonArray copies
                 || !copies.All(static copy => copy is JsonValue value && value.GetValueKind() == JsonValueKind.String)
             )
             {
@@ -193,18 +197,17 @@ internal sealed class SqlServerRenaming : IEngineRenaming
         version.Split('.').All(static group => group.Length > 0 && group.All(char.IsAsciiDigit));
 
     private static bool IsSystemSchema(JsonObject row, string member) =>
-        StringOf(row, member) is { } schema
-        && SystemSchemas.Contains(SqlServerVocabulary.Fold(schema), StringComparer.Ordinal);
+        StringOf(row, member) is { } schema && EngineSchemas.Contains(schema, StringComparer.Ordinal);
 
     // A column's name is its source column's, without a nullability mark and folded, the tool's AS [n], or null.
     private static bool IsUnaliased(JsonObject row)
     {
-        if (row["name"] is null)
+        if (row[SqlServerFields.Name] is null)
         {
             return true;
         }
 
-        if (StringOf(row, "name") is not { } name)
+        if (StringOf(row, SqlServerFields.Name) is not { } name)
         {
             return false;
         }
@@ -214,7 +217,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
             return true;
         }
 
-        return StringOf(row, "sourceColumn") is { } column
+        return StringOf(row, SqlServerFields.SourceColumn) is { } column
             && string.Equals(
                 SqlServerVocabulary.Fold(RenamingRun.MarkOf(name).Stem),
                 SqlServerVocabulary.Fold(column),

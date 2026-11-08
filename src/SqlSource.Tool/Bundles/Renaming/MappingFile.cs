@@ -1,9 +1,5 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Text.Json;
+using SqlSource.Tool.Describing.Capture;
 
 namespace SqlSource.Tool.Bundles.Renaming;
 
@@ -16,34 +12,29 @@ internal static class MappingFile
     /// <summary>The version of the file's layout.</summary>
     public const int Version = 1;
 
-    private static readonly JsonWriterOptions Options = new()
-    {
-        Indented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+    private const string VersionKey = "mappingVersion";
+    private const string NamesKey = "names";
+    private const string ReplacementKey = "replacement";
+    private const string ClassKey = "class";
+    private const string OriginalKey = "original";
 
     /// <summary>The file: indented, with <c>\n</c> line ends and a final line break.</summary>
-    public static string Write(IReadOnlyList<MappedName> names)
-    {
-        using var stream = new MemoryStream();
-        using (var json = new Utf8JsonWriter(stream, Options))
+    public static string Write(IReadOnlyList<MappedName> names) =>
+        JsonFile.Write(json =>
         {
             json.WriteStartObject();
-            json.WriteNumber("mappingVersion", Version);
-            json.WriteStartArray("names");
+            json.WriteNumber(VersionKey, Version);
+            json.WriteStartArray(NamesKey);
             foreach (var name in names)
             {
                 json.WriteStartObject();
-                json.WriteString("replacement", name.Replacement);
-                json.WriteString("class", NameClasses.WordOf(name.Class));
-                json.WriteString("original", name.Original);
+                json.WriteString(ReplacementKey, name.Replacement);
+                json.WriteString(ClassKey, NameClasses.WordOf(name.Class));
+                json.WriteString(OriginalKey, name.Original);
                 json.WriteEndObject();
             }
 
             json.WriteEndArray();
             json.WriteEndObject();
-        }
-
-        return Encoding.UTF8.GetString(stream.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
-    }
+        });
 }

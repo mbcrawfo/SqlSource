@@ -23,17 +23,28 @@ namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 /// </remarks>
 internal static class PostgresFieldRules
 {
+    /// <summary>The value of one of <c>open</c>'s settings.</summary>
+    public const string SettingValue = "answer.settings[].value";
+
+    /// <summary>The message of an error, whichever the call.</summary>
+    public const string ErrorMessage = "answer.error.message";
+
+    /// <summary>The message of the driver's error of <c>check</c>.</summary>
+    public const string DriverErrorMessage = "answer.driverError.message";
+
+    /// <summary>The plan of <c>explain</c>.</summary>
+    public const string Plan = "answer.plan";
+
     // The schemas whose rows are the engine's.
     private static readonly FrozenSet<string> EngineSchemas = FrozenSet.ToFrozenSet(
-        ["pg_catalog", "information_schema"],
+        [SystemSchemas.Postgres, "information_schema"],
         StringComparer.Ordinal
     );
 
     // Where the entry's type records are, by the method the renaming asks the entry's members by.
     private static readonly string[] TypeRecords =
     [
-        BundleFiles.Expected + " " + SidecarKeys.Parameters + "[]." + SidecarKeys.Type + ".",
-        BundleFiles.Expected + " " + SidecarKeys.Columns + "[]." + SidecarKeys.Type + ".",
+        .. EntryRenamer.TypeRecords.Select(static record => BundleFiles.Expected + " " + record),
     ];
 
     // The members of a type that hold a type of their own, whose members have the same rules.
@@ -142,7 +153,7 @@ internal static class PostgresFieldRules
         Add(PostgresCallNames.Open, "answer.serverVersion", FieldRule.Fixed);
         Add(PostgresCallNames.Open, "answer.driverVersion", FieldRule.Fixed);
         Add(PostgresCallNames.Open, "answer.settings[].name", FieldRule.Fixed);
-        Add(PostgresCallNames.Open, "answer.settings[].value", FieldRule.Own);
+        Add(PostgresCallNames.Open, SettingValue, FieldRule.Own);
 
         Add(PostgresCallNames.Prepare, "request.statement", FieldRule.Fixed);
         Add(PostgresCallNames.Prepare, "request.sql", FieldRule.Sql);
@@ -168,13 +179,13 @@ internal static class PostgresFieldRules
         Add(PostgresCallNames.Check, "answer.columns[].name", FieldRule.Name(NameClass.Column));
         Add(PostgresCallNames.Check, "answer.columns[].dataTypeName", FieldRule.TypeSpelling);
         Add(PostgresCallNames.Check, "answer.driverError.parameter", FieldRule.Parameter);
-        Add(PostgresCallNames.Check, "answer.driverError.message", FieldRule.Own);
+        Add(PostgresCallNames.Check, DriverErrorMessage, FieldRule.Own);
         Add(PostgresCallNames.Check, "answer.sent.text", FieldRule.Sql);
         Add(PostgresCallNames.Check, "answer.sent.parameters[]", FieldRule.Parameter);
 
         Add(PostgresCallNames.Explain, "request.statement", FieldRule.Fixed);
         Add(PostgresCallNames.Explain, "request.settings[]", FieldRule.Fixed);
-        Add(PostgresCallNames.Explain, "answer.plan", FieldRule.Own);
+        Add(PostgresCallNames.Explain, Plan, FieldRule.Own);
 
         Add(PostgresCallNames.Partitions, "answer.rows[].schema", FieldRule.Name(NameClass.Schema));
         Add(PostgresCallNames.Partitions, "answer.rows[].name", FieldRule.Name(NameClass.Table));
@@ -188,7 +199,7 @@ internal static class PostgresFieldRules
         foreach (var method in Methods)
         {
             Add(method, "answer.error.sqlState", FieldRule.Closed);
-            Add(method, "answer.error.message", FieldRule.Own);
+            Add(method, ErrorMessage, FieldRule.Own);
             Add(method, "answer.error.detail", FieldRule.Drop);
             Add(method, "answer.error.hint", FieldRule.Drop);
             if (method != PostgresCallNames.Prepare)

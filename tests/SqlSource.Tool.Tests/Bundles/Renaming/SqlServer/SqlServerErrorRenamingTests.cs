@@ -654,7 +654,7 @@ public sealed partial class SqlServerErrorRenamingTests
         };
 
         var token = TestContext.Current.CancellationToken;
-        var planned = BundleReplay.Plan(bundle, Engine, RenamingProof.NoPath, token);
+        var planned = BundleReplay.Plan(bundle, Engine, BundleReplay.NoPath, token);
         planned.Failure.ShouldBeNull();
         var (planQuery, dialect) = planned.Value;
         var replayed = await BundleReplay.RunAsync(
@@ -770,7 +770,7 @@ public sealed partial class SqlServerErrorRenamingTests
     // The one parameter of the bundle's query, as its query.sql names it: the renamed one, of a renamed bundle.
     private static string ParameterOf(Bundle bundle)
     {
-        var planned = BundleReplay.Plan(bundle, Engine, RenamingProof.NoPath, TestContext.Current.CancellationToken);
+        var planned = BundleReplay.Plan(bundle, Engine, BundleReplay.NoPath, TestContext.Current.CancellationToken);
         planned.Failure.ShouldBeNull();
         return planned.Value.Query.Query.Parameters.ShouldHaveSingleItem().Name;
     }

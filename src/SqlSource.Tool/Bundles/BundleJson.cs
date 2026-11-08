@@ -1,9 +1,7 @@
 using System;
-using System.IO;
-using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Bundles;
@@ -40,17 +38,9 @@ internal static class BundleJson
     private const string EntryKind = "entry";
     private const string FailureKind = "failure";
 
-    private static readonly JsonWriterOptions FileOptions = new()
-    {
-        Indented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
-
     /// <summary>The file of the bundle's info.</summary>
-    public static string Write(BundleInfo info)
-    {
-        using var stream = new MemoryStream();
-        using (var json = new Utf8JsonWriter(stream, FileOptions))
+    public static string Write(BundleInfo info) =>
+        JsonFile.Write(json =>
         {
             json.WriteStartObject();
             json.WriteNumber(VersionKey, info.BundleVersion);
@@ -79,12 +69,7 @@ internal static class BundleJson
 
             json.WriteEndObject();
             json.WriteEndObject();
-        }
-
-        // The writer indents with the platform's line end.  A line break inside a value is written as an escape,
-        // so only the writer's own are replaced.
-        return Encoding.UTF8.GetString(stream.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
-    }
+        });
 
     /// <summary>
     /// Reads the file of a bundle's info, or gives the error at the bundle: <c>SQLSRC289</c> for a

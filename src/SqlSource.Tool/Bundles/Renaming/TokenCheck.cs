@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 
 namespace SqlSource.Tool.Bundles.Renaming;
 
@@ -62,7 +63,7 @@ internal sealed partial class TokenCheck
         var check = new TokenCheck(engine, mapping, RenamingCopies.Of(engine, calls, static call => call.Renamed));
         foreach (var call in calls)
         {
-            foreach (var part in (string[])[CaptureRenamer.Request, CaptureRenamer.Answer])
+            foreach (var part in (string[])[CaptureJson.RequestKey, CaptureJson.AnswerKey])
             {
                 JsonStrings.Visit(
                     call.Renamed[part],
