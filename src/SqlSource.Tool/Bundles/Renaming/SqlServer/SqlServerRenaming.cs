@@ -91,8 +91,8 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     /// </para>
     /// <para>
     /// A schema is the server's only when it is spelled as the server reports its own, <c>sys</c> or
-    /// <c>INFORMATION_SCHEMA</c>, by ordinal.  The server reports <c>sys</c> for a system view's columns whatever the
-    /// query's spelling and the database's collation, and in a case-sensitive database a user can make a schema
+    /// <c>INFORMATION_SCHEMA</c>, by ordinal.  The server reports a system view's schema so whatever the query's
+    /// spelling and the database's collation, and in a case-sensitive database a user can make a schema
     /// <c>SYS</c>, <c>Sys</c> or <c>information_schema</c>, whose names are the user's.
     /// </para>
     /// <para>
