@@ -45,7 +45,7 @@ The review corrected each comment to say what its test asserts; what is not test
 29. ~~`SqlSource.Tests/Parsing/Markers/SqlMarkerScopeTests.cs`: the spans of the placement markers are checked in a query's scope alone, not in the preamble's or the whole file's.~~  Fixed: both span tests run in the preamble's scope, a query's and the whole file's.
 30. ~~`SqlSource.Tests/SettingsFiles/SettingsFileSchemaTests.cs`, `Schema_AnyOf_IsOnTheChoicesTheDialectAndTheParametersAlone`: looks at the top-level properties and their `items` only, so the `anyOf` of `libraryTypes.propertyNames`, `libraryTypes.additionalProperties` and `columnTypes.additionalProperties` are outside it, and no branch is checked to be an enum or a pattern.~~  Fixed: `Schema_EveryAnyOf_IsAChoiceListAndAPatternButAColumnTypesValue` walks the whole schema, finds the 11 `anyOf`s and checks that each but a column type's value is an enum and a pattern.
 31. ~~`SqlSource.Tool.Tests/Watching/WatchSetTests.cs`, `Classify_NewContentForAListedFileOutsideTheProject_IsEvaluate`: two rows are in the project's own folder, against the name; `src/App/New.sql` repeats a case of `Classify_CreatedOrRenamedUnlistedFileUnderTheProject_IsEvaluate`.~~  Fixed: The two rows in the project's own folder are a theory of their own, `Classify_NewContentInTheProjectsFolderOfARepository_IsEvaluate`, under the repository with a listed file outside the project.
-32. `SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerFieldsTests.cs`: no test walks the records of `src/SqlSource.Tool/Describing/SqlServer/SqlServerCalls.cs`, so a string member that no fixture fills and the hand-written table leaves out has no check (TD-0108 item 8).
+32. ~~`SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerFieldsTests.cs`: no test walks the records of `src/SqlSource.Tool/Describing/SqlServer/SqlServerCalls.cs`, so a string member that no fixture fills and the hand-written table leaves out has no check.~~  Fixed: `SqlServerFieldsTests` walks the records of each call by reflection, through the `CallMembers` walk that `PostgresFieldRulesTests` uses too, and fails for a string member with no rule and for a rule of no member.
 33. ~~`SqlSource.Tool.Tests/Commands/DiagnoseScrubTests.cs`, `Diagnose_ScrubOfTheRawBundle_GivesWhatDiagnoseGives`: the zips' entry lists and the contents of `query.sql` and `capture.json` are not compared.~~  Fixed: It also compares the zips' entries, and the text of `query.sql` and of `capture.json` once each renaming is undone with its own mapping, since each run renames with a key of its own.
 34. ~~`SqlSource.Tool.Tests/Commands/CheckFilterTests.cs`, `Check_NoSidecars_CountsEveryQueryUnderDiffer`: no test checks the count of `differ` for a sidecar that cannot be read.~~  Fixed: `Check_SidecarThatCannotBeRead_CountsItsQueriesUnderDiffer` counts the queries of a sidecar with a merge conflict under `differ`.
 35. ~~`SqlSource.Tool.Tests/Commands/SecretTests.cs`, `Run_ValueOnTheCommandLineAndEveryErrorWithLog_IsNeverLogged`: the log is checked for `SQLSRC999` alone; the other errors are checked on standard error only.~~  Fixed: The log is checked for every error of the run.
@@ -78,7 +78,7 @@ The bundle and renaming tests were written by sessions working in parallel, each
 
 ## Impact
 
-Low each, Medium together: a fix to one copy leaves the other wrong, and item 32 is a case a reader may think is covered.
+Low each, Medium together: a fix to one copy leaves the other wrong.
 
 ## Proposed fix
 
@@ -102,7 +102,7 @@ One item, or a few related ones, at a time:
 17. Shouldly's assertions, as PostgreSQL's `VocabularyTests` writes them.
 18. ~~A `DefaultImages.PostgresFloor` used by `VocabularyTests`, named in rule 5 and in `DatabaseTests/Postgres/README.md`.~~  Done.
 19. Give each two-part name a scenario and merge each four-part one into three.
-20. to 41. Add the missing case or assertion, or narrow the test's name where it says too much.
+20. to 41. ~~Add the missing case or assertion, or narrow the test's name where it says too much.~~  Done.
 42. ~~One `Format(DiagnosticDescriptor, params object[])` in `SqlSource.Testing`, the help-link and id-shape checks as one theory over both `All`s, and the four facts as rows.~~  Done.
 43. ~~`DotEnvPath`, `WriteDotEnv` and `WriteManifest` on `DescribeScene`, and `SqlTexts.GetInvoice`.~~  Done.
 44. ~~A `VariantCopies.ShouldShareHash` in `DatabaseTests/TestHarness/EndToEnd/`.~~  Done.
