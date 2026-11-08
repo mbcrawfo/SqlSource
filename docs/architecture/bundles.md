@@ -264,7 +264,7 @@ The vocabulary is [`postgres-vocabulary.txt`](../../src/SqlSource.Tool/Bundles/R
 
 ### PostgreSQL's plans
 
-[`PostgresPlanRenamer`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresPlanRenamer.cs) renames `answer.plan`, the text of `EXPLAIN (VERBOSE, FORMAT JSON)`, key by key, and writes it again indented with `\n` line ends.  The keys it keeps are the keys the walk reads, the constants of `PlanKeys`, each with its kind in `Kinds`; every other key is dropped at any depth, so that a key no corpus held is dropped too.
+[`PostgresPlanRenamer`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresPlanRenamer.cs) renames `answer.plan`, the text of `EXPLAIN (VERBOSE, FORMAT JSON)`, key by key, and writes it again indented with `\n` line ends.  The keys it keeps are the keys the walk reads, the constants of `PlanKeys`, each with its kind in `Kinds`; every other key is dropped at any depth, so that a key no corpus held is dropped too.  The class is `partial`, one file per walk: [`Register`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresPlanRenamer.Register.cs) in `PostgresPlanRenamer.Register.cs`, [`WordsOf`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresPlanRenamer.Words.cs) in `PostgresPlanRenamer.Words.cs` and [`Rename`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresPlanRenamer.Renaming.cs) in `PostgresPlanRenamer.Renaming.cs`, with the kinds and what the walks share in the file above.
 
 | Kind | Keys | What it keeps |
 |----|----|----|
