@@ -147,6 +147,19 @@ public sealed class AccountQueryTests(SqlServerDatabases sqlServer)
         ]);
     }
 
+    [Fact]
+    public async Task ListAccountsInRange_BoundsAndASkippedName_ReadsTheAccountsBetween()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var accounts = await connection.ListAccountsInRange(
+            new ListAccountsInRangeArgs(1, 3, "bob"),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        accounts.ShouldBe([new ListAccountsInRangeDto(1, "alice"), new ListAccountsInRangeDto(3, "carol")]);
+    }
+
     // The second namespace's methods are in its own extension class, which this namespace does not import, so they
     // are called as static methods.
     [Fact]
