@@ -164,6 +164,47 @@ public sealed class SqlDialectRulesTests
         rules.IsNameCharacter('\u20AC').ShouldBe(!sqlServer);
     }
 
+    // T-SQL reads a variable's name by its rule for names: a combining mark, a format character, a letter number, a
+    // connector, "$", "#" and "@" included.  The others take letters, digits and "_".
+    [Theory]
+    [InlineData("Ansi", false)]
+    [InlineData("SqlServer", true)]
+    [InlineData("PostgreSql", false)]
+    [InlineData("MySql", false)]
+    [InlineData("MariaDb", false)]
+    [InlineData("Sqlite", false)]
+    [InlineData("Oracle", false)]
+    [InlineData("CockroachDb", false)]
+    public void IsParameterNameCharacter_OfEachDialect_ReadsTheServersRuleUnderSqlServerAlone(
+        string dialect,
+        bool sqlServer
+    )
+    {
+        var rules = SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
+
+        rules.IsParameterNameCharacter('a').ShouldBeTrue();
+        rules.IsParameterNameCharacter('1').ShouldBeTrue();
+        rules.IsParameterNameCharacter('_').ShouldBeTrue();
+        rules.IsParameterNameCharacter('\u0301').ShouldBe(sqlServer);
+        rules.IsParameterNameCharacter('\u200C').ShouldBe(sqlServer);
+        rules.IsParameterNameCharacter('\u2160').ShouldBe(sqlServer);
+        rules.IsParameterNameCharacter('\u203F').ShouldBe(sqlServer);
+        rules.IsParameterNameCharacter('$').ShouldBe(sqlServer);
+        rules.IsParameterNameCharacter('#').ShouldBe(sqlServer);
+        rules.IsParameterNameCharacter('@').ShouldBe(sqlServer);
+        rules.IsParameterNameCharacter('\u00B7').ShouldBeFalse();
+        rules.IsParameterNameCharacter('\u20AC').ShouldBeFalse();
+        rules.IsParameterNameCharacter(' ').ShouldBeFalse();
+    }
+
+    // A name never starts with the prefix, though SQL Server takes "@" inside one.
+    [Theory]
+    [InlineData("@a$b;", 4)]
+    [InlineData("@@x", 1)]
+    [InlineData("@", 1)]
+    public void FindParameterNameEnd_AfterThePrefix_IsTheEndOfTheName(string text, int expected) =>
+        SqlDialectRules.SqlServer.FindParameterNameEnd(text, 1, text.Length).ShouldBe(expected);
+
     [Theory]
     [InlineData("SELECT a, b FROM t WHERE x = 1", 0, -1)]
     [InlineData("", 0, -1)]

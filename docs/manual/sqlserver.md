@@ -534,3 +534,5 @@ SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-pa
   ```
 
 - **A `-- param:` type whose name, written without brackets, holds a character that Unicode added or reclassified after version 3.2** can be read differently by SqlSource and by SQL Server, which reads a name by Unicode 3.2.  `dbo.x・` is refused as [SQLSRC228](diagnostics.md#sqlsrc228), "it is not written as a type name", though SQL Server accepts the name, and `dbo.ꞔ` passes SqlSource and SQL Server refuses it, SQLSRC228 "it is not a type".  Write that part of the name in brackets, as in `-- param: @p dbo.[x・]`.
+
+- **A parameter whose name holds a character that Unicode added or reclassified after version 3.2** can be read differently by SqlSource and by SQL Server too.  `@x・` is read by SqlSource as the parameter `@x` followed by text, and by SQL Server as one variable, so describing the query is [SQLSRC231](diagnostics.md#sqlsrc231).  Write the name without that character.

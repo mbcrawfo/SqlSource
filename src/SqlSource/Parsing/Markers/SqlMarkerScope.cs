@@ -590,11 +590,7 @@ internal sealed class SqlMarkerScope(
     {
         var start = marker.ValueSpan.Start;
         var end = marker.ValueSpan.End;
-        var nameEnd = start + 1;
-        while (nameEnd < end && SqlLexer.IsParameterNameCharacter(text[nameEnd]))
-        {
-            nameEnd++;
-        }
+        var nameEnd = rules.FindParameterNameEnd(text, start + 1, end);
 
         if (
             start == end

@@ -194,6 +194,30 @@ public sealed class SqlFileParserParameterTests
         Parameters(Blocks("-- name: Q\n-- param: " + value + "\nSELECT @a\n").ShouldHaveSingleItem())
             .ShouldBe([expected]);
 
+    // The marker reads a name as the SQL does: under mssql, as SQL Server reads a variable's name.
+    [Fact]
+    public void Parse_ParamMarkerOfAnMssqlFileWithALetterNumber_DeclaresItsName() =>
+        Parameters(Blocks("-- dialect: mssql\n-- name: Q\n-- param: @xⅠ int\nSELECT @xⅠ\n").ShouldHaveSingleItem())
+            .ShouldBe(["xⅠ:int:<unsaid>:declared"]);
+
+    // A name never starts with the prefix, though SQL Server takes "@" inside one.
+    [Fact]
+    public void Parse_ParamMarkerOfAnMssqlFileWithTwoPrefixes_IsSqlsrc111()
+    {
+        const string Value = "@@x int";
+        const string Text = "-- dialect: mssql\n-- name: Q\n-- param: " + Value + "\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(Text, Value),
+                    "param: " + Value,
+                    ""
+                ),
+            ]);
+    }
+
     [Fact]
     public void Parse_ParamMarkerWithWindowsLineEndings_IsRead() =>
         Parameters(Blocks("-- name: Q\r\n-- param: @a int null  \r\nSELECT @a\r\n").ShouldHaveSingleItem())
