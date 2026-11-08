@@ -79,7 +79,7 @@ public sealed class BundleQueryFileTests
             new HashSet<string>(["id"], SqlParameterName.Comparer),
             RenamingCopies.None
         );
-        _ = renamer.RenameQueryFile(FileOf(kind, "Get"), refusals.Add);
+        var renamedText = renamer.RenameQueryFile(FileOf(kind, "Get"), refusals.Add).Text;
         var renamed = !refusals.Any(refusal => refusal.Token == word);
 
         var query = mapping.Name("Get", quoted: false, NameClass.Query);
@@ -88,6 +88,13 @@ public sealed class BundleQueryFileTests
         renamed.ShouldBe(held);
         checkedAsHeld.ShouldBe(held);
         held.ShouldBe(HeldKinds.Contains(kind));
+        if (held)
+        {
+            // A held marker is renamed and passes the check whole: an arm that refuses its value would refuse every
+            // bundle that holds it, by the value and never by the marker's word.
+            refusals.ShouldBeEmpty();
+            TokenCheck.Check(engine, mapping, [], renamedText, expected: null).ShouldBeNull();
+        }
     }
 
     // A file of one query with the kind's line where the generator takes it: a marker of the file header before the
