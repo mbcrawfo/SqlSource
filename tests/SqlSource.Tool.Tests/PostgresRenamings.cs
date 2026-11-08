@@ -20,8 +20,6 @@ internal static class PostgresRenamings
     public const byte Key = 7;
 
     // Where the bundle's errors would be.  Nothing is read there.
-    private const string BundlePath = "/work/report.zip";
-
     // The schema every case of the fixtures is recorded against.
     public static string Schema => File.ReadAllText(FixtureCases.SchemaOf(Engine));
 
@@ -34,7 +32,7 @@ internal static class PostgresRenamings
             ToolHost.Create().Describers,
             raw.ExplainSettings,
             raw.Info.ShouldNotBeNull().Engine,
-            BundlePath
+            BundleInfos.Path
         );
         describer.Failure.ShouldBeNull();
 

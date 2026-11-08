@@ -3,14 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -149,7 +146,11 @@ public sealed class DatabaseRunsFaultTests : IDisposable
     public async Task Run_DescriberThatThrowsOnOpenBeforeItReturnsATask_IsAFaultWithoutTheConnection()
     {
         var fault = await Should.ThrowAsync<DescriberFaultException>(() =>
-            _scene.RunAsync(describer: new ThrowsBeforeItReturns())
+            _scene.RunAsync(
+                describer: new ThrowingDescriber(static request => new InvalidOperationException(
+                    $"cannot parse {request.Connection}"
+                ))
+            )
         );
 
         fault.InnerException.ShouldBeNull();
@@ -364,22 +365,6 @@ public sealed class DatabaseRunsFaultTests : IDisposable
 
         fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.ArgumentException", "broken ***"]);
         _scene.Describer.Closed.ShouldBe(1);
-    }
-
-    // A describer whose OpenAsync is not async.
-    private sealed class ThrowsBeforeItReturns : IQueryDescriber
-    {
-        public SqlDialect Dialect => SqlDialect.PostgreSql;
-
-        public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) => [];
-
-        public string? RewriteOf(string connection) => null;
-
-        public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
-            OpenRequest request,
-            IRunLog log,
-            CancellationToken cancellationToken
-        ) => throw new InvalidOperationException($"cannot parse {request.Connection}");
     }
 
     // A list of a describer's parts that throws whenever it is read.

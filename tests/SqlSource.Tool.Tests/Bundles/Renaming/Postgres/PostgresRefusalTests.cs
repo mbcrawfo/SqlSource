@@ -231,7 +231,7 @@ public sealed class PostgresRefusalTests
     // The bundle as a raw bundle of the failure it replays to, which must be the one given, at describe parameters.
     private static async Task<Bundle> WithItsFailureAsync(Bundle bundle, string id)
     {
-        var replayed = await BundleReplays.ReplayAsync(bundle, "/work/report.zip");
+        var replayed = await BundleReplays.ReplayAsync(bundle, BundleInfos.Path);
         replayed.ShouldBe(new ReplayOutcome.Refused(id, DescribeParameters));
 
         return RawBundles.Of(

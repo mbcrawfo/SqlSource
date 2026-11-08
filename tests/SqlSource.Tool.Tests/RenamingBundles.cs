@@ -27,9 +27,6 @@ internal static class RenamingBundles
 
     public const string ToolVersion = "1.2.3-test";
 
-    // The bundle's path, where an error of reading it would be.  Nothing is read there.
-    public const string Path = "/work/report.zip";
-
     public static FakeDescriber Describer() =>
         new()
         {
@@ -51,7 +48,12 @@ internal static class RenamingBundles
         }
 
         var token = TestContext.Current.CancellationToken;
-        var planned = BundleReplay.Plan(new Bundle(null, Query, string.Empty, null, []), Engine, Path, token);
+        var planned = BundleReplay.Plan(
+            new Bundle(null, Query, string.Empty, null, []),
+            Engine,
+            BundleInfos.Path,
+            token
+        );
         planned.Failure.ShouldBeNull();
         var (query, dialect) = planned.Value;
         var database = query.Database.ShouldNotBeNull();

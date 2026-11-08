@@ -1,18 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -23,8 +19,6 @@ namespace SqlSource.Tool.Tests.Bundles;
 // its capture does not answer.
 public sealed class BundleReplayTests
 {
-    private const string Path = "/work/report.zip";
-
     // Each case of the describers' fixtures as its engine and its name.  DescriberFixtureTests lists them, so a build
     // that copied none fails there.
     public static TheoryData<string, string> Cases =>
@@ -63,9 +57,9 @@ public sealed class BundleReplayTests
     public async Task RunAsync_EveryFixture_GivesItsExpectedEntry(string engine, string name)
     {
         var bundle = BundleReplays.OfCase(engine, name);
-        var expected = BundleReplay.ExpectedOf(bundle, Path);
+        var expected = BundleReplay.ExpectedOf(bundle, BundleInfos.Path);
 
-        var replayed = await BundleReplays.ReplayAsync(bundle, Path);
+        var replayed = await BundleReplays.ReplayAsync(bundle, BundleInfos.Path);
 
         expected.Failure.ShouldBeNull();
         var entry = expected.Value.ShouldBeOfType<ReplayOutcome.Described>().Entry;
@@ -78,7 +72,10 @@ public sealed class BundleReplayTests
     [Fact]
     public async Task RunAsync_CaptureWithoutItsExplain_IsMissedNamingExplain()
     {
-        var replayed = await BundleReplays.ReplayAsync(Without("postgres", "select-left-join", "explain"), Path);
+        var replayed = await BundleReplays.ReplayAsync(
+            Without("postgres", "select-left-join", "explain"),
+            BundleInfos.Path
+        );
 
         var missed = replayed.ShouldBeOfType<ReplayOutcome.Missed>();
         missed.Method.ShouldBe("explain");
@@ -88,7 +85,10 @@ public sealed class BundleReplayTests
     [Fact]
     public async Task RunAsync_CaptureWithoutItsDeallocate_IsMissedWhileDescribing()
     {
-        var replayed = await BundleReplays.ReplayAsync(Without("postgres", "update-inferred", "deallocate"), Path);
+        var replayed = await BundleReplays.ReplayAsync(
+            Without("postgres", "update-inferred", "deallocate"),
+            BundleInfos.Path
+        );
 
         replayed.ShouldBeOfType<ReplayOutcome.Missed>().Method.ShouldBe("deallocate");
     }
@@ -114,7 +114,7 @@ public sealed class BundleReplayTests
             cut.Add(new CaptureCall(call.Method, call.Request, document.RootElement.Clone()));
         }
 
-        var replayed = await BundleReplays.ReplayAsync(BundleReplays.WithCapture(bundle, cut), Path);
+        var replayed = await BundleReplays.ReplayAsync(BundleReplays.WithCapture(bundle, cut), BundleInfos.Path);
 
         var missed = replayed.ShouldBeOfType<ReplayOutcome.Missed>();
         missed.Method.ShouldBe("open");
@@ -130,33 +130,17 @@ public sealed class BundleReplayTests
     {
         var replayed = await BundleReplays.ReplayAsync(
             BundleReplays.OfCase("postgres", "select-plain"),
-            Path,
-            new DescriberRegistry([new MissingDescriber()])
+            BundleInfos.Path,
+            new DescriberRegistry([new ThrowingDescriber(static _ => new CaptureMissException("No answer."))])
         );
 
         replayed.ShouldBe(new ReplayOutcome.Missed("an unknown question", "No answer."));
     }
 
-    // A describer whose open throws a miss made without a method, before it asks its exchange anything.
-    private sealed class MissingDescriber : IQueryDescriber
-    {
-        public SqlDialect Dialect => SqlDialect.PostgreSql;
-
-        public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) => [];
-
-        public string? RewriteOf(string connection) => null;
-
-        public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
-            OpenRequest request,
-            IRunLog log,
-            CancellationToken cancellationToken
-        ) => throw new CaptureMissException("No answer.");
-    }
-
     [Fact]
     public async Task RunAsync_PrepareAnsweredWith42P18_IsRefusedWithIdAndStep()
     {
-        var replayed = await BundleReplays.ReplayAsync(BundleReplays.PrepareTypeNotDetermined(), Path);
+        var replayed = await BundleReplays.ReplayAsync(BundleReplays.PrepareTypeNotDetermined(), BundleInfos.Path);
 
         replayed.ShouldBe(new ReplayOutcome.Refused("SQLSRC226", "describe parameters"));
     }
@@ -166,7 +150,11 @@ public sealed class BundleReplayTests
     {
         var log = new RecordingLog();
 
-        _ = await BundleReplays.ReplayAsync(BundleReplays.OfCase("postgres", "select-left-join"), Path, log: log);
+        _ = await BundleReplays.ReplayAsync(
+            BundleReplays.OfCase("postgres", "select-left-join"),
+            BundleInfos.Path,
+            log: log
+        );
 
         log.Events.Select(static written => written.Name).ShouldContain("postgres.walk.node");
         log.Events.ShouldAllBe(static written => written.Name.StartsWith("postgres.", StringComparison.Ordinal));
@@ -180,11 +168,11 @@ public sealed class BundleReplayTests
             Query = "-- dialect: mssql\n-- name: GetOne\nSELECT 1;\n",
         };
 
-        var planned = BundleReplay.Plan(bundle, "postgres", Path, TestContext.Current.CancellationToken);
+        var planned = BundleReplay.Plan(bundle, "postgres", BundleInfos.Path, TestContext.Current.CancellationToken);
 
         var error = planned.Failure.ShouldNotBeNull();
         error.Descriptor.Id.ShouldBe("SQLSRC288");
-        error.Path.ShouldBe(Path);
+        error.Path.ShouldBe(BundleInfos.Path);
         error
             .Arguments.ToArray()
             .ShouldBe(["query.sql is read as 'mssql', and the bundle is of the engine 'postgres'"]);
@@ -198,7 +186,7 @@ public sealed class BundleReplayTests
             Query = "-- name: One\nSELECT 1;\n\n-- name: Two\nSELECT 2;\n",
         };
 
-        var planned = BundleReplay.Plan(bundle, "postgres", Path, TestContext.Current.CancellationToken);
+        var planned = BundleReplay.Plan(bundle, "postgres", BundleInfos.Path, TestContext.Current.CancellationToken);
 
         planned
             .Failure.ShouldNotBeNull()
@@ -214,7 +202,7 @@ public sealed class BundleReplayTests
             Query = "-- name: GetOne\nSELECT 'unterminated;\n",
         };
 
-        var planned = BundleReplay.Plan(bundle, "postgres", Path, TestContext.Current.CancellationToken);
+        var planned = BundleReplay.Plan(bundle, "postgres", BundleInfos.Path, TestContext.Current.CancellationToken);
 
         var error = planned.Failure.ShouldNotBeNull();
         error.Descriptor.Id.ShouldBe("SQLSRC288");
@@ -226,7 +214,7 @@ public sealed class BundleReplayTests
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain");
 
-        var planned = BundleReplay.Plan(bundle, "db2", Path, TestContext.Current.CancellationToken);
+        var planned = BundleReplay.Plan(bundle, "db2", BundleInfos.Path, TestContext.Current.CancellationToken);
 
         var error = planned.Failure.ShouldNotBeNull();
         error.Descriptor.Id.ShouldBe("SQLSRC291");
@@ -239,7 +227,7 @@ public sealed class BundleReplayTests
         var fixture = FixtureCases.Named("postgres", "select-left-join");
         var token = TestContext.Current.CancellationToken;
 
-        var planned = BundleReplay.Plan(BundleReplays.Read(fixture.Folder), "postgres", Path, token);
+        var planned = BundleReplay.Plan(BundleReplays.Read(fixture.Folder), "postgres", BundleInfos.Path, token);
 
         var (query, dialect) = FixtureReplay.Plan(fixture, token);
         planned.Value.Dialect.ShouldBe(dialect);
@@ -250,7 +238,7 @@ public sealed class BundleReplayTests
     [Fact]
     public void EngineOf_BundleJson_IsItsEngine()
     {
-        var bundle = BundleReplays.OfCase("postgres", "select-plain") with { Info = Info("mssql") };
+        var bundle = BundleReplays.OfCase("postgres", "select-plain") with { Info = BundleInfos.Sample("mssql") };
 
         BundleReplay.EngineOf(bundle).ShouldBe("mssql");
     }
@@ -272,7 +260,7 @@ public sealed class BundleReplayTests
             ),
         };
 
-        var error = BundleReplay.CaptureOf(bundle, Path).Failure.ShouldNotBeNull();
+        var error = BundleReplay.CaptureOf(bundle, BundleInfos.Path).Failure.ShouldNotBeNull();
 
         error.Descriptor.Id.ShouldBe("SQLSRC289");
         error.Arguments.ToArray().ShouldBe(["captureVersion", "2", "1"]);
@@ -283,7 +271,7 @@ public sealed class BundleReplayTests
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain") with { Capture = "{ calls" };
 
-        var error = BundleReplay.CaptureOf(bundle, Path).Failure.ShouldNotBeNull();
+        var error = BundleReplay.CaptureOf(bundle, BundleInfos.Path).Failure.ShouldNotBeNull();
 
         error.Descriptor.Id.ShouldBe("SQLSRC288");
         error.Arguments[0].ShouldStartWith("the capture is not JSON: ");
@@ -292,9 +280,9 @@ public sealed class BundleReplayTests
     [Fact]
     public void CaptureOf_EngineOtherThanBundleJsons_IsSqlsrc288()
     {
-        var bundle = BundleReplays.OfCase("postgres", "select-plain") with { Info = Info("mssql") };
+        var bundle = BundleReplays.OfCase("postgres", "select-plain") with { Info = BundleInfos.Sample("mssql") };
 
-        var error = BundleReplay.CaptureOf(bundle, Path).Failure.ShouldNotBeNull();
+        var error = BundleReplay.CaptureOf(bundle, BundleInfos.Path).Failure.ShouldNotBeNull();
 
         error.Descriptor.Id.ShouldBe("SQLSRC288");
         error.Arguments.ToArray().ShouldBe(["bundle.json names the engine 'mssql', and capture.json 'postgres'"]);
@@ -305,12 +293,12 @@ public sealed class BundleReplayTests
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain") with
         {
-            Info = Info("postgres", BundleOutcome.Failure("SQLSRC226", "describe parameters")),
+            Info = BundleInfos.Sample("postgres", outcome: BundleOutcome.Failure("SQLSRC226", "describe parameters")),
             Expected = null,
         };
 
         BundleReplay
-            .ExpectedOf(bundle, Path)
+            .ExpectedOf(bundle, BundleInfos.Path)
             .Value.ShouldBe(new ReplayOutcome.Refused("SQLSRC226", "describe parameters"));
     }
 
@@ -319,7 +307,7 @@ public sealed class BundleReplayTests
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain") with { Expected = null };
 
-        var expected = BundleReplay.ExpectedOf(bundle, Path);
+        var expected = BundleReplay.ExpectedOf(bundle, BundleInfos.Path);
 
         expected.Succeeded.ShouldBeTrue();
         expected.Value.ShouldBeNull();
@@ -331,16 +319,19 @@ public sealed class BundleReplayTests
         var recorded = BundleReplays.OfCase("postgres", "select-plain");
         var bundle = recorded with
         {
-            Info = Info("postgres", BundleOutcome.Failure("SQLSRC226", "describe parameters")),
+            Info = BundleInfos.Sample("postgres", outcome: BundleOutcome.Failure("SQLSRC226", "describe parameters")),
         };
 
-        var expected = BundleReplay.ExpectedOf(bundle, Path);
+        var expected = BundleReplay.ExpectedOf(bundle, BundleInfos.Path);
 
         expected.Failure.ShouldBeNull();
         expected
             .Value.ShouldBeOfType<ReplayOutcome.Described>()
             .Entry.ShouldBe(
-                BundleReplay.ExpectedOf(recorded, Path).Value.ShouldBeOfType<ReplayOutcome.Described>().Entry
+                BundleReplay
+                    .ExpectedOf(recorded, BundleInfos.Path)
+                    .Value.ShouldBeOfType<ReplayOutcome.Described>()
+                    .Entry
             );
     }
 
@@ -349,11 +340,11 @@ public sealed class BundleReplayTests
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain") with
         {
-            Info = Info("postgres", BundleOutcome.Entry),
+            Info = BundleInfos.Sample("postgres", outcome: BundleOutcome.Entry),
             Expected = null,
         };
 
-        var expected = BundleReplay.ExpectedOf(bundle, Path);
+        var expected = BundleReplay.ExpectedOf(bundle, BundleInfos.Path);
 
         expected.Failure.ShouldBeNull();
         expected.Value.ShouldBeNull();
@@ -367,7 +358,9 @@ public sealed class BundleReplayTests
         var queries = sidecar["queries"].ShouldNotBeNull().AsObject();
         queries["Other"] = queries["GetEverything"].ShouldNotBeNull().DeepClone();
 
-        var error = BundleReplay.ExpectedOf(bundle with { Expected = sidecar.ToJsonString() }, Path).Failure;
+        var error = BundleReplay
+            .ExpectedOf(bundle with { Expected = sidecar.ToJsonString() }, BundleInfos.Path)
+            .Failure;
 
         error.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC288");
         error.Arguments.ToArray().ShouldBe(["expected.json holds 2 entries, and a bundle's holds one"]);
@@ -379,10 +372,10 @@ public sealed class BundleReplayTests
     {
         var bundle = WithFormatVersion(BundleReplays.OfCase("postgres", "select-plain"), SidecarFormat.Version + 1);
 
-        var error = BundleReplay.ExpectedOf(bundle, Path).Failure.ShouldNotBeNull();
+        var error = BundleReplay.ExpectedOf(bundle, BundleInfos.Path).Failure.ShouldNotBeNull();
 
         error.Descriptor.Id.ShouldBe("SQLSRC289");
-        error.Path.ShouldBe(Path);
+        error.Path.ShouldBe(BundleInfos.Path);
         error
             .Arguments.ToArray()
             .ShouldBe([
@@ -398,7 +391,7 @@ public sealed class BundleReplayTests
     {
         var bundle = WithFormatVersion(BundleReplays.OfCase("postgres", "select-plain"), SidecarFormat.Version - 1);
 
-        var error = BundleReplay.ExpectedOf(bundle, Path).Failure.ShouldNotBeNull();
+        var error = BundleReplay.ExpectedOf(bundle, BundleInfos.Path).Failure.ShouldNotBeNull();
 
         error.Descriptor.Id.ShouldBe("SQLSRC288");
         error
@@ -414,23 +407,9 @@ public sealed class BundleReplayTests
     {
         var bundle = BundleReplays.OfCase("postgres", "select-plain") with { Expected = "[]" };
 
-        var error = BundleReplay.ExpectedOf(bundle, Path).Failure.ShouldNotBeNull();
+        var error = BundleReplay.ExpectedOf(bundle, BundleInfos.Path).Failure.ShouldNotBeNull();
 
         error.Descriptor.Id.ShouldBe("SQLSRC288");
         error.Arguments.ToArray().ShouldBe(["expected.json is not a sidecar: it is not one JSON object"]);
     }
-
-    private static BundleInfo Info(string engine, BundleOutcome? outcome = null) =>
-        new(
-            BundleVersion: 1,
-            Renamed: false,
-            ToolVersion: "1.4.0",
-            FormatVersion: SidecarFormat.Version,
-            Engine: engine,
-            ServerVersion: "18.6",
-            DriverVersion: null,
-            Runtime: ".NET 8.0.11",
-            OperatingSystem: "Linux 6.8",
-            Outcome: outcome ?? BundleOutcome.Entry
-        );
 }

@@ -20,8 +20,6 @@ namespace SqlSource.Tool.Tests.Bundles;
 public sealed class DiagnoseBundlesTests
 {
     // Where the bundle's errors would be.  Nothing is read there.
-    private const string BundlePath = "/work/report.zip";
-
     private const string UsersFile = """
         -- output: codegen
 
@@ -45,11 +43,11 @@ public sealed class DiagnoseBundlesTests
         using var folder = new TempFolder();
         var raw = await RawAsync(folder, CaptureOf(PostgresRenamings.Fixture("update-inferred")));
 
-        var expected = BundleReplay.ExpectedOf(raw, BundlePath);
+        var expected = BundleReplay.ExpectedOf(raw, BundleInfos.Path);
         expected.Failure.ShouldBeNull();
         var answer = expected.Value.ShouldBeOfType<ReplayOutcome.Described>();
         answer.Entry.Database.ShouldBe("app");
-        (await BundleReplays.ReplayAsync(raw, BundlePath)).ShouldBe(answer);
+        (await BundleReplays.ReplayAsync(raw, BundleInfos.Path)).ShouldBe(answer);
     }
 
     [Fact]
@@ -72,10 +70,10 @@ public sealed class DiagnoseBundlesTests
         raw.Expected.ShouldBeNull();
         var outcome = raw.Info.ShouldNotBeNull().Outcome;
         outcome.Kind.ShouldBe(BundleOutcomeKind.Failure);
-        var expected = BundleReplay.ExpectedOf(raw, BundlePath);
+        var expected = BundleReplay.ExpectedOf(raw, BundleInfos.Path);
         expected.Failure.ShouldBeNull();
         expected.Value.ShouldBe(new ReplayOutcome.Refused(outcome.Id.ShouldNotBeNull(), outcome.Step));
-        (await BundleReplays.ReplayAsync(raw, BundlePath)).ShouldBe(expected.Value);
+        (await BundleReplays.ReplayAsync(raw, BundleInfos.Path)).ShouldBe(expected.Value);
     }
 
     [Fact]

@@ -31,15 +31,7 @@ public sealed class EntryRenamerTests
 
         run.Refusal.ShouldBeNull();
         var entry = SidecarReader.Read(renamed.ShouldNotBeNull()).Sidecar.ShouldNotBeNull().Queries[0];
-        var planned = BundleReplay.Plan(
-            raw with
-            {
-                Query = query,
-            },
-            RenamingBundles.Engine,
-            RenamingBundles.Path,
-            token
-        );
+        var planned = BundleReplay.Plan(raw with { Query = query }, RenamingBundles.Engine, BundleInfos.Path, token);
         entry.Hash.ShouldBe(planned.Value.Query.Hash);
         var original = SidecarReader.Read(raw.Expected).Sidecar.ShouldNotBeNull().Queries[0];
         entry.Hash.ShouldNotBe(original.Hash);

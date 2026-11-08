@@ -44,19 +44,7 @@ public sealed class ReplayTests : IDisposable
         ];
 
     // A bundle.json for a case of the fixtures.
-    private static BundleInfo InfoOf(string engine, bool renamed = false) =>
-        new(
-            BundleVersion: 1,
-            Renamed: renamed,
-            ToolVersion: "1.4.0",
-            FormatVersion: SidecarFormat.Version,
-            Engine: engine,
-            ServerVersion: "18.6",
-            DriverVersion: null,
-            Runtime: ".NET 8.0.11",
-            OperatingSystem: "Linux 6.8",
-            Outcome: BundleOutcome.Entry
-        );
+    private static BundleInfo InfoOf(string engine, bool renamed = false) => BundleInfos.Sample(engine, renamed);
 
     // Copies a case of the fixtures into a folder of the run, and gives the folder's full path.
     private string CopyCase(string engine, string name, string folder = "case")

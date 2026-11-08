@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
@@ -283,18 +282,7 @@ public sealed class DiagnoseScrubTests : IDisposable
             File.Copy(file, Path.Combine(folder, Path.GetFileName(file)));
         }
 
-        var info = new BundleInfo(
-            BundleVersion: 1,
-            Renamed: false,
-            ToolVersion: "1.4.0",
-            FormatVersion: SidecarFormat.Version,
-            Engine: "mssql",
-            ServerVersion: "17.0.1000.7",
-            DriverVersion: null,
-            Runtime: ".NET 8.0.11",
-            OperatingSystem: "Linux 6.8",
-            Outcome: BundleOutcome.Entry
-        );
+        var info = BundleInfos.Sample("mssql") with { ServerVersion = "17.0.1000.7" };
         await File.WriteAllTextAsync(
             Path.Combine(folder, BundleFiles.Info),
             BundleJson.Write(info),
