@@ -46,6 +46,12 @@ internal static class BundleReplay
     /// <summary>The method of a miss that names none, as <c>SQLSRC290</c> quotes it.</summary>
     public const string UnknownQuestion = "an unknown question";
 
+    /// <summary>
+    /// The path of a bundle in no file, as a renamed bundle is while it is proved.  What a step of a replay says of it
+    /// names no path.
+    /// </summary>
+    public const string NoPath = "";
+
     private const string VersionKey = "captureVersion";
     private const string EngineKey = "engine";
 

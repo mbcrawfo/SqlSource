@@ -80,28 +80,22 @@ internal static class DiagnoseBundles
     private static BundleOutcome OutcomeOf(DescribeFailure failure) =>
         BundleOutcome.Failure(failure.Descriptor.Id, failure.Step is { } step ? DescribeStepName.Of(step) : null);
 
-    // The sidecar of the entry alone, with the hash of the bundle's query.sql.  The sidecar holds no position of the
-    // query's name, so the hash is all that the bundle's file changes.
+    // The sidecar of the entry alone, with the hash of the bundle's query.sql.
     private static string ExpectedOf(Bundle bundle, SidecarEntry entry)
     {
-        // The path is where a failure would be, and a query.sql that BundleQueryFile wrote always plans.
-        var planned = BundleReplay.Plan(bundle, bundle.Info!.Engine, string.Empty, CancellationToken.None);
-        if (!planned.Succeeded)
-        {
-            throw new InvalidOperationException(
-                $"The query.sql of the query '{entry.Name}' does not plan: {planned.Failure.Descriptor.Id}."
-            );
-        }
-
-        var hash =
-            planned.Value.Query.Hash
-            ?? throw new InvalidOperationException($"The query.sql of the query '{entry.Name}' has no hash.");
-        return SidecarWriter.Write(
-            new Sidecar(
-                SidecarFormat.Version,
-                PackageVersion.Prefix,
-                new EquatableArray<SidecarEntry>([entry with { Hash = hash }])
-            )
+        // A query.sql that BundleQueryFile wrote always plans.
+        var expected = ExpectedFile.Of(
+            bundle.Query,
+            bundle.Info!.Engine,
+            entry,
+            SidecarFormat.Version,
+            PackageVersion.Prefix,
+            CancellationToken.None
         );
+        return expected.Succeeded
+            ? expected.Value
+            : throw new InvalidOperationException(
+                $"The query.sql of the query '{entry.Name}' does not plan: {expected.Failure.Descriptor.Id}."
+            );
     }
 }

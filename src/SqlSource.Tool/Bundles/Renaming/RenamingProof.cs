@@ -19,12 +19,6 @@ namespace SqlSource.Tool.Bundles.Renaming;
 /// </remarks>
 internal static class RenamingProof
 {
-    /// <summary>
-    /// The path of a renamed bundle, which is in no file while it is proved.  What a step of a replay says of it names
-    /// no path.
-    /// </summary>
-    public const string NoPath = "";
-
     /// <summary>The refusal of the renamed bundle, or null when it replays to its own answer.</summary>
     /// <param name="renamed">The renamed bundle.</param>
     /// <param name="describer">The describer of the bundle's engine, made with its planner settings.</param>
@@ -35,19 +29,19 @@ internal static class RenamingProof
         CancellationToken token
     )
     {
-        var capture = BundleReplay.CaptureOf(renamed, NoPath);
+        var capture = BundleReplay.CaptureOf(renamed, BundleReplay.NoPath);
         if (!capture.Succeeded)
         {
             return Unreadable(BundleFiles.Capture, capture.Failure);
         }
 
-        var planned = BundleReplay.Plan(renamed, BundleReplay.EngineOf(renamed), NoPath, token);
+        var planned = BundleReplay.Plan(renamed, BundleReplay.EngineOf(renamed), BundleReplay.NoPath, token);
         if (!planned.Succeeded)
         {
             return Unreadable(BundleFiles.Query, planned.Failure);
         }
 
-        var expected = BundleReplay.ExpectedOf(renamed, NoPath);
+        var expected = BundleReplay.ExpectedOf(renamed, BundleReplay.NoPath);
         if (!expected.Succeeded)
         {
             return Unreadable(BundleFiles.Expected, expected.Failure);
