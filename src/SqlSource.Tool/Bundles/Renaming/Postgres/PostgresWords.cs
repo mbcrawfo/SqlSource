@@ -31,7 +31,10 @@ internal static class PostgresWords
 
     /// <summary>The schemas that are the engine's own, whose names are kept.</summary>
     public static IReadOnlySet<string> EngineSchemas { get; } =
-        FrozenSet.ToFrozenSet(["pg_catalog", "information_schema", "pg_toast", "public"], StringComparer.Ordinal);
+        FrozenSet.ToFrozenSet(
+            [SystemSchemas.Postgres, "information_schema", "pg_toast", "public"],
+            StringComparer.Ordinal
+        );
 
     /// <summary>Whether a character starts a word, by PostgreSQL's lexer.</summary>
     public static bool IsWordStart(char character) => PostgresIdentifiers.IsWordStart(character);

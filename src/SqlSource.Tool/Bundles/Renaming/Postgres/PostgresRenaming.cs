@@ -14,12 +14,6 @@ namespace SqlSource.Tool.Bundles.Renaming.Postgres;
 /// </summary>
 internal sealed class PostgresRenaming : IEngineRenaming
 {
-    // The members of an Own rule, as PostgresFieldRules gives them.
-    private const string SettingValue = "answer.settings[].value";
-    private const string ErrorMessage = "answer.error.message";
-    private const string DriverErrorMessage = "answer.driverError.message";
-    private const string Plan = "answer.plan";
-
     private PostgresRenaming() { }
 
     /// <summary>The one instance, which holds nothing of a bundle.</summary>
@@ -73,7 +67,7 @@ internal sealed class PostgresRenaming : IEngineRenaming
     /// <exception cref="InvalidOperationException">The field is no member that has the rule.</exception>
     public string RenameOwn(RenamingField field, IRenamingScope scope)
     {
-        var own = OwnOf(field);
+        var own = OwnOf(field.Method, field.Path);
         return own switch
         {
             Own.Setting => PostgresOwnStrings.Setting(field, scope),
@@ -87,7 +81,7 @@ internal sealed class PostgresRenaming : IEngineRenaming
     /// <exception cref="InvalidOperationException">The field is no member that has the rule.</exception>
     public IEnumerable<string> WordsOf(RenamingField field)
     {
-        var own = OwnOf(field);
+        var own = OwnOf(field.Method, field.Path);
         return own switch
         {
             Own.Setting => PostgresOwnStrings.WordsOfSetting(field),
@@ -100,21 +94,25 @@ internal sealed class PostgresRenaming : IEngineRenaming
     /// <inheritdoc />
     public void Derive(RenamingCall call, IRenamingScope scope) => PostgresDerivations.Derive(call, scope);
 
-    // Which of PostgreSQL's own strings a field is.  The field table gives the rule to these members alone, so any
-    // other is a bug.
-    private static Own OwnOf(RenamingField field) =>
-        (field.Method, field.Path) switch
+    /// <summary>
+    /// Which of PostgreSQL's own strings a member is.  The field table gives the rule to these members alone, so any
+    /// other is a bug.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The member has no rule <see cref="FieldRuleKind.Own" />.</exception>
+    internal static Own OwnOf(string method, string path) =>
+        (method, path) switch
         {
-            (PostgresCallNames.Open, SettingValue) => Own.Setting,
-            (_, ErrorMessage) => Own.Message,
-            (PostgresCallNames.Check, DriverErrorMessage) => Own.Message,
-            (PostgresCallNames.Explain, Plan) => Own.Plan,
+            (PostgresCallNames.Open, PostgresFieldRules.SettingValue) => Own.Setting,
+            (_, PostgresFieldRules.ErrorMessage) => Own.Message,
+            (PostgresCallNames.Check, PostgresFieldRules.DriverErrorMessage) => Own.Message,
+            (PostgresCallNames.Explain, PostgresFieldRules.Plan) => Own.Plan,
             _ => throw new InvalidOperationException(
-                $"The member '{field.Method} {field.Path}' has no rule {nameof(FieldRuleKind.Own)} of PostgreSQL's."
+                $"The member '{method} {path}' has no rule {nameof(FieldRuleKind.Own)} of PostgreSQL's."
             ),
         };
 
-    private enum Own
+    /// <summary>Which of PostgreSQL's own strings a member is.</summary>
+    internal enum Own
     {
         Setting,
         Message,

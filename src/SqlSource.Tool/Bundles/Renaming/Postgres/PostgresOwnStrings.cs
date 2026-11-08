@@ -24,9 +24,6 @@ internal static class PostgresOwnStrings
     private const string SettingName = "name";
     private const string SqlState = "sqlState";
 
-    // The message of the driver's error of "check", which no decision reads.
-    private const string DriverErrorMessage = "answer.driverError.message";
-
     // The text of a message that names a parameter, before its number.
     private const string ParameterText = "parameter $";
 
@@ -118,7 +115,7 @@ internal static class PostgresOwnStrings
     public static string Message(RenamingField field, IRenamingScope scope)
     {
         _ = scope;
-        if (field.Method == PostgresCallNames.Check && field.Path == DriverErrorMessage)
+        if (field.Method == PostgresCallNames.Check && field.Path == PostgresFieldRules.DriverErrorMessage)
         {
             return string.Empty;
         }
