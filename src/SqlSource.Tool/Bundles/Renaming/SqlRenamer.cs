@@ -487,8 +487,8 @@ internal sealed partial class SqlRenamer(
                 return;
             }
 
-            var mark = name.Length > 1 && name[^1] is '!' or '?' ? name[^1..] : string.Empty;
-            var stem = renamer.NameOf(name[..^mark.Length], quoted: true, NameClass.Alias);
+            var (stemName, mark) = RenamingRun.MarkOf(name);
+            var stem = renamer.NameOf(stemName, quoted: true, NameClass.Alias);
             _into.ReplaceTo(
                 end,
                 opener + stem.Replace(closer, closer + closer, StringComparison.Ordinal) + mark + closer

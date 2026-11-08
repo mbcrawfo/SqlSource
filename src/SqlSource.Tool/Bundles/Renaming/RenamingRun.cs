@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SqlSource.Generation;
 using SqlSource.Parsing;
 
 namespace SqlSource.Tool.Bundles.Renaming;
@@ -156,8 +157,12 @@ internal sealed class RenamingRun
     }
 
     /// <summary>A name's stem and its nullability mark, <c>!</c> or <c>?</c>, or the name whole and no mark.</summary>
+    /// <remarks>
+    /// The generator's rule of a mark is <see cref="ColumnMarker.HasMark" />.  The renaming renames a stem, and a name
+    /// that is a mark alone has none, so it is renamed whole as a name.
+    /// </remarks>
     public static (string Stem, string Mark) MarkOf(string name) =>
-        name.Length > 1 && name[^1] is '!' or '?' ? (name[..^1], name[^1..]) : (name, string.Empty);
+        name.Length > 1 && ColumnMarker.HasMark(name) ? (name[..^1], name[^1..]) : (name, string.Empty);
 
     /// <summary>
     /// The class of the names a rule makes: a rule of a name, of SQL or of a type's spelling has one.

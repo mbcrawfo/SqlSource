@@ -409,10 +409,9 @@ internal static class ModelReader
     private static bool IsNullable(SidecarColumn column, EquatableArray<ColumnMarker> markers)
     {
         var name = column.Name;
-        var last = name.Length > 0 ? name[name.Length - 1] : '\0';
-        if (last is '?' or '!')
+        if (ColumnMarker.HasMark(name))
         {
-            return last == '?';
+            return name[name.Length - 1] == '?';
         }
 
         foreach (var marker in markers)
