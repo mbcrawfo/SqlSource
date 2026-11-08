@@ -39,12 +39,10 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     private static readonly string[] ClrTypes = ["GEOMETRY", "GEOGRAPHY", "HIERARCHYID"];
 
-    // The schemas whose relations are the server's own, folded.
-    private static readonly string[] EngineSchemas =
-    [
-        SqlServerVocabulary.Fold(SystemSchemas.SqlServer),
-        "INFORMATION_SCHEMA",
-    ];
+    // The schemas whose relations are the server's own, as it reports them, compared by ordinal: in a case-sensitive
+    // database a user can make a schema SYS or information_schema, which is no schema of the server's
+    // (SystemSchemas.IsSqlServer).
+    private static readonly string[] EngineSchemas = [SystemSchemas.SqlServer, "INFORMATION_SCHEMA"];
 
     private SqlServerRenaming() { }
 
@@ -90,6 +88,12 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     /// <para>
     /// A row of <c>dbo</c> or another schema of <c>master</c>, <c>msdb</c>, <c>model</c> or <c>tempdb</c> is the
     /// user's, since a user's tables are there when the connection names that database.
+    /// </para>
+    /// <para>
+    /// A schema is the server's only when it is spelled as the server reports its own, <c>sys</c> or
+    /// <c>INFORMATION_SCHEMA</c>, by ordinal.  The server reports <c>sys</c> for a system view's columns whatever the
+    /// query's spelling and the database's collation, and in a case-sensitive database a user can make a schema
+    /// <c>SYS</c>, <c>Sys</c> or <c>information_schema</c>, whose names are the user's.
     /// </para>
     /// <para>
     /// A row's <c>name</c> is the column's alias, which is the user's, and the renaming keeps every name of a row of
@@ -193,8 +197,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
         version.Split('.').All(static group => group.Length > 0 && group.All(char.IsAsciiDigit));
 
     private static bool IsSystemSchema(JsonObject row, string member) =>
-        StringOf(row, member) is { } schema
-        && EngineSchemas.Contains(SqlServerVocabulary.Fold(schema), StringComparer.Ordinal);
+        StringOf(row, member) is { } schema && EngineSchemas.Contains(schema, StringComparer.Ordinal);
 
     // A column's name is its source column's, without a nullability mark and folded, the tool's AS [n], or null.
     private static bool IsUnaliased(JsonObject row)
