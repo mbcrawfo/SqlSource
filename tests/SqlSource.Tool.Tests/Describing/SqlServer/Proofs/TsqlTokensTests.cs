@@ -113,8 +113,7 @@ public sealed class TsqlTokensTests
             .Select(static token => (token.Kind, token.Text))
             .ShouldBe([(TsqlTokenKind.Number, "1"), (TsqlTokenKind.Word, "x")]);
 
-    // The lexer ends a parameter at the first character that is not a letter, a digit or "_", and SQL Server's
-    // variable goes on through "#", "$" and "@".
+    // SQL Server's variable goes on through "#", "$" and "@", and so does the parameter the lexer of mssql reads.
     [Theory]
     [InlineData("@a#b")]
     [InlineData("@a$b")]
@@ -130,8 +129,7 @@ public sealed class TsqlTokensTests
                 new TsqlToken(TsqlTokenKind.Word, "x", name.Length + 1, name.Length + 2),
             ]);
 
-    // The lexer reads the "@c" of "x#@c" as a parameter, since "#" is no character of a parameter's name, and the
-    // server reads one name.
+    // The server reads "x#@c" as one name, and the lexer of mssql starts no parameter after a character of a name.
     [Theory]
     [InlineData("x#@c")]
     [InlineData("x$@c")]
