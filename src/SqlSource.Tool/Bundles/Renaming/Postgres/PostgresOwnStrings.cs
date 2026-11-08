@@ -155,8 +155,7 @@ internal static class PostgresOwnStrings
     private static bool IsEngines((string Name, bool Quoted) schema) =>
         schema.Name.Length == 0 || EngineSchemas.Contains(PostgresWords.Fold(schema.Name, schema.Quoted));
 
-    private static string Written(string name, bool quoted) =>
-        quoted ? "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : name;
+    private static string Written(string name, bool quoted) => quoted ? PostgresIdentifiers.Quote(name) : name;
 
     private static bool IsParameterText(string value) =>
         value.Length > ParameterText.Length

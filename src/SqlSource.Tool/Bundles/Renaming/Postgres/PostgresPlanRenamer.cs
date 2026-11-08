@@ -316,8 +316,6 @@ internal static class PostgresPlanRenamer
     // A spelling as the token check reads it: a child of a replacement by its stem, else the spelling whole.
     private static string CheckedSpelling(string spelling) => StemOfChild(spelling) ?? spelling;
 
-    private static string Quoted(string name) => "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
-
     private static void NodeWords(JsonElement node, List<string> words)
     {
         if (node.ValueKind != JsonValueKind.Object)
@@ -354,7 +352,11 @@ internal static class PostgresPlanRenamer
                     AllStrings(value, words);
                     break;
                 case KeyKind.Name:
-                    TextWords(value, words, static (name, into) => into.Add(Quoted(CheckedSpelling(name))));
+                    TextWords(
+                        value,
+                        words,
+                        static (name, into) => into.Add(PostgresIdentifiers.Quote(CheckedSpelling(name)))
+                    );
                     break;
                 case KeyKind.Subplan:
                     TextWords(value, words, SubplanWords);
@@ -392,7 +394,7 @@ internal static class PostgresPlanRenamer
     {
         if (text.Length > CtePrefix.Length && text.StartsWith(CtePrefix, StringComparison.Ordinal))
         {
-            words.Add(Quoted(CheckedSpelling(text[CtePrefix.Length..])));
+            words.Add(PostgresIdentifiers.Quote(CheckedSpelling(text[CtePrefix.Length..])));
         }
         else
         {
@@ -417,7 +419,11 @@ internal static class PostgresPlanRenamer
                     words.Add(CheckedSpelling(written));
                     break;
                 case PlanTokens.Kind.QuotedName:
-                    words.Add(StemOfChild(PostgresIdentifiers.Unquote(written)) is { } stem ? Quoted(stem) : written);
+                    words.Add(
+                        StemOfChild(PostgresIdentifiers.Unquote(written)) is { } stem
+                            ? PostgresIdentifiers.Quote(stem)
+                            : written
+                    );
                     break;
                 case PlanTokens.Kind.String:
                     words.Add(written);
@@ -749,13 +755,13 @@ internal static class PostgresPlanRenamer
                 {
                     PlanTokens.Kind.Word => (qualifier ? MemberOf(written, quoted: false) : null)
                         ?? NameOf(written, quoted: false, cls),
-                    PlanTokens.Kind.QuotedName => Quoted(
+                    PlanTokens.Kind.QuotedName => PostgresIdentifiers.Quote(
                         (qualifier ? MemberOf(PostgresIdentifiers.Unquote(written), quoted: true) : null)
                             ?? NameOf(PostgresIdentifiers.Unquote(written), quoted: true, cls)
                     ),
                     PlanTokens.Kind.String => "'"
                         + scope
-                            .Literal(written[1..^1].Replace("''", "'", StringComparison.Ordinal))
+                            .Literal(SqlRenamer.ContentOf(written, 0, written.Length))
                             .Replace("'", "''", StringComparison.Ordinal)
                         + "'",
                     PlanTokens.Kind.Other when HasNameCharacter(written) => null,

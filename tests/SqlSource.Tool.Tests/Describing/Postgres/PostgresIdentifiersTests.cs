@@ -9,6 +9,13 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 public sealed class PostgresIdentifiersTests
 {
     [Theory]
+    [InlineData("users", "\"users\"")]
+    [InlineData("say \"hi\"", "\"say \"\"hi\"\"\"")]
+    [InlineData("", "\"\"")]
+    public void Quote_Name_IsInDoubleQuotesWithEachQuoteDoubled(string name, string quoted) =>
+        PostgresIdentifiers.Quote(name).ShouldBe(quoted);
+
+    [Theory]
     [InlineData("\"ab\" x", 4)]
     [InlineData("\"a\"\"b\"", 6)]
     [InlineData("\"\"", 2)]

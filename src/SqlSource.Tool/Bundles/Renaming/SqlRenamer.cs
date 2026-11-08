@@ -121,6 +121,44 @@ internal sealed partial class SqlRenamer(
     }
 
     /// <summary>
+    /// The content of the lexer's quoted region <c>[start, end)</c>, read by its opener: <c>'</c> with <c>''</c> read
+    /// as <c>'</c>, <c>"</c> with <c>""</c> as <c>"</c>, <c>[</c> with <c>]]</c> as <c>]</c>, and <c>$tag$</c> between
+    /// its tags.  The one reading of a region, which the renamer and the token check share.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="start">The index of the opener.</param>
+    /// <param name="end">The index after the closer.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The opener is none of the four; a caller switches on it first.
+    /// </exception>
+    internal static string ContentOf(string text, int start, int end) =>
+        text[start] switch
+        {
+            '\'' => text[(start + 1)..(end - 1)].Replace("''", "'", StringComparison.Ordinal),
+            '"' => text[(start + 1)..(end - 1)].Replace("\"\"", "\"", StringComparison.Ordinal),
+            '[' => text[(start + 1)..(end - 1)].Replace("]]", "]", StringComparison.Ordinal),
+            '$' => text[(start + DollarTagOf(text, start).Length)..(end - DollarTagOf(text, start).Length)],
+            _ => throw new InvalidOperationException($"'{text[start]}' opens no quoted region."),
+        };
+
+    /// <summary>
+    /// The tag of the dollar-quoted region at <paramref name="start" />, from its first <c>$</c> to its second, both
+    /// included.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="start">The index of the first <c>$</c>.</param>
+    internal static string DollarTagOf(string text, int start) => text[start..(text.IndexOf('$', start + 1) + 1)];
+
+    /// <summary>
+    /// The length of a hint's opener at <paramref name="start" />: 3 for <c>--+</c>, <c>/*+</c> and <c>/*!</c>, 4 for
+    /// <c>/*M!</c>.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="start">The index of the hint's first character.</param>
+    internal static int HintOpenerLength(string text, int start) =>
+        text[start] != '-' && text[start + 2] == 'M' ? 4 : 3;
+
+    /// <summary>
     /// Whether a text is a number, the one rule of the SQL renamer and the token check: ASCII digits, then optionally
     /// <c>.</c> and digits, then optionally <c>e</c> or <c>E</c>, a sign and digits, the sign optional.  Each group of
     /// digits may hold one <c>_</c> between two digits, as PostgreSQL 16 reads <c>1_000</c>; the digits after
@@ -346,7 +384,7 @@ internal sealed partial class SqlRenamer(
         private void Hint(int start, int end, NameClass newWords)
         {
             var isLine = text[start] == '-';
-            var opener = !isLine && text[start + 2] == 'M' ? 4 : 3;
+            var opener = HintOpenerLength(text, start);
             var closer = isLine ? 0 : 2;
             _into.CopyTo(start + opener);
             Text(start + opener, end - closer, quoteFollows: false, newWords);
@@ -455,13 +493,12 @@ internal sealed partial class SqlRenamer(
             switch (opener)
             {
                 case '\'':
-                    var content = text[(start + 1)..(end - 1)].Replace("''", "'", StringComparison.Ordinal);
+                    var content = ContentOf(text, start, end);
                     _into.ReplaceTo(end, "'" + renamer._mapping.Literal(content) + "'");
                     break;
                 case '$':
-                    var tag = text[start..(text.IndexOf('$', start + 1) + 1)];
-                    var inner = text[(start + tag.Length)..(end - tag.Length)];
-                    _into.ReplaceTo(end, tag + renamer._mapping.Literal(inner) + tag);
+                    var tag = DollarTagOf(text, start);
+                    _into.ReplaceTo(end, tag + renamer._mapping.Literal(ContentOf(text, start, end)) + tag);
                     break;
                 case '"':
                     QuotedName(start, end, "\"");
@@ -480,7 +517,7 @@ internal sealed partial class SqlRenamer(
         private void QuotedName(int start, int end, string closer)
         {
             var opener = text[start];
-            var name = text[(start + 1)..(end - 1)].Replace(closer + closer, closer, StringComparison.Ordinal);
+            var name = ContentOf(text, start, end);
             if (name == UnnamedColumn || renamer._engine.IsEngineWord(name, quoted: true))
             {
                 _into.CopyTo(end);
