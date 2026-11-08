@@ -88,6 +88,9 @@ public sealed class TsqlTokensTests
     [InlineData("##t")]
     [InlineData("_a$1#@")]
     [InlineData("Größe")]
+    [InlineData("Ⅰx")]
+    [InlineData("〇x")]
+    [InlineData("x\u0301\u200C‿")]
     public void Read_Name_IsOneWord(string name) =>
         TsqlTokens.Read(name).ShouldHaveSingleItem().ShouldBe(new TsqlToken(TsqlTokenKind.Word, name, 0, name.Length));
 

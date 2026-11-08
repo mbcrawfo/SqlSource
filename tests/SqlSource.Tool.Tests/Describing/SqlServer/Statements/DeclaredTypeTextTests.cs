@@ -2,11 +2,13 @@ using Shouldly;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer.Statements;
 using Xunit;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Statements;
 
 // The text of a -- param: type is put into a declaration the tool sends, so it is read against T-SQL's grammar of a
-// type name first: one or two parts, then (max) or one or two numbers in parentheses, and nothing else.
+// type name first: one or two parts, then (max), one or two numbers or an XML schema collection in parentheses, and
+// nothing else.
 public sealed class DeclaredTypeTextTests
 {
     [Theory]
@@ -31,7 +33,38 @@ public sealed class DeclaredTypeTextTests
     [InlineData("dbo.名前")]
     [InlineData("dbo.x٣")]
     [InlineData("dbo.Ａbc")]
-    public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.ShouldBe(text);
+    [InlineData("xml(S)")]
+    [InlineData("xml(dbo.S)")]
+    [InlineData("xml(CONTENT dbo.S)")]
+    [InlineData("xml(DOCUMENT S)")]
+    [InlineData("xml(content dbo.S)")]
+    [InlineData("xml([dbo].[S])")]
+    [InlineData("xml(\"dbo\".\"S\")")]
+    [InlineData("xml(CONTENT[dbo].[S])")]
+    [InlineData("xml(CONTENT CONTENT)")]
+    [InlineData("xml(CONTENT.S)")]
+    [InlineData("xml(maxSchema)")]
+    [InlineData("xml(CONTENTx)")]
+    [InlineData("sys.xml(dbo.S)")]
+    [InlineData("xml (S)")]
+    [InlineData("xml( CONTENT dbo.S )")]
+    [InlineData("dbo . Email")]
+    [InlineData("dbo .Email")]
+    [InlineData("dbo. Email")]
+    [InlineData("dbo\t.\tEmail")]
+    [InlineData("[dbo] . [Email]")]
+    [InlineData("xml(dbo . S)")]
+    [InlineData("xml(CONTENT dbo . S)")]
+    [InlineData("dbo.x\u0301")]
+    [InlineData("dbo.x\u0903")]
+    [InlineData("dbo.xⅠ")]
+    [InlineData("dbo.x\u200C")]
+    [InlineData("dbo.ꞔ")]
+    [InlineData("x‿")]
+    [InlineData("x＿")]
+    [InlineData("Ⅰx")]
+    [InlineData("〇x")]
+    public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.Text.ShouldBe(text);
 
     // A delimited name holds anything but its own closing delimiter alone, so what looks like a second statement
     // inside one is part of the one name, and the server reads it as such.
@@ -41,7 +74,7 @@ public sealed class DeclaredTypeTextTests
     [InlineData("[a]]--b]")]
     [InlineData("[x, @y int]")]
     public void Read_DelimitedNameThatHoldsSyntax_IsOneName(string text) =>
-        DeclaredTypeText.Read(text).Value.ShouldBe(text);
+        DeclaredTypeText.Read(text).Value.Text.ShouldBe(text);
 
     // Space and tab may stand between the name and its parentheses, and inside them.
     [Theory]
@@ -49,18 +82,47 @@ public sealed class DeclaredTypeTextTests
     [InlineData("nvarchar ( 50 )")]
     [InlineData("nvarchar(\tmax\t)")]
     public void Read_SpaceBeforeOrInsideTheParentheses_IsAccepted(string text) =>
-        DeclaredTypeText.Read(text).Value.ShouldBe(text);
+        DeclaredTypeText.Read(text).Value.Text.ShouldBe(text);
 
     [Fact]
     public void Read_SpaceAroundTheName_IsLeftOut() =>
-        DeclaredTypeText.Read("  nvarchar(50) \t").Value.ShouldBe("nvarchar(50)");
+        DeclaredTypeText.Read("  nvarchar(50) \t").Value.Text.ShouldBe("nvarchar(50)");
+
+    // A name in the parentheses is an XML schema collection's, or max, which the session tells apart by the type the
+    // server reads.
+    [Theory]
+    [InlineData("xml(S)")]
+    [InlineData("xml(dbo.S)")]
+    [InlineData("xml(CONTENT dbo.S)")]
+    [InlineData("xml(DOCUMENT dbo.S)")]
+    [InlineData("xml(document [dbo].[S])")]
+    [InlineData("xml(\"dbo\" . \"S\")")]
+    [InlineData("xml( CONTENT dbo . S )")]
+    [InlineData("xml(CONTENT)")]
+    [InlineData("sys.xml(dbo.S)")]
+    [InlineData("xml(max)")]
+    [InlineData("nvarchar(max)")]
+    [InlineData("VARCHAR( MAX )")]
+    public void Read_NameInTheParentheses_HoldsAName(string text) =>
+        DeclaredTypeText.Read(text).Value.HoldsName.ShouldBeTrue(text);
 
     [Theory]
-    [InlineData("int;", DeclaredTypeText.Semicolon)]
-    [InlineData("int; DROP TABLE x", DeclaredTypeText.Semicolon)]
-    [InlineData("int -- x", DeclaredTypeText.Comment)]
-    [InlineData("int /* x */", DeclaredTypeText.Comment)]
-    [InlineData("nvarchar(/* x */50)", DeclaredTypeText.Comment)]
+    [InlineData("xml")]
+    [InlineData("XML")]
+    [InlineData("int")]
+    [InlineData("nvarchar(50)")]
+    [InlineData("decimal(18, 2)")]
+    [InlineData("dbo.Email")]
+    [InlineData("[xml(dbo.S)]")]
+    public void Read_NoNameInTheParentheses_HoldsNone(string text) =>
+        DeclaredTypeText.Read(text).Value.HoldsName.ShouldBeFalse(text);
+
+    [Theory]
+    [InlineData("int;", TypeNameFound.Semicolon)]
+    [InlineData("int; DROP TABLE x", TypeNameFound.Semicolon)]
+    [InlineData("int -- x", TypeNameFound.Comment)]
+    [InlineData("int /* x */", TypeNameFound.Comment)]
+    [InlineData("nvarchar(/* x */50)", TypeNameFound.Comment)]
     [InlineData("[dbo", DeclaredTypeText.NotClosed)]
     [InlineData("\"dbo", DeclaredTypeText.NotClosed)]
     [InlineData("[a]]", DeclaredTypeText.NotClosed)]
@@ -68,6 +130,13 @@ public sealed class DeclaredTypeTextTests
     [InlineData("int foo", DeclaredTypeText.Shape)]
     [InlineData("nvarchar(", DeclaredTypeText.Shape)]
     [InlineData("nvarchar(max, 2)", DeclaredTypeText.Shape)]
+    [InlineData("xml(CONTENT dbo.S, 1)", DeclaredTypeText.Shape)]
+    // A bracketed or quoted word is a name, never the keyword, so a second name after it is out of place.
+    [InlineData("xml([CONTENT] dbo.S)", DeclaredTypeText.Shape)]
+    [InlineData("xml(\"DOCUMENT\" dbo.S)", DeclaredTypeText.Shape)]
+    [InlineData("xml(dbo.S;)", TypeNameFound.Semicolon)]
+    [InlineData("xml(CONTENT -- x)", TypeNameFound.Comment)]
+    [InlineData("xml([dbo)", DeclaredTypeText.NotClosed)]
     [InlineData("decimal(18,2,1)", DeclaredTypeText.Shape)]
     [InlineData("nvarchar(-1)", DeclaredTypeText.Shape)]
     [InlineData("nvarchar()", DeclaredTypeText.Shape)]
@@ -87,21 +156,33 @@ public sealed class DeclaredTypeTextTests
     [InlineData("€type", DeclaredTypeText.Shape)]
     [InlineData("٣x", DeclaredTypeText.Shape)]
     [InlineData("x²", DeclaredTypeText.Shape)]
-    [InlineData("a.b.c", DeclaredTypeText.Parts)]
-    [InlineData("dbo .Email", DeclaredTypeText.Parts)]
-    [InlineData("dbo. Email", DeclaredTypeText.Parts)]
-    [InlineData(".t", DeclaredTypeText.Parts)]
-    [InlineData("t.", DeclaredTypeText.Parts)]
-    [InlineData("int\nfoo", DeclaredTypeText.OneLine)]
-    [InlineData("int\r\n", DeclaredTypeText.OneLine)]
-    [InlineData("[a\nb]", DeclaredTypeText.OneLine)]
-    [InlineData("\"a\rb\"", DeclaredTypeText.OneLine)]
-    [InlineData("int\u0085foo", DeclaredTypeText.OneLine)]
-    [InlineData("int\u2028", DeclaredTypeText.OneLine)]
-    [InlineData("int\u2029foo", DeclaredTypeText.OneLine)]
-    [InlineData("[a\u0085b]", DeclaredTypeText.OneLine)]
-    [InlineData("[a\u2028b]", DeclaredTypeText.OneLine)]
-    [InlineData("\"a\u2029b\"", DeclaredTypeText.OneLine)]
+    [InlineData("\u0301x", DeclaredTypeText.Shape)]
+    [InlineData("\u200Cx", DeclaredTypeText.Shape)]
+    [InlineData("dbo.\u0301x", DeclaredTypeText.Shape)]
+    [InlineData("x𝒳", DeclaredTypeText.Shape)]
+    [InlineData("𝒳", DeclaredTypeText.Shape)]
+    [InlineData("a.b.c", TypeNameFound.Parts)]
+    [InlineData("a . b . c", TypeNameFound.Parts)]
+    [InlineData("a. b .c", TypeNameFound.Parts)]
+    [InlineData(".t", TypeNameFound.Parts)]
+    [InlineData("t.", TypeNameFound.Parts)]
+    [InlineData(". t", TypeNameFound.Parts)]
+    [InlineData("t .", TypeNameFound.Parts)]
+    // A schema collection of three parts makes the server end the session, so it never reaches the server.
+    [InlineData("xml(a.b.c)", TypeNameFound.Parts)]
+    [InlineData("xml(CONTENT a.b.c)", TypeNameFound.Parts)]
+    [InlineData("xml(a . b . c)", TypeNameFound.Parts)]
+    [InlineData("xml(.S)", TypeNameFound.Parts)]
+    [InlineData("int\nfoo", TypeNameFound.OneLine)]
+    [InlineData("int\r\n", TypeNameFound.OneLine)]
+    [InlineData("[a\nb]", TypeNameFound.OneLine)]
+    [InlineData("\"a\rb\"", TypeNameFound.OneLine)]
+    [InlineData("int\u0085foo", TypeNameFound.OneLine)]
+    [InlineData("int\u2028", TypeNameFound.OneLine)]
+    [InlineData("int\u2029foo", TypeNameFound.OneLine)]
+    [InlineData("[a\u0085b]", TypeNameFound.OneLine)]
+    [InlineData("[a\u2028b]", TypeNameFound.OneLine)]
+    [InlineData("\"a\u2029b\"", TypeNameFound.OneLine)]
     public void Read_AnythingElse_IsRefusedWithWhatWasFound(string text, string found) =>
         DeclaredTypeText.Read(text).Failure.ShouldBe(DescribeFailures.NotATypeName + ": " + found, text);
 

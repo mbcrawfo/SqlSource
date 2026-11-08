@@ -310,7 +310,7 @@ Each file of the folder has its tests in `tests/SqlSource.Tool.Tests/Bundles/Ren
 |----|----|
 | `Dialect` | `SqlDialect.SqlServer` |
 | `IsNumberStart` | An ASCII digit, or a `$` at the end of the text or before an ASCII digit or a character that is no word part, the sign of a money literal ([what building it found](#what-building-sql-servers-part-found)) |
-| `IsWordStart`, `IsWordPart` | Both `QuoteReader.IsNameCharacterOfSqlServer`, the describer's rule: a letter or a digit of any script, `_`, `@`, `#` or `$` |
+| `IsWordStart`, `IsWordPart` | Both `QuoteReader.IsNameCharacterOfSqlServer`, the describer's rule: a letter or a digit of any script, a combining mark, a letter number, a format character, a connector, `_`, `@`, `#` or `$` |
 | `Fold`, `Spelled` | `SqlServerVocabulary.Fold`, each character upper-cased by the invariant culture, so that a fold never changes a spelling's length, quoted or not; and the spelling as written ([the fold](#sql-servers-fold)) |
 | `IsEngineWord` | A word of the vocabulary; ASCII digits alone, the alias of the tool's `SELECT @p AS [1]` of `declared` and of each `AS [n]` of `operands`; or the assembly-qualified name of a system CLR type, `geometry`, `geography` or `hierarchyid`, of any version, compared folded.  Quoting does not change the answer: `[1]` is the tool's, and `[1a]` and `[2 x]` are the user's |
 | `RuleOf` | `SqlServerFields.RuleOf` ([the fields](#sql-servers-fields)) |
@@ -339,7 +339,7 @@ A number or a boolean is kept, an error's number, class and state among them.  A
 `SqlServerVocabulary` holds each list in its natural spelling, sorted, and looks a spelling up folded in one ordinal set of them all.  It is the union of what the floor image, `mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04`, and the default image, `DefaultImages.SqlServer`, know, and each list's comment says where and when it was taken:
 
 - the reserved, ODBC and future keywords of Microsoft's list, 185, 235 and 273 with `REGR_R2`, which a fetch of the page lost;
-- the words that are not reserved and that a statement reads, such as `APPLY`, `INSERTED` and `OPENJSON`;
+- the words that are not reserved and that a statement reads, such as `APPLY`, `INSERTED` and `OPENJSON`, and `CONTENT` and `DOCUMENT`, which a typed `xml`'s declaration reads, as in `-- param: @p xml(CONTENT dbo.S)`, so that the renamed declaration still replays, and a user's column named `content` is kept, as one named `source` is;
 - the words of the table hints, the query hints, a window's frame, `FOR XML`, `FOR JSON` and `FOR SYSTEM_TIME` that no keyword list holds, such as `NOLOCK`, `MAXDOP`, `FOLLOWING` and `INCLUDE_NULL_VALUES`, from the syntax of their pages;
 - the pseudo-columns with their `$`, such as `$action`, and the global variables with their `@@`, such as `@@ROWCOUNT`;
 - the documented functions either image knows, those of the documentation's table of contents with `STRING_SPLIT` and `GENERATE_SERIES`, which it lacks, and `CHANGETABLE` and `PREDICT`, which the server reads only with their own syntax and so `VocabularyTests` cannot find; and the system types of either image's `sys.types`;

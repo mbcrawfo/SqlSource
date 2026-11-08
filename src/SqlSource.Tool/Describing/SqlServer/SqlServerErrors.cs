@@ -75,9 +75,10 @@ internal static class SqlServerErrors
     private const int TwoPossibleTypes = 11506;
     private const int NoValidType = 11507;
 
-    // The errors of a declaration that names a type the database lacks.
+    // The errors of a declaration that names a type the database lacks, and an XML schema collection it lacks.
     private const int TypeNotFound = 2715;
     private const int InvalidDataType = 2724;
+    private const int CollectionNotFound = 6314;
 
     // The error of an identifier longer than SQL Server allows.
     private const int IdentifierTooLong = 103;
@@ -139,11 +140,11 @@ internal static class SqlServerErrors
         DeclaredType(query, parameter, reason, EquatableArray<string>.Empty, NotATypeHelp);
 
     /// <summary>
-    /// <c>SQLSRC228</c> for the error rows that <c>declared</c> answered: <c>2715</c> or <c>2724</c> among them is a
-    /// type the database lacks, and anything else, such as <c>102</c>, a declaration the server does not read as a
-    /// type.  A parameter whose own name is longer than SQL Server allows is no fault of its type: <c>103</c> among
-    /// the rows for it is <c>SQLSRC225</c>, as it is when the parameter is not declared and <c>parameters</c> raises
-    /// it.  Every row is a line, in the server's order.
+    /// <c>SQLSRC228</c> for the error rows that <c>declared</c> answered: <c>2715</c>, <c>2724</c> or <c>6314</c>, an
+    /// XML schema collection, among them is a type the database lacks, and anything else, such as <c>102</c>, a
+    /// declaration the server does not read as a type.  A parameter whose own name is longer than SQL Server allows is
+    /// no fault of its type: <c>103</c> among the rows for it is <c>SQLSRC225</c>, as it is when the parameter is not
+    /// declared and <c>parameters</c> raises it.  Every row is a line, in the server's order.
     /// </summary>
     /// <param name="query">The query.</param>
     /// <param name="parameter">The declared parameter that was asked.</param>
@@ -170,7 +171,7 @@ internal static class SqlServerErrors
             );
         }
 
-        return errors.Any(static row => row.Number is TypeNotFound or InvalidDataType)
+        return errors.Any(static row => row.Number is TypeNotFound or InvalidDataType or CollectionNotFound)
             ? DeclaredType(query, parameter, DescribeFailures.NoSuchType, lines, NoSuchTypeHelp)
             : DeclaredType(query, parameter, NotAType, lines, NotATypeHelp);
     }

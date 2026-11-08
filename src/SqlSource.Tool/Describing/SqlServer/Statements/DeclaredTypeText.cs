@@ -1,6 +1,7 @@
 using System;
+using System.Globalization;
 using SqlSource.Parsing.Quoting;
-using SqlSource.Tool.Describing.Describers;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.Tool.Describing.SqlServer.Statements;
 
@@ -10,73 +11,88 @@ namespace SqlSource.Tool.Describing.SqlServer.Statements;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A type is a name of one or two parts joined by a dot with no space around it, each part a plain identifier (a
-/// letter of any script, <c>_</c>, <c>@</c> or <c>#</c>, then those, digits of any script and <c>$</c>, as the server
-/// reads one), a bracketed one with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for a quote;
-/// then, after any spaces, <c>(max)</c> in any case or one or two numbers in parentheses; and nothing else but
-/// spaces at either end.  A comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open and a line break
-/// are refused, each with what was found.  A plain identifier that holds a combining mark, a letter number or a
-/// format character after its first character is refused, though the server takes it, and is written in brackets
-/// (TD-0076).
+/// A type is a name of one or two parts joined by a dot, with any spaces and tabs around it, each part a plain
+/// identifier (a letter or a letter number of any script, <c>_</c>, <c>@</c> or <c>#</c>, then those, digits of any
+/// script, combining marks, format characters, connectors and <c>$</c>, as the server reads one), a bracketed one
+/// with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for a quote; then, after any spaces, one or two
+/// numbers in parentheses, or a name in parentheses, an XML schema collection's after <c>CONTENT</c> or
+/// <c>DOCUMENT</c> in any case or not, of which <c>(max)</c> is one; and nothing else but spaces at either end.  A
+/// comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open and a line break are refused, each with what
+/// was found.
+/// </para>
+/// <para>
+/// The server reads a plain identifier by the tables of Unicode 3.2, and this reader by the current ones of .NET, so a
+/// character added or recategorised since can differ: <c>ꞔ</c> is taken here and refused by the server, and <c>・</c>
+/// after the first character is refused here and taken by the server, which a name in brackets avoids.
 /// </para>
 /// <para>
 /// It is the first refusal and not the guarantee: a declaration reaches the server only as the value of a parameter
 /// of a procedure, which reads it as a list of declarations and refuses one that is not.  It does not say whether the
-/// database has the type: the server does.
+/// database has the type: the server does.  Nor does it say whether a type takes a schema collection: the server
+/// refuses <c>int(dbo.S)</c> as it refuses any declaration it does not read.  A schema collection of three parts is
+/// refused here though, since the server ends the session for one.
 /// </para>
 /// </remarks>
 internal static class DeclaredTypeText
 {
-    public const string Semicolon = "a ; is not part of a type name";
-
-    public const string Comment = "a comment is not part of a type name";
-
     public const string NotClosed = "a quote or a bracket is not closed";
 
-    public const string Parts = "a type name has one or two parts";
-
-    public const string Shape = "a type name is a name, then (max) or one or two numbers in parentheses";
-
-    public const string OneLine = "a type name is on one line";
-
-    private const string Max = "max";
+    public const string Shape =
+        "a type name is a name, then (max), one or two numbers or an XML schema collection in parentheses";
 
     /// <summary>
-    /// The type without the spaces around it, or why it is refused: <see cref="DescribeFailures.NotATypeName" />,
-    /// <c>": "</c> and what was found at the first place the text leaves the grammar.
+    /// The type without the spaces around it, with whether its parentheses hold a name, or why it is refused:
+    /// <see cref="TypeNameFound.Reason" /> of what was found at the first place the text leaves the grammar.
     /// </summary>
-    public static Outcome<string, string> Read(string text)
+    public static Outcome<Declaration, string> Read(string text)
     {
         var position = 0;
-        var found = ReadName(text, ref position) ?? ReadModifier(text, ref position) ?? ReadEnd(text, position);
+        var holdsName = false;
+        var found =
+            ReadName(text, ref position) ?? ReadModifier(text, ref position, ref holdsName) ?? ReadEnd(text, position);
         return found is null
-            ? Outcome<string, string>.Of(text.Trim(' ', '\t'))
-            : Outcome<string, string>.Failed(DescribeFailures.NotATypeName + ": " + found);
+            ? Outcome<Declaration, string>.Of(new Declaration(text.Trim(' ', '\t'), holdsName))
+            : Outcome<Declaration, string>.Failed(TypeNameFound.Reason(found));
     }
 
-    // One part, or two joined by a dot.  Null when it was read, else what was found.  A dot with no part on one side
-    // of it, or a third part, is a count of parts.
+    // One part, or two joined by a dot with any spaces around it.  Null when it was read, else what was found.  A dot
+    // with no part on one side of it, or a third part, is a count of parts.
     private static string? ReadName(string text, ref int position)
     {
         SkipSpaces(text, ref position);
         if (IsAt(text, position, '.'))
         {
-            return Parts;
+            return TypeNameFound.Parts;
         }
 
         var found = ReadPart(text, ref position);
-        if (found is not null || !IsAt(text, position, '.'))
+        if (found is not null || !SkipToDot(text, ref position))
         {
             return found;
         }
 
         position++;
-        if (position == text.Length || (text[position] is ' ' or '\t' or '.'))
+        SkipSpaces(text, ref position);
+        if (position == text.Length || text[position] == '.')
         {
-            return Parts;
+            return TypeNameFound.Parts;
         }
 
-        return ReadPart(text, ref position) ?? (IsAt(text, position, '.') ? Parts : null);
+        return ReadPart(text, ref position) ?? (SkipToDot(text, ref position) ? TypeNameFound.Parts : null);
+    }
+
+    // Moves to a dot after any spaces, or stays where it was when no dot follows them.
+    private static bool SkipToDot(string text, ref int position)
+    {
+        var dot = position;
+        SkipSpaces(text, ref dot);
+        if (!IsAt(text, dot, '.'))
+        {
+            return false;
+        }
+
+        position = dot;
+        return true;
     }
 
     // A plain identifier, a bracketed one or a double-quoted one.
@@ -113,9 +129,9 @@ internal static class DeclaredTypeText
         while (index < text.Length)
         {
             var value = text[index];
-            if (IsLineBreak(value))
+            if (TypeNameFound.IsLineBreak(value))
             {
-                return OneLine;
+                return TypeNameFound.OneLine;
             }
 
             if (value != closing)
@@ -140,8 +156,9 @@ internal static class DeclaredTypeText
         return NotClosed;
     }
 
-    // Nothing, or "(max)" or "(n)" or "(n, m)" after any spaces, with spaces allowed inside.
-    private static string? ReadModifier(string text, ref int position)
+    // Nothing, or "(n)", "(n, m)" or "(collection)" after any spaces, with spaces allowed inside.  "(max)" is read as
+    // a collection named max, and sent as written.  A name read in the parentheses sets holdsName.
+    private static string? ReadModifier(string text, ref int position, ref bool holdsName)
     {
         var start = position;
         SkipSpaces(text, ref position);
@@ -153,15 +170,7 @@ internal static class DeclaredTypeText
 
         position++;
         SkipSpaces(text, ref position);
-        if (text.AsSpan(position).StartsWith(Max, StringComparison.OrdinalIgnoreCase))
-        {
-            position += Max.Length;
-        }
-        else if (!ReadDigits(text, ref position))
-        {
-            return Found(text, position);
-        }
-        else
+        if (ReadDigits(text, ref position))
         {
             SkipSpaces(text, ref position);
             if (IsAt(text, position, ','))
@@ -174,6 +183,20 @@ internal static class DeclaredTypeText
                 }
             }
         }
+        else if (position < text.Length && (text[position] is '[' or '"' or '.' || IsFirst(text[position])))
+        {
+            var found = ReadCollection(text, ref position);
+            if (found is not null)
+            {
+                return found;
+            }
+
+            holdsName = true;
+        }
+        else
+        {
+            return Found(text, position);
+        }
 
         SkipSpaces(text, ref position);
         if (!IsAt(text, position, ')'))
@@ -185,6 +208,36 @@ internal static class DeclaredTypeText
         return null;
     }
 
+    // An XML schema collection: a name, after CONTENT or DOCUMENT or not.  A plain first part that is one of the two
+    // words is the word when another name follows it, and the collection's name when ")" or a dot does.
+    private static string? ReadCollection(string text, ref int position)
+    {
+        var start = position;
+        if (IsAt(text, position, '.'))
+        {
+            return TypeNameFound.Parts;
+        }
+
+        var found = ReadPart(text, ref position);
+        if (found is not null)
+        {
+            return found;
+        }
+
+        // The part holds its brackets or quotes, so a delimited word is never one of the two.
+        var part = text.AsSpan(start, position - start);
+        var isWord =
+            part.Equals("CONTENT", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("DOCUMENT", StringComparison.OrdinalIgnoreCase);
+        SkipSpaces(text, ref position);
+        if (!isWord || position == text.Length || text[position] is ')' or '.')
+        {
+            position = start;
+        }
+
+        return ReadName(text, ref position);
+    }
+
     // Only spaces to the end.
     private static string? ReadEnd(string text, int position)
     {
@@ -194,28 +247,12 @@ internal static class DeclaredTypeText
             return null;
         }
 
-        return text[position] == '.' ? Parts : Found(text, position);
+        return text[position] == '.' ? TypeNameFound.Parts : Found(text, position);
     }
 
-    // What stands where the grammar was left: a ";", a comment or a line break by name, and anything else as the
-    // shape of a type name.
-    private static string Found(string text, int position)
-    {
-        if (position == text.Length)
-        {
-            return Shape;
-        }
-
-        var next = position + 1 < text.Length ? text[position + 1] : '\0';
-        return text[position] switch
-        {
-            ';' => Semicolon,
-            '-' when next == '-' => Comment,
-            '/' when next == '*' => Comment,
-            var value when IsLineBreak(value) => OneLine,
-            _ => Shape,
-        };
-    }
+    // What stands where the grammar was left, anything but a ";", a comment or a line break being the shape of a
+    // type name.
+    private static string Found(string text, int position) => TypeNameFound.At(text, position, Shape);
 
     private static bool ReadDigits(string text, ref int position)
     {
@@ -228,14 +265,15 @@ internal static class DeclaredTypeText
         return position > start;
     }
 
-    // A plain identifier of T-SQL as the server reads one: a letter of any script, "_", "#" or "@" first, then those,
-    // a digit of any script or "$".  A name with any other character is written in brackets.
-    private static bool IsFirst(char value) => char.IsLetter(value) || (value is '_' or '#' or '@');
+    // A plain identifier of T-SQL as the server reads one: a letter or a letter number of any script, "_", "#" or "@"
+    // first, then what QuoteReader.IsNameCharacterOfSqlServer takes.  A name with any other character is written in
+    // brackets.
+    private static bool IsFirst(char value) =>
+        char.IsLetter(value)
+        || (value is '_' or '#' or '@')
+        || char.GetUnicodeCategory(value) == UnicodeCategory.LetterNumber;
 
     private static bool IsNext(char value) => QuoteReader.IsNameCharacterOfSqlServer(value);
-
-    // A line break of any kind a reader may take for one: a type name stays on its line, quoted or not.
-    private static bool IsLineBreak(char value) => value is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029';
 
     private static bool IsAt(string text, int position, char value) =>
         position < text.Length && text[position] == value;
@@ -247,4 +285,12 @@ internal static class DeclaredTypeText
             position++;
         }
     }
+
+    /// <summary>A type that <see cref="Read" /> took.</summary>
+    /// <param name="Text">The type without the spaces around it.</param>
+    /// <param name="HoldsName">
+    /// Whether its parentheses hold a name: an XML schema collection's, or <c>max</c>, which names a collection only
+    /// in a type the server reads as <c>xml</c>.
+    /// </param>
+    internal readonly record struct Declaration(string Text, bool HoldsName);
 }

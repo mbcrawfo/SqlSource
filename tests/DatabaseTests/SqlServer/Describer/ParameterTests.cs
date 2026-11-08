@@ -8,6 +8,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.DatabaseTests.SqlServer.Describer;
 
@@ -291,6 +292,137 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         failure.ServerLines[0].ShouldStartWith("Msg 2715: ");
     }
 
+    // The server takes a combining mark, a letter number, a format character and a connector after a name's first
+    // character, and a letter number first, so it reads each as a name and says that the database lacks the type.
+    [Theory]
+    [InlineData("dbo.x\u0301")]
+    [InlineData("dbo.x\u0903")]
+    [InlineData("dbo.xⅠ")]
+    [InlineData("dbo.x\u200C")]
+    [InlineData("dbo.x‿")]
+    [InlineData("dbo.x＿")]
+    [InlineData("dbo.Ⅰx")]
+    [InlineData("dbo.〇x")]
+    public async Task DescribeAsync_DeclaredNameTheServerTakes_IsATypeTheDatabaseLacks(string type)
+    {
+        var failure = await ShouldFailAsync(Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", type)), "SQLSRC228");
+
+        failure.Arguments.ShouldBe([type, "@p", Query, DescribeFailures.NoSuchType]);
+    }
+
+    // The server reads a name by Unicode 3.2's tables, which lack a letter added since: the reader takes it, and the
+    // server refuses it with error 102.
+    [Fact]
+    public async Task DescribeAsync_LetterNewerThanTheServer_IsNotAType()
+    {
+        var failure = await ShouldFailAsync(
+            Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "dbo.ꞔ")),
+            "SQLSRC228"
+        );
+
+        failure.Arguments.ShouldBe(["dbo.ꞔ", "@p", Query, SqlServerErrors.NotAType]);
+        failure.ServerLines[0].ShouldStartWith("Msg 102");
+    }
+
+    // The server reads an XML schema collection's name as part of the type, and says that the database lacks it.
+    [Fact]
+    public async Task DescribeAsync_XmlOfACollectionTheDatabaseLacks_IsNoSuchCollection()
+    {
+        var failure = await ShouldFailAsync(
+            Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "xml(CONTENT dbo.Nope)")),
+            "SQLSRC228"
+        );
+
+        failure.Arguments[3].ShouldBe(DescribeFailures.NoSuchType);
+        failure.ServerLines.ShouldContain(line => line.StartsWith("Msg 6314", StringComparison.Ordinal));
+    }
+
+    // The server ends the session for a schema collection of three parts, so it is refused before anything is sent,
+    // and the session describes the next query.
+    [Fact]
+    public async Task DescribeAsync_XmlOfAThreePartCollection_IsRefusedAndTheSessionAnswers()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+
+        var refused = await session.DescribeAsync(
+            Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "xml(db.dbo.S)")),
+            token
+        );
+        var next = await session.DescribeAsync(Of(SqlDialectRules.SqlServer, "SELECT 1 AS v"), token);
+
+        var failure = refused.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC228");
+        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName + ": " + TypeNameFound.Parts);
+        failure.ServerLines.ShouldBeEmpty();
+        next.Failure.ShouldBeNull(next.Failure?.Descriptor.Id);
+    }
+
+    // A typed xml is recorded as xml, the type its method sends, whichever way the declaration names the collection.
+    [Theory]
+    [InlineData("xml(DOCUMENT dbo.TdSchemas)")]
+    [InlineData("xml(dbo.TdSchemas)")]
+    [InlineData("xml(content [dbo].[TdSchemas])")]
+    [InlineData("xml( \"dbo\" . \"TdSchemas\" )")]
+    [InlineData("XML(TdSchemas)")]
+    public async Task DescribeAsync_XmlOfACollectionTheDatabaseHas_IsXml(string type)
+    {
+        await WithSchemaCollectionAsync(async () =>
+        {
+            var description = await ShouldDescribeAsync(Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", type)));
+
+            description.Parameters.ShouldBe([
+                new DescribedParameter(
+                    "p",
+                    new SqlServerType("xml", -1, 0, 0, null),
+                    SidecarValues.TypeSource.Declared
+                ),
+            ]);
+        });
+    }
+
+    // The method sends a typed xml as xml, which has no collection, so a query that needs the collection's typing
+    // fails at describe as every call of the method would: value() of an untyped document is not a singleton.
+    [Theory]
+    [InlineData("xml(DOCUMENT dbo.TdSchemas)")]
+    [InlineData("xml(document [dbo].[TdSchemas])")]
+    [InlineData("xml( DOCUMENT \"dbo\" . \"TdSchemas\" )")]
+    public async Task DescribeAsync_XQueryThatNeedsTheCollection_IsRejectedAsTheMethodWouldBe(string type)
+    {
+        await WithSchemaCollectionAsync(async () =>
+        {
+            var failure = await ShouldFailAsync(
+                Of(SqlDialectRules.SqlServer, "SELECT @p.value('/a', 'nvarchar(10)') AS v", ("p", type)),
+                "SQLSRC225"
+            );
+
+            failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+            failure.ServerLines[0].ShouldStartWith("Msg 2389, ");
+        });
+    }
+
+    // A query that types the parameter itself, with a CAST to the collection, describes.
+    [Fact]
+    public async Task DescribeAsync_XQueryOfACastToTheCollection_Describes()
+    {
+        await WithSchemaCollectionAsync(async () =>
+        {
+            var description = await ShouldDescribeAsync(
+                Of(
+                    SqlDialectRules.SqlServer,
+                    "SELECT CAST(@p AS xml(DOCUMENT dbo.TdSchemas)).value('/a', 'nvarchar(10)') AS v",
+                    ("p", "xml")
+                )
+            );
+
+            description
+                .Columns.ShouldNotBeNull()
+                .Single()
+                .Type.ShouldBeOfType<SqlServerType>()
+                .Name.ShouldBe("nvarchar(10)");
+        });
+    }
+
     // The optional filter: the use in "IS NULL" types nothing, and the parameter takes the type of the column, in a
     // SELECT, in an UPDATE with no rows, and in an IF of two paths.  The two paths return one shape, since the columns
     // of an IF whose paths return two are SQLSRC263.
@@ -541,6 +673,28 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe(id);
         return failure;
+    }
+
+    // The schema collection dbo.TdSchemas, of one element a of xsd:string, while the action runs.
+    private async Task WithSchemaCollectionAsync(Func<Task> action)
+    {
+        await sqlServer.ExecuteAsync(
+            "IF EXISTS (SELECT 1 FROM sys.xml_schema_collections WHERE name = N'TdSchemas') "
+                + "DROP XML SCHEMA COLLECTION dbo.TdSchemas"
+        );
+        await sqlServer.ExecuteAsync(
+            "CREATE XML SCHEMA COLLECTION dbo.TdSchemas AS N'<xsd:schema "
+                + "xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><xsd:element name=\"a\" type=\"xsd:string\"/>"
+                + "</xsd:schema>'"
+        );
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP XML SCHEMA COLLECTION dbo.TdSchemas");
+        }
     }
 
     // The canary is still there.

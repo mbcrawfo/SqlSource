@@ -24,7 +24,8 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// twice.  So each use of a reused parameter is renamed to a copy of its own (<see cref="ParameterCopies" />), and
 /// the copies' types are unified: when they differ, a <c>probe</c> asks whether each copy binds declared <c>xml</c>
 /// and declared <c>int</c>, and a copy that binds both ways types nothing and is left out.  A declared parameter's
-/// type is the server's reading of its declaration, asked first, one <c>declared</c> for each.
+/// type is the server's reading of its declaration, asked first, one <c>declared</c> for each.  Every later call
+/// declares a typed <c>xml</c> as plain <c>xml</c>, which is what its method sends.
 /// </para>
 /// <para>
 /// A parameter is declared when its marker gives a type: a <c>-- param: @p null</c> with no type is inferred.
@@ -55,6 +56,9 @@ internal sealed partial class SqlServerSession : DescriberSession
     // one of xml fails as xml, and one in a context of xml fails as int.
     private const string ProbeXml = "xml";
     private const string ProbeInt = "int";
+
+    // The type a typed xml is sent to every call but "declared" as, and the name the server gives it.
+    private const string PlainXml = "xml";
 
     // The session's database, DB_NAME(), whose columns alone have an origin; null in a capture recorded before "open"
     // asked it.
@@ -140,7 +144,7 @@ internal sealed partial class SqlServerSession : DescriberSession
         CancellationToken cancellationToken
     )
     {
-        var declarations = new List<(SqlQueryParameter Parameter, string Type)>();
+        var declarations = new List<(SqlQueryParameter Parameter, DeclaredTypeText.Declaration Declaration)>();
         foreach (var parameter in request.Parameters)
         {
             if (parameter.Type is not { } text)
@@ -158,9 +162,9 @@ internal sealed partial class SqlServerSession : DescriberSession
         }
 
         var declaredTypes = new Dictionary<string, SqlServerType>(SqlParameterName.Comparer);
-        foreach (var (parameter, type) in declarations)
+        foreach (var (parameter, declaration) in declarations)
         {
-            var resolved = await ResolveAsync(request, parameter, type, cancellationToken);
+            var resolved = await ResolveAsync(request, parameter, declaration.Text, cancellationToken);
             if (!resolved.Succeeded)
             {
                 return Failed(resolved.Failure);
@@ -169,11 +173,21 @@ internal sealed partial class SqlServerSession : DescriberSession
             declaredTypes[parameter.Name] = resolved.Value;
         }
 
+        // Each declared parameter's declaration as "parameters", "probe" and "columns" are sent it, by its name.
+        var declarationOf = declarations.ToDictionary(
+            static declaration => declaration.Parameter.Name,
+            declaration => Sent(declaration.Declaration, declaredTypes[declaration.Parameter.Name]),
+            SqlParameterName.Comparer
+        );
         var copied = ParameterCopies.Rename(request.Sql, request.Parameters);
-        var declared = declarations
-            .Select(static declaration => (declaration.Parameter.Name, declaration.Type))
-            .ToList();
-        var declaredParams = declared.Count == 0 ? null : SqlServerLive.Declarations(declared);
+        var declaredParams =
+            declarations.Count == 0
+                ? null
+                : SqlServerLive.Declarations(
+                    declarations.Select(declaration =>
+                        (declaration.Parameter.Name, declarationOf[declaration.Parameter.Name])
+                    )
+                );
         var answer = await ParametersAsync(
             request.Name,
             new SqlServerParametersRequest(copied.Sql, declaredParams, copied.Reused.Count == 0 ? null : copied.Reused),
@@ -215,12 +229,6 @@ internal sealed partial class SqlServerSession : DescriberSession
             _ = rowOf.TryAdd(SqlParameterName.WithoutPrefix(row.Name, "@"), row);
         }
 
-        // Each declared parameter's declaration, as DeclaredTypeText read it, by its name.
-        var declarationOf = declarations.ToDictionary(
-            static declaration => declaration.Parameter.Name,
-            static declaration => declaration.Type,
-            SqlParameterName.Comparer
-        );
         var probes = new Probes(request, copied, declarationOf, rowOf);
         var reusedTypes = new Dictionary<string, SqlServerType>(SqlParameterName.Comparer);
         foreach (var reused in copied.Reused)

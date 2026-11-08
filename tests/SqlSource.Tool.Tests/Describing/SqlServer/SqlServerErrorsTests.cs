@@ -166,6 +166,7 @@ public sealed class SqlServerErrorsTests
     [Theory]
     [InlineData(2715, "Column, parameter, or variable #1: Cannot find data type dbo.Nope.")]
     [InlineData(2724, "Parameter or variable '@p' has an invalid data type.")]
+    [InlineData(6314, "Collection specified does not exist in metadata : 'Nope'")]
     public void Declared_TypeTheDatabaseLacks_IsSqlsrc228AtResolveType(int number, string message)
     {
         var query = Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users WHERE email = @p", ("p", "dbo.Nope"));

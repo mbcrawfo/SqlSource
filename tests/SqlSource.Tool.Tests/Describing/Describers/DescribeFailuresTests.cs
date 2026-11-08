@@ -3,13 +3,17 @@ using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
+using TypeNameFound = SqlSource.Tool.Describing.Describers.DescribeFailures.TypeNameFound;
 
 namespace SqlSource.Tool.Tests.Describing.Describers;
 
 // The three errors both describers build, with what each engine passes in: the descriptor, the arguments in their
-// order, the step, the server's lines and the help are what a run reports.
+// order, the step, the server's lines and the help are what a run reports.  And what both engines' readers of a
+// declared type say they found.
 public sealed class DescribeFailuresTests
 {
+    private const string Shape = "the shape";
+
     private static readonly DescribeRequest Query = new("GetUser", "SELECT 1", EquatableArray<SqlQueryParameter>.Empty);
 
     [Fact]
@@ -18,6 +22,39 @@ public sealed class DescribeFailuresTests
         DescribeFailures.NoSuchType.ShouldBe("the database has no such type");
         DescribeFailures.NotATypeName.ShouldBe("it is not written as a type name");
     }
+
+    [Fact]
+    public void Texts_OfWhatWasFound_AreTheOnesBothEnginesReport()
+    {
+        TypeNameFound.Semicolon.ShouldBe("a ; is not part of a type name");
+        TypeNameFound.Comment.ShouldBe("a comment is not part of a type name");
+        TypeNameFound.Parts.ShouldBe("a type name has one or two parts");
+        TypeNameFound.OneLine.ShouldBe("a type name is on one line");
+    }
+
+    [Fact]
+    public void Reason_OfWhatWasFound_FollowsTheHead() =>
+        TypeNameFound.Reason("found").ShouldBe("it is not written as a type name: found");
+
+    // What a reader found where the grammar was left: a ";", a comment and a line break by name, and the end or
+    // anything else as the shape the reader passes in.
+    [Theory]
+    [InlineData("int;", 3, TypeNameFound.Semicolon)]
+    [InlineData("int --", 4, TypeNameFound.Comment)]
+    [InlineData("int/*", 3, TypeNameFound.Comment)]
+    [InlineData("int\n", 3, TypeNameFound.OneLine)]
+    [InlineData("int\r", 3, TypeNameFound.OneLine)]
+    [InlineData("int\u0085", 3, TypeNameFound.OneLine)]
+    [InlineData("int\u2028", 3, TypeNameFound.OneLine)]
+    [InlineData("int\u2029", 3, TypeNameFound.OneLine)]
+    [InlineData("int-", 3, Shape)]
+    [InlineData("int-1", 3, Shape)]
+    [InlineData("int/", 3, Shape)]
+    [InlineData("int)", 3, Shape)]
+    [InlineData("int", 3, Shape)]
+    [InlineData("", 0, Shape)]
+    public void At_APlace_SaysWhatStandsThere(string text, int position, string found) =>
+        TypeNameFound.At(text, position, Shape).ShouldBe(found, text);
 
     [Fact]
     public void Open_WithLinesAndHelp_GivesTheDatabaseTheLinesAndTheHelp()

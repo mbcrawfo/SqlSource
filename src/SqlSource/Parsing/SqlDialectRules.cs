@@ -196,8 +196,9 @@ internal sealed class SqlDialectRules
         return family;
     }
 
-    // Whether a name may hold "@" and "#", and of the characters above U+007F only letters and digits, as T-SQL reads
-    // one.  Otherwise every character above U+007F is read as a letter, as PostgreSQL and MySQL do.
+    // Whether a name may hold "@" and "#", and of the characters above U+007F only letters, digits, combining marks,
+    // letter numbers, format characters and connectors, as T-SQL reads one.  Otherwise every character above U+007F
+    // is read as a letter, as PostgreSQL and MySQL do.
     private bool NamesHoldAtAndHash { get; init; }
 
     /// <summary>
