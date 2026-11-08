@@ -30,8 +30,6 @@ internal sealed class DiagnoseScene : IDisposable
         "    help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw "
         + "bundle is ready, without attaching it: a maintainer will say how to send it\n";
 
-    public const string Reproduced = "sqlsource: reproduced: the pipeline gives this answer\n";
-
     // The file the query of a case is put in.
     public const string File = "Users.sql";
 

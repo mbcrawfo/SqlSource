@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Bundles;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Fixtures;
@@ -29,7 +30,7 @@ public sealed class BundleCasesTests
     [MemberData(nameof(Cases))]
     public async Task Replay_EveryBundleCase_GivesItsExpectedAnswer(string engine, string name)
     {
-        var bundle = BundleReplays.Read(BundleCases.Of(engine).Single(found => found.Name == name).Folder);
+        var bundle = WrittenBundles.Read(BundleCases.Of(engine).Single(found => found.Name == name).Folder);
         var info = bundle.Info.ShouldNotBeNull();
         var expected = BundleReplay.ExpectedOf(bundle, Path);
         expected.Failure.ShouldBeNull();

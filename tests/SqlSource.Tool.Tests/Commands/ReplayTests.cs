@@ -19,8 +19,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // tests' host reads files only under the temporary folder, so each test copies its case into the run's folder.
 public sealed class ReplayTests : IDisposable
 {
-    private const string Reproduced = "sqlsource: reproduced: the pipeline gives this answer\n";
-
     private const string Raw = "sqlsource: this bundle is not renamed, and must not be posted\n";
 
     private static readonly JsonSerializerOptions Relaxed = new()
@@ -107,7 +105,7 @@ public sealed class ReplayTests : IDisposable
 
         result.Error.ShouldBeEmpty();
         result.ExitCode.ShouldBe(0);
-        result.Out.ShouldEndWith(Reproduced);
+        result.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     [Fact]
@@ -336,7 +334,7 @@ public sealed class ReplayTests : IDisposable
         zipped.Error.ShouldBeEmpty();
         zipped.Out.ShouldStartWith(Raw);
         zipped.Out[Raw.Length..].ShouldBe(folder.Out);
-        folder.Out.ShouldEndWith(Reproduced);
+        folder.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     [Fact]
@@ -349,7 +347,7 @@ public sealed class ReplayTests : IDisposable
 
         result.ExitCode.ShouldBe(0);
         result.Out.ShouldStartWith(Raw);
-        result.Out.ShouldEndWith(Reproduced);
+        result.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     [Fact]
@@ -511,7 +509,7 @@ public sealed class ReplayTests : IDisposable
         var result = await _run.RunAsync("replay", "case");
 
         result.ExitCode.ShouldBe(0);
-        result.Out.ShouldEndWith(Reproduced);
+        result.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     [Fact]
@@ -644,7 +642,7 @@ public sealed class ReplayTests : IDisposable
         var verbose = await _run.RunAsync("replay", "case", "--verbose");
 
         verbose.ExitCode.ShouldBe(0);
-        verbose.Out.ShouldEndWith(Reproduced);
+        verbose.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
         verbose.Out.Split('\n').Length.ShouldBeGreaterThan(quiet.Out.Split('\n').Length);
         verbose
             .Out.Split('\n')
@@ -720,7 +718,7 @@ public sealed class ReplayTests : IDisposable
 
         result.Error.ShouldBeEmpty();
         result.ExitCode.ShouldBe(0);
-        result.Out.ShouldEndWith(Reproduced);
+        result.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     [Fact]

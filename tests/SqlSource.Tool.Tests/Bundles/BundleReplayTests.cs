@@ -10,6 +10,7 @@ using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Bundles;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -227,7 +228,7 @@ public sealed class BundleReplayTests
         var fixture = FixtureCases.Named("postgres", "select-left-join");
         var token = TestContext.Current.CancellationToken;
 
-        var planned = BundleReplay.Plan(BundleReplays.Read(fixture.Folder), "postgres", BundleInfos.Path, token);
+        var planned = BundleReplay.Plan(WrittenBundles.Read(fixture.Folder), "postgres", BundleInfos.Path, token);
 
         var (query, dialect) = FixtureReplay.Plan(fixture, token);
         planned.Value.Dialect.ShouldBe(dialect);

@@ -7,6 +7,7 @@ using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Bundles;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -21,16 +22,9 @@ internal static class BundleReplays
 
     public const string NotDeterminedMessage = "could not determine data type of parameter $1";
 
-    // The bundle of a folder, which must read.
-    public static Bundle Read(string folder)
-    {
-        var read = BundleReader.Read(folder, ToolHost.OpenRead, ToolHost.ReadText);
-        read.Failure.ShouldBeNull();
-        return read.Value.ShouldNotBeNull();
-    }
-
     // The bundle of a recorded case of the describers' fixtures.
-    public static Bundle OfCase(string engine, string name) => Read(FixtureCases.Named(engine, name).Folder);
+    public static Bundle OfCase(string engine, string name) =>
+        WrittenBundles.Read(FixtureCases.Named(engine, name).Folder);
 
     // The bundle with its capture.json replaced by the text of another capture.
     public static Bundle WithCapture(Bundle bundle, DescribeCapture capture) =>

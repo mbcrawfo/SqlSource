@@ -123,7 +123,7 @@ public sealed class PostgresRefusalTests
     public async Task RenameAsync_PrepareErrorInTheTypeList_ReplaysToSQLSRC228()
     {
         var fixture = PostgresRenamings.Fixture(TwoDeclared);
-        var prepare = RequestOf(BundleReplays.CaptureOf(BundleReplays.Read(fixture.Folder)));
+        var prepare = RequestOf(BundleReplays.CaptureOf(WrittenBundles.Read(fixture.Folder)));
         prepare.Types.ShouldBe(["varchar(50)", "email_t", "unknown"]);
 
         // Inside email_t, the second item, which the renaming makes longer.
@@ -215,7 +215,7 @@ public sealed class PostgresRefusalTests
     // asks nothing after a prepare that failed.
     private static Bundle PrepareFailed(string name, string sqlState, string message, int? position, string? hint)
     {
-        var recorded = BundleReplays.CaptureOf(BundleReplays.Read(PostgresRenamings.Fixture(name).Folder));
+        var recorded = BundleReplays.CaptureOf(WrittenBundles.Read(PostgresRenamings.Fixture(name).Folder));
         var error = new PostgresServerError(sqlState, message, Detail: null, hint, position);
         var answer = JsonSerializer.SerializeToElement(
             new PostgresPrepareAnswer(ParameterTypes: null, error),
