@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using SqlSource.Tool.Bundles.Renaming;
 
-namespace SqlSource.Tool.Tests.Bundles.Renaming;
+namespace SqlSource.Tool.Tests;
 
 // Both engines' field tests walk the records of their calls through this, to find a string member with no rule and a
 // rule with no member.

@@ -79,7 +79,7 @@ The line numbers of the spec predate td-0104, td-0102, td-0103 and 108-renaming-
 
 **Files:**
 - Modify: `src/SqlSource.Tool/Bundles/Renaming/EntryRenamer.cs` (`TypeRecords` exposed), `src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresFieldRules.cs` (`TypeRecords` built from it), `src/SqlSource.Tool/Bundles/Renaming/SqlServer/SqlServerFields.cs`, `src/SqlSource.Tool/Bundles/Renaming/SqlServer/SqlServerRenaming.cs`
-- Create: `tests/SqlSource.Tool.Tests/Bundles/Renaming/CallMembers.cs` (the walk of `PostgresFieldRulesTests`, moved)
+- Create: `tests/SqlSource.Tool.Tests/CallMembers.cs`, at the project's root with the other helpers, (the walk of `PostgresFieldRulesTests`, moved)
 - Modify: `tests/SqlSource.Tool.Tests/Bundles/Renaming/Postgres/PostgresFieldRulesTests.cs` (calls `CallMembers`), `tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/SqlServerFieldsTests.cs`
 - Docs: `docs/architecture/bundles.md` (SQL Server's fields, ~`:325`-`:335`, and its tests, ~`:377`; PostgreSQL's members, ~`:252`), `docs/architecture/sqlserver-describer.md:98`, `src/SqlSource.Tool/Bundles/Renaming/SqlServer/AGENTS.md` if a line names a moved member.
 
