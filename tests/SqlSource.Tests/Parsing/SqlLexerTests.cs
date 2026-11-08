@@ -334,6 +334,12 @@ public sealed class SqlLexerTests
     [InlineData("Oracle", "--+ h\nx", "Hint:--+ h | Text:\nx")]
     [InlineData("Ansi,SqlServer,PostgreSql,CockroachDb,Sqlite", "--+ h\nx", "LineComment:--+ h | Text:\nx")]
     [InlineData("MySql,MariaDb", "--+ h\nx", "Text:--+ h\nx")]
+    // A format character, the zero-width non-joiner, in a parameter's name.
+    [InlineData("SqlServer", "@a‌b c", "Parameter:@a‌b | Text: c")]
+    [InlineData("Ansi,PostgreSql,CockroachDb,MySql,MariaDb,Sqlite,Oracle", "@a‌b c", "Parameter:@a | Text:‌b c")]
+    // A dollar sign in a parameter's name.
+    [InlineData("SqlServer", "@a$b c", "Parameter:@a$b | Text: c")]
+    [InlineData("Ansi,PostgreSql,CockroachDb,MySql,MariaDb,Sqlite,Oracle", "@a$b c", "Parameter:@a | Text:$b c")]
     public void Lex_Construct_IsReadByTheRulesOfTheDialect(string dialects, string text, string expected)
     {
         foreach (var dialect in dialects.Split(','))
@@ -750,6 +756,22 @@ public sealed class SqlLexerTests
     [InlineData("@")]
     public void Lex_AtSignThatStartsNoParameter_IsText(string text) => Lex(text).ShouldBe(["Text:" + text]);
 
+    // SQL Server takes "@" inside a name, but a name never starts with one: "@@ROWCOUNT" is a function.  "$" and "#"
+    // are name characters there, so an "@" after one stands inside a word.
+    [Theory]
+    [InlineData("a @@ b")]
+    [InlineData("SELECT @@ROWCOUNT")]
+    [InlineData("@@x")]
+    [InlineData("user@host")]
+    [InlineData("x_@y")]
+    [InlineData("1@y")]
+    [InlineData("@ x")]
+    [InlineData("@")]
+    [InlineData("$@a")]
+    [InlineData("#@a")]
+    public void Lex_AtSignThatStartsNoParameterUnderSqlServer_IsText(string text) =>
+        Lex(text, Rules("SqlServer")).ShouldBe(["Text:" + text]);
+
     [Theory]
     [InlineData("'@a'", "Quoted:'@a'")]
     [InlineData("\"@a\"", "Quoted:\"@a\"")]
@@ -771,6 +793,61 @@ public sealed class SqlLexerTests
     [InlineData("Oracle")]
     public void Lex_Parameter_IsFoundUnderEveryDialect(string dialect) =>
         Lex("x = @p", Rules(dialect)).ShouldBe(["Text:x = ", "Parameter:@p"]);
+
+    // SQL Server reads a variable's name as it reads any name after its first character, the first character after
+    // the "@" included.
+    [Theory]
+    // A letter number, Ⅰ.
+    [InlineData("@xⅠ")]
+    // A format character, the zero-width non-joiner.
+    [InlineData("@a‌b")]
+    // A combining acute accent, a non-spacing mark.
+    [InlineData("@é")]
+    // A spacing combining mark, the Devanagari visarga.
+    [InlineData("@aः")]
+    // A connector, ‿.
+    [InlineData("@a‿b")]
+    [InlineData("@a$b")]
+    [InlineData("@a#b")]
+    [InlineData("@a@b")]
+    [InlineData("@$a")]
+    [InlineData("@#a")]
+    [InlineData("@́x")]
+    [InlineData("@Ⅰx")]
+    // An Arabic-Indic digit, ٣.
+    [InlineData("@x٣")]
+    public void Lex_ParameterUnderSqlServer_TakesEveryNameCharacterOfTheServer(string parameter) =>
+        Lex(parameter + ";", Rules("SqlServer")).ShouldBe(["Parameter:" + parameter, "Text:;"]);
+
+    // The middle dot and the euro sign are refused by the server with error 102.
+    [Theory]
+    [InlineData("@a·b", "Text:·b")]
+    [InlineData("@a€", "Text:€")]
+    public void Lex_ParameterUnderSqlServer_EndsAtACharacterTheServerRefuses(string text, string rest) =>
+        Lex(text, Rules("SqlServer")).ShouldBe(["Parameter:@a", rest]);
+
+    // SQL Server reads a zero-width space as a space, beside a name and before its "@", as Unicode 3.2 classed it.
+    [Theory]
+    [InlineData("SELECT @id\u200B + 1", new[] { "Text:SELECT ", "Parameter:@id", "Text:\u200B + 1" })]
+    [InlineData("SELECT 1 +\u200B@a", new[] { "Text:SELECT 1 +\u200B", "Parameter:@a" })]
+    public void Lex_ParameterUnderSqlServer_StopsAtAZeroWidthSpace(string text, string[] expected) =>
+        Lex(text, Rules("SqlServer")).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("Ansi")]
+    [InlineData("PostgreSql")]
+    [InlineData("CockroachDb")]
+    [InlineData("MySql")]
+    [InlineData("MySql+AnsiQuotes+NoBackslashEscapes")]
+    [InlineData("MariaDb")]
+    [InlineData("Sqlite")]
+    [InlineData("Oracle")]
+    public void Lex_ParameterUnderOtherDialects_EndsAtAMarkOrASign(string dialect)
+    {
+        Lex("@a‌b", Rules(dialect)).ShouldBe(["Parameter:@a", "Text:‌b"]);
+        Lex("@a$b", Rules(dialect)).ShouldBe(["Parameter:@a", "Text:$b"]);
+        Lex("@xⅠ", Rules(dialect)).ShouldBe(["Parameter:@x", "Text:Ⅰ"]);
+    }
 
     // Without the parameter the second part would continue the E string, and its backslash would escape the quote.
     [Fact]

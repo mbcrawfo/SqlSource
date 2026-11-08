@@ -38,6 +38,7 @@ public sealed class QuoteReaderTests
     [InlineData('①')]
     [InlineData('·')]
     [InlineData('[')]
+    [InlineData('\u200B')]
     public void IsNameCharacterOfSqlServer_Character_IsNotAPartOfAName(char value) =>
         QuoteReader.IsNameCharacterOfSqlServer(value).ShouldBeFalse();
 

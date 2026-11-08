@@ -198,7 +198,8 @@ internal sealed class SqlDialectRules
 
     // Whether a name may hold "@" and "#", and of the characters above U+007F only letters, digits, combining marks,
     // letter numbers, format characters and connectors, as T-SQL reads one.  Otherwise every character above U+007F
-    // is read as a letter, as PostgreSQL and MySQL do.
+    // is read as a letter, as PostgreSQL and MySQL do.  A parameter's name is read by the same rule, as T-SQL reads a
+    // variable's; otherwise it takes letters, digits and "_".
     private bool NamesHoldAtAndHash { get; init; }
 
     /// <summary>
@@ -210,6 +211,49 @@ internal sealed class SqlDialectRules
         NamesHoldAtAndHash
             ? QuoteReader.IsNameCharacterOfSqlServer(value)
             : QuoteReader.IsNameCharacterOfPostgreSql(value);
+
+    /// <summary>
+    /// True for white space, and for the zero-width space where this dialect's names do not take it: SQL Server reads
+    /// it as a space.
+    /// </summary>
+    public bool IsSpace(char value) =>
+        char.IsWhiteSpace(value) || (value == QuoteReader.ZeroWidthSpace && !IsNameCharacter(value));
+
+    /// <summary>
+    /// True for a character that can be part of a parameter's name in this dialect: as
+    /// <see cref="QuoteReader.IsNameCharacterOfSqlServer" /> reads it under SQL Server, the first character too, and a
+    /// letter, a digit or <c>_</c> under every other dialect.
+    /// </summary>
+    /// <remarks>
+    /// SQL Server reads a variable's name by the tables of Unicode 3.2, and this rule by the current ones of .NET, so
+    /// the two can differ: <c>@x・</c> is the parameter <c>@x</c> here and one variable to the server, and <c>@ꞔ</c> is
+    /// a parameter here and refused by the server.
+    /// </remarks>
+    public bool IsParameterNameCharacter(char value) =>
+        NamesHoldAtAndHash
+            ? QuoteReader.IsNameCharacterOfSqlServer(value)
+            : char.IsLetterOrDigit(value) || value == '_';
+
+    /// <summary>
+    /// The offset after the name of a parameter that starts at <paramref name="nameStart" />, the character after the
+    /// prefix, read no further than <paramref name="end" />.  It is <paramref name="nameStart" /> when no name
+    /// follows, and when the prefix follows: <c>@@rowcount</c> is a function.
+    /// </summary>
+    public int FindParameterNameEnd(string text, int nameStart, int end)
+    {
+        if (nameStart >= end || text[nameStart] == ParameterPrefix)
+        {
+            return nameStart;
+        }
+
+        var index = nameStart;
+        while (index < end && IsParameterNameCharacter(text[index]))
+        {
+            index++;
+        }
+
+        return index;
+    }
 
     /// <summary>
     /// The offset of the first character from <paramref name="start" /> on that can start a comment, a parameter or a

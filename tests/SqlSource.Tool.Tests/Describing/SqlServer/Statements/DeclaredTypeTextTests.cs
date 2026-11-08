@@ -84,6 +84,19 @@ public sealed class DeclaredTypeTextTests
     public void Read_SpaceBeforeOrInsideTheParentheses_IsAccepted(string text) =>
         DeclaredTypeText.Read(text).Value.Text.ShouldBe(text);
 
+    // The server reads the zero-width space, U+200B, as a space, so it stands where a space may, and at either end of
+    // the type it is left out of the text sent as a space is.
+    [Theory]
+    [InlineData("int\u200B", "int")]
+    [InlineData("\u200Bint", "int")]
+    [InlineData(" \u200Bint\u200B ", "int")]
+    [InlineData("nvarchar\u200B(10)", "nvarchar\u200B(10)")]
+    [InlineData("nvarchar(\u200B10\u200B)", "nvarchar(\u200B10\u200B)")]
+    [InlineData("sys\u200B.int", "sys\u200B.int")]
+    [InlineData("sys.\u200Bint", "sys.\u200Bint")]
+    public void Read_ZeroWidthSpace_IsASpace(string text, string expected) =>
+        DeclaredTypeText.Read(text).Value.Text.ShouldBe(expected);
+
     [Fact]
     public void Read_SpaceAroundTheName_IsLeftOut() =>
         DeclaredTypeText.Read("  nvarchar(50) \t").Value.Text.ShouldBe("nvarchar(50)");

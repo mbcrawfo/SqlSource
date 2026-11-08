@@ -144,6 +144,11 @@ public sealed class SqlListUsesTests
     [InlineData("mssql", "[IN] @x", new[] { "Value" })]
     // "#" is a name character of T-SQL, so "x#IN" is one word.
     [InlineData("mssql", "x#IN @y", new[] { "Value" })]
+    // T-SQL takes a letter number, Ⅰ, in a variable's name.
+    [InlineData("mssql", "WHERE id IN @ids\u2160", new[] { "List" })]
+    // SQL Server reads the zero-width space as a space; the other dialects read it as part of a word.
+    [InlineData("mssql", "WHERE id\u200BIN\u200B@ids", new[] { "List" })]
+    [InlineData("postgres", "WHERE id \u200BIN @ids", new[] { "Value" })]
     [InlineData("postgres", "id IN @ids AND @other = 1", new[] { "List", "Value" })]
     // A ")" that closes nothing is passed over.
     [InlineData("postgres", "f(a)) AND id IN @ids", new[] { "List" })]

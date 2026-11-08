@@ -23,6 +23,9 @@ public sealed class SqlDeclaredVariablesTests
     [InlineData("DECLARE @a int; SELECT 1, @p DECLARE @b int", new[] { "a", "b" })]
     [InlineData("SELECT 'x'DECLARE @a int", new[] { "a" })]
     [InlineData("DECLARE", new string[0])]
+    // SQL Server reads the zero-width space as a space.
+    [InlineData("DECLARE @a int,\u200B@b int; SELECT @a, @b, @c", new[] { "a", "b" })]
+    [InlineData("DECLARE\u200B@a int", new[] { "a" })]
     public void Find_NameAfterDeclareOrAfterACommaOfItsList_IsDeclared(string sql, string[] expected) =>
         Find(sql).ShouldBe(expected);
 
@@ -153,6 +156,19 @@ public sealed class SqlDeclaredVariablesTests
         SqlDeclaredVariables.Find(Sql, lexemes, 4, 5, SqlDialectRules.SqlServer).ShouldBeNull();
         SqlDeclaredVariables.Find(Sql, lexemes, 2, 2, SqlDialectRules.SqlServer).ShouldBeNull();
     }
+
+    // T-SQL takes "$" in a variable's name, so the name declared is all of it.
+    [Fact]
+    public void Find_NameWithADollarSign_IsDeclaredWhole() =>
+        Find("DECLARE @a$b int; SELECT @a$b, @c").ShouldBe(["a$b"]);
+
+    [Fact]
+    public void Parse_UseOfADeclaredNameWithADollarSign_IsNoParameter() =>
+        ParseOf
+            .Blocks("-- name: Q\nDECLARE @a$b int; SELECT @a$b, @c\n", dialect: SqlDialect.SqlServer)
+            .ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["c"]);
 
     [Theory]
     [InlineData("n", true)]

@@ -134,26 +134,18 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
         }
     }
 
-    /// <summary>
-    /// Whether <paramref name="value" /> can be part of a parameter's name: a letter, a digit or <c>_</c>.
-    /// </summary>
-    internal static bool IsParameterNameCharacter(char value) => char.IsLetterOrDigit(value) || value == '_';
-
-    // A parameter is the prefix and a name.  The prefix follows neither another prefix nor a character of a name:
-    // "@@rowcount" is a function, and the "@" of "user@host" stands inside a word.
+    // A parameter is the prefix and a name, which the rules read.  The prefix follows neither another prefix nor a
+    // character of a name, and no name starts with the prefix: "@@rowcount" is a function, and the "@" of "user@host"
+    // stands inside a word.
     private bool TryFindParameterEnd(int start, out int end)
     {
         end = start + 1;
-        if (start > 0 && (text[start - 1] == Rules.ParameterPrefix || IsParameterNameCharacter(text[start - 1])))
+        if (start > 0 && (text[start - 1] == Rules.ParameterPrefix || Rules.IsParameterNameCharacter(text[start - 1])))
         {
             return false;
         }
 
-        while (end < text.Length && IsParameterNameCharacter(text[end]))
-        {
-            end++;
-        }
-
+        end = Rules.FindParameterNameEnd(text, start + 1, text.Length);
         return end > start + 1;
     }
 

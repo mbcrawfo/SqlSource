@@ -170,6 +170,16 @@ public sealed class TokenCheckTests
         TokenCheck.Check(engine, mapping, [Open("1.5e-3, 1_000, 2")], "SELECT 1", expected: null).ShouldBeNull();
     }
 
+    // SQL Server reads the zero-width space as a space, so the check passes it as white space, and a word it ends
+    // is still checked.  Under PostgreSQL it is a letter of its word.
+    [Fact]
+    public void Check_SqlServerZeroWidthSpace_IsWhiteSpace()
+    {
+        CheckQuery("SELECT 1\u200B,\u200B2", SqlDialect.SqlServer).ShouldBeNull();
+        CheckQuery("SELECT 1\u200Bsecret", SqlDialect.SqlServer).ShouldNotBeNull().Token.ShouldBe("secret");
+        CheckQuery("SELECT secret\u200B", SqlDialect.PostgreSql).ShouldNotBeNull().Token.ShouldBe("secret\u200B");
+    }
+
     // As the SQL renamer refuses them, wherever the check meets them.  The word e5 is no number either.
     [Theory]
     [InlineData("postgres", "SELECT 1users", "1users")]

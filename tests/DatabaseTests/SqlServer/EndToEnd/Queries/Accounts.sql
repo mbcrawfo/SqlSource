@@ -57,3 +57,11 @@ SELECT id, name, opened_on
 FROM dbo.accounts
 WHERE opened_on >= DATEADD(day, -@days, @asOf) AND opened_on <= @asOf
 ORDER BY id;
+
+-- name: ListAccountsInRange
+-- summary: The accounts whose ids are within two bounds, but one name, with parameters named by a letter number and
+-- a combining mark, which SQL Server reads as part of a name.
+SELECT id, name
+FROM dbo.accounts
+WHERE id BETWEEN @idⅠ AND @idⅡ AND name <> @skippé
+ORDER BY id;

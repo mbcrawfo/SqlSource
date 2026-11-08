@@ -91,6 +91,34 @@ public sealed class ModelNameTests
         ModelsOf(run).Queries.ShouldBeEmpty();
     }
 
+    // SQL Server takes a letter number in a variable's name, and so does C# in a property's.
+    [Fact]
+    public void Run_ParameterWithALetterNumber_GivesItsProperty()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- dialect: mssql\n-- name: GetUser\nSELECT @x\u2160;\n");
+
+        var run = SqlServerRun(file, SqlServerEntry(file, "x\u2160"));
+
+        run.Diagnostics.ShouldBeEmpty();
+        NamesOf(QueryOf(run).Input).ShouldBe(["X\u2160"]);
+    }
+
+    // SQL Server takes the zero-width non-joiner in a variable's name.  C# ignores it in a name, so a property cannot
+    // hold it.
+    [Fact]
+    public void Run_ParameterWithAFormatCharacter_IsSqlsrc254WithRename()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- dialect: mssql\n-- name: GetUser\nSELECT @a\u200Cb;\n");
+
+        var run = SqlServerRun(file, SqlServerEntry(file, "a\u200Cb"));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC254 {GeneratorHarness.UsersPath}(2,10)-(2,17): The parameter 'a\u200Cb' gives the property name "
+                + "'A\u200Cb', which is not a C# identifier.  Rename it.",
+        ]);
+        ModelsOf(run).Queries.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Run_TwoColumnsOneName_IsSqlsrc255()
     {
@@ -520,6 +548,23 @@ public sealed class ModelNameTests
             );
         }
     }
+
+    // A run of an mssql file with its sidecar, on Microsoft.Data.SqlClient 7.
+    private static GeneratorRun SqlServerRun(SqlFile file, SidecarEntry entry)
+    {
+        var run = Run(Source, [file, Sidecars.Of(file, entry)], references: [SqlClientReferences.SqlClient7]);
+        _ = run.Problems();
+        return run;
+    }
+
+    // An entry of GetUser with one parameter of int.
+    private static SidecarEntry SqlServerEntry(SqlFile file, string parameter) =>
+        MethodRuns.SqlServerEntry(
+            file,
+            "GetUser",
+            [TestSidecars.Parameter(0, parameter, TestSidecars.SqlServer())],
+            null
+        );
 
     private static QueryModels QueryOf(GeneratorRun run) => ModelsOf(run).Queries.ShouldHaveSingleItem();
 
