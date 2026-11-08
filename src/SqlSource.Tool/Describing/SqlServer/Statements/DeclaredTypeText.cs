@@ -11,14 +11,14 @@ namespace SqlSource.Tool.Describing.SqlServer.Statements;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A type is a name of one or two parts joined by a dot, with any spaces and tabs around it, each part a plain
-/// identifier (a letter or a letter number of any script, <c>_</c>, <c>@</c> or <c>#</c>, then those, digits of any
-/// script, combining marks, format characters, connectors and <c>$</c>, as the server reads one), a bracketed one
-/// with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for a quote; then, after any spaces, one or two
-/// numbers in parentheses, or a name in parentheses, an XML schema collection's after <c>CONTENT</c> or
-/// <c>DOCUMENT</c> in any case or not, of which <c>(max)</c> is one; and nothing else but spaces at either end.  A
-/// comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open and a line break are refused, each with what
-/// was found.
+/// A type is a name of one or two parts joined by a dot, with any spaces, tabs and zero-width spaces (which the server
+/// reads as spaces) around it, each part a plain identifier (a letter or a letter number of any script, <c>_</c>,
+/// <c>@</c> or <c>#</c>, then those, digits of any script, combining marks, format characters, connectors and <c>$</c>,
+/// as the server reads one), a bracketed one with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for a
+/// quote; then, after any spaces, one or two numbers in parentheses, or a name in parentheses, an XML schema
+/// collection's after <c>CONTENT</c> or <c>DOCUMENT</c> in any case or not, of which <c>(max)</c> is one; and nothing
+/// else but spaces at either end.  A comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open and a line
+/// break are refused, each with what was found.
 /// </para>
 /// <para>
 /// The server reads a plain identifier by the tables of Unicode 3.2, and this reader by the current ones of .NET, so a
@@ -51,7 +51,9 @@ internal static class DeclaredTypeText
         var found =
             ReadName(text, ref position) ?? ReadModifier(text, ref position, ref holdsName) ?? ReadEnd(text, position);
         return found is null
-            ? Outcome<Declaration, string>.Of(new Declaration(text.Trim(' ', '\t'), holdsName))
+            ? Outcome<Declaration, string>.Of(
+                new Declaration(text.Trim(' ', '\t', QuoteReader.ZeroWidthSpace), holdsName)
+            )
             : Outcome<Declaration, string>.Failed(TypeNameFound.Reason(found));
     }
 
@@ -280,7 +282,7 @@ internal static class DeclaredTypeText
 
     private static void SkipSpaces(string text, ref int position)
     {
-        while (position < text.Length && (text[position] is ' ' or '\t'))
+        while (position < text.Length && (text[position] is ' ' or '\t' or QuoteReader.ZeroWidthSpace))
         {
             position++;
         }

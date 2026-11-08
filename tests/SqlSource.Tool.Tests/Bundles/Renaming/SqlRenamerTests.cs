@@ -173,6 +173,29 @@ public sealed class SqlRenamerTests
         refusals.ShouldHaveSingleItem().ShouldBe(new RenamingRefusal(RefusalStep.Token, Place, token));
     }
 
+    // SQL Server reads the zero-width space as a space, so it is kept where a space is, and ends a word.
+    [Fact]
+    public void Rename_SqlServerZeroWidthSpace_IsKeptAsASpace() =>
+        Rename("SELECT a\u200B,\u200Bb\u200BAS\u200Bc FROM t", SqlDialect.SqlServer)
+            .ShouldMatch($"^SELECT a_{Hex}\u200B,\u200Ba_{Hex}\u200BAS\u200Ba_{Hex} FROM a_{Hex}$");
+
+    // A name before "(" is a call whatever stands between: a zero-width space is one of those.
+    [Fact]
+    public void Rename_SqlServerZeroWidthSpaceBeforeParenthesis_IsACall()
+    {
+        var (renamer, mapping, refusals) = Renamer(SqlDialect.SqlServer);
+
+        _ = renamer.Rename("SELECT fn\u200B(1)", NameClass.Alias, Place, refusals.Add);
+
+        refusals.ShouldBeEmpty();
+        mapping.Names.ShouldContain(static name => name.Class == NameClass.Function);
+    }
+
+    // Under PostgreSQL the character is a letter, so it stays in its word, and the renaming is as it was.
+    [Fact]
+    public void Rename_PostgresZeroWidthSpace_IsPartOfTheWord() =>
+        Rename("SELECT a\u200Bb", SqlDialect.PostgreSql).ShouldMatch($"^SELECT a_{Hex}$");
+
     [Fact]
     public void Rename_SqlServerPrefixes_AreKeptBeforeTheRenamedRest() =>
         Rename("SELECT @@ROWCOUNT FROM #orders JOIN ##totals ON 1 = 1", SqlDialect.SqlServer)

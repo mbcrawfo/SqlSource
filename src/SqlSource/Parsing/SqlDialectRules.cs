@@ -213,6 +213,13 @@ internal sealed class SqlDialectRules
             : QuoteReader.IsNameCharacterOfPostgreSql(value);
 
     /// <summary>
+    /// True for white space, and for the zero-width space where this dialect's names do not take it: SQL Server reads
+    /// it as a space.
+    /// </summary>
+    public bool IsSpace(char value) =>
+        char.IsWhiteSpace(value) || (value == QuoteReader.ZeroWidthSpace && !IsNameCharacter(value));
+
+    /// <summary>
     /// True for a character that can be part of a parameter's name in this dialect: as
     /// <see cref="QuoteReader.IsNameCharacterOfSqlServer" /> reads it under SQL Server, the first character too, and a
     /// letter, a digit or <c>_</c> under every other dialect.

@@ -350,7 +350,7 @@ internal static partial class SqlListUses
                 }
 
                 var textEnd = lexeme.Span.End;
-                while (_offset < textEnd && char.IsWhiteSpace(text[_offset]))
+                while (_offset < textEnd && rules.IsSpace(text[_offset]))
                 {
                     _offset++;
                 }

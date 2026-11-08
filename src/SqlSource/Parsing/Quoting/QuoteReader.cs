@@ -31,6 +31,9 @@ internal abstract class QuoteReader
     /// </summary>
     public virtual QuoteReader? FindContinuation(string text, int start) => null;
 
+    /// <summary>The zero-width space, U+200B, which SQL Server reads as a space, as Unicode 3.2 classed it.</summary>
+    internal const char ZeroWidthSpace = '\u200B';
+
     /// <summary>True for a character that can be part of an unquoted identifier.</summary>
     protected static bool IsIdentifierCharacter(char value) => char.IsLetterOrDigit(value) || value is '_' or '$';
 
@@ -61,7 +64,7 @@ internal abstract class QuoteReader
         || value is '_' or '@' or '#' or '$'
         || (
             value > '\u007F'
-            && value != '\u200B'
+            && value != ZeroWidthSpace
             && char.GetUnicodeCategory(value)
                 is UnicodeCategory.NonSpacingMark
                     or UnicodeCategory.SpacingCombiningMark

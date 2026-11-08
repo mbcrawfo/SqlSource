@@ -158,7 +158,7 @@ internal sealed partial class TokenCheck
                 Word(text, wordStart, at, end, quoteFollows, place);
             }
             else if (
-                char.IsWhiteSpace(character) || SqlRenamer.Punctuation.Contains(character, StringComparison.Ordinal)
+                SqlRenamer.IsSpace(character) || SqlRenamer.Punctuation.Contains(character, StringComparison.Ordinal)
             )
             {
                 at++;

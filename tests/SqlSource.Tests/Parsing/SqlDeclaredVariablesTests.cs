@@ -23,6 +23,9 @@ public sealed class SqlDeclaredVariablesTests
     [InlineData("DECLARE @a int; SELECT 1, @p DECLARE @b int", new[] { "a", "b" })]
     [InlineData("SELECT 'x'DECLARE @a int", new[] { "a" })]
     [InlineData("DECLARE", new string[0])]
+    // SQL Server reads the zero-width space as a space.
+    [InlineData("DECLARE @a int,\u200B@b int; SELECT @a, @b, @c", new[] { "a", "b" })]
+    [InlineData("DECLARE\u200B@a int", new[] { "a" })]
     public void Find_NameAfterDeclareOrAfterACommaOfItsList_IsDeclared(string sql, string[] expected) =>
         Find(sql).ShouldBe(expected);
 

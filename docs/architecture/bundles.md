@@ -310,7 +310,7 @@ Each file of the folder has its tests in `tests/SqlSource.Tool.Tests/Bundles/Ren
 |----|----|
 | `Dialect` | `SqlDialect.SqlServer` |
 | `IsNumberStart` | An ASCII digit, or a `$` at the end of the text or before an ASCII digit or a character that is no word part, the sign of a money literal ([what building it found](#what-building-sql-servers-part-found)) |
-| `IsWordStart`, `IsWordPart` | Both `QuoteReader.IsNameCharacterOfSqlServer`, the describer's rule: a letter or a digit of any script, a combining mark, a letter number, a format character, a connector, `_`, `@`, `#` or `$` |
+| `IsWordStart`, `IsWordPart` | Both `QuoteReader.IsNameCharacterOfSqlServer`, the describer's rule: a letter or a digit of any script, a combining mark, a letter number, a format character but the zero-width space, a connector, `_`, `@`, `#` or `$`; U+200B is read as a space, as SQL Server reads it, by `SqlRenamer.IsSpace` |
 | `Fold`, `Spelled` | `SqlServerVocabulary.Fold`, each character upper-cased by the invariant culture, so that a fold never changes a spelling's length, quoted or not; and the spelling as written ([the fold](#sql-servers-fold)) |
 | `IsEngineWord` | A word of the vocabulary; ASCII digits alone, the alias of the tool's `SELECT @p AS [1]` of `declared` and of each `AS [n]` of `operands`; or the assembly-qualified name of a system CLR type, `geometry`, `geography` or `hierarchyid`, of any version, compared folded.  Quoting does not change the answer: `[1]` is the tool's, and `[1a]` and `[2 x]` are the user's |
 | `RuleOf` | `SqlServerFields.RuleOf` ([the fields](#sql-servers-fields)) |

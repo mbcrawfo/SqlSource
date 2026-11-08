@@ -166,6 +166,21 @@ public sealed class SqlDialectRulesTests
 
     // T-SQL reads a variable's name by its rule for names: a combining mark, a format character, a letter number, a
     // connector, "$", "#" and "@" included.  The others take letters, digits and "_".
+    // SQL Server reads the zero-width space as a space; every other dialect reads it as part of a word.
+    [Theory]
+    [InlineData("SqlServer", true)]
+    [InlineData("PostgreSql", false)]
+    [InlineData("MySql", false)]
+    public void IsSpace_ZeroWidthSpace_IsASpaceUnderSqlServerAlone(string dialect, bool sqlServer)
+    {
+        var rules = SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
+
+        rules.IsSpace('\u200B').ShouldBe(sqlServer);
+        rules.IsSpace(' ').ShouldBeTrue();
+        rules.IsSpace('\u00A0').ShouldBeTrue();
+        rules.IsSpace('a').ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData("Ansi", false)]
     [InlineData("SqlServer", true)]

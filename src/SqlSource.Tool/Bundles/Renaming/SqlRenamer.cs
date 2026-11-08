@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Quoting;
 using SqlSource.Parsing.Tokens;
 
 namespace SqlSource.Tool.Bundles.Renaming;
@@ -29,6 +30,11 @@ internal sealed partial class SqlRenamer(
     /// The ASCII operators and delimiters, the only characters kept that are no word, number or white space.
     /// </summary>
     internal const string Punctuation = "!%&()*+,-./:;<=>?@[]^`{|}~\\$#'\"";
+
+    // White space, and the zero-width space, which SQL Server reads as one.  Under PostgreSQL it is a word part, so
+    // this is never asked of it there.
+    internal static bool IsSpace(char character) =>
+        char.IsWhiteSpace(character) || character == QuoteReader.ZeroWidthSpace;
 
     /// <summary>
     /// The letters that, right before a quoted region, are a literal's prefix: <c>E''</c>, <c>N''</c>, <c>B''</c>,
@@ -423,7 +429,7 @@ internal sealed partial class SqlRenamer(
 
                     Word(wordStart, at, end, quoteFollows, newWords);
                 }
-                else if (char.IsWhiteSpace(character) || Punctuation.Contains(character, StringComparison.Ordinal))
+                else if (IsSpace(character) || Punctuation.Contains(character, StringComparison.Ordinal))
                 {
                     at++;
                     _into.CopyTo(at);
@@ -477,7 +483,7 @@ internal sealed partial class SqlRenamer(
         // Whether "(" is the next thing after the white space that follows a word.
         private bool IsCall(int after, int end)
         {
-            while (after < end && char.IsWhiteSpace(text[after]))
+            while (after < end && IsSpace(text[after]))
             {
                 after++;
             }

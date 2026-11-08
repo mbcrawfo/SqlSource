@@ -73,7 +73,7 @@ internal static class TsqlTokens
         while (at < end)
         {
             var character = sql[at];
-            if (char.IsWhiteSpace(character))
+            if (char.IsWhiteSpace(character) || character == QuoteReader.ZeroWidthSpace)
             {
                 at++;
                 continue;

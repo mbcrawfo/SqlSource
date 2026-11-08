@@ -207,7 +207,7 @@ internal sealed class SqlDeclaredVariables
                 }
 
                 index++;
-                if (char.IsWhiteSpace(value))
+                if (char.IsWhiteSpace(value) || value == QuoteReader.ZeroWidthSpace)
                 {
                     continue;
                 }

@@ -40,6 +40,11 @@ public sealed class TsqlTokensTests
             ]);
     }
 
+    // The server reads the zero-width space as a space, so it is no symbol between two tokens.
+    [Fact]
+    public void Read_ZeroWidthSpace_IsASpace() =>
+        TsqlTokens.Read("a\u200B=\u200Bb").Select(static token => token.Text).ShouldBe(["a", "=", "b"]);
+
     [Fact]
     public void Read_Token_HoldsItsOffsetsInTheSql()
     {
