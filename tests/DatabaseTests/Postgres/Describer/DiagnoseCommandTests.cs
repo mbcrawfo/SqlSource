@@ -73,7 +73,7 @@ public sealed class DiagnoseCommandTests : IDisposable
             DescriberFixtures.Postgres.Schema,
             TestContext.Current.CancellationToken
         );
-        BundleLeaks.Of(renamed, [schema, Sql], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks.Of(renamed, [schema, Sql], PostgresWords.IsEngineWord).ShouldBeEmpty();
     }
 
     [Fact]

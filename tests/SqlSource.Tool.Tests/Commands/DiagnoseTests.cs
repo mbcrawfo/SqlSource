@@ -42,7 +42,7 @@ public sealed class DiagnoseTests : IDisposable
         result.ShouldBe(new CliResult(0, _scene.Written("report.zip"), ""));
         var bundle = BundleReplays.Read(_scene.PathOf("report.zip"));
         bundle.Info.ShouldNotBeNull().Renamed.ShouldBeTrue();
-        BundleLeaks.Of(bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks.Of(bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
         using var mapping = JsonDocument.Parse(ReadText(_scene.PathOf("report.zip.mapping.json")));
         mapping.RootElement.GetProperty("mappingVersion").GetInt32().ShouldBe(1);
         mapping

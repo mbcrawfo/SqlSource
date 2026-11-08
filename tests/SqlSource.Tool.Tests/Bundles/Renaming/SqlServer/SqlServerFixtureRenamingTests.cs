@@ -50,15 +50,7 @@ public sealed class SqlServerFixtureRenamingTests
 
         var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
-        BundleLeaks
-            .Find(
-                renamed.Bundle,
-                SqlServerRenamings.Part,
-                BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
-                schema,
-                raw.Query
-            )
-            .ShouldBeEmpty();
+        SqlServerBundleLeaks.Find(renamed.Bundle, SqlServerRenamings.Part, raw, schema, raw.Query).ShouldBeEmpty();
     }
 
     [Theory]

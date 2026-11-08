@@ -80,7 +80,7 @@ public sealed class DiagnoseCommandTests : IDisposable
         var raw = ReadBundle("raw-for-leaks.zip");
         var token = TestContext.Current.CancellationToken;
         var schema = await File.ReadAllTextAsync(DescriberFixtures.SqlServer.Schema, token);
-        BundleLeaks.Find(renamed, Part, BundleLeaks.EngineRowNames(raw, Part), schema, Sql).ShouldBeEmpty();
+        SqlServerBundleLeaks.Find(renamed, Part, raw, schema, Sql).ShouldBeEmpty();
     }
 
     [Fact]

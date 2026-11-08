@@ -60,6 +60,6 @@ public sealed class RealisticRenamingTests(SqlServerDatabases sqlServer)
 
         var schema = await File.ReadAllTextAsync(RealisticCases.Corpus.Schema, token);
         var seed = await File.ReadAllTextAsync(RealisticCases.Corpus.Seed, token);
-        BundleLeaks.Find(bundle, Part, BundleLeaks.EngineRowNames(raw, Part), schema, seed, raw.Query).ShouldBeEmpty();
+        SqlServerBundleLeaks.Find(bundle, Part, raw, schema, seed, raw.Query).ShouldBeEmpty();
     }
 }

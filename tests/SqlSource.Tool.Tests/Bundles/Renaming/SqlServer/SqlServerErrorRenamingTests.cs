@@ -169,7 +169,7 @@ public sealed partial class SqlServerErrorRenamingTests
         var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
-        BundleLeaks
+        SqlServerBundleLeaks
             .Find(renamed.Bundle, SqlServerRenamings.Part, new HashSet<string>(), schema, raw.Query)
             .ShouldBeEmpty();
     }
@@ -222,7 +222,7 @@ public sealed partial class SqlServerErrorRenamingTests
         renamed.Bundle.Query.ShouldNotContain(stem, Case.Insensitive);
         renamed.Bundle.Capture.ShouldNotContain(stem, Case.Insensitive);
         renamed.Bundle.Expected.ShouldNotBeNull().ShouldNotContain(stem, Case.Insensitive);
-        BundleLeaks
+        SqlServerBundleLeaks
             .Find(
                 renamed.Bundle,
                 SqlServerRenamings.Part,
@@ -260,7 +260,7 @@ public sealed partial class SqlServerErrorRenamingTests
         var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
-        BundleLeaks
+        SqlServerBundleLeaks
             .Find(
                 renamed.Bundle,
                 SqlServerRenamings.Part,
@@ -288,7 +288,7 @@ public sealed partial class SqlServerErrorRenamingTests
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
         renamed.Bundle.Query.ShouldContain("master.sys.databases AS ");
         renamed.Bundle.Query.ShouldContain(".database_id");
-        BundleLeaks
+        SqlServerBundleLeaks
             .Find(
                 renamed.Bundle,
                 SqlServerRenamings.Part,
@@ -360,7 +360,7 @@ public sealed partial class SqlServerErrorRenamingTests
         string.Equals(replacements[0], replacements[1], StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
         renamed.Bundle.Query.ShouldContain(renamed.Mapping.Single(static name => name.Original == Upper).Replacement);
         replacements.ShouldAllBe(replacement => renamed.Bundle.Capture.Contains(replacement, StringComparison.Ordinal));
-        BundleLeaks
+        SqlServerBundleLeaks
             .Find(
                 renamed.Bundle,
                 SqlServerRenamings.Part,
@@ -408,7 +408,7 @@ public sealed partial class SqlServerErrorRenamingTests
         replacements.Count.ShouldBe(2);
         replacements.Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
         string.Equals(replacements[0], replacements[1], StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
-        BundleLeaks
+        SqlServerBundleLeaks
             .Find(
                 renamed.Bundle,
                 SqlServerRenamings.Part,
@@ -445,7 +445,7 @@ public sealed partial class SqlServerErrorRenamingTests
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
         renamed.Bundle.Query.ShouldContain("> $12.50");
         renamed.Mapping.ShouldNotContain(static name => name.Original.Contains('$', StringComparison.Ordinal));
-        BundleLeaks
+        SqlServerBundleLeaks
             .Find(
                 renamed.Bundle,
                 SqlServerRenamings.Part,

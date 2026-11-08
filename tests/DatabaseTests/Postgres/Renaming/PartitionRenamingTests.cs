@@ -72,7 +72,9 @@ public sealed class PartitionRenamingTests(PostgresDatabases databases)
             DescriberFixtures.Postgres.Schema,
             TestContext.Current.CancellationToken
         );
-        BundleLeaks.Of(bundle, [schema, ScratchSchema.Partitioned, query], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks
+            .Of(bundle, [schema, ScratchSchema.Partitioned, query], PostgresWords.IsEngineWord)
+            .ShouldBeEmpty();
     }
 
     // The aliases of the members of the plan's Appends that the walk reads as one prefix, in the order of the plan.

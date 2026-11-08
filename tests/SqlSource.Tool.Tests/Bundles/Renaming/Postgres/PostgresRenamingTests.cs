@@ -82,7 +82,7 @@ public sealed class PostgresRenamingTests
         }
 
         Provenance.Of(result.Bundle.Expected!).ShouldBe(Provenance.Of(raw.Expected!));
-        BundleLeaks.Of(result.Bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks.Of(result.Bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
     }
 
     [Fact]

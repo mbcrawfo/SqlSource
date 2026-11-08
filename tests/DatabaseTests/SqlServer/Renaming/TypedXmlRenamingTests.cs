@@ -70,7 +70,7 @@ public sealed class TypedXmlRenamingTests(SqlServerDatabases sqlServer)
             bundle.Query.ShouldContain(" xml(" + keyword + "dbo.");
             bundle.Query.ShouldNotContain(Collection, Case.Insensitive);
             bundle.Capture.ShouldNotContain(Collection, Case.Insensitive);
-            BundleLeaks.Find(bundle, Part, BundleLeaks.EngineRowNames(raw, Part), raw.Query).ShouldBeEmpty();
+            SqlServerBundleLeaks.Find(bundle, Part, raw, raw.Query).ShouldBeEmpty();
         }
         finally
         {
