@@ -64,7 +64,7 @@ public sealed class DeclaredTypeTextTests
     [InlineData("x＿")]
     [InlineData("Ⅰx")]
     [InlineData("〇x")]
-    public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.ShouldBe(text);
+    public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.Text.ShouldBe(text);
 
     // A delimited name holds anything but its own closing delimiter alone, so what looks like a second statement
     // inside one is part of the one name, and the server reads it as such.
@@ -74,7 +74,7 @@ public sealed class DeclaredTypeTextTests
     [InlineData("[a]]--b]")]
     [InlineData("[x, @y int]")]
     public void Read_DelimitedNameThatHoldsSyntax_IsOneName(string text) =>
-        DeclaredTypeText.Read(text).Value.ShouldBe(text);
+        DeclaredTypeText.Read(text).Value.Text.ShouldBe(text);
 
     // Space and tab may stand between the name and its parentheses, and inside them.
     [Theory]
@@ -82,11 +82,40 @@ public sealed class DeclaredTypeTextTests
     [InlineData("nvarchar ( 50 )")]
     [InlineData("nvarchar(\tmax\t)")]
     public void Read_SpaceBeforeOrInsideTheParentheses_IsAccepted(string text) =>
-        DeclaredTypeText.Read(text).Value.ShouldBe(text);
+        DeclaredTypeText.Read(text).Value.Text.ShouldBe(text);
 
     [Fact]
     public void Read_SpaceAroundTheName_IsLeftOut() =>
-        DeclaredTypeText.Read("  nvarchar(50) \t").Value.ShouldBe("nvarchar(50)");
+        DeclaredTypeText.Read("  nvarchar(50) \t").Value.Text.ShouldBe("nvarchar(50)");
+
+    // A name in the parentheses is an XML schema collection's, or max, which the session tells apart by the type the
+    // server reads.
+    [Theory]
+    [InlineData("xml(S)")]
+    [InlineData("xml(dbo.S)")]
+    [InlineData("xml(CONTENT dbo.S)")]
+    [InlineData("xml(DOCUMENT dbo.S)")]
+    [InlineData("xml(document [dbo].[S])")]
+    [InlineData("xml(\"dbo\" . \"S\")")]
+    [InlineData("xml( CONTENT dbo . S )")]
+    [InlineData("xml(CONTENT)")]
+    [InlineData("sys.xml(dbo.S)")]
+    [InlineData("xml(max)")]
+    [InlineData("nvarchar(max)")]
+    [InlineData("VARCHAR( MAX )")]
+    public void Read_NameInTheParentheses_HoldsAName(string text) =>
+        DeclaredTypeText.Read(text).Value.HoldsName.ShouldBeTrue(text);
+
+    [Theory]
+    [InlineData("xml")]
+    [InlineData("XML")]
+    [InlineData("int")]
+    [InlineData("nvarchar(50)")]
+    [InlineData("decimal(18, 2)")]
+    [InlineData("dbo.Email")]
+    [InlineData("[xml(dbo.S)]")]
+    public void Read_NoNameInTheParentheses_HoldsNone(string text) =>
+        DeclaredTypeText.Read(text).Value.HoldsName.ShouldBeFalse(text);
 
     [Theory]
     [InlineData("int;", TypeNameFound.Semicolon)]

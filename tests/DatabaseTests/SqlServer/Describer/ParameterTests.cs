@@ -357,23 +357,18 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         next.Failure.ShouldBeNull(next.Failure?.Descriptor.Id);
     }
 
-    [Fact]
-    public async Task DescribeAsync_XmlOfACollectionTheDatabaseHas_IsXml()
+    // A typed xml is recorded as xml, the type its method sends, whichever way the declaration names the collection.
+    [Theory]
+    [InlineData("xml(DOCUMENT dbo.TdSchemas)")]
+    [InlineData("xml(dbo.TdSchemas)")]
+    [InlineData("xml(content [dbo].[TdSchemas])")]
+    [InlineData("xml( \"dbo\" . \"TdSchemas\" )")]
+    [InlineData("XML(TdSchemas)")]
+    public async Task DescribeAsync_XmlOfACollectionTheDatabaseHas_IsXml(string type)
     {
-        await sqlServer.ExecuteAsync(
-            "IF EXISTS (SELECT 1 FROM sys.xml_schema_collections WHERE name = N'TdSchemas') "
-                + "DROP XML SCHEMA COLLECTION dbo.TdSchemas"
-        );
-        await sqlServer.ExecuteAsync(
-            "CREATE XML SCHEMA COLLECTION dbo.TdSchemas AS N'<xsd:schema "
-                + "xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><xsd:element name=\"a\" type=\"xsd:string\"/>"
-                + "</xsd:schema>'"
-        );
-        try
+        await WithSchemaCollectionAsync(async () =>
         {
-            var description = await ShouldDescribeAsync(
-                Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "xml(DOCUMENT dbo.TdSchemas)"))
-            );
+            var description = await ShouldDescribeAsync(Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", type)));
 
             description.Parameters.ShouldBe([
                 new DescribedParameter(
@@ -382,11 +377,49 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
                     SidecarValues.TypeSource.Declared
                 ),
             ]);
-        }
-        finally
+        });
+    }
+
+    // The method sends a typed xml as xml, which has no collection, so a query that needs the collection's typing
+    // fails at describe as every call of the method would: value() of an untyped document is not a singleton.
+    [Theory]
+    [InlineData("xml(DOCUMENT dbo.TdSchemas)")]
+    [InlineData("xml(document [dbo].[TdSchemas])")]
+    [InlineData("xml( DOCUMENT \"dbo\" . \"TdSchemas\" )")]
+    public async Task DescribeAsync_XQueryThatNeedsTheCollection_IsRejectedAsTheMethodWouldBe(string type)
+    {
+        await WithSchemaCollectionAsync(async () =>
         {
-            await sqlServer.ExecuteAsync("DROP XML SCHEMA COLLECTION dbo.TdSchemas");
-        }
+            var failure = await ShouldFailAsync(
+                Of(SqlDialectRules.SqlServer, "SELECT @p.value('/a', 'nvarchar(10)') AS v", ("p", type)),
+                "SQLSRC225"
+            );
+
+            failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+            failure.ServerLines[0].ShouldStartWith("Msg 2389, ");
+        });
+    }
+
+    // A query that types the parameter itself, with a CAST to the collection, describes.
+    [Fact]
+    public async Task DescribeAsync_XQueryOfACastToTheCollection_Describes()
+    {
+        await WithSchemaCollectionAsync(async () =>
+        {
+            var description = await ShouldDescribeAsync(
+                Of(
+                    SqlDialectRules.SqlServer,
+                    "SELECT CAST(@p AS xml(DOCUMENT dbo.TdSchemas)).value('/a', 'nvarchar(10)') AS v",
+                    ("p", "xml")
+                )
+            );
+
+            description
+                .Columns.ShouldNotBeNull()
+                .Single()
+                .Type.ShouldBeOfType<SqlServerType>()
+                .Name.ShouldBe("nvarchar(10)");
+        });
     }
 
     // The optional filter: the use in "IS NULL" types nothing, and the parameter takes the type of the column, in a
@@ -639,6 +672,28 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe(id);
         return failure;
+    }
+
+    // The schema collection dbo.TdSchemas, of one element a of xsd:string, while the action runs.
+    private async Task WithSchemaCollectionAsync(Func<Task> action)
+    {
+        await sqlServer.ExecuteAsync(
+            "IF EXISTS (SELECT 1 FROM sys.xml_schema_collections WHERE name = N'TdSchemas') "
+                + "DROP XML SCHEMA COLLECTION dbo.TdSchemas"
+        );
+        await sqlServer.ExecuteAsync(
+            "CREATE XML SCHEMA COLLECTION dbo.TdSchemas AS N'<xsd:schema "
+                + "xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><xsd:element name=\"a\" type=\"xsd:string\"/>"
+                + "</xsd:schema>'"
+        );
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP XML SCHEMA COLLECTION dbo.TdSchemas");
+        }
     }
 
     // The canary is still there.

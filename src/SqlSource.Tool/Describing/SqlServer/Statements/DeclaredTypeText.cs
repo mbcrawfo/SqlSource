@@ -41,16 +41,18 @@ internal static class DeclaredTypeText
         "a type name is a name, then (max), one or two numbers or an XML schema collection in parentheses";
 
     /// <summary>
-    /// The type without the spaces around it, or why it is refused: <see cref="TypeNameFound.Reason" /> of what was
-    /// found at the first place the text leaves the grammar.
+    /// The type without the spaces around it, with whether its parentheses hold a name, or why it is refused:
+    /// <see cref="TypeNameFound.Reason" /> of what was found at the first place the text leaves the grammar.
     /// </summary>
-    public static Outcome<string, string> Read(string text)
+    public static Outcome<Declaration, string> Read(string text)
     {
         var position = 0;
-        var found = ReadName(text, ref position) ?? ReadModifier(text, ref position) ?? ReadEnd(text, position);
+        var holdsName = false;
+        var found =
+            ReadName(text, ref position) ?? ReadModifier(text, ref position, ref holdsName) ?? ReadEnd(text, position);
         return found is null
-            ? Outcome<string, string>.Of(text.Trim(' ', '\t'))
-            : Outcome<string, string>.Failed(TypeNameFound.Reason(found));
+            ? Outcome<Declaration, string>.Of(new Declaration(text.Trim(' ', '\t'), holdsName))
+            : Outcome<Declaration, string>.Failed(TypeNameFound.Reason(found));
     }
 
     // One part, or two joined by a dot with any spaces around it.  Null when it was read, else what was found.  A dot
@@ -155,8 +157,8 @@ internal static class DeclaredTypeText
     }
 
     // Nothing, or "(n)", "(n, m)" or "(collection)" after any spaces, with spaces allowed inside.  "(max)" is read as
-    // a collection named max, and sent as written.
-    private static string? ReadModifier(string text, ref int position)
+    // a collection named max, and sent as written.  A name read in the parentheses sets holdsName.
+    private static string? ReadModifier(string text, ref int position, ref bool holdsName)
     {
         var start = position;
         SkipSpaces(text, ref position);
@@ -188,6 +190,8 @@ internal static class DeclaredTypeText
             {
                 return found;
             }
+
+            holdsName = true;
         }
         else
         {
@@ -281,4 +285,12 @@ internal static class DeclaredTypeText
             position++;
         }
     }
+
+    /// <summary>A type that <see cref="Read" /> took.</summary>
+    /// <param name="Text">The type without the spaces around it.</param>
+    /// <param name="HoldsName">
+    /// Whether its parentheses hold a name: an XML schema collection's, or <c>max</c>, which names a collection only
+    /// in a type the server reads as <c>xml</c>.
+    /// </param>
+    internal readonly record struct Declaration(string Text, bool HoldsName);
 }

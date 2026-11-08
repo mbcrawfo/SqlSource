@@ -70,9 +70,16 @@ internal sealed partial class SqlServerSession
             );
     }
 
+    // The declaration that "parameters", "probe" and "columns" are sent for a declared parameter: as DeclaredTypeText
+    // read it, but plain xml for one whose parentheses hold a name and that "declared" read as xml, which names an XML
+    // schema collection.  The method sends xml, to which SqlClient cannot give a collection, so the query is described
+    // as it will run; "declared" alone is sent the collection, so that one the database lacks fails there.
+    private static string Sent(DeclaredTypeText.Declaration declaration, SqlServerType type) =>
+        declaration.HoldsName && type.Name == PlainXml ? PlainXml : declaration.Text;
+
     // The declarations of "columns": every parameter of the list in its order, a declared one at its declaration as
-    // DeclaredTypeText read it, and any other at the type it was described at, as SqlServerTypes.Declared writes it;
-    // or null for a query with no parameter.
+    // Sent gives it, and any other at the type it was described at, as SqlServerTypes.Declared writes it; or null for
+    // a query with no parameter.
     private static string? ColumnsParams(
         EquatableArray<DescribedParameter> parameters,
         Dictionary<string, string> declarationOf
@@ -114,8 +121,8 @@ internal sealed partial class SqlServerSession
     /// </summary>
     /// <remarks>
     /// The copy that is probed is declared at the type it is probed with; every other copy and undeclared parameter
-    /// at the system type that <c>parameters</c> gave it, and one it gave none is left out; a declared parameter as it
-    /// is declared.
+    /// at the system type that <c>parameters</c> gave it, and one it gave none is left out; a declared parameter as
+    /// <c>parameters</c> was sent it.
     /// </remarks>
     private sealed class Probes(
         DescribeRequest request,
