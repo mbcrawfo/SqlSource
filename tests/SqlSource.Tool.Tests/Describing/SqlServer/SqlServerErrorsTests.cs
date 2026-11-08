@@ -21,6 +21,13 @@ public sealed class SqlServerErrorsTests
     private static readonly SqlServerType Int = new("int", 4, 10, 0, null);
     private static readonly SqlServerType Name100 = new("nvarchar(100)", 200, 0, 0, null);
 
+    [Theory]
+    [InlineData("Parameter @id and @name_1 are ambiguous.", new[] { "id", "name_1" })]
+    [InlineData("@@ROWCOUNT and @ alone, then @x.", new[] { "x" })]
+    [InlineData("No name here.", new string[0])]
+    public void NamesIn_Message_IsEachWholeNameAfterAnAt(string message, string[] names) =>
+        SqlServerErrors.NamesIn(message).ShouldBe(names);
+
     // The four errors of a parameter whose type the server cannot deduce, each with a message that names it.
     [Theory]
     [InlineData(11502, "The type for parameter '@p' cannot be deduced in this context.")]

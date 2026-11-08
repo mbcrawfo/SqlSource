@@ -130,7 +130,7 @@ internal static class PostgresOwnStrings
 
         return
             SqlStateOf(field) is PostgresErrors.IndeterminateDatatype or PostgresErrors.AmbiguousParameter
-            && ParameterNumberIn(field.Value) is { } number
+            && PostgresErrors.FirstParameterNumberIn(field.Value) is { } number
             ? ParameterText + number.ToString(CultureInfo.InvariantCulture)
             : string.Empty;
     }
@@ -157,23 +157,6 @@ internal static class PostgresOwnStrings
 
     private static string Written(string name, bool quoted) =>
         quoted ? "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : name;
-
-    // The first "$n" of a message, as PostgresErrors reads the parameter a message names.
-    private static int? ParameterNumberIn(string message)
-    {
-        var dollar = message.IndexOf('$', StringComparison.Ordinal);
-        while (dollar >= 0)
-        {
-            if (PostgresIdentifiers.ParameterNumberAt(message, dollar) is { } number)
-            {
-                return number;
-            }
-
-            dollar = message.IndexOf('$', dollar + 1);
-        }
-
-        return null;
-    }
 
     private static bool IsParameterText(string value) =>
         value.Length > ParameterText.Length

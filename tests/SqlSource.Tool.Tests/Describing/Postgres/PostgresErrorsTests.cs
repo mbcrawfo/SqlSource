@@ -16,6 +16,13 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 // A server's error, or a refusal of the tool, as the failure the run reports at the query.
 public sealed class PostgresErrorsTests
 {
+    [Theory]
+    [InlineData("could not determine data type of parameter $2", 2)]
+    [InlineData("cost $ and $x, then parameter $12 and $3", 12)]
+    [InlineData("no parameter", null)]
+    public void FirstParameterNumberIn_Message_IsTheFirstDollarNumber(string message, int? number) =>
+        PostgresErrors.FirstParameterNumberIn(message).ShouldBe(number);
+
     [Fact]
     public void Open_ErrorWithASqlState_IsSqlsrc224AtNoStepWithTheServersLine()
     {
