@@ -32,8 +32,7 @@ internal static class PostgresFieldRules
     // Where the entry's type records are, by the method the renaming asks the entry's members by.
     private static readonly string[] TypeRecords =
     [
-        BundleFiles.Expected + " " + SidecarKeys.Parameters + "[]." + SidecarKeys.Type + ".",
-        BundleFiles.Expected + " " + SidecarKeys.Columns + "[]." + SidecarKeys.Type + ".",
+        .. EntryRenamer.TypeRecords.Select(static record => BundleFiles.Expected + " " + record),
     ];
 
     // The members of a type that hold a type of their own, whose members have the same rules.

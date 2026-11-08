@@ -23,8 +23,10 @@ internal static class EntryRenamer
     /// <summary>The place of the entry's members, as a refusal names it before a member's path.</summary>
     public const string Place = BundleFiles.Expected;
 
-    // Where the type records are; each holds members of the engine's.
-    private static readonly string[] TypeRecords =
+    /// <summary>
+    /// Where the type records are, as paths from the entry each followed by a dot; each holds members of the engine's.
+    /// </summary>
+    public static IReadOnlyList<string> TypeRecords { get; } =
     [
         JsonStrings.MemberOf(JsonStrings.ElementOf(SidecarKeys.Parameters), SidecarKeys.Type) + ".",
         JsonStrings.MemberOf(JsonStrings.ElementOf(SidecarKeys.Columns), SidecarKeys.Type) + ".",

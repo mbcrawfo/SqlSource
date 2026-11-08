@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Tool.Bundles;
@@ -32,8 +31,6 @@ public sealed class PostgresFieldRulesTests
         [PostgresCallNames.Deallocate] = (typeof(PostgresDeallocateRequest), typeof(PostgresDeallocateAnswer)),
     };
 
-    private static readonly Type[] Scalars = [typeof(string), typeof(int), typeof(long), typeof(bool)];
-
     public static TheoryData<string> Methods => [with(Calls.Keys.Order(StringComparer.Ordinal))];
 
     // A call that is added fails here until its records are mapped above, and so are walked below.
@@ -54,9 +51,13 @@ public sealed class PostgresFieldRulesTests
     public void RuleOf_EveryStringMemberOfEveryCall_HasARule()
     {
         List<string> missing = [];
-        foreach (var (method, path, isString) in AllMembers())
+        foreach (var (method, path, isString) in CallMembers.Of(Calls))
         {
-            if (isString && !IsUnderADrop(method, path) && PostgresFieldRules.RuleOf(method, path) is null)
+            if (
+                isString
+                && !CallMembers.IsUnderADrop(PostgresFieldRules.RuleOf, method, path)
+                && PostgresFieldRules.RuleOf(method, path) is null
+            )
             {
                 missing.Add(method + " " + path);
             }
@@ -68,7 +69,7 @@ public sealed class PostgresFieldRulesTests
     [Fact]
     public void RuleOf_EveryRuleOfTheTable_IsOfAMemberThatExists()
     {
-        var members = AllMembers().Select(static found => found.Method + " " + found.Path).ToHashSet();
+        var members = CallMembers.Of(Calls).Select(static found => found.Method + " " + found.Path).ToHashSet();
 
         PostgresFieldRules.Members.Where(member => !members.Contains(member)).ShouldBeEmpty();
     }
@@ -158,70 +159,4 @@ public sealed class PostgresFieldRulesTests
     )]
     public void IsEngineRow_BySchema(string row, bool expected) =>
         PostgresFieldRules.IsEngineRow(JsonNode.Parse(row)!.AsObject()).ShouldBe(expected);
-
-    // Every member of every call, at every depth, as CaptureJson.Options names it: an object and an array are members
-    // too, and an element of an array is [] in the path.
-    private static IEnumerable<(string Method, string Path, bool IsString)> AllMembers() =>
-        Calls.SelectMany(static call =>
-            MembersOf(call.Value.Request, "request")
-                .Concat(MembersOf(call.Value.Answer, "answer"))
-                .Select(found => (call.Key, found.Path, found.IsString))
-        );
-
-    private static IEnumerable<(string Path, bool IsString)> MembersOf(Type record, string path)
-    {
-        foreach (var property in record.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-        {
-            var at = path + "." + JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-            foreach (var found in ValuesOf(property.PropertyType, at))
-            {
-                yield return found;
-            }
-        }
-    }
-
-    private static IEnumerable<(string Path, bool IsString)> ValuesOf(Type type, string path)
-    {
-        var plain = Nullable.GetUnderlyingType(type) ?? type;
-        if (Scalars.Contains(plain))
-        {
-            yield return (path, plain == typeof(string));
-            yield break;
-        }
-
-        yield return (path, false);
-        var inner =
-            plain.IsGenericType && plain.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
-                ? ValuesOf(plain.GetGenericArguments()[0], path + "[]")
-                : MembersOf(plain, path);
-        foreach (var found in inner)
-        {
-            yield return found;
-        }
-    }
-
-    // Whether the member or one that holds it is dropped, as CaptureRenamer.Drop removes it.
-    private static bool IsUnderADrop(string method, string path)
-    {
-        for (var at = path; at.Length > 0; at = Parent(at))
-        {
-            if (PostgresFieldRules.RuleOf(method, at) is { Kind: FieldRuleKind.Drop })
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static string Parent(string path)
-    {
-        if (path.EndsWith("[]", StringComparison.Ordinal))
-        {
-            return path[..^2];
-        }
-
-        var dot = path.LastIndexOf('.');
-        return dot > 0 ? path[..dot] : string.Empty;
-    }
 }

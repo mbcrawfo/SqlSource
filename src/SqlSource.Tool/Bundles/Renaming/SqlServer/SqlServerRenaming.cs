@@ -39,16 +39,12 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     private static readonly string[] ClrTypes = ["GEOMETRY", "GEOGRAPHY", "HIERARCHYID"];
 
-    // The methods whose rows are the columns of a result set, with their sources.
-    private static readonly string[] ColumnMethods =
-    [
-        SqlServerCallNames.Columns,
-        SqlServerCallNames.Operands,
-        SqlServerCallNames.Table,
-    ];
-
     // The schemas whose relations are the server's own, folded.
-    private static readonly string[] SystemSchemas = ["SYS", "INFORMATION_SCHEMA"];
+    private static readonly string[] EngineSchemas =
+    [
+        SqlServerVocabulary.Fold(SystemSchemas.SqlServer),
+        "INFORMATION_SCHEMA",
+    ];
 
     private SqlServerRenaming() { }
 
@@ -106,17 +102,20 @@ internal sealed class SqlServerRenaming : IEngineRenaming
     /// </remarks>
     public bool IsEngineRow(string method, string path, JsonObject row)
     {
-        if (!ColumnMethods.Contains(method, StringComparer.Ordinal))
+        if (!SqlServerFields.ColumnMethods.Contains(method, StringComparer.Ordinal))
         {
             return false;
         }
 
         return path switch
         {
-            "answer.rows[]" => (IsSystemSchema(row, "sourceSchema") || IsSystemResource(row, "sourceDatabase"))
-                && row["sourceServer"] is null
+            SqlServerFields.Rows => (
+                IsSystemSchema(row, SqlServerFields.SourceSchema)
+                || IsSystemResource(row, SqlServerFields.SourceDatabase)
+            )
+                && row[SqlServerFields.SourceServer] is null
                 && IsUnaliased(row),
-            CaptureJson.RequestKey => method == SqlServerCallNames.Table && IsSystemSchema(row, "schema"),
+            CaptureJson.RequestKey => method == SqlServerCallNames.Table && IsSystemSchema(row, SqlServerFields.Schema),
             _ => false,
         };
     }
@@ -133,7 +132,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
         if (
             method != SqlServerCallNames.Parameters
             || call[CaptureJson.RequestKey] is not JsonObject request
-            || request["reused"] is not JsonArray reused
+            || request[SqlServerFields.Reused] is not JsonArray reused
         )
         {
             yield break;
@@ -143,8 +142,8 @@ internal sealed class SqlServerRenaming : IEngineRenaming
         {
             if (
                 entry is not JsonObject found
-                || StringOf(found, "name") is not { } parameter
-                || found["copies"] is not JsonArray copies
+                || StringOf(found, SqlServerFields.Name) is not { } parameter
+                || found[SqlServerFields.Copies] is not JsonArray copies
                 || !copies.All(static copy => copy is JsonValue value && value.GetValueKind() == JsonValueKind.String)
             )
             {
@@ -195,17 +194,17 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     private static bool IsSystemSchema(JsonObject row, string member) =>
         StringOf(row, member) is { } schema
-        && SystemSchemas.Contains(SqlServerVocabulary.Fold(schema), StringComparer.Ordinal);
+        && EngineSchemas.Contains(SqlServerVocabulary.Fold(schema), StringComparer.Ordinal);
 
     // A column's name is its source column's, without a nullability mark and folded, the tool's AS [n], or null.
     private static bool IsUnaliased(JsonObject row)
     {
-        if (row["name"] is null)
+        if (row[SqlServerFields.Name] is null)
         {
             return true;
         }
 
-        if (StringOf(row, "name") is not { } name)
+        if (StringOf(row, SqlServerFields.Name) is not { } name)
         {
             return false;
         }
@@ -215,7 +214,7 @@ internal sealed class SqlServerRenaming : IEngineRenaming
             return true;
         }
 
-        return StringOf(row, "sourceColumn") is { } column
+        return StringOf(row, SqlServerFields.SourceColumn) is { } column
             && string.Equals(
                 SqlServerVocabulary.Fold(RenamingRun.MarkOf(name).Stem),
                 SqlServerVocabulary.Fold(column),

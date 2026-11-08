@@ -1,19 +1,35 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.SqlServer;
+using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
 
 // The rule of each member of SqlServerCalls.cs' records and of the entry's SQL Server type that is written out here,
-// and a rule for every string that the SQL Server fixtures' captures hold.  A member that neither names has no check.
+// a rule for every string that the SQL Server fixtures' captures hold, and, by walking the records, a rule for every
+// string member of every call and a call member for every rule of the table.
 public sealed class SqlServerFieldsTests
 {
+    // The records of each call, as SqlServerSession asks it.
+    private static readonly Dictionary<string, (Type Request, Type Answer)> Calls = new(StringComparer.Ordinal)
+    {
+        [SqlServerCallNames.Open] = (typeof(SqlServerOpenRequest), typeof(SqlServerOpenAnswer)),
+        [SqlServerCallNames.Parameters] = (typeof(SqlServerParametersRequest), typeof(SqlServerParametersAnswer)),
+        [SqlServerCallNames.Probe] = (typeof(SqlServerProbeRequest), typeof(SqlServerProbeAnswer)),
+        [SqlServerCallNames.Declared] = (typeof(SqlServerDeclaredRequest), typeof(SqlServerDeclaredAnswer)),
+        [SqlServerCallNames.Columns] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
+        [SqlServerCallNames.Operands] = (typeof(SqlServerColumnsRequest), typeof(SqlServerColumnsAnswer)),
+        [SqlServerCallNames.Table] = (typeof(SqlServerTableRequest), typeof(SqlServerColumnsAnswer)),
+    };
+
     private static readonly string[] Methods =
     [
         "open",
@@ -42,6 +58,47 @@ public sealed class SqlServerFieldsTests
     {
         var space = member.IndexOf(' ', StringComparison.Ordinal);
         SqlServerFields.RuleOf(member[..space], member[(space + 1)..]).ShouldBe(Table[member], member);
+    }
+
+    // A call that is added fails here until its records are mapped above, and so are walked below.
+    [Fact]
+    public void Calls_AreEveryCallOfTheDescriber() =>
+        Calls
+            .Keys.Order(StringComparer.Ordinal)
+            .ShouldBe(
+                typeof(SqlServerCallNames)
+                    .GetFields(BindingFlags.Public | BindingFlags.Static)
+                    .Where(static field => field.IsLiteral)
+                    .Select(static field => (string)field.GetRawConstantValue()!)
+                    .Order(StringComparer.Ordinal)
+            );
+
+    // Below a member that is dropped nothing is renamed, so nothing there needs a rule.
+    [Fact]
+    public void RuleOf_EveryStringMemberOfEveryCall_HasARule()
+    {
+        List<string> missing = [];
+        foreach (var (method, path, isString) in CallMembers.Of(Calls))
+        {
+            if (
+                isString
+                && !CallMembers.IsUnderADrop(SqlServerFields.RuleOf, method, path)
+                && SqlServerFields.RuleOf(method, path) is null
+            )
+            {
+                missing.Add(method + " " + path);
+            }
+        }
+
+        missing.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void RuleOf_EveryRuleOfTheTable_IsOfAMemberThatExists()
+    {
+        var members = CallMembers.Of(Calls).Select(static found => found.Method + " " + found.Path).ToHashSet();
+
+        SqlServerFields.Members.Where(member => !members.Contains(member)).ShouldBeEmpty();
     }
 
     [Fact]

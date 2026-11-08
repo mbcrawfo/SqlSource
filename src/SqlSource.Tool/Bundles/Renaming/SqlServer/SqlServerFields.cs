@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Linq;
+using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
 
 namespace SqlSource.Tool.Bundles.Renaming.SqlServer;
@@ -47,16 +50,36 @@ internal static class SqlServerFields
         SqlServerCallNames.Table,
     ];
 
-    // The methods whose rows are the columns of a result set, with their sources.
-    private static readonly string[] ColumnMethods =
-    [
-        SqlServerCallNames.Columns,
-        SqlServerCallNames.Operands,
-        SqlServerCallNames.Table,
-    ];
+    /// <summary>The methods whose rows are the columns of a result set, with their sources.</summary>
+    public static IReadOnlyList<string> ColumnMethods { get; } =
+    [SqlServerCallNames.Columns, SqlServerCallNames.Operands, SqlServerCallNames.Table];
 
-    // The type records of the entry, whose members are asked with their path from the entry.
-    private static readonly string[] EntryTypes = ["parameters[].type.", "columns[].type."];
+    /// <summary>The path of a row of an answer.</summary>
+    public const string Rows = "answer.rows[]";
+
+    /// <summary>The member of a column, a source or a type that holds a name.</summary>
+    public const string Name = SidecarKeys.Name;
+
+    /// <summary>The member of a column row that holds the linked server it is read through.</summary>
+    public const string SourceServer = "sourceServer";
+
+    /// <summary>The member of a column row that holds its source database.</summary>
+    public const string SourceDatabase = "sourceDatabase";
+
+    /// <summary>The member of a column row that holds its source schema.</summary>
+    public const string SourceSchema = "sourceSchema";
+
+    /// <summary>The member of a column row that holds its source column.</summary>
+    public const string SourceColumn = "sourceColumn";
+
+    /// <summary>The member of the <c>table</c> request that holds the schema.</summary>
+    public const string Schema = SidecarKeys.Schema;
+
+    /// <summary>The member of the <c>parameters</c> request that lists the reused parameters.</summary>
+    public const string Reused = "reused";
+
+    /// <summary>The member of a reused parameter that lists its copies.</summary>
+    public const string Copies = "copies";
 
     private static readonly FrozenDictionary<string, FieldRule> Rules = Build();
 
@@ -67,66 +90,93 @@ internal static class SqlServerFields
     public static FieldRule? RuleOf(string method, string path) =>
         Rules.TryGetValue(method + " " + path, out var rule) ? rule : null;
 
+    /// <summary>
+    /// The members of the calls that the table has a rule for, as <c>"&lt;method&gt; &lt;path&gt;"</c>; the entry's
+    /// are left out.
+    /// </summary>
+    public static IEnumerable<string> Members =>
+        Rules.Keys.Where(static key => !key.StartsWith(BundleFiles.Expected + " ", StringComparison.Ordinal));
+
     private static FrozenDictionary<string, FieldRule> Build()
     {
-        var rules = new Dictionary<string, FieldRule>(StringComparer.Ordinal)
-        {
-            ["open answer.productVersion"] = FieldRule.Fixed,
-            ["open answer.driverVersion"] = FieldRule.Fixed,
-            ["open answer.settings[].name"] = FieldRule.Fixed,
-            ["open answer.settings[].value"] = FieldRule.Fixed,
-            ["open answer.database"] = FieldRule.Name(NameClass.Database),
-            ["table request.schema"] = FieldRule.Name(NameClass.Schema),
-            ["table request.table"] = FieldRule.Name(NameClass.Table),
-            ["parameters request.reused[].name"] = FieldRule.Parameter,
-            ["parameters request.reused[].copies[]"] = FieldRule.Parameter,
-            ["parameters answer.rows[].name"] = FieldRule.Parameter,
-            ["parameters answer.rows[].suggestedSystemTypeName"] = FieldRule.TypeSpelling,
-            ["parameters answer.rows[].suggestedUserTypeSchema"] = FieldRule.Name(NameClass.Schema),
-            ["parameters answer.rows[].suggestedUserTypeName"] = FieldRule.Name(NameClass.Type),
-            ["parameters answer.rows[].suggestedAssemblyQualifiedTypeName"] = FieldRule.WholeName(NameClass.Type),
-        };
+        var rules = new Dictionary<string, FieldRule>(StringComparer.Ordinal);
+        void Add(string method, string path, FieldRule rule) => rules.Add(method + " " + path, rule);
+        static string Row(string member) => JsonStrings.MemberOf(Rows, member);
+
+        var setting = JsonStrings.ElementOf("answer.settings");
+        Add(SqlServerCallNames.Open, "answer.productVersion", FieldRule.Fixed);
+        Add(SqlServerCallNames.Open, "answer.driverVersion", FieldRule.Fixed);
+        Add(SqlServerCallNames.Open, JsonStrings.MemberOf(setting, Name), FieldRule.Fixed);
+        Add(SqlServerCallNames.Open, JsonStrings.MemberOf(setting, "value"), FieldRule.Fixed);
+        Add(SqlServerCallNames.Open, "answer.database", FieldRule.Name(NameClass.Database));
+        Add(
+            SqlServerCallNames.Table,
+            JsonStrings.MemberOf(CaptureJson.RequestKey, Schema),
+            FieldRule.Name(NameClass.Schema)
+        );
+        Add(SqlServerCallNames.Table, "request.table", FieldRule.Name(NameClass.Table));
+
+        var reused = JsonStrings.ElementOf(JsonStrings.MemberOf(CaptureJson.RequestKey, Reused));
+        Add(SqlServerCallNames.Parameters, JsonStrings.MemberOf(reused, Name), FieldRule.Parameter);
+        Add(
+            SqlServerCallNames.Parameters,
+            JsonStrings.ElementOf(JsonStrings.MemberOf(reused, Copies)),
+            FieldRule.Parameter
+        );
+        Add(SqlServerCallNames.Parameters, Row(Name), FieldRule.Parameter);
+        Add(SqlServerCallNames.Parameters, Row("suggestedSystemTypeName"), FieldRule.TypeSpelling);
+        Add(SqlServerCallNames.Parameters, Row("suggestedUserTypeSchema"), FieldRule.Name(NameClass.Schema));
+        Add(SqlServerCallNames.Parameters, Row("suggestedUserTypeName"), FieldRule.Name(NameClass.Type));
+        Add(
+            SqlServerCallNames.Parameters,
+            Row("suggestedAssemblyQualifiedTypeName"),
+            FieldRule.WholeName(NameClass.Type)
+        );
+
         foreach (var method in Methods)
         {
-            rules[method + " answer.error.errors[].message"] = FieldRule.Own;
+            Add(method, "answer.error.errors[].message", FieldRule.Own);
         }
 
         foreach (var method in SqlMethods)
         {
-            rules[method + " request.sql"] = FieldRule.Sql;
-            rules[method + " request.params"] = FieldRule.TypeSpelling;
+            Add(method, "request.sql", FieldRule.Sql);
+            Add(method, "request.params", FieldRule.TypeSpelling);
         }
 
         foreach (var method in DescribeMethods)
         {
-            var row = method + " answer.rows[].";
-            rules[method + " answer.errors[].message"] = FieldRule.Own;
-            rules[row + "systemTypeName"] = FieldRule.TypeSpelling;
-            rules[row + "userTypeSchema"] = FieldRule.Name(NameClass.Schema);
-            rules[row + "userTypeName"] = FieldRule.Name(NameClass.Type);
-            rules[row + "assemblyQualifiedTypeName"] = FieldRule.WholeName(NameClass.Type);
+            Add(method, "answer.errors[].message", FieldRule.Own);
+            Add(method, Row("systemTypeName"), FieldRule.TypeSpelling);
+            Add(method, Row("userTypeSchema"), FieldRule.Name(NameClass.Schema));
+            Add(method, Row("userTypeName"), FieldRule.Name(NameClass.Type));
+            Add(method, Row("assemblyQualifiedTypeName"), FieldRule.WholeName(NameClass.Type));
         }
 
         foreach (var method in ColumnMethods)
         {
-            var row = method + " answer.rows[].";
-            rules[row + "name"] = FieldRule.Name(NameClass.Column);
-            rules[row + "sourceServer"] = FieldRule.Name(NameClass.Database);
-            rules[row + "sourceDatabase"] = FieldRule.Name(NameClass.Database);
-            rules[row + "sourceSchema"] = FieldRule.Name(NameClass.Schema);
-            rules[row + "sourceTable"] = FieldRule.Name(NameClass.Table);
-            rules[row + "sourceColumn"] = FieldRule.Name(NameClass.Column);
-            rules[row + "sourceType"] = FieldRule.Closed;
+            Add(method, Row(Name), FieldRule.Name(NameClass.Column));
+            Add(method, Row(SourceServer), FieldRule.Name(NameClass.Database));
+            Add(method, Row(SourceDatabase), FieldRule.Name(NameClass.Database));
+            Add(method, Row(SourceSchema), FieldRule.Name(NameClass.Schema));
+            Add(method, Row("sourceTable"), FieldRule.Name(NameClass.Table));
+            Add(method, Row(SourceColumn), FieldRule.Name(NameClass.Column));
+            Add(method, Row("sourceType"), FieldRule.Closed);
         }
 
-        foreach (var type in EntryTypes)
+        foreach (var type in EntryRenamer.TypeRecords)
         {
-            var record = BundleFiles.Expected + " " + type;
-            rules[record + "name"] = FieldRule.TypeSpelling;
-            rules[record + "bindName"] = FieldRule.TypeSpelling;
-            rules[record + "userType.schema"] = FieldRule.Name(NameClass.Schema);
-            rules[record + "userType.name"] = FieldRule.Name(NameClass.Type);
-            rules[record + "userType.assemblyQualifiedName"] = FieldRule.WholeName(NameClass.Type);
+            var record = type[..^1];
+            var userType = JsonStrings.MemberOf(record, SidecarKeys.UserType);
+            Add(BundleFiles.Expected, JsonStrings.MemberOf(record, Name), FieldRule.TypeSpelling);
+            Add(BundleFiles.Expected, JsonStrings.MemberOf(record, SidecarKeys.BindName), FieldRule.TypeSpelling);
+            Add(BundleFiles.Expected, JsonStrings.MemberOf(userType, Schema), FieldRule.Name(NameClass.Schema));
+            Add(BundleFiles.Expected, JsonStrings.MemberOf(userType, Name), FieldRule.Name(NameClass.Type));
+            Add(
+                BundleFiles.Expected,
+                JsonStrings.MemberOf(userType, SidecarKeys.AssemblyQualifiedName),
+                FieldRule.WholeName(NameClass.Type)
+            );
         }
 
         return rules.ToFrozenDictionary(StringComparer.Ordinal);

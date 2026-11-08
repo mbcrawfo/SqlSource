@@ -249,7 +249,7 @@ The vocabulary is [`postgres-vocabulary.txt`](../../src/SqlSource.Tool/Bundles/R
 
 ### PostgreSQL's members and rows
 
-[`PostgresFieldRules`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresFieldRules.cs) is the table of `RuleOf`, read from its `Build`: each line is a call's name from `PostgresCallNames`, a member's path from the call as `CaptureJson.Options` names it, and the member's rule.  A loop over several calls gives the members they share, the tables of `tables` and `relations` and the error of every call.  The members of the entry's PostgreSQL type, `TypeMembers`, are found under `parameters[].type.` and `columns[].type.`, at any depth of `element.`, `base.` and `subtype.`.  Every string member the pipeline reads has a rule; what is dropped is what nothing reads: an error's `detail` and `hint`, its `position` but for `prepare`'s, and the whole error of `deallocate`, `partitions` and `relations`.  A number or a boolean with no rule is kept, as for every engine.
+[`PostgresFieldRules`](../../src/SqlSource.Tool/Bundles/Renaming/Postgres/PostgresFieldRules.cs) is the table of `RuleOf`, read from its `Build`: each line is a call's name from `PostgresCallNames`, a member's path from the call as `CaptureJson.Options` names it, and the member's rule.  A loop over several calls gives the members they share, the tables of `tables` and `relations` and the error of every call.  The members of the entry's PostgreSQL type, `TypeMembers`, are found under `EntryRenamer.TypeRecords`, `parameters[].type.` and `columns[].type.`, at any depth of `element.`, `base.` and `subtype.`.  Every string member the pipeline reads has a rule; what is dropped is what nothing reads: an error's `detail` and `hint`, its `position` but for `prepare`'s, and the whole error of `deallocate`, `partitions` and `relations`.  A number or a boolean with no rule is kept, as for every engine.
 
 `IsEngineRow` reads the row's `nspname`, or its `schema` when it has none, and says the row is the engine's when that is `pg_catalog` or `information_schema`, whatever the call or path.  So a type of `pg_catalog` in `types`, or a table of `information_schema` that `tables` answers, keeps its name.  A row of `public` is the user's, and the name `public` is kept by `IsEngineWord` alone.  A column's row in `tables` holds no schema, so a column of a relation of `pg_catalog` is renamed, unless it is a word of the vocabulary: the name is not the user's and is renamed alike wherever it is, so no decision changes.
 
@@ -322,7 +322,7 @@ Each file of the folder has its tests in `tests/SqlSource.Tool.Tests/Bundles/Ren
 
 ### SQL Server's fields
 
-`SqlServerFields` gives a rule to every string member of the records of [`SqlServerCalls.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerCalls.cs), by the call's method and the member's path, and to every string member of the entry's SQL Server type, under `parameters[].type.` and `columns[].type.`.  It gives no `Drop`: the pipeline reads every member of SQL Server's calls ([the spike's finding 1](../superpowers/specs/2026-11-05-query-generation-phase-10-spike.md#1-the-fields-the-pipeline-reads)).  The kinds it gives:
+`SqlServerFields` owns the names of the members its rules and `SqlServerRenaming` share, and gives a rule to every string member of the records of [`SqlServerCalls.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerCalls.cs), by the call's method and the member's path, and to every string member of the entry's SQL Server type, under `parameters[].type.` and `columns[].type.`.  It gives no `Drop`: the pipeline reads every member of SQL Server's calls ([the spike's finding 1](../superpowers/specs/2026-11-05-query-generation-phase-10-spike.md#1-the-fields-the-pipeline-reads)).  The kinds it gives:
 
 - **`Fixed`**: the versions and the settings, each name and value, of `open`.
 - **`Sql`** and **`TypeSpelling`**: the `sql` of the requests of `parameters`, `probe`, `declared`, `columns` and `operands` is SQL, and their `params`, each row's `systemTypeName` or `suggestedSystemTypeName`, and the entry's type `name` and `bindName` are type spellings.
@@ -332,7 +332,7 @@ Each file of the folder has its tests in `tests/SqlSource.Tool.Tests/Bundles/Ren
 - **`Closed`**: the tool's `sourceType`.
 - **`Own`**: every message, of an `error` of any call and of the error rows of `declared`, `columns`, `operands` and `table`.
 
-A number or a boolean is kept, an error's number, class and state among them.  A member with no rule is refused at its place, so a member added to a record, or newly read, is given its rule in the change that adds it; `SqlServerFieldsTests` fails when a string of a committed fixture's capture has no rule, and [the describer's page](sqlserver-describer.md#the-calls-and-their-records) says so.
+A number or a boolean is kept, an error's number, class and state among them.  A member with no rule is refused at its place, so a member added to a record, or newly read, is given its rule in the change that adds it; `SqlServerFieldsTests` walks the records of `SqlServerCalls.cs` and fails when a string member of one has no rule or a rule names no member, and when a string of a committed fixture's capture has no rule, and [the describer's page](sqlserver-describer.md#the-calls-and-their-records) says so.
 
 ### SQL Server's vocabulary
 
