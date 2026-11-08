@@ -160,16 +160,10 @@ internal static class SqlFileParser
         private (TextSpan Name, ResultShape? Shape) ReadName(SqlMarker marker)
         {
             var value = marker.ValueSpan;
-            var arrow = text.IndexOf("->", value.Start, value.Length, StringComparison.Ordinal);
+            var (name, arrow) = SqlMarkerReader.SplitName(text, value);
             if (arrow < 0)
             {
-                return (value, null);
-            }
-
-            var nameEnd = arrow;
-            while (nameEnd > value.Start && char.IsWhiteSpace(text[nameEnd - 1]))
-            {
-                nameEnd--;
+                return (name, null);
             }
 
             ResultShape? shape = null;
@@ -187,7 +181,7 @@ internal static class SqlFileParser
                 );
             }
 
-            return (TextSpan.FromBounds(value.Start, nameEnd), shape);
+            return (name, shape);
         }
 
         private SqlMarkerScope ReadPreamble(int end)

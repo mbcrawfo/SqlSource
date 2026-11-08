@@ -71,12 +71,12 @@ internal sealed partial class TokenCheck
         {
             case SqlMarkerKind.Name:
                 // The result's shape after the arrow is a closed word, which must read as the generator reads it.
-                var arrow = value.IndexOf("->", StringComparison.Ordinal);
-                var name = arrow < 0 ? value : value[..arrow].TrimEnd();
+                var (nameSpan, arrow) = SqlMarkerReader.SplitName(text, marker.ValueSpan);
+                var name = text.Substring(nameSpan.Start, nameSpan.Length);
                 Whole(IsSafe(name, quoted: false), place, name);
                 if (arrow >= 0)
                 {
-                    var shape = value[(arrow + 2)..];
+                    var shape = text[(arrow + 2)..marker.ValueSpan.End];
                     Whole(SettingValue.TryReadChoice<ResultShape>(shape.AsSpan(), out _), place, shape.Trim());
                 }
 

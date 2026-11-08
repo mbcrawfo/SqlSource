@@ -24,7 +24,7 @@ internal sealed partial class SqlRenamer
             var value = text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
             var renamed = marker.Kind switch
             {
-                SqlMarkerKind.Name => NameMarker(value),
+                SqlMarkerKind.Name => NameMarker(marker),
                 SqlMarkerKind.Dialect => SqlDialectMarker.TryRead(text, marker, out _) ? value : null,
                 SqlMarkerKind.Database => DatabaseMarker(value),
                 SqlMarkerKind.Param => ParamMarker(marker),
@@ -70,19 +70,23 @@ internal sealed partial class SqlRenamer
         }
 
         // "Name" or "Name -> shape", read as the parser reads it: the name a query's, the shape kept.
-        private string? NameMarker(string value)
+        private string? NameMarker(SqlMarker marker)
         {
-            var arrow = value.IndexOf("->", StringComparison.Ordinal);
-            var name = arrow < 0 ? value : value[..arrow].TrimEnd();
+            var value = marker.ValueSpan;
+            var (name, arrow) = SqlMarkerReader.SplitName(text, value);
             if (
-                name.Length == 0
-                || (arrow >= 0 && !SettingValue.TryReadChoice<ResultShape>(value.AsSpan(arrow + 2), out _))
+                name.IsEmpty
+                || (
+                    arrow >= 0
+                    && !SettingValue.TryReadChoice<ResultShape>(text.AsSpan(arrow + 2, value.End - arrow - 2), out _)
+                )
             )
             {
                 return null;
             }
 
-            return renamer.NameOf(name, quoted: false, NameClass.Query) + value[name.Length..];
+            var written = text.Substring(name.Start, name.Length);
+            return renamer.NameOf(written, quoted: false, NameClass.Query) + text[name.End..value.End];
         }
 
         // The logical database, kept when it is the dialect's name, which is the tool's word.
