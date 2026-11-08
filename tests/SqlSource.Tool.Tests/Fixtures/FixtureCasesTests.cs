@@ -45,7 +45,7 @@ public sealed class FixtureCasesTests : IDisposable
         var schema = FixtureCases.SchemaOf("mssql");
 
         File.Exists(schema).ShouldBeTrue();
-        Path.GetFileName(schema).ShouldBe("schema.sql");
+        schema.ShouldBe(Path.Combine(FixtureCases.Root, "mssql", "schema.sql"));
     }
 
     [Fact]

@@ -19,7 +19,6 @@ namespace SqlSource.Tool.Tests.Bundles;
 // drops.
 public sealed class DiagnoseBundlesTests
 {
-    // Where the bundle's errors would be.  Nothing is read there.
     private const string UsersFile = """
         -- output: codegen
 
