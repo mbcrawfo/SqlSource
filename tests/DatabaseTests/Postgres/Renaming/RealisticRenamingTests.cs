@@ -36,9 +36,6 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
     // The first major whose plan names no arm of a set operation so.
     private const int NoSetNameFrom = 18;
 
-    // The key of every renaming here: no test compares two runs.
-    private const byte Key = 7;
-
     // The names of the server's words that a name of the user's may not be: its keywords, folded as unquoted, and
     // its catalog's functions and types, as the catalog holds them.
     private static readonly (string Sql, bool Quoted)[] ServerWords =
@@ -136,14 +133,13 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
         }
 
         var raw = await RawAsync(found);
-        var renamed = await BundleRenamer.RenameAsync(
+        var renamed = await BundleRenamings.RenamedAsync(
             raw,
             PostgresRenaming.Instance,
             new PostgresDescriber(),
-            RenamingKey.Of(Enumerable.Repeat(Key, RenamingKey.Length).ToArray()),
-            TestContext.Current.CancellationToken
+            BundleRenamings.Key(BundleRenamings.AnyKey)
         );
-        return Renamings.GetOrAdd(found.Name, (raw, renamed.Value.ShouldNotBeNull(renamed.Failure?.ToString())));
+        return Renamings.GetOrAdd(found.Name, (raw, renamed));
     }
 
     // The case described through a capturing exchange, as diagnose captures one: its entry, or the failure's id and

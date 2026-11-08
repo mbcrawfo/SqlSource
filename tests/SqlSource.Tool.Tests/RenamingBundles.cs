@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -9,6 +8,7 @@ using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -82,11 +82,7 @@ internal static class RenamingBundles
             }
             else
             {
-                var failure = described.Failure.ShouldNotBeNull();
-                outcome = BundleOutcome.Failure(
-                    failure.Descriptor.Id,
-                    failure.Step is { } step ? DescribeStepName.Of(step) : null
-                );
+                outcome = RawBundles.OutcomeOf(described.Failure.ShouldNotBeNull());
             }
         }
 
@@ -105,21 +101,17 @@ internal static class RenamingBundles
         return new Bundle(info, Query, CaptureJson.Write(capture), expected, []);
     }
 
-    // A key of 32 bytes of one value.
-    public static RenamingKey Key(byte fill) => RenamingKey.Of(Enumerable.Repeat(fill, RenamingKey.Length).ToArray());
-
     // The bundle renamed with the fake engine part, or the one given, and a fresh describer.
     public static Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(
         Bundle raw,
         FakeEngineRenaming? engine = null,
-        byte key = 1
+        byte key = BundleRenamings.AnyKey
     ) =>
-        BundleRenamer.RenameAsync(
+        BundleRenamings.RenameAsync(
             raw,
             engine ?? new FakeEngineRenaming(),
             new FakeDescriber(),
-            Key(key),
-            TestContext.Current.CancellationToken
+            BundleRenamings.Key(key)
         );
 
     // The text of every file of a bundle, as a zip holds it.

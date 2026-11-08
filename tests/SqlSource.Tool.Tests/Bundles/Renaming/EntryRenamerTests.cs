@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Bundles.Renaming;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming;
@@ -13,7 +14,7 @@ public sealed class EntryRenamerTests
     private static RenamingRun Run(FakeEngineRenaming engine, string query) =>
         RenamingRun.For(
             engine,
-            new NameMapping(RenamingBundles.Key(1), engine.Fold, engine.Spelled),
+            new NameMapping(BundleRenamings.Key(1), engine.Fold, engine.Spelled),
             query,
             RenamingCopies.None
         );

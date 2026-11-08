@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Settings;
@@ -32,7 +31,6 @@ public sealed class TypedXmlRenamingTests(SqlServerDatabases sqlServer)
     [InlineData("")]
     public async Task RenameAsync_ParameterOfATypedXml_KeepsTheKeywordAndReplaysToItsRenamedEntry(string keyword)
     {
-        var token = TestContext.Current.CancellationToken;
         await sqlServer.ExecuteAsync(
             "IF EXISTS (SELECT 1 FROM sys.xml_schema_collections WHERE name = N'"
                 + Collection
@@ -60,16 +58,14 @@ public sealed class TypedXmlRenamingTests(SqlServerDatabases sqlServer)
             );
             raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
 
-            var renamed = await BundleRenamer.RenameAsync(
+            var renamed = await BundleRenamings.RenamedAsync(
                 raw,
                 Part,
                 new SqlServerDescriber(),
-                RenamingKey.Of(Enumerable.Repeat((byte)1, RenamingKey.Length).ToArray()),
-                token
+                BundleRenamings.Key(BundleRenamings.AnyKey)
             );
 
-            renamed.Failure.ShouldBeNull(renamed.Failure?.ToString());
-            var bundle = renamed.Value.ShouldNotBeNull().Bundle;
+            var bundle = renamed.Bundle;
             Provenance.Of(bundle.Expected.ShouldNotBeNull()).ShouldBe(Provenance.Of(raw.Expected.ShouldNotBeNull()));
             bundle.Query.ShouldContain(" xml(" + keyword + "dbo.");
             bundle.Query.ShouldNotContain(Collection, Case.Insensitive);

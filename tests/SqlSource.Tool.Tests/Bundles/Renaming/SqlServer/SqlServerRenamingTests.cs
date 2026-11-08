@@ -6,6 +6,7 @@ using SqlSource.Parsing;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.SqlServer;
 using SqlSource.Tool.Describing.SqlServer.Statements;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
@@ -426,7 +427,7 @@ public sealed class SqlServerRenamingTests
     [Fact]
     public void Check_AMoneyLiteral_PassesAsANumber()
     {
-        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold, Engine.Spelled);
+        var mapping = new NameMapping(BundleRenamings.Key(1), Engine.Fold, Engine.Spelled);
         var query = mapping.Name("GetPrice", quoted: false, NameClass.Query);
         var price = mapping.Name("price", quoted: false, NameClass.Alias);
 
@@ -444,7 +445,7 @@ public sealed class SqlServerRenamingTests
     [Fact]
     public void RenameOwn_AMessage_IsItsParametersRenamed()
     {
-        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold, Engine.Spelled);
+        var mapping = new NameMapping(BundleRenamings.Key(1), Engine.Fold, Engine.Spelled);
         var call = ParametersCall(("label", ["label_1", "label_2"]), ("before", ["before_1", "before_2"]));
         var copies = RenamingCopies.Of(
             Engine,
@@ -491,7 +492,7 @@ public sealed class SqlServerRenamingTests
     // The SQL renamed as query.sql's body, its mapping and the run's refusal.
     private static (string Renamed, NameMapping Mapping, RenamingRefusal? Refusal) RenameQuery(string sql)
     {
-        var mapping = new NameMapping(RenamingBundles.Key(1), Engine.Fold, Engine.Spelled);
+        var mapping = new NameMapping(BundleRenamings.Key(1), Engine.Fold, Engine.Spelled);
         var run = RenamingRun.For(Engine, mapping, sql, RenamingCopies.None);
         var renamed = run.At("query.sql").Sql(sql, NameClass.Alias).Text;
         return (renamed, mapping, run.Refusal);

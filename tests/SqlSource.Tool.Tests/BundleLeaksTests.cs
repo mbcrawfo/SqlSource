@@ -1,11 +1,8 @@
 using System;
 using Shouldly;
-using SqlSource.Settings;
 using SqlSource.Tool.Bundles;
-using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.Postgres;
 using SqlSource.Tool.Testing.Bundles;
-using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -14,22 +11,15 @@ namespace SqlSource.Tool.Tests;
 // bundles of SQL Server's fixtures, which hold all of it, so that a search that finds nothing is known to look.
 public sealed class BundleLeaksTests
 {
-    // The engine of the fixtures that Find is run on.
-    private const string Engine = "mssql";
-
     // The source that Of is run on.
     private const string Source =
         "-- name: FindUser\nSELECT u.id, \"Full Name!\" FROM users u WHERE u.status = 'active' AND u.id = @id;\n";
 
     private const string QuotedOrder = "SELECT 1 AS \"Order\" ORDER BY 1;";
 
-    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer);
-
     // The keywords of the sources, folded as PostgreSQL folds them.
     private static bool IsEngineWord(string word, bool quoted) =>
         PostgresWords.Fold(word, quoted) is "select" or "from" or "where" or "and" or "as" or "order" or "by";
-
-    private static Bundle RawOf(string name) => RawBundles.OfFixture(FixtureCases.Named(Engine, name));
 
     private static Bundle BundleOf(string query, string capture) => new(null, query, capture, null, []);
 
@@ -153,9 +143,14 @@ public sealed class BundleLeaksTests
     [Fact]
     public void Find_RawBundle_FindsTheUsersNamesInEveryFile()
     {
-        var raw = RawOf("select-left-join");
+        var raw = SqlServerRenamings.Raw("select-left-join");
 
-        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), raw.Query);
+        var found = BundleLeaks.Find(
+            raw,
+            SqlServerRenamings.Part,
+            BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
+            raw.Query
+        );
 
         found.ShouldContain("users in query.sql");
         found.ShouldContain("users in capture.json call 2 'columns' answer.rows[].sourceTable");
@@ -166,9 +161,14 @@ public sealed class BundleLeaksTests
     [Fact]
     public void Find_RawBundle_LeavesOutWhatIsFixed()
     {
-        var raw = RawOf("select-left-join");
+        var raw = SqlServerRenamings.Raw("select-left-join");
 
-        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), raw.Query);
+        var found = BundleLeaks.Find(
+            raw,
+            SqlServerRenamings.Part,
+            BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
+            raw.Query
+        );
 
         found.ShouldNotContain(place => place.Contains("serverVersion") || place.Contains("productVersion"));
     }
@@ -176,9 +176,14 @@ public sealed class BundleLeaksTests
     [Fact]
     public void Find_DeclaredParameterOnlyInAMarker_IsFound()
     {
-        var raw = RawOf("delete-declared-only");
+        var raw = SqlServerRenamings.Raw("delete-declared-only");
 
-        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), raw.Query);
+        var found = BundleLeaks.Find(
+            raw,
+            SqlServerRenamings.Part,
+            BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
+            raw.Query
+        );
 
         found.ShouldContain("tenant in query.sql");
         found.ShouldContain("PurgeOrders in query.sql");
@@ -187,20 +192,33 @@ public sealed class BundleLeaksTests
     [Fact]
     public void Find_MarkersWordAndShape_AreNoLeak()
     {
-        var raw = RawOf("select-left-join") with { Query = "-- name: q_1 -> many\nSELECT 1 AS a;\n" };
+        var raw = SqlServerRenamings.Raw("select-left-join") with { Query = "-- name: q_1 -> many\nSELECT 1 AS a;\n" };
 
-        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), "SELECT name, many FROM t;");
+        var found = BundleLeaks.Find(
+            raw,
+            SqlServerRenamings.Part,
+            BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
+            "SELECT name, many FROM t;"
+        );
 
-        Part.IsEngineWord("many", quoted: false).ShouldBeFalse();
+        SqlServerRenamings.Part.IsEngineWord("many", quoted: false).ShouldBeFalse();
         found.ShouldNotContain(place => place.EndsWith("in query.sql"));
     }
 
     [Fact]
     public void Find_LiteralOfOneLetter_IsFoundAsAWholeTokenOnly()
     {
-        var raw = RawOf("select-left-join") with { Query = "-- name: q_1\nSELECT 'xml' AS a, 'x' AS b;\n" };
+        var raw = SqlServerRenamings.Raw("select-left-join") with
+        {
+            Query = "-- name: q_1\nSELECT 'xml' AS a, 'x' AS b;\n",
+        };
 
-        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), "SELECT N'x';");
+        var found = BundleLeaks.Find(
+            raw,
+            SqlServerRenamings.Part,
+            BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
+            "SELECT N'x';"
+        );
 
         found.ShouldBe(["x in query.sql"]);
     }
@@ -208,9 +226,17 @@ public sealed class BundleLeaksTests
     [Fact]
     public void Find_LiteralOfTwoWords_IsFoundAnywhereInAString()
     {
-        var raw = RawOf("select-left-join") with { Query = "-- name: q_1\nSELECT 'big red dog' AS a;\n" };
+        var raw = SqlServerRenamings.Raw("select-left-join") with
+        {
+            Query = "-- name: q_1\nSELECT 'big red dog' AS a;\n",
+        };
 
-        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), "SELECT 'red dog';");
+        var found = BundleLeaks.Find(
+            raw,
+            SqlServerRenamings.Part,
+            BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
+            "SELECT 'red dog';"
+        );
 
         found.ShouldBe(["'red dog' in query.sql"]);
     }
@@ -218,9 +244,17 @@ public sealed class BundleLeaksTests
     [Fact]
     public void Find_LiteralWithNoToken_IsNoLeak()
     {
-        var raw = RawOf("select-left-join") with { Query = "-- name: q_1\nSELECT a, b, 'ab, cd' AS c;\n" };
+        var raw = SqlServerRenamings.Raw("select-left-join") with
+        {
+            Query = "-- name: q_1\nSELECT a, b, 'ab, cd' AS c;\n",
+        };
 
-        var found = BundleLeaks.Find(raw, Part, BundleLeaks.EngineRowNames(raw, Part), "SELECT ', ', 'ab, cd';");
+        var found = BundleLeaks.Find(
+            raw,
+            SqlServerRenamings.Part,
+            BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part),
+            "SELECT ', ', 'ab, cd';"
+        );
 
         found.ShouldBe(["'ab, cd' in query.sql"]);
     }
@@ -228,9 +262,9 @@ public sealed class BundleLeaksTests
     [Fact]
     public void EngineRowNames_OfAViewOfSys_AreTheEnginesNames()
     {
-        var raw = RawOf("select-other-database");
+        var raw = SqlServerRenamings.Raw("select-other-database");
 
-        var names = BundleLeaks.EngineRowNames(raw, Part);
+        var names = BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part);
 
         names.ShouldContain("databases");
         names.ShouldContain("database_id");
@@ -242,7 +276,7 @@ public sealed class BundleLeaksTests
     [Fact]
     public void EngineRowNames_OfAnAliasOfAColumnOfSys_LeaveOutItsRow()
     {
-        var raw = RawOf("select-other-database");
+        var raw = SqlServerRenamings.Raw("select-other-database");
         raw = raw with
         {
             Capture = raw.Capture.Replace(
@@ -252,7 +286,7 @@ public sealed class BundleLeaksTests
             ),
         };
 
-        var names = BundleLeaks.EngineRowNames(raw, Part);
+        var names = BundleLeaks.EngineRowNames(raw, SqlServerRenamings.Part);
 
         raw.Capture.ShouldContain("acme_payroll_db");
         names.ShouldNotContain("acme_payroll_db");
@@ -263,7 +297,7 @@ public sealed class BundleLeaksTests
     [Fact]
     public void Provenance_Entry_IsItsPlanTableMatchAndSources()
     {
-        var raw = RawOf("select-left-join");
+        var raw = SqlServerRenamings.Raw("select-left-join");
 
         var provenance = Provenance.Of(raw.Expected.ShouldNotBeNull());
 

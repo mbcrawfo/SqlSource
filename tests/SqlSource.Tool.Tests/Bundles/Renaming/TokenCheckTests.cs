@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Bundles.Renaming;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming;
@@ -14,7 +15,7 @@ public sealed class TokenCheckTests
     private static (FakeEngineRenaming Engine, NameMapping Mapping) Mapping(SqlDialect dialect = SqlDialect.PostgreSql)
     {
         var engine = new FakeEngineRenaming(dialect);
-        return (engine, new NameMapping(RenamingBundles.Key(1), engine.Fold, engine.Spelled));
+        return (engine, new NameMapping(BundleRenamings.Key(1), engine.Fold, engine.Spelled));
     }
 
     // A call of describe whose request is the one given, renamed as it is.
@@ -515,7 +516,7 @@ public sealed class TokenCheckTests
                 ["describe request.clrType"] = FieldRule.WholeName(NameClass.Type),
             }
         );
-        var mapping = new NameMapping(RenamingBundles.Key(1), engine.Fold, engine.Spelled);
+        var mapping = new NameMapping(BundleRenamings.Key(1), engine.Fold, engine.Spelled);
         var type = mapping.Name("MyApp.Money, MyApp", quoted: true, NameClass.Type);
 
         TokenCheck
