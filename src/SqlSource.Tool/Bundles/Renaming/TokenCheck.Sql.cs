@@ -122,8 +122,8 @@ internal sealed partial class TokenCheck
         Words(text, marker.ValueSpan.End, marker.Span.End, quoteFollows: false, place);
     }
 
-    // Plain text: numbers, white space and punctuation pass, a run from a digit that is no number is refused, and each
-    // word must be safe.  A token placeholder's name must be safe as quoted, as the SQL renamer reads one in every
+    // Plain text: numbers, white space and punctuation pass, a run a number starts that is no number is refused, and
+    // each word must be safe.  A token placeholder's name must be safe as quoted, as the SQL renamer reads one in every
     // text.
     private void Words(string text, int start, int end, bool quoteFollows, string place)
     {
@@ -137,10 +137,9 @@ internal sealed partial class TokenCheck
                 Whole(IsSafe(token, quoted: true), place, token);
                 at = name.End;
             }
-            else if (char.IsAsciiDigit(character))
+            else if (SqlRenamer.NumberAt(_engine, text, at, end) is (var runEnd, var isNumber))
             {
-                var runEnd = SqlRenamer.NumberRunEnd(_engine, text, at, end);
-                if (!SqlRenamer.IsNumber(text.AsSpan(at, runEnd - at)))
+                if (!isNumber)
                 {
                     Refuse(place, text[at..runEnd]);
                 }

@@ -167,9 +167,9 @@ public sealed class CorpusWordsTests
         while (at < end)
         {
             var character = text[at];
-            if (char.IsAsciiDigit(character))
+            if (SqlRenamer.NumberAt(Engine, text, at, end) is (var runEnd, _))
             {
-                at = SqlRenamer.NumberRunEnd(Engine, text, at, end);
+                at = runEnd;
             }
             else if (Engine.IsWordStart(character))
             {

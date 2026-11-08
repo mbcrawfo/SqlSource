@@ -23,9 +23,18 @@ internal interface IEngineRenaming
     SqlDialect Dialect { get; }
 
     /// <summary>
+    /// Whether a number starts at <paramref name="at" /> of a <see cref="SqlLexemeKind.Text" /> lexeme's text, which
+    /// ends before <paramref name="end" />, by the engine's own rule: at an ASCII digit for both engines, and for
+    /// SQL Server at a <c>$</c> that no word character but an ASCII digit follows, the sign of a money literal, as in
+    /// <c>$12</c>, <c>$ 12</c> or <c>$-12</c>.  It is asked before <see cref="IsWordStart" />, and the run it starts
+    /// is read by <see cref="SqlRenamer.NumberAt" />.
+    /// </summary>
+    bool IsNumberStart(string text, int at, int end);
+
+    /// <summary>
     /// Whether a character starts a word in a <see cref="SqlLexemeKind.Text" /> lexeme, by the engine's own rule.
-    /// An ASCII digit is read as the start of a run that must be a number before this is asked, so its answer for one
-    /// is never read.
+    /// A character at which <see cref="IsNumberStart" /> starts a number is read as one before this is asked, so its
+    /// answer there is never read.
     /// </summary>
     bool IsWordStart(char character);
 

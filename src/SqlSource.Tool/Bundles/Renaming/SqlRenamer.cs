@@ -42,11 +42,61 @@ internal sealed partial class SqlRenamer(
     internal const string UnnamedColumn = "?column?";
 
     /// <summary>
+    /// The number that starts at <paramref name="at" />, before <paramref name="end" />, where
+    /// <see cref="IEngineRenaming.IsNumberStart" /> says one does: its end, and whether the run is a number, which is
+    /// kept, or is refused whole.  A run from an ASCII digit ends by <see cref="NumberRunEnd" /> and is a number by
+    /// <see cref="IsNumber" />.  A run from any other character, a sign such as SQL Server's <c>$</c>, is the sign
+    /// and, after any spaces and one optional <c>+</c> or <c>-</c>, the run from the ASCII digit or the <c>.</c> and
+    /// digit that follow, which must be digits, then optionally <c>.</c> and digits, with no exponent and no
+    /// <c>_</c>, since SQL Server reads <c>$1e5</c> and <c>$ -1e5</c> as money and the alias <c>e5</c>; it is the sign
+    /// alone when nothing of a number follows.  The SQL renamer, the token check and the tests' leak search all read
+    /// a number by this.
+    /// </summary>
+    /// <returns>The run, or null when no number starts there.</returns>
+    internal static (int End, bool IsNumber)? NumberAt(IEngineRenaming engine, string text, int at, int end)
+    {
+        if (!engine.IsNumberStart(text, at, end))
+        {
+            return null;
+        }
+
+        if (char.IsAsciiDigit(text[at]))
+        {
+            var runEnd = NumberRunEnd(engine, text, at, end);
+            return (runEnd, IsNumber(text.AsSpan(at, runEnd - at)));
+        }
+
+        var digits = at + 1;
+        while (digits < end && text[digits] == ' ')
+        {
+            digits++;
+        }
+
+        if (digits < end && text[digits] is '+' or '-')
+        {
+            digits++;
+        }
+
+        var startsDecimal =
+            digits < end
+            && (
+                char.IsAsciiDigit(text[digits])
+                || (text[digits] == '.' && digits + 1 < end && char.IsAsciiDigit(text[digits + 1]))
+            );
+        if (!startsDecimal)
+        {
+            return (at + 1, true);
+        }
+
+        var signedEnd = NumberRunEnd(engine, text, digits, end);
+        return (signedEnd, IsDecimal(text.AsSpan(digits, signedEnd - digits)));
+    }
+
+    /// <summary>
     /// The end of the run that the ASCII digit at <paramref name="start" /> begins, before <paramref name="end" />: the
     /// engine's word parts, <c>.</c>, and a sign right after <c>e</c> or <c>E</c> and before a digit.  The run is kept
-    /// when <see cref="IsNumber" /> says it is a number, and refused whole otherwise, since an engine may read the
-    /// rest as a name, as PostgreSQL before 15 reads <c>1users</c> as <c>1 AS users</c>, or as a value, as a hex or
-    /// binary constant holds one.  The SQL renamer and the token check both split a run by this.
+    /// when it is a number, and refused whole otherwise, since an engine may read the rest as a name, as PostgreSQL
+    /// before 15 reads <c>1users</c> as <c>1 AS users</c>, or as a value, as a hex or binary constant holds one.
     /// </summary>
     internal static int NumberRunEnd(IEngineRenaming engine, string text, int start, int end)
     {
@@ -76,6 +126,12 @@ internal sealed partial class SqlRenamer(
     /// digits may hold one <c>_</c> between two digits, as PostgreSQL 16 reads <c>1_000</c>; the digits after
     /// <c>.</c> may be none, as in <c>1.</c>.
     /// </summary>
+    /// <remarks>
+    /// A limitation, accepted: SQL Server and PostgreSQL before 16 read <c>1_000</c> as <c>1 AS _000</c>, so such an
+    /// alias is kept verbatim.  It is an <c>_</c> and digits alone, which tell nothing of the user's, and the bundle
+    /// still replays; telling the engines apart would need PostgreSQL's server version, which the renaming does not
+    /// read.
+    /// </remarks>
     internal static bool IsNumber(ReadOnlySpan<char> text)
     {
         var at = DigitsEnd(text, 0);
@@ -107,6 +163,30 @@ internal sealed partial class SqlRenamer(
         }
 
         return at == text.Length;
+    }
+
+    // ASCII digits, then optionally . and digits, with a digit on one side of the . at least: 12, 12., 12.5 and .5.
+    private static bool IsDecimal(ReadOnlySpan<char> text)
+    {
+        var at = 0;
+        var digits = 0;
+        while (at < text.Length && char.IsAsciiDigit(text[at]))
+        {
+            at++;
+            digits++;
+        }
+
+        if (at < text.Length && text[at] == '.')
+        {
+            at++;
+            while (at < text.Length && char.IsAsciiDigit(text[at]))
+            {
+                at++;
+                digits++;
+            }
+        }
+
+        return digits > 0 && at == text.Length;
     }
 
     // The end of the digits from the index, each _ between two of them; the index itself when no digit is there.
@@ -144,7 +224,7 @@ internal sealed partial class SqlRenamer(
     /// <summary>
     /// The SQL renamed.  A new word is of the class given, or a function before <c>(</c> unless the class is
     /// <see cref="NameClass.Type" />, and a token placeholder's name is renamed as a token.  SQL that does not lex, a
-    /// character that is no word, number, white space or punctuation, or a run from a digit that is no number, is a
+    /// character that is no word, number, white space or punctuation, or a run a number starts that is no number, is a
     /// refusal of <see cref="RefusalStep.Token" /> at the place.
     /// </summary>
     /// <param name="sql">The SQL.</param>
@@ -284,10 +364,9 @@ internal sealed partial class SqlRenamer(
                 {
                     at = after;
                 }
-                else if (char.IsAsciiDigit(character))
+                else if (NumberAt(engine, text, at, end) is (var runEnd, var isNumber))
                 {
-                    var runEnd = NumberRunEnd(engine, text, at, end);
-                    if (!IsNumber(text.AsSpan(at, runEnd - at)))
+                    if (!isNumber)
                     {
                         Refuse(text[at..runEnd]);
                     }

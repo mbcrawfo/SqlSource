@@ -56,7 +56,15 @@ internal sealed class SqlServerRenaming : IEngineRenaming
 
     public SqlDialect Dialect => SqlDialect.SqlServer;
 
-    // A $ starts a word, so a money literal such as $12 is renamed as a name: TD-0103.
+    /// <summary>
+    /// An ASCII digit, or a <c>$</c> at the end or before an ASCII digit or a character that is no word part: the
+    /// server reads <c>$</c>, <c>$12.50</c>, <c>$ 12</c>, <c>$-12</c> and <c>$.5</c> as money, and <c>$action</c> as
+    /// a word.
+    /// </summary>
+    public bool IsNumberStart(string text, int at, int end) =>
+        char.IsAsciiDigit(text[at])
+        || (text[at] == '$' && (at + 1 == end || char.IsAsciiDigit(text[at + 1]) || !IsWordPart(text[at + 1])));
+
     public bool IsWordStart(char character) => QuoteReader.IsNameCharacterOfSqlServer(character);
 
     public bool IsWordPart(char character) => QuoteReader.IsNameCharacterOfSqlServer(character);
