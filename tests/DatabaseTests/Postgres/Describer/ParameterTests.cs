@@ -10,6 +10,7 @@ using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -75,7 +76,7 @@ public sealed class ParameterTests(PostgresDatabases postgres)
             "int) AS SELECT 1; DROP TABLE users; --",
             "@id",
             DescribeRequests.Query,
-            DescribeFailures.NotATypeName,
+            DescribeFailures.NotATypeName + ": " + DeclaredTypeText.Shape,
         ]);
         MethodsOf(capture).ShouldBe(["open"]);
     }

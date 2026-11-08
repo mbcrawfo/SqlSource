@@ -13,10 +13,65 @@ internal static class DescribeFailures
     public const string NoSuchType = "the database has no such type";
 
     /// <summary>
-    /// The reason of <c>SQLSRC228</c> for a declaration that is not written as a type name; for SQL Server it is the
-    /// head of the reason, before <c>": "</c> and what was found.
+    /// The reason of <c>SQLSRC228</c> for a declaration that is not written as a type name.  The tool's own refusal
+    /// gives it as the head of the reason, before <c>": "</c> and what was found (<see cref="TypeNameFound" />); a
+    /// refusal by the server gives it alone.
     /// </summary>
     public const string NotATypeName = "it is not written as a type name";
+
+    /// <summary>
+    /// What both engines' readers of a declared type say they found where a text leaves the grammar of a type name;
+    /// what is only one engine's, such as the shape of its type names, is its reader's own.
+    /// </summary>
+    internal static class TypeNameFound
+    {
+        /// <summary>A <c>;</c>.</summary>
+        public const string Semicolon = "a ; is not part of a type name";
+
+        /// <summary>A <c>--</c> or a <c>/*</c>.</summary>
+        public const string Comment = "a comment is not part of a type name";
+
+        /// <summary>A dot with no part on one side of it, or a third part.</summary>
+        public const string Parts = "a type name has one or two parts";
+
+        /// <summary>A line break.</summary>
+        public const string OneLine = "a type name is on one line";
+
+        /// <summary>
+        /// The reason of <c>SQLSRC228</c>: <see cref="NotATypeName" />, <c>": "</c> and what was found.
+        /// </summary>
+        /// <param name="found">What was found.</param>
+        public static string Reason(string found) => NotATypeName + ": " + found;
+
+        /// <summary>
+        /// What stands at a place where the grammar was left: a <c>;</c>, a comment or a line break by name, and the
+        /// end or anything else as the shape the reader expected there.
+        /// </summary>
+        /// <param name="text">The declared type.</param>
+        /// <param name="position">The place in it, which may be its end.</param>
+        /// <param name="shape">What the reader says of anything else.</param>
+        public static string At(string text, int position, string shape)
+        {
+            if (position == text.Length)
+            {
+                return shape;
+            }
+
+            var next = position + 1 < text.Length ? text[position + 1] : '\0';
+            return text[position] switch
+            {
+                ';' => Semicolon,
+                '-' when next == '-' => Comment,
+                '/' when next == '*' => Comment,
+                var value when IsLineBreak(value) => OneLine,
+                _ => shape,
+            };
+        }
+
+        /// <summary>A line break of any kind a reader may take for one.</summary>
+        /// <param name="value">The character.</param>
+        public static bool IsLineBreak(char value) => value is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029';
+    }
 
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever the server's error: a

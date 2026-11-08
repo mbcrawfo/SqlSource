@@ -4,7 +4,6 @@ using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
-using SqlSource.Tool.Describing.SqlServer.Statements;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.SqlServerScript;
@@ -150,6 +149,186 @@ public sealed class SqlServerSessionParameterTests
             ]);
     }
 
+    // A typed xml is sent as the xml its method sends: "declared" alone is asked with the declaration as written, so
+    // that a collection the database lacks fails there, and "parameters" and "columns" with xml.  "(max)" is a
+    // collection's name when the server reads the type as xml.
+    [Theory]
+    [InlineData("xml(dbo.S)")]
+    [InlineData("xml(CONTENT dbo.S)")]
+    [InlineData("xml(DOCUMENT dbo.S)")]
+    [InlineData("xml(document dbo.S)")]
+    [InlineData("xml([dbo].[S])")]
+    [InlineData("xml(\"dbo\".\"S\")")]
+    [InlineData("xml(dbo . S)")]
+    [InlineData("xml( CONTENT [dbo] . [S] )")]
+    [InlineData("XML(S)")]
+    [InlineData("sys.xml(dbo.S)")]
+    [InlineData("[xml](dbo.S)")]
+    [InlineData("xml(max)")]
+    public async Task DescribeAsync_XmlOfACollection_AsksDeclaredWithItAndTheOtherCallsWithXml(string type)
+    {
+        const string Sql = "SELECT @doc AS v WHERE @id = 1";
+        var declared = new SqlServerDeclaredRequest("SELECT @doc AS [1]", "@doc " + type);
+        var parameters = new SqlServerParametersRequest(Sql, "@doc xml", null);
+        var columns = new SqlServerColumnsRequest(Sql, "@doc xml, @id int");
+        var script = new SqlServerScript()
+            .Declared(declared, DeclaredAs("xml", -1))
+            .Parameters(parameters, new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null))
+            .Columns(columns, NoRows);
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql, ("doc", type)));
+
+        asked.ShouldBe([
+            Call(Calls.Declared, declared),
+            Call(Calls.Parameters, parameters),
+            Call(Calls.Columns, columns),
+        ]);
+        described
+            .Value.ShouldNotBeNull()
+            .Parameters[0]
+            .ShouldBe(
+                new DescribedParameter(
+                    "doc",
+                    new SqlServerType("xml", -1, 0, 0, null),
+                    SidecarValues.TypeSource.Declared
+                )
+            );
+    }
+
+    // A declaration with no collection is sent to every call as written: plain xml in any case, a "(max)" of a type
+    // the server does not read as xml, and an alias type.
+    [Theory]
+    [InlineData("xml", "xml", -1, null)]
+    [InlineData("XML", "xml", -1, null)]
+    [InlineData("nvarchar(max)", "nvarchar(max)", -1, null)]
+    [InlineData("NVARCHAR( MAX )", "nvarchar(max)", -1, null)]
+    [InlineData("dbo.Email", "nvarchar(320)", 640, "Email")]
+    public async Task DescribeAsync_DeclarationOfNoCollection_AsksEveryCallWithItAsWritten(
+        string type,
+        string systemType,
+        int maxLength,
+        string? userType
+    )
+    {
+        const string Sql = "SELECT @doc AS v WHERE @id = 1";
+        var declared = new SqlServerDeclaredRequest("SELECT @doc AS [1]", "@doc " + type);
+        var parameters = new SqlServerParametersRequest(Sql, "@doc " + type, null);
+        var columns = new SqlServerColumnsRequest(Sql, "@doc " + type + ", @id int");
+        var script = new SqlServerScript()
+            .Declared(
+                declared,
+                new SqlServerDeclaredAnswer(
+                    [
+                        new SqlServerDeclaredRow(
+                            1,
+                            systemType,
+                            maxLength,
+                            0,
+                            0,
+                            userType is null ? null : "dbo",
+                            userType,
+                            null
+                        ),
+                    ],
+                    null,
+                    null
+                )
+            )
+            .Parameters(parameters, new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null))
+            .Columns(columns, NoRows);
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql, ("doc", type)));
+
+        asked.ShouldBe([
+            Call(Calls.Declared, declared),
+            Call(Calls.Parameters, parameters),
+            Call(Calls.Columns, columns),
+        ]);
+        described.Failure.ShouldBeNull();
+    }
+
+    // A probe declares a typed xml as xml too.
+    [Fact]
+    public async Task DescribeAsync_XmlOfACollectionBesideCopiesThatDisagree_ProbesWithXml()
+    {
+        const string Sql = "SELECT @doc AS v WHERE (@name IS NULL OR name = @name)";
+        const string Renamed = "SELECT @doc AS v WHERE (@name_1 IS NULL OR name = @name_2)";
+        var declared = new SqlServerDeclaredRequest("SELECT @doc AS [1]", "@doc xml(DOCUMENT dbo.S)");
+        var parameters = new SqlServerParametersRequest(
+            Renamed,
+            "@doc xml",
+            [new SqlServerReusedParameter("name", ["name_1", "name_2"])]
+        );
+        var xmlFirst = new SqlServerProbeRequest(Renamed, "@doc xml, @name_1 xml, @name_2 nvarchar(100)");
+        var intFirst = new SqlServerProbeRequest(Renamed, "@doc xml, @name_1 int, @name_2 nvarchar(100)");
+        var xmlSecond = new SqlServerProbeRequest(Renamed, "@doc xml, @name_1 int, @name_2 xml");
+        var columns = new SqlServerColumnsRequest(Sql, "@doc xml, @name nvarchar(100)");
+        var script = new SqlServerScript()
+            .Declared(declared, DeclaredAs("xml", -1))
+            .Parameters(
+                parameters,
+                new SqlServerParametersAnswer(
+                    [IntRow with { Name = "@name_1" }, Name100Row with { Name = "@name_2" }],
+                    null
+                )
+            )
+            .Probe(xmlFirst, new SqlServerProbeAnswer(true, null))
+            .Probe(intFirst, new SqlServerProbeAnswer(true, null))
+            .Probe(xmlSecond, new SqlServerProbeAnswer(false, null))
+            .Columns(columns, NoRows);
+
+        var (described, asked) = await script.DescribeAsync(
+            Of(SqlDialectRules.SqlServer, Sql, ("doc", "xml(DOCUMENT dbo.S)"))
+        );
+
+        asked.ShouldBe([
+            Call(Calls.Declared, declared),
+            Call(Calls.Parameters, parameters),
+            Call(Calls.Probe, xmlFirst),
+            Call(Calls.Probe, intFirst),
+            Call(Calls.Probe, xmlSecond),
+            Call(Calls.Columns, columns),
+        ]);
+        described.Failure.ShouldBeNull();
+    }
+
+    // A batch that did not compile asks "columns" for its cause with the declarations "parameters" was asked with.
+    [Fact]
+    public async Task DescribeAsync_XmlOfACollectionInABatchThatDidNotCompile_AsksColumnsWithXml()
+    {
+        const string Sql = "SELECT @doc.value('/a', 'nvarchar(10)') AS v";
+        var declared = new SqlServerDeclaredRequest("SELECT @doc AS [1]", "@doc xml(dbo.S)");
+        var parameters = new SqlServerParametersRequest(Sql, "@doc xml", null);
+        var columns = new SqlServerColumnsRequest(Sql, "@doc xml");
+        var script = new SqlServerScript()
+            .Declared(declared, DeclaredAs("xml", -1))
+            .Parameters(
+                parameters,
+                new SqlServerParametersAnswer(
+                    null,
+                    new SqlServerServerError([
+                        new SqlServerErrorRow(102, 15, 1, "Incorrect syntax."),
+                        new SqlServerErrorRow(
+                            11501,
+                            16,
+                            1,
+                            "The batch could not be analyzed because of compile errors."
+                        ),
+                    ])
+                )
+            )
+            .Columns(columns, NoRows);
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql, ("doc", "xml(dbo.S)")));
+
+        asked.ShouldBe([
+            Call(Calls.Declared, declared),
+            Call(Calls.Parameters, parameters),
+            Call(Calls.Columns, columns),
+        ]);
+        described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC225");
+    }
+
     [Fact]
     public async Task DescribeAsync_DeclaredTypeTheGrammarRefuses_IsSqlsrc228AndAsksNothing()
     {
@@ -160,7 +339,7 @@ public sealed class SqlServerSessionParameterTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments[0].ShouldBe("int; DROP TABLE dbo.victim");
-        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName + ": " + DeclaredTypeText.Semicolon);
+        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName + ": " + DescribeFailures.TypeNameFound.Semicolon);
         asked.ShouldBeEmpty();
     }
 
@@ -299,4 +478,8 @@ public sealed class SqlServerSessionParameterTests
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments[3].ShouldBe(DescribeFailures.NoSuchType);
     }
+
+    // The answer of "declared" for a system type with no precision or scale.
+    private static SqlServerDeclaredAnswer DeclaredAs(string systemType, int maxLength) =>
+        new([new SqlServerDeclaredRow(1, systemType, maxLength, 0, 0, null, null, null)], null, null);
 }

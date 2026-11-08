@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Quoting;
 using SqlSource.Tool.Describing.Describers;
@@ -113,7 +114,11 @@ internal static class TsqlTokens
             var start = at;
             TsqlTokenKind kind;
 
-            if (char.IsLetter(character) || character is '_' or '#' or '@')
+            if (
+                char.IsLetter(character)
+                || character is '_' or '#' or '@'
+                || char.GetUnicodeCategory(character) == UnicodeCategory.LetterNumber
+            )
             {
                 kind = TsqlTokenKind.Word;
                 at++;

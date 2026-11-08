@@ -746,13 +746,19 @@ internal static class SqlServerVocabulary
         "ZONE",
     ];
 
-    // Written by hand on 2026-11-05 from the grammar of the statements that a query can hold.
-    /// <summary>The words that are not reserved and that the server reads as words of a statement.</summary>
+    // Written by hand on 2026-11-05 from the grammar of the statements that a query can hold, with CONTENT and
+    // DOCUMENT, the words of a typed xml's declaration, xml(CONTENT|DOCUMENT schema.collection), added on 2026-11-07.
+    /// <summary>
+    /// The words that are not reserved and that the server reads as words of a statement or of a parameter's declared
+    /// type.
+    /// </summary>
     public static IReadOnlyList<string> NonReserved { get; } =
     [
         "ABSENT",
         "APPLY",
+        "CONTENT",
         "DELETED",
+        "DOCUMENT",
         "INSERTED",
         "MATCHED",
         "OFFSET",
