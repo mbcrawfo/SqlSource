@@ -23,4 +23,14 @@ public sealed class RenamingRunTests
     [InlineData(nameof(NameClass.Literal), false)]
     public void IsQuoted_Class_IsWhetherItIsComparedAsWritten(string cls, bool quoted) =>
         RenamingRun.IsQuoted(Enum.Parse<NameClass>(cls)).ShouldBe(quoted);
+
+    // A name that is a mark alone has a mark to the generator, and no stem for the renaming to rename.
+    [Theory]
+    [InlineData("id?", "id", "?")]
+    [InlineData("id!", "id", "!")]
+    [InlineData("id", "id", "")]
+    [InlineData("?", "?", "")]
+    [InlineData("!", "!", "")]
+    public void MarkOf_Name_IsItsStemAndMark(string name, string stem, string mark) =>
+        RenamingRun.MarkOf(name).ShouldBe((stem, mark));
 }

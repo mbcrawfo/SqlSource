@@ -624,14 +624,25 @@ internal static class PostgresErrors
     }
 
     // The parameter of the first "$n" of a message, or null when it has none or n is no ordinal of the list.
-    private static SqlQueryParameter? NamedIn(string message, DescribeRequest query)
+    private static SqlQueryParameter? NamedIn(string message, DescribeRequest query) =>
+        FirstParameterNumberIn(message) is { } ordinal && ordinal >= 1 && ordinal <= query.Parameters.Count
+            ? query.Parameters[ordinal - 1]
+            : null;
+
+    /// <summary>
+    /// The number of the first <c>$n</c> of a message that <see cref="PostgresIdentifiers.ParameterNumberAt" /> reads,
+    /// or null when it has none.  The renaming reads a message through this method too, so that the two cannot
+    /// disagree.
+    /// </summary>
+    /// <param name="message">The text of a server's message.</param>
+    internal static int? FirstParameterNumberIn(string message)
     {
         var dollar = message.IndexOf('$', StringComparison.Ordinal);
         while (dollar >= 0)
         {
-            if (PostgresIdentifiers.ParameterNumberAt(message, dollar) is { } ordinal)
+            if (PostgresIdentifiers.ParameterNumberAt(message, dollar) is { } number)
             {
-                return ordinal >= 1 && ordinal <= query.Parameters.Count ? query.Parameters[ordinal - 1] : null;
+                return number;
             }
 
             dollar = message.IndexOf('$', dollar + 1);

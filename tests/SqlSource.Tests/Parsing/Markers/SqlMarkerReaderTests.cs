@@ -190,4 +190,19 @@ public sealed class SqlMarkerReaderTests
                 .Select(marker => $"{marker.Kind}:{text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length)}"),
         ];
     }
+
+    [Theory]
+    [InlineData("GetUser", "GetUser", -1)]
+    [InlineData("GetUser -> one", "GetUser", 8)]
+    [InlineData("GetUser\t->many", "GetUser", 8)]
+    [InlineData(" -> one", "", 1)]
+    [InlineData("A->B->C", "A", 1)]
+    public void SplitName_Value_IsTheNameBeforeTheFirstArrow(string value, string name, int arrow)
+    {
+        var text = "-- name: " + value;
+        var span = new TextSpan(9, value.Length);
+        var (split, at) = SqlMarkerReader.SplitName(text, span);
+        text.Substring(split.Start, split.Length).ShouldBe(name);
+        at.ShouldBe(arrow < 0 ? -1 : 9 + arrow);
+    }
 }

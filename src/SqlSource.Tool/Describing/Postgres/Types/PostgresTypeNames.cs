@@ -70,7 +70,7 @@ internal static class PostgresTypeNames
     /// a digit, else in double quotes with a quote doubled.
     /// </summary>
     public static string Identifier(string name) =>
-        PostgresIdentifiers.IsBareName(name) ? name : $"\"{name.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
+        PostgresIdentifiers.IsBareName(name) ? name : PostgresIdentifiers.Quote(name);
 
     // format_type(oid, -1) of char is "bpchar": only a char with a length is "character".  Of bit it is "bit" with
     // the quotes, since plain bit means bit(1): the tool writes the length form itself and keeps the server's

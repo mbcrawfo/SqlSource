@@ -186,12 +186,12 @@ internal sealed partial class TokenCheck
     {
         if (word.Length >= 2 && word[0] == '\'' && word[^1] == '\'')
         {
-            var content = word[1..^1].Replace("''", "'", StringComparison.Ordinal);
+            var content = SqlRenamer.ContentOf(word, 0, word.Length);
             Whole(_mapping.IsReplacement(content), place, content);
         }
         else if (word.Length >= 2 && word[0] == '"' && word[^1] == '"')
         {
-            QuotedName(word[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal), place);
+            QuotedName(SqlRenamer.ContentOf(word, 0, word.Length), place);
         }
         else
         {

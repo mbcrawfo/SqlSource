@@ -7,8 +7,8 @@ using SqlSource.Tool.Describing.Postgres.Statements;
 namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
-/// How PostgreSQL writes a name: a quoted name, the bare name it leaves unquoted, the characters of a word of SQL, and
-/// a <c>$n</c>.  Each rule has its one definition here.
+/// How PostgreSQL writes a name: a quoted name (<see cref="Quote" />), the bare name it leaves unquoted, the
+/// characters of a word of SQL, and a <c>$n</c>.  Each rule has its one definition here.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -58,6 +58,10 @@ internal static class PostgresIdentifiers
 
         return false;
     }
+
+    /// <summary>A name as a quoted identifier: in double quotes, with each quote doubled.</summary>
+    /// <param name="name">The name, without quotes.</param>
+    public static string Quote(string name) => "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
 
     /// <summary>The name a quoted name stands for: the text between its quotes, with <c>""</c> made <c>"</c>.</summary>
     /// <param name="quoted">The quoted name, with its quotes.</param>
