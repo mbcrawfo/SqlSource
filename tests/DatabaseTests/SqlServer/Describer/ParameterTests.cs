@@ -333,6 +333,7 @@ public sealed class ParameterTests(SqlServerDatabases sqlServer)
             "SQLSRC228"
         );
 
+        failure.Arguments[3].ShouldBe(DescribeFailures.NoSuchType);
         failure.ServerLines.ShouldContain(line => line.StartsWith("Msg 6314", StringComparison.Ordinal));
     }
 

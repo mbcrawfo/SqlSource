@@ -1944,7 +1944,7 @@ Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `t
 For SQL Server the error is at the step `resolve type`, and its reasons are these:
 
 - `it is not written as a type name`, followed by what was found: the text is not a type name as T-SQL writes one, a name of one or two parts, each plain, `[bracketed]` or `"quoted"`, with any spaces around the dot, then `(max)`, one or two numbers, or an XML schema collection in parentheses, as in `xml(CONTENT dbo.Schemas)`.  A `;`, a comment, a second `(` and a line break are refused.  Nothing of the query is sent.
-- `the database has no such type`: the database has no type of that name, `Msg 2715`.
+- `the database has no such type`: the database has no type of that name, `Msg 2715`, or no XML schema collection of that name, `Msg 6314`.
 - `it is not a type`: SQL Server did not accept the text as a type, such as `nvarchar(9000)`, longer than the most it allows, `Msg 131`.
 
 ```console
