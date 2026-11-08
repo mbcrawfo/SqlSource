@@ -126,6 +126,12 @@ internal sealed partial class SqlRenamer(
     /// digits may hold one <c>_</c> between two digits, as PostgreSQL 16 reads <c>1_000</c>; the digits after
     /// <c>.</c> may be none, as in <c>1.</c>.
     /// </summary>
+    /// <remarks>
+    /// A limitation, accepted: SQL Server and PostgreSQL before 16 read <c>1_000</c> as <c>1 AS _000</c>, so such an
+    /// alias is kept verbatim.  It is an <c>_</c> and digits alone, which tell nothing of the user's, and the bundle
+    /// still replays; telling the engines apart would need PostgreSQL's server version, which the renaming does not
+    /// read.
+    /// </remarks>
     internal static bool IsNumber(ReadOnlySpan<char> text)
     {
         var at = DigitsEnd(text, 0);
