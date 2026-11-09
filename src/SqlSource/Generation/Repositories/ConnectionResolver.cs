@@ -328,11 +328,26 @@ internal static class ConnectionResolver
         private ConnectionSource SourceOf(ConnectionCandidate candidate) =>
             new(
                 KindOf(candidate.Type),
+                candidate.Member,
                 candidate.Name,
                 AccessTextOf(candidate),
                 candidate.IsAsync,
-                candidate.TakesCancellationToken
+                candidate.TakesCancellationToken,
+                LeadingNameOf(candidate),
+                TypeName
             );
+
+        // The name the access starts with, which an argument or a local of the method could hide: a parameter's own,
+        // and the type's for a static member.  An instance member is reached through this, which nothing hides.
+        private string? LeadingNameOf(ConnectionCandidate candidate)
+        {
+            if (candidate.Member == CandidateMember.Parameter)
+            {
+                return candidate.Name;
+            }
+
+            return candidate.IsStatic ? type.Name : null;
+        }
 
         // A parameter by its name, a static member through the type as its own code writes it, which reaches a base
         // type's static member too, and an instance member through this.  The type's name and type parameters are as

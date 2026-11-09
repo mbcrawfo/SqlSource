@@ -56,7 +56,8 @@ internal static class QueryMethodWriter
             method.Input,
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
             streams,
-            capabilities
+            capabilities,
+            method.Source
         );
         var context = new QueryMethodContext(
             builder,
@@ -75,6 +76,7 @@ internal static class QueryMethodWriter
         HeaderWriter.AppendDocumentation(in context, indent);
         HeaderWriter.AppendSignature(in context, indent);
         _ = builder.Append(indent).Append("{\n");
+        var checksStart = builder.Length;
         HeaderWriter.AppendChecks(in context, bodyIndent);
         if (!streams)
         {
@@ -87,7 +89,7 @@ internal static class QueryMethodWriter
         // The checks run when the method is called, and the rest when the loop asks for the first row.  The iterator
         // takes every argument by the same name, so the body is written as in any other method, and captures nothing
         // but the locals that the checks count lists into.
-        HeaderWriter.AppendIteratorCall(in context, bodyIndent);
+        HeaderWriter.AppendIteratorCall(in context, bodyIndent, afterChecks: builder.Length > checksStart);
         CommandWriter.AppendBody(in context, blockIndent);
         AppendEnd(builder, bodyIndent);
         ListWriter.AppendHelpers(in context, bodyIndent);

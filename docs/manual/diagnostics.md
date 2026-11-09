@@ -3103,13 +3103,13 @@ See: [Result shapes](sql-files.md#result-shapes)
 
 **Driver is not referenced**
 
-A query of the `postgres` dialect has the output `methods`, and the project does not reference Npgsql, or a query of the `mssql` dialect has it and the project does not reference Microsoft.Data.SqlClient.  The query's method runs on the driver, so it is not generated.  The message names the database and the package.
+A query of the `postgres` dialect has the output `methods` or `repository`, and the project does not reference Npgsql, or a query of the `mssql` dialect has one of them and the project does not reference Microsoft.Data.SqlClient.  The query's method runs on the driver, so it is not generated.  The message names the database and the package.
 
 ```console
-CSC : error SQLSRC273: A query for PostgreSQL has the output methods, and this project does not reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.
+CSC : error SQLSRC273: A query for PostgreSQL has the output methods or repository, and this project does not reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.
 ```
 
-Reference the package from the project: `Npgsql` 8.0 or later for PostgreSQL, `Microsoft.Data.SqlClient` 6.1 or later for SQL Server.  A project that runs its queries some other way, with Dapper on a connection that a package of its own brings, sets the output to `models`, which gives the SQL and the models without the methods.  The error has no file and line, because it is about the project's references, and it is reported once for the project and database, however many of its queries have the output `methods`.  The models are still generated.
+Reference the package from the project: `Npgsql` 8.0 or later for PostgreSQL, `Microsoft.Data.SqlClient` 6.1 or later for SQL Server.  A project that runs its queries some other way, with Dapper on a connection that a package of its own brings, sets the output to `models`, which gives the SQL and the models without the methods.  The error has no file and line, because it is about the project's references, and it is reported once for the project and database, however many of its queries have the output `methods` or `repository`.  The models are still generated.
 
 See: [Query methods](generator.md#query-methods)
 
@@ -3121,6 +3121,7 @@ The method of a query whose output is `methods` would have the name of something
 
 - under the default [member location](generator.md#locations) `extension-class`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
+- for a `repository` query, also the name of the member of a base type, or the primary-constructor parameter, that its method gets its connection from, which the method would hide;
 - under `nested-class`, the name of the constant, token method or method of another query of the type in the same class, which may come from another file of the type;
 - the name of the method of another query of the same type in the same class, which is reported at both queries;
 - under `extension-class`, the name of the method of a query of another type whose methods go into the same extension class, as two types of one name nested in two types do, or of a method of the same name and the same parameters in the extension class of another type of the same namespace, which a call on a connection could not tell apart from it.  Both queries get the error, and neither gets its method.  Two methods of one name in the classes of two types whose parameters differ, one with an input model and one without, say, are two overloads, and each is generated.
@@ -3139,13 +3140,19 @@ See: [Query methods](generator.md#query-methods)
 
 **Token is named as an argument of the method**
 
-A token of a query whose output is `methods` has the name of one of the arguments a query method can have: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  A token is an argument of the method too, so it cannot take one of these names, even in a query without parameters, whose method has no `parameters`, and the method is not generated.  The message names the token and the query.
+A token of a query whose output is `methods` or `repository` has the name of one of the arguments a query method can have: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  A token is an argument of the method too, so it cannot take one of these names, even in a query without parameters, whose method has no `parameters`, and the method is not generated.  The message names the token, the query and what has the name.
+
+A token of a `repository` query also cannot take the name of what its method gets its connection through, which the token's argument would hide: the primary-constructor parameter that gives the connection, or the type when the connection comes from a `static` member of the type.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC275: The token 'transaction' of the query 'ListFrom' has the name of an argument that a query method can have: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.
 ```
 
-Rename the token, everywhere the query writes it and in its `-- token:` marker.  The error is reported at the query's name, once for each such token, and the query's models are still generated.
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC275: The token 'dataSource' of the query 'ListFrom' has the name of the primary-constructor parameter 'dataSource', which gives the repository methods of 'App.UserRepository' their connection.  Rename the token.
+```
+
+Rename the token, everywhere the query writes it and in its `-- token:` marker, or, for a `repository` query, rename the parameter.  The error is reported at the query's name, once for each such token, and the query's models are still generated.
 
 See: [Query methods](generator.md#query-methods)
 

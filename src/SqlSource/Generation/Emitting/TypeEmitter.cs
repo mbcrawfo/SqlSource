@@ -59,7 +59,7 @@ internal static class TypeEmitter
 
     // The members on the type, each with its own accessibility, then each nested class that holds a member, with its
     // accessibility and its members public, then the empty nested class of a type with no usable query.  A query whose
-    // output is Methods gets no member here, whether it gets a method or not: the method, in a file of its own, takes
+    // output has a method gets no member here, whether it gets a method or not: the method, in a file of its own, takes
     // the place of its constant, and a nested class that holds only methods is written there alone.
     private static string Write(TypeQueries input, UsableQuerySequence queries)
     {

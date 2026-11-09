@@ -32,4 +32,16 @@ internal static class DatabaseEngineExtensions
             DatabaseEngine.SqlServer => "Microsoft.Data.SqlClient",
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
+
+    /// <summary>
+    /// The engine's driver's connection, from <c>global::</c>, which a repository's method makes from a connection
+    /// string.
+    /// </summary>
+    public static string ConnectionTypeText(this DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => "global::Npgsql.NpgsqlConnection",
+            DatabaseEngine.SqlServer => "global::Microsoft.Data.SqlClient.SqlConnection",
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
 }

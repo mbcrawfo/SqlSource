@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,6 +9,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
+using SqlSource.Generation.Repositories;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
@@ -86,6 +88,15 @@ public sealed class QueryMethodWriterTests
     {
         Engine = DatabaseEngine.SqlServer,
         Input = null,
+    };
+
+    // GetUser as a repository's method on the type, without its token, whose connection is the data source in the field
+    // _dataSource.
+    private static readonly QueryMethod Repository = GetUser with
+    {
+        Segments = TestSidecars.Of(TestModels.Literal("SELECT id, name FROM users WHERE id = @id")),
+        Host = new MethodHost(Visibility.Public, MemberLocation.Class, null),
+        Source = TestModels.Source(),
     };
 
     // StreamIds: GetUser streaming the accounts of a list of ids, IN @ids.
@@ -1668,6 +1679,321 @@ public sealed class QueryMethodWriterTests
         Write(GetUser with { SummaryXml = "Finds a user by <c>id</c>,\nor none." })
             .ShouldStartWith("/// <summary>\n/// Finds a user by <c>id</c>,\n/// or none.\n/// </summary>\n");
 
+    // The null source's exception, as a repository method of GetUserRepository writes it for its member.
+    private const string NullSource =
+        "throw new global::System.InvalidOperationException("
+        + "\"The connection source '_dataSource' of 'App.UserRepository' is null.\")";
+
+    // A repository's method: an instance method that gets its connection from its source, opens it when it is closed
+    // and disposes it when the method made it, and takes neither a connection, a transaction nor a timeout.
+    [Fact]
+    public void Append_RepositoryDataSource_IsTheWholeMethod() =>
+        WriteAsPlanned(Repository)
+            .ShouldBe(
+                GeneratedFile.Joined(
+                    """
+                    /// <summary>
+                    /// The <c>GetUser</c> query from <c>Users.sql</c>.
+                    /// </summary>
+                    /// <remarks>
+                    /// <code>
+                    /// SELECT id, name FROM users WHERE id = @id
+                    /// </code>
+                    /// </remarks>
+                    /// <param name="parameters">The query's parameters.</param>
+                    /// <param name="cancellationToken">Cancels the query.</param>
+                    /// <returns>The row, or null when there is none.</returns>
+                    /// <exception cref="T:SqlSource.UnexpectedRowCountException">↩
+                    The query returned more than one row.</exception>
+                    public async global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(
+                        global::App.GetUserParams parameters,
+                        global::System.Threading.CancellationToken cancellationToken = default)
+                    {
+                        global::System.ArgumentNullException.ThrowIfNull(parameters);
+                        const string sql = "SELECT id, name FROM users WHERE id = @id";
+                        await using var connection = await (this._dataSource ?? ↩
+                    throw new global::System.InvalidOperationException(↩
+                    "The connection source '_dataSource' of 'App.UserRepository' is null.")).↩
+                    OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+                        var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
+                        if (wasClosed)
+                        {
+                            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                        }
+
+                        try
+                        {
+                            var command = connection.CreateCommand();
+                            await using var commandScope = ↩
+                    global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                            command.CommandText = sql;
+
+                            {
+                                var parameter = new global::Npgsql.NpgsqlParameter<int>();
+                                parameter.ParameterName = "id";
+                                parameter.DataTypeName = "pg_catalog.int4";
+                                parameter.TypedValue = parameters.Id;
+                                command.Parameters.Add(parameter);
+                            }
+
+                            var reader = await command.ExecuteReaderAsync(↩
+                    global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
+                            await using var readerScope = ↩
+                    global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                                return null;
+                            }
+
+                            var row = new global::App.GetUserDto(reader.GetFieldValue<int>(0), ↩
+                    reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1));
+                            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                                throw new global::SqlSource.UnexpectedRowCountException("GetUser", true);
+                            }
+
+                            return row;
+                        }
+                        finally
+                        {
+                            if (wasClosed)
+                            {
+                                await connection.CloseAsync().ConfigureAwait(false);
+                            }
+                        }
+                    }
+
+                    """
+                )
+            );
+
+    // Each kind of source gives its connection by its own statement: a connection string a new driver connection, a
+    // data source an opened one, a factory what it returns, awaited when it is asynchronous and given the token when
+    // it takes one, and a borrowed connection itself, which the method does not dispose.
+    [Theory]
+    [InlineData(
+        nameof(ConnectionSourceKind.ConnectionString),
+        nameof(CandidateMember.Field),
+        false,
+        false,
+        "await using var connection = new global::Npgsql.NpgsqlConnection(this._dataSource ?? {0});\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.ConnectionString),
+        nameof(CandidateMember.Method),
+        false,
+        false,
+        "await using var connection = new global::Npgsql.NpgsqlConnection(this._dataSource() ?? {0});\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.ConnectionString),
+        nameof(CandidateMember.Method),
+        false,
+        true,
+        "await using var connection = new global::Npgsql.NpgsqlConnection("
+            + "this._dataSource(cancellationToken) ?? {0});\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.DataSource),
+        nameof(CandidateMember.Field),
+        false,
+        false,
+        "await using var connection = await (this._dataSource ?? {0})"
+            + ".OpenConnectionAsync(cancellationToken).ConfigureAwait(false);\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Factory),
+        nameof(CandidateMember.Method),
+        false,
+        false,
+        "await using var connection = this._dataSource() ?? {0};\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Factory),
+        nameof(CandidateMember.Method),
+        false,
+        true,
+        "await using var connection = this._dataSource(cancellationToken) ?? {0};\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Factory),
+        nameof(CandidateMember.Method),
+        true,
+        false,
+        "await using var connection = await this._dataSource().ConfigureAwait(false) ?? {0};\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Factory),
+        nameof(CandidateMember.Method),
+        true,
+        true,
+        "await using var connection = await this._dataSource(cancellationToken).ConfigureAwait(false) ?? {0};\n"
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Borrowed),
+        nameof(CandidateMember.Property),
+        false,
+        false,
+        "var connection = this._dataSource ?? {0};\n"
+    )]
+    public void Append_RepositoryKind_AcquiresAsTheTableSays(
+        string kindName,
+        string memberName,
+        bool isAsync,
+        bool takesCancellationToken,
+        string statement
+    )
+    {
+        var source = TestModels.Source(
+            Enum.Parse<ConnectionSourceKind>(kindName),
+            Enum.Parse<CandidateMember>(memberName),
+            isAsync: isAsync,
+            takesCancellationToken: takesCancellationToken
+        );
+
+        WriteAsPlanned(Repository with { Source = source })
+            .ShouldContain(
+                "    const string sql = \"SELECT id, name FROM users WHERE id = @id\";\n"
+                    + "    "
+                    + string.Format(CultureInfo.InvariantCulture, statement, NullSource)
+                    + "    var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;\n"
+            );
+    }
+
+    // A connection string is the engine's driver's connection.
+    [Fact]
+    public void Append_RepositoryConnectionStringOnSqlServer_MakesASqlConnection() =>
+        WriteAsPlanned(
+                Repository with
+                {
+                    Engine = DatabaseEngine.SqlServer,
+                    Input = null,
+                    Source = TestModels.Source(ConnectionSourceKind.ConnectionString),
+                }
+            )
+            .ShouldContain(
+                "    await using var connection = new global::Microsoft.Data.SqlClient.SqlConnection("
+                    + "this._dataSource ?? "
+                    + NullSource
+                    + ");\n"
+            );
+
+    // The iterator reaches the type's member, so it is no static local function, and it gets the connection when the
+    // loop starts, so that the connection lives until the loop ends.
+    [Fact]
+    public void Append_RepositoryStream_AcquiresInsideANonStaticIterator()
+    {
+        var text = WriteAsPlanned(
+            Repository with
+            {
+                Shape = ResultShape.Many,
+                Collection = CollectionKind.IAsyncEnumerable,
+            }
+        );
+        var call = text.IndexOf("return ReadRows(", StringComparison.Ordinal);
+
+        call.ShouldBeGreaterThan(0);
+        text.ShouldContain(
+            "public global::System.Collections.Generic.IAsyncEnumerable<global::App.GetUserDto> GetUser(\n"
+                + "    global::App.GetUserParams parameters,\n"
+                + "    global::System.Threading.CancellationToken cancellationToken = default)\n"
+        );
+        text.ShouldContain(
+            "    return ReadRows(parameters, cancellationToken);\n\n"
+                + "    async global::System.Collections.Generic.IAsyncEnumerable<global::App.GetUserDto> ReadRows(\n"
+                + "        global::App.GetUserParams parameters,\n"
+                + "        [global::System.Runtime.CompilerServices.EnumeratorCancellation] "
+                + "global::System.Threading.CancellationToken cancellationToken)\n"
+                + "    {\n"
+                + "        const string sql = \"SELECT id, name FROM users WHERE id = @id\";\n"
+                + "        await using var connection = await (this._dataSource ?? "
+                + NullSource
+                + ").OpenConnectionAsync(cancellationToken).ConfigureAwait(false);\n"
+        );
+        text.ShouldNotContain("static");
+        text[..call].ShouldNotContain("connection");
+    }
+
+    // A stream with nothing to check returns its iterator at once, with no blank line before.
+    [Fact]
+    public void Append_RepositoryStreamWithoutChecks_ReturnsTheIteratorFirst() =>
+        WriteAsPlanned(
+                Repository with
+                {
+                    Shape = ResultShape.Many,
+                    Collection = CollectionKind.IAsyncEnumerable,
+                    Input = null,
+                }
+            )
+            .ShouldContain(
+                "    global::System.Threading.CancellationToken cancellationToken = default)\n"
+                    + "{\n"
+                    + "    return ReadRows(cancellationToken);\n"
+            );
+
+    // A repository's method takes no transaction, so it neither refuses a completed one nor checks for a rollback, and
+    // it still reads the later results, which can hold an error the caller is to see.
+    [Fact]
+    public void Append_RepositoryOnSqlServer_WritesNoTransactionCheck()
+    {
+        var text = WriteAsPlanned(
+            Repository with
+            {
+                Engine = DatabaseEngine.SqlServer,
+                Input = null,
+                Shape = ResultShape.Many,
+            }
+        );
+
+        text.ShouldNotContain("transaction");
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain("commandTimeout");
+        text.ShouldNotContain("CommandTimeout");
+        text.ShouldContain(Drain("        "));
+    }
+
+    // A primary-constructor parameter named as the connection's local is reached by its name, so the local takes
+    // another.
+    [Fact]
+    public void Append_RepositorySourceParameterNamedConnection_RenamesTheLocal()
+    {
+        var source = TestModels.Source(
+            member: CandidateMember.Parameter,
+            name: "connection",
+            access: "connection",
+            leadingName: "connection"
+        );
+
+        var text = WriteAsPlanned(Repository with { Source = source });
+
+        text.ShouldContain(
+            "    await using var connection1 = await (connection ?? throw new global::System.InvalidOperationException("
+                + "\"The connection source 'connection' of 'App.UserRepository' is null.\"))"
+                + ".OpenConnectionAsync(cancellationToken).ConfigureAwait(false);\n"
+                + "    var wasClosed = connection1.State == global::System.Data.ConnectionState.Closed;\n"
+        );
+        text.ShouldContain("        var command = connection1.CreateCommand();\n");
+    }
+
+    // The visibility is the placement's, and a repository's method is an instance method whatever it is.
+    [Theory]
+    [InlineData(nameof(Visibility.Public), "public async ")]
+    [InlineData(nameof(Visibility.Internal), "internal async ")]
+    [InlineData(nameof(Visibility.Protected), "protected async ")]
+    [InlineData(nameof(Visibility.Private), "private async ")]
+    public void Append_RepositoryVisibility_IsAnInstanceMethodOfIt(string visibilityName, string modifiers)
+    {
+        var text = WriteAsPlanned(Repository with { Host = OnType(visibilityName) });
+
+        text.ShouldContain(
+            "\n"
+                + modifiers
+                + "global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(\n"
+                + "    global::App.GetUserParams parameters,\n"
+        );
+        text.ShouldNotContain("static");
+    }
+
     // Not required of this writer's tests, which compare text: the driver tests compile it.  Every shape, collection
     // type, placement and engine, with names that could hide what the method writes, compiled together against the
     // real System.Data, Npgsql's parameter and SqlClient's SqlVector.
@@ -1979,6 +2305,9 @@ public sealed class QueryMethodWriterTests
         QueryMethodWriter.Append(builder, string.Empty, method with { Host = host });
         return builder.ToString();
     }
+
+    // The method on the host it has, as a repository's method is planned.
+    private static string WriteAsPlanned(QueryMethod method) => Write(method, method.Host);
 
     // A method on the type, of the visibility.
     private static MethodHost OnType(string visibilityName) =>

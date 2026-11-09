@@ -158,7 +158,7 @@ public sealed class SidecarTests
     [Fact]
     public void Run_RepositoryQueryWithoutAnEntry_ReportsSqlsrc241()
     {
-        // The type has a connection, so that the query's entry is its one problem.
+        // The type has a connection and the project its driver, so that the query's entry is its one problem.
         var source = new SourceFile(
             GeneratorHarness.SourcePath,
             GeneratorHarness
@@ -170,6 +170,7 @@ public sealed class SidecarTests
             OutputKind.Repository,
             [source],
             [GeneratorHarness.UsersFile],
+            references: [NpgsqlReferences.Npgsql10],
             dialect: "postgres"
         );
 

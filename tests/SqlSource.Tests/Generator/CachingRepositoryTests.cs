@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Repositories;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.StepReasons;
@@ -21,6 +22,11 @@ public sealed class CachingRepositoryTests
     private const string BasePath = "/app/Repo/RepositoryBase.cs";
 
     private const string RepositoryPath = "/app/Repo/UserRepository.cs";
+
+    // The file the repository claims by its name, and the file of its methods.
+    private const string RepositoryQueriesPath = "/app/Repo/UserRepository.sql";
+
+    private const string RepositoryMethods = "App.UserRepository-Methods.g.cs";
 
     private const string Base = """
         namespace App
@@ -42,14 +48,25 @@ public sealed class CachingRepositoryTests
         }
         """;
 
+    // The repository's query gets its method once the base's member gives it a connection.
     [Fact]
     public void Run_BaseMemberMarkedLater_ResolvesTheDerivedRepository()
     {
-        var compilation = GeneratorHarness.CreateCompilation([
-            new SourceFile(BasePath, Base),
-            new SourceFile(RepositoryPath, Repository),
-        ]);
-        var driver = FirstRun(compilation);
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile(BasePath, Base), new SourceFile(RepositoryPath, Repository)],
+            references: [NpgsqlReferences.Npgsql10]
+        );
+        var queries = new InMemoryAdditionalText(RepositoryQueriesPath, SqlTexts.GetUser);
+        var driver = CachingScene
+            .CreateDriver(
+                CachingScene.ProjectFile(OutputKind.Repository, "postgres"),
+                [queries, CachingScene.TypedSidecar(queries, "GetUser", "int4")]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver
+            .GetRunResult()
+            .Results.ShouldHaveSingleItem()
+            .GeneratedSources.ShouldNotContain(source => source.HintName == RepositoryMethods);
 
         var marked = Base.Replace(
             "protected string Name",
@@ -63,6 +80,10 @@ public sealed class CachingRepositoryTests
         candidate.Name.ShouldBe("Name");
         candidate.IsMarked.ShouldBeTrue();
         candidate.IsInherited.ShouldBeTrue();
+        result.Diagnostics.ShouldBeEmpty();
+        CachingScene
+            .MethodsOf(result, RepositoryMethods)
+            .ShouldContain("await using var connection = new global::Npgsql.NpgsqlConnection(this.Name ?? ");
     }
 
     // The repository's declaration is not read again, since its file did not change, and the step still sees the

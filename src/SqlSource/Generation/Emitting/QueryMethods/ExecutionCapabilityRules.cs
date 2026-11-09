@@ -4,11 +4,18 @@ using SqlSource.Settings;
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
-/// Decides the <see cref="ExecutionCapabilities" /> of a query's method, from its engine, its shape and whether it
-/// streams.  It runs in the output step, as the method is written, and its result is never cached.
+/// Decides the <see cref="ExecutionCapabilities" /> of a query's method, from its engine, its shape, whether it
+/// streams and whether it takes a transaction.  It runs in the output step, as the method is written, and its result
+/// is never cached.
 /// </summary>
 internal static class ExecutionCapabilityRules
 {
+    // The flags that check or refuse the transaction a method takes.
+    private const ExecutionCapabilities TransactionFlags =
+        ExecutionCapabilities.RefusesCompletedTransaction
+        | ExecutionCapabilities.ChecksRollbackAtRead
+        | ExecutionCapabilities.ChecksRollbackAfterDatabaseError;
+
     /// <summary>
     /// The method's capabilities, from one switch over its engine.  A new engine adds its row here, and a new flag only
     /// for a new behaviour, named for the behaviour; see <c>docs/architecture/generator.md</c>, "Adding a database
@@ -51,8 +58,18 @@ internal static class ExecutionCapabilityRules
     /// throw in the loop's body or a disposal disposes the iterator at its yield, and the rest of the batch can hold
     /// an error that the caller is to see, which the reader's disposal would drop.
     /// </para>
+    /// <para>
+    /// A repository's method, whose <see cref="QueryMethod.Source" /> gives its connection, takes no transaction, so it
+    /// has none of the flags about one, <see cref="TransactionFlags" />; it keeps the drains.
+    /// </para>
     /// </remarks>
     public static ExecutionCapabilities Of(QueryMethod method)
+    {
+        var capabilities = OfEngine(method);
+        return method.Source is null ? capabilities : capabilities & ~TransactionFlags;
+    }
+
+    private static ExecutionCapabilities OfEngine(QueryMethod method)
     {
         var readsRows = method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
         return method.Engine switch

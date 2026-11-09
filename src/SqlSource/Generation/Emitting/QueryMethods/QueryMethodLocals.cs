@@ -2,19 +2,21 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using SqlSource.Generation.Methods;
+using SqlSource.Generation.Repositories;
 
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// The names of the locals of a query's method and of its lambdas' parameters, none of which an argument has, and of
-/// the connection and the transaction the method runs its query on.  The locals that read rows are named only for a
-/// method that reads them, whose output is given, the value of a converted parameter, or of an array its property
-/// holds as any sequence, only for a method that has one, the element of an array and its value only for a method that
-/// converts one by element, the iterator only for a method that streams, the flag of a row being yielded only for one
-/// whose <see cref="ExecutionCapabilities" /> drain when its loop is left at a row, the exception its catch takes only
-/// for one whose capabilities check for a rollback at its read or after a database error, the flag of a later error
-/// only for one whose capabilities check after a database error, the result of a read only for one of those that
-/// streams, and the names of its lists only for a method that has one.
+/// the connection and the transaction the method runs its query on: the arguments' own, or, for a repository's method,
+/// a local of the connection, which the name its source's access starts with does not take either, and no transaction.
+/// The locals that read rows are named only for a method that reads them, whose output is given, the value of a
+/// converted parameter, or of an array its property holds as any sequence, only for a method that has one, the element
+/// of an array and its value only for a method that converts one by element, the iterator only for a method that
+/// streams, the flag of a row being yielded only for one whose <see cref="ExecutionCapabilities" /> drain when its loop
+/// is left at a row, the exception its catch takes only for one whose capabilities check for a rollback at its read or
+/// after a database error, the flag of a later error only for one whose capabilities check after a database error, the
+/// result of a read only for one of those that streams, and the names of its lists only for a method that has one.
 /// </summary>
 internal sealed class QueryMethodLocals
 {
@@ -23,12 +25,22 @@ internal sealed class QueryMethodLocals
         MethodInput? input,
         MethodOutput? output,
         bool streams,
-        ExecutionCapabilities capabilities
+        ExecutionCapabilities capabilities,
+        ConnectionSource? source
     )
     {
-        Connection = MethodArguments.Connection;
-        Transaction = MethodArguments.Transaction;
-        var names = new LocalNames(Seed(arguments));
+        var names = new LocalNames(Seed(arguments, source));
+        if (arguments.TakesConnection)
+        {
+            Connection = MethodArguments.Connection;
+            Transaction = MethodArguments.Transaction;
+        }
+        else
+        {
+            Connection = names.Take("connection");
+            Transaction = string.Empty;
+        }
+
         Sql = names.Take("sql");
         WasClosed = names.Take("wasClosed");
         Command = names.Take("command");
@@ -81,11 +93,11 @@ internal sealed class QueryMethodLocals
         Lists = ListLocals.Of(input, names);
     }
 
-    // The connection and the transaction the body runs the query on, today the arguments themselves.  A receiver other
-    // than the connection would take local names for them here, from the method's LocalNames, and copy into them once,
-    // at the start of the method (docs/architecture/generator.md, "Adding a kind of method").
+    // The connection the body runs the query on: the argument, or the local a repository's method gets it into from its
+    // source (docs/architecture/generator.md, "Adding a kind of method").
     public string Connection { get; }
 
+    // The transaction the body runs the query in: the argument, or empty for a repository's method, which takes none.
     public string Transaction { get; }
 
     public string Sql { get; }
@@ -148,12 +160,17 @@ internal sealed class QueryMethodLocals
         (input is not null && input.Parameters.Any(static parameter => parameter.Write is { IsByElement: true }))
         || (output is not null && output.Columns.Any(static column => column.Read is { IsByElement: true }));
 
-    // The names of the method's arguments, which no local may take.
-    private static IEnumerable<string> Seed(MethodArguments arguments)
+    // The names of the method's arguments, and the name its source's access starts with, which no local may take.
+    private static IEnumerable<string> Seed(MethodArguments arguments, ConnectionSource? source)
     {
         foreach (var argument in arguments)
         {
             yield return argument.Name;
+        }
+
+        if (source?.LeadingName is { } leadingName)
+        {
+            yield return leadingName;
         }
     }
 }

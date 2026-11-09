@@ -34,24 +34,20 @@ public sealed class MethodDriverTests
     ];
 
     private const string PostgresNotReferenced =
-        "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output methods, and this project does not reference "
-        + "Npgsql, which its method needs.  Reference Npgsql, or set the output to models.";
+        "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output methods or repository, and this project does not "
+        + "reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.";
 
     private const string SqlServerNotReferenced =
-        "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output methods, and this project does not reference "
-        + "Microsoft.Data.SqlClient, which its method needs.  Reference Microsoft.Data.SqlClient, or set the output to "
-        + "models.";
+        "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output methods or repository, and this project does not "
+        + "reference Microsoft.Data.SqlClient, which its method needs.  Reference Microsoft.Data.SqlClient, or set the "
+        + "output to models.";
 
     [Fact]
     public void Run_PostgresMethodsWithoutNpgsql_IsSqlsrc273OnceAndModelsAreEmitted()
     {
         var run = MethodRuns.Run(Users, PostgresEntries, references: []);
 
-        run.Problems()
-            .ShouldBe([
-                "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output methods, and this project does not "
-                    + "reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.",
-            ]);
+        run.Problems().ShouldBe([PostgresNotReferenced]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldContain("App.ListUsersDto-Model.g.cs");
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
@@ -62,12 +58,24 @@ public sealed class MethodDriverTests
     {
         var run = MethodRuns.RunSqlServer(Users, SqlServerEntries, references: []);
 
-        run.Problems()
-            .ShouldBe([
-                "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output methods, and this project does not "
-                    + "reference Microsoft.Data.SqlClient, which its method needs.  Reference "
-                    + "Microsoft.Data.SqlClient, or set the output to models.",
-            ]);
+        run.Problems().ShouldBe([SqlServerNotReferenced]);
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // A repository's method runs on the driver too.
+    [Fact]
+    public void Run_PostgresRepositoryWithoutNpgsql_IsSqlsrc273()
+    {
+        var run = RepositoryRuns.Run(
+            Users,
+            PostgresEntries,
+            "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\")]\n"
+                + "    public partial class Sample(string connectionString);\n}\n",
+            references: []
+        );
+
+        run.Problems().ShouldBe([PostgresNotReferenced]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }

@@ -12,6 +12,8 @@ namespace SqlSource.Tests.Generator;
 // run is under postgres on Npgsql 10, at Repository but for the type whose queries are all methods.
 public sealed class RepositoryDiagnosticsTests
 {
+    private const string MethodsFile = "App.Sample-Methods.g.cs";
+
     private static readonly SqlFile UsersFile = new(
         GeneratorHarness.UsersPath,
         "-- name: GetUser\nSELECT id FROM users;\n"
@@ -40,6 +42,7 @@ public sealed class RepositoryDiagnosticsTests
                     + "mark the member that gives the connection [SqlSourceConnection].  Or set the output of its "
                     + "repository queries to methods.",
             ]);
+        run.Sources.Keys.ShouldNotContain(MethodsFile);
     }
 
     [Fact]
@@ -63,6 +66,7 @@ public sealed class RepositoryDiagnosticsTests
                     + "query is an instance method.  Set the output of its repository queries to methods, or remove "
                     + "static.",
             ]);
+        run.Sources.Keys.ShouldNotContain(MethodsFile);
     }
 
     // The members come before the primary constructor's parameters, so the parameter that the type stores in a field
@@ -87,6 +91,7 @@ public sealed class RepositoryDiagnosticsTests
         var run = RepositoryRuns.Run(UsersFile, [Entry(UsersFile, "GetUser", [], [Column("id")])], Source);
 
         run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain("await using var connection = await (this._dataSource ?? ");
     }
 
     // A query's database is the one its settings name, so a member marked for the settings file's database gives its

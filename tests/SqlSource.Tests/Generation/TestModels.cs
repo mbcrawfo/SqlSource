@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Repositories;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
@@ -115,4 +116,16 @@ internal static class TestModels
             new TextSpan(9, 7),
             new LinePositionSpan(new LinePosition(0, 9), new LinePosition(0, 16))
         );
+
+    // The connection source of a repository's methods: the data source in the field _dataSource of
+    // App.UserRepository unless the test says otherwise.
+    public static ConnectionSource Source(
+        ConnectionSourceKind kind = ConnectionSourceKind.DataSource,
+        CandidateMember member = CandidateMember.Field,
+        string name = "_dataSource",
+        string access = "this._dataSource",
+        bool isAsync = false,
+        bool takesCancellationToken = false,
+        string? leadingName = null
+    ) => new(kind, member, name, access, isAsync, takesCancellationToken, leadingName, "App.UserRepository");
 }

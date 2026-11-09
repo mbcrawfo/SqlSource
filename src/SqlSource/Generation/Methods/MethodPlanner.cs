@@ -28,7 +28,8 @@ namespace SqlSource.Generation.Methods;
 /// query that uses a library older than its floor gets no method and keeps the problems it has: the project gets
 /// <c>SQLSRC282</c> from the libraries that the type's queries use.  A type with a query whose output is
 /// <see cref="OutputKind.Repository" /> gets the problems of its connection, <c>SQLSRC028</c> to <c>SQLSRC034</c>, from
-/// <see cref="ConnectionResolver" />.
+/// <see cref="ConnectionResolver" />, and such a query gets an instance method on the type only when its database has a
+/// connection.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -38,10 +39,10 @@ internal static class MethodPlanner
 
     /// <summary>
     /// The methods of the type: one for each query of a file it can use whose output is
-    /// <see cref="OutputKind.Methods" />, or <see cref="OutputKind.Repository" /> once it has a method, whose entry has
-    /// the models it needs, whose shape, name, tokens and converters a method can have, whose engine's driver the
-    /// project references at or above the floor, and which uses no library older than its floor.  A type with a
-    /// diagnostic of its own, or with no file, has none.
+    /// <see cref="OutputKind.Methods" />, or <see cref="OutputKind.Repository" /> when its database has a connection,
+    /// whose entry has the models it needs, whose shape, name, tokens and converters a method can have, whose engine's
+    /// driver the project references at or above the floor, and which uses no library older than its floor.  A type
+    /// with a diagnostic of its own, or with no file, has none.
     /// </summary>
     public static TypeMethods Plan(MethodsInput input)
     {
@@ -163,20 +164,16 @@ internal static class MethodPlanner
         var engines = MethodEngines.None;
         var served = new ServedConverters(input.Converters);
         // The type's repository is resolved once, before its queries, and only when it has a repository query.
+        ConnectionResolution? resolution = null;
         if (input.Repository is { } shape && NeededDatabases(typeQueries, queries) is { } needed)
         {
-            diagnostics.AddRange(ConnectionResolver.Resolve(typeQueries.Type.Type, shape, needed).Diagnostics);
+            resolution = ConnectionResolver.Resolve(typeQueries.Type.Type, shape, needed);
+            diagnostics.AddRange(resolution.Diagnostics);
         }
 
         foreach (var usable in queries)
         {
             if (!usable.Settings.Output.HasMethod())
-            {
-                continue;
-            }
-
-            // A repository query gets no method yet; its connection's problems are the type's, reported above.
-            if (usable.Settings.Output == OutputKind.Repository)
             {
                 continue;
             }
@@ -190,7 +187,13 @@ internal static class MethodPlanner
 
             var engine = SqlDescribableDialects.EngineOf(file.Dialect);
             engines |= engine.ToMethodEngines();
-            var context = new QueryContext(input, key, file, engine, usable);
+            // A repository query's connection is its database's, or none when the resolution failed it, whose problem
+            // the type has reported above.
+            var source =
+                usable.Settings.Output == OutputKind.Repository
+                    ? SourceOf(resolution, DatabaseOf(typeQueries, usable, file))
+                    : null;
+            var context = new QueryContext(input, key, file, engine, usable, source);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
             var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
             if (Plan(context, written, queries, target, served.Of(target), ref usedLibraries) is { } plan)
@@ -218,11 +221,7 @@ internal static class MethodPlanner
                 continue;
             }
 
-            var name = QuerySettings.ResolveDatabase(
-                usable.Query.Markers,
-                typeQueries.FileSettings[usable.FileIndex],
-                SqlDialectName.Canonical(file.Dialect)
-            );
+            var name = DatabaseOf(typeQueries, usable, file);
             needed ??= [];
             if (!needed.Exists(database => DatabaseName.Comparer.Equals(database.Name, name)))
             {
@@ -232,6 +231,20 @@ internal static class MethodPlanner
 
         return needed;
     }
+
+    // The query's database, by its markers and its file's level, else its dialect's name.
+    private static string DatabaseOf(TypeQueries typeQueries, UsableQuery usable, ParsedSqlFile file) =>
+        QuerySettings.ResolveDatabase(
+            usable.Query.Markers,
+            typeQueries.FileSettings[usable.FileIndex],
+            SqlDialectName.Canonical(file.Dialect)
+        );
+
+    // The connection of the database, by DatabaseName.Comparer, or null when the type has none for it.
+    private static ConnectionSource? SourceOf(ConnectionResolution? resolution, string database) =>
+        resolution
+            ?.Sources.FirstOrDefault(resolved => DatabaseName.Comparer.Equals(resolved.Database, database))
+            ?.Source;
 
     // The names of the members the type's file writes for the queries that have no method: each one's constant
     // or token method, with the nested class that holds it, or null for one on the type itself.
@@ -266,11 +279,12 @@ internal static class MethodPlanner
             _ => throw UnexpectedEnumValueException.Of(placement.Location),
         };
 
-    // The plan of one query whose output is Methods, or null when it gets nothing and reports nothing here.  Every
+    // The plan of one query whose output has a method, or null when it gets nothing and reports nothing here.  Every
     // problem of its SQL, of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC274 and of its converters that the query has is
     // reported, and any one leaves it no method.  Its conversions see the converters of the type's slice that serve
     // its target.  The libraries it uses are added to the type's, and one older than its floor leaves it no method,
-    // beside its problems, which stay true once the library is updated.
+    // beside its problems, which stay true once the library is updated.  A repository query without a connection gets
+    // no method either, beside its problems.
     private static Planned? Plan(
         QueryContext context,
         HashSet<(string? NestedClass, string Name)> written,
@@ -280,7 +294,7 @@ internal static class MethodPlanner
         ref HashSet<LibraryUse>? usedLibraries
     )
     {
-        var (input, _, file, engine, usable) = context;
+        var (input, _, file, engine, usable, source) = context;
         var (_, queryIndex, query, settings, placement) = usable;
         // A query without models has its own error already, reported by its file.  Its SQL's own errors need no
         // models, so it gets them before it is described.
@@ -317,10 +331,12 @@ internal static class MethodPlanner
             );
         }
 
-        problems.AddRange(FindTokenProblems(query));
+        problems.AddRange(FindTokenProblems(query, source));
         var name = query.Name + ((settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0 ? AsyncSuffix : "");
         var host = HostOf(placement);
-        var reason = FindTakenReason(input, name, host, written, queries.Placement.NestedClasses);
+        var reason =
+            FindTakenReason(input, name, host, written, queries.Placement.NestedClasses)
+            ?? FindTakenBySource(source, name);
         if (reason is not null)
         {
             problems.Add(
@@ -347,7 +363,8 @@ internal static class MethodPlanner
         // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
         var isBelowTheFloor = AddUsedLibraries(input, engine, models, methodInput, methodOutput, ref usedLibraries);
         // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
-        if (problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor)
+        var hasNoConnection = settings.Output == OutputKind.Repository && source is null;
+        if (problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor || hasNoConnection)
         {
             return new Planned(problems, query.Name, query.NameLocation, [], false, []);
         }
@@ -369,6 +386,7 @@ internal static class MethodPlanner
         )
         {
             Host = host,
+            Source = source,
         };
         return new Planned(
             problems,
@@ -384,7 +402,7 @@ internal static class MethodPlanner
     // query has its own error already.
     private static bool HasInternalModel(QueryContext context, QueryModels models)
     {
-        var (input, key, file, _, usable) = context;
+        var (input, key, file, _, usable, _) = context;
         return (
                 models.Input is not null
                 && FindAssignment(input.Assignments, key, file.NormalizedPath, usable.QueryIndex, ModelRole.Input)
@@ -468,7 +486,7 @@ internal static class MethodPlanner
         ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses
     )
     {
-        var (input, _, _, engine, usable) = context;
+        var (input, _, _, engine, usable, _) = context;
         if (input.Files[usable.FileIndex].Find(usable.QueryIndex, usable.Query.Name) is not { } models)
         {
             return;
@@ -613,20 +631,68 @@ internal static class MethodPlanner
         }
     }
 
-    // SQLSRC275 for each token named as an argument that every method can have, as MethodArguments.IsReserved says.
-    private static List<DiagnosticInfo> FindTokenProblems(SqlQuery query) =>
-        [
-            .. query
-                .Tokens.Where(static token => MethodArguments.IsReserved(token.Name))
-                .Select(token =>
+    // SQLSRC275 for each token named as an argument that every method can have, as MethodArguments.IsReserved says, or,
+    // for a repository's method, as the name its source's access starts with, which the token's argument would hide.
+    private static List<DiagnosticInfo> FindTokenProblems(SqlQuery query, ConnectionSource? source)
+    {
+        var problems = new List<DiagnosticInfo>();
+        foreach (var name in query.Tokens.Select(static token => token.Name))
+        {
+            var reason = MethodArguments.IsReserved(name)
+                ? "an argument that a query method can have: connection, parameters, transaction, commandTimeout or "
+                    + "cancellationToken"
+                : HiddenSourceReason(source, name);
+            if (reason is not null)
+            {
+                problems.Add(
                     DiagnosticInfo.Create(
                         SqlDiagnostics.TokenNamedAsAnArgument,
                         query.NameLocation,
-                        token.Name,
-                        query.Name
+                        name,
+                        query.Name,
+                        reason
                     )
-                ),
-        ];
+                );
+            }
+        }
+
+        return problems;
+    }
+
+    // What a token of the name would hide of the source, as SQLSRC275 says it: the primary-constructor parameter, or
+    // the type a static member is reached through.  Null when it hides nothing.
+    private static string? HiddenSourceReason(ConnectionSource? source, string name)
+    {
+        if (source?.LeadingName is not { } leadingName || !string.Equals(leadingName, name, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return source.Member == CandidateMember.Parameter
+            ? "the primary-constructor parameter '"
+                + leadingName
+                + "', which gives the repository methods of '"
+                + source.TypeName
+                + "' their connection"
+            : "the type '"
+                + leadingName
+                + "', through which the repository methods of '"
+                + source.TypeName
+                + "' reach their connection '"
+                + source.MemberName
+                + "'";
+    }
+
+    // What SQLSRC274 says takes the name of a repository's method that is its source's: a member of a base type or a
+    // parameter, which the method would hide from itself.  A member of the type's own is found as any member is.
+    private static string? FindTakenBySource(ConnectionSource? source, string name) =>
+        source is not null && string.Equals(source.MemberName, name, StringComparison.Ordinal)
+            ? "the repository methods of '"
+                + source.TypeName
+                + "' get their connection from '"
+                + source.MemberName
+                + "'"
+            : null;
 
     // The input model, or null when the query has no parameters.  False when it needs one and has none, when its
     // properties do not match its parameters, which is never thrown on, or when a parameter's converter blocks it.
@@ -637,7 +703,7 @@ internal static class MethodPlanner
         out MethodInput? methodInput
     )
     {
-        var (input, key, file, engine, usable) = context;
+        var (input, key, file, engine, usable, _) = context;
         var (_, queryIndex, query, _, _) = usable;
         methodInput = null;
         if (models.Input is not { } properties)
@@ -697,7 +763,7 @@ internal static class MethodPlanner
         out MethodOutput? methodOutput
     )
     {
-        var (input, key, file, _, usable) = context;
+        var (input, key, file, _, usable, _) = context;
         var (_, queryIndex, _, settings, _) = usable;
         methodOutput = null;
         if (models.Output is not { } properties)
@@ -960,13 +1026,15 @@ internal static class MethodPlanner
         };
 
     // The values that planning one query reads from its type and its file: the type's input and key, the query's file
-    // and the engine of its dialect, and the query with its place and settings.
+    // and the engine of its dialect, the query with its place and settings, and, for a repository query whose database
+    // has one, its connection.
     private readonly record struct QueryContext(
         MethodsInput Input,
         string Key,
         ParsedSqlFile File,
         DatabaseEngine Engine,
-        UsableQuery Query
+        UsableQuery Query,
+        ConnectionSource? Source
     );
 
     // What deciding the converters of one query's properties reads: whether its driver allows a method, without which

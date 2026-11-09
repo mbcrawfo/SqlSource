@@ -39,7 +39,9 @@ namespace SqlSource.Generation.Methods;
 /// The libraries that a settings file turns on for the methods and that the project cannot use, without the
 /// positions of their members, which <see cref="SettingsFileLibraryUse.Locate" /> finds.
 /// </param>
-/// <param name="MethodEngines">The engines of the type's queries whose output is <c>Methods</c>.</param>
+/// <param name="MethodEngines">
+/// The engines of the type's queries whose output has a method, <c>Methods</c> or <c>Repository</c>.
+/// </param>
 /// <param name="WarningIds">
 /// The ids of the compiler's warnings that the methods give, which their file disables: of every converter they call
 /// and every property type they read or bind, an obsolete or experimental one, in ordinal order, each once.
@@ -49,8 +51,8 @@ namespace SqlSource.Generation.Methods;
 /// <see cref="Settings.Libraries.SqlLibrary" />, each once: the classes of conversions that the project gets.
 /// </param>
 /// <param name="UsedLibraries">
-/// The libraries that a query of the type whose output is <c>Methods</c> uses, each with the query's engine, in the
-/// order of <see cref="LibraryUse.Order" />, each once: of a property that a library's row typed, or of a conversion
+/// The libraries that a query of the type whose output has a method uses, each with the query's engine, in the order
+/// of <see cref="LibraryUse.Order" />, each once: of a property that a library's row typed, or of a conversion
 /// that is a library's generated one.  The project gets <c>SQLSRC282</c> for each package of them that is older than
 /// its floor.
 /// </param>

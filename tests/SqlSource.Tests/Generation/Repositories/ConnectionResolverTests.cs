@@ -35,10 +35,13 @@ public sealed class ConnectionResolverTests
         resolved.Source.ShouldBe(
             new ConnectionSource(
                 ConnectionSourceKind.ConnectionString,
+                CandidateMember.Field,
                 "_connectionString",
                 "this._connectionString",
                 false,
-                false
+                false,
+                null,
+                "App.UserRepository"
             )
         );
     }
@@ -368,8 +371,25 @@ public sealed class ConnectionResolverTests
     {
         var resolution = Resolve([Candidate("dataSource", CandidateType.DataSource, CandidateMember.Parameter)], Main);
 
-        resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("dataSource");
+        var source = resolution.Sources.ShouldHaveSingleItem().Source;
+        source.AccessText.ShouldBe("dataSource");
+        source.LeadingName.ShouldBe("dataSource");
     }
+
+    // A method's own argument or local of a parameter's name would hide it, so its name is the one the access starts
+    // with; an instance member is reached through this, which nothing hides.
+    [Fact]
+    public void Resolve_InstanceMember_HasNoLeadingName() =>
+        Resolve([Candidate("_dataSource", CandidateType.DataSource)], Main)
+            .Sources.ShouldHaveSingleItem()
+            .Source.LeadingName.ShouldBeNull();
+
+    // A method returning a connection string is called, so the source says which kind of member it is.
+    [Fact]
+    public void Resolve_MethodReturningAConnectionString_IsAMethodSource() =>
+        Resolve([Candidate("GetConnectionString", CandidateType.ConnectionString, CandidateMember.Method, true)], Main)
+            .Sources.ShouldHaveSingleItem()
+            .Source.Member.ShouldBe(CandidateMember.Method);
 
     [Fact]
     public void Resolve_KeywordName_IsEscaped()
@@ -396,7 +416,10 @@ public sealed class ConnectionResolverTests
 
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
-        resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("Repo<T>.ConnectionString");
+        var source = resolution.Sources.ShouldHaveSingleItem().Source;
+        source.AccessText.ShouldBe("Repo<T>.ConnectionString");
+        source.LeadingName.ShouldBe("Repo");
+        source.TypeName.ShouldBe("App.Repo<T>");
     }
 
     // The type's name is as its declaration writes it, so a keyword keeps its @.

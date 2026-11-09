@@ -18,4 +18,10 @@ public sealed class DatabaseEngineExtensionsTests
     [InlineData((int)DatabaseEngine.SqlServer, "Microsoft.Data.SqlClient")]
     public void DriverName_EachEngine_IsItsDriversPackage(int engine, string expected) =>
         ((DatabaseEngine)engine).DriverName().ShouldBe(expected);
+
+    [Theory]
+    [InlineData((int)DatabaseEngine.PostgreSql, "global::Npgsql.NpgsqlConnection")]
+    [InlineData((int)DatabaseEngine.SqlServer, "global::Microsoft.Data.SqlClient.SqlConnection")]
+    public void ConnectionTypeText_Engine_IsTheDriversConnection(int engine, string expected) =>
+        ((DatabaseEngine)engine).ConnectionTypeText().ShouldBe(expected);
 }

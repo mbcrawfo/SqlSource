@@ -1144,8 +1144,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor DriverNotReferenced = new(
         id: "SQLSRC273",
         title: "Driver is not referenced",
-        messageFormat: "A query for {0} has the output methods, and this project does not reference {1}, which its "
-            + "method needs.  Reference {1}, or set the output to models.",
+        messageFormat: "A query for {0} has the output methods or repository, and this project does not reference {1}, "
+            + "which its method needs.  Reference {1}, or set the output to models.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -1166,12 +1166,12 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the token's name and {1} the query.
+    // {0} is the token's name, {1} the query and {2} what has the name: the arguments a query method can have, or what
+    // a repository's method reaches its connection through.
     public static readonly DiagnosticDescriptor TokenNamedAsAnArgument = new(
         id: "SQLSRC275",
         title: "Token is named as an argument of the method",
-        messageFormat: "The token '{0}' of the query '{1}' has the name of an argument that a query method can "
-            + "have: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.",
+        messageFormat: "The token '{0}' of the query '{1}' has the name of {2}.  Rename the token.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
