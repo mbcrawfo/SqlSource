@@ -877,7 +877,12 @@ The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of
 
 **Repository interface name is taken**
 
-A type that claims a query whose output is `repository` gets an interface of its public repository methods, named `I` and the type's name unless `InterfaceName` names it, beside the type: in its namespace, or in the type it is nested in.  Something there already has that name: a type of the project, other than an interface whose every declaration is `partial`, a type of a referenced assembly, or, for a nested type, a member of the type it is nested in.
+A type that claims a query whose output is `repository` gets an interface of its public repository methods, named `I` and the type's name unless `InterfaceName` names it, beside the type: in its namespace, or in the type it is nested in.  Something there already has that name:
+
+- a type of the project, other than an interface whose every declaration is `partial`, or a type of a referenced assembly;
+- a type parameter of the type, or of a type it is nested in;
+- for a nested type, the type it is nested in, or a member of it;
+- something else that SqlSource writes beside it: a model, the extension class of a type's `methods` queries, a namespace that holds models, or the interface of another type, in which case each of the two types gets the error.
 
 ```csharp
 public class IUserRepository { }
@@ -913,7 +918,7 @@ The error is at the parameter, and the repository queries of that database get n
 
 **Repository interface name is not valid**
 
-A type that claims a query whose output is `repository` gets an interface of its public repository methods, and its `[SqlSourceGenerate]` names it with `InterfaceName`, but the name is not a C# identifier: it holds a character that an identifier cannot, such as `-`, a namespace, type parameters, or an `@`.  A keyword such as `"class"` is an identifier, and is written `@class`.
+A type that claims a query whose output is `repository` gets an interface of its public repository methods, and its `[SqlSourceGenerate]` names it with `InterfaceName`, but the name is not a C# identifier: it holds a character that an identifier cannot, such as `-`, a namespace, type parameters, or an `@`.  A keyword such as `"class"`, or a contextual keyword such as `"file"`, is an identifier, and is written `@class` or `@file`.
 
 ```csharp
 [SqlSourceGenerate(InterfaceName = "I-Users")]
@@ -3158,6 +3163,7 @@ The method of a query whose output is `methods` or `repository` would have the n
 - under the default [member location](generator.md#locations) `extension-class`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
 - for a `repository` query, also the name of the member of a base type, or the primary-constructor parameter, that its method gets its connection from, which the method would hide;
+- for a public method of a `repository` query, also the name of the type's [interface](#sqlsrc035), which holds the method too, and whose member cannot have its name; the interface is still generated, without the method;
 - under `nested-class`, the name of the constant, token method or method of another query of the type in the same class, which may come from another file of the type;
 - the name of the method of another query of the same type in the same class, which is reported at both queries;
 - under `extension-class`, the name of the method of a query of another type whose methods go into the same extension class, as two types of one name nested in two types do, or of a method of the same name and the same parameters in the extension class of another type of the same namespace, which a call on a connection could not tell apart from it.  Both queries get the error, and neither gets its method.  Two methods of one name in the classes of two types whose parameters differ, one with an input model and one without, say, are two overloads, and each is generated.

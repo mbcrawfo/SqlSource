@@ -46,7 +46,7 @@ public sealed class MethodEmitterTests
     [Fact]
     public void Emit_InterfaceWithoutMethods_WritesTheTypeAndTheEmptyInterface() =>
         MethodEmitter
-            .Emit(Of([Sample], [], "ISample", true), EquatableArray<string>.Empty, false)
+            .Emit(Of([Sample], [], "ISample", true), EquatableArray<string>.Empty, false, false)
             .Source.ShouldBe(
                 GeneratedFile.Header
                     + "\nnamespace App\n{\n"
@@ -66,7 +66,7 @@ public sealed class MethodEmitterTests
         var repo = new TypeDeclaration("class", "Repo", "Repo", "<T>", 1);
 
         var source = MethodEmitter
-            .Emit(Of([outer, repo], [RepositoryMethodWriterTests.Repository], "IRepo", false), default, false)
+            .Emit(Of([outer, repo], [RepositoryMethodWriterTests.Repository], "IRepo", false), default, false, false)
             .Source.ShouldNotBeNull();
 
         source.ShouldContain(
@@ -86,7 +86,12 @@ public sealed class MethodEmitterTests
     public void Emit_InterfaceAndExtensionClass_WritesTheInterfaceBetween()
     {
         var source = MethodEmitter
-            .Emit(Of([Sample], [RepositoryMethodWriterTests.Repository, ListUsers], "ISample", true), default, false)
+            .Emit(
+                Of([Sample], [RepositoryMethodWriterTests.Repository, ListUsers], "ISample", true),
+                default,
+                false,
+                false
+            )
             .Source.ShouldNotBeNull();
 
         var type = source.IndexOf("    partial class Sample : global::App.ISample\n", System.StringComparison.Ordinal);
@@ -97,10 +102,27 @@ public sealed class MethodEmitterTests
         extensions.ShouldBeGreaterThan(contract);
     }
 
+    // An interface that something else SqlSource writes has the name of is left out, and the type implements nothing.
+    [Fact]
+    public void Emit_InterfaceBlocked_WritesTheTypeWithoutIt()
+    {
+        var source = MethodEmitter
+            .Emit(Of([Sample], [RepositoryMethodWriterTests.Repository], "ISample", true), default, false, true)
+            .Source.ShouldNotBeNull();
+
+        source.ShouldContain("    partial class Sample\n    {\n");
+        source.ShouldNotContain("interface");
+    }
+
+    // A repository whose every method failed and whose interface is blocked gets no file.
+    [Fact]
+    public void Emit_InterfaceBlockedWithoutMethods_GivesNoSource() =>
+        MethodEmitter.Emit(Of([Sample], [], "ISample", true), default, false, true).Source.ShouldBeNull();
+
     // The source of an extension class that holds GetUser and ListUsers, without the dropped names.
     private static string? Emit(EquatableArray<string> dropped) =>
         MethodEmitter
-            .Emit(Of([Sample], [QueryMethodWriterTests.GetUser, ListUsers], null, false), dropped, false)
+            .Emit(Of([Sample], [QueryMethodWriterTests.GetUser, ListUsers], null, false), dropped, false, false)
             .Source;
 
     // The methods of a type of the namespace App, nested in the types before its own.

@@ -23,6 +23,7 @@ public sealed class MethodConflictsTests
             new MethodConflicts(
                 EquatableArray<DroppedMethod>.Empty,
                 EquatableArray<string>.Empty,
+                EquatableArray<string>.Empty,
                 EquatableArray<DiagnosticInfo>.Empty
             )
         );
@@ -110,6 +111,7 @@ public sealed class MethodConflictsTests
                 Signature("App.Sample", "SampleExtensions", "Get"),
                 Signature("App.Sample", "SampleExtensions", "List")
             ),
+            EquatableArray<InterfaceSignature>.Empty,
             new EquatableArray<TakenName>([new TakenName("App.SampleExtensions", (TakenReason)reason, part)]),
             EquatableArray<string>.Empty
         );
@@ -133,6 +135,7 @@ public sealed class MethodConflictsTests
     {
         var conflicts = MethodConflicts.Find(
             TestSidecars.Of(Signature("App.Sample", "SampleExtensions", "Get")),
+            EquatableArray<InterfaceSignature>.Empty,
             EquatableArray<TakenName>.Empty,
             new EquatableArray<string>(["App.GetDto", model])
         );
@@ -179,6 +182,7 @@ public sealed class MethodConflictsTests
                 Signature("App.First", "FirstExtensions", "Get"),
                 Signature("App.Second", "SecondExtensions", "Get", path: "b.sql")
             ),
+            EquatableArray<InterfaceSignature>.Empty,
             new EquatableArray<TakenName>([
                 new TakenName("App.FirstExtensions", TakenReason.Type, "App.FirstExtensions"),
             ]),
@@ -263,6 +267,7 @@ public sealed class MethodConflictsTests
                     attributePath: "Second.cs"
                 )
             ),
+            EquatableArray<InterfaceSignature>.Empty,
             new EquatableArray<TakenName>([
                 new TakenName("App.QueriesExtensions", TakenReason.Type, "App.QueriesExtensions"),
             ]),
@@ -324,6 +329,7 @@ public sealed class MethodConflictsTests
     private static MethodConflicts Find(MethodSignature[] signatures) =>
         MethodConflicts.Find(
             new EquatableArray<MethodSignature>([.. signatures]),
+            EquatableArray<InterfaceSignature>.Empty,
             EquatableArray<TakenName>.Empty,
             EquatableArray<string>.Empty
         );

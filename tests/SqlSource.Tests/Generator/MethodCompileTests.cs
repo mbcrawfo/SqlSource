@@ -508,7 +508,8 @@ public sealed class MethodCompileTests
 
     // A repository of a type that the interface's declaration and the base list of the type's part must repeat: a
     // generic type with a constraint, which the interface leaves out, a type nested in a generic class, whose
-    // interface is its sibling, internal as the type is, and a struct, a record and a record struct.
+    // interface is its sibling, internal as the type is, a generic type nested in one, and a struct, a record and a
+    // record struct.
     [Theory]
     [InlineData(
         "[SqlSourceGenerate(Source = \".\")]\n    public partial class Repo<T>\n        where T : class\n"
@@ -521,6 +522,12 @@ public sealed class MethodCompileTests
             + "        internal partial class Repo\n        {\n{0}        }\n    }",
         "partial class Repo : global::App.Outer<U>.IRepo\n",
         "        internal partial interface IRepo\n"
+    )]
+    [InlineData(
+        "public partial class Outer<U>\n    {\n        [SqlSourceGenerate(Source = \".\")]\n"
+            + "        public partial class Repo<T>\n        {\n{0}        }\n    }",
+        "partial class Repo<T> : global::App.Outer<U>.IRepo<T>\n",
+        "        public partial interface IRepo<T>\n"
     )]
     [InlineData(
         "[SqlSourceGenerate(Source = \".\")]\n    public partial struct Repo\n    {\n{0}    }",

@@ -445,18 +445,6 @@ public sealed class RepositoryMethodWriterTests
         text.ShouldNotContain("static");
     }
 
-    private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
-
-    // The loop that reads the results after the rows, at an indent.
-    private static string Drain(string indent) =>
-        indent
-        + "while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))\n"
-        + indent
-        + "{\n"
-        + indent
-        + "}\n";
-
-    // The method on the host it has, as a repository's method is planned.
     // A member of the repository's interface repeats the method's documentation and signature, the default of the
     // cancellation token too, without modifiers or a body.
     [Fact]
@@ -518,6 +506,18 @@ public sealed class RepositoryMethodWriterTests
             );
     }
 
+    private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
+
+    // The loop that reads the results after the rows, at an indent.
+    private static string Drain(string indent) =>
+        indent
+        + "while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))\n"
+        + indent
+        + "{\n"
+        + indent
+        + "}\n";
+
+    // The method on the host it has, as a repository's method is planned.
     private static string WriteAsPlanned(QueryMethod method)
     {
         var builder = new StringBuilder();

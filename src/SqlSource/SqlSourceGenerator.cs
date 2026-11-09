@@ -911,6 +911,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (each, _) => ExtensionClassNamesOf(each))
             .WithTrackingName(TrackingNames.ExtensionClassNames);
 
+        // Every type's repository interface, where it goes, which almost never changes.
+        var interfaces = typeMethods
+            .Select(static (methods, _) => InterfaceSignature.Of(methods))
+            .WhereNotNull()
+            .Collect()
+            .Select(static (each, _) => ToSortedInterfaces(each))
+            .WithTrackingName(TrackingNames.InterfaceSignatures);
+
         // Those names that the project has already, as a type or a namespace.  Like the lookup of the models' names, it
         // runs on every run, since the driver gives a new compilation each time, and its value is equal until a type or
         // a namespace of a name appears or goes.
@@ -923,11 +931,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.TakenExtensionClasses);
 
         // A step of its own, since it sees every type's methods at once: where the methods of two types are compared,
-        // and each extension class's name with the project's and the models'.
+        // each extension class's name with the project's and the models', and each interface's name with the models',
+        // the extension classes' and the other interfaces'.
         var conflicts = signatures
+            .Combine(interfaces)
             .Combine(takenExtensionClasses)
             .Combine(modelNames)
-            .Select(static (input, _) => MethodConflicts.Find(input.Left.Left, input.Left.Right, input.Right))
+            .Select(
+                static (input, _) =>
+                    MethodConflicts.Find(input.Left.Left.Left, input.Left.Left.Right, input.Left.Right, input.Right)
+            )
             .WithTrackingName(TrackingNames.MethodConflicts);
 
         // Each type's file, from its own slice of the conflicts, so that a clash re-emits only the types it touches.
@@ -938,10 +951,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     (
                         Methods: input.Left,
                         Dropped: input.Right.DroppedOf(input.Left.TypeKey),
-                        Blocked: input.Right.IsBlocked(input.Left.TypeKey)
+                        Blocked: input.Right.IsBlocked(input.Left.TypeKey),
+                        InterfaceBlocked: input.Right.IsInterfaceBlocked(input.Left.TypeKey)
                     )
             )
-            .Select(static (input, _) => MethodEmitter.Emit(input.Methods, input.Dropped, input.Blocked))
+            .Select(
+                static (input, _) =>
+                    MethodEmitter.Emit(input.Methods, input.Dropped, input.Blocked, input.InterfaceBlocked)
+            )
             .WithTrackingName(TrackingNames.MethodOutput);
 
         // The problems of every type's methods together, each once: a file that two types claim gives both the same
@@ -1177,6 +1194,10 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ThenBy(static signature => signature.Name, StringComparer.Ordinal)
                 .ToImmutableArray()
         );
+
+    // The interfaces of the types that get one, sorted ordinally by the type's key.
+    private static EquatableArray<InterfaceSignature> ToSortedInterfaces(ImmutableArray<InterfaceSignature> each) =>
+        new(each.OrderBy(static signature => signature.TypeKey, StringComparer.Ordinal).ToImmutableArray());
 
     // The distinct full names of the extension classes, in ordinal order.
     private static EquatableArray<string> ExtensionClassNamesOf(EquatableArray<MethodSignature> signatures) =>

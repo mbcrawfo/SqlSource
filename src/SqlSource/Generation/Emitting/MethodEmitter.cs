@@ -31,16 +31,21 @@ internal static class MethodEmitter
     /// Whether the extension class cannot be written, which leaves out every method under
     /// <see cref="MemberLocation.ExtensionClass" />.
     /// </param>
+    /// <param name="interfaceBlocked">
+    /// Whether the repository's interface cannot be written, since something else that SqlSource writes has its name.
+    /// </param>
     public static (string HintName, string? Source, bool UsesRowBuffer) Emit(
         TypeMethods methods,
         EquatableArray<string> dropped,
-        bool extensionClassBlocked
+        bool extensionClassBlocked,
+        bool interfaceBlocked
     )
     {
         var (onType, extensions) = Keep(methods.Methods, dropped, extensionClassBlocked);
+        var interfaceName = interfaceBlocked ? null : methods.InterfaceName;
         // The interface is written when every method of the repository failed, so that code that names it does not
         // fail too.
-        var writesType = onType.Count > 0 || methods.InterfaceName is not null;
+        var writesType = onType.Count > 0 || interfaceName is not null;
         if (!writesType && extensions.Count == 0)
         {
             return (methods.HintName, null, false);
@@ -67,7 +72,7 @@ internal static class MethodEmitter
         var usesRowBuffer = false;
         if (writesType)
         {
-            usesRowBuffer |= AppendOnType(builder, depth, methods, onType);
+            usesRowBuffer |= AppendOnType(builder, depth, methods, interfaceName, onType);
         }
 
         if (extensions.Count > 0)
@@ -91,7 +96,13 @@ internal static class MethodEmitter
     // The partial declaration of the type, with its own methods and then each nested class's, as a static partial
     // class with the accessibility that the type's file gives it too, then the repository's interface, in the types
     // the type is nested in, which the type's declaration implements.
-    private static bool AppendOnType(StringBuilder builder, int depth, TypeMethods methods, List<QueryMethod> onType)
+    private static bool AppendOnType(
+        StringBuilder builder,
+        int depth,
+        TypeMethods methods,
+        string? interfaceName,
+        List<QueryMethod> onType
+    )
     {
         var start = depth;
         var last = methods.Types.Count - 1;
@@ -102,8 +113,8 @@ internal static class MethodEmitter
             TypeEmitter.Open(
                 builder,
                 depth++,
-                index == last && methods.InterfaceName is { } name
-                    ? header + " : " + InterfaceOf(methods, name)
+                index == last && interfaceName is not null
+                    ? header + " : " + InterfaceOf(methods, interfaceName)
                     : header
             );
         }
@@ -147,7 +158,7 @@ internal static class MethodEmitter
         }
 
         _ = builder.Append(TypeEmitter.GetIndent(--depth)).Append("}\n");
-        if (methods.InterfaceName is { } interfaceName)
+        if (interfaceName is not null)
         {
             _ = builder.Append('\n');
             AppendInterface(builder, depth, methods, interfaceName, onType);
@@ -226,8 +237,10 @@ internal static class MethodEmitter
     private static bool IsInterfaceMember(QueryMethod method) =>
         method is { Source: not null, Host: { Location: MemberLocation.Class, Accessibility: Visibility.Public } };
 
-    // The interface's name as code writes it: a keyword after an @.
-    private static string CodeNameOf(string name) => SqlIdentifier.IsReservedKeyword(name) ? "@" + name : name;
+    // The interface's name as code writes it: a keyword after an @, a contextual one too, since C# refuses some of them
+    // as the name of a type, such as file, scoped and required, and extension, which this compiler may not know.
+    private static string CodeNameOf(string name) =>
+        SqlIdentifier.IsReservedKeyword(name) || SqlIdentifier.IsContextualKeyword(name) ? "@" + name : name;
 
     // The extension class, which takes the widest accessibility of the type's extension methods.
     private static bool AppendExtensionClass(

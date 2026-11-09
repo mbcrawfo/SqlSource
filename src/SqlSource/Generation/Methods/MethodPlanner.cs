@@ -66,6 +66,7 @@ internal static class MethodPlanner
             engines = Collect(
                 input,
                 key,
+                interfaceName,
                 methods,
                 diagnostics,
                 libraryUses,
@@ -122,8 +123,9 @@ internal static class MethodPlanner
 
     // The name of the type's repository interface: none for a type that claims no repository query, whose interface
     // is off, or that is static, which cannot implement one and has its own problem; none, with SQLSRC037 at the
-    // attribute, when the attribute names it with no identifier, and with SQLSRC035 when something takes the name.  A
-    // type whose every repository method fails still gets it.
+    // attribute, when the attribute names it with no identifier, and with SQLSRC035 when something of the compilation
+    // or of the type takes the name.  MethodConflicts compares it with what SqlSource writes beside it.  A type whose
+    // every repository method fails still gets it.
     private static string? InterfaceNameOf(MethodsInput input, ImmutableArray<DiagnosticInfo>.Builder diagnostics)
     {
         var type = input.Type.Type.Type;
@@ -147,7 +149,7 @@ internal static class MethodPlanner
             return null;
         }
 
-        if (shape.InterfaceTakenBy is { } takenBy)
+        if ((shape.InterfaceTakenBy ?? TakenInTheType(type, shape.InterfaceName)) is { } takenBy)
         {
             diagnostics.Add(
                 DiagnosticInfo.Create(
@@ -162,6 +164,25 @@ internal static class MethodPlanner
         }
 
         return shape.InterfaceName;
+    }
+
+    // What of the type takes the interface's name, as SQLSRC035 says it, or null: a type parameter of the type or of a
+    // type it is nested in, which a member beside it cannot be named as, or the type it is nested in, which a member of
+    // it cannot be named as (CS0542).
+    private static string? TakenInTheType(TargetType type, string name)
+    {
+        for (var index = 0; index < type.Types.Count; index++)
+        {
+            if (HasTypeParameter(type.Types[index].TypeParameters, name))
+            {
+                return "the type parameter " + name + " of " + DisplayNameOf(type, index);
+            }
+        }
+
+        var container = type.Types.Count - 2;
+        return container >= 0 && string.Equals(type.Types[container].ValueName, name, StringComparison.Ordinal)
+            ? "the containing type " + DisplayNameOf(type, container)
+            : null;
     }
 
     // What the planned methods' hosts give their file: whether the extension class is public, as its widest method is,
@@ -195,6 +216,7 @@ internal static class MethodPlanner
     private static MethodEngines Collect(
         MethodsInput input,
         string key,
+        string? interfaceName,
         ImmutableArray<QueryMethod>.Builder methods,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
         ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses,
@@ -242,7 +264,7 @@ internal static class MethodPlanner
                 usable.Settings.Output == OutputKind.Repository
                     ? SourceOf(resolution, DatabaseOf(typeQueries, usable, file))
                     : null;
-            var context = new QueryContext(input, key, file, engine, usable, source);
+            var context = new QueryContext(input, key, file, engine, usable, source, interfaceName);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
             var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
             if (Plan(context, written, queries, target, served.Of(target), ref usedLibraries) is { } plan)
@@ -354,7 +376,7 @@ internal static class MethodPlanner
         ref HashSet<LibraryUse>? usedLibraries
     )
     {
-        var (input, _, file, engine, usable, source) = context;
+        var (input, _, file, engine, usable, source, interfaceName) = context;
         var (_, queryIndex, query, settings, placement) = usable;
         // A query without models has its own error already, reported by its file.  Its SQL's own errors need no
         // models, so it gets them before it is described.
@@ -396,7 +418,8 @@ internal static class MethodPlanner
         var host = HostOf(placement);
         var reason =
             FindTakenReason(input, name, host, written, queries.Placement.NestedClasses)
-            ?? FindTakenBySource(source, name);
+            ?? FindTakenBySource(source, name)
+            ?? FindTakenByInterface(input.Type.Type.Type, interfaceName, source, host, name);
         if (reason is not null)
         {
             problems.Add(
@@ -462,7 +485,7 @@ internal static class MethodPlanner
     // query has its own error already.
     private static bool HasInternalModel(QueryContext context, QueryModels models)
     {
-        var (input, key, file, _, usable, _) = context;
+        var (input, key, file, _, usable, _, _) = context;
         return (
                 models.Input is not null
                 && FindAssignment(input.Assignments, key, file.NormalizedPath, usable.QueryIndex, ModelRole.Input)
@@ -546,7 +569,7 @@ internal static class MethodPlanner
         ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses
     )
     {
-        var (input, _, _, engine, usable, _) = context;
+        var (input, _, _, engine, usable, _, _) = context;
         if (input.Files[usable.FileIndex].Find(usable.QueryIndex, usable.Query.Name) is not { } models)
         {
             return;
@@ -763,7 +786,7 @@ internal static class MethodPlanner
         out MethodInput? methodInput
     )
     {
-        var (input, key, file, engine, usable, _) = context;
+        var (input, key, file, engine, usable, _, _) = context;
         var (_, queryIndex, query, _, _) = usable;
         methodInput = null;
         if (models.Input is not { } properties)
@@ -823,7 +846,7 @@ internal static class MethodPlanner
         out MethodOutput? methodOutput
     )
     {
-        var (input, key, file, _, usable, _) = context;
+        var (input, key, file, _, usable, _, _) = context;
         var (_, queryIndex, _, settings, _) = usable;
         methodOutput = null;
         if (models.Output is not { } properties)
@@ -983,6 +1006,42 @@ internal static class MethodPlanner
             : null;
     }
 
+    // The reason, as SQLSRC274 says it, that a repository's public method on the type cannot have the name of the
+    // type's interface, which holds it too, and whose member cannot be named as it is (CS0542), or null.
+    private static string? FindTakenByInterface(
+        TargetType type,
+        string? interfaceName,
+        ConnectionSource? source,
+        MethodHost host,
+        string name
+    ) =>
+        source is not null
+        && host is { Location: MemberLocation.Class, Accessibility: Visibility.Public }
+        && string.Equals(name, interfaceName, StringComparison.Ordinal)
+            ? "it is the name of the interface '" + InterfaceDisplayName(type, name) + "' that holds the method"
+            : null;
+
+    // The interface in full, as a diagnostic names it: beside the type, with the type's type parameters.
+    private static string InterfaceDisplayName(TargetType type, string name)
+    {
+        var last = type.Types.Count - 1;
+        var container = last > 0 ? DisplayNameOf(type, last - 1) : type.NamespaceValue;
+        return (container.Length > 0 ? container + "." : "") + name + type.Types[last].TypeParameters;
+    }
+
+    // The type of the index and those it is nested in, as a diagnostic names them: App.Outer<U>.
+    private static string DisplayNameOf(TargetType type, int index)
+    {
+        var name = type.NamespaceValue;
+        for (var each = 0; each <= index; each++)
+        {
+            var declaration = type.Types[each];
+            name = (name.Length > 0 ? name + "." : "") + declaration.ValueName + declaration.TypeParameters;
+        }
+
+        return name;
+    }
+
     // Whether the type parameters as written, "<TKey, @TValue>", have the name, as a value.
     private static bool HasTypeParameter(string typeParameters, string name) =>
         typeParameters.Length > 2
@@ -1086,15 +1145,16 @@ internal static class MethodPlanner
         };
 
     // The values that planning one query reads from its type and its file: the type's input and key, the query's file
-    // and the engine of its dialect, the query with its place and settings, and, for a repository query whose database
-    // has one, its connection.
+    // and the engine of its dialect, the query with its place and settings, for a repository query whose database has
+    // one, its connection, and the name of the type's interface, when it gets one.
     private readonly record struct QueryContext(
         MethodsInput Input,
         string Key,
         ParsedSqlFile File,
         DatabaseEngine Engine,
         UsableQuery Query,
-        ConnectionSource? Source
+        ConnectionSource? Source,
+        string? InterfaceName
     );
 
     // What deciding the converters of one query's properties reads: whether its driver allows a method, without which

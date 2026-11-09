@@ -49,7 +49,7 @@ public sealed class CachingRepositoryTests
         """;
 
     // The repository's query gets its method once the base's member gives it a connection.  Before, its file holds
-    // the interface alone.
+    // the interface alone, of the same name, so the interfaces compared across types are equal.
     [Fact]
     public void Run_BaseMemberMarkedLater_ResolvesTheDerivedRepository()
     {
@@ -87,6 +87,10 @@ public sealed class CachingRepositoryTests
         CachingScene
             .MethodsOf(result, RepositoryMethods)
             .ShouldContain("var connection = new global::Npgsql.NpgsqlConnection(this.Name ?? ");
+
+        // The interface had its name before, so the conflicts are not looked for again.
+        AllReasons(result, TrackingNames.InterfaceSignatures).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
     // The repository's declaration is not read again, since its file did not change, and the step still sees the

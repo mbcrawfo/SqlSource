@@ -305,6 +305,195 @@ public sealed class RepositoryInterfaceTests
         run.Sources[MethodsFile].ShouldNotContain("interface");
     }
 
+    // A public method of the interface's name could not be its member (CS0542), so it is left out, and the interface
+    // is written without it.
+    [Fact]
+    public void Run_PublicMethodNamedLikeTheInterface_ReportsSqlsrc274()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: IUserRepository -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [GetUserEntry(file, "IUserRepository")], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,25): The method of the query 'IUserRepository' cannot be "
+                    + "named 'IUserRepository', because it is the name of the interface 'App.IUserRepository' that "
+                    + "holds the method.  Rename the query.",
+            ]);
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain("    public partial interface IUserRepository\n    {\n    }\n");
+        methods.ShouldNotContain(" async ");
+    }
+
+    // A protected method is no member of the interface, so it can have the interface's name.
+    [Fact]
+    public void Run_ProtectedMethodNamedLikeTheInterface_IsKept()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: IUserRepository -> one-optional\n-- visibility: protected\n"
+                + "SELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [GetUserEntry(file, "IUserRepository")], Source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain(" protected async ");
+    }
+
+    // A type parameter of the type, or of a type it is nested in, takes the name of a member beside it (CS0694,
+    // CS0102), and the type it is nested in that of its member (CS0542), so the type gets no interface.
+    [Theory]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial class Repo<IRepo>(NpgsqlDataSource dataSource);",
+        "App.Repo<IRepo>",
+        "the type parameter IRepo of App.Repo<IRepo>",
+        "App.Repo-1-Methods.g.cs"
+    )]
+    [InlineData(
+        "public partial class Outer<IRepo>\n    {\n        [SqlSourceGenerate(Source = \".\")]\n"
+            + "        public partial class Repo(NpgsqlDataSource dataSource);\n    }",
+        "App.Outer<IRepo>.Repo",
+        "the type parameter IRepo of App.Outer<IRepo>",
+        "App.Outer-1.Repo-Methods.g.cs"
+    )]
+    [InlineData(
+        "public partial class Outer\n    {\n        [SqlSourceGenerate(Source = \".\", InterfaceName = \"Outer\")]\n"
+            + "        public partial class Repo(NpgsqlDataSource dataSource);\n    }",
+        "App.Outer.Repo",
+        "the containing type App.Outer",
+        "App.Outer.Repo-Methods.g.cs"
+    )]
+    public void Run_InterfaceNamedLikeTheTypes_ReportsSqlsrc035AndWritesNone(
+        string declaration,
+        string typeName,
+        string takenBy,
+        string methodsFile
+    )
+    {
+        var source = "using Npgsql;\nusing SqlSource;\n\nnamespace App\n{\n    " + declaration + "\n}\n";
+        var name = takenBy.Contains("containing", StringComparison.Ordinal) ? "Outer" : "IRepo";
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], source);
+
+        run.Problems()
+            .Select(static problem => problem[problem.IndexOf(':', StringComparison.Ordinal)..])
+            .ShouldBe([
+                ": '"
+                    + typeName
+                    + "' cannot get its interface '"
+                    + name
+                    + "', because "
+                    + takenBy
+                    + " already has that name.  Set InterfaceName on its [SqlSourceGenerate] to another name, or set "
+                    + "GenerateInterface to false.",
+            ]);
+        run.Problems().ShouldAllBe(problem => problem.StartsWith("SQLSRC035 ", StringComparison.Ordinal));
+        var methods = run.Sources[methodsFile];
+        methods.ShouldContain(" GetUser(\n");
+        methods.ShouldNotContain("interface");
+    }
+
+    // A model, an extension class or another type's interface that SqlSource writes beside the interface takes its
+    // name (CS0101), so the type gets no interface.
+    [Theory]
+    [InlineData("GetUserDto", "the model App.GetUserDto that SqlSource writes")]
+    [InlineData("UserRepositoryExtensions", "the extension class App.UserRepositoryExtensions that SqlSource writes")]
+    public void Run_InterfaceNamedLikeWhatSqlSourceWrites_ReportsSqlsrc035AndWritesNone(string name, string takenBy)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+                + "-- name: FindUser -> one-optional\n-- output: methods\nSELECT id FROM users WHERE id = @id;\n"
+        );
+        var source = Source.Replace(
+            "Source = \".\"",
+            "Source = \".\", InterfaceName = \"" + name + "\"",
+            StringComparison.Ordinal
+        );
+
+        var run = RepositoryRuns.Run(file, [GetUserEntry(file), GetUserEntry(file, "FindUser")], source);
+
+        var end = 37 + 20 + name.Length;
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC035 /app/Repo/Sample.cs(6,6)-(6,"
+                    + end.ToString(CultureInfo.InvariantCulture)
+                    + "): 'App.UserRepository' cannot get its interface '"
+                    + name
+                    + "', because "
+                    + takenBy
+                    + " already has that name.  Set InterfaceName on its [SqlSourceGenerate] to another name, or set "
+                    + "GenerateInterface to false.",
+            ]);
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain("    partial class UserRepository\n    {\n");
+        methods.ShouldContain(" GetUser(\n");
+        methods.ShouldContain("static partial class UserRepositoryExtensions\n");
+        methods.ShouldNotContain("interface");
+    }
+
+    // Two types whose interfaces have one name would each implement the other's members, so neither gets it.
+    [Fact]
+    public void Run_TwoTypesOfOneInterfaceName_ReportsSqlsrc035AtEach()
+    {
+        const string TwoTypes = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".", InterfaceName = "IStore")]
+                public partial class UserRepository(NpgsqlDataSource dataSource);
+
+                [SqlSourceGenerate(Source = ".", InterfaceName = "IStore")]
+                public partial class OrderRepository(NpgsqlDataSource dataSource);
+            }
+            """;
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], TwoTypes);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC035 /app/Repo/Sample.cs(6,6)-(6,63): 'App.UserRepository' cannot get its interface 'IStore', "
+                    + "because the interface App.IStore that SqlSource writes for App.OrderRepository already has "
+                    + "that name.  Set InterfaceName on its [SqlSourceGenerate] to another name, or set "
+                    + "GenerateInterface to false.",
+                "SQLSRC035 /app/Repo/Sample.cs(9,6)-(9,63): 'App.OrderRepository' cannot get its interface 'IStore', "
+                    + "because the interface App.IStore that SqlSource writes for App.UserRepository already has "
+                    + "that name.  Set InterfaceName on its [SqlSourceGenerate] to another name, or set "
+                    + "GenerateInterface to false.",
+            ]);
+        run.Sources[MethodsFile].ShouldNotContain("interface");
+        run.Sources["App.OrderRepository-Methods.g.cs"].ShouldNotContain("interface");
+    }
+
+    // A contextual keyword that C# refuses as the name of a type, or reads otherwise, is written after an @.
+    [Theory]
+    [InlineData("file")]
+    [InlineData("scoped")]
+    [InlineData("required")]
+    [InlineData("record")]
+    [InlineData("extension")]
+    public void Run_InterfaceNameIsAContextualKeyword_EscapesIt(string name)
+    {
+        var source = Source.Replace(
+            "Source = \".\"",
+            "Source = \".\", InterfaceName = \"" + name + "\"",
+            StringComparison.Ordinal
+        );
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain("    partial class UserRepository : global::App.@" + name + "\n");
+        methods.ShouldContain("    public partial interface @" + name + "\n");
+    }
+
     // The user's own part of the interface adds a member, which the type implements beside the generated ones.
     [Fact]
     public void Run_UserPartialInterface_AddsItsOwnMembers()

@@ -139,6 +139,8 @@ internal static class TrackingNames
 
     public const string ExtensionClassNames = nameof(ExtensionClassNames);
 
+    public const string InterfaceSignatures = nameof(InterfaceSignatures);
+
     public const string TakenExtensionClasses = nameof(TakenExtensionClasses);
 
     public const string MethodConflicts = nameof(MethodConflicts);
