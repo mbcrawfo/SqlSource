@@ -45,7 +45,7 @@ public sealed class AttributeSourceTests
             .Where(type => type.ContainingNamespace.ToDisplayString() == "SqlSource")
             .ToList();
 
-        types.Count.ShouldBe(2);
+        types.Count.ShouldBe(3);
         types.ShouldAllBe(type =>
             type.GetAttributes()
                 .Any(attribute =>
@@ -70,6 +70,55 @@ public sealed class AttributeSourceTests
         var usage = attribute.GetAttributes().Single(a => a.AttributeClass!.Name == "AttributeUsageAttribute");
         usage.ConstructorArguments.Single().Value.ShouldBe((int)AttributeTargets.Method);
         attribute.GetAttributes().ShouldNotContain(a => a.AttributeClass!.Name == "ConditionalAttribute");
+    }
+
+    // A repository's connection may be a member of a base class in a referenced assembly, so the attribute stays in
+    // metadata.
+    [Fact]
+    public void Text_ConnectionAttribute_TargetsMembersAndParametersAndIsNotConditional()
+    {
+        var compilation = CompileText();
+
+        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
+        var attribute = compilation
+            .GetTypeByMetadataName(AttributeSource.ConnectionAttributeMetadataName)
+            .ShouldNotBeNull();
+        attribute.DeclaredAccessibility.ShouldBe(Accessibility.Internal);
+        attribute.IsSealed.ShouldBeTrue();
+        attribute.BaseType!.ToDisplayString().ShouldBe("System.Attribute");
+        var usage = attribute.GetAttributes().Single(a => a.AttributeClass!.Name == "AttributeUsageAttribute");
+        usage
+            .ConstructorArguments.Single()
+            .Value.ShouldBe(
+                (int)(
+                    AttributeTargets.Field
+                    | AttributeTargets.Property
+                    | AttributeTargets.Method
+                    | AttributeTargets.Parameter
+                )
+            );
+        attribute.GetAttributes().ShouldNotContain(a => a.AttributeClass!.Name == "ConditionalAttribute");
+        attribute
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Select(property => $"{property.Type.ToDisplayString()} {property.Name}")
+            .ShouldBe(["string Database"]);
+    }
+
+    [Fact]
+    public void Text_GenerateAttribute_HasTheInterfaceProperties()
+    {
+        var attribute = CompileText().GetTypeByMetadataName(AttributeSource.AttributeMetadataName).ShouldNotBeNull();
+
+        attribute
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Select(property => $"{property.Type.ToDisplayString()} {property.Name}")
+            .ShouldBe([
+                $"string {AttributeSource.SourceProperty}",
+                $"bool {AttributeSource.GenerateInterfaceProperty}",
+                $"string {AttributeSource.InterfaceNameProperty}",
+            ]);
     }
 
     [Fact]

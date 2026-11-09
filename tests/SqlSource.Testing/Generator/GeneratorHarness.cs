@@ -171,7 +171,7 @@ internal static class GeneratorHarness
         }
 
         // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders,
-        // SqlSourceTransitivePackageAssemblies and SqlSourcePublicExceptions.
+        // SqlSourceTransitivePackageAssemblies, SqlSourcePublicExceptions and SqlSourceRepositoryInterfaces.
         var options = new TestOptionsProvider(properties);
         var projectSettings = ProjectSettings(output, dialect, generatorParameters, settings);
         var files = WithProjectSettings(sqlFiles, projectSettings);

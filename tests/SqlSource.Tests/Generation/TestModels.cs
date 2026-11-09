@@ -50,11 +50,14 @@ internal static class TestModels
             TestSidecars.Of(
                 types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]
             ),
+            @namespace + "." + (types?[^1].ValueName ?? "UserRepository"),
             isPublic,
             isReachableAsProtected,
             isStatic,
             isSealed,
             source,
+            null,
+            null,
             filePath,
             AttributeLocation,
             TestSidecars.Of(takenNames ?? [types?[^1].ValueName ?? "UserRepository"]),

@@ -50,16 +50,45 @@ internal static class TargetTypeReader
                 ? string.Empty
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
             new EquatableArray<TypeDeclaration>(types),
+            MetadataNameOf(symbol),
             IsPublic(symbol),
             IsReachableAsProtected(symbol),
             symbol.IsStatic,
             symbol.IsSealed,
             ReadSource(attribute),
+            GetNamedArgument(attribute, AttributeSource.GenerateInterfaceProperty) is { Value: bool generate }
+                ? generate
+                : null,
+            GetNamedArgument(attribute, AttributeSource.InterfaceNameProperty) is { Value: string { Length: > 0 } name }
+                ? name
+                : null,
             reference.SyntaxTree.FilePath,
             LocationInfo.From(reference.GetSyntax(cancellationToken).GetLocation()),
             GetTakenNames(symbol),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
         );
+    }
+
+    /// <summary>
+    /// The name that <c>Compilation.GetTypeByMetadataName</c> finds a named type by: its namespace, then its metadata
+    /// name and those of the types it is nested in, outermost first, joined by <c>+</c>.  Any other type, such as an
+    /// array or a type parameter, as C# writes it.
+    /// </summary>
+    public static string MetadataNameOf(ITypeSymbol type)
+    {
+        if (type is not INamedTypeSymbol named)
+        {
+            return type.ToDisplayString();
+        }
+
+        var names = new Stack<string>();
+        for (var each = named; each is not null; each = each.ContainingType)
+        {
+            names.Push(each.MetadataName);
+        }
+
+        var name = string.Join("+", names);
+        return named.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() + "." + name : name;
     }
 
     // A model is public or internal, so the declared accessibility of the type and of each type it is nested in is

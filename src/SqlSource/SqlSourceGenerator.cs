@@ -14,6 +14,7 @@ using SqlSource.Generation.Exceptions;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
+using SqlSource.Generation.Repositories;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using SqlSource.Generation.Types.Drivers;
@@ -42,6 +43,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         RegisterExceptions(context);
         var settingsFiles = ReadSettingsFiles(context);
         var claims = ClaimFiles(context);
+        _ = ReadRepositories(context, claims.TargetTypes);
         ReportSettingsFiles(context, settingsFiles, claims.SqlPaths);
         var fileLevels = ReadSettings(claims.SqlFiles, settingsFiles);
         var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.ClaimedPaths);
@@ -202,7 +204,38 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return new ClaimedFiles(sqlFiles, sqlPaths, typeFiles, claimedPaths, repeatedPaths);
+        return new ClaimedFiles(targetTypes, sqlFiles, sqlPaths, typeFiles, claimedPaths, repeatedPaths);
+    }
+
+    // Each marked type's candidates for a repository's connection and the settings and name of its interface.  It runs
+    // on every compilation, as the lookups of the models' names do: a base type, or a type with the interface's name,
+    // may be declared in a file that ForAttributeWithMetadataName does not read again.  Its value is equal until a
+    // candidate or an interface's settings change.
+    private static IncrementalValueProvider<EquatableArray<RepositoryShape>> ReadRepositories(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TargetType> targetTypes
+    )
+    {
+        var interfacesOn = context
+            .AnalyzerConfigOptionsProvider.Select(
+                static (options, _) => RepositoryInterfaces.Read(options.GlobalOptions)
+            )
+            .WithTrackingName(TrackingNames.RepositoryInterfaces);
+
+        var shapes = targetTypes
+            .Collect()
+            .Combine(context.CompilationProvider)
+            .Combine(interfacesOn)
+            .Select(
+                static (input, cancellationToken) =>
+                    RepositoryShapeReader.Read(input.Left.Left, input.Left.Right, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.RepositoryShapes);
+
+        // No method reads the shapes yet; an output that does nothing keeps the step in the pipeline, since the
+        // driver runs only the steps that reach an output.
+        context.RegisterSourceOutput(shapes, static (_, _) => { });
+        return shapes;
     }
 
     // The problems of each settings file that the chain of the folder of some .sql file or C# file reaches, whether or
@@ -1257,6 +1290,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // The project's .sql files and their paths, each type with the files it claims, every claimed path, and the paths
     // the project lists more than once.
     private readonly record struct ClaimedFiles(
+        IncrementalValuesProvider<TargetType> TargetTypes,
         IncrementalValuesProvider<AdditionalText> SqlFiles,
         IncrementalValueProvider<EquatableArray<string>> SqlPaths,
         IncrementalValuesProvider<TypeFiles> ClaimingTypes,

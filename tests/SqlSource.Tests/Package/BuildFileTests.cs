@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Shouldly;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Repositories;
 using Xunit;
 
 namespace SqlSource.Tests.Package;
@@ -119,18 +120,18 @@ public sealed partial class BuildFileTests
 
     // A source generator sees only the properties that are listed here, and the settings are in settings files, so
     // the compiler is shown the folders of the build and the assemblies that only a package brings, which the targets
-    // set, and whether the project's exceptions are public, alone.  No metadata is listed: the SDK would write a
-    // section into the file the compiler reads for every item of a type that is.  A project that sets
-    // SqlSourceIncludeFiles to false lists its own .sql files, and still needs the properties, so nothing may put a
-    // condition on the items.
+    // set, whether the project's exceptions are public and whether its repositories get interfaces, alone.  No
+    // metadata is listed: the SDK would write a section into the file the compiler reads for every item of a type that
+    // is.  A project that sets SqlSourceIncludeFiles to false lists its own .sql files, and still needs the
+    // properties, so nothing may put a condition on the items.
     [Fact]
-    public void Props_PropertiesTheCompilerIsShown_AreTheBuildsFoldersThePackageAssembliesAndThePublicExceptions()
+    public void Props_PropertiesTheCompilerIsShown_AreTheBuildsFoldersThePackageAssembliesAndTheProjectsSwitches()
     {
         var items = Props.Descendants("CompilerVisibleProperty").ToList();
 
         items
             .Select(item => item.Attribute("Include").ShouldNotBeNull().Value)
-            .ShouldBe([BuildFolders, PackageAssemblies, PublicExceptions]);
+            .ShouldBe([BuildFolders, PackageAssemblies, PublicExceptions, RepositoryInterfaces.PropertyName]);
         items.SelectMany(ConditionsAround).ShouldBeEmpty();
         Props.Descendants("CompilerVisibleItemMetadata").ShouldBeEmpty();
         Targets.Descendants("CompilerVisibleProperty").ShouldBeEmpty();

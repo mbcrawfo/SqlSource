@@ -8,8 +8,8 @@ namespace SqlSource.Testing.Generator;
 // that does not set the property.  A property is named as MSBuild names it: SqlSourceBuildFolders.  No .sql file or C#
 // file has metadata.
 //
-// The generator reads SqlSourceBuildFolders, SqlSourceTransitivePackageAssemblies and SqlSourcePublicExceptions alone,
-// properties of the build and no settings of the queries.
+// The generator reads SqlSourceBuildFolders, SqlSourceTransitivePackageAssemblies, SqlSourcePublicExceptions and
+// SqlSourceRepositoryInterfaces alone, properties of the build and no settings of the queries.
 internal sealed class TestOptionsProvider(IReadOnlyDictionary<string, string?>? properties = null)
     : AnalyzerConfigOptionsProvider
 {
