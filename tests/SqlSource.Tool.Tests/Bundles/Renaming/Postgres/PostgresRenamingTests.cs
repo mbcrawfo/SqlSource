@@ -82,7 +82,7 @@ public sealed class PostgresRenamingTests
         }
 
         Provenance.Of(result.Bundle.Expected!).ShouldBe(Provenance.Of(raw.Expected!));
-        BundleLeaks.Of(result.Bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks.Of(result.Bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public sealed class PostgresRenamingTests
             Capture = capture.ToJsonString(),
             Expected = null,
         };
-        var replayed = await BundleReplays.ReplayAsync(raw, "/work/report.zip");
+        var replayed = await BundleReplays.ReplayAsync(raw, BundleInfos.Path);
         var entry = replayed.ShouldBeOfType<ReplayOutcome.Described>(replayed.ToString()).Entry;
         return raw with
         {

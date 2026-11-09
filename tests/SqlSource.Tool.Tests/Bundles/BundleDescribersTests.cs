@@ -12,8 +12,6 @@ namespace SqlSource.Tool.Tests.Bundles;
 // The describer a bundle is replayed with: the host's, or PostgreSQL's with the bundle's settings of the planner.
 public sealed class BundleDescribersTests
 {
-    private const string Path = "/work/report.zip";
-
     private static DescriberRegistry Registry => ToolHost.Create().Describers;
 
     // walk-left-hash was recorded with the hash join alone, and its capture's explain carries the settings.
@@ -25,15 +23,24 @@ public sealed class BundleDescribersTests
 
         var registry = Registry;
 
-        var described = BundleDescribers.For(SqlDialect.PostgreSql, registry, bundle.ExplainSettings, "postgres", Path);
-        var replayed = await BundleReplays.ReplayAsync(bundle, Path, registry);
+        var described = BundleDescribers.For(
+            SqlDialect.PostgreSql,
+            registry,
+            bundle.ExplainSettings,
+            "postgres",
+            BundleInfos.Path
+        );
+        var replayed = await BundleReplays.ReplayAsync(bundle, BundleInfos.Path, registry);
 
         described.Value.ShouldBeOfType<PostgresDescriber>().ShouldNotBeSameAs(registry.Find(SqlDialect.PostgreSql));
         // The entry a replay gives is this tool's.
         replayed
             .ShouldBeOfType<ReplayOutcome.Described>()
             .Entry.ShouldBe(
-                BundleReplay.ExpectedOf(bundle, Path).Value.ShouldBeOfType<ReplayOutcome.Described>().Entry with
+                BundleReplay
+                    .ExpectedOf(bundle, BundleInfos.Path)
+                    .Value.ShouldBeOfType<ReplayOutcome.Described>()
+                    .Entry with
                 {
                     ToolVersion = PackageVersion.Prefix,
                 }
@@ -46,7 +53,7 @@ public sealed class BundleDescribersTests
     {
         var bundle = BundleReplays.OfCase("postgres", "walk-left-hash") with { ExplainSettings = [] };
 
-        var replayed = await BundleReplays.ReplayAsync(bundle, Path);
+        var replayed = await BundleReplays.ReplayAsync(bundle, BundleInfos.Path);
 
         replayed.ShouldBeOfType<ReplayOutcome.Missed>().Method.ShouldBe("explain");
     }
@@ -56,7 +63,7 @@ public sealed class BundleDescribersTests
     {
         var registry = Registry;
 
-        var described = BundleDescribers.For(SqlDialect.SqlServer, registry, [], "mssql", Path);
+        var described = BundleDescribers.For(SqlDialect.SqlServer, registry, [], "mssql", BundleInfos.Path);
 
         described.Value.ShouldBeSameAs(registry.Find(SqlDialect.SqlServer));
     }
@@ -69,19 +76,19 @@ public sealed class BundleDescribersTests
             Registry,
             ["enable_hashjoin=off", "work_mem=1GB"],
             "postgres",
-            Path
+            BundleInfos.Path
         );
 
         var error = described.Failure.ShouldNotBeNull();
         error.Descriptor.Id.ShouldBe("SQLSRC288");
-        error.Path.ShouldBe(Path);
+        error.Path.ShouldBe(BundleInfos.Path);
         error.Arguments.ToArray().ShouldBe(["the line 'work_mem=1GB' of explain-settings.txt is no planner setting"]);
     }
 
     [Fact]
     public void For_SettingLineWithAnEscapeSequence_IsSqlsrc288WithItsEscape() =>
         BundleDescribers
-            .For(SqlDialect.PostgreSql, Registry, ["work_mem\u001b[2J\t=1GB"], "postgres", Path)
+            .For(SqlDialect.PostgreSql, Registry, ["work_mem\u001b[2J\t=1GB"], "postgres", BundleInfos.Path)
             .Failure.ShouldNotBeNull()
             .Arguments.ToArray()
             .ShouldBe(["the line 'work_mem\\u001B[2J\t=1GB' of explain-settings.txt is no planner setting"]);
@@ -89,7 +96,13 @@ public sealed class BundleDescribersTests
     [Fact]
     public void For_SqlServerWithSettings_IsSqlsrc288()
     {
-        var described = BundleDescribers.For(SqlDialect.SqlServer, Registry, ["enable_hashjoin=off"], "mssql", Path);
+        var described = BundleDescribers.For(
+            SqlDialect.SqlServer,
+            Registry,
+            ["enable_hashjoin=off"],
+            "mssql",
+            BundleInfos.Path
+        );
 
         var error = described.Failure.ShouldNotBeNull();
         error.Descriptor.Id.ShouldBe("SQLSRC288");
@@ -99,12 +112,18 @@ public sealed class BundleDescribersTests
     [Fact]
     public void For_EngineWithNoDescriber_IsSqlsrc291()
     {
-        var empty = BundleDescribers.For(SqlDialect.PostgreSql, DescriberRegistry.Empty, [], "postgres", Path);
-        var oracle = BundleDescribers.For(SqlDialect.Oracle, Registry, [], "oracle", Path);
+        var empty = BundleDescribers.For(
+            SqlDialect.PostgreSql,
+            DescriberRegistry.Empty,
+            [],
+            "postgres",
+            BundleInfos.Path
+        );
+        var oracle = BundleDescribers.For(SqlDialect.Oracle, Registry, [], "oracle", BundleInfos.Path);
 
         var error = empty.Failure.ShouldNotBeNull();
         error.Descriptor.Id.ShouldBe("SQLSRC291");
-        error.Path.ShouldBe(Path);
+        error.Path.ShouldBe(BundleInfos.Path);
         error.Arguments.ToArray().ShouldBe(["postgres"]);
         oracle.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC291");
         oracle.Failure.Arguments.ToArray().ShouldBe(["oracle"]);

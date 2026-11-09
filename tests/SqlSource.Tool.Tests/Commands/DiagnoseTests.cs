@@ -40,9 +40,9 @@ public sealed class DiagnoseTests : IDisposable
         var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip");
 
         result.ShouldBe(new CliResult(0, _scene.Written("report.zip"), ""));
-        var bundle = BundleReplays.Read(_scene.PathOf("report.zip"));
+        var bundle = WrittenBundles.Read(_scene.PathOf("report.zip"));
         bundle.Info.ShouldNotBeNull().Renamed.ShouldBeTrue();
-        BundleLeaks.Of(bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks.Of(bundle, [fixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
         using var mapping = JsonDocument.Parse(ReadText(_scene.PathOf("report.zip.mapping.json")));
         mapping.RootElement.GetProperty("mappingVersion").GetInt32().ShouldBe(1);
         mapping
@@ -55,7 +55,7 @@ public sealed class DiagnoseTests : IDisposable
 
         replayed.Error.ShouldBeEmpty();
         replayed.ExitCode.ShouldBe(0);
-        replayed.Out.ShouldEndWith(DiagnoseScene.Reproduced);
+        replayed.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class DiagnoseTests : IDisposable
 
         result.ShouldBe(new CliResult(0, _scene.WrittenRaw("raw.zip"), ""));
         File.Exists(_scene.PathOf("raw.zip.mapping.json")).ShouldBeFalse();
-        var bundle = BundleReplays.Read(_scene.PathOf("raw.zip"));
+        var bundle = WrittenBundles.Read(_scene.PathOf("raw.zip"));
         bundle.Info.ShouldNotBeNull().Renamed.ShouldBeFalse();
         bundle.Query.ShouldContain("-- name: GetEverything\n");
 
@@ -75,7 +75,7 @@ public sealed class DiagnoseTests : IDisposable
 
         replayed.ExitCode.ShouldBe(0);
         replayed.Out.ShouldStartWith("sqlsource: this bundle is not renamed, and must not be posted\n");
-        replayed.Out.ShouldEndWith(DiagnoseScene.Reproduced);
+        replayed.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     // The bundle of a query that the describer refuses is a report too: bundle.json holds the failure, and the run
@@ -93,14 +93,14 @@ public sealed class DiagnoseTests : IDisposable
             new CliResult(0, "sqlsource: the query was refused: SQLSRC226\n" + _scene.Written("report.zip"), "")
         );
         result.Error.ShouldNotContain(Cli.RunAgainLine);
-        var bundle = BundleReplays.Read(_scene.PathOf("report.zip"));
+        var bundle = WrittenBundles.Read(_scene.PathOf("report.zip"));
         bundle.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Failure("SQLSRC226", "describe parameters"));
         bundle.Expected.ShouldBeNull();
 
         var replayed = await _scene.Run.RunAsync("replay", "report.zip");
 
         replayed.ExitCode.ShouldBe(0);
-        replayed.Out.ShouldEndWith(DiagnoseScene.Reproduced);
+        replayed.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     // The bundle needs the server's version, and the capture holds nothing of the query.  The port 1 of this machine
@@ -144,7 +144,7 @@ public sealed class DiagnoseTests : IDisposable
         Directory
             .GetFiles(_scene.Run.Folder.Path, "*" + SqlPath.SidecarExtension, SearchOption.AllDirectories)
             .ShouldBe([sidecar]);
-        var query = BundleReplays.Read(_scene.PathOf("raw.zip")).Query;
+        var query = WrittenBundles.Read(_scene.PathOf("raw.zip")).Query;
         query.ShouldContain("-- name: GetEverything\n");
         query.ShouldNotContain("First");
         query.ShouldNotContain("Last");
@@ -175,7 +175,7 @@ public sealed class DiagnoseTests : IDisposable
         var result = await _scene.DiagnoseAsync("--query", Query, "--out", "report.zip", "--log", "run.log");
 
         result.ShouldBe(new CliResult(0, _scene.Written("report.zip"), ""));
-        BundleReplays.Read(_scene.PathOf("report.zip")).Info.ShouldNotBeNull().Renamed.ShouldBeTrue();
+        WrittenBundles.Read(_scene.PathOf("report.zip")).Info.ShouldNotBeNull().Renamed.ShouldBeTrue();
         var logged = LogReader.Events(_scene.PathOf("run.log"), "diagnostic").ShouldHaveSingleItem();
         logged.GetProperty("id").GetString().ShouldBe(id);
         logged.GetProperty("path").GetString().ShouldBe(wrong);
@@ -448,12 +448,12 @@ public sealed class DiagnoseTests : IDisposable
         var result = await scene.DiagnoseAsync("--query", "Users.sql:" + name, "--out", "report.zip");
 
         result.ShouldBe(new CliResult(0, scene.Written("report.zip"), ""));
-        BundleReplays.Read(scene.PathOf("report.zip")).Info.ShouldNotBeNull().Engine.ShouldBe("mssql");
+        WrittenBundles.Read(scene.PathOf("report.zip")).Info.ShouldNotBeNull().Engine.ShouldBe("mssql");
 
         var replayed = await scene.Run.RunAsync("replay", "report.zip");
 
         replayed.ExitCode.ShouldBe(0);
-        replayed.Out.ShouldEndWith(DiagnoseScene.Reproduced);
+        replayed.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     [Fact]

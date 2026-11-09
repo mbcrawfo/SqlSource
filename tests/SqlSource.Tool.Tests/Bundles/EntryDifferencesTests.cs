@@ -11,11 +11,9 @@ namespace SqlSource.Tool.Tests.Bundles;
 // them.
 public sealed class EntryDifferencesTests
 {
-    private const string Path = "/work/report.zip";
-
     private static SidecarEntry Expected =>
         BundleReplay
-            .ExpectedOf(BundleReplays.OfCase("postgres", "select-left-join"), Path)
+            .ExpectedOf(BundleReplays.OfCase("postgres", "select-left-join"), BundleInfos.Path)
             .Value.ShouldBeOfType<ReplayOutcome.Described>()
             .Entry;
 
@@ -69,7 +67,7 @@ public sealed class EntryDifferencesTests
     public void Of_MemberOnlyOneSideWrites_IsNone()
     {
         var named = BundleReplay
-            .ExpectedOf(BundleReplays.OfCase("postgres", "insert-returning"), Path)
+            .ExpectedOf(BundleReplays.OfCase("postgres", "insert-returning"), BundleInfos.Path)
             .Value.ShouldBeOfType<ReplayOutcome.Described>()
             .Entry;
         var parameters = named.Parameters.ToArray();

@@ -17,9 +17,6 @@ namespace SqlSource.Tool.Tests.Bundles;
 
 public sealed class BundleQueryFileTests
 {
-    // Where the bundle's errors would be.  Nothing is read there.
-    private const string BundlePath = "/work/report.zip";
-
     // One valid marker line of each kind, under PostgreSQL.  A kind missing from it fails the theory by name.
     private static readonly Dictionary<SqlMarkerKind, string> MarkerLines = new()
     {
@@ -311,7 +308,7 @@ public sealed class BundleQueryFileTests
         var planned = BundleReplay.Plan(
             new Bundle(Info: null, queryFile, Capture: "{}", Expected: null, []),
             "postgres",
-            BundlePath,
+            BundleInfos.Path,
             TestContext.Current.CancellationToken
         );
         planned.Failure.ShouldBeNull();

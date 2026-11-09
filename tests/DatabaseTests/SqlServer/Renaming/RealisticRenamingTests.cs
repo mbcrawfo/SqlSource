@@ -1,5 +1,4 @@
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.DatabaseTests.SqlServer.Realistic;
@@ -41,16 +40,14 @@ public sealed class RealisticRenamingTests(SqlServerDatabases sqlServer)
             found.Refusal is { } refusal ? BundleOutcome.Failure(refusal, info.Outcome.Step) : BundleOutcome.Entry
         );
 
-        var renamed = await BundleRenamer.RenameAsync(
+        var renamed = await BundleRenamings.RenamedAsync(
             raw,
             Part,
             new SqlServerDescriber(),
-            RenamingKey.Of(Enumerable.Repeat((byte)1, RenamingKey.Length).ToArray()),
-            token
+            BundleRenamings.Key(BundleRenamings.AnyKey)
         );
 
-        renamed.Failure.ShouldBeNull();
-        var bundle = renamed.Value.ShouldNotBeNull().Bundle;
+        var bundle = renamed.Bundle;
         bundle.Info.ShouldBe(info with { Renamed = true });
         if (raw.Expected is { } expected)
         {
@@ -63,6 +60,6 @@ public sealed class RealisticRenamingTests(SqlServerDatabases sqlServer)
 
         var schema = await File.ReadAllTextAsync(RealisticCases.Corpus.Schema, token);
         var seed = await File.ReadAllTextAsync(RealisticCases.Corpus.Seed, token);
-        BundleLeaks.Find(bundle, Part, BundleLeaks.EngineRowNames(raw, Part), schema, seed, raw.Query).ShouldBeEmpty();
+        SqlServerBundleLeaks.Find(bundle, Part, raw, schema, seed, raw.Query).ShouldBeEmpty();
     }
 }

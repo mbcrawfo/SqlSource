@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Shouldly;
 using SqlSource.DatabaseTests.SqlServer.Realistic;
 using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Parsing;
-using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.SqlServer;
+using SqlSource.Tool.Testing.Bundles;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
@@ -16,8 +17,8 @@ namespace SqlSource.DatabaseTests.SqlServer.Renaming;
 // which SqlServerVocabulary holds, or the user's, which CorpusUserWords holds.  The renaming keeps an engine word
 // verbatim and renames a user's, and a renamed engine word still replays, so only this test finds an engine word that
 // the vocabulary lacks.  A word is each word of the query's plain text by the engine's word rule, a leading @ or #
-// trimmed and an @@ word whole, and each bracketed or double-quoted name; comments, literals and parameters are left
-// out.  The class needs no server.
+// trimmed and an @@ word whole, and each bracketed or double-quoted name, as SqlServerBundleLeaks reads them for the
+// leak search; comments, literals and parameters are left out.  The class needs no server.
 public sealed class CorpusWordsTests
 {
     private static readonly SqlServerRenaming Engine = SqlServerRenaming.Instance;
@@ -34,7 +35,7 @@ public sealed class CorpusWordsTests
             .Select(pair => $"{pair.Key} ({string.Join(", ", pair.Value.Take(3))})")
             .ToList();
 
-        Assert.True(unclassified.Count == 0, "Neither the engine's nor the user's: " + string.Join("; ", unclassified));
+        unclassified.ShouldBeEmpty("Neither the engine's nor the user's: " + string.Join("; ", unclassified));
     }
 
     [Fact]
@@ -42,7 +43,7 @@ public sealed class CorpusWordsTests
     {
         var engines = CorpusUserWords.Spellings.Where(word => Engine.IsEngineWord(word, quoted: false)).ToList();
 
-        Assert.True(engines.Count == 0, "Engine words among the user's: " + string.Join(", ", engines));
+        engines.ShouldBeEmpty("Engine words among the user's: " + string.Join(", ", engines));
     }
 
     [Fact]
@@ -51,7 +52,7 @@ public sealed class CorpusWordsTests
         var present = WordsByCase().Keys.ToHashSet(StringComparer.Ordinal);
         var absent = CorpusUserWords.Spellings.Where(word => !present.Contains(Folded(word))).ToList();
 
-        Assert.True(absent.Count == 0, "User words in no case: " + string.Join(", ", absent));
+        absent.ShouldBeEmpty("User words in no case: " + string.Join(", ", absent));
     }
 
     [Fact]
@@ -62,10 +63,7 @@ public sealed class CorpusWordsTests
             .EngineRowNames.Where(word => !present.Contains(word) || Engine.IsEngineWord(word, quoted: false))
             .ToList();
 
-        Assert.True(
-            misplaced.Count == 0,
-            "Engine row names in no case, or engine words: " + string.Join(", ", misplaced)
-        );
+        misplaced.ShouldBeEmpty("Engine row names in no case, or engine words: " + string.Join(", ", misplaced));
     }
 
     [Fact]
@@ -73,8 +71,8 @@ public sealed class CorpusWordsTests
     {
         var spelled = CorpusUserWords.Spellings;
 
-        Assert.Equal(spelled.OrderBy(static word => word, StringComparer.OrdinalIgnoreCase), spelled);
-        Assert.Equal(spelled.Count, CorpusUserWords.Words.Count);
+        spelled.ShouldBe(spelled.OrderBy(static word => word, StringComparer.OrdinalIgnoreCase));
+        CorpusUserWords.Words.Count.ShouldBe(spelled.Count);
     }
 
     private static string Folded(string word) => Engine.Fold(word, quoted: false);
@@ -138,14 +136,22 @@ public sealed class CorpusWordsTests
                 case SqlLexemeKind.Text:
                 case SqlLexemeKind.Hint:
                     var quoteFollows = index + 1 < lexemes.Count && lexemes[index + 1].Kind == SqlLexemeKind.Quoted;
-                    foreach (var word in PlainWordsOf(source, start, end, quoteFollows))
+                    var words = SqlServerBundleLeaks.PlainWordsOf(
+                        source,
+                        start,
+                        end,
+                        quoteFollows,
+                        Engine,
+                        keepsSystemFunctions: true
+                    );
+                    foreach (var word in words)
                     {
                         yield return word;
                     }
 
                     break;
                 case SqlLexemeKind.Quoted:
-                    if (NameOf(source[start..end]) is { } name)
+                    if (SqlServerBundleLeaks.QuotedNameOf(source[start..end]) is { } name)
                     {
                         yield return name;
                     }
@@ -159,66 +165,5 @@ public sealed class CorpusWordsTests
                     throw new InvalidOperationException($"A lexeme of the kind {lexeme.Kind} is not classified.");
             }
         }
-    }
-
-    private static IEnumerable<string> PlainWordsOf(string text, int start, int end, bool quoteFollows)
-    {
-        var at = start;
-        while (at < end)
-        {
-            var character = text[at];
-            if (SqlRenamer.NumberAt(Engine, text, at, end) is (var runEnd, _))
-            {
-                at = runEnd;
-            }
-            else if (Engine.IsWordStart(character))
-            {
-                var wordStart = at;
-                at++;
-                while (at < end && Engine.IsWordPart(text[at]))
-                {
-                    at++;
-                }
-
-                var word = text[wordStart..at];
-                var isPrefix =
-                    quoteFollows
-                    && word.Length == 1
-                    && SqlRenamer.LiteralPrefixes.Contains(word[0], StringComparison.Ordinal)
-                    && (at == end || (at + 1 == end && text[at] == '&'));
-                if (isPrefix)
-                {
-                    continue;
-                }
-
-                var trimmed = word.StartsWith("@@", StringComparison.Ordinal) ? word : word.TrimStart('@', '#');
-                if (trimmed.Length > 0)
-                {
-                    yield return trimmed;
-                }
-            }
-            else
-            {
-                at++;
-            }
-        }
-    }
-
-    // A bracketed or double-quoted name, with a nullability mark after its stem left out; null for a literal.
-    private static string? NameOf(string quoted)
-    {
-        var closer = quoted[0] switch
-        {
-            '"' => "\"",
-            '[' => "]",
-            _ => null,
-        };
-        if (closer is null)
-        {
-            return null;
-        }
-
-        var content = quoted[1..^1].Replace(closer + closer, closer, StringComparison.Ordinal);
-        return content.Length > 1 && content[^1] is '!' or '?' ? content[..^1] : content;
     }
 }

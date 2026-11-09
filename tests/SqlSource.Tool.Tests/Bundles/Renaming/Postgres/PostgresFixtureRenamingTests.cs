@@ -50,7 +50,7 @@ public sealed class PostgresFixtureRenamingTests
 
         var renamed = await PostgresRenamings.RenamedAsync(RawBundles.OfFixture(fixture));
 
-        BundleLeaks
+        PostgresBundleLeaks
             .Of(renamed.Bundle, [PostgresRenamings.Schema, fixture.Query], PostgresWords.IsEngineWord)
             .ShouldBeEmpty();
     }

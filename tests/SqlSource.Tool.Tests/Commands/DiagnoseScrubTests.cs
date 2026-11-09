@@ -6,9 +6,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Bundles;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -47,14 +47,14 @@ public sealed class DiagnoseScrubTests : IDisposable
 
         result.ShouldBe(new CliResult(0, _scene.Written("report.zip"), ""));
         _scene.Run.Processes.Requests.Count.ShouldBe(requests);
-        BundleReplays.Read(_scene.PathOf("report.zip")).Info.ShouldNotBeNull().Renamed.ShouldBeTrue();
+        WrittenBundles.Read(_scene.PathOf("report.zip")).Info.ShouldNotBeNull().Renamed.ShouldBeTrue();
         File.Exists(_scene.PathOf("report.zip" + BundleFiles.MappingSuffix)).ShouldBeTrue();
 
         var replayed = await _scene.Run.RunAsync("replay", "report.zip");
 
         replayed.Error.ShouldBeEmpty();
         replayed.ExitCode.ShouldBe(0);
-        replayed.Out.ShouldEndWith(DiagnoseScene.Reproduced);
+        replayed.Out.ShouldEndWith(DiagnoseCommands.Reproduced);
     }
 
     // The same kind of bundle as diagnose writes directly: the same bundle.json, so renamed and with the same outcome,
@@ -69,8 +69,8 @@ public sealed class DiagnoseScrubTests : IDisposable
 
         _ = await _scene.DiagnoseAsync("--scrub", "raw.zip", "--out", "scrubbed.zip");
 
-        var direct = BundleReplays.Read(_scene.PathOf("direct.zip"));
-        var scrubbed = BundleReplays.Read(_scene.PathOf("scrubbed.zip"));
+        var direct = WrittenBundles.Read(_scene.PathOf("direct.zip"));
+        var scrubbed = WrittenBundles.Read(_scene.PathOf("scrubbed.zip"));
         scrubbed.Info.ShouldBe(direct.Info);
         (scrubbed.Expected is null).ShouldBe(direct.Expected is null);
         scrubbed.ExplainSettings.ShouldBe(direct.ExplainSettings);
@@ -278,23 +278,12 @@ public sealed class DiagnoseScrubTests : IDisposable
     private static async Task<string> OlderRawBundleAsync(CliRun run, string name)
     {
         var folder = run.Folder.CreateFolder("old");
-        foreach (var file in Directory.GetFiles(FixtureCases.Of("mssql").Single(found => found.Name == name).Folder))
+        foreach (var file in Directory.GetFiles(FixtureCases.Named("mssql", name).Folder))
         {
             File.Copy(file, Path.Combine(folder, Path.GetFileName(file)));
         }
 
-        var info = new BundleInfo(
-            BundleVersion: 1,
-            Renamed: false,
-            ToolVersion: "1.4.0",
-            FormatVersion: SidecarFormat.Version,
-            Engine: "mssql",
-            ServerVersion: "17.0.1000.7",
-            DriverVersion: null,
-            Runtime: ".NET 8.0.11",
-            OperatingSystem: "Linux 6.8",
-            Outcome: BundleOutcome.Entry
-        );
+        var info = BundleInfos.Sample("mssql") with { ServerVersion = "17.0.1000.7" };
         await File.WriteAllTextAsync(
             Path.Combine(folder, BundleFiles.Info),
             BundleJson.Write(info),

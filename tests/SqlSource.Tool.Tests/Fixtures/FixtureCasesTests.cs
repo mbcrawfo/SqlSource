@@ -20,6 +20,35 @@ public sealed class FixtureCasesTests : IDisposable
     public void Of_EngineWithNoFolder_IsEmpty() => FixtureCases.Of("no-such-engine").ShouldBeEmpty();
 
     [Fact]
+    public void Named_ACaseOfTheEngine_IsThatCase()
+    {
+        var found = FixtureCases.Named("postgres", "select-plain");
+
+        found.Name.ShouldBe("select-plain");
+        found.Engine.ShouldBe("postgres");
+    }
+
+    [Fact]
+    public void Named_NoCaseOfTheName_FailsNamingTheEngineAndTheName()
+    {
+        var message = Should
+            .Throw<InvalidOperationException>(() => FixtureCases.Named("mssql", "no-such-case"))
+            .Message;
+
+        message.ShouldContain("mssql");
+        message.ShouldContain("no-such-case");
+    }
+
+    [Fact]
+    public void SchemaOf_Engine_IsItsSchemaFile()
+    {
+        var schema = FixtureCases.SchemaOf("mssql");
+
+        File.Exists(schema).ShouldBeTrue();
+        schema.ShouldBe(Path.Combine(FixtureCases.Root, "mssql", "schema.sql"));
+    }
+
+    [Fact]
     public void InFolder_EngineWithCases_GivesThemInNameOrder()
     {
         _ = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "b", "SELECT 1;\n");

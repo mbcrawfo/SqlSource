@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -36,26 +35,6 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
     // The first major whose plan names no arm of a set operation so.
     private const int NoSetNameFrom = 18;
 
-    // The key of every renaming here: no test compares two runs.
-    private const byte Key = 7;
-
-    // The names of the server's words that a name of the user's may not be: its keywords, folded as unquoted, and
-    // its catalog's functions and types, as the catalog holds them.
-    private static readonly (string Sql, bool Quoted)[] ServerWords =
-    [
-        ("SELECT word FROM pg_catalog.pg_get_keywords()", false),
-        (
-            "SELECT DISTINCT p.proname FROM pg_catalog.pg_proc p"
-                + " JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'pg_catalog'",
-            true
-        ),
-        (
-            "SELECT DISTINCT t.typname FROM pg_catalog.pg_type t"
-                + " JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'pg_catalog'",
-            true
-        ),
-    ];
-
     // Each case's raw bundle and its renaming, by the case's name, made once in a run on the one container.
     private static readonly ConcurrentDictionary<string, (Bundle Raw, RenamedBundle Renamed)> Renamings = new(
         StringComparer.Ordinal
@@ -84,7 +63,9 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
         }
 
         var schema = await File.ReadAllTextAsync(RealisticCases.Corpus.Schema, TestContext.Current.CancellationToken);
-        BundleLeaks.Of(renamed.Bundle, [schema, found.AsFixture.Query], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks
+            .Of(renamed.Bundle, [schema, found.AsFixture.Query], PostgresWords.IsEngineWord)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -136,14 +117,13 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
         }
 
         var raw = await RawAsync(found);
-        var renamed = await BundleRenamer.RenameAsync(
+        var renamed = await BundleRenamings.RenamedAsync(
             raw,
             PostgresRenaming.Instance,
             new PostgresDescriber(),
-            RenamingKey.Of(Enumerable.Repeat(Key, RenamingKey.Length).ToArray()),
-            TestContext.Current.CancellationToken
+            BundleRenamings.Key(BundleRenamings.AnyKey)
         );
-        return Renamings.GetOrAdd(found.Name, (raw, renamed.Value.ShouldNotBeNull(renamed.Failure?.ToString())));
+        return Renamings.GetOrAdd(found.Name, (raw, renamed));
     }
 
     // The case described through a capturing exchange, as diagnose captures one: its entry, or the failure's id and
@@ -170,28 +150,15 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
         );
     }
 
-    [SuppressMessage(
-        "Security",
-        "CA2100:Review SQL queries for security vulnerabilities",
-        Justification = "The SQL is a constant of this test."
-    )]
-    private async Task<HashSet<string>> ServerWordsAsync()
+    // Only the server's keywords, functions and types, not the vocabulary's operators and system columns: an operator
+    // is no name, and a table's column may not take a system column's name.
+    private async Task<SortedSet<string>> ServerWordsAsync()
     {
-        var token = TestContext.Current.CancellationToken;
         await using var source = databases.SourceOf(PostgresDatabases.RealisticDatabase);
-        await using var connection = await source.OpenConnectionAsync(token);
-        var words = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (sql, quoted) in ServerWords)
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = sql;
-            await using var reader = await command.ExecuteReaderAsync(token);
-            while (await reader.ReadAsync(token))
-            {
-                _ = words.Add(PostgresWords.Fold(reader.GetString(0), quoted));
-            }
-        }
-
-        return words;
+        return await PostgresCatalogWords.ReadAsync(
+            source,
+            PostgresCatalogWords.Names,
+            TestContext.Current.CancellationToken
+        );
     }
 }

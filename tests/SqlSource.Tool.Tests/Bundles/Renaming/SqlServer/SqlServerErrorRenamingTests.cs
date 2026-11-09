@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Tool.Bundles;
@@ -28,8 +26,6 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
 // column of sys under its own name.
 public sealed partial class SqlServerErrorRenamingTests
 {
-    private const string Engine = "mssql";
-
     private const string Columns = "columns";
 
     private const string OtherDatabase = "select-other-database";
@@ -44,8 +40,6 @@ public sealed partial class SqlServerErrorRenamingTests
     // The members of a column's row that name its source.
     private static readonly string[] SourceMembers = ["sourceDatabase", "sourceSchema", "sourceTable", "sourceColumn"];
 
-    private static IEngineRenaming Part => EngineRenamings.For(DatabaseEngine.SqlServer);
-
     [Fact]
     public async Task RenameAsync_UndeclaredParameterError_NamesTheRenamedParameter()
     {
@@ -54,7 +48,7 @@ public sealed partial class SqlServerErrorRenamingTests
         copy.ShouldBe(Parameter + "_1");
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Failure("SQLSRC226", "describe parameters"));
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         var replacement = renamed
             .Mapping.Single(static name => name.Class == NameClass.Parameter && name.Original == Parameter)
@@ -76,7 +70,7 @@ public sealed partial class SqlServerErrorRenamingTests
         copy.ShouldBe(Parameter + "_1");
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Failure("SQLSRC226", "describe parameters"));
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         // "before" is a word of SQL Server's, kept as it is, and its copy is written as the parameter.
         ParameterOf(renamed.Bundle).ShouldBe(Parameter);
@@ -109,7 +103,7 @@ public sealed partial class SqlServerErrorRenamingTests
         );
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Failure("SQLSRC225", "describe columns"));
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         MessagesOf(renamed.Bundle, Columns, "errors").ShouldBe([""]);
         var errors = CallOf(Parse(renamed.Bundle.Capture), Columns)["answer"]!["errors"]!.AsArray();
@@ -146,7 +140,7 @@ public sealed partial class SqlServerErrorRenamingTests
         );
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Failure("SQLSRC224", null));
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         MessagesOf(renamed.Bundle, "open", "error.errors").ShouldBe([""]);
         var row = CallOf(Parse(renamed.Bundle.Capture), "open")["answer"]!["error"]!["errors"]!.AsArray().Single()!;
@@ -170,15 +164,14 @@ public sealed partial class SqlServerErrorRenamingTests
         var raw = await EditedAsync("select-left-join", capture => WithDatabase(capture, Session, database));
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
         raw.Capture.ShouldNotContain(Session);
-        var schema = await File.ReadAllTextAsync(
-            Path.Combine(FixtureCases.Root, Engine, "schema.sql"),
-            TestContext.Current.CancellationToken
-        );
+        var schema = await SqlServerRenamings.SchemaAsync();
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
-        BundleLeaks.Find(renamed.Bundle, Part, new HashSet<string>(), schema, raw.Query).ShouldBeEmpty();
+        SqlServerBundleLeaks
+            .Find(renamed.Bundle, SqlServerRenamings.Part, new HashSet<string>(), schema, raw.Query)
+            .ShouldBeEmpty();
     }
 
     // A column of the server's under an alias of the user's is no row of the engine's: its alias, and a column of the
@@ -223,14 +216,20 @@ public sealed partial class SqlServerErrorRenamingTests
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
         var stem = RenamingRun.MarkOf(alias).Stem;
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
         renamed.Bundle.Query.ShouldNotContain(stem, Case.Insensitive);
         renamed.Bundle.Capture.ShouldNotContain(stem, Case.Insensitive);
         renamed.Bundle.Expected.ShouldNotBeNull().ShouldNotContain(stem, Case.Insensitive);
-        BundleLeaks
-            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+        SqlServerBundleLeaks
+            .Find(
+                renamed.Bundle,
+                SqlServerRenamings.Part,
+                SourcesOfServersRows(raw),
+                await SqlServerRenamings.SchemaAsync(),
+                raw.Query
+            )
             .ShouldBeEmpty();
     }
 
@@ -258,11 +257,17 @@ public sealed partial class SqlServerErrorRenamingTests
         );
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
-        BundleLeaks
-            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+        SqlServerBundleLeaks
+            .Find(
+                renamed.Bundle,
+                SqlServerRenamings.Part,
+                SourcesOfServersRows(raw),
+                await SqlServerRenamings.SchemaAsync(),
+                raw.Query
+            )
             .ShouldBeEmpty();
         renamed.Bundle.Query.ShouldNotContain(Server, Case.Insensitive);
         renamed.Bundle.Capture.ShouldNotContain(Server, Case.Insensitive);
@@ -275,16 +280,22 @@ public sealed partial class SqlServerErrorRenamingTests
     [InlineData(OperandOfAProof)]
     public async Task RenameAsync_AColumnOfTheServersUnderItsOwnName_KeepsTheServersNames(string variant)
     {
-        var raw = variant == OwnName ? RawBundles.OfFixture(FixtureOf(OtherDatabase)) : await OperandOfSysAsync();
+        var raw = variant == OwnName ? SqlServerRenamings.Raw(OtherDatabase) : await OperandOfSysAsync();
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
         renamed.Bundle.Query.ShouldContain("master.sys.databases AS ");
         renamed.Bundle.Query.ShouldContain(".database_id");
-        BundleLeaks
-            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+        SqlServerBundleLeaks
+            .Find(
+                renamed.Bundle,
+                SqlServerRenamings.Part,
+                SourcesOfServersRows(raw),
+                await SqlServerRenamings.SchemaAsync(),
+                raw.Query
+            )
             .ShouldBeEmpty();
     }
 
@@ -298,7 +309,7 @@ public sealed partial class SqlServerErrorRenamingTests
         );
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
 
-        var refusal = await RefusedAsync(raw);
+        var refusal = await SqlServerRenamings.RefusedAsync(raw);
 
         refusal.ShouldBe(
             new RenamingRefusal(RefusalStep.Token, "capture.json call 2 'columns' answer.rows[].extra", Extra)
@@ -311,8 +322,7 @@ public sealed partial class SqlServerErrorRenamingTests
         const string Column = "email";
         const string Upper = "EMAIL";
         const string Fixture = "select-computed-not-null";
-        TableMatchOf(RawBundles.OfFixture(FixtureCases.Of(Engine).Single(found => found.Name == Fixture)))
-            .ShouldBe("matched");
+        TableMatchOf(SqlServerRenamings.Raw(Fixture)).ShouldBe("matched");
         var raw = await EditedAsync(
             Fixture,
             capture =>
@@ -335,7 +345,7 @@ public sealed partial class SqlServerErrorRenamingTests
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
         TableMatchOf(raw).ShouldBe("names-differ");
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         // The tool matches the column to the table's ordinally, so the two spellings stay apart by ordinal, in
         // replacements that are one name ignoring case: the query holds the spelling it was written with, and the
@@ -350,8 +360,14 @@ public sealed partial class SqlServerErrorRenamingTests
         string.Equals(replacements[0], replacements[1], StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
         renamed.Bundle.Query.ShouldContain(renamed.Mapping.Single(static name => name.Original == Upper).Replacement);
         replacements.ShouldAllBe(replacement => renamed.Bundle.Capture.Contains(replacement, StringComparison.Ordinal));
-        BundleLeaks
-            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+        SqlServerBundleLeaks
+            .Find(
+                renamed.Bundle,
+                SqlServerRenamings.Part,
+                SourcesOfServersRows(raw),
+                await SqlServerRenamings.SchemaAsync(),
+                raw.Query
+            )
             .ShouldBeEmpty();
     }
 
@@ -379,7 +395,7 @@ public sealed partial class SqlServerErrorRenamingTests
         );
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
         var replacements = renamed
@@ -392,8 +408,14 @@ public sealed partial class SqlServerErrorRenamingTests
         replacements.Count.ShouldBe(2);
         replacements.Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
         string.Equals(replacements[0], replacements[1], StringComparison.OrdinalIgnoreCase).ShouldBeTrue();
-        BundleLeaks
-            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+        SqlServerBundleLeaks
+            .Find(
+                renamed.Bundle,
+                SqlServerRenamings.Part,
+                SourcesOfServersRows(raw),
+                await SqlServerRenamings.SchemaAsync(),
+                raw.Query
+            )
             .ShouldBeEmpty();
     }
 
@@ -418,13 +440,19 @@ public sealed partial class SqlServerErrorRenamingTests
         raw.Info.ShouldNotBeNull().Outcome.ShouldBe(BundleOutcome.Entry);
         raw.Query.ShouldContain(Money);
 
-        var renamed = await RenamedAsync(raw);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw);
 
         renamed.Bundle.Info.ShouldBe(raw.Info with { Renamed = true });
         renamed.Bundle.Query.ShouldContain("> $12.50");
         renamed.Mapping.ShouldNotContain(static name => name.Original.Contains('$', StringComparison.Ordinal));
-        BundleLeaks
-            .Find(renamed.Bundle, Part, SourcesOfServersRows(raw), await SchemaAsync(), raw.Query)
+        SqlServerBundleLeaks
+            .Find(
+                renamed.Bundle,
+                SqlServerRenamings.Part,
+                SourcesOfServersRows(raw),
+                await SqlServerRenamings.SchemaAsync(),
+                raw.Query
+            )
             .ShouldBeEmpty();
 
         static string WithMoney(string text) => text.Replace("LIKE @pattern", Money, StringComparison.Ordinal);
@@ -585,14 +613,6 @@ public sealed partial class SqlServerErrorRenamingTests
         return kept;
     }
 
-    private static FixtureCase FixtureOf(string name) => FixtureCases.Of(Engine).Single(found => found.Name == name);
-
-    private static Task<string> SchemaAsync() =>
-        File.ReadAllTextAsync(
-            Path.Combine(FixtureCases.Root, Engine, "schema.sql"),
-            TestContext.Current.CancellationToken
-        );
-
     // Every database member of the node and its children, "database" of open and "sourceDatabase" of a row, that
     // names the database given, named as the other.
     private static void WithDatabase(JsonNode? node, string database, string other)
@@ -641,7 +661,7 @@ public sealed partial class SqlServerErrorRenamingTests
         Func<string, string>? query = null
     )
     {
-        var fixture = RawBundles.OfFixture(FixtureCases.Of(Engine).Single(found => found.Name == name));
+        var fixture = SqlServerRenamings.Raw(name);
         var edited = Parse(fixture.Capture);
         capture(edited);
         var read = CaptureJson.Read(edited.ToJsonString());
@@ -654,7 +674,7 @@ public sealed partial class SqlServerErrorRenamingTests
         };
 
         var token = TestContext.Current.CancellationToken;
-        var planned = BundleReplay.Plan(bundle, Engine, BundleReplay.NoPath, token);
+        var planned = BundleReplay.Plan(bundle, SqlServerRenamings.Engine, BundleReplay.NoPath, token);
         planned.Failure.ShouldBeNull();
         var (planQuery, dialect) = planned.Value;
         var replayed = await BundleReplay.RunAsync(
@@ -684,29 +704,6 @@ public sealed partial class SqlServerErrorRenamingTests
             _ => throw new InvalidOperationException($"The edited case {name} replayed raw as {replayed}."),
         };
     }
-
-    private static async Task<RenamedBundle> RenamedAsync(Bundle raw, RenamingKey? key = null)
-    {
-        var renamed = await RenameAsync(raw, key);
-        renamed.Failure.ShouldBeNull();
-        return renamed.Value.ShouldNotBeNull();
-    }
-
-    private static async Task<RenamingRefusal> RefusedAsync(Bundle raw, RenamingKey? key = null)
-    {
-        var renamed = await RenameAsync(raw, key);
-        renamed.Value.ShouldBeNull();
-        return renamed.Failure.ShouldNotBeNull();
-    }
-
-    private static Task<Outcome<RenamedBundle, RenamingRefusal>> RenameAsync(Bundle raw, RenamingKey? key = null) =>
-        BundleRenamer.RenameAsync(
-            raw,
-            Part,
-            new SqlServerDescriber(),
-            key ?? RenamingBundles.Key(1),
-            TestContext.Current.CancellationToken
-        );
 
     private static JsonObject Parse(string capture) => JsonNode.Parse(capture).ShouldNotBeNull().AsObject();
 
@@ -770,7 +767,12 @@ public sealed partial class SqlServerErrorRenamingTests
     // The one parameter of the bundle's query, as its query.sql names it: the renamed one, of a renamed bundle.
     private static string ParameterOf(Bundle bundle)
     {
-        var planned = BundleReplay.Plan(bundle, Engine, BundleReplay.NoPath, TestContext.Current.CancellationToken);
+        var planned = BundleReplay.Plan(
+            bundle,
+            SqlServerRenamings.Engine,
+            BundleReplay.NoPath,
+            TestContext.Current.CancellationToken
+        );
         planned.Failure.ShouldBeNull();
         return planned.Value.Query.Query.Parameters.ShouldHaveSingleItem().Name;
     }

@@ -7,8 +7,6 @@ namespace SqlSource.Tool.Tests.Bundles;
 
 public sealed class BundleErrorsTests
 {
-    private const string Path = "/work/report.zip";
-
     // A control character of each kind that a crafted bundle may hold, and how it is printed: C0's escape and bell, a
     // character of C1, DEL, and a line break.
     public static TheoryData<string, string> Controls =>
@@ -25,27 +23,27 @@ public sealed class BundleErrorsTests
     [MemberData(nameof(Controls))]
     public void CannotBeRead_ReasonWithAControlCharacter_EscapesItAndKeepsTheTab(string control, string escape)
     {
-        var error = BundleErrors.CannotBeRead(Path, $"the kind is 'x{control}[2J\ty'");
+        var error = BundleErrors.CannotBeRead(BundleInfos.Path, $"the kind is 'x{control}[2J\ty'");
 
         error.Descriptor.Id.ShouldBe("SQLSRC288");
-        error.Path.ShouldBe(Path);
+        error.Path.ShouldBe(BundleInfos.Path);
         error.Arguments.ToArray().ShouldBe([$"the kind is 'x{escape}[2J\ty'"]);
     }
 
     [Fact]
     public void OfNewerTool_Numbers_AreItsArguments() =>
         BundleErrors
-            .OfNewerTool(Path, "captureVersion", 2, 1)
+            .OfNewerTool(BundleInfos.Path, "captureVersion", 2, 1)
             .Arguments.ToArray()
             .ShouldBe(["captureVersion", "2", "1"]);
 
     [Fact]
     public void CallMissing_MadeByAVersion_NamesItAndThisVersion()
     {
-        var error = BundleErrors.CallMissing(Path, "columns", BundleErrors.MadeBy("1.4.0"));
+        var error = BundleErrors.CallMissing(BundleInfos.Path, "columns", BundleErrors.MadeBy("1.4.0"));
 
         error.Descriptor.Id.ShouldBe("SQLSRC290");
-        error.Path.ShouldBe(Path);
+        error.Path.ShouldBe(BundleInfos.Path);
         error.Arguments.ToArray().ShouldBe(["columns", "sqlsource 1.4.0", Cli.Version]);
     }
 
@@ -53,7 +51,7 @@ public sealed class BundleErrorsTests
     [MemberData(nameof(Controls))]
     public void CallMissing_MethodWithAControlCharacter_EscapesItAndKeepsTheTab(string control, string escape) =>
         BundleErrors
-            .CallMissing(Path, $"col{control}\tumns", BundleErrors.MadeBy("1.4.0"))
+            .CallMissing(BundleInfos.Path, $"col{control}\tumns", BundleErrors.MadeBy("1.4.0"))
             .Arguments.ToArray()
             .ShouldBe([$"col{escape}\tumns", "sqlsource 1.4.0", Cli.Version]);
 
@@ -61,7 +59,7 @@ public sealed class BundleErrorsTests
     [MemberData(nameof(Controls))]
     public void CallMissing_ToolVersionWithAControlCharacter_EscapesItAndKeepsTheTab(string control, string escape) =>
         BundleErrors
-            .CallMissing(Path, "columns", BundleErrors.MadeBy($"1.4{control}[3A\t0"))
+            .CallMissing(BundleInfos.Path, "columns", BundleErrors.MadeBy($"1.4{control}[3A\t0"))
             .Arguments.ToArray()
             .ShouldBe(["columns", $"sqlsource 1.4{escape}[3A\t0", Cli.Version]);
 
@@ -73,7 +71,7 @@ public sealed class BundleErrorsTests
     [MemberData(nameof(Controls))]
     public void NoDescriber_EngineWithAControlCharacter_EscapesItAndKeepsTheTab(string control, string escape)
     {
-        var error = BundleErrors.NoDescriber(Path, $"x{control}]0;pwned\tsql");
+        var error = BundleErrors.NoDescriber(BundleInfos.Path, $"x{control}]0;pwned\tsql");
 
         error.Descriptor.Id.ShouldBe("SQLSRC291");
         error.Arguments.ToArray().ShouldBe([$"x{escape}]0;pwned\tsql"]);

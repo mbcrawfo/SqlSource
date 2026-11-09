@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using Shouldly;
 using SqlSource.Tool.Bundles.Renaming.SqlServer;
 using Xunit;
 
@@ -45,7 +46,7 @@ public sealed class VocabularyTests(SqlServerDatabases databases)
             }
         }
 
-        Assert.True(missing.Count == 0, "Missing types: " + string.Join(", ", missing.Select(Quote)));
+        missing.ShouldBeEmpty("Missing types: " + string.Join(", ", missing.Select(Quote)));
     }
 
     [Fact]
@@ -70,8 +71,8 @@ public sealed class VocabularyTests(SqlServerDatabases databases)
             }
         }
 
-        Assert.True(known > 0);
-        Assert.True(missing.Count == 0, "Missing functions: " + string.Join(", ", missing.Select(Quote)));
+        known.ShouldBeGreaterThan(0);
+        missing.ShouldBeEmpty("Missing functions: " + string.Join(", ", missing.Select(Quote)));
     }
 
     private static string Quote(string name) => "\"" + name + "\"";

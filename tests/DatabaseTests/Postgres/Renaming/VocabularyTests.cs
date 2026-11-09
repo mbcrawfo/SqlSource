@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -23,34 +22,6 @@ public sealed class VocabularyTests(PostgresDatabases databases)
     private const string RecordCommand =
         "SQLSOURCE_TESTS_POSTGRES_IMAGE=<image> dotnet test --project tests/DatabaseTests/Postgres -- --filter-class"
         + " \"SqlSource.DatabaseTests.Postgres.Renaming.VocabularyTests\" --explicit only";
-
-    // The five sources of the list, each read whole.  A keyword is folded as unquoted, as the user writes one, and a
-    // catalog's name is kept as the catalog holds it.
-    private static readonly (string Sql, bool Quoted)[] Sources =
-    [
-        ("SELECT word FROM pg_catalog.pg_get_keywords()", false),
-        (
-            "SELECT DISTINCT p.proname FROM pg_catalog.pg_proc p"
-                + " JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'pg_catalog'",
-            true
-        ),
-        (
-            "SELECT DISTINCT o.oprname FROM pg_catalog.pg_operator o"
-                + " JOIN pg_catalog.pg_namespace n ON n.oid = o.oprnamespace WHERE n.nspname = 'pg_catalog'",
-            true
-        ),
-        (
-            "SELECT DISTINCT t.typname FROM pg_catalog.pg_type t"
-                + " JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace"
-                + " WHERE n.nspname IN ('pg_catalog', 'information_schema')",
-            true
-        ),
-        (
-            "SELECT a.attname FROM pg_catalog.pg_attribute a"
-                + " WHERE a.attrelid = 'pg_catalog.pg_class'::pg_catalog.regclass AND a.attnum < 0",
-            true
-        ),
-    ];
 
     // The header of the file, which says what it holds and how it is made.  Each line starts with
     // PostgresWords.HeaderMark.
@@ -123,28 +94,13 @@ public sealed class VocabularyTests(PostgresDatabases databases)
             $"The vocabulary is made from {DefaultImages.PostgresFloor} and {DefaultImages.Postgres} alone."
         );
 
-    [SuppressMessage(
-        "Security",
-        "CA2100:Review SQL queries for security vulnerabilities",
-        Justification = "The SQL is a constant of this test."
-    )]
     private async Task<SortedSet<string>> ImageWordsAsync()
     {
-        var token = TestContext.Current.CancellationToken;
         await using var source = databases.SourceOf(PostgresDatabases.Database);
-        await using var connection = await source.OpenConnectionAsync(token);
-        var words = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (var (sql, quoted) in Sources)
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = sql;
-            await using var reader = await command.ExecuteReaderAsync(token);
-            while (await reader.ReadAsync(token))
-            {
-                _ = words.Add(PostgresWords.Fold(reader.GetString(0), quoted));
-            }
-        }
-
-        return words;
+        return await PostgresCatalogWords.ReadAsync(
+            source,
+            PostgresCatalogWords.All,
+            TestContext.Current.CancellationToken
+        );
     }
 }

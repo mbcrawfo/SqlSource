@@ -10,6 +10,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -786,7 +787,7 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
         var log = await File.ReadAllTextAsync(scene.PathOf("run.log"), TestContext.Current.CancellationToken);
         log.ShouldNotContain(Secrets.Marker);
-        var bundle = BundleReplays.Read(scene.PathOf("raw.zip"));
+        var bundle = WrittenBundles.Read(scene.PathOf("raw.zip"));
         bundle.Capture.ShouldNotContain(Secrets.Marker);
         bundle.Query.ShouldNotContain(Secrets.Marker);
     }

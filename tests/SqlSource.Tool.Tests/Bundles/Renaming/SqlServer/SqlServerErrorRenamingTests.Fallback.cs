@@ -7,6 +7,7 @@ using Shouldly;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming.SqlServer;
@@ -34,7 +35,7 @@ public sealed partial class SqlServerErrorRenamingTests
         var raw = await ParameterInThreeSpellingsAsync();
         var key = KeyWhere(CutoffSpellings, NameClass.Parameter, fallsBack: true);
 
-        var refusal = await RefusedAsync(raw, key);
+        var refusal = await SqlServerRenamings.RefusedAsync(raw, key);
 
         refusal.ShouldBe(new RenamingRefusal(RefusalStep.RequestSql, "capture.json call 'parameters'", null));
     }
@@ -45,7 +46,7 @@ public sealed partial class SqlServerErrorRenamingTests
         var raw = await ParameterInThreeSpellingsAsync();
         var key = KeyWhere(CutoffSpellings, NameClass.Parameter, fallsBack: false);
 
-        var renamed = await RenamedAsync(raw, key);
+        var renamed = await SqlServerRenamings.RenamedAsync(raw, key);
 
         var replacements = ReplacementsOf(renamed, CutoffSpellings);
         replacements.Distinct(StringComparer.Ordinal).Count().ShouldBe(CutoffSpellings.Length);
@@ -67,7 +68,7 @@ public sealed partial class SqlServerErrorRenamingTests
 
         var renamed = await BundleRenamer.RenameAsync(
             raw,
-            Part,
+            SqlServerRenamings.Part,
             new SqlServerDescriber(),
             () => keys[calls++],
             TestContext.Current.CancellationToken
@@ -76,7 +77,7 @@ public sealed partial class SqlServerErrorRenamingTests
         calls.ShouldBe(2);
         renamed.Failure.ShouldBeNull();
         var bundle = renamed.Value.ShouldNotBeNull();
-        bundle.Mapping.ShouldBe((await RenamedAsync(raw, keys[1])).Mapping);
+        bundle.Mapping.ShouldBe((await SqlServerRenamings.RenamedAsync(raw, keys[1])).Mapping);
     }
 
     [Fact]
@@ -88,7 +89,7 @@ public sealed partial class SqlServerErrorRenamingTests
 
         var renamed = await BundleRenamer.RenameAsync(
             raw,
-            Part,
+            SqlServerRenamings.Part,
             new SqlServerDescriber(),
             () =>
             {
@@ -116,9 +117,9 @@ public sealed partial class SqlServerErrorRenamingTests
 
         var renamed = await BundleRenamer.RenameAsync(
             raw,
-            Part,
+            SqlServerRenamings.Part,
             new SqlServerDescriber(),
-            () => RenamingBundles.Key((byte)++calls),
+            () => BundleRenamings.Key((byte)++calls),
             TestContext.Current.CancellationToken
         );
 
@@ -139,7 +140,7 @@ public sealed partial class SqlServerErrorRenamingTests
 
         var renamed = await BundleRenamer.RenameAsync(
             raw,
-            Part,
+            SqlServerRenamings.Part,
             new SqlServerDescriber(),
             () =>
             {
@@ -207,8 +208,8 @@ public sealed partial class SqlServerErrorRenamingTests
     {
         for (var fill = 0; fill <= byte.MaxValue; fill++)
         {
-            var key = RenamingBundles.Key((byte)fill);
-            var mapping = new NameMapping(key, Part.Fold, Part.Spelled);
+            var key = BundleRenamings.Key((byte)fill);
+            var mapping = new NameMapping(key, SqlServerRenamings.Part.Fold, SqlServerRenamings.Part.Spelled);
             foreach (var spelling in spellings)
             {
                 _ = mapping.Name(spelling, quoted: false, cls);
