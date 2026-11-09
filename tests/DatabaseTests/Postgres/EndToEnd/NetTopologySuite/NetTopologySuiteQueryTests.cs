@@ -52,7 +52,7 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
     };
 
     [Fact]
-    public async Task EveryRow_RoundTrips()
+    public async Task InsertSpatialValues_EveryRow_RoundTrips()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.GisWithNetTopologySuite(postgis);
@@ -79,7 +79,7 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
     // The row of the seed, which the server wrote from its text: every column read, with the point of four dimensions
     // keeping its Z and M and the array its NULL element.
     [Fact]
-    public async Task SeededRow_ReadsEveryColumn()
+    public async Task GetSpatialValues_SeededRow_ReadsEveryColumn()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.GisWithNetTopologySuite(postgis);
@@ -100,7 +100,7 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
 
     // A point of four dimensions written to geometry and to geography comes back with its Z and M.
     [Fact]
-    public async Task PointZM_KeepsZAndM()
+    public async Task InsertSpatialValues_PointZM_KeepsZAndM()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.GisWithNetTopologySuite(postgis);
@@ -127,7 +127,7 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
     // GetPointValue and GetPolygonValue read the column as the type their query's type override names, which the
     // plugin reads.
     [Fact]
-    public async Task PointAndPolygon_ByTypeOverride_ReadAsThoseTypes()
+    public async Task GetPointValue_PointAndPolygonByTypeOverride_ReadAsThoseTypes()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.GisWithNetTopologySuite(postgis);
@@ -155,7 +155,7 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
     }
 
     [Fact]
-    public async Task Nulls_RoundTrip()
+    public async Task InsertSpatialValues_Nulls_RoundTrip()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.GisWithNetTopologySuite(postgis);
@@ -198,7 +198,7 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
     // A sequence that is no IList, from LINQ, as the array parameter: it is copied once on its way to the server, and
     // the elements come back as they were, a NULL one and its SRID included.
     [Fact]
-    public async Task GeometryArray_LazySequence_RoundTrips()
+    public async Task InsertSpatialValues_GeometryArrayLazySequence_RoundTrips()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.GisWithNetTopologySuite(postgis);
@@ -227,7 +227,7 @@ public sealed class NetTopologySuiteQueryTests(PostgisDatabases postgis)
     }
 
     [Fact]
-    public void MethodTypes_AreGeometries()
+    public void MethodTypes_OfTheSpatialQueries_AreGeometries()
     {
         (string Name, Type Type, bool Nullable)[] properties =
         [
