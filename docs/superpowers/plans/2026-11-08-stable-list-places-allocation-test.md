@@ -6,7 +6,7 @@
 
 **Fix:** a test helper, `PooledAllocations.Of` at the root of `tests/SqlSource.Tests`, measures 20 calls after 20 warm-up calls five times and returns the least.  A trim adds bytes to the one measure it falls in, and the next measure finds the pool full again; an allocation the code makes on its own is in every measure, so the test guarantees what it did.
 
-**Scope:** the two tests that measure `Find`, the only code of the generator that rents from the pool: `SqlListPlacesTests.Find_WithPlaces_AllocatesThePlacesAlone` and `SqlListUsesTests.Find_QueryWithLists_AllocatesItsUsesAlone` (same exposure, not yet seen to fail).  `Find_TextWithoutIn_IsEmptyAndAllocatesNothing` rents nothing.  A rule in `tests/SqlSource.Tests/AGENTS.md` names the helper (`tests/AGENTS.md` has no room).
+**Scope:** the two tests that hold an exact number of bytes for a call that rents from the pool, both of `Find`: `SqlListPlacesTests.Find_WithPlaces_AllocatesThePlacesAlone` and `SqlListUsesTests.Find_QueryWithLists_AllocatesItsUsesAlone` (same exposure, not yet seen to fail).  `Find_TextWithoutIn_IsEmptyAndAllocatesNothing` rents nothing.  Other code of the generator rents too (`SqlTextBuilder`, `SettingsFileSet`, `SqlPath`, `PropertyNames`), but its tests hold budgets with room, as `SqlFileParserAllocationTests` does, or reach no rent.  A rule in `tests/SqlSource.Tests/AGENTS.md` names the helper and says a budget with room keeps its own measure (`tests/AGENTS.md` has no room).
 
 ## Steps
 
