@@ -423,8 +423,12 @@ internal sealed class TypePlacement
                         query.MemberLocationMarker ?? query.NameLocation,
                         query.Name,
                         TypeName,
+                        location == MemberLocation.NestedClass ? "nested class" : "extension class",
                         PlaceText.Of(writtenLocation.Place),
-                        SettingValue.NameOf(settings.Output)
+                        SettingValue.NameOf(settings.Output),
+                        settings.Output == OutputKind.Repository
+                            ? "A repository method is an instance method of the type.  Use class."
+                            : "Only a query method extends the connection.  Use class or nested-class."
                     )
                 );
                 return false;

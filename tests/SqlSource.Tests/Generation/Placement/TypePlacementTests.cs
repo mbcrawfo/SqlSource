@@ -230,16 +230,20 @@ public sealed class TypePlacementTests
                 At("Users.sql", 0),
                 "GetUser",
                 "App.UserRepository",
+                "extension class",
                 "the settings file '/app/sqlsource.json'",
-                "sql"
+                "sql",
+                "Only a query method extends the connection.  Use class or nested-class."
             ),
             DiagnosticInfo.Create(
                 SqlDiagnostics.MemberLocationNotFit,
                 At("Users.sql", 3),
                 "ListUsers",
                 "App.UserRepository",
+                "extension class",
                 "the settings file '/app/sqlsource.json'",
-                "models"
+                "models",
+                "Only a query method extends the connection.  Use class or nested-class."
             ),
         ]);
         placement.Usable.ShouldBe([false]);
@@ -267,8 +271,10 @@ public sealed class TypePlacementTests
                 At("Users.sql", 1),
                 "GetUser",
                 "App.UserRepository",
+                "extension class",
                 "its own marker",
-                "sql"
+                "sql",
+                "Only a query method extends the connection.  Use class or nested-class."
             ),
         ]);
     }

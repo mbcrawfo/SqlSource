@@ -1156,7 +1156,7 @@ See: [Parameters](parameters-and-tokens.md#query-parameters)
 
 **Member location does not fit the query**
 
-A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](generator.md#locations) is `extension-class`.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql` or `models`.  The message names the query, the type that claims the file and where the value was written; two types that claim one file each report the error.
+A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](generator.md#locations) is `extension-class`.  A query whose output is `repository` has an instance method of the type, which cannot go in the extension class or in a nested class, and its member location is `extension-class` or `nested-class`; its default, `class`, fits.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql`, `models` or `repository`.  The message names the query, the type that claims the file and where the value was written; two types that claim one file each report the error.
 
 ```sql
 -- member-location: extension-class
@@ -1167,10 +1167,12 @@ SELECT count(*) FROM users;
 ```
 
 ```console
-/work/App/Queries/Users.sql(3,10): error SQLSRC122: The query 'CountUsers' of 'App.UserRepository' cannot go in the extension class, which the file header sets, because its output is sql and only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.
+/work/App/Queries/Users.sql(3,10): error SQLSRC122: The query 'CountUsers' of 'App.UserRepository' cannot go in the extension class, which the file header sets, because its output is sql.  Only a query method extends the connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.
 ```
 
-The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members and no models for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `methods`.
+For a query whose output is `repository`, the message names the location that does not fit, `extension class` or `nested class`, and ends with "A repository method is an instance method of the type.  Use class."
+
+The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members and no models for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `methods`; a `repository` query takes only `class`.
 
 See: [Where the members go](generator.md#locations)
 

@@ -549,9 +549,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MemberLocationNotFit = new(
         id: "SQLSRC122",
         title: "Member location does not fit the query",
-        messageFormat: "The query '{0}' of '{1}' cannot go in the extension class, which {2} sets, because its output "
-            + "is {3} and only a query method extends the connection.  Use class or nested-class.  Write "
-            + "-- visibility: or -- member-location: on the query.",
+        messageFormat: "The query '{0}' of '{1}' cannot go in the {2}, which {3} sets, because its output "
+            + "is {4}.  {5}  Write -- visibility: or -- member-location: on the query.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
