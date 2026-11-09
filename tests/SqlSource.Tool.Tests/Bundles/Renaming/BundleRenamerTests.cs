@@ -43,11 +43,11 @@ public sealed partial class BundleRenamerTests
 
         var bundle = renamed.Bundle;
         bundle.Info.ShouldBe(raw.Info.ShouldNotBeNull() with { Renamed = true });
-        var expected = BundleReplay.ExpectedOf(bundle, RenamingBundles.Path);
+        var expected = BundleReplay.ExpectedOf(bundle, BundleInfos.Path);
         expected.Failure.ShouldBeNull();
         var replayed = await BundleReplays.ReplayAsync(
             bundle,
-            RenamingBundles.Path,
+            BundleInfos.Path,
             new DescriberRegistry([new FakeDescriber()])
         );
         replayed.ShouldBe(expected.Value);
@@ -231,7 +231,7 @@ public sealed partial class BundleRenamerTests
         (
             await BundleReplays.ReplayAsync(
                 renamed.Bundle,
-                RenamingBundles.Path,
+                BundleInfos.Path,
                 new DescriberRegistry([new FakeDescriber()])
             )
         ).ShouldBe(new ReplayOutcome.Refused("SQLSRC999", "describe columns"));

@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Bundles.Renaming;
+using SqlSource.Tool.Testing.Bundles;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Bundles.Renaming;
@@ -13,7 +14,7 @@ public sealed class EntryRenamerTests
     private static RenamingRun Run(FakeEngineRenaming engine, string query) =>
         RenamingRun.For(
             engine,
-            new NameMapping(RenamingBundles.Key(1), engine.Fold, engine.Spelled),
+            new NameMapping(BundleRenamings.Key(1), engine.Fold, engine.Spelled),
             query,
             RenamingCopies.None
         );
@@ -31,15 +32,7 @@ public sealed class EntryRenamerTests
 
         run.Refusal.ShouldBeNull();
         var entry = SidecarReader.Read(renamed.ShouldNotBeNull()).Sidecar.ShouldNotBeNull().Queries[0];
-        var planned = BundleReplay.Plan(
-            raw with
-            {
-                Query = query,
-            },
-            RenamingBundles.Engine,
-            RenamingBundles.Path,
-            token
-        );
+        var planned = BundleReplay.Plan(raw with { Query = query }, RenamingBundles.Engine, BundleInfos.Path, token);
         entry.Hash.ShouldBe(planned.Value.Query.Hash);
         var original = SidecarReader.Read(raw.Expected).Sidecar.ShouldNotBeNull().Queries[0];
         entry.Hash.ShouldNotBe(original.Hash);

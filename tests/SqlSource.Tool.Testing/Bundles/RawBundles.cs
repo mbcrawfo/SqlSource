@@ -90,7 +90,8 @@ internal static class RawBundles
         return new Bundle(info, query, CaptureJson.Write(capture), expected, explainSettings);
     }
 
-    private static BundleOutcome OutcomeOf(DescribeFailure failure) =>
+    // The outcome of a raw bundle whose query the describer refuses: the failure's id and step.
+    public static BundleOutcome OutcomeOf(DescribeFailure failure) =>
         BundleOutcome.Failure(failure.Descriptor.Id, failure.Step is { } step ? DescribeStepName.Of(step) : null);
 
     private static string? StringOf(JsonElement answer, string member) =>

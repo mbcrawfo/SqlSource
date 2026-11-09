@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Bundles;
@@ -31,8 +30,6 @@ internal sealed class DiagnoseScene : IDisposable
         "    help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw "
         + "bundle is ready, without attaching it: a maintainer will say how to send it\n";
 
-    public const string Reproduced = "sqlsource: reproduced: the pipeline gives this answer\n";
-
     // The file the query of a case is put in.
     public const string File = "Users.sql";
 
@@ -55,7 +52,7 @@ internal sealed class DiagnoseScene : IDisposable
     public TestProject Project { get; }
 
     // A case of the engine's fixtures.
-    public FixtureCase Case(string name) => FixtureCases.Of(Engine).Single(found => found.Name == name);
+    public FixtureCase Case(string name) => FixtureCases.Named(Engine, name);
 
     // Puts the case's query in the project's file, or the text given, and answers every call from its capture.
     public string AddCase(FixtureCase fixture, string? fileText = null)

@@ -9,20 +9,7 @@ namespace SqlSource.Tool.Tests.Bundles;
 
 public sealed class BundleJsonTests
 {
-    private const string Path = "/work/report.zip";
-
-    private static readonly BundleInfo Info = new(
-        BundleVersion: 1,
-        Renamed: true,
-        ToolVersion: "1.4.0",
-        FormatVersion: SidecarFormat.Version,
-        Engine: "postgres",
-        ServerVersion: "18.6",
-        DriverVersion: "Npgsql 9.0.3",
-        Runtime: ".NET 8.0.11",
-        OperatingSystem: "Linux 6.8",
-        Outcome: BundleOutcome.Entry
-    );
+    private static readonly BundleInfo Info = BundleInfos.Sample(renamed: true, driverVersion: "Npgsql 9.0.3");
 
     [Fact]
     public void Write_ThenRead_GivesTheSameInfo()
@@ -37,7 +24,7 @@ public sealed class BundleJsonTests
 
         foreach (var info in new[] { Info, failure, refused })
         {
-            var read = BundleJson.Read(BundleJson.Write(info), Path);
+            var read = BundleJson.Read(BundleJson.Write(info), BundleInfos.Path);
 
             read.Failure.ShouldBeNull();
             read.Succeeded.ShouldBeTrue();
@@ -62,12 +49,12 @@ public sealed class BundleJsonTests
     {
         var read = BundleJson.Read( /*lang=json,strict*/
             """{"bundleVersion": 2}""",
-            Path
+            BundleInfos.Path
         );
 
         read.Succeeded.ShouldBeFalse();
         read.Failure.Descriptor.Id.ShouldBe("SQLSRC289");
-        read.Failure.Path.ShouldBe(Path);
+        read.Failure.Path.ShouldBe(BundleInfos.Path);
         read.Failure.Arguments.ToArray().ShouldBe(["bundleVersion", "2", "1"]);
     }
 
@@ -75,11 +62,14 @@ public sealed class BundleJsonTests
     [Fact]
     public void Read_FormatVersionNewerThanThisToolWrites_IsSqlsrc289()
     {
-        var read = BundleJson.Read(BundleJson.Write(Info with { FormatVersion = SidecarFormat.Version + 1 }), Path);
+        var read = BundleJson.Read(
+            BundleJson.Write(Info with { FormatVersion = SidecarFormat.Version + 1 }),
+            BundleInfos.Path
+        );
 
         read.Succeeded.ShouldBeFalse();
         read.Failure.Descriptor.Id.ShouldBe("SQLSRC289");
-        read.Failure.Path.ShouldBe(Path);
+        read.Failure.Path.ShouldBe(BundleInfos.Path);
         read.Failure.Arguments.ToArray()
             .ShouldBe([
                 "formatVersion",
@@ -94,7 +84,7 @@ public sealed class BundleJsonTests
     {
         var older = Info with { FormatVersion = SidecarFormat.Version - 1 };
 
-        BundleJson.Read(BundleJson.Write(older), Path).Value.ShouldBe(older);
+        BundleJson.Read(BundleJson.Write(older), BundleInfos.Path).Value.ShouldBe(older);
     }
 
     [Theory]
@@ -106,11 +96,11 @@ public sealed class BundleJsonTests
             .Write(Info)
             .Replace("\"bundleVersion\": 1,", $"\"bundleVersion\": {version},", System.StringComparison.Ordinal);
 
-        var read = BundleJson.Read(text, Path);
+        var read = BundleJson.Read(text, BundleInfos.Path);
 
         read.Succeeded.ShouldBeFalse();
         read.Failure.Descriptor.Id.ShouldBe("SQLSRC288");
-        read.Failure.Path.ShouldBe(Path);
+        read.Failure.Path.ShouldBe(BundleInfos.Path);
         read.Failure.Arguments.Single()
             .ShouldBe($"the bundleVersion of bundle.json is {version}, which no sqlsource writes");
     }
@@ -120,11 +110,11 @@ public sealed class BundleJsonTests
     {
         var text = BundleJson.Write(Info).Replace("  \"engine\": \"postgres\",\n", "", System.StringComparison.Ordinal);
 
-        var read = BundleJson.Read(text, Path);
+        var read = BundleJson.Read(text, BundleInfos.Path);
 
         read.Succeeded.ShouldBeFalse();
         read.Failure.Descriptor.Id.ShouldBe("SQLSRC288");
-        read.Failure.Path.ShouldBe(Path);
+        read.Failure.Path.ShouldBe(BundleInfos.Path);
         read.Failure.Arguments.Single().ShouldContain("engine");
     }
 
@@ -135,7 +125,7 @@ public sealed class BundleJsonTests
             .Write(Info)
             .Replace("\"renamed\": true", "\"renamed\": \"yes\"", System.StringComparison.Ordinal);
 
-        var read = BundleJson.Read(text, Path);
+        var read = BundleJson.Read(text, BundleInfos.Path);
 
         read.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC288");
         read.Failure.Arguments.Single().ShouldContain("renamed");
@@ -144,7 +134,7 @@ public sealed class BundleJsonTests
     [Fact]
     public void Read_NotJson_IsSqlsrc288()
     {
-        var read = BundleJson.Read("{ not json", Path);
+        var read = BundleJson.Read("{ not json", BundleInfos.Path);
 
         read.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC288");
         read.Failure.Arguments.Single().ShouldContain("bundle.json");
@@ -155,7 +145,7 @@ public sealed class BundleJsonTests
     {
         var text = BundleJson.Write(Info).Replace("\"entry\"", "\"other\\nkind\"", System.StringComparison.Ordinal);
 
-        var read = BundleJson.Read(text, Path);
+        var read = BundleJson.Read(text, BundleInfos.Path);
 
         read.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC288");
         read.Failure.Arguments.Single().ShouldContain("kind");

@@ -3,7 +3,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using Xunit;
 
@@ -12,18 +11,7 @@ namespace SqlSource.Tool.Tests.Bundles;
 public sealed class BundleWriterTests
 {
     private static readonly Bundle Bundle = new(
-        new BundleInfo(
-            BundleVersion: 1,
-            Renamed: true,
-            ToolVersion: "1.4.0",
-            FormatVersion: SidecarFormat.Version,
-            Engine: "postgres",
-            ServerVersion: "18.6",
-            DriverVersion: "Npgsql 9.0.3",
-            Runtime: ".NET 8.0.11",
-            OperatingSystem: "Linux 6.8",
-            Outcome: BundleOutcome.Entry
-        ),
+        BundleInfos.Sample(renamed: true, driverVersion: "Npgsql 9.0.3"),
         "select 1;\n",
         "{}\n",
         /*lang=json,strict*/

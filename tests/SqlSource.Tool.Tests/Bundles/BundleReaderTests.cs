@@ -4,7 +4,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
@@ -15,18 +14,7 @@ namespace SqlSource.Tool.Tests.Bundles;
 
 public sealed class BundleReaderTests : IDisposable
 {
-    private static readonly BundleInfo Info = new(
-        BundleVersion: 1,
-        Renamed: true,
-        ToolVersion: "1.4.0",
-        FormatVersion: SidecarFormat.Version,
-        Engine: "postgres",
-        ServerVersion: "18.6",
-        DriverVersion: null,
-        Runtime: ".NET 8.0.11",
-        OperatingSystem: "Linux 6.8",
-        Outcome: BundleOutcome.Entry
-    );
+    private static readonly BundleInfo Info = BundleInfos.Sample(renamed: true);
 
     private readonly TempFolder _folder = new();
 
@@ -38,7 +26,7 @@ public sealed class BundleReaderTests : IDisposable
     [Fact]
     public void Read_FolderOfAFixture_GivesItsFiles()
     {
-        var fixture = FixtureCases.Of("postgres").Single(static found => found.Name == "walk-left-hash");
+        var fixture = FixtureCases.Named("postgres", "walk-left-hash");
 
         var read = Read(fixture.Folder);
 
@@ -183,7 +171,7 @@ public sealed class BundleReaderTests : IDisposable
     public void Read_FileThatCannotBeOpened_IsSqlsrc288WithTheReason()
     {
         var read = BundleReader.Read(
-            "/work/report.zip",
+            BundleInfos.Path,
             static _ => throw new IOException("The disk\nis gone."),
             static _ => null
         );

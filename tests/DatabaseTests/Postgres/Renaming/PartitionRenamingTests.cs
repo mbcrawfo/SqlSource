@@ -6,7 +6,6 @@ using SqlSource.DatabaseTests.Postgres.Describer;
 using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Bundles;
-using SqlSource.Tool.Bundles.Renaming;
 using SqlSource.Tool.Bundles.Renaming.Postgres;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
@@ -27,9 +26,6 @@ namespace SqlSource.DatabaseTests.Postgres.Renaming;
 [Collection(UsesPostgres.Name)]
 public sealed class PartitionRenamingTests(PostgresDatabases databases)
 {
-    // The key of every renaming here: no test compares two runs.
-    private const byte Key = 7;
-
     // The table scanned without an alias, so that its partitions' scans are scratch_parts_1 and scratch_parts_2, and
     // the members of a UNION ALL of the partitions themselves, scanned under their own names, on the null-extended
     // side of a LEFT JOIN, whose nullability the walk reads from the partitions.
@@ -63,21 +59,22 @@ public sealed class PartitionRenamingTests(PostgresDatabases databases)
         var raw = RawBundles.Of(query, capture, expected, BundleOutcome.Entry, []);
         MemberAliasesOf(raw).ShouldBe(["scratch_parts_1", "scratch_parts_2"]);
 
-        var renamed = await BundleRenamer.RenameAsync(
+        var renamed = await BundleRenamings.RenamedAsync(
             raw,
             PostgresRenaming.Instance,
             new PostgresDescriber(),
-            RenamingKey.Of(Enumerable.Repeat(Key, RenamingKey.Length).ToArray()),
-            TestContext.Current.CancellationToken
+            BundleRenamings.Key(BundleRenamings.AnyKey)
         );
 
-        var bundle = renamed.Value.ShouldNotBeNull(renamed.Failure?.ToString()).Bundle;
+        var bundle = renamed.Bundle;
         Provenance.Of(bundle.Expected.ShouldNotBeNull()).ShouldBe(Provenance.Of(expected));
         var schema = await File.ReadAllTextAsync(
             DescriberFixtures.Postgres.Schema,
             TestContext.Current.CancellationToken
         );
-        BundleLeaks.Of(bundle, [schema, ScratchSchema.Partitioned, query], PostgresWords.IsEngineWord).ShouldBeEmpty();
+        PostgresBundleLeaks
+            .Of(bundle, [schema, ScratchSchema.Partitioned, query], PostgresWords.IsEngineWord)
+            .ShouldBeEmpty();
     }
 
     // The aliases of the members of the plan's Appends that the walk reads as one prefix, in the order of the plan.
