@@ -54,11 +54,18 @@ internal readonly record struct QuerySettings(
 
     /// <summary>
     /// Where the query's members go: the one written, else the default of its output, a nested class for the output
-    /// that has no method and the extension class for the one that has.
+    /// that has no method, the extension class for a method that extends the connection, and the type for the
+    /// repository.
     /// </summary>
     public MemberLocation MemberLocation =>
         WrittenMemberLocation?.Value
-        ?? (Output == OutputKind.Methods ? MemberLocation.ExtensionClass : MemberLocation.NestedClass);
+        ?? Output switch
+        {
+            OutputKind.Methods => MemberLocation.ExtensionClass,
+            OutputKind.Repository => MemberLocation.Class,
+            OutputKind.Sql or OutputKind.Models => MemberLocation.NestedClass,
+            _ => throw UnexpectedEnumValueException.Of(Output),
+        };
 
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;

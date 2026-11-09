@@ -155,6 +155,17 @@ public sealed class SidecarTests
         UsableEntries(withoutEntry).ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Run_RepositoryQueryWithoutAnEntry_ReportsSqlsrc241()
+    {
+        var run = Run(OutputKind.Repository, GeneratorHarness.UsersFile);
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'repository' needs one.  Run 'sqlsource describe'.",
+        ]);
+    }
+
     // An entry of another engine than the file's is never usable, whether SqlSource knows the engine, as mssql, or
     // not, as oracle, which is no crash either.
     [Theory]

@@ -40,6 +40,8 @@ public sealed class SettingValueTests
     [InlineData("methods", 2)]
     [InlineData("me-thods", 2)]
     [InlineData("Methods", 2)]
+    [InlineData("repository", 3)]
+    [InlineData("Re-pository", 3)]
     public void TryReadChoice_Output_IsRead(string value, int expected)
     {
         SettingValue.TryReadChoice<OutputKind>(value.AsSpan(), out var output).ShouldBeTrue();

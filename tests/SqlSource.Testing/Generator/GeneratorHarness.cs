@@ -310,6 +310,7 @@ internal static class GeneratorHarness
             OutputKind.Sql => "Sql",
             OutputKind.Models => "Models",
             OutputKind.Methods => "Methods",
+            OutputKind.Repository => "Repository",
             _ => throw new ArgumentOutOfRangeException(nameof(output), output, null),
         };
 

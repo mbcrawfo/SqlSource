@@ -141,7 +141,7 @@ internal static class TypeEmitter
         List<Member>?[]? inClasses = null;
         foreach (var usable in queries)
         {
-            if (usable.Settings.Output == OutputKind.Methods)
+            if (usable.Settings.Output.HasMethod())
             {
                 continue;
             }

@@ -33,14 +33,14 @@
       "type": "string"
     },
     "output": {
-      "description": "What SqlSource generates for a query: `sql`, `models` or `methods`, matched ignoring case, hyphens and spaces. Default `methods`.",
+      "description": "What SqlSource generates for a query: `sql`, `models`, `methods` or `repository`, matched ignoring case, hyphens and spaces. Default `methods`.",
       "type": "string",
       "anyOf": [
         {
-          "enum": ["sql", "models", "methods"]
+          "enum": ["sql", "models", "methods", "repository"]
         },
         {
-          "pattern": "^\\s*(?:[- \\t]*(?:[sS][- \\t]*[qQ][- \\t]*[lL][- \\t]*|[mM][- \\t]*[oO][- \\t]*[dD][- \\t]*[eE][- \\t]*[lL][- \\t]*[sS][- \\t]*|[mM][- \\t]*[eE][- \\t]*[tT][- \\t]*[hH][- \\t]*[oO][- \\t]*[dD][- \\t]*[sS][- \\t]*))?\\s*$"
+          "pattern": "^\\s*(?:[- \\t]*(?:[sS][- \\t]*[qQ][- \\t]*[lL][- \\t]*|[mM][- \\t]*[oO][- \\t]*[dD][- \\t]*[eE][- \\t]*[lL][- \\t]*[sS][- \\t]*|[mM][- \\t]*[eE][- \\t]*[tT][- \\t]*[hH][- \\t]*[oO][- \\t]*[dD][- \\t]*[sS][- \\t]*|[rR][- \\t]*[eE][- \\t]*[pP][- \\t]*[oO][- \\t]*[sS][- \\t]*[iI][- \\t]*[tT][- \\t]*[oO][- \\t]*[rR][- \\t]*[yY][- \\t]*))?\\s*$"
         }
       ]
     },
@@ -196,7 +196,7 @@
       "type": "string"
     },
     "memberLocation": {
-      "description": "Where a query's members go: `extension class`, `class` or `nested class`, matched ignoring case, hyphens and spaces. Default: `extension class` for the output `methods`, else `nested class`.",
+      "description": "Where a query's members go: `extension class`, `class` or `nested class`, matched ignoring case, hyphens and spaces. Default: `extension class` for the output `methods`, `class` for `repository`, else `nested class`.",
       "type": "string",
       "anyOf": [
         {

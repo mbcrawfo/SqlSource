@@ -50,6 +50,17 @@ public sealed class TypePlacementTests
         PlacementOf(placement, 0, 0).NestedClass.ShouldBeNull();
     }
 
+    [Fact]
+    public void Of_RepositoryQueryOnAnInternalType_IsPublicOnTheType()
+    {
+        var files = Files(File("Users.sql", Query("GetUser", output: OutputKind.Repository)));
+
+        var (placement, diagnostics) = Analyse(TestModels.Type(isPublic: false), files);
+
+        diagnostics.ShouldBeEmpty();
+        PlacementOf(placement, 0, 0).ShouldBe(new QueryPlacement(MemberLocation.Class, Visibility.Public, null));
+    }
+
     // The nested class is ignored away from a nested class.
     [Fact]
     public void Of_NestedClassWrittenUnderClass_IsIgnored()

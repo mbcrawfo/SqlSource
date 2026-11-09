@@ -13,4 +13,7 @@ internal enum OutputKind
 
     /// <summary><see cref="Models" />, and the method that runs the query.</summary>
     Methods = 2,
+
+    /// <summary><see cref="Models" />, and an instance method of the type that gets its own connection.</summary>
+    Repository = 3,
 }

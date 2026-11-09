@@ -299,6 +299,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     [Theory]
     [InlineData("models", "methods", "methods")]
     [InlineData("models", "sql", "models")]
+    [InlineData("methods", "repository", "repository")]
     public void Plan_TwoClaimsWithTwoOutputs_NameTheGreaterInAMessage(string first, string second, string named)
     {
         var farther = _folder.WriteFile("sqlsource.json", $$"""{"dialect": "ansi", "output": "{{first}}"}""");

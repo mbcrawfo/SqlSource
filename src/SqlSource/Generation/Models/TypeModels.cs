@@ -48,8 +48,8 @@ internal static class TypeModels
 
             var settings = usable.Settings;
             if (
-                settings.Output is not (OutputKind.Models or OutputKind.Methods)
-                || (settings.Output != OutputKind.Methods && query.WithoutLibraryFailure is not null)
+                (settings.Output != OutputKind.Models && !settings.Output.HasMethod())
+                || (!settings.Output.HasMethod() && query.WithoutLibraryFailure is not null)
             )
             {
                 continue;
@@ -192,7 +192,7 @@ internal static class TypeModels
 
         var parameter = isInput ? GeneratorParameters.SortInput : GeneratorParameters.SortOutput;
         var isSorted = (settings.Parameters & parameter) != 0;
-        if (settings.Output != OutputKind.Methods)
+        if (!settings.Output.HasMethod())
         {
             properties = ForOtherOutputs(properties);
         }

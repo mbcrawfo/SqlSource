@@ -99,6 +99,37 @@ public sealed class PlacementDiagnosticsTests
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
     }
 
+    [Theory]
+    [InlineData("extension-class")]
+    [InlineData("nested-class")]
+    public void Run_NonClassMarkerOnARepositoryQuery_ReportsSqlsrc122AtTheMarker(string location)
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Repository,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile(GeneratorHarness.UsersPath, $"-- name: GetUser\n-- member-location: {location}\nSELECT 1;\n"),
+            Kept
+        );
+
+        // The query has no entry either, which is SQLSRC241, so only the diagnostic under test is picked out.
+        run.Diagnostics.Where(IsSqlsrc122)
+            .ShouldHaveSingleItem()
+            .ShouldContain("because its output is repository and only a query method extends the connection.");
+    }
+
+    [Fact]
+    public void Run_ClassMarkerOnARepositoryQuery_ReportsNothing()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Repository,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- member-location: class\nSELECT 1;\n"),
+            Kept
+        );
+
+        run.Diagnostics.Where(IsSqlsrc122).ShouldBeEmpty();
+    }
+
     // A query's own marker is where the error is, and the type keeps the members of its other file.
     [Fact]
     public void Run_ExtensionClassMarkerOnASqlQuery_ReportsSqlsrc122AtTheMarker()
@@ -816,6 +847,8 @@ public sealed class PlacementDiagnosticsTests
             + "its models are internal, which a method reachable from another assembly cannot take or return.  Write "
             + "-- visibility: or -- member-location: on the query.";
     }
+
+    private static bool IsSqlsrc122(string diagnostic) => diagnostic.StartsWith("SQLSRC122", StringComparison.Ordinal);
 
     // SQLSRC122 at a query at sql, set by the place.
     private static string Sqlsrc122(string span, string query, string place) =>

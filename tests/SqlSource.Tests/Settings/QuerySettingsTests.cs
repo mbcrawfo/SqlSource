@@ -194,6 +194,7 @@ public sealed class QuerySettingsTests
     [InlineData("Sql", "NestedClass")]
     [InlineData("Models", "NestedClass")]
     [InlineData("Methods", "ExtensionClass")]
+    [InlineData("Repository", "Class")]
     public void MemberLocation_NoLevelWritesOne_IsTheDefaultOfTheOutput(string output, string expected)
     {
         var level = new SettingsLevel { Output = Enum.Parse<OutputKind>(output) };

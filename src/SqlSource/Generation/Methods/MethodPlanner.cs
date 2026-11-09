@@ -160,7 +160,13 @@ internal static class MethodPlanner
         var served = new ServedConverters(input.Converters);
         foreach (var usable in queries)
         {
-            if (usable.Settings.Output != OutputKind.Methods)
+            if (!usable.Settings.Output.HasMethod())
+            {
+                continue;
+            }
+
+            // A repository query gets no method yet, and reports nothing here.
+            if (usable.Settings.Output == OutputKind.Repository)
             {
                 continue;
             }
@@ -194,7 +200,7 @@ internal static class MethodPlanner
         var names = new HashSet<(string? NestedClass, string Name)>();
         foreach (var usable in queries)
         {
-            if (usable.Settings.Output != OutputKind.Methods)
+            if (!usable.Settings.Output.HasMethod())
             {
                 _ = names.Add((usable.Placement.NestedClass, usable.Query.Name));
             }
