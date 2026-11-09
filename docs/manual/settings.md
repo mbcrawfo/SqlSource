@@ -22,7 +22,7 @@ SELECT id, name FROM users;
 
 ```csharp
 [SqlSourceGenerate(Source = "Reports")]
-internal static partial class Reports;
+internal partial class Reports(NpgsqlDataSource dataSource);
 ```
 
 The first block writes settings as markers in a `.sql` file, the second in a [settings file](#settings-files), `sqlsource.json`, which applies to the `.sql` files of its folder and of every folder below it, the third as a property of the attribute.  Which of the three a setting accepts is in [the tables](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
