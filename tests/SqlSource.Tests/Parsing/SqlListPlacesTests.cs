@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
@@ -9,8 +8,6 @@ namespace SqlSource.Tests.Parsing;
 
 public sealed class SqlListPlacesTests
 {
-    private const int Iterations = 20;
-
     // Each query, and the place of each of its uses, by name.
     public static TheoryData<string, string[]> Queries =>
         new()
@@ -470,7 +467,7 @@ public sealed class SqlListPlacesTests
 
     // The reading of places keeps its depths and the place of each use in arrays rented from the pool, so it adds
     // the result's array alone to what Find allocates without it: here 22 depths, more than the 16 slots of the first
-    // array the pool gives.
+    // array the pool gives.  PooledAllocations says why a measure is the least of a few.
     [Fact]
     public void Find_WithPlaces_AllocatesThePlacesAlone()
     {
@@ -483,10 +480,10 @@ public sealed class SqlListPlacesTests
         var rules = SqlDialectRules.SqlServer;
         var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
 
-        var without = Allocated(() => SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules));
-        var with = Allocated(() => SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out _));
+        var without = PooledAllocations.Of(() => SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules));
+        var with = PooledAllocations.Of(() => SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out _));
 
-        (with - without).ShouldBe(Allocated(static () => new SqlListPlace[3]));
+        (with - without).ShouldBe(PooledAllocations.Of(static () => new SqlListPlace[3]));
     }
 
     private static ImmutableArray<SqlListPlace> PlacesOf(string sql)
@@ -496,22 +493,5 @@ public sealed class SqlListPlacesTests
 
         _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules, out var places);
         return places;
-    }
-
-    // What a call allocates, once the first calls have paid for one-off work and filled the pool.
-    private static long Allocated<T>(Func<T> call)
-    {
-        for (var iteration = 0; iteration < Iterations; iteration++)
-        {
-            _ = call();
-        }
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var iteration = 0; iteration < Iterations; iteration++)
-        {
-            _ = call();
-        }
-
-        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 }

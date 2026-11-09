@@ -248,6 +248,7 @@ public sealed class SqlListUsesTests
     // The reading of conditions keeps its frames and where each use waits in arrays rented from the pool, so Find
     // allocates its result alone: once the pool holds them, a flat query and one of 21 frames, more than the 16 slots
     // of the first array, allocate what three uses do.  No parenthesis, whose depth the reading of NOT keeps in a list.
+    // PooledAllocations says why a measure is the least of a few.
     [Fact]
     public void Find_QueryWithLists_AllocatesItsUsesAlone()
     {
@@ -261,38 +262,22 @@ public sealed class SqlListUsesTests
             + string.Concat(Enumerable.Repeat(" END", 10))
             + " FROM t WHERE b IN @b IS FALSE AND c IN @b";
         var rules = SqlDialectRules.PostgreSql;
-        var uses = UsesAllocated(3);
+        var uses = PooledAllocations.Of(static () => Build(3));
 
         Allocated(Flat, rules).ShouldBe(uses);
         Allocated(nested, rules).ShouldBe(uses);
     }
 
-    // What building a result of that many uses allocates, as Find builds one.
-    private static long UsesAllocated(int count)
+    // A result of that many uses, as Find builds one.
+    private static ImmutableArray<SqlParameterUse> Build(int count)
     {
-        for (var iteration = 0; iteration < Iterations; iteration++)
+        var builder = ImmutableArray.CreateBuilder<SqlParameterUse>(count);
+        for (var index = 0; index < count; index++)
         {
-            _ = Build(count);
+            builder.Add(SqlParameterUse.List);
         }
 
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var iteration = 0; iteration < Iterations; iteration++)
-        {
-            _ = Build(count);
-        }
-
-        return GC.GetAllocatedBytesForCurrentThread() - before;
-
-        static ImmutableArray<SqlParameterUse> Build(int count)
-        {
-            var builder = ImmutableArray.CreateBuilder<SqlParameterUse>(count);
-            for (var index = 0; index < count; index++)
-            {
-                builder.Add(SqlParameterUse.List);
-            }
-
-            return builder.MoveToImmutable();
-        }
+        return builder.MoveToImmutable();
     }
 
     [Theory]
@@ -317,18 +302,6 @@ public sealed class SqlListUsesTests
     {
         var lexemes = SqlLexer.Lex(sql, rules).Lexemes;
 
-        // The first calls pay for one-off work, and fill the pool.
-        for (var iteration = 0; iteration < Iterations; iteration++)
-        {
-            _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules);
-        }
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var iteration = 0; iteration < Iterations; iteration++)
-        {
-            _ = SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules);
-        }
-
-        return GC.GetAllocatedBytesForCurrentThread() - before;
+        return PooledAllocations.Of(() => SqlListUses.Find(sql, lexemes, 0, lexemes.Count, rules));
     }
 }
