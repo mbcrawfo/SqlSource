@@ -506,6 +506,62 @@ public sealed class MethodCompileTests
         run.Sources["App.RecordFactories-Methods.g.cs"].ShouldContain("= self.OpenSqlServer(cancellationToken) ?? ");
     }
 
+    // A repository of a type that the interface's declaration and the base list of the type's part must repeat: a
+    // generic type with a constraint, which the interface leaves out, a type nested in a generic class, whose
+    // interface is its sibling, internal as the type is, and a struct, a record and a record struct.
+    [Theory]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial class Repo<T>\n        where T : class\n"
+            + "    {\n{0}    }",
+        "partial class Repo<T> : global::App.IRepo<T>\n",
+        "    public partial interface IRepo<T>\n"
+    )]
+    [InlineData(
+        "public partial class Outer<U>\n    {\n        [SqlSourceGenerate(Source = \".\")]\n"
+            + "        internal partial class Repo\n        {\n{0}        }\n    }",
+        "partial class Repo : global::App.Outer<U>.IRepo\n",
+        "        internal partial interface IRepo\n"
+    )]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial struct Repo\n    {\n{0}    }",
+        "partial struct Repo : global::App.IRepo\n",
+        "    public partial interface IRepo\n"
+    )]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial record Repo\n    {\n{0}    }",
+        "partial record Repo : global::App.IRepo\n",
+        "    public partial interface IRepo\n"
+    )]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial record struct Repo\n    {\n{0}    }",
+        "partial record struct Repo : global::App.IRepo\n",
+        "    public partial interface IRepo\n"
+    )]
+    public void Run_RepositoryOnAwkwardTypes_Compiles(string declaration, string implements, string contract)
+    {
+        const string Members = """
+                    [SqlSourceConnection(Database = "postgres")]
+                    private static string Postgres() => "";
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private static string SqlServer() => "";
+
+            """;
+        var source =
+            "using SqlSource;\n\nnamespace App\n{\n    "
+            + declaration.Replace("{0}", Members, StringComparison.Ordinal)
+            + "\n}\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources.Single(pair => pair.Key.EndsWith("-Methods.g.cs", StringComparison.Ordinal)).Value;
+        methods.ShouldContain(implements);
+        methods.ShouldContain(contract);
+        methods.ShouldContain(" FindUser(\n");
+        methods.ShouldContain(" StreamDocuments(\n");
+    }
+
     // The repositories of the source, at Repository, claiming a postgres file and an mssql file of a query that reads
     // one row, one of many and one that streams, with both drivers referenced.
     private static GeneratorRun RunRepositories(string source)

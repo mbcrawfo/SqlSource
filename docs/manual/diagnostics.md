@@ -876,7 +876,7 @@ The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of
 
 **Repository interface name is taken**
 
-A type that claims a query whose output is `repository` gets an interface of its public repository methods, named `I` and the type's name unless `InterfaceName` names it, in the type's namespace.  Something there already has that name: a type of the project, other than an interface whose every declaration is `partial`, a type of a referenced assembly, or, for a nested type, a member of the type it is nested in.
+A type that claims a query whose output is `repository` gets an interface of its public repository methods, named `I` and the type's name unless `InterfaceName` names it, beside the type: in its namespace, or in the type it is nested in.  Something there already has that name: a type of the project, other than an interface whose every declaration is `partial`, a type of a referenced assembly, or, for a nested type, a member of the type it is nested in.
 
 ```csharp
 public class IUserRepository { }

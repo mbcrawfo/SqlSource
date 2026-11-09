@@ -38,6 +38,21 @@ internal static class QueryMethodWriter
         Append(builder, indent, method, ExecutionCapabilityRules.Of(method));
 
     /// <summary>
+    /// Appends the method's member of its type's repository interface: the documentation comment and the signature
+    /// that <see cref="Append(StringBuilder, string, QueryMethod)" /> writes, the default of the cancellation token
+    /// too, without modifiers, and a semicolon in place of the body.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts each line of the member.</param>
+    /// <param name="method">A repository's public method on its type.</param>
+    public static void AppendInterfaceMember(StringBuilder builder, string indent, QueryMethod method)
+    {
+        var context = ContextOf(builder, method, ExecutionCapabilityRules.Of(method));
+        HeaderWriter.AppendDocumentation(in context, indent);
+        HeaderWriter.AppendInterfaceSignature(in context, indent);
+    }
+
+    /// <summary>
     /// Appends the documentation comment and the method with the capabilities given, which the tests choose to write
     /// a combination of flags that no engine has yet.
     /// </summary>
@@ -48,28 +63,8 @@ internal static class QueryMethodWriter
         ExecutionCapabilities capabilities
     )
     {
-        var tokens = MethodWriter.GetTokens(method.Segments);
-        var arguments = MethodArguments.Of(method, tokens);
-        var streams = method.Streams;
-        var locals = new QueryMethodLocals(
-            arguments,
-            method.Input,
-            method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
-            streams,
-            capabilities,
-            method.Source
-        );
-        var context = new QueryMethodContext(
-            builder,
-            method,
-            method.Host,
-            tokens,
-            MethodArguments.SpellTokens(tokens),
-            arguments,
-            locals,
-            capabilities,
-            streams
-        );
+        var context = ContextOf(builder, method, capabilities);
+        var streams = context.Streams;
         var bodyIndent = GeneratedText.Deeper(indent);
         var blockIndent = GeneratedText.Deeper(bodyIndent);
 
@@ -100,4 +95,35 @@ internal static class QueryMethodWriter
         _ = builder.Append(indent).Append("if (").Append(condition).Append(")\n").Append(indent).Append("{\n");
 
     internal static void AppendEnd(StringBuilder builder, string indent) => _ = builder.Append(indent).Append("}\n");
+
+    // What every part of the method is written from, built once for it.
+    private static QueryMethodContext ContextOf(
+        StringBuilder builder,
+        QueryMethod method,
+        ExecutionCapabilities capabilities
+    )
+    {
+        var tokens = MethodWriter.GetTokens(method.Segments);
+        var arguments = MethodArguments.Of(method, tokens);
+        var streams = method.Streams;
+        var locals = new QueryMethodLocals(
+            arguments,
+            method.Input,
+            method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
+            streams,
+            capabilities,
+            method.Source
+        );
+        return new QueryMethodContext(
+            builder,
+            method,
+            method.Host,
+            tokens,
+            MethodArguments.SpellTokens(tokens),
+            arguments,
+            locals,
+            capabilities,
+            streams
+        );
+    }
 }

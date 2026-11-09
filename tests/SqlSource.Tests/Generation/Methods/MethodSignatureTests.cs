@@ -48,6 +48,8 @@ public sealed class MethodSignatureTests
             TestSidecars.Of(new TypeDeclaration("class", "Sample", "Sample", string.Empty, 0)),
             "SampleExtensions",
             true,
+            null,
+            false,
             EquatableArray<NestedClassPlacement>.Empty,
             false,
             TestModels.NameLocation("Sample.cs"),

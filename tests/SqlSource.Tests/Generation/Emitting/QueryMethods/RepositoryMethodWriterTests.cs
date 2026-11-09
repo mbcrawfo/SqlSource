@@ -20,7 +20,7 @@ public sealed class RepositoryMethodWriterTests
 {
     // GetUser as a repository's method on the type, without its token, whose connection is the data source in the field
     // _dataSource.
-    private static readonly QueryMethod Repository = QueryMethodWriterTests.GetUser with
+    internal static readonly QueryMethod Repository = QueryMethodWriterTests.GetUser with
     {
         Segments = TestSidecars.Of(TestModels.Literal("SELECT id, name FROM users WHERE id = @id")),
         Host = new MethodHost(Visibility.Public, MemberLocation.Class, null),
@@ -457,6 +457,67 @@ public sealed class RepositoryMethodWriterTests
         + "}\n";
 
     // The method on the host it has, as a repository's method is planned.
+    // A member of the repository's interface repeats the method's documentation and signature, the default of the
+    // cancellation token too, without modifiers or a body.
+    [Fact]
+    public void AppendInterfaceMember_Repository_IsTheDocumentationAndTheSignature()
+    {
+        var builder = new StringBuilder();
+
+        QueryMethodWriter.AppendInterfaceMember(builder, string.Empty, Repository);
+
+        builder
+            .ToString()
+            .ShouldBe(
+                GeneratedFile.Joined(
+                    """
+                    /// <summary>
+                    /// The <c>GetUser</c> query from <c>Users.sql</c>.
+                    /// </summary>
+                    /// <remarks>
+                    /// <code>
+                    /// SELECT id, name FROM users WHERE id = @id
+                    /// </code>
+                    /// </remarks>
+                    /// <param name="parameters">The query's parameters.</param>
+                    /// <param name="cancellationToken">Cancels the query.</param>
+                    /// <returns>The row, or null when there is none.</returns>
+                    /// <exception cref="T:SqlSource.UnexpectedRowCountException">↩
+                    The query returned more than one row.</exception>
+                    global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(
+                        global::App.GetUserParams parameters,
+                        global::System.Threading.CancellationToken cancellationToken = default);
+
+                    """
+                )
+            );
+    }
+
+    // A streaming method returns its rows, not a task of them.
+    [Fact]
+    public void AppendInterfaceMember_RepositoryStream_ReturnsTheRows()
+    {
+        var builder = new StringBuilder();
+
+        QueryMethodWriter.AppendInterfaceMember(
+            builder,
+            "    ",
+            Repository with
+            {
+                Shape = ResultShape.Many,
+                Collection = CollectionKind.IAsyncEnumerable,
+            }
+        );
+
+        builder
+            .ToString()
+            .ShouldEndWith(
+                "    global::System.Collections.Generic.IAsyncEnumerable<global::App.GetUserDto> GetUser(\n"
+                    + "        global::App.GetUserParams parameters,\n"
+                    + "        global::System.Threading.CancellationToken cancellationToken = default);\n"
+            );
+    }
+
     private static string WriteAsPlanned(QueryMethod method)
     {
         var builder = new StringBuilder();

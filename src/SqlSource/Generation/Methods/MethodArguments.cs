@@ -51,6 +51,11 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
     // The attribute that marks the iterator's token as the one WithCancellation gives.
     private const string EnumeratorCancellation = "[global::System.Runtime.CompilerServices.EnumeratorCancellation] ";
 
+    // What follows the last argument: a method's body, or the end of a member of an interface.
+    private const string MethodEnd = ")\n";
+
+    private const string InterfaceMemberEnd = ");\n";
+
     // The names of the arguments that every method can have, which no token may take, with an input or without.
     private static readonly string[] ReservedNames =
     [
@@ -164,7 +169,16 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
     /// Where the method goes, which writes <c>this</c> before the connection of an extension.
     /// </param>
     public void AppendDeclaration(StringBuilder builder, string indent, MethodHost host) =>
-        Append(builder, indent, host.IsExtension, isIterator: false);
+        Append(builder, indent, host.IsExtension, isIterator: false, MethodEnd);
+
+    /// <summary>
+    /// Appends the arguments of a member of a repository's interface as <see cref="AppendDeclaration" /> does for its
+    /// method, the defaults included, then the <c>);</c> that ends the member.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts the member's line.</param>
+    public void AppendInterfaceDeclaration(StringBuilder builder, string indent) =>
+        Append(builder, indent, isExtension: false, isIterator: false, InterfaceMemberEnd);
 
     /// <summary>
     /// Appends the arguments of a streaming method's iterator as <see cref="AppendDeclaration" /> does, without
@@ -173,7 +187,7 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
     /// <param name="builder">The source being built.</param>
     /// <param name="indent">The whitespace that starts the iterator's line.</param>
     public void AppendIteratorDeclaration(StringBuilder builder, string indent) =>
-        Append(builder, indent, isExtension: false, isIterator: true);
+        Append(builder, indent, isExtension: false, isIterator: true, MethodEnd);
 
     /// <summary>Appends the arguments of the call to the iterator: each name, in order, joined by <c>, </c>.</summary>
     public void AppendCall(StringBuilder builder)
@@ -191,7 +205,7 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
         }
     }
 
-    private void Append(StringBuilder builder, string indent, bool isExtension, bool isIterator)
+    private void Append(StringBuilder builder, string indent, bool isExtension, bool isIterator, string end)
     {
         foreach (var argument in this)
         {
@@ -213,7 +227,7 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
                 _ = builder.Append(" = ").Append(defaultText);
             }
 
-            _ = builder.Append(argument.Role == ArgumentRole.Cancellation ? ")\n" : ",\n");
+            _ = builder.Append(argument.Role == ArgumentRole.Cancellation ? end : ",\n");
         }
     }
 

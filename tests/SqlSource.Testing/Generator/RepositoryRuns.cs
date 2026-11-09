@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using SqlSource.Snapshot;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -26,14 +27,15 @@ internal static class RepositoryRuns
 
     // The source and the file with its sidecar of these entries, at Repository under postgres, on Npgsql 10 unless the
     // references are given.  The output and the dialect are the project's settings file, with the entries of settings,
-    // a JSON object, over them.
+    // a JSON object, over them.  The properties are what MSBuild tells the generator.
     public static GeneratorRun Run(
         SqlFile file,
         SidecarEntry[] entries,
         string source = Source,
         MetadataReference[]? references = null,
         string dialect = "postgres",
-        string? settings = null
+        string? settings = null,
+        IReadOnlyDictionary<string, string?>? properties = null
     ) =>
         GeneratorHarness.Run(
             OutputKind.Repository,
@@ -41,6 +43,7 @@ internal static class RepositoryRuns
             [file, Sidecars.Of(file, entries)],
             references: references ?? [NpgsqlReferences.Npgsql10],
             dialect: dialect,
+            properties: properties,
             settings: settings
         );
 }

@@ -71,7 +71,7 @@ namespace App
 
 namespace App
 {
-    partial class Sample
+    partial class Sample : global::App.ISample
     {
         /// <summary>
         /// The <c>FindUser</c> query from <c>Users.sql</c>.
@@ -275,6 +275,56 @@ namespace App
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// The public repository methods of <c>App.Sample</c>, which it implements.
+    /// </summary>
+    public partial interface ISample
+    {
+        /// <summary>
+        /// The <c>FindUser</c> query from <c>Users.sql</c>.
+        /// </summary>
+        /// <remarks>
+        /// <code>
+        /// SELECT id, name FROM users WHERE id = @id;
+        /// </code>
+        /// </remarks>
+        /// <param name="parameters">The query's parameters.</param>
+        /// <param name="cancellationToken">Cancels the query.</param>
+        /// <returns>The row, or null when there is none.</returns>
+        /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
+        global::System.Threading.Tasks.Task<global::App.FindUserDto?> FindUser(
+            global::App.FindUserParams parameters,
+            global::System.Threading.CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The <c>ListUsers</c> query from <c>Users.sql</c>.
+        /// </summary>
+        /// <remarks>
+        /// <code>
+        /// SELECT id, name FROM users WHERE id &gt; @id;
+        /// </code>
+        /// </remarks>
+        /// <param name="parameters">The query's parameters.</param>
+        /// <param name="cancellationToken">Cancels the query.</param>
+        /// <returns>The rows the query returned.</returns>
+        global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ListUsers(
+            global::App.ListUsersParams parameters,
+            global::System.Threading.CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The <c>StreamUsers</c> query from <c>Users.sql</c>.
+        /// </summary>
+        /// <remarks>
+        /// <code>
+        /// SELECT id, name FROM users;
+        /// </code>
+        /// </remarks>
+        /// <param name="cancellationToken">Cancels the query.</param>
+        /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
+        global::System.Collections.Generic.IAsyncEnumerable<global::App.StreamUsersDto> StreamUsers(
+            global::System.Threading.CancellationToken cancellationToken = default);
     }
 }
 

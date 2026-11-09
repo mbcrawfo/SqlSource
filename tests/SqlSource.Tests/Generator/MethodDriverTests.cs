@@ -77,7 +77,11 @@ public sealed class MethodDriverTests
 
         run.Problems().ShouldBe([PostgresNotReferenced]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
-        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+
+        // The file holds the type's interface alone, empty, which names no type of the driver.
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("    public partial interface ISample\n    {\n    }\n");
+        run.Sources[MethodRuns.MethodsFile].ShouldNotContain(" async ");
+        run.Sources[MethodRuns.MethodsFile].ShouldNotContain("Npgsql");
     }
 
     // A dialect the describer does not know has no entry and no method, so it needs no driver: SQLSRC209 alone.

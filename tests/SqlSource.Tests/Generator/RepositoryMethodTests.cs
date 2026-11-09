@@ -27,7 +27,7 @@ public sealed class RepositoryMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodsFile];
-        methods.ShouldContain("    partial class Sample\n    {\n");
+        methods.ShouldContain("    partial class Sample : global::App.ISample\n    {\n");
         methods.ShouldContain(
             "        public async global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(\n"
                 + "            global::App.GetUserParams parameters,\n"
@@ -108,7 +108,10 @@ public sealed class RepositoryMethodTests
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,17): The method of the query 'GetUser' cannot be named "
                     + "'GetUser', because 'App.Sample' has a member of that name.  Rename the query.",
             ]);
-        run.Sources.Keys.ShouldNotContain(MethodsFile);
+
+        // The file holds the type's interface alone, empty.
+        run.Sources[MethodsFile].ShouldContain("    public partial interface ISample\n    {\n    }\n");
+        run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
     // A method of the source's name would hide the member of a base type, or the primary constructor's parameter,
@@ -153,7 +156,10 @@ public sealed class RepositoryMethodTests
                     + "'GetUser', because the repository methods of 'App.Sample' get their connection from "
                     + "'GetUser'.  Rename the query.",
             ]);
-        run.Sources.Keys.ShouldNotContain(MethodsFile);
+
+        // The file holds the type's interface alone, empty.
+        run.Sources[MethodsFile].ShouldContain("    public partial interface ISample\n    {\n    }\n");
+        run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
     // The visibility is the query's, and the method stays an instance method.
@@ -233,7 +239,10 @@ public sealed class RepositoryMethodTests
                     + reason
                     + ".  Rename the token.",
             ]);
-        run.Sources.Keys.ShouldNotContain(MethodsFile);
+
+        // The file holds the type's interface alone, empty.
+        run.Sources[MethodsFile].ShouldContain("    public partial interface ISample\n    {\n    }\n");
+        run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
     // A token named like a generic type hides nothing: a name with type arguments is never a local's.

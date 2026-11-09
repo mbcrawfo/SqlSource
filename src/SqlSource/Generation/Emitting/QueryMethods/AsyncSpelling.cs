@@ -55,9 +55,16 @@ internal static class AsyncSpelling
     /// <summary>
     /// Appends <c> async Task</c>, or <c> async Task&lt;resultType&gt;</c> when the method returns a result.
     /// </summary>
-    public static StringBuilder AppendTaskType(StringBuilder builder, string? resultType)
+    public static StringBuilder AppendTaskType(StringBuilder builder, string? resultType) =>
+        AppendTask(builder.Append(" async "), resultType);
+
+    /// <summary>
+    /// Appends <c>Task</c>, or <c>Task&lt;resultType&gt;</c> when the method returns a result, without <c>async</c>:
+    /// the type that a member of a repository's interface returns.
+    /// </summary>
+    public static StringBuilder AppendTask(StringBuilder builder, string? resultType)
     {
-        _ = builder.Append(" async global::System.Threading.Tasks.Task");
+        _ = builder.Append("global::System.Threading.Tasks.Task");
         return resultType is null ? builder : builder.Append('<').Append(resultType).Append('>');
     }
 }

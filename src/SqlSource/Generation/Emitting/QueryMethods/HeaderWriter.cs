@@ -6,7 +6,8 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// <summary>
 /// Writes the start of a query's method, the first of <see cref="QueryMethodWriter" />'s phases: its documentation
 /// comment, its signature, the checks of its arguments and, for a method that streams, the return of its iterator's
-/// call and the iterator's signature.  <see cref="CommandWriter" /> writes what follows.
+/// call and the iterator's signature.  <see cref="CommandWriter" /> writes what follows.  It also writes the method's
+/// member of a repository's interface, its documentation comment and its signature alone.
 /// </summary>
 internal static class HeaderWriter
 {
@@ -81,6 +82,25 @@ internal static class HeaderWriter
 
         _ = builder.Append(context.Method.Name).Append("(\n");
         context.Arguments.AppendDeclaration(builder, indent, context.Host);
+    }
+
+    // The signature of the method as a member of the repository's interface repeats it: no modifiers, the type it
+    // returns, its name and its arguments with their defaults, then the semicolon that ends the member.
+    internal static void AppendInterfaceSignature(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        _ = builder.Append(indent);
+        if (context.Streams)
+        {
+            _ = builder.Append(RowsWriter.GetResultType(in context)).Append(' ');
+        }
+        else
+        {
+            _ = AsyncSpelling.AppendTask(builder, RowsWriter.GetResultType(in context)).Append(' ');
+        }
+
+        _ = builder.Append(context.Method.Name).Append("(\n");
+        context.Arguments.AppendInterfaceDeclaration(builder, indent);
     }
 
     // The method's accessibility, then static unless it is a repository's instance method.

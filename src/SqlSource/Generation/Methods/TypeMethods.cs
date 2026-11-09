@@ -22,6 +22,15 @@ namespace SqlSource.Generation.Methods;
 /// Whether one of the methods in the extension class is public, which makes the class public: it takes the widest
 /// accessibility of its methods.
 /// </param>
+/// <param name="InterfaceName">
+/// The name of the repository's interface, which the type's part implements, as a value: null when the type gets none,
+/// since it claims no query whose output is <c>Repository</c>, its interface is off, it is static, or the name is
+/// taken.
+/// </param>
+/// <param name="InterfaceIsPublic">
+/// Whether the interface is public, as the type is when it and every type it is nested in are; it is internal
+/// otherwise.
+/// </param>
 /// <param name="NestedClasses">
 /// The classes nested in the type that hold methods, in the order of the type's placement, each with the accessibility
 /// that the type's file gives it too.
@@ -64,6 +73,8 @@ internal sealed record TypeMethods(
     EquatableArray<TypeDeclaration> Types,
     string ExtensionClass,
     bool ExtensionClassIsPublic,
+    string? InterfaceName,
+    bool InterfaceIsPublic,
     EquatableArray<NestedClassPlacement> NestedClasses,
     bool DisablesProtectedWarning,
     LocationInfo AttributeLocation,

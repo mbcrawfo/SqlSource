@@ -42,7 +42,10 @@ public sealed class RepositoryDiagnosticsTests
                     + "mark the member that gives the connection [SqlSourceConnection].  Or set the output of its "
                     + "repository queries to methods.",
             ]);
-        run.Sources.Keys.ShouldNotContain(MethodsFile);
+
+        // The file holds the type's interface alone, empty.
+        run.Sources[MethodsFile].ShouldContain("    public partial interface ISample\n    {\n    }\n");
+        run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
     [Fact]
@@ -66,6 +69,8 @@ public sealed class RepositoryDiagnosticsTests
                     + "query is an instance method.  Set the output of its repository queries to methods, or remove "
                     + "static.",
             ]);
+
+        // A static class cannot implement the interface, so it gets none, and no file.
         run.Sources.Keys.ShouldNotContain(MethodsFile);
     }
 
@@ -93,7 +98,10 @@ public sealed class RepositoryDiagnosticsTests
                     + "repository methods have an argument named 'cancellationToken', which hides it.  Rename the "
                     + "parameter, or store it in a field or property and give the connection from that.",
             ]);
-        run.Sources.Keys.ShouldNotContain(MethodsFile);
+
+        // The file holds the type's interface alone, empty.
+        run.Sources[MethodsFile].ShouldContain("    public partial interface ISample\n    {\n    }\n");
+        run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
     // The members come before the primary constructor's parameters, so the parameter that the type stores in a field

@@ -48,7 +48,8 @@ public sealed class CachingRepositoryTests
         }
         """;
 
-    // The repository's query gets its method once the base's member gives it a connection.
+    // The repository's query gets its method once the base's member gives it a connection.  Before, its file holds
+    // the interface alone.
     [Fact]
     public void Run_BaseMemberMarkedLater_ResolvesTheDerivedRepository()
     {
@@ -66,7 +67,9 @@ public sealed class CachingRepositoryTests
         driver
             .GetRunResult()
             .Results.ShouldHaveSingleItem()
-            .GeneratedSources.ShouldNotContain(source => source.HintName == RepositoryMethods);
+            .GeneratedSources.ShouldContain(source =>
+                source.HintName == RepositoryMethods && !source.SourceText.ToString().Contains(" async ")
+            );
 
         var marked = Base.Replace(
             "protected string Name",

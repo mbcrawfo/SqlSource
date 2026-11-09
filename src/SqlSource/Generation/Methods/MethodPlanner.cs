@@ -29,7 +29,7 @@ namespace SqlSource.Generation.Methods;
 /// <c>SQLSRC282</c> from the libraries that the type's queries use.  A type with a query whose output is
 /// <see cref="OutputKind.Repository" /> gets the problems of its connection, <c>SQLSRC028</c> to <c>SQLSRC034</c>, from
 /// <see cref="ConnectionResolver" />, and such a query gets an instance method on the type only when its database has a
-/// connection.
+/// connection.  Such a type gets its interface unless it is off, or <c>SQLSRC035</c> reports that its name is taken.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -58,8 +58,10 @@ internal static class MethodPlanner
         SortedSet<SqlLibrary>? conversionLibraries = null;
         HashSet<LibraryUse>? usedLibraries = null;
         IReadOnlyList<NestedClassPlacement> nestedClasses = [];
+        string? interfaceName = null;
         if (typeQueries.Type.Diagnostics.Count == 0 && typeQueries.Files.Count > 0)
         {
+            interfaceName = InterfaceNameOf(input, diagnostics);
             engines = Collect(
                 input,
                 key,
@@ -82,6 +84,8 @@ internal static class MethodPlanner
             type.Types,
             type.Name + ExtensionsSuffix,
             extensionClassIsPublic,
+            interfaceName,
+            interfaceName is not null && type.IsPublic,
             usedClasses,
             type.IsSealed && hasProtected,
             type.AttributeLocation,
@@ -114,6 +118,34 @@ internal static class MethodPlanner
                 .Distinct()
                 .ToImmutableArray()
         );
+
+    // The name of the type's repository interface: none for a type that claims no repository query, whose interface
+    // is off, or that is static, which cannot implement one and has its own problem, and none, with SQLSRC035 at the
+    // attribute, when something takes the name.  A type whose every repository method fails still gets it.
+    private static string? InterfaceNameOf(MethodsInput input, ImmutableArray<DiagnosticInfo>.Builder diagnostics)
+    {
+        var type = input.Type.Type.Type;
+        if (input.Repository is not { InterfaceOn: true } shape || type.IsStatic)
+        {
+            return null;
+        }
+
+        if (shape.InterfaceTakenBy is { } takenBy)
+        {
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.RepositoryInterfaceNameTaken,
+                    type.AttributeLocation,
+                    PlacementChecks.NameOf(type),
+                    shape.InterfaceName,
+                    takenBy
+                )
+            );
+            return null;
+        }
+
+        return shape.InterfaceName;
+    }
 
     // What the planned methods' hosts give their file: whether the extension class is public, as its widest method is,
     // the nested classes that hold a method, in the placement's order, and whether a method on the type or such a
