@@ -157,6 +157,6 @@ public sealed class PostgresFieldRulesTests
         """{"name":"pg_catalog"}""",
         false
     )]
-    public void IsEngineRow_BySchema(string row, bool expected) =>
+    public void IsEngineRow_RowOfASchema_IsTrueForTheEnginesSchemasAlone(string row, bool expected) =>
         PostgresFieldRules.IsEngineRow(JsonNode.Parse(row)!.AsObject()).ShouldBe(expected);
 }

@@ -12,7 +12,7 @@ namespace SqlSource.Tests.EndToEnd;
 public sealed class EndToEndTests
 {
     [Fact]
-    public void NestedLocation_SourceDot_HasAConstantForEachQueryOfEachFile()
+    public void UserQueries_NestedLocationWithSourceDot_HasAConstantForEachQueryOfEachFile()
     {
         UserQueries.GetUserSql.ShouldBe("SELECT id, name\nFROM users\nWHERE id = @id;");
         UserQueries.ListUsersSql.ShouldBe("SELECT id, name\nFROM users\nORDER BY name;");
@@ -20,7 +20,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void DirectLocation_NoSource_TakesTheFileNamedForTheType()
+    public void GetNamed_DirectLocationWithNoSource_ComesFromTheFileNamedForTheType()
     {
         // Evaluated by the compiler: the member is a constant.
         const string Sql = Named.NamedQueries.GetNamed;
@@ -29,7 +29,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void NestedLocation_SqlClass_IsPrivateStaticAndHoldsPublicConstants()
+    public void Sql_NestedLocation_IsPrivateStaticAndHoldsPublicConstants()
     {
         var sql = typeof(UserQueries).GetNestedType("Sql", BindingFlags.NonPublic).ShouldNotBeNull();
 
@@ -42,7 +42,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void DirectLocation_PathToAFile_PutsTheConstantsOnTheType()
+    public void GetOrder_DirectLocationWithAPathToAFile_IsAConstantOfTheType()
     {
         // Evaluated by the compiler: the member is a constant.
         const string Sql = OrderQueries.GetOrder;
@@ -51,7 +51,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void DirectLocation_QueryWithTokens_IsAMethodThatReplacesEachOccurrence() =>
+    public void OrdersOf_DirectLocationAndTokens_IsAMethodThatReplacesEachOccurrence() =>
         OrderQueries
             .OrdersOf("sales", "u.name = @name")
             .ShouldBe(
@@ -61,18 +61,18 @@ public sealed class EndToEndTests
             );
 
     [Fact]
-    public void NestedLocation_QueryWithSeveralTokens_ReplacesEachOccurrence() =>
+    public void Search_NestedLocationAndSeveralTokens_ReplacesEachOccurrence() =>
         TokenQueries
             .Search("id, name", "users", "name LIKE @pattern")
             .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
 
     [Fact]
-    public void NestedLocation_QueryThatIsOnlyAToken_ReturnsTheArgument() =>
+    public void Whole_NestedLocationAndAQueryThatIsOnlyAToken_ReturnsTheArgument() =>
         TokenQueries.Whole("SELECT 1;").ShouldBe("SELECT 1;");
 
     // Eight tokens are more than one tuple holds: the eighth is read from the nested tuple's Rest.
     [Fact]
-    public void NestedLocation_QueryWithEightTokens_ReplacesEachInItsPlace() =>
+    public void Eight_NestedLocationAndEightTokens_ReplacesEachInItsPlace() =>
         TokenQueries.Eight("1", "2", "3", "4", "5", "6", "7", "8").ShouldBe("SELECT 12, 3, 4, 5, 6, 7, 8, 1;");
 
     // The sqlsource.json of this folder lists sort-input and token-validation=off as the generator parameters, and
@@ -157,11 +157,11 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void GenericType_PathToAFolder_SharesTheFileWithAnotherType() =>
+    public void Describe_GenericTypeWithAPathToAFolder_SharesTheFileWithAnotherType() =>
         new Repository<int>(7).Describe().ShouldBe(OrderQueries.GetOrder + " -- 7");
 
     [Fact]
-    public void NestedRecordStruct_PathThroughAParentFolder_HasTheConstant() =>
+    public void CountUsers_NestedRecordStructWithAPathThroughAParentFolder_IsTheQuery() =>
         Outer.Counts.CountUsers.ShouldBe("SELECT COUNT(*) FROM users;");
 
     [Theory]
