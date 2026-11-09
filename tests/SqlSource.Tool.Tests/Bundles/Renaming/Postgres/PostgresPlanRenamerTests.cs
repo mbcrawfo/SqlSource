@@ -15,11 +15,11 @@ public sealed class PostgresPlanRenamerTests
     private const string Place = "capture.json call 3 'explain' " + PlanPath;
 
     [Fact]
-    public void KeysRead_AreEveryKeyOfPlanKeys() =>
+    public void KeysRead_OfPlanRenamer_AreEveryKeyOfPlanKeys() =>
         PostgresPlanRenamer.KeysRead.ShouldBe(PlanKeys.All, ignoreOrder: true);
 
     [Fact]
-    public void Rename_DropsEveryKeyNotRead()
+    public void Rename_PlanWithUnreadKeys_DropsEveryKeyNotRead()
     {
         var plan = new JsonArray(
             new JsonObject
@@ -469,7 +469,7 @@ public sealed class PostgresPlanRenamerTests
     }
 
     [Fact]
-    public void Rename_WritesIndentedWithLineFeeds()
+    public void Rename_Plan_WritesIndentedWithLineFeeds()
     {
         var node = new JsonObject
         {
@@ -576,7 +576,7 @@ public sealed class PostgresPlanRenamerTests
     }
 
     [Fact]
-    public void Register_NamesEveryNameKeyButAChildAlias()
+    public void Register_NestedPlan_NamesEveryNameKeyButAChildAlias()
     {
         var scope = Scope();
         var node = new JsonObject
@@ -657,7 +657,7 @@ public sealed class PostgresPlanRenamerTests
     }
 
     [Fact]
-    public void WordsOf_GivesEveryNameWordAndLiteral()
+    public void WordsOf_Node_GivesEveryNameWordAndLiteral()
     {
         var node = new JsonObject
         {

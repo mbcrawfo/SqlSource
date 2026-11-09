@@ -29,7 +29,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     [InlineData("List")]
     [InlineData("HashSet")]
     [InlineData("lazy")]
-    public async Task Ids_EachKindOfCollection_FindsTheRows(string kind)
+    public async Task ListAccountsByIds_EachKindOfCollection_FindsTheRows(string kind)
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -45,7 +45,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // A sequence that is no collection is copied once, so its values are counted and sent from one enumeration.
     [Fact]
-    public async Task Ids_LazySequence_IsEnumeratedOnce()
+    public async Task ListAccountsByIds_LazySequence_IsEnumeratedOnce()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -75,7 +75,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     [InlineData(512)]
     [InlineData(513)]
     [InlineData(1025)]
-    public async Task Ids_CountsAcrossEachPaddingStep_FindTheRows(int count)
+    public async Task ListAccountsByIds_CountsAcrossEachPaddingStep_FindTheRows(int count)
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -90,7 +90,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Ids_Empty_FindsNoRows()
+    public async Task ListAccountsByIds_Empty_FindsNoRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -102,7 +102,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Except_Empty_FindsEveryRow()
+    public async Task ListAccountsExcept_Empty_FindsEveryRow()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -117,7 +117,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     // properties of the joined columns can be null, though body is NOT NULL, since a NOT IN of one value would have
     // dropped her row.
     [Fact]
-    public async Task NotesExcept_Empty_ReadsTheAccountWithoutANote()
+    public async Task ListAccountNotesExcept_Empty_ReadsTheAccountWithoutANote()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -139,7 +139,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     // A list whose truth IS FALSE tests is read as one that NOT negates: an empty list keeps carol's row, whose body
     // the join fills with NULL, and the method reads it.
     [Fact]
-    public async Task NotesNotListed_Empty_ReadsTheAccountWithoutANote()
+    public async Task ListAccountNotesNotListed_Empty_ReadsTheAccountWithoutANote()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -159,7 +159,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task NotesExcept_Ids_LeavesTheirNotesOut()
+    public async Task ListAccountNotesExcept_Ids_LeavesTheirNotesOut()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -176,7 +176,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     // A list beside its null test keeps the LEFT JOIN outer: (@accountIds IS NOT NULL OR n.id > 0) is no filter of the
     // notes when a list is given, so carol, who has none, is read with a NULL body.
     [Fact]
-    public async Task NotesOptional_AccountWithoutANote_ReadsItsNullBody()
+    public async Task ListAccountNotesOptional_AccountWithoutANote_ReadsItsNullBody()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -194,7 +194,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task NotesOptional_Null_ReadsTheNotesAlone()
+    public async Task ListAccountNotesOptional_Null_ReadsTheNotesAlone()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -209,7 +209,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Optional_Null_FindsEveryRow()
+    public async Task ListAccountsOptional_Null_FindsEveryRow()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -224,7 +224,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Optional_Empty_FindsNoRows()
+    public async Task ListAccountsOptional_Empty_FindsNoRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -239,7 +239,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Optional_Values_Filters()
+    public async Task ListAccountsOptional_Values_Filters()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -255,7 +255,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // The statuses are of the enum account_status, sent as strings.
     [Fact]
-    public async Task TwoLists_Filter()
+    public async Task ListAccountsByIdsAndStatuses_IdsAndStatuses_FindTheRowsOfBoth()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -271,7 +271,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // The first use finds bob, whose id is in the list, and the second alice, whose id plus one is.
     [Fact]
-    public async Task UsedTwice_Filters()
+    public async Task ListAccountsUsedTwice_OneList_FiltersAtEachUse()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -287,7 +287,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // Three values, which the method sends as three, at no padded size.
     [Fact]
-    public async Task NoPadding_Filters()
+    public async Task ListAccountsByIdsNoPadding_ThreeValues_FindsTheRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -304,7 +304,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     // The query has no other parameter, so the list is the whole limit.  Padded, it would pass it, so the method sends
     // it as it is.
     [Fact]
-    public async Task Ids_AtTheLimit_Runs()
+    public async Task ListAccountsByIds_AtTheLimit_Runs()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -319,7 +319,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Ids_OneOverTheLimit_ThrowsArgumentException()
+    public async Task ListAccountsByIds_OneOverTheLimit_ThrowsArgumentException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -342,7 +342,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // 65,500 values pad to 65,536, one past the limit, which Npgsql would refuse, so the method sends the 65,500.
     [Fact]
-    public async Task Ids_PaddingWouldPassTheLimit_SendsExactCounts()
+    public async Task ListAccountsByIds_PaddingWouldPassTheLimit_SendsExactCounts()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -358,7 +358,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // The two lists count together against the limit: the ids fill it but for the two statuses.
     [Fact]
-    public async Task TwoLists_AtTheLimit_Runs()
+    public async Task ListAccountsByIdsAndStatuses_TwoListsAtTheLimit_Runs()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -372,9 +372,10 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
         accounts.ShouldBe([Alice, Carol]);
     }
 
-    // One id more than TwoLists_AtTheLimit_Runs sends; the message names the list of more values.
+    // One id more than ListAccountsByIdsAndStatuses_TwoListsAtTheLimit_Runs
+    // sends; the message names the list of more values.
     [Fact]
-    public async Task TwoLists_OneOverTheLimit_ThrowsArgumentException()
+    public async Task ListAccountsByIdsAndStatuses_TwoListsOneOverTheLimit_ThrowsArgumentException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -397,7 +398,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // The null test of @ids is a parameter of its own, which counts against the limit beside the list's values.
     [Fact]
-    public async Task Optional_AtTheLimit_Runs()
+    public async Task ListAccountsOptional_AtTheLimit_Runs()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -412,7 +413,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Optional_OneOverTheLimit_ThrowsArgumentException()
+    public async Task ListAccountsOptional_OneOverTheLimit_ThrowsArgumentException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -435,7 +436,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
 
     // The streaming method counts its lists at the call, so the limit throws there, before the connection is opened.
     [Fact]
-    public async Task StreamIds_OverTheLimit_ThrowsBeforeEnumeration()
+    public async Task StreamAccountsByIds_OverTheLimit_ThrowsBeforeEnumeration()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -453,7 +454,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task StreamIds_Values_YieldsTheRows()
+    public async Task StreamAccountsByIds_Values_YieldsTheRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -469,7 +470,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     // The streaming method counts the list at the call and binds it at the first MoveNextAsync, so a value added
     // between the two is found when the values are bound.
     [Fact]
-    public async Task StreamIds_ListChangedAfterTheCall_ThrowsInvalidOperationException()
+    public async Task StreamAccountsByIds_ListChangedAfterTheCall_ThrowsInvalidOperationException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -485,7 +486,7 @@ public sealed class ListQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task StreamIds_EmptyListFilledAfterTheCall_ThrowsInvalidOperationException()
+    public async Task StreamAccountsByIds_EmptyListFilledAfterTheCall_ThrowsInvalidOperationException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);

@@ -104,7 +104,7 @@ public sealed partial class BundleRenamerTests
     }
 
     [Fact]
-    public async Task RenameAsync_MappingHoldsEachPair()
+    public async Task RenameAsync_RawBundle_MappingHoldsEachPair()
     {
         var raw = await RenamingBundles.RawAsync();
 

@@ -386,7 +386,7 @@ public sealed class SettingsLevelReaderTests
     }
 
     [Fact]
-    public void LibraryTypes_AreReadFromMembers()
+    public void Read_LibraryTypesAsMembers_AreReadIntoTheLevel()
     {
         var source = new FakeSource(
             [],
@@ -408,7 +408,7 @@ public sealed class SettingsLevelReaderTests
     }
 
     [Fact]
-    public void LibraryTypes_InvalidMemberIsReportedByIndex()
+    public void Read_LibraryTypesWithAnInvalidMember_IsReportedByIndex()
     {
         var source = new FakeSource(
             [],
@@ -425,7 +425,7 @@ public sealed class SettingsLevelReaderTests
     }
 
     [Fact]
-    public void LibraryTypes_RepeatedLibraryIsRepeatedKey()
+    public void Read_LibraryTypesWithARepeatedLibrary_IsAReportedRepeatedKey()
     {
         var source = new FakeSource(
             [],
@@ -444,7 +444,7 @@ public sealed class SettingsLevelReaderTests
     }
 
     [Fact]
-    public void LibraryTypes_ASettingWithAnEmptyObject_IsNotSet()
+    public void Read_LibraryTypesAsAnEmptyObject_IsNotSet()
     {
         var source = new FakeSource(
             [],

@@ -217,7 +217,7 @@ public sealed class BundleQueryFileTests
     }
 
     [Fact]
-    public void Of_DropsEveryOtherMarker()
+    public void Of_QueryWithGeneratorMarkers_DropsEveryOtherMarker()
     {
         using var folder = new TempFolder();
         var (file, text) = PlannedFileOf(
@@ -273,7 +273,7 @@ public sealed class BundleQueryFileTests
             + "FROM users WHERE name = @name AND extra = @extra {{where}};\r\n",
         0
     )]
-    public void Of_ReadsBackToTheSameSampleSqlAndParameters(string fileName, string sql, int index)
+    public void Of_QueryOfAPlannedFile_ReadsBackToTheSameSampleSqlAndParameters(string fileName, string sql, int index)
     {
         using var folder = new TempFolder();
         var (file, text) = PlannedFileOf(Plans.Postgres(folder), fileName, sql);

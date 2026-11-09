@@ -113,7 +113,7 @@ public sealed class NodaTimeQueryTests(AppContainer app)
     };
 
     [Fact]
-    public async Task EveryRow_RoundTrips()
+    public async Task InsertNodaValues_EveryRow_RoundTrips()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NodaTimeSource();
@@ -143,7 +143,7 @@ public sealed class NodaTimeQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Nulls_RoundTrip()
+    public async Task InsertNodaValues_Nulls_RoundTrip()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NodaTimeSource();

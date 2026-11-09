@@ -59,7 +59,7 @@ public sealed class ExecutionCapabilityRulesTests
 
     // The values the theory above gives as numbers.
     [Fact]
-    public void Flags_HaveTheValuesOfTheTheory()
+    public void Flags_AsNumbers_HaveTheValuesOfTheTheory()
     {
         ((int)ExecutionCapabilities.RefusesCompletedTransaction).ShouldBe(1);
         ((int)SqlServerReadsRows).ShouldBe(23);

@@ -26,7 +26,7 @@ public sealed class ListNamesTests
     }
 
     [Fact]
-    public void PrefixOf_ComparesIgnoringCase()
+    public void PrefixOf_ANameOfAnotherCase_ComparesIgnoringCase()
     {
         var parameters = Of(List("ids"), Scalar("IDS_3"));
 

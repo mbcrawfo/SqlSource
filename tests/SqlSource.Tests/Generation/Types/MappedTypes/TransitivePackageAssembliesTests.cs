@@ -60,7 +60,7 @@ public sealed class TransitivePackageAssembliesTests
 
     // An assembly's name is compared ignoring case, as the runtime binds one.
     [Fact]
-    public void Contains_IgnoresCase()
+    public void Contains_ANameInAnotherCase_IgnoresCase()
     {
         var assemblies = TransitivePackageAssemblies.Of("Microsoft.Identity.Client");
 

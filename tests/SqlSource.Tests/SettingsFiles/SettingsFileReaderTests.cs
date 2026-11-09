@@ -657,7 +657,7 @@ public sealed class SettingsFileReaderTests
 
     // The member moves and the level stays equal, so that a step that reads the level alone is not run again.
     [Fact]
-    public void Read_LibraryTypes_MovedMember_LeavesTheLevelEqual()
+    public void Read_LibraryTypesWithAMovedMember_LeavesTheLevelEqual()
     {
         const string Before = /*lang=json,strict*/
             "{\"outputModelSuffix\": \"Row\", \"libraryTypes\": {\"nodaTime\": \"on\"}}";

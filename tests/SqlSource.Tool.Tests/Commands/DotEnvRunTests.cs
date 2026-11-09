@@ -275,7 +275,7 @@ public sealed class DotEnvRunTests : IDisposable
     [InlineData("none")]
     [InlineData("NONE")]
     [InlineData(" None ")]
-    public async Task Run_EnvFileNone_ReadsNoFile_AndHelpSaysSo(string none)
+    public async Task Run_EnvFileNone_ReadsNoFileAndHelpSaysSo(string none)
     {
         _ = _scene.WriteDotEnv("SQLSOURCE_CONNECTION_BILLING=Host=db\n");
 

@@ -31,7 +31,7 @@ public sealed class ListQueryTests(AppContainer app)
     [InlineData("List")]
     [InlineData("HashSet")]
     [InlineData("lazy")]
-    public async Task Ids_EachKindOfCollection_FindsTheRows(string kind)
+    public async Task ListAccountsByIds_EachKindOfCollection_FindsTheRows(string kind)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -46,7 +46,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // A sequence that is no collection is copied once, so its values are counted and sent from one enumeration.
     [Fact]
-    public async Task Ids_LazySequence_IsEnumeratedOnce()
+    public async Task ListAccountsByIds_LazySequence_IsEnumeratedOnce()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -75,7 +75,7 @@ public sealed class ListQueryTests(AppContainer app)
     [InlineData(512)]
     [InlineData(513)]
     [InlineData(1025)]
-    public async Task Ids_CountsAcrossEachPaddingStep_FindTheRows(int count)
+    public async Task ListAccountsByIds_CountsAcrossEachPaddingStep_FindTheRows(int count)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -89,7 +89,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Ids_Empty_FindsNoRows()
+    public async Task ListAccountsByIds_Empty_FindsNoRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -100,7 +100,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Except_Empty_FindsEveryRow()
+    public async Task ListAccountsExcept_Empty_FindsEveryRow()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -112,7 +112,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // A list inside an aggregate runs while it holds a value: carol alone is suspended.
     [Fact]
-    public async Task CountStatuses_List_CountsInTheAggregate()
+    public async Task CountAccountsWithStatuses_List_CountsInTheAggregate()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -127,7 +127,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // An empty list is sent as one NULL, which SQL Server takes inside an aggregate, and which matches no account.
     [Fact]
-    public async Task CountStatuses_Empty_CountsNone()
+    public async Task CountAccountsWithStatuses_Empty_CountsNone()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -142,7 +142,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // A list in a GROUP BY: carol alone is suspended, so alice and bob are one group and carol the other.
     [Fact]
-    public async Task GroupedByStatuses_List_GroupsByTheTest()
+    public async Task CountAccountsGroupedByStatuses_List_GroupsByTheTest()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -157,7 +157,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // An empty list in a GROUP BY matches no account, so every account is in one group.
     [Fact]
-    public async Task GroupedByStatuses_Empty_IsOneGroupOfEveryAccount()
+    public async Task CountAccountsGroupedByStatuses_Empty_IsOneGroupOfEveryAccount()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -172,7 +172,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // A list in an OUTPUT clause marks bob alone.
     [Fact]
-    public async Task MarkIds_List_MarksTheListedAccounts()
+    public async Task MarkAccountsWithIds_List_MarksTheListedAccounts()
     {
         await using var connection = new SqlConnection(app.ConnectionString);
 
@@ -187,7 +187,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // An empty list in an OUTPUT clause matches no account, so none is marked.
     [Fact]
-    public async Task MarkIds_Empty_MarksNone()
+    public async Task MarkAccountsWithIds_Empty_MarksNone()
     {
         await using var connection = new SqlConnection(app.ConnectionString);
 
@@ -202,7 +202,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // The list's two uses: alice and carol are not in it, and alice's next id, bob's, is.
     [Fact]
-    public async Task ExceptAndBefore_List_CountsBoth()
+    public async Task CountAccountsExceptAndBefore_List_CountsBoth()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -217,7 +217,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // Empty, the use after a NOT matches every account, and the one inside the aggregate none, each in its own form.
     [Fact]
-    public async Task ExceptAndBefore_Empty_CountsEveryAccountAndNoneBefore()
+    public async Task CountAccountsExceptAndBefore_Empty_CountsEveryAccountAndNoneBefore()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -233,7 +233,7 @@ public sealed class ListQueryTests(AppContainer app)
     // SQLSRC127's workaround: a list after a NOT, tested in a WITH query and the aggregate over its result, runs for
     // an empty list, which every account is outside.
     [Fact]
-    public async Task CountWithoutStatusesTestedFirst_Empty_CountsEveryAccount()
+    public async Task CountAccountsWithoutStatusesTestedFirst_Empty_CountsEveryAccount()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -247,7 +247,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task CountWithoutStatusesTestedFirst_Statuses_CountsTheOthers()
+    public async Task CountAccountsWithoutStatusesTestedFirst_Statuses_CountsTheOthers()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -261,7 +261,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Optional_Null_FindsEveryRow()
+    public async Task ListAccountsOptional_Null_FindsEveryRow()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -275,7 +275,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Optional_Empty_FindsNoRows()
+    public async Task ListAccountsOptional_Empty_FindsNoRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -289,7 +289,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Optional_Values_Filters()
+    public async Task ListAccountsOptional_Values_Filters()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -303,7 +303,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task TwoLists_Filter()
+    public async Task ListAccountsByIdsAndStatuses_IdsAndStatuses_FindTheRowsOfBoth()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -318,7 +318,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // The first use finds bob, whose id is in the list, and the second alice, whose id plus one is.
     [Fact]
-    public async Task UsedTwice_Filters()
+    public async Task ListAccountsUsedTwice_OneList_FiltersAtEachUse()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -333,7 +333,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // Three values, which the method sends as three, at no padded size.
     [Fact]
-    public async Task NoPadding_Filters()
+    public async Task ListAccountsByIdsNoPadding_ThreeValues_FindsTheRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -349,7 +349,7 @@ public sealed class ListQueryTests(AppContainer app)
     // The query has no other parameter, so the list is the whole limit.  Padded, it would pass it, so the method sends
     // it as it is.
     [Fact]
-    public async Task Ids_AtTheLimit_Runs()
+    public async Task ListAccountsByIds_AtTheLimit_Runs()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -363,7 +363,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Ids_OneOverTheLimit_ThrowsArgumentException()
+    public async Task ListAccountsByIds_OneOverTheLimit_ThrowsArgumentException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -385,7 +385,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // 2,050 values pad to 2,560, past the limit, which SQL Server would refuse, so the method sends the 2,050.
     [Fact]
-    public async Task Ids_PaddingWouldPassTheLimit_SendsExactCounts()
+    public async Task ListAccountsByIds_PaddingWouldPassTheLimit_SendsExactCounts()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -400,7 +400,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // The two lists count together against the limit: the ids fill it but for the two statuses.
     [Fact]
-    public async Task TwoLists_AtTheLimit_Runs()
+    public async Task ListAccountsByIdsAndStatuses_TwoListsAtTheLimit_Runs()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -413,9 +413,10 @@ public sealed class ListQueryTests(AppContainer app)
         accounts.ShouldBe([Alice, Carol]);
     }
 
-    // One id more than TwoLists_AtTheLimit_Runs sends; the message names the list of more values.
+    // One id more than ListAccountsByIdsAndStatuses_TwoListsAtTheLimit_Runs
+    // sends; the message names the list of more values.
     [Fact]
-    public async Task TwoLists_OneOverTheLimit_ThrowsArgumentException()
+    public async Task ListAccountsByIdsAndStatuses_TwoListsOneOverTheLimit_ThrowsArgumentException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -437,7 +438,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // The null test of @ids is a parameter of its own, which counts against the limit beside the list's values.
     [Fact]
-    public async Task Optional_AtTheLimit_Runs()
+    public async Task ListAccountsOptional_AtTheLimit_Runs()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -451,7 +452,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task Optional_OneOverTheLimit_ThrowsArgumentException()
+    public async Task ListAccountsOptional_OneOverTheLimit_ThrowsArgumentException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -473,7 +474,7 @@ public sealed class ListQueryTests(AppContainer app)
 
     // The streaming method counts its lists at the call, so the limit throws there, before the connection is opened.
     [Fact]
-    public async Task StreamIds_OverTheLimit_ThrowsBeforeEnumeration()
+    public async Task StreamAccountsByIds_OverTheLimit_ThrowsBeforeEnumeration()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -490,7 +491,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task StreamIds_Values_YieldsTheRows()
+    public async Task StreamAccountsByIds_Values_YieldsTheRows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -505,7 +506,7 @@ public sealed class ListQueryTests(AppContainer app)
     // The streaming method counts the list at the call and binds it at the first MoveNextAsync, so a value added
     // between the two is found when the values are bound.
     [Fact]
-    public async Task StreamIds_ListChangedAfterTheCall_ThrowsInvalidOperationException()
+    public async Task StreamAccountsByIds_ListChangedAfterTheCall_ThrowsInvalidOperationException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
@@ -520,7 +521,7 @@ public sealed class ListQueryTests(AppContainer app)
     }
 
     [Fact]
-    public async Task StreamIds_EmptyListFilledAfterTheCall_ThrowsInvalidOperationException()
+    public async Task StreamAccountsByIds_EmptyListFilledAfterTheCall_ThrowsInvalidOperationException()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);

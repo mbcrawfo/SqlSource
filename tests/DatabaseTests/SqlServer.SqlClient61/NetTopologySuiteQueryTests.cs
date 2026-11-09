@@ -248,7 +248,7 @@ public sealed class NetTopologySuiteQueryTests(AppContainer app)
     }
 
     [Fact]
-    public void MethodTypes_AreGeometries()
+    public void MethodTypes_OfTheSpatialQueries_AreGeometries()
     {
         (string Name, Type Type, bool Nullable)[] values =
         [

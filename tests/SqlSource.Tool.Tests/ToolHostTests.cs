@@ -83,7 +83,7 @@ public sealed class ToolHostTests
     }
 
     [Fact]
-    public void Create_RealHost_ReadTextFile_GivesTextAndNullForNoFileOrAFolder()
+    public void ReadTextFile_OfTheRealHost_GivesTextAndNullForNoFileOrAFolder()
     {
         using var folder = new TempFolder();
         var path = folder.WriteFile(".env", "KEY=value\r\n");
@@ -100,7 +100,7 @@ public sealed class ToolHostTests
         ToolHost.Create().OpenReadFile.ShouldBe(new Func<string, Stream?>(ToolHost.OpenRead));
 
     [Fact]
-    public void Create_RealHost_OpenReadFile_GivesAStreamAndNullForNoFileOrAFolder()
+    public void OpenReadFile_OfTheRealHost_GivesAStreamAndNullForNoFileOrAFolder()
     {
         using var folder = new TempFolder();
         var path = folder.WriteFile("report.zip", "x");

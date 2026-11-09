@@ -390,7 +390,7 @@ public sealed class JsonQueryTests(AppContainer app)
     }
 
     [Fact]
-    public void MethodTypes_AreJsonTypesAndClasses()
+    public void MethodTypes_OfTheJsonQueries_AreJsonTypesAndClasses()
     {
         (string Name, Type Type, bool Nullable)[] properties =
         [

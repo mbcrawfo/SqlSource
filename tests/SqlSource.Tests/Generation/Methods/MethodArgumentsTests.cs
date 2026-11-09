@@ -101,7 +101,7 @@ public sealed class MethodArgumentsTests
     }
 
     [Fact]
-    public void AppendIteratorDeclaration_TakesNoDefaultsAndMarksTheToken()
+    public void AppendIteratorDeclaration_OfTheArguments_TakesNoDefaultsAndMarksTheToken()
     {
         var builder = new StringBuilder();
 
@@ -122,7 +122,7 @@ public sealed class MethodArgumentsTests
     }
 
     [Fact]
-    public void AppendCall_GivesEachNameInOrder()
+    public void AppendCall_OfTheArguments_GivesEachNameInOrder()
     {
         var builder = new StringBuilder();
 

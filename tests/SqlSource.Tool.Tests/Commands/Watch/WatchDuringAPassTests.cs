@@ -329,7 +329,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
 
     // A save in a folder that an evaluating pass adds to the set, after the evaluation and while the pass describes.
     [Fact]
-    public async Task Watch_SaveInAFolderTheEvaluationAdded_DuringThatPass_GivesOneMorePass()
+    public async Task Watch_SaveInAFolderTheEvaluationAddedDuringThatPass_GivesOneMorePass()
     {
         await using var watch = new WatchScene("App");
         AboveTheTempFolder.SkipWhenInARepository(watch.Run.Folder.Path);

@@ -35,7 +35,7 @@ public sealed class PostgresFieldRulesTests
 
     // A call that is added fails here until its records are mapped above, and so are walked below.
     [Fact]
-    public void Calls_AreEveryCallOfTheDescriber() =>
+    public void Calls_Keys_AreEveryCallOfTheDescriber() =>
         Calls
             .Keys.Order(StringComparer.Ordinal)
             .ShouldBe(
@@ -157,6 +157,6 @@ public sealed class PostgresFieldRulesTests
         """{"name":"pg_catalog"}""",
         false
     )]
-    public void IsEngineRow_BySchema(string row, bool expected) =>
+    public void IsEngineRow_RowOfASchema_IsTrueForTheEnginesSchemasAlone(string row, bool expected) =>
         PostgresFieldRules.IsEngineRow(JsonNode.Parse(row)!.AsObject()).ShouldBe(expected);
 }

@@ -96,7 +96,7 @@ public sealed class GeneratorParameterListTests
     }
 
     [Fact]
-    public void All_IsTheUnionOfTheNamedParameters()
+    public void All_OfTheList_IsTheUnionOfTheNamedParameters()
     {
         var union = GeneratorParameters.None;
         foreach (var (_, parameter) in GeneratorParameterList.Names)

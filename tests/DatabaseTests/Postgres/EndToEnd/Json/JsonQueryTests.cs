@@ -220,7 +220,7 @@ public sealed class JsonQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public void MethodTypes_AreJsonTypesAndClasses()
+    public void MethodTypes_OfTheJsonQueries_AreJsonTypesAndClasses()
     {
         (string Name, Type Type, bool Nullable)[] properties =
         [

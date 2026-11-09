@@ -116,7 +116,7 @@ public sealed class NodaTimeQueryTests(PostgresDatabases postgres)
     };
 
     [Fact]
-    public async Task EveryRow_RoundTrips()
+    public async Task InsertNodaValues_EveryRow_RoundTrips()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.AppWithNodaTime(postgres);
@@ -146,7 +146,7 @@ public sealed class NodaTimeQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public async Task Nulls_RoundTrip()
+    public async Task InsertNodaValues_Nulls_RoundTrip()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.AppWithNodaTime(postgres);
@@ -170,7 +170,7 @@ public sealed class NodaTimeQueryTests(PostgresDatabases postgres)
     }
 
     [Fact]
-    public void MethodTypes_AreNodaTimes()
+    public void MethodTypes_OfTheNodaQueries_AreNodaTimes()
     {
         (string Name, Type Type, bool Nullable)[] properties =
         [
@@ -215,7 +215,7 @@ public sealed class NodaTimeQueryTests(PostgresDatabases postgres)
     // The plain data source of "app", which never calls UseNodaTime(): Npgsql reads timestamptz as a DateTime, and
     // refuses an Instant both ways, before a value is sent and at the read of a row.
     [Fact]
-    public async Task WithoutUseNodaTime_ThrowsInvalidCast()
+    public async Task GetNodaValues_WithoutUseNodaTime_ThrowsInvalidCast()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);

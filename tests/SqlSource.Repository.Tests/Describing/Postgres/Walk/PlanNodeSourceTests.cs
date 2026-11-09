@@ -11,7 +11,7 @@ namespace SqlSource.Repository.Tests.Describing.Postgres.Walk;
 public sealed class PlanNodeSourceTests
 {
     [Fact]
-    public void PlanNode_ReadsNoKeyLiteral()
+    public void PlanNode_Source_ReadsNoKeyLiteral()
     {
         // The code, without the comments: the documentation's `param name="Output"` names a parameter and not a key.
         var code = File.ReadLines(

@@ -48,10 +48,10 @@ public sealed class PostgresWordsTests
         PostgresWords.IsEngineWord(spelling, quoted).ShouldBeFalse();
 
     [Fact]
-    public void Vocabulary_IsTheCommittedList() => PostgresWords.Vocabulary.Count.ShouldBeGreaterThan(3000);
+    public void Vocabulary_Count_ExceedsThreeThousand() => PostgresWords.Vocabulary.Count.ShouldBeGreaterThan(3000);
 
     [Fact]
-    public void EngineSchemas_AreTheEnginesOwn() =>
+    public void EngineSchemas_OfPostgres_AreTheEnginesOwn() =>
         PostgresWords.EngineSchemas.ShouldBe(
             ["pg_catalog", "information_schema", "pg_toast", "public"],
             ignoreOrder: true

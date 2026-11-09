@@ -76,7 +76,7 @@ public sealed class PostgresOwnStringsTests
 
     // A setting that open starts to read fails here until this renaming gives its value a rule.
     [Fact]
-    public void SettingNames_AreTheOnesThisRenames() =>
+    public void SettingNames_OfPostgresLive_AreTheOnesThisRenames() =>
         PostgresLive.SettingNames.ShouldBe(["search_path", "plan_cache_mode", "standard_conforming_strings"]);
 
     [Theory]

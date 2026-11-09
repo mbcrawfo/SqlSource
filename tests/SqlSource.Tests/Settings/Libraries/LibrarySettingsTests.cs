@@ -24,7 +24,7 @@ public sealed class LibrarySettingsTests
     }
 
     [Fact]
-    public void Over_ReplacesOnlyTheLibrariesTheNearLevelNames()
+    public void Over_NearAndFarLevels_ReplacesOnlyTheLibrariesTheNearLevelNames()
     {
         var off = new EquatableArray<LibrarySetting>([Entry(LibraryState.Off, Near)]);
         var on = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, SettingsFile)]);
@@ -34,7 +34,7 @@ public sealed class LibrarySettingsTests
     }
 
     [Fact]
-    public void Over_KeepsADefaultEntry()
+    public void Over_ANearDefaultEntry_IsKept()
     {
         var near = new EquatableArray<LibrarySetting>([Entry(LibraryState.Default, Near)]);
         var far = new EquatableArray<LibrarySetting>([Entry(LibraryState.On, SettingsFile)]);
@@ -66,7 +66,12 @@ public sealed class LibrarySettingsTests
     [InlineData("json=on", true, "Json", "On")]
     [InlineData("  JSON = off ", true, "Json", "Off")]
     [InlineData("jsn=on", false, null, null)]
-    public void TryReadEntry_ReadsNamesAndValuesAsAChoice(string entry, bool valid, string? library, string? state)
+    public void TryReadEntry_AnEntry_ReadsNamesAndValuesAsAChoice(
+        string entry,
+        bool valid,
+        string? library,
+        string? state
+    )
     {
         LibrarySettings.TryReadEntry(entry.AsSpan(), out var readLibrary, out var readState).ShouldBe(valid);
 

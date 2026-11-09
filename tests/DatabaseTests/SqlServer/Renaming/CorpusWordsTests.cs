@@ -24,7 +24,7 @@ public sealed class CorpusWordsTests
     private static readonly SqlServerRenaming Engine = SqlServerRenaming.Instance;
 
     [Fact]
-    public void EveryWord_OfTheCorpora_IsTheEnginesOrTheUsers()
+    public void WordsByCase_EveryWord_IsTheEnginesOrTheUsers()
     {
         var unclassified = WordsByCase()
             .Where(pair =>
@@ -39,7 +39,7 @@ public sealed class CorpusWordsTests
     }
 
     [Fact]
-    public void EveryUserWord_IsNoEngineWord()
+    public void CorpusUserWords_EverySpelling_IsNoEngineWord()
     {
         var engines = CorpusUserWords.Spellings.Where(word => Engine.IsEngineWord(word, quoted: false)).ToList();
 
@@ -47,7 +47,7 @@ public sealed class CorpusWordsTests
     }
 
     [Fact]
-    public void EveryUserWord_IsInSomeCase()
+    public void CorpusUserWords_EverySpelling_IsInSomeCase()
     {
         var present = WordsByCase().Keys.ToHashSet(StringComparer.Ordinal);
         var absent = CorpusUserWords.Spellings.Where(word => !present.Contains(Folded(word))).ToList();
@@ -56,7 +56,7 @@ public sealed class CorpusWordsTests
     }
 
     [Fact]
-    public void EveryEngineRowName_IsInSomeCase_AndNoEngineWord()
+    public void CorpusUserWords_EngineRowNames_AreInSomeCaseAndNoEngineWord()
     {
         var present = WordsByCase().Keys.ToHashSet(StringComparer.Ordinal);
         var misplaced = CorpusUserWords
@@ -67,7 +67,7 @@ public sealed class CorpusWordsTests
     }
 
     [Fact]
-    public void UserWords_AreSortedAndDistinct()
+    public void CorpusUserWords_Spellings_AreSortedAndDistinct()
     {
         var spelled = CorpusUserWords.Spellings;
 

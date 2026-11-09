@@ -12,7 +12,7 @@ namespace SqlSource.Tests.EndToEnd;
 public sealed class EndToEndTests
 {
     [Fact]
-    public void NestedLocation_SourceDot_HasAConstantForEachQueryOfEachFile()
+    public void UserQueries_NestedLocationWithSourceDot_HasAConstantForEachQueryOfEachFile()
     {
         UserQueries.GetUserSql.ShouldBe("SELECT id, name\nFROM users\nWHERE id = @id;");
         UserQueries.ListUsersSql.ShouldBe("SELECT id, name\nFROM users\nORDER BY name;");
@@ -20,7 +20,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void DirectLocation_NoSource_TakesTheFileNamedForTheType()
+    public void GetNamed_DirectLocationWithNoSource_ComesFromTheFileNamedForTheType()
     {
         // Evaluated by the compiler: the member is a constant.
         const string Sql = Named.NamedQueries.GetNamed;
@@ -29,7 +29,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void NestedLocation_SqlClass_IsPrivateStaticAndHoldsPublicConstants()
+    public void Sql_NestedLocation_IsPrivateStaticAndHoldsPublicConstants()
     {
         var sql = typeof(UserQueries).GetNestedType("Sql", BindingFlags.NonPublic).ShouldNotBeNull();
 
@@ -42,7 +42,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void DirectLocation_PathToAFile_PutsTheConstantsOnTheType()
+    public void GetOrder_DirectLocationWithAPathToAFile_IsAConstantOfTheType()
     {
         // Evaluated by the compiler: the member is a constant.
         const string Sql = OrderQueries.GetOrder;
@@ -51,7 +51,7 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void DirectLocation_QueryWithTokens_IsAMethodThatReplacesEachOccurrence() =>
+    public void OrdersOf_DirectLocationAndTokens_IsAMethodThatReplacesEachOccurrence() =>
         OrderQueries
             .OrdersOf("sales", "u.name = @name")
             .ShouldBe(
@@ -61,18 +61,18 @@ public sealed class EndToEndTests
             );
 
     [Fact]
-    public void NestedLocation_QueryWithSeveralTokens_ReplacesEachOccurrence() =>
+    public void Search_NestedLocationAndSeveralTokens_ReplacesEachOccurrence() =>
         TokenQueries
             .Search("id, name", "users", "name LIKE @pattern")
             .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
 
     [Fact]
-    public void NestedLocation_QueryThatIsOnlyAToken_ReturnsTheArgument() =>
+    public void Whole_NestedLocationAndAQueryThatIsOnlyAToken_ReturnsTheArgument() =>
         TokenQueries.Whole("SELECT 1;").ShouldBe("SELECT 1;");
 
     // Eight tokens are more than one tuple holds: the eighth is read from the nested tuple's Rest.
     [Fact]
-    public void NestedLocation_QueryWithEightTokens_ReplacesEachInItsPlace() =>
+    public void Eight_NestedLocationAndEightTokens_ReplacesEachInItsPlace() =>
         TokenQueries.Eight("1", "2", "3", "4", "5", "6", "7", "8").ShouldBe("SELECT 12, 3, 4, 5, 6, 7, 8, 1;");
 
     // The sqlsource.json of this folder lists sort-input and token-validation=off as the generator parameters, and
@@ -81,66 +81,66 @@ public sealed class EndToEndTests
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void ProjectWithValidationOff_QueryWithoutAGeneratorParameter_AcceptsAnArgumentWithoutText(string filter) =>
+    public void Search_WithValidationOffAndNoGeneratorParameter_AcceptsAnArgumentWithoutText(string filter) =>
         TokenQueries
             .Search("id", "users", filter)
             .ShouldBe("SELECT id\nFROM users\nWHERE " + filter + "\nORDER BY users.id;");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithoutAGeneratorParameter_FailsOnANullArgumentWhereItIsRead() =>
+    public void Search_WithValidationOffAndNoGeneratorParameter_FailsOnANullArgumentWhereItIsRead() =>
         Should.Throw<NullReferenceException>(() => TokenQueries.Search("id", null!, "1 = 1"));
 
     [Theory]
     [InlineData("")]
     [InlineData(" \t")]
-    public void ProjectWithValidationOff_QueryThatResetsItsParameters_RejectsAnArgumentWithoutText(string filter) =>
+    public void Checked_WithValidationOffAndResetParameters_RejectsAnArgumentWithoutText(string filter) =>
         Should.Throw<ArgumentException>(() => TokenQueries.Checked("users", filter)).ParamName.ShouldBe("filter");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryThatResetsItsParameters_RejectsANullArgument() =>
+    public void Checked_WithValidationOffAndResetParameters_RejectsANullArgument() =>
         Should.Throw<ArgumentNullException>(() => TokenQueries.Checked(null!, "1 = 1")).ParamName.ShouldBe("table");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryThatResetsItsParameters_ReturnsTheSqlForArgumentsWithText() =>
+    public void Checked_WithValidationOffAndResetParameters_ReturnsTheSqlForArgumentsWithText() =>
         TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
 
     // The sqlsource.json of this folder sets the dialect to postgres.  ANSI would end the string at the quote after the
     // backslash and take the rest of the line for a comment.
     [Fact]
-    public void ProjectWithADialect_FileWithoutItsOwn_IsReadByTheDialectOfTheSettingsFile() =>
+    public void ByProject_ADialectAndAFileWithoutItsOwn_IsReadByTheDialectOfTheSettingsFile() =>
         DialectQueries.ByProject.ShouldBe("SELECT E'it'\n    '\\'s -- not a comment' AS note;");
 
     // The header of ByHeader.sql says mysql.  That the file is read as MySQL shows the header over the settings file.
     [Fact]
-    public void ProjectWithADialect_FileWithAHeader_IsReadByTheDialectOfItsHeader() =>
+    public void ByHeader_ADialectAndAFileWithAHeader_IsReadByTheDialectOfItsHeader() =>
         DialectQueries.ByHeader.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
 
     // The header of ByOption.sql names an option after the dialect, with a comma.  Plain MySQL would not close the
     // string, so this project would not build.
     [Fact]
-    public void ProjectWithADialect_FileWithAnOptionInItsHeader_IsReadByThatOption() =>
+    public void ByOption_ADialectAndAFileWithAnOptionInItsHeader_IsReadByThatOption() =>
         DialectQueries.ByOption.ShouldBe("SELECT 'C:\\temp\\' AS path;");
 
     [Fact]
-    public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
+    public void ByMarker_ADialectAndAFileWithAMarker_IsReadByTheDialectItNames() =>
         DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
     // The header of Kept.sql gives every generator parameter its default, then turns token-validation off and
     // keep-comments on.  The settings file does not keep comments, so that the comment is there shows the header
     // reaching the generator and turning keep-comments on over the settings file.
     [Fact]
-    public void ProjectWithParameters_FileWithAHeader_KeepsTheCommentItsHeaderTurnsOn() =>
+    public void Kept_ParametersAndAFileWithAHeader_KeepsTheCommentItsHeaderTurnsOn() =>
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
     // Plain.sql has no header, so the settings file's generator parameters apply.  Without keep-comments it leaves the
     // comment out, and with token-validation=off the method takes the blank text of its token, which it would throw on
     // otherwise.
     [Fact]
-    public void ProjectWithParameters_FileWithoutAHeader_UsesTheParametersOfTheSettingsFile() =>
+    public void Plain_ParametersAndAFileWithoutAHeader_UsesTheParametersOfTheSettingsFile() =>
         ParameterQueries.Plain("").ShouldBe("SELECT 2   AS two;");
 
     [Fact]
-    public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
+    public void Search_Call_AllocatesTheStringItReturnsAndNothingElse()
     {
         // The first call creates the delegate that the method then keeps.
         var expected = TokenQueries.Search("id, name", "users", "name LIKE @pattern");
@@ -157,11 +157,11 @@ public sealed class EndToEndTests
     }
 
     [Fact]
-    public void GenericType_PathToAFolder_SharesTheFileWithAnotherType() =>
+    public void Describe_GenericTypeWithAPathToAFolder_SharesTheFileWithAnotherType() =>
         new Repository<int>(7).Describe().ShouldBe(OrderQueries.GetOrder + " -- 7");
 
     [Fact]
-    public void NestedRecordStruct_PathThroughAParentFolder_HasTheConstant() =>
+    public void CountUsers_NestedRecordStructWithAPathThroughAParentFolder_IsTheQuery() =>
         Outer.Counts.CountUsers.ShouldBe("SELECT COUNT(*) FROM users;");
 
     [Theory]

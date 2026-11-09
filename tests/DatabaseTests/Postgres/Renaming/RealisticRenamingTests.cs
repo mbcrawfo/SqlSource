@@ -85,7 +85,7 @@ public sealed class RealisticRenamingTests(PostgresDatabases databases)
     // A name the renaming replaced that is a word of the running server is one the committed vocabulary lacks.  A
     // literal is replaced whatever it spells, so it is no name to check.
     [Fact]
-    public async Task RenamedWords_AreNoWordOfTheServer()
+    public async Task RenameAsync_EveryCase_ReplacesNoWordOfTheServer()
     {
         var words = await ServerWordsAsync();
         var originals = new SortedSet<string>(StringComparer.Ordinal);

@@ -109,7 +109,7 @@ public sealed class SqlQueryHashTests
 
     // A library switch changes the C# types of a query, not the SQL the database describes.
     [Fact]
-    public void Hash_IgnoresALibraryTypesMarker() =>
+    public void Hash_ALibraryTypesMarker_IsIgnored() =>
         Hash("-- library-types: nodatime=on\n-- name: Q\n-- library-types: nodatime=off\nSELECT 1;\n")
             .ShouldBe(Hash(Simple));
 

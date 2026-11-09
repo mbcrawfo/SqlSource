@@ -124,7 +124,7 @@ public sealed class LibraryTypeTests
         [NpgsqlReferences.Npgsql10, LibraryReferences.NodaTime("3.3.7"), LibraryReferences.NpgsqlNodaTime("10.0.3")];
 
     [Fact]
-    public void Detected_PluginReferenced_TimestamptzIsInstant()
+    public void Run_DetectedPluginReferenced_TimestamptzIsInstant()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
 
@@ -139,7 +139,7 @@ public sealed class LibraryTypeTests
 
     // Typing does not know the output, so a query at Models is typed the same, and its models pick by the output.
     [Fact]
-    public void Detected_PluginReferenced_TimestamptzIsInstant_AtModels()
+    public void Run_DetectedPluginReferencedAtModels_TimestamptzIsInstant()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
 
@@ -153,7 +153,7 @@ public sealed class LibraryTypeTests
 
     // NodaTime alone is not enough on PostgreSQL: the driver reads its types only through the plugin.
     [Fact]
-    public void NotDetected_NoPlugin_TimestamptzIsDateTime()
+    public void Run_NotDetectedNoPlugin_TimestamptzIsDateTime()
     {
         var run = RunEvents(ListEvents, [NpgsqlReferences.Npgsql10, LibraryReferences.NodaTime("3.3.7")]);
 
@@ -163,7 +163,7 @@ public sealed class LibraryTypeTests
     }
 
     [Fact]
-    public void SettingsFileOff_TurnsADetectedLibraryOff()
+    public void Run_SettingsFileOff_TurnsADetectedLibraryOff()
     {
         var run = RunEvents(ListEvents, WithThePlugin, NodaTimeIs("off"));
 
@@ -172,7 +172,7 @@ public sealed class LibraryTypeTests
     }
 
     [Fact]
-    public void HeaderOn_OverSettingsFileOff()
+    public void Run_HeaderOnOverSettingsFileOff_TurnsTheLibraryOn()
     {
         var run = RunEvents("-- library-types: nodatime=on\n\n" + ListEvents, WithThePlugin, NodaTimeIs("off"));
 
@@ -183,7 +183,7 @@ public sealed class LibraryTypeTests
     // The query's marker turns the library off for that query alone, and the other query of the file keeps its
     // header's.
     [Fact]
-    public void QueryOff_OverHeaderOn()
+    public void Run_QueryOffOverHeaderOn_TurnsTheLibraryOffForThatQueryAlone()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -206,7 +206,7 @@ public sealed class LibraryTypeTests
     // A nearer default takes the library out of the farther levels, so the engine's default applies: detection, which
     // finds the plugin.
     [Fact]
-    public void Default_HidesAFartherOff_GivesDetection()
+    public void Run_DefaultHidingAFartherOff_GivesDetection()
     {
         var run = RunEvents(ListEvents, WithThePlugin, NodaTimeIs("off"), folderFile: NodaTimeIs("default"));
 
@@ -215,7 +215,7 @@ public sealed class LibraryTypeTests
     }
 
     [Fact]
-    public void NearerSettingsFile_WinsOverFarther()
+    public void Run_NearerSettingsFileOverFarther_Wins()
     {
         var run = RunEvents(ListEvents, WithThePlugin, NodaTimeIs("on"), folderFile: NodaTimeIs("off"));
 
@@ -228,7 +228,7 @@ public sealed class LibraryTypeTests
     [InlineData("columnMarker")]
     [InlineData("columnType")]
     [InlineData("typeOverride")]
-    public void ColumnMarker_ColumnType_Override_WinOverTheLibrary(string chooser)
+    public void Run_ColumnMarkerColumnTypeAndOverride_WinOverTheLibrary(string chooser)
     {
         var text =
             chooser == "columnMarker"
@@ -253,7 +253,7 @@ public sealed class LibraryTypeTests
 
     // The parameter's marker chooses its type; the column, which nothing chooses, has the library's.
     [Fact]
-    public void ParamMarker_WinsOverTheLibrary()
+    public void Run_ParamMarker_WinsOverTheLibrary()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -279,7 +279,7 @@ public sealed class LibraryTypeTests
 
     // A parameter that nothing chooses a type for has the library's, as a column has.
     [Fact]
-    public void Detected_PluginReferenced_ParameterIsInstant()
+    public void Run_DetectedPluginReferenced_ParameterIsInstant()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -300,7 +300,7 @@ public sealed class LibraryTypeTests
 
     // An array of a library's type is its element's with [], beside the base map's array.
     [Fact]
-    public void Detected_PluginReferenced_ArrayIsOfTheElementsType()
+    public void Run_DetectedPluginReferenced_ArrayIsOfTheElementsType()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
         var entry = Entry(file, "ListEvents", [], [Column("at", ArrayOf(Timestamptz, "_timestamptz"))]);
@@ -317,7 +317,7 @@ public sealed class LibraryTypeTests
     // An assembly with NodaTime's and the plugin's types and no Npgsql: tstzrange has the library's row, while the base
     // map, with no driver, has no C# type for it.  The base map's failure is the query's, and the row is not used.
     [Fact]
-    public void Detected_BaseMapFails_TheBaseMapsErrorIsTheQuerys()
+    public void Run_DetectedBaseMapFails_TheBaseMapsErrorIsTheQuerys()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
         var range = Catalog("tstzrange", SidecarValues.Kind.Range, Timestamptz);
@@ -337,7 +337,7 @@ public sealed class LibraryTypeTests
 
     // On, though the plugin is missing: the query keeps the base map's types, and the entry that says on is recorded.
     [Fact]
-    public void On_WithoutPlugin_KeepsTheBaseTypes_AndRecordsTheEntry()
+    public void Run_OnWithoutPlugin_KeepsTheBaseTypesAndRecordsTheEntry()
     {
         var run = RunEvents(ListEvents, [NpgsqlReferences.Npgsql10], NodaTimeIs("on"));
 
@@ -404,7 +404,7 @@ public sealed class LibraryTypeTests
     }
 
     [Fact]
-    public void SqlServer_NodaTimeOn_WithoutNodaTime_RecordsTheEntry()
+    public void Run_SqlServerNodaTimeOnWithoutNodaTime_RecordsTheEntry()
     {
         var run = RunOrders([SqlClientReferences.SqlClient7]);
 
@@ -422,7 +422,7 @@ public sealed class LibraryTypeTests
     [Theory]
     [InlineData("10.0.3", "3.3.7", true)]
     [InlineData("8.0.3", "3.1.9", false)]
-    public void CodeGen_NodaTime_CompilesWithoutWarnings(string npgsql, string nodaTime, bool newest)
+    public void Run_CodeGenNodaTime_CompilesWithoutWarnings(string npgsql, string nodaTime, bool newest)
     {
         var tstz = Timestamptz;
         var tsrange = Catalog("tsrange", SidecarValues.Kind.Range, Catalog("timestamp"));

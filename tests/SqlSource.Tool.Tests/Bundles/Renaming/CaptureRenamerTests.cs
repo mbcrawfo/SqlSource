@@ -13,7 +13,7 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming;
 public sealed class CaptureRenamerTests
 {
     [Fact]
-    public async Task Drop_RemovesAtEveryDepth()
+    public async Task Drop_RulesAtSeveralDepths_RemoveTheirMembers()
     {
         var raw = await RenamingBundles.RawAsync();
         var calls = CaptureRenamer.CallsOf(CaptureJson.Read(raw.Capture).Value.ShouldNotBeNull());

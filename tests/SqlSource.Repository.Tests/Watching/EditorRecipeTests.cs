@@ -23,7 +23,7 @@ public sealed class EditorRecipeTests
     private const string UnpositionedPath = "/work/App/Queries/Orders.sql";
 
     [Fact]
-    public void VsCodeTask_RunsTheWatch()
+    public void VsCodeTask_Recipe_RunsTheWatchInTheBackgroundOnFolderOpen()
     {
         var task = VsCodeTask();
 
