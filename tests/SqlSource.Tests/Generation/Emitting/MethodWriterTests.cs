@@ -393,7 +393,7 @@ public sealed class MethodWriterTests
         run.ShouldBeClean();
     }
 
-    // The same names as the token of a query's method under CodeGen, at the newest C#, as
+    // The same names as the token of a query's method under Methods, at the newest C#, as
     // Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles of GeneratedSourceMethodTests runs them at C# 12.
     [Theory]
     [InlineData("span")]

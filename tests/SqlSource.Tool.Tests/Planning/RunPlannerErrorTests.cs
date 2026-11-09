@@ -140,7 +140,7 @@ public sealed class RunPlannerErrorTests : IDisposable
                 ToolDiagnostics.OutputNeedsDescribableDialect,
                 sql,
                 new LinePosition(4, Name.Length),
-                "codegen",
+                "methods",
                 canonical
             ),
         ]);
@@ -263,7 +263,7 @@ public sealed class RunPlannerErrorTests : IDisposable
                 ("SQLSRC210", sql, new LinePosition(0, Name.Length), "where"),
                 ("SQLSRC210", sql, new LinePosition(0, Name.Length), "order"),
             ]);
-        result.Errors[0].Arguments[1].ShouldBe("codegen");
+        result.Errors[0].Arguments[1].ShouldBe("methods");
         var help = result.Errors[0].Lines.ShouldHaveSingleItem();
         help.Label.ShouldBe("help");
         help.Text.ShouldContain("{{where:default}}");
@@ -297,7 +297,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     // Two projects claim the file with two outputs, each from its own chain: both list the farther settings file, and
     // only the second the nearer one.  A message names the greater.
     [Theory]
-    [InlineData("models", "codegen", "codegen")]
+    [InlineData("models", "methods", "methods")]
     [InlineData("models", "sql", "models")]
     public void Plan_TwoClaimsWithTwoOutputs_NameTheGreaterInAMessage(string first, string second, string named)
     {

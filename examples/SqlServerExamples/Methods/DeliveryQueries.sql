@@ -1,4 +1,4 @@
--- The queries of the deliveries, at the default output, codegen, which DeliveryQueries calls.  The project's library
+-- The queries of the deliveries, at the default output, methods, which DeliveryQueries calls.  The project's library
 -- types turn on NodaTime, NetTopologySuite and System.Text.Json, so delivered_at, a datetimeoffset, is NodaTime's
 -- OffsetDateTime, location, a geography, NetTopologySuite's Geometry, and events, a json, a JsonElement.  details, a
 -- json too, is the project's class DeliveryDetails.  The methods convert each of them themselves, so nothing is

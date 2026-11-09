@@ -12,7 +12,7 @@ namespace SqlSource.Testing.Generator.Corpus;
 internal static partial class QueryMethodCorpus
 {
     // A token named as each local and local function a method or its iterator has, which the method renames, each with
-    // the default that a query whose output is codegen needs.
+    // the default that a query whose output is methods needs.
     private const string LocalTokens =
         "{{sql:a}} {{command:b}} {{reader:c}} {{row:d}} {{rows:e}} {{wasClosed:f}} {{exception:g}} {{atRow:h}} "
         + "{{ReadRows:i}} {{value:j}} {{span:k}} {{state:l}}";

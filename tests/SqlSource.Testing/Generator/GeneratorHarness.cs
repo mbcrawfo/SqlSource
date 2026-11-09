@@ -141,7 +141,7 @@ internal static class GeneratorHarness
     // Every run states its output, the output of the project's settings file: null writes none, for a test that needs
     // the project not to set it, of the default or of the output's levels, or whose own root file, which hides the
     // project's, or own file at ProjectSettingsPath gives the output, and the test says so in a comment.  The default,
-    // CodeGen, needs an entry in a sidecar for each query, so a test that leaves it unsaid gets SQLSRC209 for each file
+    // Methods, needs an entry in a sidecar for each query, so a test that leaves it unsaid gets SQLSRC209 for each file
     // under ansi.
     public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
         Run(output, [new SourceFile(SourcePath, source)], sqlFiles);
@@ -217,7 +217,7 @@ internal static class GeneratorHarness
     // The JSON of the project's settings file: the output, spelled as a user writes it, and memberLocation class when
     // the output is Sql or Models, so that a test reads the constants and token methods on the type, as Sample.Query;
     // then the dialect as given, the generator parameters as the array of their words, and each entry of settings, a
-    // JSON object as a user writes the file, which replaces the key it names.  Null when all four are null.  A CodeGen
+    // JSON object as a user writes the file, which replaces the key it names.  Null when all four are null.  A Methods
     // run writes no memberLocation, so its methods go to the extension class, the default.  The spelling is the tests'
     // own, not taken from the generator, so that a change to the generator's spelling fails a test.  CachingScene
     // writes the project's file of its drivers with it too.
@@ -309,7 +309,7 @@ internal static class GeneratorHarness
         {
             OutputKind.Sql => "Sql",
             OutputKind.Models => "Models",
-            OutputKind.CodeGen => "CodeGen",
+            OutputKind.Methods => "Methods",
             _ => throw new ArgumentOutOfRangeException(nameof(output), output, null),
         };
 

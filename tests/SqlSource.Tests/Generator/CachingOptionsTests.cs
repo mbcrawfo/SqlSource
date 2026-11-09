@@ -219,7 +219,7 @@ public sealed class CachingOptionsTests
     }
 
     // The edited file's folder holds one type's file, whose level changes, and its query loses its constant to the
-    // method of codegen.  The other file has a level from the file above both folders, which is resolved again and
+    // method of methods.  The other file has a level from the file above both folders, which is resolved again and
     // comes out equal: the step named FileLevel is the one after the filter of nulls, which reports such a value as
     // taken from the previous run.  No file is parsed: the output is no part of what a parse depends on.
     [Fact]
@@ -238,7 +238,7 @@ public sealed class CachingOptionsTests
 
         var edited = new InMemoryAdditionalText(
             settings.Path, /*lang=json,strict*/
-            """{"output":"codegen"}"""
+            """{"output":"methods"}"""
         );
         var result = Run(driver.ReplaceAdditionalText(settings, edited), compilation);
 

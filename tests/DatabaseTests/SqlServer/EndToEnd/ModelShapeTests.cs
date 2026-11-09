@@ -444,10 +444,10 @@ public sealed class ModelShapeTests
             ("PaidAt", typeof(DateTime?), true)
         );
 
-    // A codegen query has a method and no constant: InvoiceQueries is left as it was declared, and its methods are in
+    // A methods query has a method and no constant: InvoiceQueries is left as it was declared, and its methods are in
     // InvoiceQueriesExtensions.
     [Fact]
-    public void Build_CodeGenClaim_HasNoConstantsAndNoNestedClass()
+    public void Build_MethodsClaim_HasNoConstantsAndNoNestedClass()
     {
         const BindingFlags Members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
 

@@ -105,7 +105,7 @@ internal static class TypeDiagnostics
                 failure.Detail ?? "",
                 sqlClientVersion
             ),
-            // A spatial type, which NetTopologySuite's row reads in a CodeGen query, or the package's type.
+            // A spatial type, which NetTopologySuite's row reads in a Methods query, or the package's type.
             TypeMappingKind.NeedsSqlServerTypes when SqlServerNames.IsSpatial(key) => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
@@ -114,7 +114,7 @@ internal static class TypeDiagnostics
                 "Reference "
                     + LibraryProbe.SqlServerSpatialPackages
                     + ", and turn the netTopologySuite library on, to read it as "
-                    + "NetTopologySuite's Geometry in a codegen query, or reference the package "
+                    + "NetTopologySuite's Geometry in a methods query, or reference the package "
                     + "Microsoft.SqlServer.Types and map it with the type override, as "
                     + key
                     + "="
@@ -170,13 +170,13 @@ internal static class TypeDiagnostics
                 failure.Detail ?? "",
                 failure.Text ?? ""
             ),
-            // PostGIS's types are read by the plugin of NetTopologySuite, through its row, in a CodeGen query.
+            // PostGIS's types are read by the plugin of NetTopologySuite, through its row, in a Methods query.
             TypeMappingKind.Unreadable when isPostgis => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
                 subject,
                 typeName,
-                "Reference Npgsql.NetTopologySuite to read it as NetTopologySuite's Geometry in a codegen query, "
+                "Reference Npgsql.NetTopologySuite to read it as NetTopologySuite's Geometry in a methods query, "
                     + "or map it with the type override, as "
                     + AsAKey(key, engine)
                     + "=<a C# type>"

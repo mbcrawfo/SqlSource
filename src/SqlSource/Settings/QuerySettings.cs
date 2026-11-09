@@ -58,7 +58,7 @@ internal readonly record struct QuerySettings(
     /// </summary>
     public MemberLocation MemberLocation =>
         WrittenMemberLocation?.Value
-        ?? (Output == OutputKind.CodeGen ? MemberLocation.ExtensionClass : MemberLocation.NestedClass);
+        ?? (Output == OutputKind.Methods ? MemberLocation.ExtensionClass : MemberLocation.NestedClass);
 
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
@@ -83,7 +83,7 @@ internal readonly record struct QuerySettings(
     public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel file) =>
         new(
             markers.Parameters.Over(file.Parameters).Resolve(),
-            markers.Output ?? file.Output ?? OutputKind.CodeGen,
+            markers.Output ?? file.Output ?? OutputKind.Methods,
             markers.InputModelSuffix ?? file.InputModelSuffix ?? DefaultInputModelSuffix,
             markers.OutputModelSuffix ?? file.OutputModelSuffix ?? DefaultOutputModelSuffix,
             markers.ModelNamespace ?? file.ModelNamespace,

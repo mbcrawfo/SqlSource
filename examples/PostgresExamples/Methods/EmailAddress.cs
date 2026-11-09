@@ -1,6 +1,6 @@
 using SqlSource;
 
-namespace PostgresExamples.CodeGen;
+namespace PostgresExamples.Methods;
 
 // An email address, the type that UserQueries.sql gives the domain email with a type override.  The driver reads a
 // domain over text as a C# string and knows nothing of EmailAddress, so the generated methods read the string and pass

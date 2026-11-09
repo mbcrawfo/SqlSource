@@ -26,18 +26,18 @@ public sealed class PlacementTests
     private const string ProtectedPragma =
         "#pragma warning disable CS0628 // A file asks for protected members of a sealed type.\n";
 
-    // A query at codegen, whose method takes an id and reads it.
+    // A query at methods, whose method takes an id and reads it.
     private static readonly SqlFile Users = new(
         GeneratorHarness.UsersPath,
         "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
     );
 
-    // The run is at CodeGen, which writes no member location, so the query at sql takes its output's default.
+    // The run is at Methods, which writes no member location, so the query at sql takes its output's default.
     [Fact]
     public void Run_SqlQueryWithNoLocation_IsAConstantOfAPrivateSqlClass()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             """
             using SqlSource;
 
@@ -62,7 +62,7 @@ public sealed class PlacementTests
     }
 
     [Fact]
-    public void Run_CodeGenQueryWithNoLocation_IsAnInternalMethodOfTheExtensionClass()
+    public void Run_MethodsQueryWithNoLocation_IsAnInternalMethodOfTheExtensionClass()
     {
         var run = MethodRuns.Run(Users, [UserEntry(Users)]);
 
@@ -327,7 +327,7 @@ public sealed class PlacementTests
     // In a nested class a query method cannot extend the connection, so it is a static method that takes it, beside
     // the constant of another query of the class, which the type's file writes.  Both files write the class.
     [Fact]
-    public void Run_CodeGenQueryInTheNestedClass_IsAStaticMethodThatTakesTheConnection()
+    public void Run_MethodsQueryInTheNestedClass_IsAStaticMethodThatTakesTheConnection()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,

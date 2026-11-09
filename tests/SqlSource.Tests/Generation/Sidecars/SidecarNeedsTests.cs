@@ -16,8 +16,8 @@ public sealed class SidecarNeedsTests
 
     private static readonly FileNeeds Second = Needs(
         "app/Users.sql",
-        new QueryNeed("ListUsers", OutputKind.CodeGen),
-        new QueryNeed("GetUser", OutputKind.CodeGen)
+        new QueryNeed("ListUsers", OutputKind.Methods),
+        new QueryNeed("GetUser", OutputKind.Methods)
     );
 
     // The order the types come in does not change the value, so equal needs never check a file again.
@@ -33,8 +33,8 @@ public sealed class SidecarNeedsTests
             .Queries.Select(query => (query.Name, query.Output))
             .ShouldBe([
                 ("CountUsers", OutputKind.Models),
-                ("GetUser", OutputKind.CodeGen),
-                ("ListUsers", OutputKind.CodeGen),
+                ("GetUser", OutputKind.Methods),
+                ("ListUsers", OutputKind.Methods),
             ]);
 
     [Fact]

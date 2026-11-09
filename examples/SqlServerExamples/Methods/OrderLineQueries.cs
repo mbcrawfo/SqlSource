@@ -3,9 +3,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using SqlSource;
 
-namespace SqlServerExamples.CodeGen;
+namespace SqlServerExamples.Methods;
 
-// The default output, codegen, and the default file, OrderLineQueries.sql beside this one, which need nothing on the
+// The default output, methods, and the default file, OrderLineQueries.sql beside this one, which need nothing on the
 // attribute.  Each query gets its models and a method that runs it, an extension method of the connection in the
 // generated class OrderLineQueriesExtensions, which opens the connection when it is closed, sends the input model's
 // values and reads the rows into the output model.  Each method here passes on the caller's CancellationToken.  See

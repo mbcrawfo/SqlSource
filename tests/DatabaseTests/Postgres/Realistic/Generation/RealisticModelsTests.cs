@@ -7,7 +7,7 @@ using Xunit;
 namespace SqlSource.DatabaseTests.Postgres.Realistic.Generation;
 
 // The reading of a case's models: the model the generator names from its sidecar entry, and the method of its claim at
-// CodeGen.  It reads the compiled models and needs no server.  The tests name this project's own generated models and
+// Methods.  It reads the compiled models and needs no server.  The tests name this project's own generated models and
 // methods, which the other engine's project does not have, so they are not shared.
 public sealed class RealisticModelsTests
 {
@@ -38,7 +38,7 @@ public sealed class RealisticModelsTests
         RealisticCases.Models.InputModelOf(EntryOf("cte-chain")).ShouldBeNull();
 
     [Fact]
-    public void MethodOf_Entry_IsTheMethodOfItsCodeGenClaim()
+    public void MethodOf_Entry_IsTheMethodOfItsMethodsClaim()
     {
         var method = RealisticCases.Models.MethodOf(RealisticCases.Corpus, Case("cte-chain"), EntryOf("cte-chain"));
 

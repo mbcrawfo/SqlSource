@@ -1,4 +1,4 @@
--- The queries of the deliveries, at the default output, codegen, which DeliveryQueries calls.  The project's type
+-- The queries of the deliveries, at the default output, methods, which DeliveryQueries calls.  The project's type
 -- override makes every timestamptz a DateTimeOffset, for Dapper, and would win over NodaTime, so the file's type
 -- override gives timestamptz back to its default, and the file's timestamptz is NodaTime's Instant.  The project
 -- references Npgsql's plugins for NodaTime and NetTopologySuite, so location, a geography, is NetTopologySuite's

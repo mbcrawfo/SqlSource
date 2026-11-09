@@ -3,10 +3,10 @@ using System;
 namespace SqlSource.Generation.Methods;
 
 /// <summary>
-/// The engines that a type has a query of whose output is <c>CodeGen</c>, which need their driver (<c>SQLSRC273</c>).
+/// The engines that a type has a query of whose output is <c>Methods</c>, which need their driver (<c>SQLSRC273</c>).
 /// </summary>
 [Flags]
-internal enum CodeGenEngines
+internal enum MethodEngines
 {
     /// <summary>No engine.</summary>
     None = 0,

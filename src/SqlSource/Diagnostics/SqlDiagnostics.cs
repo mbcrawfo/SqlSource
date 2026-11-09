@@ -619,7 +619,7 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the list, with its prefix, as written where it is reported, and {1} where it stands.  Reported at the use,
-    // for a query whose output is CodeGen alone.
+    // for a query whose output is Methods alone.
     public static readonly DiagnosticDescriptor NegatedListRefusedEmpty = new(
         id: "SQLSRC127",
         title: "Negated list stands where SQL Server refuses an empty list",
@@ -1033,7 +1033,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor DriverNotReferenced = new(
         id: "SQLSRC273",
         title: "Driver is not referenced",
-        messageFormat: "A query for {0} has the output codegen, and this project does not reference {1}, which its "
+        messageFormat: "A query for {0} has the output methods, and this project does not reference {1}, which its "
             + "method needs.  Reference {1}, or set the output to models.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
@@ -1164,7 +1164,7 @@ internal static class SqlDiagnostics
 
     // {0} is the package, as "NodaTime" or "NetTopologySuite.IO.SqlServerBytes", {1} the version the project
     // references, as "3.1.8", and {2} the oldest that SqlSource supports.  Reported with no position, once for the
-    // project and package, when a codegen query uses a library that needs the package; the queries that use it get no
+    // project and package, when a methods query uses a library that needs the package; the queries that use it get no
     // method.  The package is an argument, so every package's floor shares it.
     public static readonly DiagnosticDescriptor LibraryBelowTheFloor = new(
         id: "SQLSRC282",
@@ -1184,7 +1184,7 @@ internal static class SqlDiagnostics
     // type; "'<the type>' is a type of System.Text.Json, which is read without the serializer"; or "'<the type>' is a
     // type that the driver reads, which the serializer never takes", each with "its element '<the element>'" in place
     // of "'<the type>'" for an array on an array that holds JSON.  Reported at the query's name, by ConversionPlanner,
-    // for codegen queries only, once for each column and parameter whose place says json.
+    // for methods queries only, once for each column and parameter whose place says json.
     public static readonly DiagnosticDescriptor JsonOptInNotApplicable = new(
         id: "SQLSRC283",
         title: "JSON opt-in does not apply",

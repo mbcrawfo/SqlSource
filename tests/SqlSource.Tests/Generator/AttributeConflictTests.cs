@@ -157,7 +157,7 @@ public sealed class AttributeConflictTests
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListOthers\nSELECT id, name FROM users;\n");
         var columns = new[] { Column("id"), Column("name", Text, nullable: true) };
         var (reference, sources) = GeneratorHarness.CreateProject(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             "Other",
             OtherQueriesSource,
             [otherFile, Sidecars.Of(otherFile, Entry(otherFile, "ListUsers", [], columns))],
@@ -168,7 +168,7 @@ public sealed class AttributeConflictTests
         var entry = Entry(file, "ListOthers", [], columns);
 
         var (diagnostics, builtSources) = await GeneratorHarness.BuildProjectAsync(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             QueriesSource,
             [file, Sidecars.Of(file, entry)],
             [reference, NpgsqlReferences.Npgsql10],
@@ -195,7 +195,7 @@ public sealed class AttributeConflictTests
         SqlFile[] files = [file, Sidecars.Of(file, MethodRuns.SqlServerEntry(file, "ListOthers", [], [At()]))];
 
         var (diagnostics, builtSources) = await GeneratorHarness.BuildProjectAsync(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             QueriesSource,
             files,
             [reference, .. SqlServerReferences],
@@ -299,7 +299,7 @@ public sealed class AttributeConflictTests
             )
             .Reference;
 
-    // The other project with a CodeGen query on SQL Server whose method calls a conversion of NodaTime's, so that it
+    // The other project with a Methods query on SQL Server whose method calls a conversion of NodaTime's, so that it
     // holds SqlSource.NodaTimeConversions as well as the attributes and the exceptions.
     private static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) OtherWithConversions(
         bool compilationReference
@@ -307,7 +307,7 @@ public sealed class AttributeConflictTests
     {
         var otherFile = new SqlFile("/other/Events.sql", Override + "-- name: ListEvents\nSELECT at FROM events;\n");
         return GeneratorHarness.CreateProject(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             "Other",
             OtherQueriesSource,
             [otherFile, Sidecars.Of(otherFile, MethodRuns.SqlServerEntry(otherFile, "ListEvents", [], [At()]))],

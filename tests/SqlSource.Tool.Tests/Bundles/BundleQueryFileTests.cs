@@ -232,7 +232,7 @@ public sealed class BundleQueryFileTests
             -- summary: Finds a user.
             -- param: @id int -> UserId
             -- column: name not null
-                -- output: codegen
+                -- output: methods
             -- output-model: UserRow
             -- token: {{order:id}}
             -- token-ignore: literal

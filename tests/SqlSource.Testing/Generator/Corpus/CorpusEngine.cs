@@ -157,7 +157,7 @@ internal sealed record CorpusEngine(
     public static SidecarColumn Column(string name, SidecarType type, bool nullable = false) =>
         TestSidecars.Column(0, name, type, nullable);
 
-    // The sources and files at CodeGen under the engine's dialect, at C# 12, on the engine's driver unless the
+    // The sources and files at Methods under the engine's dialect, at C# 12, on the engine's driver unless the
     // references are given.  The settings, a JSON object, go over the project's settings file, and the properties are
     // what MSBuild tells the generator.
     public GeneratorRun Run(
@@ -168,7 +168,7 @@ internal sealed record CorpusEngine(
         IReadOnlyDictionary<string, string?>? properties = null
     ) =>
         GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             sources,
             files,
             languageVersion: LanguageVersion.CSharp12,

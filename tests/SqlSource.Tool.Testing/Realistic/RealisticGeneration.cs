@@ -22,8 +22,8 @@ namespace SqlSource.Tool.Testing.Realistic;
 // folder above the query, which gives the database realistic and the type override; and the project's sqlsource.json
 // as the harness's project file, which names the dialect and whose generator parameters reach the run.
 //
-// The project's file says "output": "CodeGen", and the harness lets a key of the settings it is given replace the
-// output it writes, so the key is removed and the run's OutputKind.Models stands.  At CodeGen a query has a method and
+// The project's file says "output": "Methods", and the harness lets a key of the settings it is given replace the
+// output it writes, so the key is removed and the run's OutputKind.Models stands.  At Methods a query has a method and
 // no constant.
 //
 // SQLSRC240, a sidecar written by another version of the tool, is let through: the projects keep it a warning in

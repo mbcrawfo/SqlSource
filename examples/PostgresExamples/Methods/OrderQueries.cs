@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SqlSource;
 
-namespace PostgresExamples.CodeGen;
+namespace PostgresExamples.Methods;
 
 // The queries of OrderQueries.sql, the file named for the class, whose markers put their methods on the class itself:
 // ListOrdersOfUser, FindOrder and ListOrdersByStatuses are public static methods, which any code calls as

@@ -4,12 +4,12 @@ namespace SqlSource.Generation.Methods;
 
 internal static class DatabaseEngineExtensions
 {
-    /// <summary>The flag of the engine's queries in <see cref="CodeGenEngines" />.</summary>
-    public static CodeGenEngines ToCodeGenEngines(this DatabaseEngine engine) =>
+    /// <summary>The flag of the engine's queries in <see cref="MethodEngines" />.</summary>
+    public static MethodEngines ToMethodEngines(this DatabaseEngine engine) =>
         engine switch
         {
-            DatabaseEngine.PostgreSql => CodeGenEngines.Postgres,
-            DatabaseEngine.SqlServer => CodeGenEngines.SqlServer,
+            DatabaseEngine.PostgreSql => MethodEngines.Postgres,
+            DatabaseEngine.SqlServer => MethodEngines.SqlServer,
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
 

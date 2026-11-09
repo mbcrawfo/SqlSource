@@ -33,14 +33,14 @@
       "type": "string"
     },
     "output": {
-      "description": "What SqlSource generates for a query: `sql`, `models` or `codegen`, matched ignoring case, hyphens and spaces. Default `codegen`.",
+      "description": "What SqlSource generates for a query: `sql`, `models` or `methods`, matched ignoring case, hyphens and spaces. Default `methods`.",
       "type": "string",
       "anyOf": [
         {
-          "enum": ["sql", "models", "codegen"]
+          "enum": ["sql", "models", "methods"]
         },
         {
-          "pattern": "^\\s*(?:[- \\t]*(?:[sS][- \\t]*[qQ][- \\t]*[lL][- \\t]*|[mM][- \\t]*[oO][- \\t]*[dD][- \\t]*[eE][- \\t]*[lL][- \\t]*[sS][- \\t]*|[cC][- \\t]*[oO][- \\t]*[dD][- \\t]*[eE][- \\t]*[gG][- \\t]*[eE][- \\t]*[nN][- \\t]*))?\\s*$"
+          "pattern": "^\\s*(?:[- \\t]*(?:[sS][- \\t]*[qQ][- \\t]*[lL][- \\t]*|[mM][- \\t]*[oO][- \\t]*[dD][- \\t]*[eE][- \\t]*[lL][- \\t]*[sS][- \\t]*|[mM][- \\t]*[eE][- \\t]*[tT][- \\t]*[hH][- \\t]*[oO][- \\t]*[dD][- \\t]*[sS][- \\t]*))?\\s*$"
         }
       ]
     },
@@ -196,7 +196,7 @@
       "type": "string"
     },
     "memberLocation": {
-      "description": "Where a query's members go: `extension class`, `class` or `nested class`, matched ignoring case, hyphens and spaces. Default: `extension class` for the output `codegen`, else `nested class`.",
+      "description": "Where a query's members go: `extension class`, `class` or `nested class`, matched ignoring case, hyphens and spaces. Default: `extension class` for the output `methods`, else `nested class`.",
       "type": "string",
       "anyOf": [
         {

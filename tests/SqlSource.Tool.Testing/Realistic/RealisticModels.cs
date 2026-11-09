@@ -99,7 +99,7 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
         entry.Parameters.Count == 0 ? null : ModelNamed(entry.Name, InputSuffix);
 
     // The method the generator writes for the case's query, on the extension class of the corpus's claim of the case at
-    // CodeGen, in the namespace of the models.  It must have the generated signature for the entry's models, which
+    // Methods, in the namespace of the models.  It must have the generated signature for the entry's models, which
     // RealisticCalls checks.
     public MethodInfo MethodOf(RealisticCorpus corpus, RealisticCase found, SidecarEntry entry)
     {

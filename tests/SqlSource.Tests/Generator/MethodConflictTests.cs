@@ -9,7 +9,7 @@ namespace SqlSource.Tests.Generator;
 
 // The methods of two types compared: two extension methods that a call could not tell apart (SQLSRC274), and an
 // extension class that cannot be written (SQLSRC276).  Neither leaves an error in the compilation.  Each run is at
-// CodeGen under postgres on Npgsql 10.
+// Methods under postgres on Npgsql 10.
 public sealed class MethodConflictTests
 {
     private const string APath = "/app/Repo/A.sql";

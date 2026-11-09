@@ -70,7 +70,7 @@ public sealed class SettingsFileReaderTests
             {
                 "dialect": "mysql, ansi_quotes",
                 "database": "orders",
-                "output": "Code-Gen",
+                "output": "Me-Thods",
                 "inputModelSuffix": "Args",
                 "outputModelSuffix": "Row",
                 "modelNamespace": "App.Models",
@@ -91,7 +91,7 @@ public sealed class SettingsFileReaderTests
             new SettingsLevel
             {
                 Database = "orders",
-                Output = OutputKind.CodeGen,
+                Output = OutputKind.Methods,
                 InputModelSuffix = "Args",
                 OutputModelSuffix = "Row",
                 ModelNamespace = "App.Models",

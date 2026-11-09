@@ -30,10 +30,10 @@ public sealed class PlacementDiagnosticsTests
     // A file of the type that no error reaches, whose constant the type keeps.
     private static readonly SqlFile Kept = new("/app/Repo/Kept.sql", "-- name: Kept\n-- output: sql\nSELECT 9;\n");
 
-    // The sql constant goes to a private nested class, and the codegen query, whose method goes to the extension
+    // The sql constant goes to a private nested class, and the methods query, whose method goes to the extension
     // class by default, cannot be private there.  The message names the header and suggests a marker on the query.
     [Fact]
-    public void Run_HeaderPrivateWithACodeGenQuery_ReportsSqlsrc123NamingTheHeader()
+    public void Run_HeaderPrivateWithAMethodsQuery_ReportsSqlsrc123NamingTheHeader()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -58,7 +58,7 @@ public sealed class PlacementDiagnosticsTests
 
     // The fix the message suggests: the query's own visibility, which the header's does not reach.
     [Fact]
-    public void Run_HeaderPrivateWithAVisibilityOnTheCodeGenQuery_PlacesBoth()
+    public void Run_HeaderPrivateWithAVisibilityOnTheMethodsQuery_PlacesBoth()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -343,7 +343,7 @@ public sealed class PlacementDiagnosticsTests
         run.Problems()
             .ShouldBe([
                 "SQLSRC241 /app/Repo/Users.sql(1,10)-(1,17): The query 'GetUser' has no entry in the sidecar of its "
-                    + "file, and its output 'codegen' needs one.  Run 'sqlsource describe'.",
+                    + "file, and its output 'methods' needs one.  Run 'sqlsource describe'.",
             ]);
     }
 

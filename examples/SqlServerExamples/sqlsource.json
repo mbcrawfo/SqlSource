@@ -14,7 +14,7 @@
   },
   "libraryTypes": {
     // SQL Server turns a library on only when asked, so the project turns on NodaTime, NetTopologySuite and
-    // System.Text.Json, whose types only the methods of CodeGen/ get.  The type override above still wins over NodaTime
+    // System.Text.Json, whose types only the methods of Methods/ get.  The type override above still wins over NodaTime
     // for every date, which stays a DateOnly.
     "nodaTime": "on",
     "netTopologySuite": "on",

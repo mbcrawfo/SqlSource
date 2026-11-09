@@ -14,7 +14,7 @@ namespace SqlSource.Tests.Generator;
 
 // A project's own class in a JSON column, json or jsonb on PostgreSQL and json on SQL Server, read and sent through
 // System.Text.Json's serializer with its default options, whether an override, a column type or a marker chose it,
-// unless the project has a converter of the class.  Each run is at CodeGen, with an entry written for each query's
+// unless the project has a converter of the class.  Each run is at Methods, with an entry written for each query's
 // current hash, on the driver it names: Npgsql 8 and 10 give the same text.
 public sealed class JsonSerializerMethodTests
 {
@@ -541,7 +541,7 @@ public sealed class JsonSerializerMethodTests
         };
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [file, Sidecars.Of(file, entry)],
             supportedFramework: !net8,
@@ -830,12 +830,12 @@ public sealed class JsonSerializerMethodTests
         run.Sources["App.SaveMetaParams-Model.g.cs"].ShouldContain(OrderMetadata + " Meta");
     }
 
-    // A type override of jsonb to the class reaches a models query and a codegen query of one file: the models
-    // query's model keeps the class, with nothing reported, and the codegen query's method serializes it.
+    // A type override of jsonb to the class reaches a models query and a methods query of one file: the models
+    // query's model keeps the class, with nothing reported, and the methods query's method serializes it.
     [Theory]
     [InlineData("Npgsql 10", "jsonb")]
     [InlineData("SqlClient 7", "json")]
-    public void Run_OverrideToAClassSharedByModelsAndCodeGen_UsesTheClassInEach(string driver, string key)
+    public void Run_OverrideToAClassSharedByModelsAndMethods_UsesTheClassInEach(string driver, string key)
     {
         var isSqlServer = IsSqlServer(driver);
         SidecarType database = isSqlServer ? SqlServerJson : Jsonb;

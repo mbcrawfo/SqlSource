@@ -421,7 +421,7 @@ Rules: [a class in a JSON column](settings.md#json-class), [the JSON opt-in](set
 
 ## Use the queries with Dapper or your own ADO.NET code
 
-Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under the default, `codegen`, it has a [method](generator.md#query-methods) in place of the constant, so a file whose queries you run yourself sets the output to `models`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
+Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under the default, `methods`, it has a [method](generator.md#query-methods) in place of the constant, so a file whose queries you run yourself sets the output to `models`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
 
 ```sql
 -- output: models
@@ -501,7 +501,7 @@ public partial class OrderRepository(DbConnection connection)
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 ```
 
-The input model is the parameter object, and the output model is the type of a row.  The output `models` gives the queries their constants and models, and no [method](generator.md#query-methods), which the default, `codegen`, would give in place of the constant.  What makes Dapper read them, with either database:
+The input model is the parameter object, and the output model is the type of a row.  The output `models` gives the queries their constants and models, and no [method](generator.md#query-methods), which the default, `methods`, would give in place of the constant.  What makes Dapper read them, with either database:
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.

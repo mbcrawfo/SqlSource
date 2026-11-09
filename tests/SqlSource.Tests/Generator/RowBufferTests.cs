@@ -16,7 +16,7 @@ namespace SqlSource.Tests.Generator;
 
 // The buffer a many method reads its rows into when it returns an array, a list, an immutable array or one of their
 // interfaces: written once for the project, in a file of its own, when a method it keeps uses it, and named from
-// global:: in each method.  Each run is at CodeGen under postgres on Npgsql 10, and every method must compile without
+// global:: in each method.  Each run is at Methods under postgres on Npgsql 10, and every method must compile without
 // a warning.
 public sealed class RowBufferTests
 {
@@ -298,7 +298,7 @@ public sealed class RowBufferTests
         var source = MethodRuns.Source.Replace("(Source = \".\")", string.Empty, StringComparison.Ordinal);
         var listUsers = ListUsers with { Path = "/app/Repo/Sample.sql" };
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
             [listUsers, Sidecars.Of(listUsers, Users(listUsers, "ListUsers"))],
             supportedFramework: supportedFramework,

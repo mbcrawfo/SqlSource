@@ -54,7 +54,7 @@ public sealed class MethodSignatureTests
             TestSidecars.Of(method),
             EquatableArray<DiagnosticInfo>.Empty,
             EquatableArray<SettingsFileLibraryUse>.Empty,
-            CodeGenEngines.None,
+            MethodEngines.None,
             EquatableArray<string>.Empty,
             EquatableArray<LibraryValue>.Empty,
             EquatableArray<LibraryUse>.Empty

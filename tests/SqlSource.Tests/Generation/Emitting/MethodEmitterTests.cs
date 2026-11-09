@@ -55,7 +55,7 @@ public sealed class MethodEmitterTests
             TestSidecars.Of(QueryMethodWriterTests.GetUser, ListUsers),
             EquatableArray<DiagnosticInfo>.Empty,
             EquatableArray<SettingsFileLibraryUse>.Empty,
-            CodeGenEngines.None,
+            MethodEngines.None,
             EquatableArray<string>.Empty,
             EquatableArray<LibraryValue>.Empty,
             EquatableArray<LibraryUse>.Empty

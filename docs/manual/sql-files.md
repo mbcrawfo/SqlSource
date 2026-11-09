@@ -31,7 +31,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- token:` | Gives a token a default | no | yes | [Defaults](parameters-and-tokens.md#token-marker) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](parameters-and-tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
-| `-- output:` | What is generated for a query: its SQL alone (`sql`), its SQL and its models (`models`), or its models and a method that runs it (`codegen`).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](settings.md#setting-output) |
+| `-- output:` | What is generated for a query: its SQL alone (`sql`), its SQL and its models (`models`), or its models and a method that runs it (`methods`).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](settings.md#setting-output) |
 | `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
 | `-- model-namespace:` | The namespace of the models | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
 | `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](settings.md#setting-model-type) |
@@ -80,7 +80,7 @@ SELECT id, name FROM users WHERE id = @id;
 UPDATE users SET name = @name WHERE id = @id;
 ```
 
-A name can be followed by `->` and one of five shapes, which say what the [method](generator.md#query-methods) of a query whose output is `codegen` returns:
+A name can be followed by `->` and one of five shapes, which say what the [method](generator.md#query-methods) of a query whose output is `methods` returns:
 
 | Shape | The method returns |
 |----|----|
@@ -191,7 +191,7 @@ Writing a marker twice in one place is fine when the value is the same.  The wor
 
 A comment of yours that happens to start with one of the words and a colon, such as `-- summary: see the ticket`, is read as a marker.  Reword it.
 
-An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves the query without models: under the output `models` it keeps its constant or token method, and under `codegen` it gets no method until it is fixed.  See [which queries get a method](generator.md#which-methods) and [diagnostics](diagnostics.md).
+An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves the query without models: under the output `models` it keeps its constant or token method, and under `methods` it gets no method until it is fixed.  See [which queries get a method](generator.md#which-methods) and [diagnostics](diagnostics.md).
 
 <a id="known-issues"></a>
 

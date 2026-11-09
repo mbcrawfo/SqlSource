@@ -257,7 +257,7 @@ public sealed class GeneratedSourceMethodTests
     }
 
     // The same names as the token of a query's method, beside its parameters, its connection and its locals, under
-    // CodeGen: one method reads many rows, the other one, and each binds a parameter and reads a column through a
+    // Methods: one method reads many rows, the other one, and each binds a parameter and reads a column through a
     // converter, and an array element by element, so that value names the pattern variable of the binding and element
     // and item the static lambdas' parameter and pattern variable too.  C# lets a lambda's names hide the token's
     // argument, so the text is checked for them as well.

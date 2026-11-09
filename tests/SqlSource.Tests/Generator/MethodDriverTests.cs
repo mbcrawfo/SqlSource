@@ -13,7 +13,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The driver a query's method needs: without it, SQLSRC273 once for the project and engine; below the floor,
-// SQLSRC247 or SQLSRC267.  Either way the models are emitted and no method is.  Each run is at CodeGen.
+// SQLSRC247 or SQLSRC267.  Either way the models are emitted and no method is.  Each run is at Methods.
 public sealed class MethodDriverTests
 {
     private static readonly SqlFile Users = new(
@@ -34,22 +34,22 @@ public sealed class MethodDriverTests
     ];
 
     private const string PostgresNotReferenced =
-        "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output codegen, and this project does not reference "
+        "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output methods, and this project does not reference "
         + "Npgsql, which its method needs.  Reference Npgsql, or set the output to models.";
 
     private const string SqlServerNotReferenced =
-        "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output codegen, and this project does not reference "
+        "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output methods, and this project does not reference "
         + "Microsoft.Data.SqlClient, which its method needs.  Reference Microsoft.Data.SqlClient, or set the output to "
         + "models.";
 
     [Fact]
-    public void Run_PostgresCodeGenWithoutNpgsql_IsSqlsrc273OnceAndModelsAreEmitted()
+    public void Run_PostgresMethodsWithoutNpgsql_IsSqlsrc273OnceAndModelsAreEmitted()
     {
         var run = MethodRuns.Run(Users, PostgresEntries, references: []);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output codegen, and this project does not "
+                "SQLSRC273 (1,1)-(1,1): A query for PostgreSQL has the output methods, and this project does not "
                     + "reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.",
             ]);
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
@@ -58,13 +58,13 @@ public sealed class MethodDriverTests
     }
 
     [Fact]
-    public void Run_SqlServerCodeGenWithoutSqlClient_IsSqlsrc273OnceAndModelsAreEmitted()
+    public void Run_SqlServerMethodsWithoutSqlClient_IsSqlsrc273OnceAndModelsAreEmitted()
     {
         var run = MethodRuns.RunSqlServer(Users, SqlServerEntries, references: []);
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output codegen, and this project does not "
+                "SQLSRC273 (1,1)-(1,1): A query for SQL Server has the output methods, and this project does not "
                     + "reference Microsoft.Data.SqlClient, which its method needs.  Reference "
                     + "Microsoft.Data.SqlClient, or set the output to models.",
             ]);
@@ -74,7 +74,7 @@ public sealed class MethodDriverTests
 
     // A dialect the describer does not know has no entry and no method, so it needs no driver: SQLSRC209 alone.
     [Fact]
-    public void Run_AnsiCodeGenWithoutDrivers_IsSqlsrc209AndNotSqlsrc273()
+    public void Run_AnsiMethodsWithoutDrivers_IsSqlsrc209AndNotSqlsrc273()
     {
         var run = MethodRuns.Run(Users, [], references: [], dialect: "ansi");
 
@@ -85,7 +85,7 @@ public sealed class MethodDriverTests
 
     // Once for each engine whose queries need a driver the project does not reference.
     [Fact]
-    public void Run_CodeGenOfBothEnginesWithNeitherDriver_IsSqlsrc273OnceForEach()
+    public void Run_MethodsOfBothEnginesWithNeitherDriver_IsSqlsrc273OnceForEach()
     {
         var orders = new SqlFile(
             "/app/Repo/Orders.sql",
@@ -99,7 +99,7 @@ public sealed class MethodDriverTests
         );
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
             [Users, Sidecars.Of(Users, PostgresEntries), orders, Sidecars.Of(orders, ordersEntry)],
             references: [],

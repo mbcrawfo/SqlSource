@@ -12,5 +12,5 @@ internal enum OutputKind
     Models = 1,
 
     /// <summary><see cref="Models" />, and the method that runs the query.</summary>
-    CodeGen = 2,
+    Methods = 2,
 }

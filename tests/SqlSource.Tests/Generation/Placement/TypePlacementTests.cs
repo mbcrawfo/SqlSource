@@ -264,7 +264,7 @@ public sealed class TypePlacementTests
 
     // A header's visibility reaches every query of the file, including one whose location it does not fit.
     [Fact]
-    public void Of_HeaderPrivateWithACodeGenQuery_ReportsSqlsrc123NamingTheHeader()
+    public void Of_HeaderPrivateWithAMethodsQuery_ReportsSqlsrc123NamingTheHeader()
     {
         var files = Files(
             File(
@@ -620,7 +620,7 @@ public sealed class TypePlacementTests
     public void Of_DeclaredNameOffTheTypeOrForAMethod_IsNoErrorHere(bool isMethod)
     {
         var query = isMethod
-            ? Query("Get", output: OutputKind.CodeGen, location: MemberLocation.Class)
+            ? Query("Get", output: OutputKind.Methods, location: MemberLocation.Class)
             : Query("Get", output: OutputKind.Sql, location: MemberLocation.NestedClass);
         var files = Files(File("Users.sql", query));
 
@@ -763,10 +763,10 @@ public sealed class TypePlacementTests
         );
 
     // A query whose markers give what the test writes, from the file header unless the place says otherwise, at the
-    // first line of Users.sql unless the test gives another place.  Its output is CodeGen unless the test says.
+    // first line of Users.sql unless the test gives another place.  Its output is Methods unless the test says.
     private static SqlQuery Query(
         string name,
-        OutputKind output = OutputKind.CodeGen,
+        OutputKind output = OutputKind.Methods,
         MemberLocation? location = null,
         Visibility? visibility = null,
         string? nestedClass = null,

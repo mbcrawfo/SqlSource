@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SqlSource;
 
-namespace PostgresExamples.CodeGen;
+namespace PostgresExamples.Methods;
 
 // The queries of UserQueries.sql, the file named for the class.  Their methods are in the generated class
 // UserQueriesExtensions.

@@ -120,7 +120,7 @@ internal sealed class CachingScene
         + (members.Length == 0 ? ";\n" : "\n{\n" + members + "}\n");
 
     // The two types of the tests of the methods with these sources, which put both in the namespace App, so that a
-    // method of each can clash, and read no constant, since a query at CodeGen has none.  OrderQueries is the plain
+    // method of each can clash, and read no constant, since a query at Methods has none.  OrderQueries is the plain
     // type of App unless its source is given.
     public static CSharpCompilation MethodsCompilation(string usersSource, string? ordersSource = null) =>
         GeneratorHarness.CreateCompilation(
@@ -131,7 +131,7 @@ internal sealed class CachingScene
             references: [NpgsqlReferences.Npgsql10]
         );
 
-    // Both types at CodeGen under postgres, with Users and Orders, each with a current sidecar whose entry has one
+    // Both types at Methods under postgres, with Users and Orders, each with a current sidecar whose entry has one
     // column, of int4, so that each type has one method, in its extension class.  A sidecar given is used in place of
     // the one of its file.
     public GeneratorDriver FirstRunOfMethods(Compilation compilation, params InMemoryAdditionalText[] given)
@@ -160,7 +160,7 @@ internal sealed class CachingScene
             sidecars.Add(sidecar);
         }
 
-        return CreateDriver(ProjectFile(OutputKind.CodeGen, "postgres"), [users, Orders, .. sidecars])
+        return CreateDriver(ProjectFile(OutputKind.Methods, "postgres"), [users, Orders, .. sidecars])
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
     }
 

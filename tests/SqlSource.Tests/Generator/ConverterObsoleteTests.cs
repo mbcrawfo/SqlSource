@@ -10,7 +10,7 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generator;
 
 // A converter or a mapped type that is obsolete or experimental: the generated code that calls it disables the warning
-// of its attribute, so that a project builds as it did.  Each run is at CodeGen under postgres on Npgsql 10.  The
+// of its attribute, so that a project builds as it did.  Each run is at Methods under postgres on Npgsql 10.  The
 // cases are shared with ConverterMethodTests through ConverterCases.
 public sealed class ConverterObsoleteTests
 {
@@ -55,7 +55,7 @@ public sealed class ConverterObsoleteTests
     // A method reads a mapped type that has no converter through GetFieldValue<T>, and an obsolete one warns there as
     // it would in a model.
     [Fact]
-    public void Run_ObsoleteMappedTypeUnderCodeGen_DisablesItsWarning()
+    public void Run_ObsoleteMappedTypeUnderMethods_DisablesItsWarning()
     {
         const string Source = """
             using SqlSource;

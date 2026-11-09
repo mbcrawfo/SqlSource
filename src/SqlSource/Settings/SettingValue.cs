@@ -10,8 +10,8 @@ internal static class SettingValue
 {
     /// <summary>
     /// Reads a value from a fixed list: the name of a member of <typeparamref name="T" />, ignoring case and
-    /// ignoring the hyphens, spaces and tabs inside <paramref name="value" />.  So <c>CodeGen</c>, <c>codegen</c>
-    /// and <c>code-gen</c> are one value, and so are <c>SealedRecord</c> and <c>sealed record</c>.  Nothing is
+    /// ignoring the hyphens, spaces and tabs inside <paramref name="value" />.  So <c>Methods</c>, <c>methods</c>
+    /// and <c>me-thods</c> are one value, and so are <c>SealedRecord</c> and <c>sealed record</c>.  Nothing is
     /// allocated.
     /// </summary>
     public static bool TryReadChoice<T>(ReadOnlySpan<char> value, out T choice)

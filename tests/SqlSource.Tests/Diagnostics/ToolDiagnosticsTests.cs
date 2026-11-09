@@ -211,9 +211,9 @@ public sealed class ToolDiagnosticsTests
 
     [Fact]
     public void OutputNeedsDescribableDialect_Message_HoldsTheOutputAndTheDialect() =>
-        Format(ToolDiagnostics.OutputNeedsDescribableDialect, "codegen", "ansi")
+        Format(ToolDiagnostics.OutputNeedsDescribableDialect, "methods", "ansi")
             .ShouldBe(
-                "The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no "
+                "The output 'methods' needs each query described by its database, and the dialect 'ansi' has no "
                     + "database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'."
             );
 

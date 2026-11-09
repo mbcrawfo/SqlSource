@@ -1,5 +1,5 @@
 # The PostgreSQL of the example: PostgreSQL 18.6 with PostGIS installed at an exact package version, which the queries
-# of CodeGen/DeliveryQueries.sql need for their geography column.  docker-compose.yml builds it on its first start.
+# of Methods/DeliveryQueries.sql need for their geography column.  docker-compose.yml builds it on its first start.
 # Only in this repository: both versions are those of its tests, which a test keeps in step, as rule 5 of the
 # repository's AGENTS.md says.
 FROM postgres:18.6

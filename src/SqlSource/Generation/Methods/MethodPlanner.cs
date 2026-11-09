@@ -19,7 +19,7 @@ namespace SqlSource.Generation.Methods;
 /// Decides which queries of one type get a method, and what each method is written from, with the problems of those
 /// that cannot have one: <c>SQLSRC123</c> for a method that cannot take or return its internal models,
 /// <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, the errors of a query's SQL that are only a method's
-/// (<see cref="SqlQuery.CodeGenErrors" />), and, from
+/// (<see cref="SqlQuery.MethodErrors" />), and, from
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
@@ -35,7 +35,7 @@ internal static class MethodPlanner
 
     /// <summary>
     /// The methods of the type: one for each query of a file it can use whose output is
-    /// <see cref="OutputKind.CodeGen" />, whose entry has the models it needs, whose shape, name, tokens and
+    /// <see cref="OutputKind.Methods" />, whose entry has the models it needs, whose shape, name, tokens and
     /// converters a method can have, whose engine's driver the project references at or above the floor, and which
     /// uses no library older than its floor.  A type with a diagnostic of its own, or with no file, has none.
     /// </summary>
@@ -47,7 +47,7 @@ internal static class MethodPlanner
         var methods = ImmutableArray.CreateBuilder<QueryMethod>();
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var libraryUses = ImmutableArray.CreateBuilder<SettingsFileLibraryUse>();
-        var engines = CodeGenEngines.None;
+        var engines = MethodEngines.None;
         var warningIds = new SortedSet<string>(StringComparer.Ordinal);
         // Made only when a first library is added, so that a type that uses none allocates nothing for them.
         SortedSet<SqlLibrary>? conversionLibraries = null;
@@ -138,7 +138,7 @@ internal static class MethodPlanner
         return (isPublic, new EquatableArray<NestedClassPlacement>(used), hasProtected);
     }
 
-    private static CodeGenEngines Collect(
+    private static MethodEngines Collect(
         MethodsInput input,
         string key,
         ImmutableArray<QueryMethod>.Builder methods,
@@ -156,11 +156,11 @@ internal static class MethodPlanner
         nestedClasses = queries.Placement.NestedClasses;
         var written = WrittenNames(queries);
         var planned = new List<Planned>();
-        var engines = CodeGenEngines.None;
+        var engines = MethodEngines.None;
         var served = new ServedConverters(input.Converters);
         foreach (var usable in queries)
         {
-            if (usable.Settings.Output != OutputKind.CodeGen)
+            if (usable.Settings.Output != OutputKind.Methods)
             {
                 continue;
             }
@@ -173,7 +173,7 @@ internal static class MethodPlanner
             }
 
             var engine = SqlDescribableDialects.EngineOf(file.Dialect);
-            engines |= engine.ToCodeGenEngines();
+            engines |= engine.ToMethodEngines();
             var context = new QueryContext(input, key, file, engine, usable);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
             var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
@@ -187,14 +187,14 @@ internal static class MethodPlanner
         return engines;
     }
 
-    // The names of the members the type's file writes for the queries whose output is not CodeGen: each one's constant
+    // The names of the members the type's file writes for the queries whose output is not Methods: each one's constant
     // or token method, with the nested class that holds it, or null for one on the type itself.
     private static HashSet<(string? NestedClass, string Name)> WrittenNames(UsableQuerySequence queries)
     {
         var names = new HashSet<(string? NestedClass, string Name)>();
         foreach (var usable in queries)
         {
-            if (usable.Settings.Output != OutputKind.CodeGen)
+            if (usable.Settings.Output != OutputKind.Methods)
             {
                 _ = names.Add((usable.Placement.NestedClass, usable.Query.Name));
             }
@@ -220,7 +220,7 @@ internal static class MethodPlanner
             _ => throw UnexpectedEnumValueException.Of(placement.Location),
         };
 
-    // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
+    // The plan of one query whose output is Methods, or null when it gets nothing and reports nothing here.  Every
     // problem of its SQL, of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC274 and of its converters that the query has is
     // reported, and any one leaves it no method.  Its conversions see the converters of the type's slice that serve
     // its target.  The libraries it uses are added to the type's, and one older than its floor leaves it no method,
@@ -240,12 +240,12 @@ internal static class MethodPlanner
         // models, so it gets them before it is described.
         if (input.Files[usable.FileIndex].Find(queryIndex, query.Name) is not { } models)
         {
-            return query.CodeGenErrors.Count == 0
+            return query.MethodErrors.Count == 0
                 ? null
-                : new Planned([.. query.CodeGenErrors], query.Name, query.NameLocation, [], false, []);
+                : new Planned([.. query.MethodErrors], query.Name, query.NameLocation, [], false, []);
         }
 
-        var problems = new List<DiagnosticInfo>(query.CodeGenErrors);
+        var problems = new List<DiagnosticInfo>(query.MethodErrors);
         // Its models' assignments are looked for only where its visibility needs them public, so a method that is not
         // refused costs one switch.
         var type = input.Type.Type.Type;

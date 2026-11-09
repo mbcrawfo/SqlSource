@@ -1,6 +1,6 @@
 using SqlSource;
 
-namespace SqlServerExamples.CodeGen;
+namespace SqlServerExamples.Methods;
 
 // An email address, the type that UserQueries.sql gives the alias type dbo.Email with a type override.  The driver
 // reads an alias type over nvarchar as a C# string and knows nothing of EmailAddress, so the generated methods read the

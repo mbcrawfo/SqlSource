@@ -14,12 +14,12 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// SQLSRC281: a library that the switch turns on for a codegen query, whose assemblies the project does not reference
+// SQLSRC281: a library that the switch turns on for a methods query, whose assemblies the project does not reference
 // for the query's engine, is reported at the place that says on, once for each place and engine, whatever the number
 // of queries, files and types it reaches.  The queries keep their methods, with the base map's types.  Each run is
 // under postgres on Npgsql 10 unless it says otherwise.
 //
-// SQLSRC282: a package of a library older than its floor that a codegen query uses on its engine is reported once for
+// SQLSRC282: a package of a library older than its floor that a methods query uses on its engine is reported once for
 // the project, with no position, and the queries that use it get no method, while their models keep the library's
 // types.
 public sealed class LibraryDiagnosticsTests
@@ -134,7 +134,7 @@ public sealed class LibraryDiagnosticsTests
         var events = new SqlFile("/app/Repo/Events.sql", "-- name: ListOthers\nSELECT at FROM events;\n");
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, TwoTypes)],
             [
                 users,
@@ -167,7 +167,7 @@ public sealed class LibraryDiagnosticsTests
         );
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
             [users, Sidecars.Of(users, EventsEntry(users)), orders, Sidecars.Of(orders, ordersEntry)],
             references: [NpgsqlReferences.Npgsql10, SqlClientReferences.SqlClient7],
@@ -178,7 +178,7 @@ public sealed class LibraryDiagnosticsTests
         run.Problems().ShouldBe([AtTheProjectsMember + OnForPostgres, AtTheProjectsMember + OnForSqlServer]);
     }
 
-    // The switch is for codegen queries: a query at models has the base map's types, whatever it says.
+    // The switch is for methods queries: a query at models has the base map's types, whatever it says.
     [Fact]
     public void Run_OnForAModelsClaimOnly_IsNotReported()
     {
@@ -237,7 +237,7 @@ public sealed class LibraryDiagnosticsTests
     // Two types claim two files, each of one SQL Server query that reads and finds by a date, which NodaTime, on for
     // the project and below its floor, makes a LocalDate: one SQLSRC282, no method, and models of LocalDate.
     [Fact]
-    public void Run_NodaTimeBelowTheFloorAndACodeGenUse_Reports282Once()
+    public void Run_NodaTimeBelowTheFloorAndAMethodsUse_Reports282Once()
     {
         const string TwoTypes = """
             using SqlSource;
@@ -258,7 +258,7 @@ public sealed class LibraryDiagnosticsTests
         var events = new SqlFile("/app/Repo/Events.sql", "-- name: FindEvents\nSELECT d FROM events WHERE d = @d;\n");
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, TwoTypes)],
             [
                 users,
@@ -278,7 +278,7 @@ public sealed class LibraryDiagnosticsTests
         run.Sources.Keys.ShouldNotContain(ConversionsFile);
     }
 
-    // The library's rows are for codegen queries: at models a query has the base map's types, and uses nothing.
+    // The library's rows are for methods queries: at models a query has the base map's types, and uses nothing.
     [Fact]
     public void Run_NodaTimeBelowTheFloorAndAModelsUseOnly_ReportsNothing()
     {
@@ -559,7 +559,7 @@ public sealed class LibraryDiagnosticsTests
         var places = new SqlFile("/app/Repo/Places.sql", "-- dialect: mssql\n" + FindPlaces);
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
             [shapes, Sidecars.Of(shapes, ShapesEntry(shapes)), places, Sidecars.Of(places, PlacesEntry(places))],
             references:
@@ -609,14 +609,14 @@ public sealed class LibraryDiagnosticsTests
             [TestSidecars.Column(0, "place", Geography, nullable: true)]
         );
 
-    // ListShapes at CodeGen under postgres, with these references.
+    // ListShapes at Methods under postgres, with these references.
     private static GeneratorRun RunShapes(MetadataReference[] references)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
         return MethodRuns.Run(file, [ShapesEntry(file)], references: references);
     }
 
-    // FindPlaces at CodeGen under mssql, with these references and NetTopologySuite on.
+    // FindPlaces at Methods under mssql, with these references and NetTopologySuite on.
     private static GeneratorRun RunPlaces(MetadataReference[] references)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, FindPlaces);
@@ -643,7 +643,7 @@ public sealed class LibraryDiagnosticsTests
     private static string NodaTimeIs(string state) =>
         GeneratorHarness.Json(new JsonObject { ["libraryTypes"] = new JsonObject { ["nodaTime"] = state } });
 
-    // ListEvents of this text at CodeGen, with these references and the project's settings.
+    // ListEvents of this text at Methods, with these references and the project's settings.
     private static GeneratorRun RunEvents(string text, MetadataReference[] references, string? settings = null)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, text);

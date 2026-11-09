@@ -1,21 +1,18 @@
--- The queries of the users, at the default output, codegen, which UserQueries calls.  The type override gives the
--- domain email of the file the type EmailAddress, whose converters the methods call to read and send an email.
--- type-override: public.email=EmailAddress
+-- The queries of the users, at the default output, methods, which UserQueries calls.  The type override gives the
+-- alias type dbo.Email of the file the type EmailAddress, whose converters the methods call to read and send an email.
+-- type-override: dbo.Email=EmailAddress
 
 -- name: FindUserByEmail -> one-optional
 -- summary: The user with an email address, or null.
--- one-optional: the method returns the row, or null when there is none.  PostgreSQL gives a parameter compared with a
--- domain column the domain's base type, text, so the marker declares @email as the domain, which the type override
--- reaches.
--- param: @email public.email
+-- one-optional: the method returns the row, or null when there is none.  SQL Server gives a parameter compared with a
+-- column of an alias type that alias type, so @email is an EmailAddress with no marker.
 SELECT id, name, email
 FROM users
 WHERE email = @email;
 
 -- name: ChangeUserEmail -> rowcount
 -- summary: Changes the email address of one user.
--- rowcount: the method returns the count of rows updated.  A parameter written to a domain column has the domain's
--- type, so @email is an EmailAddress with no marker.
+-- rowcount: the method returns the count of rows updated.
 UPDATE users
 SET email = @email
 WHERE id = @userId;

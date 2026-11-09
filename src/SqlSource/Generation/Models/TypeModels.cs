@@ -19,10 +19,10 @@ internal static class TypeModels
 {
     /// <summary>
     /// The requests of the type, for each query of a file it can use whose output is <see cref="OutputKind.Models" />
-    /// or <see cref="OutputKind.CodeGen" /> and whose models are in <paramref name="files" />.  A type with a
+    /// or <see cref="OutputKind.Methods" /> and whose models are in <paramref name="files" />.  A type with a
     /// diagnostic of its own asks for none, as it gets no file of its own.  A query at <see cref="OutputKind.Models" />
     /// whose models have a <see cref="QueryModels.WithoutLibraryFailure" /> gets none: a property of it has a type only
-    /// through a library, which only <see cref="OutputKind.CodeGen" /> reads, and <see cref="LibraryFailuresOf" />
+    /// through a library, which only <see cref="OutputKind.Methods" /> reads, and <see cref="LibraryFailuresOf" />
     /// reports the failure instead.
     /// </summary>
     /// <param name="type">The type with its parsed files.</param>
@@ -48,8 +48,8 @@ internal static class TypeModels
 
             var settings = usable.Settings;
             if (
-                settings.Output is not (OutputKind.Models or OutputKind.CodeGen)
-                || (settings.Output != OutputKind.CodeGen && query.WithoutLibraryFailure is not null)
+                settings.Output is not (OutputKind.Models or OutputKind.Methods)
+                || (settings.Output != OutputKind.Methods && query.WithoutLibraryFailure is not null)
             )
             {
                 continue;
@@ -75,7 +75,7 @@ internal static class TypeModels
     /// <summary>
     /// The failure without its libraries of each query that the type claims at <see cref="OutputKind.Models" /> and
     /// whose models have one, <see cref="QueryModels.WithoutLibraryFailure" />, once for each query: the error that
-    /// takes the place of its models.  A query at <see cref="OutputKind.CodeGen" /> reads the library's type, and one
+    /// takes the place of its models.  A query at <see cref="OutputKind.Methods" /> reads the library's type, and one
     /// at <see cref="OutputKind.Sql" /> has no models.  A type with a diagnostic of its own reports none, as it asks
     /// for no models.
     /// </summary>
@@ -192,7 +192,7 @@ internal static class TypeModels
 
         var parameter = isInput ? GeneratorParameters.SortInput : GeneratorParameters.SortOutput;
         var isSorted = (settings.Parameters & parameter) != 0;
-        if (settings.Output != OutputKind.CodeGen)
+        if (settings.Output != OutputKind.Methods)
         {
             properties = ForOtherOutputs(properties);
         }
@@ -222,8 +222,8 @@ internal static class TypeModels
     }
 
     // Typing runs once for a file, whatever the output of the types that claim it, and a column or parameter that a
-    // library's row types has the type it has without the library beside it.  Only CodeGen reads and writes the
-    // library's type, through the driver's plugin, so a model of any other output has the base map's.  Only CodeGen's
+    // library's row types has the type it has without the library beside it.  Only Methods reads and writes the
+    // library's type, through the driver's plugin, so a model of any other output has the base map's.  Only Methods's
     // method sends an array parameter from any sequence too, so at any other output, where a library such as Dapper
     // hands the value to Npgsql as it is, the property is the array.  A list parameter is a sequence at every output.
     // Nothing is allocated when no property changes.

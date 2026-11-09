@@ -6,7 +6,7 @@ using NetTopologySuite.Geometries;
 using NodaTime;
 using SqlSource;
 
-namespace SqlServerExamples.CodeGen;
+namespace SqlServerExamples.Methods;
 
 // The queries of DeliveryQueries.sql, the file named for the class.  Their methods are in the generated class
 // DeliveryQueriesExtensions.

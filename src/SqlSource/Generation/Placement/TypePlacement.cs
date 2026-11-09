@@ -280,7 +280,7 @@ internal sealed class TypePlacement
             var leftOut = new List<int>();
             foreach (var (fileIndex, query, settings) in UsableQueries(MemberLocation.Class))
             {
-                if (settings.Output == OutputKind.CodeGen || !classes.Contains(query.Name))
+                if (settings.Output == OutputKind.Methods || !classes.Contains(query.Name))
                 {
                     continue;
                 }
@@ -406,7 +406,7 @@ internal sealed class TypePlacement
             // class.
             if (
                 location == MemberLocation.ExtensionClass
-                && settings.Output != OutputKind.CodeGen
+                && settings.Output != OutputKind.Methods
                 && settings.WrittenMemberLocation is { } writtenLocation
             )
             {
@@ -417,7 +417,7 @@ internal sealed class TypePlacement
                         query.Name,
                         TypeName,
                         PlaceText.Of(writtenLocation.Place),
-                        OutputText(settings.Output)
+                        SettingValue.NameOf(settings.Output)
                     )
                 );
                 return false;
@@ -454,7 +454,7 @@ internal sealed class TypePlacement
             location switch
             {
                 MemberLocation.NestedClass => settings.NestedClass,
-                MemberLocation.Class => settings.Output == OutputKind.CodeGen ? null : type.Name,
+                MemberLocation.Class => settings.Output == OutputKind.Methods ? null : type.Name,
                 MemberLocation.ExtensionClass => null,
                 _ => throw UnexpectedEnumValueException.Of(location),
             };
@@ -464,12 +464,12 @@ internal sealed class TypePlacement
         // first, and the method planner judges a method's name.
         private bool IsDeclaredOnType(QuerySettings settings, MemberLocation location, string name) =>
             location == MemberLocation.Class
-            && settings.Output != OutputKind.CodeGen
+            && settings.Output != OutputKind.Methods
             && SortedSearch.IndexOf(type.TakenNames, name, static taken => taken, StringComparer.Ordinal) >= 0;
 
         // What a query's method adds to its name: Async under async-method-suffix.  A constant adds nothing.
         private static string Suffix(QuerySettings settings) =>
-            settings.Output == OutputKind.CodeGen && (settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0
+            settings.Output == OutputKind.Methods && (settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0
                 ? AsyncSuffix
                 : string.Empty;
 
@@ -478,15 +478,6 @@ internal sealed class TypePlacement
             name.Length == member.Length + suffix.Length
             && name.StartsWith(member, StringComparison.Ordinal)
             && name.EndsWith(suffix, StringComparison.Ordinal);
-
-        private static string OutputText(OutputKind output) =>
-            output switch
-            {
-                OutputKind.Sql => "sql",
-                OutputKind.Models => "models",
-                OutputKind.CodeGen => "codegen",
-                _ => throw UnexpectedEnumValueException.Of(output),
-            };
 
         // Every file that has a query in one of the classes, left out.
         private void LeaveOutFilesOf(HashSet<string> classes)

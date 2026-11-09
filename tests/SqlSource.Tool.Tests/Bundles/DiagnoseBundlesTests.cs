@@ -20,7 +20,7 @@ namespace SqlSource.Tool.Tests.Bundles;
 public sealed class DiagnoseBundlesTests
 {
     private const string UsersFile = """
-        -- output: codegen
+        -- output: methods
 
         -- name: First
         SELECT 1;

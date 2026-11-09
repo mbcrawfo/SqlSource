@@ -383,7 +383,7 @@ public sealed class SqlRenamerTests
 
     [Theory]
     [InlineData("-- summary: Gets the users", "-- summary:")]
-    [InlineData("-- output: codegen", "-- output:")]
+    [InlineData("-- output: methods", "-- output:")]
     [InlineData("-- column: total not null", "-- column:")]
     public void RenameQueryFile_UnknownMarker_IsRefused(string marker, string token)
     {

@@ -1,6 +1,6 @@
 using SqlSource;
 
-namespace SqlServerExamples.CodeGen;
+namespace SqlServerExamples.Methods;
 
 // A price, the type that OrderLineQueries.sql gives its decimal columns with a type override.  The driver reads a
 // decimal column as a C# decimal and knows nothing of Price, so the generated method reads the decimal and passes it to

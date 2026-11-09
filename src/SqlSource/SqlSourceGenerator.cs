@@ -949,15 +949,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(usesRowBuffer, AddRowBuffer);
 
-        // The engines of the project's CodeGen queries, which almost never change.
-        var codeGenEngines = typeMethods
-            .Select(static (methods, _) => methods.CodeGenEngines)
+        // The engines of the project's Methods queries, which almost never change.
+        var methodEngines = typeMethods
+            .Select(static (methods, _) => methods.MethodEngines)
             .Collect()
-            .Select(static (engines, _) => engines.Aggregate(CodeGenEngines.None, static (all, engine) => all | engine))
-            .WithTrackingName(TrackingNames.CodeGenEngines);
+            .Select(static (engines, _) => engines.Aggregate(MethodEngines.None, static (all, engine) => all | engine))
+            .WithTrackingName(TrackingNames.MethodEngines);
 
         // Not located, and once for the project and engine, however many of its queries need the driver.
-        context.RegisterSourceOutput(codeGenEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
+        context.RegisterSourceOutput(methodEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
 
         // The libraries whose generated conversion a method calls, each once, which almost never change.
         var conversionLibraries = typeMethods
@@ -981,7 +981,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
 
-        // The libraries that the CodeGen queries use, each once for each engine, which almost never change.
+        // The libraries that the Methods queries use, each once for each engine, which almost never change.
         var usedLibraries = typeMethods
             .Select(static (methods, _) => methods.UsedLibraries)
             .Collect()
@@ -1045,7 +1045,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    // SQLSRC282 for each package that the libraries a CodeGen query uses need on its engine and that the project
+    // SQLSRC282 for each package that the libraries a Methods query uses need on its engine and that the project
     // references older than its floor, each once: NetTopologySuite, used on both engines, is one error.
     private static void ReportLibrariesBelowTheFloor(
         SourceProductionContext output,
@@ -1087,16 +1087,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // SQLSRC273 for each engine that a CodeGen query has and whose driver the project does not reference.
+    // SQLSRC273 for each engine that a Methods query has and whose driver the project does not reference.
     private static void ReportMissingDrivers(
         SourceProductionContext output,
-        (CodeGenEngines Engines, (NpgsqlProbe Npgsql, SqlClientProbe SqlClient) Probes) input
+        (MethodEngines Engines, (NpgsqlProbe Npgsql, SqlClientProbe SqlClient) Probes) input
     )
     {
         foreach (var engine in DatabaseEngines.All)
         {
             if (
-                (input.Engines & engine.ToCodeGenEngines()) != 0
+                (input.Engines & engine.ToMethodEngines()) != 0
                 && !DriverProbes.Of(engine, input.Probes.Npgsql, input.Probes.SqlClient).Referenced
             )
             {

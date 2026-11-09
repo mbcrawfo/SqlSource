@@ -1,6 +1,6 @@
 # Concepts
 
-SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: for a described query its models, a type for its parameters and a type for its rows, and by default a method that runs it; or a string constant, or a method where the query has tokens, that holds its SQL for your own code to run.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  On a machine with a connection, the build [runs the tool itself](tool.md#running-in-the-build) before it compiles.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
+SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: for a described query its models, a type for its parameters and a type for its rows, and by default a method that runs it; or a string constant, or a method where the query has tokens, that holds its SQL for your own code to run.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  On a machine with a connection, the build [runs the tool itself](tool.md#running-in-the-build) before it compiles.  A query whose [output](#output) is `models` or `methods`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
 
 ```mermaid
 flowchart LR
@@ -66,7 +66,7 @@ The setting that says what SqlSource produces for a query: its SQL alone, its SQ
 
 #### Query method
 
-What a described query whose [output](#output) is `codegen` becomes: an asynchronous method that opens a connection when it is closed, sends the query's parameters, runs it and reads its rows into its models.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
+What a described query whose [output](#output) is `methods` becomes: an asynchronous method that opens a connection when it is closed, sends the query's parameters, runs it and reads its rows into its models.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
 
 <a id="token-method"></a>
 
