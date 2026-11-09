@@ -330,7 +330,7 @@ public partial class OrderRepository(IConnectionFactory connections)
 }
 ```
 
-A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it.  `OrderRepository`'s method is a factory: each repository method calls it, opens the connection it returns when it is closed, and disposes it.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
+A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [known issues](generator.md#known-issues) says.  `OrderRepository`'s method is a factory: each repository method calls it, opens the connection it returns when it is closed, and disposes it.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
 
 Rules: [the connection](generator.md#repository-connection).
 
@@ -593,7 +593,7 @@ public partial class OrderRepository(DbConnection connection)
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 ```
 
-The input model is the parameter object, and the output model is the type of a row.  The output `models` gives the queries their constants and models, and no [method](generator.md#query-methods), which the default, `methods`, would give in place of the constant.  What makes Dapper read them, with either database:
+The input model is the parameter object, and the output model is the type of a row.  The output `models` gives the queries their constants and models, and no [method](generator.md#query-methods), which the default, `repository`, or `methods` would give in place of the constant.  What makes Dapper read them, with either database:
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.

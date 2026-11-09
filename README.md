@@ -213,7 +213,7 @@ By default the models are in the namespace of the type that claims the query.  S
 
 ### My project uses several databases
 
-For several databases of one kind, name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name, and a repository that uses several a connection for each, marked `[SqlSourceConnection(Database = "billing")]`: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  For files written for another kind of database, give their folder its own dialect with a `sqlsource.json` of its own, or one file a `-- dialect:` line at its top: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#folder-with-another-dialect).
+For several databases of one kind, name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name.  A repository that uses several marks a connection for each, `[SqlSourceConnection(Database = "billing")]`: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  For files written for another kind of database, give their folder its own dialect with a `sqlsource.json` of its own, or one file a `-- dialect:` line at its top: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#folder-with-another-dialect).
 
 ### How do I keep migration scripts out?
 

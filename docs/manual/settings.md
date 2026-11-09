@@ -946,7 +946,7 @@ A type that claims a query whose output is `repository` gets an [interface](gene
 
 Above, the project turns the interfaces off, and `UserRepository` turns its own back on, named `IUserStore`.  `GenerateInterface = false` turns one type's off in a project that leaves them on.
 
-- **It is a property of the project file**, and not a setting of a settings file: the settings of a `.sql` file reach its queries, and one type can claim the files of several folders.  So are the two properties of the attribute, which belong to the type.
+- **It is a property of the project file**, and not a setting of a settings file: the settings of a `.sql` file reach its queries, and one type can claim the files of several folders.  The two properties of the attribute are not settings either: they belong to the type.
 - **A name that is taken** by something beside the type is [SQLSRC035](diagnostics.md#sqlsrc035), and a name that is not a C# identifier is [SQLSRC037](diagnostics.md#sqlsrc037): the type gets no interface, and keeps its methods.
 - **A type with no repository query** gets no interface, whatever these say.
 

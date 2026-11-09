@@ -42,7 +42,7 @@ With the output `models`, the same queries give `Sql.GetUser`, a [constant](#con
 internal static partial class Reports;
 ```
 
-- **It goes on a class, a struct, a record or a record struct.**  The type may be static, generic, or nested in other types.  A static type has no instance, so its queries need an output other than `repository` ([SQLSRC034](diagnostics.md#sqlsrc034)): The files of `Reports` above set the output `methods`, `models` or `sql`.
+- **It goes on a class, a struct, a record or a record struct.**  The type may be static, generic, or nested in other types.  A static type has no instance, so its queries need an output other than `repository` ([SQLSRC034](diagnostics.md#sqlsrc034)): the files of `Reports` above set the output `methods`, `models` or `sql`.
 - **The type and every type that contains it must be `partial`** ([SQLSRC001](diagnostics.md#sqlsrc001)), and none may be `file` ([SQLSRC002](diagnostics.md#sqlsrc002)).  The generator adds its members in a second declaration of each.
 - **A type with an error gets no members**, and asks for no models.  The code that uses them then fails to compile too, so fix the first error the build reports.
 
@@ -394,7 +394,7 @@ FROM users
 WHERE id = @id;
 ```
 
-A property has the C# type of its column or parameter.  Above, in a project that maps `"date": "System.DateOnly"` with the type override and references `Npgsql.NodaTime`, `Id` is a `UserId` by the file header's column type, `Nickname` a `Nickname` by its query's marker, `CreatedAt`, a `timestamptz`, a `NodaTime.Instant` by NodaTime under `methods` and a `System.DateTime` under `models`, and `Born`, a `date`, a `System.DateOnly` by the type override.  A column's C# type is the first of these that gives one:
+A property has the C# type of its column or parameter.  Above, in a project that maps `"date": "System.DateOnly"` with the type override and references `Npgsql.NodaTime`, `Id` is a `UserId` by the file header's column type, `Nickname` a `Nickname` by its query's marker, `CreatedAt`, a `timestamptz`, a `NodaTime.Instant` by NodaTime under `methods` or `repository` and a `System.DateTime` under `models`, and `Born`, a `date`, a `System.DateOnly` by the type override.  A column's C# type is the first of these that gives one:
 
 1. its query's `-- column: name -> Type` marker: see [the `-- column:` marker](#column-marker);
 2. the [column types](settings.md#setting-column-types), by the column of a table or view it is read from;
