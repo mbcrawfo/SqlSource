@@ -281,7 +281,7 @@ public sealed class TypeEmitterTests
         source.ShouldNotContain("SELECT 2;");
     }
 
-    // A Methods query has no member in the type its member would go in, so its file is usable, and a query at sql of
+    // A methods query has no member in the type its member would go in, so its file is usable, and a query at sql of
     // the file keeps its constant.
     [Theory]
     [InlineData(false, "Sql")]
@@ -521,7 +521,7 @@ public sealed class TypeEmitterTests
         );
     }
 
-    // A Methods query's method takes the place of its constant, whether it gets one or not.
+    // A methods query's method takes the place of its constant, whether it gets one or not.
     [Fact]
     public void Emit_MethodsQuery_WritesNoConstant()
     {

@@ -222,10 +222,11 @@ internal static class TypeModels
     }
 
     // Typing runs once for a file, whatever the output of the types that claim it, and a column or parameter that a
-    // library's row types has the type it has without the library beside it.  Only Methods reads and writes the
-    // library's type, through the driver's plugin, so a model of any other output has the base map's.  Only Methods's
-    // method sends an array parameter from any sequence too, so at any other output, where a library such as Dapper
-    // hands the value to Npgsql as it is, the property is the array.  A list parameter is a sequence at every output.
+    // library's row types has the type it has without the library beside it.  Only a methods query reads and writes
+    // the library's type, through the driver's plugin, so a model of any other output has the base map's.  Only a
+    // methods query's method sends an array parameter from any sequence too, so at any other output, where a library
+    // such as Dapper hands the value to Npgsql as it is, the property is the array.  A list parameter is a sequence at
+    // every output.
     // Nothing is allocated when no property changes.
     private static EquatableArray<ModelProperty> ForOtherOutputs(EquatableArray<ModelProperty> properties)
     {

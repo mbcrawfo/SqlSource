@@ -14,7 +14,7 @@ namespace SqlSource.Tests.Generator;
 
 // SQL Server's spatial read path: a geography or geometry read as one of NetTopologySuite's geometries is read through
 // the column's stream and bound as SqlBytes, by the shared instances of SqlSource.NetTopologySuiteConversions, which a
-// project gets once, in a file of its own, when a method of a Methods query calls one.  Each run is under mssql on
+// project gets once, in a file of its own, when a method of a methods query calls one.  Each run is under mssql on
 // SqlClient 7 with NetTopologySuite 2.6.0 and NetTopologySuite.IO.SqlServerBytes 2.1.0, unless it says otherwise, with
 // an entry written for each query's current hash.
 public sealed class SpatialConversionTests

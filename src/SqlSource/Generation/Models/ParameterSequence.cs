@@ -10,7 +10,7 @@ internal enum ParameterSequence
     None,
 
     /// <summary>
-    /// A PostgreSQL array parameter of a <c>Methods</c> query, whose type is the array <c>E[]</c>: the property is an
+    /// A PostgreSQL array parameter of a <c>methods</c> query, whose type is the array <c>E[]</c>: the property is an
     /// <c>IEnumerable&lt;E&gt;</c>, and the method sends it as an <c>IList&lt;E&gt;</c>, copied into an array when
     /// it is not one.
     /// </summary>

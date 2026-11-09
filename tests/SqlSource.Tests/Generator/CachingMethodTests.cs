@@ -517,7 +517,7 @@ public sealed class CachingMethodTests
             );
     }
 
-    // The project's settings file puts both types at Models, so the project has no Methods query, and then the header
+    // The project's settings file puts both types at Models, so the project has no methods query, and then the header
     // of Users puts UserQueries at Methods: its query's engine is now among those of the project's methods.
     [Fact]
     public void Run_TypeTurnedToMethods_FindsTheEnginesAgain()

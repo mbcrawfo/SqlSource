@@ -105,7 +105,7 @@ internal static class TypeDiagnostics
                 failure.Detail ?? "",
                 sqlClientVersion
             ),
-            // A spatial type, which NetTopologySuite's row reads in a Methods query, or the package's type.
+            // A spatial type, which NetTopologySuite's row reads in a methods query, or the package's type.
             TypeMappingKind.NeedsSqlServerTypes when SqlServerNames.IsSpatial(key) => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
@@ -170,7 +170,7 @@ internal static class TypeDiagnostics
                 failure.Detail ?? "",
                 failure.Text ?? ""
             ),
-            // PostGIS's types are read by the plugin of NetTopologySuite, through its row, in a Methods query.
+            // PostGIS's types are read by the plugin of NetTopologySuite, through its row, in a methods query.
             TypeMappingKind.Unreadable when isPostgis => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,

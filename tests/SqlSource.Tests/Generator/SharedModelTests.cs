@@ -818,7 +818,7 @@ public sealed class SharedModelTests
         run.Sources["App.ListEventsDto-Model.g.cs"].ShouldContain("(global::System.DateTime At);");
     }
 
-    // Two queries at Methods of one type, one of which turns the library off: the properties differ as a Methods type's
+    // Two queries at Methods of one type, one of which turns the library off: the properties differ as a methods type's
     // and a Models type's do.
     [Fact]
     public void Run_SharedModelOfTwoMethodsQueriesWithLibraryOnAndOff_IsSQLSRC257()

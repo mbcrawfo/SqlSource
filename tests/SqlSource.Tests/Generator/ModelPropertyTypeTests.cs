@@ -12,7 +12,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The C# type a property of a model is declared with, where it is not the type the parameter's or column's type maps
-// to: a PostgreSQL array parameter is an IEnumerable<T> of its element in a Methods query's input model, which its
+// to: a PostgreSQL array parameter is an IEnumerable<T> of its element in a methods query's input model, which its
 // method sends whatever the sequence, and stays an array at Models, where a library hands the value to Npgsql as it is.
 // Each run is under postgres on Npgsql 10, at Methods unless it says Models, with an entry written for each query's
 // current hash.

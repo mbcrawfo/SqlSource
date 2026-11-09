@@ -47,7 +47,7 @@ public sealed class ExceptionReuseTests
 
         """;
 
-    // A type of the other project with a Methods query of the shape one, whose method throws
+    // A type of the other project with a methods query of the shape one, whose method throws
     // UnexpectedRowCountException.
     private const string OtherQueriesSource = """
         namespace Other
@@ -63,7 +63,7 @@ public sealed class ExceptionReuseTests
         "-- name: GetUser -> one\nSELECT id FROM users;\n"
     );
 
-    // This project's own Methods query of the shape one, whose method throws the exception it sees.
+    // This project's own methods query of the shape one, whose method throws the exception it sees.
     private static readonly SqlFile OwnFile = new(
         GeneratorHarness.UsersPath,
         "-- name: GetOne -> one\nSELECT id FROM users;\n"
@@ -548,7 +548,7 @@ public sealed class ExceptionReuseTests
             properties: new Dictionary<string, string?> { [PublicExceptions.PropertyName] = value }
         );
 
-    // The other project, which uses SqlSource with a Methods query on Npgsql 10, with this text before its source.
+    // The other project, which uses SqlSource with a methods query on Npgsql 10, with this text before its source.
     private static MetadataReference OtherWithQuery(
         string before,
         IReadOnlyDictionary<string, string?>? properties,
@@ -567,7 +567,7 @@ public sealed class ExceptionReuseTests
             )
             .Reference;
 
-    // This project, which uses SqlSource with a Methods query of the shape one and nothing else, over the reference.
+    // This project, which uses SqlSource with a methods query of the shape one and nothing else, over the reference.
     private static Task<(IReadOnlyList<string> Diagnostics, IReadOnlyDictionary<string, string> Sources)> BuildOwnQuery(
         MetadataReference reference
     ) =>
@@ -629,7 +629,7 @@ public sealed class ExceptionReuseTests
             )
             .Reference;
 
-    // This project, which uses SqlSource with a Methods query of the shape one, calls the other's method and catches
+    // This project, which uses SqlSource with a methods query of the shape one, calls the other's method and catches
     // both exceptions by type, after the other references.
     private static Task<(
         IReadOnlyList<string> Diagnostics,

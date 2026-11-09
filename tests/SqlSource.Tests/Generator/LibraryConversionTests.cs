@@ -14,7 +14,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The class of a library's conversions, SqlSource.NodaTimeConversions or SqlSource.JsonConversions, which a project
-// gets once, in a file of its own, when a method of a Methods query calls one of its conversions, and never otherwise.
+// gets once, in a file of its own, when a method of a methods query calls one of its conversions, and never otherwise.
 // Each run is under mssql on SqlClient 7 with NodaTime 3.3.7, unless it says otherwise, with an entry written for each
 // query's current hash.
 public sealed class LibraryConversionTests

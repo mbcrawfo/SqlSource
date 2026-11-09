@@ -330,7 +330,7 @@ internal static class ModelReader
         SqlQueryParameter? declared
     ) => IsArraySequence(parameter, type, declared) ? ParameterSequence.Array : ParameterSequence.None;
 
-    // Whether a Methods method sends the parameter from any sequence: a PostgreSQL array, or a domain over one, whose
+    // Whether a methods method sends the parameter from any sequence: a PostgreSQL array, or a domain over one, whose
     // C# type is an array of one rank, E[], that the type map, a library or the type override gave.  A C# type that the
     // parameter's -- param: marker names after -> is taken as written, the marker found as the typing finds it, by
     // its name ignoring case.  bytea is no array of the database's, and a multirange is an array of the C# alone.

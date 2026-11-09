@@ -249,7 +249,7 @@ public sealed class MethodDiagnosticsTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
-    // A Methods query on the type has no constant there, so its name is judged as its method's.
+    // A methods query on the type has no constant there, so its name is judged as its method's.
     [Fact]
     public void Run_QueryNamedAsTheTypeUnderClass_IsSqlsrc274()
     {

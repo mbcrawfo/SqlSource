@@ -299,7 +299,7 @@ public sealed class AttributeConflictTests
             )
             .Reference;
 
-    // The other project with a Methods query on SQL Server whose method calls a conversion of NodaTime's, so that it
+    // The other project with a methods query on SQL Server whose method calls a conversion of NodaTime's, so that it
     // holds SqlSource.NodaTimeConversions as well as the attributes and the exceptions.
     private static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) OtherWithConversions(
         bool compilationReference

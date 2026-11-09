@@ -11,7 +11,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// The converter that each column and parameter of a Methods query is read and bound through, where a type override
+// The converter that each column and parameter of a methods query is read and bound through, where a type override
 // chose its type: SQLSRC280 for a type without the direction the query needs, SQLSRC279 for a foreign type whose
 // converters are of another type, and SQLSRC277 at the query for a converter of a referenced assembly.  A query with
 // one gets no method and keeps its models.  Each run is at Methods under postgres on Npgsql 10 unless it says

@@ -563,7 +563,7 @@ public sealed class ConverterDiagnosticsTests
             ]);
     }
 
-    // The converters are found whatever the output, so a Methods project without a query gets the error too.
+    // The converters are found whatever the output, so a methods project without a query gets the error too.
     [Fact]
     public void Run_ConverterUnderMethodsWithoutQueries_ReportsSqlsrc277()
     {

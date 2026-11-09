@@ -240,8 +240,8 @@ public sealed class MethodTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
     }
 
-    // A Methods query has no member in the nested class, so it may have the nested class's name: its method goes into
-    // the extension class, alone, beside another Methods query, or beside a query at sql whose constant the nested
+    // A methods query has no member in the nested class, so it may have the nested class's name: its method goes into
+    // the extension class, alone, beside another methods query, or beside a query at sql whose constant the nested
     // class holds.
     [Theory]
     [InlineData("")]
@@ -274,7 +274,7 @@ public sealed class MethodTests
         }
     }
 
-    // A Methods query whose method goes into the extension class has no member on the type, so it may have the
+    // A methods query whose method goes into the extension class has no member on the type, so it may have the
     // type's name, beside a query at sql whose constant is on the type.
     [Fact]
     public void Run_MethodsQueryNamedLikeTheTypeInTheExtensionClass_IsAMethodOfTheExtensionClass()
