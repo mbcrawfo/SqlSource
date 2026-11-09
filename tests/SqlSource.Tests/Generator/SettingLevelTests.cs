@@ -12,7 +12,7 @@ namespace SqlSource.Tests.Generator;
 // reported where it was written.  Without a dialect no query can have models, so they change only the diagnostics.
 //
 // Every run without a dialect leaves the output unset, since the output's levels are among what these tests compare,
-// unless it says otherwise.  So a query whose output is the default, methods, is SQLSRC209 at its name, and gets
+// unless it says otherwise.  So a query whose output is the default, repository, is SQLSRC209 at its name, and gets
 // neither a method nor a constant.  The settings that change a method are run at methods under postgres, through
 // MethodRuns, with an entry for the query.
 public sealed class SettingLevelTests
@@ -77,8 +77,8 @@ public sealed class SettingLevelTests
         }
     }
 
-    // Every level below the project's file.  Methods is both the default and the output MethodRuns gives the project,
-    // so a project's file of methods would decide nothing.
+    // Every level below the project's file, which each test gives an output other than the level's, so that the
+    // level decides.
     public static TheoryData<SettingLevel> LevelsBelowTheProjectFile =>
         [SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
 

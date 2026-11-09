@@ -117,12 +117,12 @@ public sealed class QuerySettingsTests
     }
 
     [Fact]
-    public void Resolve_Output_IsMethodsUnlessALevelSaysOtherwise()
+    public void Resolve_Output_IsRepositoryUnlessALevelSaysOtherwise()
     {
         var sql = new SettingsLevel { Output = OutputKind.Sql };
         var models = new SettingsLevel { Output = OutputKind.Models };
 
-        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None).Output.ShouldBe(OutputKind.Methods);
+        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None).Output.ShouldBe(OutputKind.Repository);
         QuerySettings.Resolve(SettingsLevel.None, sql).Output.ShouldBe(OutputKind.Sql);
         QuerySettings.Resolve(models, sql).Output.ShouldBe(OutputKind.Models);
     }

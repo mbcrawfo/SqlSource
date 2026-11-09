@@ -140,7 +140,7 @@ public sealed class RunPlannerErrorTests : IDisposable
                 ToolDiagnostics.OutputNeedsDescribableDialect,
                 sql,
                 new LinePosition(4, Name.Length),
-                "methods",
+                "repository",
                 canonical
             ),
         ]);
@@ -263,7 +263,7 @@ public sealed class RunPlannerErrorTests : IDisposable
                 ("SQLSRC210", sql, new LinePosition(0, Name.Length), "where"),
                 ("SQLSRC210", sql, new LinePosition(0, Name.Length), "order"),
             ]);
-        result.Errors[0].Arguments[1].ShouldBe("methods");
+        result.Errors[0].Arguments[1].ShouldBe("repository");
         var help = result.Errors[0].Lines.ShouldHaveSingleItem();
         help.Label.ShouldBe("help");
         help.Text.ShouldContain("{{where:default}}");

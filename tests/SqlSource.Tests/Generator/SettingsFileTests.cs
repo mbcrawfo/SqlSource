@@ -241,7 +241,7 @@ public sealed class SettingsFileTests
     }
 
     // A root file that sets nothing else still hides the file above: its output, sql, does not apply, and neither does
-    // its dialect.  So the query has the default output, methods, under ansi, which has no database to describe it.
+    // its dialect.  So the query has the default output, repository, under ansi, which has no database to describe it.
     // The run writes no project's file, which the root would hide too.
     [Fact]
     public void Run_RootFileThatSaysNothingElse_HidesTheFilesAbove()
@@ -262,7 +262,7 @@ public sealed class SettingsFileTests
 
         var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
         diagnostic.ShouldStartWith("SQLSRC209 " + QueryPath + "(");
-        diagnostic.ShouldContain("The output 'methods' needs each query described by its database");
+        diagnostic.ShouldContain("The output 'repository' needs each query described by its database");
         diagnostic.ShouldContain("the dialect 'ansi' has no database to ask");
     }
 

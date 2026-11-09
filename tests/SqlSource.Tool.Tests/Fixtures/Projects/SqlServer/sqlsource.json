@@ -4,4 +4,6 @@
   "root": true,
   "dialect": "mssql",
   "database": "fixtures",
+  // The type of the queries is static, which only methods can extend.
+  "output": "methods",
 }

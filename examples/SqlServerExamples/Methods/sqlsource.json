@@ -1,0 +1,6 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json",
+  // The output of every .sql file of this folder: methods, so that each query gets an extension method on a connection
+  // and its models.
+  "output": "methods",
+}

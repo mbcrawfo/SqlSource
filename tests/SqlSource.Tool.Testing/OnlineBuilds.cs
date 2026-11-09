@@ -74,7 +74,7 @@ internal sealed class OnlineBuilds(ErrorPathEngine engine, string connection) : 
     // Builds a copy whose settings file holds a value that is no output, and finds that the build lists the error of
     // the file once and says nothing of its own about the tool: the tool reads the same file and finds the same error
     // but leaves it to the compiler, and its exit code is not read as a tool that failed.  The compiler then reports
-    // what follows from the file: here the query has the default output, whose method needs a driver.
+    // what follows from the file: here the query has the default output, which a static type cannot have.
     public async Task ShouldListABrokenSettingsFileOnceAsync()
     {
         var project = RealPath(_projects.Copy("ErrorPaths"));

@@ -33,7 +33,7 @@
       "type": "string"
     },
     "output": {
-      "description": "What SqlSource generates for a query: `sql`, `models`, `methods` or `repository`, matched ignoring case, hyphens and spaces. Default `methods`.",
+      "description": "What SqlSource generates for a query: `sql`, `models`, `methods` or `repository`, matched ignoring case, hyphens and spaces. Default `repository`.",
       "type": "string",
       "anyOf": [
         {

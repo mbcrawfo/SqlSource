@@ -141,8 +141,8 @@ internal static class GeneratorHarness
     // Every run states its output, the output of the project's settings file: null writes none, for a test that needs
     // the project not to set it, of the default or of the output's levels, or whose own root file, which hides the
     // project's, or own file at ProjectSettingsPath gives the output, and the test says so in a comment.  The default,
-    // Methods, needs an entry in a sidecar for each query, so a test that leaves it unsaid gets SQLSRC209 for each file
-    // under ansi.
+    // Repository, needs a connection and an entry in a sidecar for each query, so a test that leaves it unsaid gets
+    // SQLSRC209 for each file under ansi.
     public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
         Run(output, [new SourceFile(SourcePath, source)], sqlFiles);
 
