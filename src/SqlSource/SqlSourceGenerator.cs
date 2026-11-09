@@ -43,7 +43,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         RegisterExceptions(context);
         var settingsFiles = ReadSettingsFiles(context);
         var claims = ClaimFiles(context);
-        _ = ReadRepositories(context, claims.TargetTypes);
+        var repositories = ReadRepositories(context, claims.TargetTypes);
         ReportSettingsFiles(context, settingsFiles, claims.SqlPaths);
         var fileLevels = ReadSettings(claims.SqlFiles, settingsFiles);
         var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.ClaimedPaths);
@@ -74,7 +74,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             typing.SqlClientProbe,
             typing.LibraryProbe,
             typing.TypingLibraryProbe,
-            converters
+            converters,
+            repositories
         );
     }
 
@@ -232,9 +233,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             )
             .WithTrackingName(TrackingNames.RepositoryShapes);
 
-        // No method reads the shapes yet; an output that does nothing keeps the step in the pipeline, since the
-        // driver runs only the steps that reach an output.
-        context.RegisterSourceOutput(shapes, static (_, _) => { });
         return shapes;
     }
 
@@ -855,7 +853,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
         IncrementalValueProvider<LibraryProbe> libraryProbe,
         IncrementalValueProvider<LibraryProbe> typingLibraryProbe,
-        IncrementalValueProvider<ConverterSet> converters
+        IncrementalValueProvider<ConverterSet> converters,
+        IncrementalValueProvider<EquatableArray<RepositoryShape>> repositories
     )
     {
         // Whether each engine's driver allows its methods, and whether SQL Server's spatial read path can be taken,
@@ -876,19 +875,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
         // queries and its names, its files' models, the models its queries got, the drivers, the converters of the
-        // types that its type overrides, column types and markers chose, or the libraries below their floor.
+        // types that its type overrides, column types and markers chose, the libraries below their floor, or its
+        // repository's shape.
         var typeMethods = typeQueries
             .Combine(allFileModels.Combine(assignments))
             .Combine(drivers.Combine(converters.Combine(librariesBelowTheFloor)))
+            .Combine(repositories)
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
-                        input.Left.Left,
+                        input.Left.Left.Left,
+                        input.Left.Left.Right.Left,
+                        input.Left.Left.Right.Right,
                         input.Left.Right.Left,
-                        input.Left.Right.Right,
-                        input.Right.Left,
-                        input.Right.Right.Left,
-                        input.Right.Right.Right
+                        input.Left.Right.Right.Left,
+                        input.Left.Right.Right.Right,
+                        input.Right
                     )
             )
             .WithTrackingName(TrackingNames.MethodsInput)

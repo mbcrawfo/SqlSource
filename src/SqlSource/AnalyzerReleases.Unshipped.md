@@ -28,6 +28,14 @@ SQLSRC024 | SqlSource | Error | SqlSourceOnline is not valid
 SQLSRC025 | SqlSource | Error | Build cannot run the tool
 SQLSRC026 | SqlSource | Warning | Build cannot run the tool and uses the committed sidecars
 SQLSRC027 | SqlSource | Error | Tool failed without an error
+SQLSRC028 | SqlSource | Error | Repository has no connection
+SQLSRC029 | SqlSource | Error | Repository has more than one connection
+SQLSRC030 | SqlSource | Error | Connection needs a database
+SQLSRC031 | SqlSource | Warning | Connection's database is not used
+SQLSRC032 | SqlSource | Error | Connection member is not supported
+SQLSRC033 | SqlSource | Error | Connection is of another database engine
+SQLSRC034 | SqlSource | Error | Repository is static
+SQLSRC035 | SqlSource | Error | Repository interface name is taken
 SQLSRC101 | SqlSource | Error | Quote is not closed
 SQLSRC102 | SqlSource | Error | Comment is not closed
 SQLSRC103 | SqlSource | Error | Query name is not valid

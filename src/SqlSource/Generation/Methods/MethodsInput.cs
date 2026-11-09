@@ -6,6 +6,7 @@ using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
+using SqlSource.Generation.Repositories;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
@@ -39,13 +40,18 @@ namespace SqlSource.Generation.Methods;
 /// package, from <see cref="BelowTheFloorOf" />: a query of that engine that uses one gets no method.  Without the
 /// versions, so that a version that stays on one side of the floor plans no method again.
 /// </param>
+/// <param name="Repository">
+/// The type's candidates for a repository's connection and the settings of its interface, found by its key, or null
+/// when the shapes have none of it.
+/// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
     EquatableArray<FileModels> Files,
     EquatableArray<ModelAssignment> Assignments,
     MethodDrivers Drivers,
     EquatableArray<Converter> Converters,
-    EquatableArray<LibraryUse> LibrariesBelowTheFloor
+    EquatableArray<LibraryUse> LibrariesBelowTheFloor,
+    RepositoryShape? Repository
 )
 {
     // Every library and engine, in the order of SqlLibrary and then of DatabaseEngine: a new member of either is in it.
@@ -96,13 +102,15 @@ internal sealed record MethodsInput(
     /// <param name="drivers">Which engines' methods the project's drivers allow.</param>
     /// <param name="converters">Every converter of the project.</param>
     /// <param name="librariesBelowTheFloor">The libraries that the project references older than their floor.</param>
+    /// <param name="repositories">Every type's shape, sorted ordinally by its key.</param>
     public static MethodsInput Gather(
         TypeQueries type,
         EquatableArray<FileModels> allFileModels,
         EquatableArray<ModelAssignment> assignments,
         MethodDrivers drivers,
         ConverterSet converters,
-        EquatableArray<LibraryUse> librariesBelowTheFloor
+        EquatableArray<LibraryUse> librariesBelowTheFloor,
+        EquatableArray<RepositoryShape> repositories
     )
     {
         var files = ImmutableArray.CreateBuilder<FileModels>(type.Files.Count);
@@ -120,8 +128,33 @@ internal sealed record MethodsInput(
             SliceOf(assignments, key),
             drivers,
             ConvertersOf(slice, converters),
-            librariesBelowTheFloor
+            librariesBelowTheFloor,
+            ShapeOf(repositories, key)
         );
+    }
+
+    // The first shape of the key, by a search of the sorted shapes.  Two types whose hint names are ambiguous share a
+    // key, and get no file, so either shape will do.
+    private static RepositoryShape? ShapeOf(EquatableArray<RepositoryShape> shapes, string key)
+    {
+        var low = 0;
+        var high = shapes.Count;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (string.CompareOrdinal(shapes[middle].TypeKey, key) < 0)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low < shapes.Count && string.Equals(shapes[low].TypeKey, key, StringComparison.Ordinal)
+            ? shapes[low]
+            : null;
     }
 
     // The converters of the chosen properties' types: a pass over the properties, and a search of the set only for a

@@ -158,7 +158,20 @@ public sealed class SidecarTests
     [Fact]
     public void Run_RepositoryQueryWithoutAnEntry_ReportsSqlsrc241()
     {
-        var run = Run(OutputKind.Repository, GeneratorHarness.UsersFile);
+        // The type has a connection, so that the query's entry is its one problem.
+        var source = new SourceFile(
+            GeneratorHarness.SourcePath,
+            GeneratorHarness
+                .SampleSource(null)
+                .Replace("class Sample;", "class Sample(string connectionString);", StringComparison.Ordinal)
+        );
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Repository,
+            [source],
+            [GeneratorHarness.UsersFile],
+            dialect: "postgres"
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "

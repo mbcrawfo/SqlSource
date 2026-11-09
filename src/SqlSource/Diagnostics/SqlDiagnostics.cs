@@ -304,6 +304,118 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the type in full, {1} the database, and {2} what to add, which depends on whether the type uses one
+    // database and marks a member.  Reported at the type's attribute, once for each database that has no connection.
+    public static readonly DiagnosticDescriptor RepositoryHasNoConnection = new(
+        id: "SQLSRC028",
+        title: "Repository has no connection",
+        messageFormat: "'{0}' has no connection for the database '{1}', which its repository queries use.  {2}  Or set "
+            + "the output of its repository queries to methods.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc028",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the database, and {2} the members, each quoted, in the order they are declared.
+    // Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor RepositoryHasManyConnections = new(
+        id: "SQLSRC029",
+        title: "Repository has more than one connection",
+        messageFormat: "'{0}' has more than one connection for the database '{1}': {2}.  Mark only the one to use "
+            + "[SqlSourceConnection].",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc029",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the member, and {2} the databases, each quoted.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionNeedsDatabase = new(
+        id: "SQLSRC030",
+        title: "Connection needs a database",
+        messageFormat: "'{1}' of '{0}' is marked [SqlSourceConnection] without a Database, and the repository queries "
+            + "of '{0}' use more than one database: {2}.  Set its Database to the one it connects to.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc030",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // A warning a project may configure: the member gives no repository method its connection, and no method is left
+    // out for it.  The type's own code may use the member for queries of another output, and an error would break the
+    // build of a type whose queries of that database move to the output methods for a while.  {0} is the type in full,
+    // {1} the member, {2} its Database, and {3} the databases the queries use, each quoted.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionDatabaseNotUsed = new(
+        id: "SQLSRC031",
+        title: "Connection's database is not used",
+        messageFormat: "'{1}' of '{0}' is marked [SqlSourceConnection] for the database '{2}', and no repository query "
+            + "of '{0}' uses it: they use {3}.  Correct its Database, or remove the mark.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc031"
+    );
+
+    // {0} is the type in full and {1} the member.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionMemberNotSupported = new(
+        id: "SQLSRC032",
+        title: "Connection member is not supported",
+        messageFormat: "'{1}' of '{0}' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, "
+            + "property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a method "
+            + "that is not generic, takes nothing or a CancellationToken, and returns a string, a DbConnection, or a "
+            + "Task or ValueTask of a DbConnection.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc032",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the member, {2} its type, {3} the database, {4} the database's engine and {5} that
+    // engine's driver.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionOfAnotherEngine = new(
+        id: "SQLSRC033",
+        title: "Connection is of another database engine",
+        messageFormat: "'{1}' of '{0}' is a '{2}', of another engine's driver, and the database '{3}' is {4}.  Give "
+            + "the database a connection of {5}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc033",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full.  Reported at the type's attribute, once for the type.
+    public static readonly DiagnosticDescriptor RepositoryIsStatic = new(
+        id: "SQLSRC034",
+        title: "Repository is static",
+        messageFormat: "'{0}' is static, and the method of a repository query is an instance method.  Set the output "
+            + "of its repository queries to methods, or remove static.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc034",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the interface's name, and {2} what has that name, as
+    // "the class App.IUserRepository".  Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor RepositoryInterfaceNameTaken = new(
+        id: "SQLSRC035",
+        title: "Repository interface name is taken",
+        messageFormat: "'{0}' cannot get its interface '{1}', because {2} already has that name.  Set InterfaceName "
+            + "on its [SqlSourceGenerate] to another name, or set GenerateInterface to false.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc035",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1243,6 +1355,14 @@ internal static class SqlDiagnostics
             OnlineToolCannotRun,
             OnlineToolCannotRunOffline,
             OnlineToolFailedSilently,
+            RepositoryHasNoConnection,
+            RepositoryHasManyConnections,
+            ConnectionNeedsDatabase,
+            ConnectionDatabaseNotUsed,
+            ConnectionMemberNotSupported,
+            ConnectionOfAnotherEngine,
+            RepositoryIsStatic,
+            RepositoryInterfaceNameTaken,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120 or [SQLSRC126](#sqlsrc126), costs the file its members until it is fixed, and so does an error in where a query's members go, an id from 122 to 125, for the type it is reported for.  [SQLSRC127](#sqlsrc127), a list that SQL Server cannot take empty where it stands, costs only its query the method, and only when the query's output is `methods`.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `methods` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.  In a build that [runs the tool](tool.md#running-in-the-build), each of its errors is one line, with its other lines after it, each after `; `.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), a warning about a connection marked for a database that no repository query uses, [SQLSRC031](#sqlsrc031), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120 or [SQLSRC126](#sqlsrc126), costs the file its members until it is fixed, and so does an error in where a query's members go, an id from 122 to 125, for the type it is reported for.  [SQLSRC127](#sqlsrc127), a list that SQL Server cannot take empty where it stands, costs only its query the method, and only when the query's output is `methods`.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `methods` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.  In a build that [runs the tool](tool.md#running-in-the-build), each of its errors is one line, with its other lines after it, each after `; `.
 
 **Project and attribute**
 
@@ -49,6 +49,19 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC025](#sqlsrc025) | Build cannot run the tool |
 | [SQLSRC026](#sqlsrc026) | Build cannot run the tool and uses the committed sidecars |
 | [SQLSRC027](#sqlsrc027) | Tool failed without an error |
+
+**Repositories**
+
+| Id | Title |
+|----|----|
+| [SQLSRC028](#sqlsrc028) | Repository has no connection |
+| [SQLSRC029](#sqlsrc029) | Repository has more than one connection |
+| [SQLSRC030](#sqlsrc030) | Connection needs a database |
+| [SQLSRC031](#sqlsrc031) | Connection's database is not used |
+| [SQLSRC032](#sqlsrc032) | Connection member is not supported |
+| [SQLSRC033](#sqlsrc033) | Connection is of another database engine |
+| [SQLSRC034](#sqlsrc034) | Repository is static |
+| [SQLSRC035](#sqlsrc035) | Repository interface name is taken |
 
 **`.sql` files**
 
@@ -274,7 +287,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC295](#sqlsrc295) | Bundle is not a raw bundle |
 | [SQLSRC296](#sqlsrc296) | Raw bundle is not reproduced by this version |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  Ids from 101 to 127 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 296 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120 and [SQLSRC126](#sqlsrc126), under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file, and [SQLSRC127](#sqlsrc127), which depends on the query's output.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  [SQLSRC028](#sqlsrc028) to [SQLSRC035](#sqlsrc035) are about a type that claims a query whose output is `repository`, at its `[SqlSourceGenerate]` or at the member they name, and never about a type whose queries are all of other outputs.  Each but the warning [SQLSRC031](#sqlsrc031) leaves the repository queries of the databases it is about without a method until it is fixed; their models are still generated.  Ids from 101 to 127 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 296 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120 and [SQLSRC126](#sqlsrc126), under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file, and [SQLSRC127](#sqlsrc127), which depends on the query's output.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -701,6 +714,177 @@ The build ran `dotnet sqlsource describe` on the project before it compiled, and
 Bring the tool to the version of the `SqlSource` package the project uses, with `dotnet tool update SqlSource.Tool --version <version>`: the two are released together under one version number.  If the versions are the same, run `dotnet sqlsource describe` in the project's folder to see what the tool says.
 
 See: [Running in the build](tool.md#running-in-the-build)
+
+## SQLSRC028
+
+**Repository has no connection**
+
+A query whose output is `repository` gets an instance method of the type that claims it, and the method takes its connection from a member of the type: a `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`, or one of a type that derives from `DbDataSource`, or the member you mark `[SqlSourceConnection]`.  The type has none of these for a database that its repository queries use.
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository
+{
+    private readonly string _connection = "";
+}
+```
+
+```console
+/work/App/UserRepository.cs(1,2): error SQLSRC028: 'App.UserRepository' has no connection for the database 'postgres', which its repository queries use.  Add a string field, property or primary-constructor parameter named connectionString, or one of a DbDataSource type, or mark the member that gives the connection [SqlSourceConnection].  Or set the output of its repository queries to methods.
+```
+
+The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection, and the repository queries of that database get no method.  The database is the one the queries' [database](settings.md#setting-database) setting names, or their dialect's name.
+
+- Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`, or mark the member that gives the connection `[SqlSourceConnection]`.
+- When a member is marked, no other is found by its name or type: mark the one for this database too.
+- When the type's repository queries use more than one database, no member is found by its name or type, since nothing says which database it is for: mark one member for each, `[SqlSourceConnection(Database = "reports")]`.
+- Or set the queries' [output](settings.md#setting-output) to `methods`, whose methods take the connection as an argument.
+
+## SQLSRC029
+
+**Repository has more than one connection**
+
+The type has more than one member that could give its repository queries their connection for one database: two members that the build finds by their name or type, or two marked `[SqlSourceConnection]` for the same database.
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository(NpgsqlDataSource dataSource)
+{
+    private readonly string _connectionString = "";
+}
+```
+
+```console
+/work/App/UserRepository.cs(1,2): error SQLSRC029: 'App.UserRepository' has more than one connection for the database 'postgres': '_connectionString', 'dataSource'.  Mark only the one to use [SqlSourceConnection].
+```
+
+The error is at the type's `[SqlSourceGenerate]` and lists the members, and the repository queries of that database get no method.  A primary-constructor parameter is found only when no field, property or method of the type is, so a parameter that the type stores in a field of its own gives one connection, the field.
+
+Mark the one to use `[SqlSourceConnection]`, which leaves the others alone; when several are marked, leave one marked for the database, or set each one's `Database` to the database it connects to.
+
+## SQLSRC030
+
+**Connection needs a database**
+
+A member is marked `[SqlSourceConnection]` without a `Database`, and the type's repository queries use more than one database, so it cannot tell which one the member connects to.
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository
+{
+    [SqlSourceConnection]
+    private readonly NpgsqlDataSource _dataSource;
+}
+```
+
+```console
+/work/App/UserRepository.cs(4,39): error SQLSRC030: '_dataSource' of 'App.UserRepository' is marked [SqlSourceConnection] without a Database, and the repository queries of 'App.UserRepository' use more than one database: 'main', 'reports'.  Set its Database to the one it connects to.
+```
+
+The error is at the member.  Each database that no member is marked for by name gets no repository method until it is fixed.  Set the member's `Database`, `[SqlSourceConnection(Database = "main")]`, and mark a member for each other database.
+
+## SQLSRC031
+
+**Connection's database is not used**
+
+A member is marked `[SqlSourceConnection]` for a database that no repository query of the type uses: its `Database` is misspelt, or the queries of that database have another output, or are gone.
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository
+{
+    [SqlSourceConnection(Database = "archive")]
+    private readonly NpgsqlDataSource _archive;
+}
+```
+
+```console
+/work/App/UserRepository.cs(4,39): warning SQLSRC031: '_archive' of 'App.UserRepository' is marked [SqlSourceConnection] for the database 'archive', and no repository query of 'App.UserRepository' uses it: they use 'main'.  Correct its Database, or remove the mark.
+```
+
+The warning is at the member, and leaves out no method: the member gives no method its connection.  A database's name is compared without regard to case.  Correct the `Database`, or remove the mark from a member that your own code uses for other queries.
+
+This is a warning, since a type that keeps a member for queries whose output is `methods` for a while still builds.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+
+```xml
+<PropertyGroup>
+    <NoWarn>$(NoWarn);SQLSRC031</NoWarn>
+</PropertyGroup>
+```
+
+## SQLSRC032
+
+**Connection member is not supported**
+
+A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  A connection comes from a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`, or from a method that is not generic, takes nothing or one `CancellationToken`, and returns a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of one.
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository
+{
+    [SqlSourceConnection]
+    private NpgsqlConnection Connect(string name) => new(name);
+}
+```
+
+```console
+/work/App/UserRepository.cs(4,30): error SQLSRC032: 'Connect' of 'App.UserRepository' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a method that is not generic, takes nothing or a CancellationToken, and returns a string, a DbConnection, or a Task or ValueTask of a DbConnection.
+```
+
+The error is at the member, and the repository queries of its database, or of every database when it names none, get no method.  An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.  Mark a member of one of the shapes above.
+
+## SQLSRC033
+
+**Connection is of another database engine**
+
+The member that gives a database its connection is of a type of the other engine's driver: an Npgsql type, such as `NpgsqlDataSource`, for a SQL Server database, or a Microsoft.Data.SqlClient type, such as `SqlConnection`, for a PostgreSQL one.
+
+```csharp
+[SqlSourceGenerate]
+public partial class OrderRepository(NpgsqlDataSource dataSource);
+```
+
+```console
+/work/App/OrderRepository.cs(2,55): error SQLSRC033: 'dataSource' of 'App.OrderRepository' is a 'Npgsql.NpgsqlDataSource', of another engine's driver, and the database 'mssql' is SQL Server.  Give the database a connection of Microsoft.Data.SqlClient.
+```
+
+The error is at the member, and the repository queries of that database get no method.  Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`, and mark it for the database when the type uses several.
+
+## SQLSRC034
+
+**Repository is static**
+
+A query whose output is `repository` gets an instance method, and the type that claims it is `static`, so it has no instance.
+
+```csharp
+[SqlSourceGenerate]
+public static partial class UserQueries;
+```
+
+```console
+/work/App/UserQueries.cs(1,2): error SQLSRC034: 'App.UserQueries' is static, and the method of a repository query is an instance method.  Set the output of its repository queries to methods, or remove static.
+```
+
+The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of its repository queries gets a method.  Set their [output](settings.md#setting-output) to `methods`, whose methods are static or extension methods that take the connection, or remove `static` and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
+
+## SQLSRC035
+
+**Repository interface name is taken**
+
+A type that claims a query whose output is `repository` gets an interface of its public repository methods, named `I` and the type's name unless `InterfaceName` names it, in the type's namespace.  Something there already has that name: a type of the project, other than an interface whose every declaration is `partial`, a type of a referenced assembly, or, for a nested type, a member of the type it is nested in.
+
+```csharp
+public class IUserRepository { }
+
+[SqlSourceGenerate]
+public partial class UserRepository(NpgsqlDataSource dataSource);
+```
+
+```console
+/work/App/UserRepository.cs(3,2): error SQLSRC035: 'App.UserRepository' cannot get its interface 'IUserRepository', because the class App.IUserRepository already has that name.  Set InterfaceName on its [SqlSourceGenerate] to another name, or set GenerateInterface to false.
+```
+
+The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface.  Name the interface otherwise with `[SqlSourceGenerate(InterfaceName = "IUserStore")]`, rename what has the name, or turn the interface off with `GenerateInterface = false`.  To add members to the interface yourself, declare it `partial interface IUserRepository`, which the generated part joins.
 
 ## SQLSRC101
 

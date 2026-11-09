@@ -7,6 +7,7 @@ using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Placement;
+using SqlSource.Generation.Repositories;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
 using SqlSource.Settings;
@@ -25,7 +26,9 @@ namespace SqlSource.Generation.Methods;
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
 /// diagnostic, and for a settings file as a <see cref="SettingsFileLibraryUse" />, which is located at the end.  A
 /// query that uses a library older than its floor gets no method and keeps the problems it has: the project gets
-/// <c>SQLSRC282</c> from the libraries that the type's queries use.
+/// <c>SQLSRC282</c> from the libraries that the type's queries use.  A type with a query whose output is
+/// <see cref="OutputKind.Repository" /> gets the problems of its connection, <c>SQLSRC028</c> to <c>SQLSRC034</c>, from
+/// <see cref="ConnectionResolver" />.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -159,6 +162,12 @@ internal static class MethodPlanner
         var planned = new List<Planned>();
         var engines = MethodEngines.None;
         var served = new ServedConverters(input.Converters);
+        // The type's repository is resolved once, before its queries, and only when it has a repository query.
+        if (input.Repository is { } shape && NeededDatabases(typeQueries, queries) is { } needed)
+        {
+            diagnostics.AddRange(ConnectionResolver.Resolve(typeQueries.Type.Type, shape, needed).Diagnostics);
+        }
+
         foreach (var usable in queries)
         {
             if (!usable.Settings.Output.HasMethod())
@@ -166,7 +175,7 @@ internal static class MethodPlanner
                 continue;
             }
 
-            // A repository query gets no method yet, and reports nothing here.
+            // A repository query gets no method yet; its connection's problems are the type's, reported above.
             if (usable.Settings.Output == OutputKind.Repository)
             {
                 continue;
@@ -192,6 +201,36 @@ internal static class MethodPlanner
 
         AddPlanned(planned, methods, diagnostics, warningIds, ref conversionLibraries);
         return engines;
+    }
+
+    // The databases of the type's repository queries in a file of a describable dialect, by the query's markers and
+    // its file's level, else its dialect's name, each once by DatabaseName.Comparer, in the order of the queries, with
+    // its first query's spelling and engine, or null when there is none, so that a type without one allocates nothing.
+    // A query of any other dialect has no entry, so it needs no connection.
+    private static List<NeededDatabase>? NeededDatabases(TypeQueries typeQueries, UsableQuerySequence queries)
+    {
+        List<NeededDatabase>? needed = null;
+        foreach (var usable in queries)
+        {
+            var file = typeQueries.Files[usable.FileIndex];
+            if (usable.Settings.Output != OutputKind.Repository || !SqlDescribableDialects.Contains(file.Dialect))
+            {
+                continue;
+            }
+
+            var name = QuerySettings.ResolveDatabase(
+                usable.Query.Markers,
+                typeQueries.FileSettings[usable.FileIndex],
+                SqlDialectName.Canonical(file.Dialect)
+            );
+            needed ??= [];
+            if (!needed.Exists(database => DatabaseName.Comparer.Equals(database.Name, name)))
+            {
+                needed.Add(new NeededDatabase(name, SqlDescribableDialects.EngineOf(file.Dialect)));
+            }
+        }
+
+        return needed;
     }
 
     // The names of the members the type's file writes for the queries that have no method: each one's constant
