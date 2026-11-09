@@ -77,11 +77,6 @@ public sealed class SettingLevelTests
         }
     }
 
-    // Every level below the project's file, which each test gives an output other than the level's, so that the
-    // level decides.
-    public static TheoryData<SettingLevel> LevelsBelowTheProjectFile =>
-        [SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
-
     // Every level of a setting.
     public static TheoryData<SettingLevel> Levels =>
         [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
@@ -158,9 +153,10 @@ public sealed class SettingLevelTests
         ModelRuns.ModelFiles(run).ShouldBe([ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 
-    // Methods at each level below the project's file, which says sql: the query is a method with its models.
+    // Methods at each level, below which the project's file says sql, so that the level is what decides, the project's
+    // file included, whose methods then win over the default, repository: the query is a method with its models.
     [Theory]
-    [MemberData(nameof(LevelsBelowTheProjectFile))]
+    [MemberData(nameof(Levels))]
     public void Run_MethodsOutputAtEachLevel_GivesAMethodAndTheModels(SettingLevel level)
     {
         var run = RunWithOutputAt(level, "Methods", belowIt: "Sql", withEntry: true);
