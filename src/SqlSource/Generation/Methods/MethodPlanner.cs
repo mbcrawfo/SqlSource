@@ -29,7 +29,8 @@ namespace SqlSource.Generation.Methods;
 /// <c>SQLSRC282</c> from the libraries that the type's queries use.  A type with a query whose output is
 /// <see cref="OutputKind.Repository" /> gets the problems of its connection, <c>SQLSRC028</c> to <c>SQLSRC034</c>, from
 /// <see cref="ConnectionResolver" />, and such a query gets an instance method on the type only when its database has a
-/// connection.  Such a type gets its interface unless it is off, or <c>SQLSRC035</c> reports that its name is taken.
+/// connection.  Such a type gets its interface unless it is off, <c>SQLSRC037</c> reports that its name is no
+/// identifier, or <c>SQLSRC035</c> that it is taken.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -120,13 +121,29 @@ internal static class MethodPlanner
         );
 
     // The name of the type's repository interface: none for a type that claims no repository query, whose interface
-    // is off, or that is static, which cannot implement one and has its own problem, and none, with SQLSRC035 at the
-    // attribute, when something takes the name.  A type whose every repository method fails still gets it.
+    // is off, or that is static, which cannot implement one and has its own problem; none, with SQLSRC037 at the
+    // attribute, when the attribute names it with no identifier, and with SQLSRC035 when something takes the name.  A
+    // type whose every repository method fails still gets it.
     private static string? InterfaceNameOf(MethodsInput input, ImmutableArray<DiagnosticInfo>.Builder diagnostics)
     {
         var type = input.Type.Type.Type;
         if (input.Repository is not { InterfaceOn: true } shape || type.IsStatic)
         {
+            return null;
+        }
+
+        // A name the attribute writes that is no identifier would break the generated file.  A keyword is one, and
+        // is written after an @.
+        if (type.InterfaceName is { } written && !SqlIdentifier.IsValid(written))
+        {
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.RepositoryInterfaceNameNotValid,
+                    type.AttributeLocation,
+                    PlacementChecks.NameOf(type),
+                    written
+                )
+            );
             return null;
         }
 

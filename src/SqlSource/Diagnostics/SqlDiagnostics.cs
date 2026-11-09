@@ -430,6 +430,19 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the type in full and {1} the InterfaceName as it is written.  Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor RepositoryInterfaceNameNotValid = new(
+        id: "SQLSRC037",
+        title: "Repository interface name is not valid",
+        messageFormat: "'{0}' cannot get its interface '{1}', because the name is not a C# identifier.  Set "
+            + "InterfaceName on its [SqlSourceGenerate] to an identifier, without an @ or a namespace, or remove it.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc037",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1378,6 +1391,7 @@ internal static class SqlDiagnostics
             RepositoryIsStatic,
             RepositoryInterfaceNameTaken,
             ConnectionParameterHidden,
+            RepositoryInterfaceNameNotValid,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -252,6 +253,56 @@ public sealed class RepositoryInterfaceTests
         methods.ShouldContain("    partial class UserRepository\n    {\n");
         methods.ShouldContain(" GetUser(\n");
         methods.ShouldNotContain("interface");
+    }
+
+    // A name that is no identifier would break the generated file, so the type gets no interface, and keeps its
+    // methods.
+    [Theory]
+    [InlineData("I-Users")]
+    [InlineData("@IUsers")]
+    [InlineData("App.IUsers")]
+    [InlineData("IUsers<T>")]
+    public void Run_InterfaceNameNotAnIdentifier_ReportsSqlsrc037AndWritesNone(string name)
+    {
+        var source = Source.Replace(
+            "Source = \".\"",
+            "Source = \".\", InterfaceName = \"" + name + "\"",
+            StringComparison.Ordinal
+        );
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], source);
+
+        // The attribute ends after ", InterfaceName = \"\"" and the name.
+        var end = 37 + 20 + name.Length;
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC037 /app/Repo/Sample.cs(6,6)-(6,"
+                    + end.ToString(CultureInfo.InvariantCulture)
+                    + "): 'App.UserRepository' cannot get its interface '"
+                    + name
+                    + "', because the name is not a C# identifier.  Set InterfaceName on its [SqlSourceGenerate] to an "
+                    + "identifier, without an @ or a namespace, or remove it.",
+            ]);
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain("    partial class UserRepository\n    {\n");
+        methods.ShouldContain(" GetUser(\n");
+        methods.ShouldNotContain("interface");
+    }
+
+    // A name that the type does not use is not checked.
+    [Fact]
+    public void Run_InterfaceNameNotAnIdentifierWithTheInterfaceOff_ReportsNothing()
+    {
+        var source = Source.Replace(
+            "Source = \".\"",
+            "Source = \".\", GenerateInterface = false, InterfaceName = \"I-Users\"",
+            StringComparison.Ordinal
+        );
+
+        var run = RepositoryRuns.Run(UsersFile, [GetUserEntry()], source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldNotContain("interface");
     }
 
     // The user's own part of the interface adds a member, which the type implements beside the generated ones.

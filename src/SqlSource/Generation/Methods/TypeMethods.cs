@@ -24,8 +24,8 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="InterfaceName">
 /// The name of the repository's interface, which the type's part implements, as a value: null when the type gets none,
-/// since it claims no query whose output is <c>Repository</c>, its interface is off, it is static, or the name is
-/// taken.
+/// since it claims no query whose output is <c>Repository</c>, its interface is off, it is static, or the name is not
+/// valid or is taken.
 /// </param>
 /// <param name="InterfaceIsPublic">
 /// Whether the interface is public, as the type is when it and every type it is nested in are; it is internal
