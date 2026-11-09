@@ -161,7 +161,7 @@ internal static class CommandWriter
     {
         var builder = context.Builder;
         var locals = context.Locals;
-        var access = locals.Source.Length > 0 ? locals.Source : source.AccessText;
+        var access = locals.SourceAccess;
         _ = builder.Append(indent).Append("var ").Append(locals.Connection).Append(" = ");
         switch (source.Kind)
         {
@@ -191,8 +191,8 @@ internal static class CommandWriter
         }
     }
 
-    // The source's value, or the exception that says it is null: its member, or the local a struct's streaming method
-    // read it into, read, or called with the token when it takes one, and awaited when it is an asynchronous factory.
+    // The source's value, or the exception that says it is null: its member, as the method reaches it, read, or called
+    // with the token when it takes one, and awaited when it is an asynchronous factory.
     private static void AppendSourceOrThrow(StringBuilder builder, ConnectionSource source, string access)
     {
         var isAwaited = source is { Kind: ConnectionSourceKind.Factory, IsAsync: true };

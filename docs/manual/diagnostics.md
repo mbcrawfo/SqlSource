@@ -903,7 +903,7 @@ public partial class UserRepository(NpgsqlDataSource parameters);
 ```
 
 ```console
-/work/App/UserRepository.cs(2,55): error SQLSRC036: 'parameters' of 'App.UserRepository' is the primary-constructor parameter that gives the database 'postgres' its connection, and the repository methods have an argument named 'parameters', which hides it.  Rename the parameter, or store it in a field or property and give the connection from that.
+/work/App/UserRepository.cs(2,54): error SQLSRC036: 'parameters' of 'App.UserRepository' is the primary-constructor parameter that gives the database 'postgres' its connection, and the repository methods have an argument named 'parameters', which hides it.  Rename the parameter, or store it in a field or property and give the connection from that.
 ```
 
 The error is at the parameter, and the repository queries of that database get no method.  Rename the parameter, or store it in a field or property of the type, which is then the connection, marked `[SqlSourceConnection]` when it is not found by its name or type.
@@ -3135,7 +3135,7 @@ See: [Query methods](generator.md#query-methods)
 
 **Method name is taken**
 
-The method of a query whose output is `methods` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  It is taken when it is:
+The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  It is taken when it is:
 
 - under the default [member location](generator.md#locations) `extension-class`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;

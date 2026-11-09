@@ -443,13 +443,67 @@ public sealed class MethodCompileTests
 
         run.ShouldBeClean();
         run.Sources["App.Strings-Methods.g.cs"].ShouldContain("var source = postgres;\n");
-        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("var source = this.SqlServer;\n");
-        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(source(cancellationToken) ?? ");
+        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("var self = this;\n");
+        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(self.SqlServer(cancellationToken) ?? ");
         run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("var source = this._sqlServer;\n");
-        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("var source = this.Open;\n");
+        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("var self = this;\n");
         run.Sources["App.Factories-Methods.g.cs"]
-            .ShouldContain("= await source(cancellationToken).ConfigureAwait(false) ?? ");
+            .ShouldContain("= await self.OpenAsync(cancellationToken).ConfigureAwait(false) ?? ");
         run.Sources["App.Borrowed-Methods.g.cs"].ShouldContain("var connection = source ?? ");
+    }
+
+    // A struct's marked factory beside an unmarked overload of it, which a method group of the name could not convert
+    // to a delegate, is called through a copy of the struct, where the call resolves the overload as written.
+    [Fact]
+    public void Run_StructRepositoryWithAnOverloadedFactory_CompilesWithoutWarnings()
+    {
+        const string Source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Microsoft.Data.SqlClient;
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct Factories
+                {
+                    public readonly NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "postgres")]
+                    public readonly NpgsqlConnection Open(CancellationToken cancellationToken) => new();
+
+                    public readonly Task<SqlConnection> OpenAsync() => Task.FromResult(new SqlConnection());
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    public readonly Task<SqlConnection> OpenAsync(CancellationToken cancellationToken) =>
+                        Task.FromResult(new SqlConnection());
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial record struct RecordFactories
+                {
+                    public readonly NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "postgres")]
+                    public readonly NpgsqlConnection Open(CancellationToken cancellationToken) => new();
+
+                    public readonly SqlConnection OpenSqlServer() => new();
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    public readonly SqlConnection OpenSqlServer(CancellationToken cancellationToken) => new();
+                }
+            }
+            """;
+
+        var run = RunRepositories(Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("= self.Open(cancellationToken) ?? ");
+        run.Sources["App.Factories-Methods.g.cs"]
+            .ShouldContain("= await self.OpenAsync(cancellationToken).ConfigureAwait(false) ?? ");
+        run.Sources["App.RecordFactories-Methods.g.cs"].ShouldContain("= self.OpenSqlServer(cancellationToken) ?? ");
     }
 
     // The repositories of the source, at Repository, claiming a postgres file and an mssql file of a query that reads

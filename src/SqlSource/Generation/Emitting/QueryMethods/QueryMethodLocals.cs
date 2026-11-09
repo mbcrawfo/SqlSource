@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -20,6 +21,9 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// </summary>
 internal sealed class QueryMethodLocals
 {
+    // How the access of an instance member starts.
+    private const string This = "this.";
+
     public QueryMethodLocals(
         MethodArguments arguments,
         MethodInput? input,
@@ -44,7 +48,7 @@ internal sealed class QueryMethodLocals
         ConnectionScope = source is null or { Kind: ConnectionSourceKind.Borrowed }
             ? string.Empty
             : names.Take("connectionScope");
-        Source = streams && source is { InStruct: true } ? names.Take("source") : string.Empty;
+        (SourceLocal, SourceValue, SourceAccess) = SourceOf(source, streams, names);
 
         Sql = names.Take("sql");
         WasClosed = names.Take("wasClosed");
@@ -108,10 +112,17 @@ internal sealed class QueryMethodLocals
     // The scope that disposes the connection a repository's method made, or empty when it borrows one or takes it.
     public string ConnectionScope { get; }
 
-    // The value of a struct repository's source, or the delegate of its method, which the streaming method reads before
-    // its iterator, since a local function of a struct reaches neither this nor a primary-constructor parameter.  Empty
-    // for any other method.
-    public string Source { get; }
+    // The local that a struct repository's streaming method declares before its iterator, since a local function of a
+    // struct reaches neither this nor a primary-constructor parameter: the source's value, or a copy of the struct for
+    // an instance method, through which overloads resolve as written.  Empty, as SourceValue is, for any other method.
+    public string SourceLocal { get; }
+
+    // What SourceLocal is set to: the source's access, or this.
+    public string SourceValue { get; }
+
+    // The source as the body reaches it: its access, or through SourceLocal.  Empty for a method that takes its
+    // connection.
+    public string SourceAccess { get; }
 
     public string Sql { get; }
 
@@ -162,6 +173,40 @@ internal sealed class QueryMethodLocals
 
     // The names of what the method declares for its lists, or null when it has none.
     public ListLocals? Lists { get; }
+
+    // The local of a struct repository's streaming method, its value, and the source as the body reaches it.  A static
+    // method is reached through its type, which the iterator can reach.
+    private static (string Local, string Value, string Access) SourceOf(
+        ConnectionSource? source,
+        bool streams,
+        LocalNames names
+    )
+    {
+        if (source is null)
+        {
+            return (string.Empty, string.Empty, string.Empty);
+        }
+
+        if (!streams || !source.InStruct)
+        {
+            return (string.Empty, string.Empty, source.AccessText);
+        }
+
+        if (source.Member != CandidateMember.Method)
+        {
+            var local = names.Take("source");
+            return (local, source.AccessText, local);
+        }
+
+        // An instance member's access is this, a dot and its name; a static one's starts with its type.
+        if (!source.AccessText.StartsWith(This, StringComparison.Ordinal))
+        {
+            return (string.Empty, string.Empty, source.AccessText);
+        }
+
+        var self = names.Take("self");
+        return (self, "this", self + source.AccessText.Substring(This.Length - 1));
+    }
 
     // Whether a parameter's binding matches its value as one that can be null: one bound through a converter, or an
     // array that its property holds as any sequence.

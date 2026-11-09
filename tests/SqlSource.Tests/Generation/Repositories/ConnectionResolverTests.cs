@@ -459,8 +459,24 @@ public sealed class ConnectionResolverTests
 
         var source = resolution.Sources.ShouldHaveSingleItem().Source;
         source.AccessText.ShouldBe("Repo<T>.ConnectionString");
-        source.LeadingName.ShouldBe("Repo");
+        source.LeadingName.ShouldBeNull();
         source.TypeName.ShouldBe("App.Repo<T>");
+    }
+
+    // A local of the type's name would hide a type that is not generic, which a static member is reached through.
+    [Fact]
+    public void Resolve_StaticMemberOfATypeThatIsNotGeneric_StartsWithTheType()
+    {
+        var type = TestModels.Type(types: [new TypeDeclaration("class", "Repo", "Repo", "", 0)]);
+        var candidate = Candidate("ConnectionString", CandidateType.ConnectionString, CandidateMember.Property) with
+        {
+            IsStatic = true,
+        };
+
+        var source = ConnectionResolver.Resolve(type, Shape(candidate), [Main]).Sources.ShouldHaveSingleItem().Source;
+
+        source.AccessText.ShouldBe("Repo.ConnectionString");
+        source.LeadingName.ShouldBe("Repo");
     }
 
     // The type's name is as its declaration writes it, so a keyword keeps its @.

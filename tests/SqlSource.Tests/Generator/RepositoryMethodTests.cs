@@ -236,6 +236,33 @@ public sealed class RepositoryMethodTests
         run.Sources.Keys.ShouldNotContain(MethodsFile);
     }
 
+    // A token named like a generic type hides nothing: a name with type arguments is never a local's.
+    [Fact]
+    public void Run_TokenNamedLikeAGenericTypeOfAStaticSource_ReportsNothing()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample<T>
+                {
+                    private static readonly string ConnectionString = "";
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetFrom\n-- token: {{Sample:users}}\nSELECT id FROM {{Sample}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Sample-1-Methods.g.cs"].ShouldContain("Sample<T>.ConnectionString ?? ");
+    }
+
     // The entry of GetUser, of the file given or UsersFile: the parameter id and the column id.
     private static SidecarEntry GetUserEntry(SqlFile? file = null) =>
         Entry(file ?? UsersFile, "GetUser", [Parameter("id")], [Column("id")]);

@@ -355,7 +355,8 @@ internal static class ConnectionResolver
             );
 
         // The name the access starts with, which an argument or a local of the method could hide: a parameter's own,
-        // and the type's for a static member.  An instance member is reached through this, which nothing hides.
+        // and the type's for a static member of a type that is not generic.  An instance member is reached through
+        // this, which nothing hides.
         private string? LeadingNameOf(ConnectionCandidate candidate)
         {
             if (candidate.Member == CandidateMember.Parameter)
@@ -363,7 +364,9 @@ internal static class ConnectionResolver
                 return candidate.Name;
             }
 
-            return candidate.IsStatic ? type.Name : null;
+            // A local of the type's name hides it only when the type is not generic: a name with type arguments is
+            // never a local's.
+            return candidate.IsStatic && type.Types[type.Types.Count - 1].Arity == 0 ? type.Name : null;
         }
 
         // A parameter by its name, a static member through the type as its own code writes it, which reaches a base

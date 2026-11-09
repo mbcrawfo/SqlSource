@@ -128,8 +128,8 @@ internal static class HeaderWriter
 
     // A streaming method's return of a call to its iterator, after a blank line when checks come before it, then the
     // iterator's signature and the brace that opens its body, at the indent of the method's body.  A repository's
-    // method of no input and no checked token has no check.  A struct repository's method reads its source first, into
-    // a local that the iterator captures.
+    // method of no input and no checked token has no check.  A struct repository's method reads its source, or copies
+    // itself, first, into a local that the iterator captures.
     internal static void AppendIteratorCall(in QueryMethodContext context, string indent, bool afterChecks)
     {
         var builder = context.Builder;
@@ -141,14 +141,14 @@ internal static class HeaderWriter
             _ = builder.Append('\n');
         }
 
-        if (locals.Source.Length > 0)
+        if (locals.SourceLocal.Length > 0)
         {
             _ = builder
                 .Append(indent)
                 .Append("var ")
-                .Append(locals.Source)
+                .Append(locals.SourceLocal)
                 .Append(" = ")
-                .Append(context.Method.Source!.AccessText)
+                .Append(locals.SourceValue)
                 .Append(";\n");
         }
 
