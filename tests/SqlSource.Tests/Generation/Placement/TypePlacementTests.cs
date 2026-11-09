@@ -251,6 +251,35 @@ public sealed class TypePlacementTests
     }
 
     [Fact]
+    public void Of_QueryMarkerOfTheNestedClassOnARepositoryQuery_ReportsSqlsrc122AtTheMarker()
+    {
+        var query = Query(
+            "GetUser",
+            output: OutputKind.Repository,
+            location: MemberLocation.NestedClass,
+            place: SettingPlace.Query
+        ) with
+        {
+            MemberLocationMarker = At("Users.sql", 1),
+        };
+
+        var (_, diagnostics) = Analyse(TestModels.Type(), Files(File("Users.sql", query)));
+
+        diagnostics.ShouldBe([
+            DiagnosticInfo.Create(
+                SqlDiagnostics.MemberLocationNotFit,
+                At("Users.sql", 1),
+                "GetUser",
+                "App.UserRepository",
+                "nested class",
+                "its own marker",
+                "repository",
+                "A repository method is an instance method of the type.  Use class."
+            ),
+        ]);
+    }
+
+    [Fact]
     public void Of_QueryMarkerOfTheExtensionClassOnASqlQuery_ReportsSqlsrc122AtTheMarker()
     {
         var query = Query(

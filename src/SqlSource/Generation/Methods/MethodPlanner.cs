@@ -35,9 +35,10 @@ internal static class MethodPlanner
 
     /// <summary>
     /// The methods of the type: one for each query of a file it can use whose output is
-    /// <see cref="OutputKind.Methods" />, whose entry has the models it needs, whose shape, name, tokens and
-    /// converters a method can have, whose engine's driver the project references at or above the floor, and which
-    /// uses no library older than its floor.  A type with a diagnostic of its own, or with no file, has none.
+    /// <see cref="OutputKind.Methods" />, or <see cref="OutputKind.Repository" /> once it has a method, whose entry has
+    /// the models it needs, whose shape, name, tokens and converters a method can have, whose engine's driver the
+    /// project references at or above the floor, and which uses no library older than its floor.  A type with a
+    /// diagnostic of its own, or with no file, has none.
     /// </summary>
     public static TypeMethods Plan(MethodsInput input)
     {
@@ -193,7 +194,7 @@ internal static class MethodPlanner
         return engines;
     }
 
-    // The names of the members the type's file writes for the queries whose output is not Methods: each one's constant
+    // The names of the members the type's file writes for the queries that have no method: each one's constant
     // or token method, with the nested class that holds it, or null for one on the type itself.
     private static HashSet<(string? NestedClass, string Name)> WrittenNames(UsableQuerySequence queries)
     {
