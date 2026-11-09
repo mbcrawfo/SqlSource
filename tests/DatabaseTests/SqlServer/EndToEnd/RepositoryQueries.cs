@@ -16,19 +16,24 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 internal sealed partial class ConnectionStringRepository(string connectionString);
 
 // A factory by the attribute, a method that takes a CancellationToken: each method calls it, and disposes the
-// connection it returns.  It opens each connection, which the method then leaves open, so that one closed after the
-// method was closed by its disposal, and keeps each, with those whose Disposed event has been raised, for a test to
-// look at after the method.
+// connection it returns.  The factory opens each connection itself, so the method never closes one; a connection that
+// is closed after the method was disposed by it.  It keeps each connection for a test to look at, with those whose
+// Disposed event has been raised, and, given no connection string, returns null, as a factory of the user's may.
 [SqlSourceGenerate(Source = "Queries/Repository.sql")]
-internal sealed partial class FactoryRepository(string appConnectionString)
+internal sealed partial class FactoryRepository(string? appConnectionString)
 {
     public List<SqlConnection> Connections { get; } = [];
 
     public List<SqlConnection> Disposed { get; } = [];
 
     [SqlSourceConnection]
-    private async ValueTask<SqlConnection> OpenAsync(CancellationToken cancellationToken)
+    private async ValueTask<SqlConnection?> OpenAsync(CancellationToken cancellationToken)
     {
+        if (appConnectionString is null)
+        {
+            return null;
+        }
+
         var connection = new SqlConnection(appConnectionString);
         Connections.Add(connection);
         connection.Disposed += (_, _) => Disposed.Add(connection);

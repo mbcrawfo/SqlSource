@@ -33,7 +33,6 @@ public sealed class RepositoryQueryTests(SqlServerDatabases sqlServer)
     public async Task GetNote_EachSource_ReadsTheRow(string source)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
         var connectionString = EndToEndSources.AppConnectionString(sqlServer);
         var parameters = new GetNoteArgs(1);
 
@@ -41,14 +40,15 @@ public sealed class RepositoryQueryTests(SqlServerDatabases sqlServer)
         {
             "ConnectionString" => await new ConnectionStringRepository(connectionString).GetNote(parameters, token),
             "Factory" => await new FactoryRepository(connectionString).GetNote(parameters, token),
-            "Borrowed" => await new BorrowedRepository(connection).GetNote(parameters, token),
+            "Borrowed" => await GetNoteBorrowedAsync(sqlServer, parameters, token),
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, "No repository has this source."),
         };
 
         note.ShouldBe(Notes[0]);
     }
 
-    // The factory opens its connection, so the method does not close it, and only its disposal at the break can.
+    // The factory opens its connection, so the method does not close it, and only its disposal at the break can; the
+    // Disposed event, raised once, proves that the method disposed it exactly once.
     [Fact]
     public async Task ListNotes_BreakAfterFirstRow_DisposesTheFactoryConnection()
     {
@@ -106,13 +106,34 @@ public sealed class RepositoryQueryTests(SqlServerDatabases sqlServer)
     {
         var repository = new ConnectionStringRepository(null!);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
-            repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken)
-        );
-
-        exception.Message.ShouldBe(
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
             "The connection source 'connectionString' of "
                 + "'SqlSource.DatabaseTests.SqlServer.EndToEnd.ConnectionStringRepository' is null."
+        );
+    }
+
+    [Fact]
+    public async Task GetNote_FactoryReturnsNull_ThrowsNamingTheMember()
+    {
+        var repository = new FactoryRepository(null);
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'OpenAsync' of "
+                + "'SqlSource.DatabaseTests.SqlServer.EndToEnd.FactoryRepository' is null."
+        );
+    }
+
+    [Fact]
+    public async Task GetNote_NullBorrowedConnection_ThrowsNamingTheMember()
+    {
+        var repository = new BorrowedRepository(null!);
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'Connection' of "
+                + "'SqlSource.DatabaseTests.SqlServer.EndToEnd.BorrowedRepository' is null."
         );
     }
 
@@ -132,4 +153,22 @@ public sealed class RepositoryQueryTests(SqlServerDatabases sqlServer)
     // Code that knows the repository only by its generated interface, as a caller that may be given a fake does.
     private static Task<int> TouchNoteAsync<TRepository>(TRepository repository, CancellationToken token)
         where TRepository : IConnectionStringRepository => repository.TouchNote(new TouchNoteArgs(1), token);
+
+    // A borrowed connection made for the one row of the theory that needs it, and disposed by its owner, the test.
+    private static async Task<RepositoryNote?> GetNoteBorrowedAsync(
+        SqlServerDatabases sqlServer,
+        GetNoteArgs parameters,
+        CancellationToken token
+    )
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+        return await new BorrowedRepository(connection).GetNote(parameters, token);
+    }
+
+    // The method throws, before it opens anything, the InvalidOperationException that names the null source.
+    private static async Task ShouldThrowNullSourceAsync(Func<Task> call, string message)
+    {
+        var exception = await Should.ThrowAsync<InvalidOperationException>(call);
+        exception.Message.ShouldBe(message);
+    }
 }

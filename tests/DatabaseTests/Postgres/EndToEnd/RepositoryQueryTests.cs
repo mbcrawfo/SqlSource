@@ -4,6 +4,7 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Npgsql;
 using Shouldly;
 using Xunit;
 
@@ -34,7 +35,6 @@ public sealed class RepositoryQueryTests(PostgresDatabases postgres)
     {
         var token = TestContext.Current.CancellationToken;
         await using var dataSource = EndToEndSources.App(postgres);
-        await using var connection = dataSource.CreateConnection();
         var parameters = new GetNoteArgs(2);
 
         var note = source switch
@@ -44,7 +44,7 @@ public sealed class RepositoryQueryTests(PostgresDatabases postgres)
                 EndToEndSources.AppConnectionString(postgres)
             ).GetNote(parameters, token),
             "Factory" => await new FactoryRepository(dataSource).GetNote(parameters, token),
-            "Borrowed" => await new BorrowedRepository(connection).GetNote(parameters, token),
+            "Borrowed" => await GetNoteBorrowedAsync(dataSource, parameters, token),
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, "No repository has this source."),
         };
 
@@ -52,7 +52,9 @@ public sealed class RepositoryQueryTests(PostgresDatabases postgres)
     }
 
     // The factory opens its connection, so the method does not close it, and only its disposal at the break can.
-    // Npgsql raises no Disposed event, so the disposal shows as the ObjectDisposedException of an open after it.
+    // Npgsql raises no Disposed event, so the disposal shows as the ObjectDisposedException of an open after it: this
+    // proves that the connection was disposed, not that it was disposed once, which SQL Server's test, counting the
+    // event, proves.
     [Fact]
     public async Task ListNotes_BreakAfterFirstRow_DisposesTheFactoryConnection()
     {
@@ -113,13 +115,46 @@ public sealed class RepositoryQueryTests(PostgresDatabases postgres)
     {
         var repository = new ConnectionStringRepository(null!);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
-            repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken)
-        );
-
-        exception.Message.ShouldBe(
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
             "The connection source 'connectionString' of "
                 + "'SqlSource.DatabaseTests.Postgres.EndToEnd.ConnectionStringRepository' is null."
+        );
+    }
+
+    [Fact]
+    public async Task GetNote_NullDataSource_ThrowsNamingTheMember()
+    {
+        var repository = new DataSourceRepository(null!);
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'dataSource' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.DataSourceRepository' is null."
+        );
+    }
+
+    [Fact]
+    public async Task GetNote_FactoryReturnsNull_ThrowsNamingTheMember()
+    {
+        var repository = new FactoryRepository(null);
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'OpenAsync' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.FactoryRepository' is null."
+        );
+    }
+
+    [Fact]
+    public async Task GetNote_NullBorrowedConnection_ThrowsNamingTheMember()
+    {
+        var repository = new BorrowedRepository(null!);
+
+        await ShouldThrowNullSourceAsync(
+            () => repository.GetNote(new GetNoteArgs(1), TestContext.Current.CancellationToken),
+            "The connection source 'Connection' of "
+                + "'SqlSource.DatabaseTests.Postgres.EndToEnd.BorrowedRepository' is null."
         );
     }
 
@@ -140,4 +175,22 @@ public sealed class RepositoryQueryTests(PostgresDatabases postgres)
     // Code that knows the repository only by its generated interface, as a caller that may be given a fake does.
     private static Task<int> TouchNoteAsync<TRepository>(TRepository repository, CancellationToken token)
         where TRepository : IDataSourceRepository => repository.TouchNote(new TouchNoteArgs(1), token);
+
+    // A borrowed connection made for the one row of the theory that needs it, and disposed by its owner, the test.
+    private static async Task<RepositoryNote?> GetNoteBorrowedAsync(
+        NpgsqlDataSource dataSource,
+        GetNoteArgs parameters,
+        CancellationToken token
+    )
+    {
+        await using var connection = dataSource.CreateConnection();
+        return await new BorrowedRepository(connection).GetNote(parameters, token);
+    }
+
+    // The method throws, before it opens anything, the InvalidOperationException that names the null source.
+    private static async Task ShouldThrowNullSourceAsync(Func<Task> call, string message)
+    {
+        var exception = await Should.ThrowAsync<InvalidOperationException>(call);
+        exception.Message.ShouldBe(message);
+    }
 }
