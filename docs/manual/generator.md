@@ -1,6 +1,6 @@
 # The generator
 
-The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code.  For each described query it writes a type for its parameters and a type for its rows, its [models](#models), and, under the default [output](settings.md#setting-output), `methods`, a [method](#query-methods) that runs the query.  A query whose output is `sql` or `models` gets a string constant instead, or a method that returns its SQL where it has [tokens](concepts.md#token), for your own code to run.  It needs no database, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](diagnostics.md#sqlsrc003), [SQLSRC012](diagnostics.md#sqlsrc012)).  It needs the package, one attribute, and one choice: a query whose output is `models` or `methods`, the default, must be described by the [tool](tool.md), and the build reports one that has no current entry in its sidecar, while a query whose output is `sql` needs nothing more.
+The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code.  For each described query it writes a type for its parameters and a type for its rows, its [models](#models), and, under the default [output](settings.md#setting-output), `repository`, a [repository method](#repository-methods): an instance method of your type that gets its own connection and runs the query.  Under the output `methods` a query gets a [method that takes the connection](#methods-that-take-a-connection) instead, for a connection, a transaction or a timeout that your own code manages.  A query whose output is `sql` or `models` gets a string constant instead, or a method that returns its SQL where it has [tokens](concepts.md#token), for your own code to run.  It needs no database, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](diagnostics.md#sqlsrc003), [SQLSRC012](diagnostics.md#sqlsrc012)).  It needs the package, one attribute, and one choice: a query whose output is `models`, `methods` or `repository`, the default, must be described by the [tool](tool.md), and the build reports one that has no current entry in its sidecar, while a query whose output is `sql` needs nothing more.
 
 ```sql postgres
 -- name: GetUser -> one-optional
@@ -15,21 +15,19 @@ SELECT id, name FROM {{table:users}} ORDER BY {{orderBy:name}};
 ```
 
 ```csharp
-using System.Data.Common;
+using Npgsql;
 using SqlSource;
 
 [SqlSourceGenerate]
-public partial class UserRepository(DbConnection connection)
-{
-    public Task<GetUserDto?> Get(int id) =>
-        connection.GetUser(new GetUserParams(id));
+public partial class UserRepository(NpgsqlDataSource dataSource);
 
-    public Task<ListFromDto[]> List() =>
-        connection.ListFrom("users", "name DESC");
-}
+// elsewhere
+var users = new UserRepository(dataSource);
+GetUserDto? user = await users.GetUser(new GetUserParams(42));
+ListFromDto[] rows = await users.ListFrom("users", "name DESC");
 ```
 
-`GetUser` and `ListFrom` are the generated methods of the two queries, extension methods of `DbConnection` in the generated class `UserRepositoryExtensions`.  Each opens the connection when it is closed, sends the query's parameters, runs it and reads its rows into its output model: `GetUser` one row or null, as its [result shape](sql-files.md#result-shapes) `one-optional` says, and `ListFrom` every row, the default for a query that returns rows.  `ListFrom` takes the text of each token, and its token defaults, `users` and `name`, are only samples for [describing](concepts.md#describe) the query.  `GetUserParams`, `GetUserDto` and `ListFromDto` are the models of the two queries, generated from what the tool recorded when it described them.  A query that is renamed or removed is a compile error where it is used, and so is a column that is renamed or removed once the query is described again.
+`GetUser` and `ListFrom` are the generated methods of the two queries, public instance methods of `UserRepository`.  Each opens a connection from the data source, sends the query's parameters, runs it, reads its rows into its output model and disposes the connection: `GetUser` one row or null, as its [result shape](sql-files.md#result-shapes) `one-optional` says, and `ListFrom` every row, the default for a query that returns rows.  `ListFrom` takes the text of each token, and its token defaults, `users` and `name`, are only samples for [describing](concepts.md#describe) the query.  `GetUserParams`, `GetUserDto` and `ListFromDto` are the models of the two queries, generated from what the tool recorded when it described them.  `UserRepository` also gets an interface of the two methods, `IUserRepository`, for code that takes a repository and a test that fakes one: see [the interface](#repository-interface).  A query that is renamed or removed is a compile error where it is used, and so is a column that is renamed or removed once the query is described again.
 
 With the output `models`, the same queries give `Sql.GetUser`, a [constant](#constants) that holds the text of the first query, and `Sql.ListFrom("users", "name DESC")`, a [token method](#token-methods) that returns the text of the second with its tokens filled in, and their models, for Dapper, ADO.NET or any other library to run: see [the recipe](recipes.md#dapper-and-adonet).
 
@@ -37,22 +35,24 @@ With the output `models`, the same queries give `Sql.GetUser`, a [constant](#con
 
 ## The attribute
 
-`[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, the [`[SqlSourceConverter]`](settings.md#converters) attribute and the exceptions that a query method throws, [`UnexpectedRowCountException`](#unexpected-row-count) and [`TransactionRolledBackException`](#transaction-rolled-back), in your project, as internal types in the namespace `SqlSource`, so the code above needs `using SqlSource;` and nothing else.  The exceptions are left out when your project uses another project's, and are public when it sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions): see [projects that share internals](#projects-that-share-internals).  It also adds `Microsoft.CodeAnalysis.EmbeddedAttribute`, in the generated file `SqlSource-EmbeddedAttribute.g.cs`, an internal attribute that keeps every one of these types but the exceptions out of sight of other projects: see [known issues](#known-issues) if your project declares it too.
+`[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, the [`[SqlSourceConverter]`](settings.md#converters) and [`[SqlSourceConnection]`](#repository-connection) attributes and the exceptions that a query method throws, [`UnexpectedRowCountException`](#unexpected-row-count) and [`TransactionRolledBackException`](#transaction-rolled-back), in your project, as internal types in the namespace `SqlSource`, so the code above needs `using SqlSource;` and nothing else.  The exceptions are left out when your project uses another project's, and are public when it sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions): see [projects that share internals](#projects-that-share-internals).  It also adds `Microsoft.CodeAnalysis.EmbeddedAttribute`, in the generated file `SqlSource-EmbeddedAttribute.g.cs`, an internal attribute that keeps every one of these types but the exceptions out of sight of other projects: see [known issues](#known-issues) if your project declares it too.
 
 ```csharp
 [SqlSourceGenerate(Source = "Queries")]
 internal static partial class Reports;
 ```
 
-- **It goes on a class, a struct, a record or a record struct.**  The type may be static, generic, or nested in other types.
+- **It goes on a class, a struct, a record or a record struct.**  The type may be static, generic, or nested in other types.  A static type has no instance, so its queries need an output other than `repository` ([SQLSRC034](diagnostics.md#sqlsrc034)): The files of `Reports` above set the output `methods`, `models` or `sql`.
 - **The type and every type that contains it must be `partial`** ([SQLSRC001](diagnostics.md#sqlsrc001)), and none may be `file` ([SQLSRC002](diagnostics.md#sqlsrc002)).  The generator adds its members in a second declaration of each.
 - **A type with an error gets no members**, and asks for no models.  The code that uses them then fails to compile too, so fix the first error the build reports.
 
-The attribute's one property is a [setting](settings.md), documented there:
+The attribute has three properties:
 
 | Property | Sets |
 |----|----|
 | `Source` | Which `.sql` files belong to the type: [Source](settings.md#setting-source) |
+| `GenerateInterface` | Whether a repository gets its interface, over the project's choice: [repository interfaces](settings.md#repository-interfaces) |
+| `InterfaceName` | The name of a repository's interface, `IUserRepository` by default: [repository interfaces](settings.md#repository-interfaces) |
 
 Every other setting of a query, its [output](settings.md#setting-output) and [where its members go](#locations) among them, comes from its `.sql` file, through its markers and the [settings files](settings.md#settings-files) of its folder, and not from the type that claims it.
 
@@ -74,7 +74,7 @@ A type gets the file named for it, beside its C# file, or the files that its [`S
 - **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](diagnostics.md#sqlsrc008), and the file with the second one gets no members and no models for that type.
 - **Two types may claim one file**, and each gets its own members from it, though two types of one namespace can give one method twice: see [where the methods go](#method-location).  They take the same settings from it, since every setting of a query comes from the file and its settings files: one output, one member location, one suffix and one shape of model for both.  Two types in one namespace share the models of the file's queries; two in two namespaces get a model each, unless the [namespace of the models](settings.md#setting-model-namespace) gives them one ([shared models](#shared-models)).  A type that needs other settings needs a file of its own.
 - **A `.sql` file that no type claims is ignored**: see [Source](settings.md#setting-source).
-- **A file with an error in how it is written produces no members** until it is fixed: see [`.sql` files](sql-files.md).  The other files of the type are unaffected.  An error about describing a query or about its sidecar, such as [SQLSRC241](diagnostics.md#sqlsrc241), leaves the query without models until it is fixed, and so without a [method](#which-methods) under `methods`; under `models` it keeps its constant or token method.
+- **A file with an error in how it is written produces no members** until it is fixed: see [`.sql` files](sql-files.md).  The other files of the type are unaffected.  An error about describing a query or about its sidecar, such as [SQLSRC241](diagnostics.md#sqlsrc241), leaves the query without models until it is fixed, and so without a [method](#which-methods) under `methods` or `repository`; under `models` it keeps its constant or token method.
 
 <a id="locations"></a>
 
@@ -89,30 +89,29 @@ SELECT id, name FROM users WHERE id = @id;
 SELECT count(*) FROM users;
 
 -- name: ListUsers
+-- output: methods
 -- member-location: class
--- visibility: public
 SELECT id, name FROM users ORDER BY name;
 ```
 
 ```csharp
 [SqlSourceGenerate]
-public partial class UserRepository(DbConnection connection)
+public partial class UserRepository(NpgsqlDataSource dataSource)
 {
-    public Task<GetUserDto?> Get(int id) => connection.GetUser(new GetUserParams(id));
-
     public string CountText => Sql.CountUsers;
 }
 
 // elsewhere
-ListUsersDto[] users = await UserRepository.ListUsers(connection);
+GetUserDto? user = await users.GetUser(new GetUserParams(42));
+ListUsersDto[] all = await UserRepository.ListUsers(connection);
 ```
 
-Each query's members go where its [member location](settings.md#setting-member-location) says, with the accessibility its [visibility](settings.md#setting-visibility) gives, two settings of its `.sql` file.  Without them, as for `GetUser` and `CountUsers`, a query method is an `internal` extension method of `DbConnection`, in the class `UserRepositoryExtensions`, and a constant or token method is a public member of a private class `Sql` nested in the type, for the type's own code.  `ListUsers` is a public static method of the type, which takes the connection.  The settings' sections give their values and defaults; what follows is what to know of the code you get.
+Each query's members go where its [member location](settings.md#setting-member-location) says, with the accessibility its [visibility](settings.md#setting-visibility) gives, two settings of its `.sql` file.  Without them, as for `GetUser` and `CountUsers`, a repository method is a `public` instance method of the type, and a constant or token method is a public member of a private class `Sql` nested in the type, for the type's own code.  A query whose output is `methods` is by default an `internal` extension method of `DbConnection`, in the class `UserRepositoryExtensions`; `ListUsers` writes `class`, so it is a static method of the type, which takes the connection, `public` since the type is.  The settings' sections give their values and defaults; what follows is what to know of the code you get.
 
 - **The models follow the type, and the members follow `visibility`.**  A model is `public` or `internal` by the type that claims its query, as [accessibility](#model-accessibility) says, whatever the visibility of the query's members.  So a `private` method of a `public` type still has public models, and a `public` extension method of a type that is not `public` is [SQLSRC123](diagnostics.md#sqlsrc123) when it takes or returns a model that is internal, as its models are unless a `public` type shares them.  One with no parameters and no rows takes no models, and compiles.
 - **A nested class is `static partial`**, and is written for the members it holds alone: a class of query methods only is in the file of the type's methods, and a class of constants and methods has a part in each file.  Its members are `public`, and the class has the visibility.  A type none of whose queries can be used, such as one whose only file has an error, keeps an empty private class `Sql`, or the one that the `nestedClass` of its first file's settings files names, so that code that uses one of its members reports the member missing, and not the class.
 - **In a nested class**, the type cannot have a member, a nested type or a type parameter named like the class, nor that name itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  A query is not named like its class, with `Async` after a query method's name under `async-method-suffix` ([SQLSRC009](diagnostics.md#sqlsrc009)).
-- **On the type**, a constant or token method is not named like the type ([SQLSRC009](diagnostics.md#sqlsrc009)), nor like a member, a nested type or a type parameter that the type declares, nor like a nested class of the type's queries ([SQLSRC125](diagnostics.md#sqlsrc125)).  So a token method does not overload a method of yours of the same name.  A query method's name is checked where [the methods go](#method-location).
+- **On the type**, a constant or token method is not named like the type ([SQLSRC009](diagnostics.md#sqlsrc009)), nor like a member, a nested type or a type parameter that the type declares, nor like a nested class of the type's queries ([SQLSRC125](diagnostics.md#sqlsrc125)).  So a token method does not overload a method of yours of the same name.  A query method's name is checked as [its output's section](#repository-signature) says for a repository method, and where [the methods go](#method-location) for a `methods` method.
 - **A placement error leaves its file out.**  A query whose member location or visibility does not fit ([SQLSRC122](diagnostics.md#sqlsrc122), [SQLSRC123](diagnostics.md#sqlsrc123)), or whose members would take a name that is taken ([SQLSRC007](diagnostics.md#sqlsrc007), [SQLSRC125](diagnostics.md#sqlsrc125)), or whose nested class has two visibilities ([SQLSRC124](diagnostics.md#sqlsrc124)), leaves its whole file without members and without models for the type, as [a name used twice](#files-of-a-type) does; the type's other files keep theirs.  A visibility that does not fit only the models a query method takes or returns, also SQLSRC123, leaves out that method alone, as a [method's other errors](#query-methods) do.
 - A query may share its name with a member that the type inherits, such as `ToString`.  The constant hides it, with no warning in the generated code.
 
@@ -122,11 +121,12 @@ Each query's members go where its [member location](settings.md#setting-member-l
 
 A member location or a visibility written in a file header or a settings file reaches every query below it, whatever its output, and a query where it does not fit is an error that leaves its file without members and without models for the type until it is fixed, or only its method when what does not fit is the method's models.  The message says where the value was written.  Two cases catch a project out:
 
-- **`"memberLocation": "ExtensionClass"` in a settings file** is [SQLSRC122](diagnostics.md#sqlsrc122) at every query whose output is `sql` or `models`, in its folder and the folders below it, since only a query method can go in the extension class.  Leave it out: a query method goes there by default.
+- **`"memberLocation": "ExtensionClass"` in a settings file** is [SQLSRC122](diagnostics.md#sqlsrc122) at every query whose output is `sql`, `models` or `repository`, in its folder and the folders below it, since only a `methods` method can go in the extension class, and so is `"memberLocation": "NestedClass"` at every repository query, whose method is always an instance method of the type.  Leave it out: each output's members go to its own default.
 - **A visibility in the header of a file that mixes outputs** reaches its query methods too:
 
 ```sql postgres
 -- visibility: private
+-- output: methods
 
 -- name: CountUsers
 -- output: sql
@@ -144,6 +144,7 @@ error SQLSRC123: The query 'GetUser' of 'App.UserRepository' cannot be private, 
 
 ```sql postgres
 -- visibility: private
+-- output: methods
 
 -- name: CountUsers
 -- output: sql
@@ -182,7 +183,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
 ```
 
-A query with a token whose output is `sql` or `models` is a `static string` method with the name of the query, as visible as a constant would be, `ListFrom(string table, string orderBy)`, in place of a constant.  Under `methods` the query's [method](#query-methods) takes the tokens instead, and runs the query.  Its parameters, and what it returns, are under [tokens](parameters-and-tokens.md#tokens).
+A query with a token whose output is `sql` or `models` is a `static string` method with the name of the query, as visible as a constant would be, `ListFrom(string table, string orderBy)`, in place of a constant.  Under `methods` or `repository` the query's [method](#query-methods) takes the tokens instead, and runs the query.  Its parameters, and what it returns, are under [tokens](parameters-and-tokens.md#tokens).
 
 A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](concepts.md#query-parameter) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [parameters and tokens](parameters-and-tokens.md#tokens).
 
@@ -270,7 +271,7 @@ The models are built at every build from the committed sidecars, with no databas
 
 ### Which queries get models
 
-A query gets models when its [output](settings.md#setting-output) is `models` or `methods`, the default, and its entry in its sidecar is current.  Which models it gets depends on the entry:
+A query gets models when its [output](settings.md#setting-output) is `models`, `methods` or `repository`, the default, and its entry in its sidecar is current.  Which models it gets depends on the entry:
 
 | The query | Input model | Output model |
 |----|----|----|
@@ -280,7 +281,7 @@ A query gets models when its [output](settings.md#setting-output) is `models` or
 | Has neither | No | No |
 
 - **Rows of no column**, which PostgreSQL gives for `SELECT FROM users`, get an output model with no properties.
-- **A query has no models while it has an error**: an entry that is missing or out of date ([SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244)), a column or a parameter with no C# type ([SQLSRC246](diagnostics.md#sqlsrc246), [SQLSRC249](diagnostics.md#sqlsrc249) to [SQLSRC252](diagnostics.md#sqlsrc252), [SQLSRC261](diagnostics.md#sqlsrc261), [SQLSRC269](diagnostics.md#sqlsrc269) and [SQLSRC270](diagnostics.md#sqlsrc270)), a name that gives no property ([property names](#property-names)), or a [`-- column:` marker](#column-marker) that names no column it can set ([SQLSRC260](diagnostics.md#sqlsrc260)).  Under the output `models` its constant or token method is still generated; under `methods` it has no method either.
+- **A query has no models while it has an error**: an entry that is missing or out of date ([SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244)), a column or a parameter with no C# type ([SQLSRC246](diagnostics.md#sqlsrc246), [SQLSRC249](diagnostics.md#sqlsrc249) to [SQLSRC252](diagnostics.md#sqlsrc252), [SQLSRC261](diagnostics.md#sqlsrc261), [SQLSRC269](diagnostics.md#sqlsrc269) and [SQLSRC270](diagnostics.md#sqlsrc270)), a name that gives no property ([property names](#property-names)), or a [`-- column:` marker](#column-marker) that names no column it can set ([SQLSRC260](diagnostics.md#sqlsrc260)).  Under the output `models` its constant or token method is still generated; under `methods` or `repository` it has no method either.
 - **A query whose output is `sql` gets none.**
 - **A type with an error asks for no models.**  When two types claim one file, a type with an error of its own asks for no models of its queries, and neither does a type for a file that it leaves out ([SQLSRC008](diagnostics.md#sqlsrc008), [SQLSRC009](diagnostics.md#sqlsrc009), or a [placement error](#locations)); the other type still gets them.
 - **`-- output-model:` on a query that returns no rows** is [SQLSRC259](diagnostics.md#sqlsrc259), and the query has no models until the marker is removed.  `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119).
@@ -372,7 +373,7 @@ The [generator parameters](settings.md#setting-generator-parameters) `sort-input
 
 A property's name is the PascalCase of its column's or its parameter's name: the name is split at each `_`, the first character of each part is made upper case, the rest of it is kept as it is, and the parts are joined.  A column's name first loses one `!` or `?` at its end, which sets its [nullability](#model-nullability).  A parameter's name is the one the SQL first writes it with, without its `@`: `@accountId` gives `AccountId`.
 
-Each of these is an error at the query's name, and the query has no models until it is fixed, nor a method under `methods`; under `models` its constant or token method is still generated.  Give the column an alias, or rename the parameter, and describe the query again.
+Each of these is an error at the query's name, and the query has no models until it is fixed, nor a method under `methods` or `repository`; under `models` its constant or token method is still generated.  Give the column an alias, or rename the parameter, and describe the query again.
 
 - **A column with no name**, which PostgreSQL calls `?column?`, as an expression `price * quantity` without an alias: [SQLSRC253](diagnostics.md#sqlsrc253).  SQL Server gives such a column no name, and the tool reports it when it describes the query, as [SQLSRC266](diagnostics.md#sqlsrc266).
 - **A name whose PascalCase is not a C# identifier**: one of underscores alone, one that starts with a digit, or one with a character that an identifier cannot hold, such as `unit-price`: [SQLSRC254](diagnostics.md#sqlsrc254).
@@ -398,14 +399,14 @@ A property has the C# type of its column or parameter.  Above, in a project that
 1. its query's `-- column: name -> Type` marker: see [the `-- column:` marker](#column-marker);
 2. the [column types](settings.md#setting-column-types), by the column of a table or view it is read from;
 3. the [type override](settings.md#setting-type-overrides), by its database type;
-4. a library of the [library types](settings.md#setting-library-types) that is on for the query, NodaTime, NetTopologySuite or System.Text.Json, for a query whose output is `methods` alone;
+4. a library of the [library types](settings.md#setting-library-types) that is on for the query, NodaTime, NetTopologySuite or System.Text.Json, for a query whose output is `methods` or `repository` alone;
 5. the type map of [PostgreSQL](postgresql.md#type-map) or [SQL Server](sqlserver.md#types).
 
 A parameter's is its [`-- param:` marker](parameters-and-tokens.md#param-marker)'s C# type after `->`, then the type override's, the library's and the type map's.  Each of the first three is a type you chose, which a query method reads and sends through your [converters](settings.md#converters) when it has them, and a class of yours in a column that holds JSON through System.Text.Json's serializer: see [a class in a JSON column](settings.md#json-class).  A library's type is read and sent on PostgreSQL by Npgsql, through its plugin for NodaTime or NetTopologySuite, and by the query method itself on SQL Server, unless your converters convert it, and the type map's is read and sent by the driver.  On SQL Server a type of NetTopologySuite is read and sent by the query method whichever place chose it, and no converter of yours replaces that: see [NetTopologySuite on SQL Server](sqlserver.md#nettopologysuite).
 
-A PostgreSQL array parameter of a query whose output is `methods` has the type `IEnumerable<T>` of its element, `IEnumerable<int>` for an `int4[]`, in place of `T[]`, and the query method sends any sequence: see [array parameters](postgresql.md#array-parameters).  A column's property, and a parameter's in a query whose output is `models`, stay `T[]`.
+A PostgreSQL array parameter of a query whose output is `methods` or `repository` has the type `IEnumerable<T>` of its element, `IEnumerable<int>` for an `int4[]`, in place of `T[]`, and the query method sends any sequence: see [array parameters](postgresql.md#array-parameters).  A column's property, and a parameter's in a query whose output is `models`, stay `T[]`.
 
-A [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, has the type `IEnumerable<T>` of its values' C# type under `methods` and `models`: `IEnumerable<int>` for a list of `integer`.  Its values' type is found as a parameter's is, and is never nullable.
+A [list parameter](parameters-and-tokens.md#list-parameters), written after `IN` with no parentheses, has the type `IEnumerable<T>` of its values' C# type under `models`, `methods` and `repository`: `IEnumerable<int>` for a list of `integer`.  Its values' type is found as a parameter's is, and is never nullable.
 
 <a id="model-nullability"></a>
 
@@ -508,8 +509,8 @@ A model is generated once for its full name, however many queries and types ask 
 
 - **Two models of one name that differ** are [SQLSRC257](diagnostics.md#sqlsrc257), which names the first difference.  The queries are taken in the order of their files' paths, then of their order in a file, then of the names of the types that claim them, and the error is at the later query, at its `-- input-model:` or `-- output-model:` marker, or at its name when it has none.  The earlier query's model is generated, and the later query has none of that kind until the two agree.
 - **An input model and an output model are never shared**, so one name for both, which two equal suffixes give a query, is SQLSRC257 too.
-- **A model shared across outputs can differ by a library's types.**  A query whose output is `methods` gets a library's types where the [library types](settings.md#setting-library-types) turn it on, NodaTime's `Instant` for a `timestamptz` on PostgreSQL, while a query whose output is `models` keeps the type map's `System.DateTime`.  So a table model, or a model named by a marker, that a `methods` query and a `models` query share, or two `methods` queries where the library is on for one and off for the other, is SQLSRC257.  Name the models apart with [`-- output-model:`](settings.md#setting-model-name), or turn the library on or off alike for both.
-- **A PostgreSQL array parameter differs by output too.**  A `methods` query's input model holds it as an `IEnumerable<T>`, and a `models` query's as a `T[]`, so a model of one name that both share is SQLSRC257, which names both types.  Name the models apart, or give both queries the same output: see [array parameters](postgresql.md#array-parameters).
+- **A model shared across outputs can differ by a library's types.**  A query whose output is `methods` or `repository` gets a library's types where the [library types](settings.md#setting-library-types) turn it on, NodaTime's `Instant` for a `timestamptz` on PostgreSQL, while a query whose output is `models` keeps the type map's `System.DateTime`.  So a table model, or a model named by a marker, that a query with a method and a `models` query share, or two queries with methods where the library is on for one and off for the other, is SQLSRC257.  Name the models apart with [`-- output-model:`](settings.md#setting-model-name), or turn the library on or off alike for both.
+- **A PostgreSQL array parameter differs by output too.**  The input model of a query with a method, `methods` or `repository`, holds it as an `IEnumerable<T>`, and a `models` query's as a `T[]`, so a model of one name that both share is SQLSRC257, which names both types.  Name the models apart, or give both queries the same output: see [array parameters](postgresql.md#array-parameters).
 - **A shared model's documentation is its first query's**: that query's summary, and its columns' or parameters' documentation, though another query's column comes from another table.
 
 <a id="unusable-model-names"></a>
@@ -538,6 +539,203 @@ WHERE id = @id;
 ```
 
 ```csharp
+// A repository, at the default output, repository
+GetUserDto? user = await users.GetUser(new GetUserParams(42));
+
+// At the output methods
+GetUserDto? user = await connection.GetUser(new GetUserParams(42));
+```
+
+A query whose [output](settings.md#setting-output) is `repository`, the default, or `methods` gets an asynchronous method that runs it, in place of its constant or token method.  The two outputs differ in where the connection comes from:
+
+| Output | The method | Called as |
+|----|----|----|
+| `repository`, the default | A [repository method](#repository-methods): a `public` instance method of the type, which gets its own connection from a member of the type, and takes no connection, transaction or timeout | `users.GetUser(...)` |
+| `methods` | A [method that takes a connection](#methods-that-take-a-connection): by default an `internal` extension method of `DbConnection`, which takes the connection, a transaction and a timeout | `connection.GetUser(...)` |
+
+Either method sends each parameter, runs the query and reads its rows into the output model, here one row or null, by its [result shape](sql-files.md#result-shapes).  It runs on ADO.NET's `DbConnection`, through the driver your project references, Npgsql for PostgreSQL and Microsoft.Data.SqlClient for SQL Server, and uses no reflection and no library of SqlSource's.  Its SQL is built inside the method, from the query's text, its [tokens](parameters-and-tokens.md#tokens) and its [lists](parameters-and-tokens.md#list-parameters), and your code cannot reach it: a project that runs a query's SQL itself, through Dapper or its own code, gives it the output `models`.  One type can have queries of both outputs, in one file or in several: a repository keeps the queries that run alone at `repository`, and gives those that its own code runs in a transaction the output `methods`.  What each shape returns, how a row is read and a parameter sent, and the exceptions, below, are the same for both.
+
+<a id="which-methods"></a>
+
+### Which queries get a method
+
+A query gets its method from a type that claims its file when, for that type:
+
+- **its output is `repository` or `methods`**;
+- **it has what its models need**: a current entry in its sidecar, a C# type for each column and parameter, and every model it needs, an input model when it has parameters and an output model when it returns rows.  A query with neither needs no model;
+- **its method can be written**: a result shape that its rows allow ([SQLSRC272](diagnostics.md#sqlsrc272)), a name that nothing else takes ([SQLSRC274](diagnostics.md#sqlsrc274)), no token named as an argument a query method can have ([SQLSRC275](diagnostics.md#sqlsrc275)), and, in the extension class, a class to hold it ([SQLSRC276](diagnostics.md#sqlsrc276));
+- **for a repository query, its type has its connection**: the type is not static ([SQLSRC034](diagnostics.md#sqlsrc034)), and one member of it gives the connection of the query's database, as [the connection](#repository-connection) says ([SQLSRC028](diagnostics.md#sqlsrc028) to [SQLSRC033](diagnostics.md#sqlsrc033), [SQLSRC036](diagnostics.md#sqlsrc036));
+- **its [converters](settings.md#converters) serve it**: a column or parameter whose type a type override, a column type or a `-- param:` marker chose, and whose type has converters, has one it can use: of the direction it needs ([SQLSRC280](diagnostics.md#sqlsrc280)), between it and the type the driver reads when it is a type of yours that the driver never reads ([SQLSRC279](diagnostics.md#sqlsrc279)), and the only one of that direction, with nothing wrong with it ([SQLSRC277](diagnostics.md#sqlsrc277), [SQLSRC278](diagnostics.md#sqlsrc278));
+- **the project references the driver of its dialect** ([SQLSRC273](diagnostics.md#sqlsrc273)), at Npgsql 8.0 or later ([SQLSRC247](diagnostics.md#sqlsrc247)) or Microsoft.Data.SqlClient 6.1 or later ([SQLSRC267](diagnostics.md#sqlsrc267)).
+
+A query whose output is `repository` or `methods` that fails any of the others has an error, and gets neither its method nor a constant until it is fixed.  Its models are still generated when it has them, and the type's other queries get their methods.  A [placement error](#locations), such as a visibility that does not fit the query's member location ([SQLSRC123](diagnostics.md#sqlsrc123)), is different: it leaves the query's whole file without members and without models for the type.  A visibility that does not fit only the models the method takes or returns, also SQLSRC123, leaves out the method alone, as the others here do.  Each type that claims a file gets its own methods from it, by its own settings, and [where the methods go](#method-location) says when two such types give one `methods` method twice.  Only the queries of a dialect that can be described, `postgres` or `mssql`, have entries: a query of another dialect whose output is `repository` or `methods` is [SQLSRC209](diagnostics.md#sqlsrc209), and wants the output `sql`.  A statement that the tool cannot describe, such as PostgreSQL's `CALL` ([SQLSRC233](diagnostics.md#sqlsrc233)), gets no method either, so on PostgreSQL no method calls a procedure: give such a query `-- output: sql` and run its constant yourself.
+
+<a id="repository-methods"></a>
+
+### Repository methods
+
+```sql postgres
+-- name: GetUser -> one-optional
+-- summary: Loads one user by id.
+SELECT id, name
+FROM users
+WHERE id = @id;
+```
+
+```csharp
+// Your code
+[SqlSourceGenerate]
+public partial class UserRepository(NpgsqlDataSource dataSource);
+
+// Generated, shown without global::
+namespace App
+{
+    partial class UserRepository : IUserRepository
+    {
+        public async Task<GetUserDto?> GetUser(
+            GetUserParams parameters,
+            CancellationToken cancellationToken = default)
+    }
+
+    public partial interface IUserRepository
+    {
+        Task<GetUserDto?> GetUser(
+            GetUserParams parameters,
+            CancellationToken cancellationToken = default);
+    }
+}
+
+// Your code
+var users = new UserRepository(dataSource);
+GetUserDto? user = await users.GetUser(new GetUserParams(42));
+```
+
+A query whose [output](settings.md#setting-output) is `repository`, the default, gets an instance method of the type that claims it, a repository.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method gets a connection from a member of the repository, here a new one from the data source `dataSource`, sends each parameter, runs the query, reads its row into the output model, and disposes the connection before it returns or throws.  So the code that calls it passes no connection, and needs none.  The repository also gets [an interface](#repository-interface) of its public repository methods, `IUserRepository`, for the code that uses it.
+
+<a id="repository-signature"></a>
+
+#### The signature
+
+```csharp
+public async Task<ListFromDto[]> ListFrom(
+    string table,
+    string orderBy,
+    CancellationToken cancellationToken = default)
+```
+
+The method has the name of the query, with `Async` after it under the [generator parameter](settings.md#setting-generator-parameters) `async-method-suffix`: `ListFromAsync`.  Its arguments, in this order:
+
+| Argument | What it is |
+|----|----|
+| `parameters` | The query's input model, when it has parameters.  It is not in the method of a query without parameters |
+| A `string` for each [token](parameters-and-tokens.md#tokens) | The text that replaces the token, named as the token, in the order the tokens first appear, checked as [a method that takes a connection](#method-signature) checks it |
+| `cancellationToken` | Cancels getting and opening the connection, running the query and reading its rows |
+
+It takes no connection, no transaction and no command timeout: see [transactions and timeouts](#repository-transactions).  It returns what [its shape](#method-shapes) says, as any query method does, and throws as [a method that takes a connection](#method-signature) throws, but for the checks of the connection and the transaction it does not take: `ArgumentNullException` for a null `parameters`, and for a list parameter `ArgumentException` and `InvalidOperationException`.
+
+- **It is an instance method of the type, `public` by default**, whatever the accessibility of the type: a public method of an internal type is internal in effect.  [`visibility`](settings.md#setting-visibility) gives it another, such as `protected` for the methods of an abstract base repository, which its derived types expose as they choose.  A method that is not `public` is left out of the interface.
+- **It is always on the type.**  A [member location](settings.md#setting-member-location) of `class` fits, and `extension-class` or `nested-class` is [SQLSRC122](diagnostics.md#sqlsrc122).
+- **Its name is not taken** by a member of the type, the type itself or one of its type parameters, a constant or token method that another query puts on the type, a nested class of the type's queries, or, for a public method, the name of the type's interface ([SQLSRC274](diagnostics.md#sqlsrc274)).  A token is not named `parameters` or `cancellationToken`, nor as any other argument a query method can have ([SQLSRC275](diagnostics.md#sqlsrc275)).
+- A type's repository methods are in the file of its methods, `App.UserRepository-Methods.g.cs`, with its other query methods and its interface.
+
+<a id="repository-connection"></a>
+
+#### The connection
+
+```csharp
+[SqlSourceGenerate]
+public partial class OrderRepository(string connectionString);
+
+[SqlSourceGenerate]
+public partial class AuditRepository(IConnectionFactory factory)
+{
+    [SqlSourceConnection]
+    private Task<DbConnection> OpenAsync(CancellationToken cancellationToken) =>
+        factory.OpenAsync("audit", cancellationToken);
+}
+```
+
+A repository method gets its connection from one member of the type, its connection source, which the build finds by its name or type, or which you mark `[SqlSourceConnection]`.  `OrderRepository` above has a connection string, found by its name, and `AuditRepository` a method of its own that the attribute marks.  What the method does with the connection depends on what the member gives:
+
+| The member | Found | The method's connection |
+|----|----|----|
+| A `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`, or any `string` member or method that is marked | By its name and type | A new connection of the string, an `NpgsqlConnection` or a `Microsoft.Data.SqlClient.SqlConnection`, which the method opens and disposes |
+| A field, property or primary-constructor parameter of `DbDataSource` or a type derived from it, such as `NpgsqlDataSource` | By its type | A new connection that the data source opens, `OpenConnectionAsync`, which the method disposes |
+| A method that returns a `DbConnection` or a type derived from it, or a `Task` or `ValueTask` of one, and that takes nothing or one `CancellationToken`, which gets the method's | When marked | The connection it returns, called for each call of the method, opened when it is closed, and disposed |
+| A field, property or primary-constructor parameter of `DbConnection` or a type derived from it | When marked | Borrowed: opened when it is closed and closed again before the method returns, never disposed |
+
+The rule to remember: **a method is a factory, and a field, a property or a parameter is held.**  What a method returns is the repository method's, which disposes it; a connection that the repository holds is borrowed, and left as the method found it.  A connection string and a data source make a new connection for each call, which the method disposes.
+
+- **Found by its name or type.**  With no member marked, the type's one source is its one `string` named as above, or its one member of a data source type, among its own fields and properties, those of its base types that it can reach, static ones too, and its primary constructor's parameters.  A connection is never found by its type, since only you know whether the repository owns it: mark it.  None is [SQLSRC028](diagnostics.md#sqlsrc028), and two or more [SQLSRC029](diagnostics.md#sqlsrc029), which lists them.
+- **Fields and properties before parameters.**  A primary-constructor parameter is found only when no field or property is.  So `partial class UserRepository(NpgsqlDataSource dataSource) { private readonly NpgsqlDataSource _dataSource = dataSource; }` uses `_dataSource`, a record's positional parameter yields to its property, and `UserRepository(string connectionString) : RepositoryBase(connectionString)` uses the base type's member when it can reach one.
+- **`[SqlSourceConnection]` marks the source**, on a field, a property, a method or a primary-constructor parameter, of any of the four kinds above.  Once one member is marked, only marked members count, and none is found by its name or type.  An override of a marked member is marked as the member it overrides.  A marked member that cannot give a connection, such as a method with other parameters, is [SQLSRC032](diagnostics.md#sqlsrc032).
+- **Several databases.**  A repository whose queries use more than one [logical database](settings.md#setting-database) marks one member for each, with the database's name, which is compared ignoring case.  Nothing is found by its name or type then, since nothing says which database a member is for.
+
+  ```csharp
+  [SqlSourceGenerate(Source = ".")]
+  public partial class Reports(
+      [SqlSourceConnection(Database = "main")] NpgsqlDataSource main,
+      [SqlSourceConnection(Database = "reports")] NpgsqlDataSource reports);
+  ```
+
+  A mark without `Database` on such a type is [SQLSRC030](diagnostics.md#sqlsrc030), and one for a database that no repository query of the type uses is the warning [SQLSRC031](diagnostics.md#sqlsrc031).  A query whose output is not `repository` needs no source.
+- **The source is of its database's engine**: an Npgsql type for a SQL Server database, or a Microsoft.Data.SqlClient type for a PostgreSQL one, is [SQLSRC033](diagnostics.md#sqlsrc033).  Microsoft.Data.SqlClient has no data source, so a SQL Server repository takes a connection string, a factory method, or a connection it borrows.
+- **A primary-constructor parameter named `parameters` or `cancellationToken`** is hidden by the method's own argument of that name, [SQLSRC036](diagnostics.md#sqlsrc036): rename it.
+- **A null source throws.**  A connection string, a data source or a connection that is null when the method is called, or a factory that returns null, throws `InvalidOperationException`, "The connection source 'dataSource' of 'App.UserRepository' is null.", before anything is sent.
+- **A method that [streams its rows](settings.md#streaming-rows)** gets its connection when the loop asks for the first row, and disposes it, or closes a borrowed one that it opened, when the loop ends, so the connection is held for the whole loop.
+- **A borrowed connection runs the command in no transaction.**  A repository method gives its command no transaction, so on SQL Server, Microsoft.Data.SqlClient refuses it on a connection that has a pending transaction, with `InvalidOperationException`; Npgsql runs it in the connection's transaction.  To run queries in a transaction, give them the output `methods`: see [transactions and timeouts](#repository-transactions).
+- **A PostgreSQL connection string makes a bare connection**, which knows none of the plugins and mappings of your data source: see [known issues](#known-issues).  Give a PostgreSQL repository a data source.
+
+The attribute is `SqlSource.SqlSourceConnectionAttribute`, generated into your project beside `[SqlSourceGenerate]`.  Its one property, `Database`, names the [logical database](settings.md#setting-database) as the `database` setting does.
+
+<a id="repository-interface"></a>
+
+#### The interface
+
+```csharp
+// Your code
+public sealed class Greeter(IUserRepository users)
+{
+    public async Task<string> Greet(int id) =>
+        (await users.GetUser(new GetUserParams(id)))?.Name ?? "stranger";
+}
+
+// Your code, adding a member of your own to the generated interface
+public partial interface IUserRepository
+{
+    Task<int> CountActive(CancellationToken cancellationToken = default);
+}
+```
+
+A type that claims a query whose output is `repository` gets a `partial interface`, named `I` and the type's name, `IUserRepository` for `UserRepository`, which the type implements.  Code that takes the interface can be given a fake of it in a test, with no database.
+
+- **Its members are the type's public repository methods**, with their signatures and documentation.  A method of another output, a method that is not `public`, and a method with an error are not in it.  It is generated while the type claims a repository query, even when every repository method has an error, so that code that names it reports only those errors.
+- **It is beside the type**, in its namespace, or inside the type it is nested in, with the type's type parameters.  It is `public` when the type and every type around it are, and `internal` otherwise.
+- **It is `partial`**, so a `partial interface` of your own of the same name adds members, which your own part of the repository implements.
+- **Its name** is [`InterfaceName`](settings.md#repository-interfaces) on the type's `[SqlSourceGenerate]` when it is given.  A name that something beside the type already has is [SQLSRC035](diagnostics.md#sqlsrc035), and one that is not a C# identifier [SQLSRC037](diagnostics.md#sqlsrc037).  Both leave the interface out, and the methods in.
+- **Turning it off**: `GenerateInterface = false` on the type's `[SqlSourceGenerate]`, or `SqlSourceRepositoryInterfaces` for the project, as [repository interfaces](settings.md#repository-interfaces) says.
+
+<a id="repository-transactions"></a>
+
+#### Transactions and timeouts
+
+A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, in no transaction of yours, under the driver's default timeout.  A query that must run in a transaction with others, or that needs its own timeout, takes the output `methods` instead, in its own file or with `-- output: methods` on the query, and your own code in the repository opens a connection, begins the transaction and calls its [method that takes a connection](#methods-that-take-a-connection).  See [the recipe](recipes.md#queries-in-a-transaction).
+
+<a id="methods-that-take-a-connection"></a>
+
+### Methods that take a connection
+
+```sql postgres
+-- output: methods
+
+-- name: GetUser -> one-optional
+-- summary: Loads one user by id.
+SELECT id, name, deleted_at
+FROM users
+WHERE id = @id;
+```
+
+```csharp
 // Generated, shown without global::
 namespace App
 {
@@ -556,27 +754,13 @@ namespace App
 GetUserDto? user = await connection.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](settings.md#setting-output) is `methods`, the default, gets an asynchronous method that runs it, in place of its constant or token method.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, here one row or null, by its [result shape](sql-files.md#result-shapes).  It runs on ADO.NET's `DbConnection`, through the driver your project references, Npgsql for PostgreSQL and Microsoft.Data.SqlClient for SQL Server, and uses no reflection and no library of SqlSource's.  Its SQL is built inside the method, from the query's text, its [tokens](parameters-and-tokens.md#tokens) and its [lists](parameters-and-tokens.md#list-parameters), and your code cannot reach it: a project that runs a query's SQL itself, through Dapper or its own code, gives it the output `models`.
-
-<a id="which-methods"></a>
-
-### Which queries get a method
-
-A query gets its method from a type that claims its file when, for that type:
-
-- **its output is `methods`**;
-- **it has what its models need**: a current entry in its sidecar, a C# type for each column and parameter, and every model it needs, an input model when it has parameters and an output model when it returns rows.  A query with neither needs no model;
-- **its method can be written**: a result shape that its rows allow ([SQLSRC272](diagnostics.md#sqlsrc272)), a name that nothing else takes ([SQLSRC274](diagnostics.md#sqlsrc274)), no token named as an argument a query method can have ([SQLSRC275](diagnostics.md#sqlsrc275)), and, in the extension class, a class to hold it ([SQLSRC276](diagnostics.md#sqlsrc276));
-- **its [converters](settings.md#converters) serve it**: a column or parameter whose type a type override, a column type or a `-- param:` marker chose, and whose type has converters, has one it can use: of the direction it needs ([SQLSRC280](diagnostics.md#sqlsrc280)), between it and the type the driver reads when it is a type of yours that the driver never reads ([SQLSRC279](diagnostics.md#sqlsrc279)), and the only one of that direction, with nothing wrong with it ([SQLSRC277](diagnostics.md#sqlsrc277), [SQLSRC278](diagnostics.md#sqlsrc278));
-- **the project references the driver of its dialect** ([SQLSRC273](diagnostics.md#sqlsrc273)), at Npgsql 8.0 or later ([SQLSRC247](diagnostics.md#sqlsrc247)) or Microsoft.Data.SqlClient 6.1 or later ([SQLSRC267](diagnostics.md#sqlsrc267)).
-
-A query whose output is `methods` that fails any of the others has an error, and gets neither its method nor a constant until it is fixed.  Its models are still generated when it has them, and the type's other queries get their methods.  A [placement error](#locations), such as a visibility that does not fit the query's member location ([SQLSRC123](diagnostics.md#sqlsrc123)), is different: it leaves the query's whole file without members and without models for the type.  A visibility that does not fit only the models the method takes or returns, also SQLSRC123, leaves out the method alone, as the others here do.  Each type that claims a file gets its own methods from it, by its own settings, and [where the methods go](#method-location) says when two such types give one method twice.  Only the queries of a dialect that can be described, `postgres` or `mssql`, have entries: a query of another dialect whose output is `methods` is [SQLSRC209](diagnostics.md#sqlsrc209), and wants the output `sql`.  A statement that the tool cannot describe, such as PostgreSQL's `CALL` ([SQLSRC233](diagnostics.md#sqlsrc233)), gets no method either, so on PostgreSQL no method calls a procedure: give such a query `-- output: sql` and run its constant yourself.
+A query whose [output](settings.md#setting-output) is `methods` gets a method that takes the connection to run on, for code that manages its connections, its transactions and its timeouts itself.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, and leaves a connection that was open as it was.
 
 <a id="method-location"></a>
 
-### Where the methods go
+#### Where the methods go
 
-A query method goes where its query's [member location](settings.md#setting-member-location) says, with its [visibility](settings.md#setting-visibility).  Without either, it is an `internal` extension method of `DbConnection`, called on the connection as `connection.GetUser(...)`, in a generated `static partial class` named after the type with `Extensions` after it, `UserRepositoryExtensions` for `UserRepository`.
+A `methods` method goes where its query's [member location](settings.md#setting-member-location) says, with its [visibility](settings.md#setting-visibility).  Without either, it is an `internal` extension method of `DbConnection`, called on the connection as `connection.GetUser(...)`, in a generated `static partial class` named after the type with `Extensions` after it, `UserRepositoryExtensions` for `UserRepository`.
 
 - **The extension class is in the type's namespace**, not nested in the types around the type, and is named after the type's own name alone: `Outer.Queries<T>` gives `QueriesExtensions`.  Code in another namespace calls the methods with a `using` of that namespace.
 - **It is `public` when one of the type's methods in it is**, as `-- visibility: public` asks and a type that is `public` with every type around it allows, and `internal` otherwise.  Each method keeps its own visibility in it.
@@ -591,7 +775,7 @@ Two methods of one name in one class, as those of a query `Get` under `async-met
 
 <a id="method-signature"></a>
 
-### The signature
+#### The signature
 
 ```csharp
 internal static async Task<ListFromDto[]> ListFrom(
@@ -616,19 +800,11 @@ The method has the name of the query, with `Async` after it under the [generator
 
 The method of a query with tokens raises no CA2100 ("Review SQL queries for security vulnerabilities") in your build, though it runs SQL made with their text: that text is your own code's choice, never a user's, as [tokens](parameters-and-tokens.md#tokens) says.  Nor does the method of a query with a [list parameter](parameters-and-tokens.md#list-parameters), whose SQL is the query's own with a parameter for each value.
 
-A null `connection` or `parameters` throws `ArgumentNullException`.  A method with a list parameter throws `ArgumentException` when its query would send more parameters than its database takes, and `InvalidOperationException` when a list changed after the method counted it, as [list parameters](parameters-and-tokens.md#list-limit) say.  The names of the arguments a query method can have, `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`, are not names a token can have ([SQLSRC275](diagnostics.md#sqlsrc275)).  What the method returns depends on the query's result shape:
-
-| Shape | Returns |
-|----|----|
-| `many` | `Task<C>`, where `C` is the [collection type](settings.md#setting-collection-type) of the output model: an array by default, `Task<ListFromDto[]>`.  For the collection type `IAsyncEnumerable`, `IAsyncEnumerable<TDto>`, with no `Task` |
-| `one` | `Task<TDto>`, the output model |
-| `one-optional` | `Task<TDto?>` |
-| `none` | `Task` |
-| `rowcount` | `Task<int>` |
+A null `connection` or `parameters` throws `ArgumentNullException`.  A method with a list parameter throws `ArgumentException` when its query would send more parameters than its database takes, and `InvalidOperationException` when a list changed after the method counted it, as [list parameters](parameters-and-tokens.md#list-limit) say.  The names of the arguments a query method can have, `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`, are not names a token can have ([SQLSRC275](diagnostics.md#sqlsrc275)).  What the method returns depends on the query's result shape, as [what each shape returns](#method-shapes) says.
 
 <a id="method-connection"></a>
 
-### The connection
+#### The connection
 
 The method opens the connection when its `State` is `Closed`, and closes it again before it returns or throws.  A method that [streams its rows](settings.md#streaming-rows) opens it when the loop asks for the first row, and closes it again when the loop ends, and the connection is busy with the query until then, so the loop's body cannot run another command on it, on PostgreSQL or on a SQL Server connection without `MultipleActiveResultSets`.  A connection that was not closed is left as it was: it stays open, in the transaction and with the session's settings it had, unless, on SQL Server, an error that the method does not report rolls the transaction back, as [what a method reads and throws](sqlserver.md#method-results) says.  So to run several queries on one open connection, or in a transaction, open the connection yourself.
 
@@ -639,6 +815,16 @@ The method opens the connection when its `State` is `Closed`, and closes it agai
 ### What each shape returns
 
 The [result shape](sql-files.md#result-shapes) after the query's name says what the method does with the rows.  Without one, a query that returns rows is `many`, and one that returns none is `rowcount`.
+
+What a query method returns, at either output, depends on the query's result shape:
+
+| Shape | Returns |
+|----|----|
+| `many` | `Task<C>`, where `C` is the [collection type](settings.md#setting-collection-type) of the output model: an array by default, `Task<ListFromDto[]>`.  For the collection type `IAsyncEnumerable`, `IAsyncEnumerable<TDto>`, with no `Task` |
+| `one` | `Task<TDto>`, the output model |
+| `one-optional` | `Task<TDto?>` |
+| `none` | `Task` |
+| `rowcount` | `Task<int>` |
 
 - **`many`** reads every row into the [collection type](settings.md#setting-collection-type), an array by default, and complete when the task completes, or, for the collection type `IAsyncEnumerable`, gives each row to the caller's loop as it is read: see [streaming rows](settings.md#streaming-rows).  Unless the query has [`array-pool=off`](settings.md#setting-generator-parameters), the rows of every collection type but `ImmutableList<T>`, `IImmutableList<T>` and `IAsyncEnumerable<T>`, which holds no rows, are read into buffers borrowed from .NET's shared array pool, so that, once the pool holds buffers of the sizes it needs, the method allocates no collection for up to about 1,000 rows but the one it returns.
 - **`one`** returns the one row.  It throws [`UnexpectedRowCountException`](#unexpected-row-count) when the query returns no rows, or more than one: it reads a second row to see whether there is one.
@@ -678,7 +864,7 @@ The [result shape](sql-files.md#result-shapes) after the query's name says what 
 // -- name: GetActiveUser -> one
 try
 {
-    var user = await connection.GetActiveUser(new GetActiveUserParams(email));
+    var user = await users.GetActiveUser(new GetActiveUserParams(email));
 }
 catch (UnexpectedRowCountException exception)
 {
@@ -696,7 +882,7 @@ The method of a query whose shape is `one` throws `UnexpectedRowCountException` 
 ### `TransactionRolledBackException`
 
 ```csharp
-// -- name: GetActiveUser -> one, on SQL Server
+// -- name: GetActiveUser -> one, at the output methods, on SQL Server
 try
 {
     var user = await connection.GetActiveUser(new GetActiveUserParams(email), transaction: transaction);
@@ -708,8 +894,9 @@ catch (TransactionRolledBackException exception)
 }
 ```
 
-A SQL Server method of the shape `one`, `one-optional` or `many` throws `TransactionRolledBackException` when it was given a transaction, threw an exception of its own or reached an error that the database raised for a row or for a statement after the rows, and an error that the rest of its query raised then rolled the transaction back.  The first exception is the `InnerException`: `UnexpectedRowCountException`, a null in a column whose property cannot be null, a converter's exception, or the `SqlException` of the database's error, such as a divide by zero at a row.  The later error, the one that rolled the transaction back, is not kept.  Its message names the query, "The transaction was rolled back by an error that the query 'GetActiveUser' raised after the inner exception was thrown.", and its `QueryName` the query.  Without a transaction, or with the transaction still open, the method throws the first exception as it is, and a database error that itself rolled the transaction back, such as a `THROW` under `SET XACT_ABORT ON`, is thrown as its `SqlException`.  A Microsoft.Data.SqlClient transaction that had completed before the call is refused before the query runs, with `InvalidOperationException`, so this exception says that the method's own query rolled the transaction back.  A transaction of a library that wraps Microsoft.Data.SqlClient's and keeps its `Connection` set after it completes is neither refused nor reported: see [what a method reads and throws](sqlserver.md#method-results).
+A SQL Server method of the shape `one`, `one-optional` or `many` that takes a connection throws `TransactionRolledBackException` when it was given a transaction, threw an exception of its own or reached an error that the database raised for a row or for a statement after the rows, and an error that the rest of its query raised then rolled the transaction back.  The first exception is the `InnerException`: `UnexpectedRowCountException`, a null in a column whose property cannot be null, a converter's exception, or the `SqlException` of the database's error, such as a divide by zero at a row.  The later error, the one that rolled the transaction back, is not kept.  Its message names the query, "The transaction was rolled back by an error that the query 'GetActiveUser' raised after the inner exception was thrown.", and its `QueryName` the query.  Without a transaction, or with the transaction still open, the method throws the first exception as it is, and a database error that itself rolled the transaction back, such as a `THROW` under `SET XACT_ABORT ON`, is thrown as its `SqlException`.  A Microsoft.Data.SqlClient transaction that had completed before the call is refused before the query runs, with `InvalidOperationException`, so this exception says that the method's own query rolled the transaction back.  A transaction of a library that wraps Microsoft.Data.SqlClient's and keeps its `Connection` set after it completes is neither refused nor reported: see [what a method reads and throws](sqlserver.md#method-results).
 
+- **A repository method never throws it**, since it takes no transaction.
 - **It derives from `InvalidOperationException`**, so code that catches that catches it too.
 - **It is in the namespace `SqlSource`, and as visible as `UnexpectedRowCountException`**, beside which it is generated, so another assembly catches it by type only when it sees it, and as `InvalidOperationException` otherwise: see [known issues](#known-issues).
 
@@ -728,7 +915,7 @@ A SQL Server method of the shape `one`, `one-optional` or `many` throws `Transac
 // App.Tests, which may use SqlSource too
 try
 {
-    await connection.GetActiveUser(new GetActiveUserParams(email));
+    await users.GetActiveUser(new GetActiveUserParams(email));
 }
 catch (UnexpectedRowCountException exception)
 {
@@ -738,7 +925,7 @@ catch (UnexpectedRowCountException exception)
 
 A test project usually sees the internals of the project it tests, through `InternalsVisibleTo`.  Both can use SqlSource.
 
-- **The attribute and `SqlSourceConverterAttribute`** are each project's own, and the two copies do not conflict.  The same holds for `SqlSource.NodaTimeConversions`, `SqlSource.NetTopologySuiteConversions` and `SqlSource.JsonConversions`, the classes that the query methods of a project call to read and send [NodaTime's types on SQL Server](sqlserver.md#nodatime), [NetTopologySuite's](sqlserver.md#nettopologysuite), and System.Text.Json's types on [SQL Server](sqlserver.md#json) and on [Npgsql 8 and 9](postgresql.md#json), when the query methods of both projects call one.
+- **The attribute, `SqlSourceConverterAttribute` and `SqlSourceConnectionAttribute`** are each project's own, and the two copies of each do not conflict.  The same holds for `SqlSource.NodaTimeConversions`, `SqlSource.NetTopologySuiteConversions` and `SqlSource.JsonConversions`, the classes that the query methods of a project call to read and send [NodaTime's types on SQL Server](sqlserver.md#nodatime), [NetTopologySuite's](sqlserver.md#nettopologysuite), and System.Text.Json's types on [SQL Server](sqlserver.md#json) and on [Npgsql 8 and 9](postgresql.md#json), when the query methods of both projects call one.
 - **`UnexpectedRowCountException` and `TransactionRolledBackException` are the other project's.**  A project that sees them in a project it references gets none of its own, and its query methods throw the other project's.  A project referenced only under an extern alias (`Aliases` on its reference, without `global`) does not count: the project gets its own.  So the test project catches what a method of either project throws by its type, and so does a project that sees the other's internals and does not use SqlSource.
 - **They are `internal`**, unless the project that has them sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions) to `true`, which makes them `public`, so that any project that references it catches them by type.  A project that uses another's exceptions gets none of its own, whatever it sets.
 - **A project that sees them in two projects it references** gets [SQLSRC022](diagnostics.md#sqlsrc022), as an app does that sees the internals of two data projects that both use SqlSource.  Put them in one shared project instead, which grants `InternalsVisibleTo` to every project that catches them or uses SqlSource and sees the others' internals, test projects among them: see [the recipe](recipes.md#share-the-exceptions).  A project that sees them in a project that uses another version of SqlSource gets [SQLSRC023](diagnostics.md#sqlsrc023).
@@ -753,6 +940,7 @@ The compiler gives no warning (CS0436) about the types that are each project's o
 - **An input model binds through Dapper only when the query writes its parameters as the model's properties are named.**  Dapper sends a property of a parameter object only to a parameter that the SQL writes as `@` and the property's name, ignoring case but not `_`.  So the property `AccountId` binds to `@accountId`, and a query that writes `@account_id` gets no value from it.  Write the query's parameters in camelCase, or give Dapper the parameters yourself, as in `new { account_id = args.AccountId }`: see [the recipe](recipes.md#models-through-dapper).
 - **`UnexpectedRowCountException` and `TransactionRolledBackException` are caught by their type only where they are seen.**  A project that sees another's exceptions, because the other grants it `InternalsVisibleTo` or sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions), catches them by type.  A project that uses SqlSource and sees them in two projects it references gets [SQLSRC022](diagnostics.md#sqlsrc022), which [one shared project](recipes.md#share-the-exceptions) fixes; a project that does not use SqlSource and sees two copies gets the compiler's error that the name is ambiguous where it names one, which the same shared project fixes.  Anywhere else, as in an assembly that calls a `public` method of a project whose exceptions are `internal`, catch `InvalidOperationException`, from which both derive.
 - **A `cref` to the exceptions can fail in a project that uses another project's.**  A project that uses the `UnexpectedRowCountException` and `TransactionRolledBackException` of a project it references, and also references another project or package that uses SqlSource and whose exceptions it cannot see, gets a compiler warning at a `cref` in its own documentation comments that names either exception or one of its members, when it builds a documentation file: CS0419 for the exception itself, such as `<exception cref="UnexpectedRowCountException"/>`, and CS1574 for a member, such as `<see cref="UnexpectedRowCountException.QueryName"/>`.  Under warnings as errors the build fails.  Write the reference as the documentation ID of what it names, which the compiler takes as it is: `T:` and the full name for an exception, as `cref="T:SqlSource.UnexpectedRowCountException"` or `cref="T:SqlSource.TransactionRolledBackException"`, and `P:` for a property or `M:` for a constructor, as `cref="P:SqlSource.UnexpectedRowCountException.QueryName"`.
-- **A query method with parameters works only on a connection whose commands take its driver's own parameters.**  It works on the connections of the drivers, such as `NpgsqlConnection`, the one an `NpgsqlDataSource` gives, and `SqlConnection`.  A `DbConnection` that wraps one of them, and whose commands create or accept only parameters of their own type, fails before the query is sent: on PostgreSQL with the wrapper's own exception, typically an `InvalidCastException`, and on SQL Server with `InvalidCastException`, "Unable to cast object of type '...' to type 'Microsoft.Data.SqlClient.SqlParameter'.".  Give the method the driver's connection that the wrapper holds, or give the query the output `models` and send its parameters through the wrapper yourself.
+- **A query method with parameters works only on a connection whose commands take its driver's own parameters.**  It works on the connections of the drivers, such as `NpgsqlConnection`, the one an `NpgsqlDataSource` gives, and `SqlConnection`, and so on those a repository makes from a connection string or a data source.  A `DbConnection` that wraps one of them, and whose commands create or accept only parameters of their own type, fails before the query is sent: on PostgreSQL with the wrapper's own exception, typically an `InvalidCastException`, and on SQL Server with `InvalidCastException`, "Unable to cast object of type '...' to type 'Microsoft.Data.SqlClient.SqlParameter'.".  Give the method the driver's connection that the wrapper holds, from a repository's factory method or a connection it borrows too, or give the query the output `models` and send its parameters through the wrapper yourself.
+- **A PostgreSQL repository whose source is a connection string reads no plugin's types.**  The connection it makes, a new `NpgsqlConnection` of the string, has none of the setup of your application's data source: no plugin, such as NodaTime's or NetTopologySuite's, and none of your own mappings, `MapEnum<T>()` or `MapComposite<T>()`.  So a repository method that reads or sends a type that needs one compiles, and throws Npgsql's `InvalidCastException` when it runs, such as "Reading as 'NodaTime.Instant' is not supported".  Give the repository the data source your application builds, an `NpgsqlDataSource`, which Npgsql itself recommends over a connection string, or a factory method that opens a connection from it: see [the connection](#repository-connection).  A SQL Server repository is not affected, since its methods convert NodaTime's, NetTopologySuite's and System.Text.Json's types themselves.
 - **On SQL Server, `rowcount` returns `-1` once `SET NOCOUNT ON` has run on the connection's session.**  A query without parameters, or a command of your own without them, that runs `SET NOCOUNT ON` sets it for the session, not for the statement: on a connection you opened, every later `rowcount` method returns `-1` until the connection is closed and its session reset.  A query with parameters, which Microsoft.Data.SqlClient runs through `sp_executesql`, sets it for itself alone, and only its own count is `-1`.  Run `SET NOCOUNT OFF` after it, or do not set it in a query without parameters on a connection that runs a `rowcount` method.
 - **A project that declares `Microsoft.CodeAnalysis.EmbeddedAttribute` itself compiles only when its declaration can be joined to SqlSource's.**  SqlSource adds `internal sealed partial class EmbeddedAttribute : System.Attribute`, in the namespace `Microsoft.CodeAnalysis`, to every project.  A declaration of that name in your code, or in code that another package adds to your project, compiles when it is an `internal partial class` that derives from `System.Attribute` or names no base class, `sealed` or not.  Any other fails the build with the compiler's errors, which SqlSource cannot report first: CS0260 when it is not `partial`, CS0262 when it is `public`, CS0263 when it derives from another class, CS0441 when it is `static`, and CS0261 when it is a record, each with more errors after it.  Make the declaration an `internal partial class`, or remove it.

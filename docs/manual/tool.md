@@ -7,9 +7,9 @@ $ dotnet sqlsource describe --connection billing="Host=localhost;Database=billin
 billing (postgres): 4 described, 0 skipped, 0 failed
 ```
 
-The generator writes a constant or a token method for every query whose output is `sql` or `models`, with the tool or without it.  The tool is for the queries that must be described, those whose [output](settings.md#setting-output) is `models` or `methods`, the default: the build checks each of them against its file's sidecar, and reports one that has no current entry there.  A project whose queries all have the output `sql` needs no tool.
+The generator writes a constant or a token method for every query whose output is `sql` or `models`, with the tool or without it.  The tool is for the queries that must be described, those whose [output](settings.md#setting-output) is `models`, `methods` or `repository`, the default: the build checks each of them against its file's sidecar, and reports one that has no current entry there.  A project whose queries all have the output `sql` needs no tool.
 
-The generator builds the [models](generator.md#models) of each described query from the sidecars that the tool writes, and the [method](generator.md#query-methods) that runs a query whose output is `methods`.
+The generator builds the [models](generator.md#models) of each described query from the sidecars that the tool writes, and the [method](generator.md#query-methods) that runs a query whose output is `methods` or `repository`.
 
 This page has two parts: [the workflow](#install-the-tool), from installing the tool and running it in the build to checking the sidecars in CI and reporting a model that is wrong, and [the command reference](#command-reference).  The tool's `diagnose` command makes a bug-report bundle of one query that you can attach to an issue, and its `replay` command checks a bundle with no database: see [reporting a wrong model](#report-a-bug) and [checking a bundle with `replay`](#replay).
 
@@ -41,7 +41,7 @@ SELECT id, name FROM users WHERE id = @id;
 TRUNCATE TABLE audit_log;
 ```
 
-`describe` finds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it runs on, and describes each query whose [output](settings.md#setting-output) is `models` or `methods`.  `methods` is the default, so `GetUser` above is described.  `ResetAuditLog` asks for its SQL alone, and the tool leaves it out: it needs no database and no connection.
+`describe` finds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it runs on, and describes each query whose [output](settings.md#setting-output) is `models`, `methods` or `repository`.  `repository` is the default, so `GetUser` above is described.  `ResetAuditLog` asks for its SQL alone, and the tool leaves it out: it needs no database and no connection.
 
 A query is described through its [dialect](concepts.md#dialect).  The tool can ask PostgreSQL, which is the dialect `postgres`, and SQL Server, which is `mssql`; the [database support table](dialects.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be, every row marked No in [database support](dialects.md#database-support), such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209), from the tool and in the build.  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.  Set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says, or set the dialect, when the files are PostgreSQL or SQL Server.
 

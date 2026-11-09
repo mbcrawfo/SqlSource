@@ -9,6 +9,8 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Describe again after a schema change](#after-a-migration)
 - [Start the watcher with your editor](#start-the-watcher-with-your-editor)
 - [Run queries in a transaction](#queries-in-a-transaction)
+- [Give a repository its connection from a service of your own](#connection-from-a-provider)
+- [Make a SQL Server repository from a connection string](#sql-server-repository)
 - [Give an id a type of its own](#strongly-typed-id)
 - [Read a class of your own from a JSON column](#class-in-a-json-column)
 - [Use the queries with Dapper or your own ADO.NET code](#dapper-and-adonet)
@@ -105,9 +107,16 @@ billing (postgres): 4 described, 0 skipped, 0 failed
 reports (postgres): 2 described, 0 skipped, 0 failed
 ```
 
-The files of `reports` start with `-- database: reports`.
+The files of `reports` start with `-- database: reports`.  A repository that claims files of both marks the connection of each:
 
-Rules: [database](settings.md#setting-database), [connections](tool.md#connections).
+```csharp
+[SqlSourceGenerate(Source = ".")]
+public partial class Accounting(
+    [SqlSourceConnection(Database = "billing")] NpgsqlDataSource billing,
+    [SqlSourceConnection(Database = "reports")] NpgsqlDataSource reports);
+```
+
+Rules: [database](settings.md#setting-database), [connections](tool.md#connections), [a repository's connection](generator.md#repository-connection).
 
 <a id="check-sidecars-in-ci"></a>
 
@@ -247,27 +256,110 @@ Rules: [describe on save](tool.md#describe-on-save), [what your editor shows](to
 ## Run queries in a transaction
 
 ```sql postgres
+-- name: GetAccount -> one-optional
+SELECT id, owner, balance FROM accounts WHERE id = @accountId;
+
 -- name: GetBalance -> one
-SELECT balance FROM accounts WHERE id = @accountId;
+-- output: methods
+SELECT balance FROM accounts WHERE id = @accountId FOR UPDATE;
 
 -- name: SetBalance -> none
+-- output: methods
 UPDATE accounts SET balance = @balance WHERE id = @accountId;
 ```
 
 ```csharp
-await using var connection = dataSource.CreateConnection();
-await connection.OpenAsync();
-await using var transaction = await connection.BeginTransactionAsync();
+[SqlSourceGenerate]
+public partial class AccountRepository(NpgsqlDataSource dataSource)
+{
+    public async Task Withdraw(int accountId, decimal amount, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-var account = await connection.GetBalance(new GetBalanceParams(accountId), transaction);
-await connection.SetBalance(new SetBalanceParams(account.Balance - amount, accountId), transaction);
+        var account = await connection.GetBalance(
+            new GetBalanceParams(accountId), transaction, cancellationToken: cancellationToken);
+        await connection.SetBalance(
+            new SetBalanceParams(account.Balance - amount, accountId), transaction, cancellationToken: cancellationToken);
 
-await transaction.CommitAsync();
+        await transaction.CommitAsync(cancellationToken);
+    }
+}
+
+// Adds Withdraw to the generated interface, beside GetAccount
+public partial interface IAccountRepository
+{
+    Task Withdraw(int accountId, decimal amount, CancellationToken cancellationToken = default);
+}
 ```
 
-Open the connection yourself, and give every method the transaction: [the connection](generator.md#method-connection) says why.
+A repository method takes no transaction, so the queries that run in one take the output `methods`, whose methods take the connection and the transaction, and a method of your own on the repository opens the connection, begins the transaction and calls them.  `GetAccount` runs alone, and stays a repository method.  Give every method the transaction: [the connection](generator.md#method-connection) says why.  A query that needs a command timeout takes `methods` in the same way, and its `commandTimeout`.
 
-Rules: [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [result shapes](sql-files.md#result-shapes).
+Rules: [transactions and timeouts](generator.md#repository-transactions), [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [the interface](generator.md#repository-interface).
+
+<a id="connection-from-a-provider"></a>
+
+## Give a repository its connection from a service of your own
+
+```csharp
+public interface IConnectionStrings
+{
+    string Get(string name);
+}
+
+[SqlSourceGenerate]
+public partial class UserRepository(IConnectionStrings connectionStrings)
+{
+    [SqlSourceConnection]
+    private string AppDatabase => connectionStrings.Get("app");
+}
+```
+
+```csharp
+public interface IConnectionFactory
+{
+    Task<DbConnection> OpenAsync(CancellationToken cancellationToken);
+}
+
+[SqlSourceGenerate]
+public partial class OrderRepository(IConnectionFactory connections)
+{
+    [SqlSourceConnection]
+    private Task<DbConnection> OpenAsync(CancellationToken cancellationToken) =>
+        connections.OpenAsync(cancellationToken);
+}
+```
+
+A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it.  `OrderRepository`'s method is a factory: each repository method calls it, opens the connection it returns when it is closed, and disposes it.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
+
+Rules: [the connection](generator.md#repository-connection).
+
+<a id="sql-server-repository"></a>
+
+## Make a SQL Server repository from a connection string
+
+```jsonc
+// sqlsource.json, beside your project file
+{
+    "root": true,
+    "dialect": "mssql",
+}
+```
+
+```csharp
+[SqlSourceGenerate]
+public partial class OrderRepository(string connectionString);
+```
+
+```csharp
+// Program.cs
+builder.Services.AddSingleton<IOrderRepository>(
+    new OrderRepository(builder.Configuration.GetConnectionString("App")!));
+```
+
+Microsoft.Data.SqlClient has no data source, so a SQL Server repository takes the connection string, found by its name, `connectionString`.  Each method makes a `SqlConnection` of it, opens it, runs the query and disposes the connection, which returns it to Microsoft.Data.SqlClient's pool.  The code that uses the repository takes the generated `IOrderRepository`.
+
+Rules: [the connection](generator.md#repository-connection), [the interface](generator.md#repository-interface), [connecting to SQL Server](sqlserver.md#connecting).
 
 <a id="strongly-typed-id"></a>
 
@@ -306,7 +398,7 @@ public readonly record struct CustomerId(long Value)
 ```
 
 ```csharp
-GetCustomerDto? customer = await connection.GetCustomer(new GetCustomerParams(customerId));
+GetCustomerDto? customer = await customers.GetCustomer(new GetCustomerParams(customerId));
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
@@ -354,9 +446,9 @@ public sealed record OrderMetadata(string Channel, int Priority);
 ```
 
 ```csharp
-GetOrderDto order = await connection.GetOrder(new GetOrderParams(orderId));
+GetOrderDto order = await orders.GetOrder(new GetOrderParams(orderId));
 // order.Metadata is an OrderMetadata, read from the jsonb column metadata
-await connection.SetMetadata(new SetMetadataParams(order.Metadata with { Priority = 2 }, orderId));
+await orders.SetMetadata(new SetMetadataParams(order.Metadata with { Priority = 2 }, orderId));
 ```
 
 `metadata` is a `jsonb`, so the query methods read and send the `OrderMetadata` through System.Text.Json's serializer, with nothing to register on the data source.  The serializer's default options write the names of the properties as the record has them, `{"Channel":"web","Priority":2}`, and match them with their case, so JSON that other code wrote in camelCase, `{"channel":"web"}`, reads as an `OrderMetadata` whose properties have their default values, `null` and `0`, with no error.
@@ -421,7 +513,7 @@ Rules: [a class in a JSON column](settings.md#json-class), [the JSON opt-in](set
 
 ## Use the queries with Dapper or your own ADO.NET code
 
-Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under the default, `methods`, it has a [method](generator.md#query-methods) in place of the constant, so a file whose queries you run yourself sets the output to `models`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
+Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under `methods` or the default, `repository`, it has a [method](generator.md#query-methods) in place of the constant, so a file whose queries you run yourself sets the output to `models`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
 
 ```sql
 -- output: models
@@ -761,13 +853,13 @@ SELECT COUNT(*) AS total FROM {{table:orders}};
 
 ```csharp
 var table = kind == Kind.Archived ? "orders_archive" : "orders";
-var counted = await connection.CountRows(table);
+var counted = await reports.CountRows(table);
 // runs SELECT COUNT(*) AS total FROM orders_archive; counted.Total is the count
 ```
 
 The query's method takes the text of the token, and runs the query with the token replaced.  Under the output `sql` or `models`, the query is instead a method that returns the SQL, `Sql.CountRows(table)`, for your own code to run.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
 
-Rules: [tokens](parameters-and-tokens.md#tokens), [the signature](generator.md#method-signature), [token methods](generator.md#token-methods), [defaults](parameters-and-tokens.md#token-defaults).
+Rules: [tokens](parameters-and-tokens.md#tokens), [the signature](generator.md#repository-signature), [token methods](generator.md#token-methods), [defaults](parameters-and-tokens.md#token-defaults).
 
 <a id="filter-by-a-list"></a>
 
@@ -783,8 +875,8 @@ ORDER BY placed_at DESC;
 
 ```csharp
 string[] notCancelled = ["pending", "shipped"];
-var orders = await connection.ListOrdersByStatuses(new ListOrdersByStatusesParams(notCancelled));
-var everyOrder = await connection.ListOrdersByStatuses(new ListOrdersByStatusesParams(null));
+var shown = await orders.ListOrdersByStatuses(new ListOrdersByStatusesParams(notCancelled));
+var everyOrder = await orders.ListOrdersByStatuses(new ListOrdersByStatusesParams(null));
 ```
 
 `@statuses`, written after `IN` with no parentheses, is a list, and `ListOrdersByStatusesParams.Statuses` an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The method sends a parameter for each status.  A null list returns every order, by the test `@statuses IS NULL`, and an empty one returns none.  The same query runs on SQL Server as it is.  On PostgreSQL, `status = ANY(@statuses)` sends the list as one array instead.
@@ -803,7 +895,8 @@ Rules: [list parameters](parameters-and-tokens.md#list-parameters), [array param
 ```
 
 ```csharp
-// App.Tests, which references the SqlSource package too
+// App.Tests, which references the SqlSource package too, with "output": "methods" in the sqlsource.json of
+// Queries, since a static type has no repository methods
 using SqlSource;
 
 [SqlSourceGenerate(Source = "Queries")]
@@ -812,7 +905,7 @@ internal static partial class TestQueries;
 
 ```csharp
 // App.Tests catches the exception that a method of App throws by its type
-await Should.ThrowAsync<UnexpectedRowCountException>(() => connection.GetActiveUser(new GetActiveUserParams(email)));
+await Should.ThrowAsync<UnexpectedRowCountException>(() => users.GetActiveUser(new GetActiveUserParams(email)));
 ```
 
 The test project uses App's `UnexpectedRowCountException` and `TransactionRolledBackException`, whether it uses SqlSource or not, and the attributes of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
