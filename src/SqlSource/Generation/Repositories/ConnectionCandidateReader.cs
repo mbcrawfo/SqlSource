@@ -58,8 +58,7 @@ internal static class ConnectionCandidateReader
             foreach (var member in currentMembers)
             {
                 if (
-                    member.CanBeReferencedByName
-                    && !derivedNames.Contains(member.Name)
+                    !derivedNames.Contains(member.Name)
                     && (!isInherited || IsReachable(member, type, compilation))
                     && ReadMember(member, isInherited, fallback) is { } candidate
                 )
@@ -91,12 +90,21 @@ internal static class ConnectionCandidateReader
             || compilation.IsSymbolAccessibleWithin(getter, type)
         );
 
+    // A member that a call can name.  A write-only property gives nothing, and an indexer needs an argument, so each
+    // is one of the others: unsupported when it is marked, so that no convention is chosen over a member the user
+    // marked, and nothing otherwise.
     private static ConnectionCandidate? ReadMember(ISymbol member, bool isInherited, LocationInfo fallback) =>
         member switch
         {
-            IFieldSymbol field => Held(field, CandidateMember.Field, field.Type, field.IsStatic, isInherited, fallback),
-            // A write-only property gives nothing, and an indexer needs an argument.
-            IPropertySymbol { IsIndexer: false, GetMethod: not null } property => Held(
+            IFieldSymbol { CanBeReferencedByName: true } field => Held(
+                field,
+                CandidateMember.Field,
+                field.Type,
+                field.IsStatic,
+                isInherited,
+                fallback
+            ),
+            IPropertySymbol { CanBeReferencedByName: true, IsIndexer: false, GetMethod: not null } property => Held(
                 property,
                 CandidateMember.Property,
                 property.Type,
@@ -104,9 +112,45 @@ internal static class ConnectionCandidateReader
                 isInherited,
                 fallback
             ),
-            IMethodSymbol { MethodKind: MethodKind.Ordinary } method => Method(method, isInherited, fallback),
-            _ => null,
+            IMethodSymbol { CanBeReferencedByName: true, MethodKind: MethodKind.Ordinary } method => Method(
+                method,
+                isInherited,
+                fallback
+            ),
+            _ => Other(member, isInherited, fallback),
         };
+
+    // An explicit interface implementation, an operator, an accessor, an indexer, a write-only property or the backing
+    // field of a property: unsupported when it is marked, named for its property when it belongs to one.
+    private static ConnectionCandidate? Other(ISymbol member, bool isInherited, LocationInfo fallback)
+    {
+        if (FindMarking(member) is not { } marking)
+        {
+            return null;
+        }
+
+        var (kind, type) = member switch
+        {
+            IFieldSymbol field => (CandidateMember.Field, field.Type),
+            IPropertySymbol property => (CandidateMember.Property, property.Type),
+            IMethodSymbol method => (CandidateMember.Method, method.ReturnType),
+            IEventSymbol @event => (CandidateMember.Field, @event.Type),
+            _ => (CandidateMember.Field, null),
+        };
+        var candidate = Create(
+            member,
+            kind,
+            CandidateType.Unsupported,
+            isAsync: false,
+            takesCancellationToken: false,
+            member.IsStatic,
+            isInherited,
+            marking,
+            type is null ? string.Empty : TargetTypeReader.MetadataNameOf(type),
+            fallback
+        );
+        return OwnerOf(member) is { } owner ? candidate with { Name = owner.Name } : candidate;
+    }
 
     // The primary constructor's parameters: those of the instance constructor that the type's declaration itself
     // declares.  Roslyn 4.14 has no public flag for it.
@@ -272,8 +316,41 @@ internal static class ConnectionCandidateReader
                 : fallback
         );
 
+    // The member's own attribute, or that of the nearest member it overrides: an override of a marked member is marked
+    // as it is, Database too, since the attribute is not inherited and the override hides the member it overrides.
+    private static AttributeData? FindMarking(ISymbol symbol)
+    {
+        for (var current = symbol; current is not null; current = OverriddenOf(current))
+        {
+            if (MarkingOf(current) is { } marking)
+            {
+                return marking;
+            }
+        }
+
+        return null;
+    }
+
+    private static ISymbol? OverriddenOf(ISymbol symbol) =>
+        symbol switch
+        {
+            IMethodSymbol method => method.OverriddenMethod,
+            IPropertySymbol property => property.OverriddenProperty,
+            IEventSymbol @event => @event.OverriddenEvent,
+            _ => null,
+        };
+
+    // The property or event that an accessor or a backing field belongs to.
+    private static ISymbol? OwnerOf(ISymbol member) =>
+        member switch
+        {
+            IFieldSymbol field => field.AssociatedSymbol,
+            IMethodSymbol method => method.AssociatedSymbol,
+            _ => null,
+        };
+
     // The name alone first, so that the full name is made only for an attribute that can be the connection's.
-    private static AttributeData? FindMarking(ISymbol symbol) =>
+    private static AttributeData? MarkingOf(ISymbol symbol) =>
         symbol
             .GetAttributes()
             .FirstOrDefault(static attribute =>

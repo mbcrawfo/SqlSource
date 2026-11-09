@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
@@ -50,7 +52,7 @@ internal static class TestModels
             TestSidecars.Of(
                 types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]
             ),
-            @namespace + "." + (types?[^1].ValueName ?? "UserRepository"),
+            MetadataNameOf(@namespace, types),
             isPublic,
             isReachableAsProtected,
             isStatic,
@@ -63,6 +65,20 @@ internal static class TestModels
             TestSidecars.Of(takenNames ?? [types?[^1].ValueName ?? "UserRepository"]),
             TestSidecars.Of(diagnostics ?? [])
         );
+
+    // The metadata name that TargetTypeReader gives the type: the namespace and a dot, unless it is the global one,
+    // then each type's name with its arity, joined by +.
+    private static string MetadataNameOf(string @namespace, TypeDeclaration[]? types)
+    {
+        var names = string.Join(
+            "+",
+            (types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]).Select(
+                static type => type.Arity > 0 ? $"{type.ValueName}`{type.Arity}" : type.ValueName
+            )
+        );
+        var ns = @namespace.Replace("@", string.Empty, StringComparison.Ordinal);
+        return ns.Length == 0 ? names : $"{ns}.{names}";
+    }
 
     public static SqlSegment Literal(string text) => new(SqlSegmentKind.Literal, text);
 

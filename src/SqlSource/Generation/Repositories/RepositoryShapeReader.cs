@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -45,7 +46,7 @@ internal static class RepositoryShapeReader
                         : ConnectionCandidateReader.Read(symbol, compilation, type.AttributeLocation, token),
                     interfaceOn,
                     interfaceName,
-                    symbol is not null && interfaceOn ? FindTaken(symbol, interfaceName, token) : null
+                    symbol is not null && interfaceOn ? FindTaken(symbol, interfaceName, compilation, token) : null
                 )
             );
         }
@@ -55,21 +56,67 @@ internal static class RepositoryShapeReader
         );
     }
 
-    // What the project's own assembly declares where the interface goes, the type's namespace or the type it is nested
-    // in, with the interface's name and the type's arity, unless it is an interface that every declaration of makes
-    // partial, which the generated part merges with.  A type of a referenced assembly does not stop the interface
-    // from compiling.
-    private static string? FindTaken(INamedTypeSymbol type, string name, CancellationToken token)
+    // What takes the interface's full name, in the type's namespace or the type it is nested in, with the type's arity:
+    // a type of the project's own assembly, unless it is an interface that every declaration of makes partial, which
+    // the generated part merges with; a type of a referenced assembly that the project sees, whose name the interface
+    // would hide; or, in the containing type, a member of the name.
+    private static string? FindTaken(
+        INamedTypeSymbol type,
+        string name,
+        Compilation compilation,
+        CancellationToken token
+    )
     {
-        var siblings = type.ContainingType is { } container
-            ? container.GetTypeMembers(name, type.Arity)
-            : type.ContainingNamespace.GetTypeMembers(name, type.Arity);
-        var taken = siblings.FirstOrDefault(sibling =>
-            SymbolEqualityComparer.Default.Equals(sibling.ContainingAssembly, type.ContainingAssembly)
-            && !IsPartialInterface(sibling, token)
+        var metadataName =
+            PrefixOf(type) + name + (type.Arity > 0 ? "`" + type.Arity.ToString(CultureInfo.InvariantCulture) : "");
+        var types = compilation.GetTypesByMetadataName(metadataName);
+        var own = types.FirstOrDefault(each =>
+            SymbolEqualityComparer.Default.Equals(each.ContainingAssembly, compilation.Assembly)
+            && !IsPartialInterface(each, token)
         );
-        return taken is null ? null : "the " + KindOf(taken) + " " + taken.ToDisplayString();
+        if (own is not null)
+        {
+            return "the " + KindOf(own) + " " + own.ToDisplayString();
+        }
+
+        var referenced = types.FirstOrDefault(each =>
+            !SymbolEqualityComparer.Default.Equals(each.ContainingAssembly, compilation.Assembly)
+            && compilation.IsSymbolAccessibleWithin(each, compilation.Assembly)
+        );
+        if (referenced is not null)
+        {
+            return "the "
+                + KindOf(referenced)
+                + " "
+                + referenced.ToDisplayString()
+                + " of the assembly "
+                + referenced.ContainingAssembly.Name;
+        }
+
+        var member = type.ContainingType?.GetMembers(name).FirstOrDefault(static each => each is not INamedTypeSymbol);
+        return member is null ? null : "the " + MemberKindOf(member) + " " + member.ToDisplayString();
     }
+
+    // What the metadata name of a type beside the type starts with: its container's and a +, or its namespace's and a
+    // dot, or nothing in the global namespace.
+    private static string PrefixOf(INamedTypeSymbol type)
+    {
+        if (type.ContainingType is { } container)
+        {
+            return TargetTypeReader.MetadataNameOf(container) + "+";
+        }
+
+        return type.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() + "." : string.Empty;
+    }
+
+    private static string MemberKindOf(ISymbol member) =>
+        member switch
+        {
+            IMethodSymbol => "method",
+            IPropertySymbol => "property",
+            IEventSymbol => "event",
+            _ => "field",
+        };
 
     private static bool IsPartialInterface(INamedTypeSymbol type, CancellationToken token) =>
         type.TypeKind == TypeKind.Interface

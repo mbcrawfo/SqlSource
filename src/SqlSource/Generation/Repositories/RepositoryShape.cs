@@ -18,8 +18,9 @@ namespace SqlSource.Generation.Repositories;
 /// </param>
 /// <param name="InterfaceName">The attribute's <c>InterfaceName</c>, or the type's name after an <c>I</c>.</param>
 /// <param name="InterfaceTakenBy">
-/// What the project already declares with the interface's full name, such as <c>the class App.IUserRepository</c>, or
-/// null when it declares nothing there, or only a partial interface, or the type gets no interface.
+/// What already takes the interface's full name, such as <c>the class App.IUserRepository</c>: a type of the project,
+/// unless it is a partial interface, a type of a referenced assembly that the project sees, or a member of the
+/// containing type.  Null when nothing does, or the type gets no interface.
 /// </param>
 internal sealed record RepositoryShape(
     string TypeKey,
