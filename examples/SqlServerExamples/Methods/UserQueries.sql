@@ -1,4 +1,4 @@
--- The queries of the users, at the default output, methods, which UserQueries calls.  The type override gives the
+-- The queries of the users, at the folder's output, methods, which UserQueries calls.  The type override gives the
 -- alias type dbo.Email of the file the type EmailAddress, whose converters the methods call to read and send an email.
 -- type-override: dbo.Email=EmailAddress
 

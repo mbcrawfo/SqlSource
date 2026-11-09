@@ -1,4 +1,4 @@
--- The queries of the orders, at the default output, methods, whose markers put their methods on the class rather than
+-- The queries of the orders, at the folder's output, methods, whose markers put their methods on the class rather than
 -- in an extension class.  ListOrdersOfUser, FindOrder and ListOrdersByStatuses are public static methods of
 -- OrderQueries, which take the connection first, and CountOrderLines is a method of the class's private nested class
 -- Sql, the default of a nested class, which only OrderQueries' own code calls.  ListOrdersByStatuses filters by a list:

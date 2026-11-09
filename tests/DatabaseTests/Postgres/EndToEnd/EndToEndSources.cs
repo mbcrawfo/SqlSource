@@ -55,6 +55,11 @@ internal static class EndToEndSources
         return builder.Build();
     }
 
+    // The connection string of "app", for a repository that makes its own connections of it: a bare NpgsqlConnection
+    // has none of App's mappings, so a query on it reads no note_kind as NoteKind.
+    public static string AppConnectionString(PostgresDatabases postgres) =>
+        postgres.ConnectionStringOf(PostgresDatabases.AppDatabase);
+
     public static NpgsqlDataSource Billing(PostgresDatabases postgres) =>
         NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresDatabases.BillingDatabase));
 

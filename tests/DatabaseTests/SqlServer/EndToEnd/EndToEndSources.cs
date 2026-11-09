@@ -48,6 +48,10 @@ internal static class EndToEndSources
             }.ConnectionString
         );
 
+    // The connection string of "app", for a repository that makes its own connections of it.
+    public static string AppConnectionString(SqlServerDatabases sqlServer) =>
+        sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase);
+
     public static SqlConnection Billing(SqlServerDatabases sqlServer) =>
         new(sqlServer.ConnectionStringOf(SqlServerDatabases.BillingDatabase));
 
