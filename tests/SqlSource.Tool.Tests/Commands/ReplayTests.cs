@@ -752,7 +752,7 @@ public sealed class ReplayTests : IDisposable
     }
 
     [Fact]
-    public async Task Help_ListsReplay()
+    public async Task Help_WithNoCommand_ListsReplay()
     {
         var result = await _run.RunAsync("--help");
 

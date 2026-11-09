@@ -20,7 +20,7 @@ public sealed class EntryRenamerTests
         );
 
     [Fact]
-    public async Task Rename_HashIsOfTheRenamedQuery()
+    public async Task Rename_RenamedQuery_HashIsOfTheRenamedQuery()
     {
         var token = TestContext.Current.CancellationToken;
         var raw = await RenamingBundles.RawAsync();

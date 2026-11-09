@@ -217,7 +217,7 @@ public sealed class BundleQueryFileTests
     }
 
     [Fact]
-    public void Of_DropsEveryOtherMarker()
+    public void Of_QueryWithGeneratorMarkers_DropsEveryOtherMarker()
     {
         using var folder = new TempFolder();
         var (file, text) = PlannedFileOf(

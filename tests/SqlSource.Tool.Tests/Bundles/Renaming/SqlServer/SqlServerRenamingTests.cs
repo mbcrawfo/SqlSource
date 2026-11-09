@@ -20,7 +20,7 @@ public sealed class SqlServerRenamingTests
     private static readonly SqlServerRenaming Engine = SqlServerRenaming.Instance;
 
     [Fact]
-    public void Dialect_IsSqlServers() => Engine.Dialect.ShouldBe(SqlDialect.SqlServer);
+    public void Dialect_OfSqlServerRenaming_IsSqlServer() => Engine.Dialect.ShouldBe(SqlDialect.SqlServer);
 
     [Theory]
     [InlineData('a', true)]
@@ -32,21 +32,21 @@ public sealed class SqlServerRenamingTests
     [InlineData('.', false)]
     [InlineData(' ', false)]
     [InlineData('[', false)]
-    public void IsWordStartAndPart_AreTheServersNameCharacters(char character, bool expected)
+    public void IsWordStartAndPart_Character_AreTheServersNameCharacters(char character, bool expected)
     {
         Engine.IsWordStart(character).ShouldBe(expected);
         Engine.IsWordPart(character).ShouldBe(expected);
     }
 
     [Fact]
-    public void Spelled_IsTheSpellingAsWritten()
+    public void Spelled_QuotedAndUnquoted_IsTheSpellingAsWritten()
     {
         Engine.Spelled("EMAIL", false).ShouldBe("EMAIL");
         Engine.Spelled("EMAIL", true).ShouldBe("EMAIL");
     }
 
     [Fact]
-    public void Fold_IgnoresCaseAndQuoting()
+    public void Fold_MixedCaseAndQuoted_IgnoresCaseAndQuoting()
     {
         Engine.Fold("Users", false).ShouldBe(Engine.Fold("USERS", true));
         Engine.Fold("Café", true).ShouldBe("CAFÉ");
@@ -113,7 +113,7 @@ public sealed class SqlServerRenamingTests
         Engine.IsEngineWord(spelling, quoted).ShouldBeFalse(spelling);
 
     [Fact]
-    public void RuleOf_IsTheFieldsTables()
+    public void RuleOf_AKnownAndAnUnknownField_GivesTheFieldsRuleAndNull()
     {
         Engine.RuleOf("open", "answer.database").ShouldBe(FieldRule.Name(NameClass.Database));
         Engine.RuleOf("columns", "answer.rows[].unknown").ShouldBeNull();
@@ -349,7 +349,7 @@ public sealed class SqlServerRenamingTests
     [InlineData("$#", 0, false)]
     [InlineData("$$", 0, false)]
     [InlineData("a", 0, false)]
-    public void IsNumberStart_IsADigitOrTheSignOfAMoneyLiteral(string text, int at, bool expected) =>
+    public void IsNumberStart_Text_IsADigitOrTheSignOfAMoneyLiteral(string text, int at, bool expected) =>
         Engine.IsNumberStart(text, at, text.Length).ShouldBe(expected);
 
     // The server reads each of these as money, so the renaming keeps it as it keeps 12.

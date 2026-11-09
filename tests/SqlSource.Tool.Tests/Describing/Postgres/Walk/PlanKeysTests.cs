@@ -9,7 +9,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 public sealed class PlanKeysTests
 {
     [Fact]
-    public void All_IsEveryConstant()
+    public void All_OfPlanKeys_IsEveryConstant()
     {
         var constants = typeof(PlanKeys)
             .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)

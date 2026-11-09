@@ -307,7 +307,7 @@ public sealed class SqlRenamerTests
     }
 
     [Fact]
-    public void MapPosition_CountsCodePoints()
+    public void MapPosition_AstralCodePointInLiteral_CountsCodePoints()
     {
         var (renamer, _, refusals) = Renamer();
         const string Sql = "SELECT '\U0001F600' FROM t";

@@ -47,7 +47,7 @@ public sealed class PostgresRenamingTests
     }
 
     [Fact]
-    public void Spelled_IsTheFold()
+    public void Spelled_UnquotedAndQuoted_FoldsOnlyTheUnquoted()
     {
         PostgresRenaming.Instance.Spelled("Users", false).ShouldBe("users");
         PostgresRenaming.Instance.Spelled("Users", true).ShouldBe("Users");
@@ -58,7 +58,7 @@ public sealed class PostgresRenamingTests
     [InlineData("$12", false)]
     [InlineData("$", false)]
     [InlineData("a", false)]
-    public void IsNumberStart_IsAnAsciiDigit(string text, bool expected) =>
+    public void IsNumberStart_Text_IsAnAsciiDigit(string text, bool expected) =>
         PostgresRenaming.Instance.IsNumberStart(text, 0, text.Length).ShouldBe(expected);
 
     [Fact]

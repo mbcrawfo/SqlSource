@@ -7,7 +7,7 @@ namespace SqlSource.Tool.Tests.Bundles.Renaming;
 public sealed class MappingFileTests
 {
     [Fact]
-    public void Write_ListsEachRenamedName()
+    public void Write_TwoNames_ListsEachRenamedName()
     {
         var text = MappingFile.Write([
             new MappedName("t_1a2b3c4d", NameClass.Table, "users"),

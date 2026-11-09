@@ -66,7 +66,7 @@ public sealed class NameMappingTests
         Mapping(1).Name("users", false, NameClass.Table).ShouldNotBe(Mapping(2).Name("users", false, NameClass.Table));
 
     [Fact]
-    public void Name_IsPrefixAndEightLowerHexDigits() =>
+    public void Name_Table_IsPrefixAndEightLowerHexDigits() =>
         Mapping().Name("users", false, NameClass.Table).ShouldMatch("^t_[0-9a-f]{8}$");
 
     [Fact]
@@ -309,7 +309,7 @@ public sealed class NameMappingTests
     }
 
     [Fact]
-    public void Literal_IsClassLiteral()
+    public void Literal_Text_IsMappedAsClassLiteral()
     {
         var mapping = Mapping();
 
@@ -341,7 +341,7 @@ public sealed class NameMappingTests
     }
 
     [Fact]
-    public void RenamingKey_Of_OtherLength_Throws() =>
+    public void RenamingKey_OfAnotherLength_Throws() =>
         Should.Throw<ArgumentException>(() => RenamingKey.Of(new byte[16]));
 
     [Fact]
