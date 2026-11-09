@@ -90,7 +90,7 @@ internal readonly record struct QuerySettings(
     public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel file) =>
         new(
             markers.Parameters.Over(file.Parameters).Resolve(),
-            markers.Output ?? file.Output ?? OutputKind.Methods,
+            ResolveOutput(markers, file),
             markers.InputModelSuffix ?? file.InputModelSuffix ?? DefaultInputModelSuffix,
             markers.OutputModelSuffix ?? file.OutputModelSuffix ?? DefaultOutputModelSuffix,
             markers.ModelNamespace ?? file.ModelNamespace,
@@ -138,6 +138,14 @@ internal readonly record struct QuerySettings(
     /// </summary>
     public static EquatableArray<LibrarySetting> ResolveLibraries(SettingsLevel markers, SettingsLevel file) =>
         LibrarySettings.Over(markers.LibraryTypes, file.LibraryTypes) ?? EquatableArray<LibrarySetting>.Empty;
+
+    /// <summary>
+    /// The output of a query: the markers', then the file's level's, else <see cref="OutputKind.Methods" />.  The
+    /// file's level is the chain of its folder.  <see cref="Resolve" /> gives it too; a step that needs only the
+    /// output asks this, without resolving the rest.
+    /// </summary>
+    public static OutputKind ResolveOutput(SettingsLevel markers, SettingsLevel file) =>
+        markers.Output ?? file.Output ?? OutputKind.Methods;
 
     /// <summary>
     /// The database of a query: the markers', then the file's level's, else the name of the dialect, which the caller

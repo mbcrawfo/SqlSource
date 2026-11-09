@@ -41,8 +41,9 @@ namespace SqlSource.Generation.Methods;
 /// versions, so that a version that stays on one side of the floor plans no method again.
 /// </param>
 /// <param name="Repository">
-/// The type's candidates for a repository's connection and the settings of its interface, found by its key, or null
-/// when the shapes have none of it.
+/// The type's candidates for a repository's connection and the settings of its interface, found by its key: only for a
+/// type that claims a query whose output is <see cref="OutputKind.Repository" />, so that a change to the candidates of
+/// any other type plans none of its methods again.  Null otherwise, or when the shapes have none of it.
 /// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
@@ -102,7 +103,9 @@ internal sealed record MethodsInput(
     /// <param name="drivers">Which engines' methods the project's drivers allow.</param>
     /// <param name="converters">Every converter of the project.</param>
     /// <param name="librariesBelowTheFloor">The libraries that the project references older than their floor.</param>
-    /// <param name="repositories">Every type's shape, sorted ordinally by its key.</param>
+    /// <param name="repositories">
+    /// Every type's shape, sorted ordinally by its key, of which the type takes its own when it has a repository query.
+    /// </param>
     public static MethodsInput Gather(
         TypeQueries type,
         EquatableArray<FileModels> allFileModels,
@@ -129,8 +132,25 @@ internal sealed record MethodsInput(
             drivers,
             ConvertersOf(slice, converters),
             librariesBelowTheFloor,
-            ShapeOf(repositories, key)
+            ClaimsRepositoryQuery(type) ? ShapeOf(repositories, key) : null
         );
+    }
+
+    // Whether a query of one of the type's files has the output Repository, by its markers and its file's level.
+    private static bool ClaimsRepositoryQuery(TypeQueries type)
+    {
+        for (var index = 0; index < type.Files.Count; index++)
+        {
+            foreach (var query in type.Files[index].Queries)
+            {
+                if (QuerySettings.ResolveOutput(query.Markers, type.FileSettings[index]) == OutputKind.Repository)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // The first shape of the key, by a search of the sorted shapes.  Two types whose hint names are ambiguous share a

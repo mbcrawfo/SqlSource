@@ -9,11 +9,13 @@ using SqlSource.Generation.Repositories;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.StepReasons;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
 // The caching of the repositories' connection candidates, which are read for every compilation, since a repository's
-// base class may be declared in a file that no edit of the repository's own file touches.
+// base class may be declared in a file that no edit of the repository's own file touches, and of the methods planned
+// from them, which take a type's shape only when it has a repository query.
 public sealed class CachingRepositoryTests
 {
     private const string BasePath = "/app/Repo/RepositoryBase.cs";
@@ -103,6 +105,62 @@ public sealed class CachingRepositoryTests
         AllReasons(result, TrackingNames.RepositoryShapes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         OutputReasonsAfter(result, TrackingNames.RepositoryShapes).ShouldAllBeCached();
     }
+
+    // A methods type takes no shape, so a candidate of it that moves plans none of its methods again.
+    [Fact]
+    public void Run_CandidateOfAMethodsTypeMoved_LeavesItsMethodsCached()
+    {
+        var compilation = CachingScene.MethodsCompilation(UserQueries(ConnectionString));
+        var driver = new CachingScene().FirstRunOfMethods(compilation);
+
+        var result = Run(driver, CachingScene.WithUserQueries(compilation, UserQueries("\n" + ConnectionString)));
+
+        AllReasons(result, TrackingNames.RepositoryShapes).ShouldBe([IncrementalStepRunReason.Modified]);
+        MethodReasons(result, TrackingNames.TypeMethods)
+            .ShouldBe(
+                CachingScene.UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+    }
+
+    // Each repository takes its own shape, so the candidate of one that moves plans no other's methods again.
+    [Fact]
+    public void Run_CandidateOfOneRepositoryMoved_LeavesTheOthersMethodsCached()
+    {
+        var scene = new CachingScene();
+        var compilation = CachingScene.MethodsCompilation(
+            UserQueries(ConnectionString),
+            CachingScene.TypeSource("App", "OrderQueries", members: ConnectionString)
+        );
+        var driver = CachingScene
+            .CreateDriver(
+                CachingScene.ProjectFile(OutputKind.Repository, "postgres"),
+                [
+                    scene.Users,
+                    scene.Orders,
+                    CachingScene.TypedSidecar(scene.Users, "GetUser", "int4"),
+                    CachingScene.TypedSidecar(scene.Orders, "GetOrder", "int4"),
+                ]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var result = Run(driver, CachingScene.WithUserQueries(compilation, UserQueries("\n" + ConnectionString)));
+
+        MethodReasons(result, TrackingNames.MethodsInput)
+            .ShouldBe(
+                CachingScene.UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged),
+                ignoreOrder: true
+            );
+        MethodReasons(result, TrackingNames.TypeMethods)[CachingScene.OrderMethods]
+            .ShouldBe(IncrementalStepRunReason.Cached);
+    }
+
+    private const string ConnectionString = "    private readonly string connectionString = \"\";\n";
+
+    // UserQueries of the namespace App, with these members.
+    private static string UserQueries(string members) =>
+        CachingScene.TypeSource("App", "UserQueries", members: members);
 
     private static GeneratorDriver FirstRun(Compilation compilation) =>
         GeneratorHarness

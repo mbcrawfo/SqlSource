@@ -205,6 +205,24 @@ public sealed class ConnectionResolverTests
         resolution.Sources.ShouldBeEmpty();
     }
 
+    // An unsupported member that names no database stands for each, beside a member that names one.
+    [Fact]
+    public void Resolve_UnsupportedMarkedWithoutDatabaseOnTwoDatabases_FailsEveryDatabase()
+    {
+        var resolution = Resolve(
+            [
+                Candidate("Connect", CandidateType.Unsupported, CandidateMember.Method, isMarked: true),
+                Candidate("_main", CandidateType.DataSource, isMarked: true, database: "main"),
+            ],
+            Main,
+            Reports
+        );
+
+        resolution.Diagnostics.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.ConnectionMemberNotSupported);
+        resolution.FailedDatabases.ShouldBe(["main", "reports"]);
+        resolution.Sources.ShouldBeEmpty();
+    }
+
     // An unsupported member marked for one database fails that one alone.
     [Fact]
     public void Resolve_UnsupportedMarkedForADatabase_FailsOnlyItsDatabase()
@@ -379,6 +397,21 @@ public sealed class ConnectionResolverTests
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
         resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("Repo<T>.ConnectionString");
+    }
+
+    // The type's name is as its declaration writes it, so a keyword keeps its @.
+    [Fact]
+    public void Resolve_StaticMemberOfATypeNamedByAKeyword_EscapesTheTypesName()
+    {
+        var type = TestModels.Type(types: [new TypeDeclaration("class", "@class", "class", "<@int>", 1)]);
+        var candidate = Candidate("ConnectionString", CandidateType.ConnectionString, CandidateMember.Property) with
+        {
+            IsStatic = true,
+        };
+
+        var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
+
+        resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("@class<@int>.ConnectionString");
     }
 
     private static ConnectionResolution Resolve(ConnectionCandidate[] candidates, params NeededDatabase[] needed) =>

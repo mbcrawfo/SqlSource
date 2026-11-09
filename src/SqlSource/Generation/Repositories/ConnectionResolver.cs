@@ -166,19 +166,21 @@ internal static class ConnectionResolver
             return [resolving.Needed[0].Name];
         }
 
-        // An unsupported member is reported as one, whatever its database.
-        if (candidate.Type != CandidateType.Unsupported)
+        // An unsupported member is reported as one, and stands for every database, each of which it fails.
+        if (candidate.Type == CandidateType.Unsupported)
         {
-            resolving.Report(
-                DiagnosticInfo.Create(
-                    SqlDiagnostics.ConnectionNeedsDatabase,
-                    candidate.Location,
-                    resolving.TypeName,
-                    candidate.Name,
-                    QuotedList(resolving.Needed.Select(static needed => needed.Name))
-                )
-            );
+            return [.. resolving.Needed.Select(static needed => needed.Name)];
         }
+
+        resolving.Report(
+            DiagnosticInfo.Create(
+                SqlDiagnostics.ConnectionNeedsDatabase,
+                candidate.Location,
+                resolving.TypeName,
+                candidate.Name,
+                QuotedList(resolving.Needed.Select(static needed => needed.Name))
+            )
+        );
 
         // It could be the connection of any database that no member names, so each of those fails.
         resolving.FailEach(resolving.Needed.Select(static needed => needed.Name).Where(name => !named.Contains(name)));
@@ -333,7 +335,8 @@ internal static class ConnectionResolver
             );
 
         // A parameter by its name, a static member through the type as its own code writes it, which reaches a base
-        // type's static member too, and an instance member through this.
+        // type's static member too, and an instance member through this.  The type's name and type parameters are as
+        // they are written, so a keyword among them keeps its @.
         private string AccessTextOf(ConnectionCandidate candidate)
         {
             var name = SqlIdentifier.IsReservedKeyword(candidate.Name) ? "@" + candidate.Name : candidate.Name;
