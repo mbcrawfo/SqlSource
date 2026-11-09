@@ -1679,6 +1679,11 @@ public sealed class QueryMethodWriterTests
         Write(GetUser with { SummaryXml = "Finds a user by <c>id</c>,\nor none." })
             .ShouldStartWith("/// <summary>\n/// Finds a user by <c>id</c>,\n/// or none.\n/// </summary>\n");
 
+    // The scope that disposes a repository method's own connection, as the command and the reader are disposed.
+    private const string ConnectionScope =
+        "    await using var connectionScope = "
+        + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);\n";
+
     // The null source's exception, as a repository method of GetUserRepository writes it for its member.
     private const string NullSource =
         "throw new global::System.InvalidOperationException("
@@ -1711,10 +1716,12 @@ public sealed class QueryMethodWriterTests
                     {
                         global::System.ArgumentNullException.ThrowIfNull(parameters);
                         const string sql = "SELECT id, name FROM users WHERE id = @id";
-                        await using var connection = await (this._dataSource ?? ↩
+                        var connection = await (this._dataSource ?? ↩
                     throw new global::System.InvalidOperationException(↩
                     "The connection source '_dataSource' of 'App.UserRepository' is null.")).↩
                     OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+                        await using var connectionScope = ↩
+                    global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);
                         var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
                         if (wasClosed)
                         {
@@ -1769,65 +1776,67 @@ public sealed class QueryMethodWriterTests
 
     // Each kind of source gives its connection by its own statement: a connection string a new driver connection, a
     // data source an opened one, a factory what it returns, awaited when it is asynchronous and given the token when
-    // it takes one, and a borrowed connection itself, which the method does not dispose.
+    // it takes one, each disposed as the command is, and a borrowed connection itself, which the method does not
+    // dispose.
     [Theory]
     [InlineData(
         nameof(ConnectionSourceKind.ConnectionString),
         nameof(CandidateMember.Field),
         false,
         false,
-        "await using var connection = new global::Npgsql.NpgsqlConnection(this._dataSource ?? {0});\n"
+        "var connection = new global::Npgsql.NpgsqlConnection(this._dataSource ?? {0});\n" + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.ConnectionString),
         nameof(CandidateMember.Method),
         false,
         false,
-        "await using var connection = new global::Npgsql.NpgsqlConnection(this._dataSource() ?? {0});\n"
+        "var connection = new global::Npgsql.NpgsqlConnection(this._dataSource() ?? {0});\n" + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.ConnectionString),
         nameof(CandidateMember.Method),
         false,
         true,
-        "await using var connection = new global::Npgsql.NpgsqlConnection("
-            + "this._dataSource(cancellationToken) ?? {0});\n"
+        "var connection = new global::Npgsql.NpgsqlConnection(this._dataSource(cancellationToken) ?? {0});\n"
+            + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.DataSource),
         nameof(CandidateMember.Field),
         false,
         false,
-        "await using var connection = await (this._dataSource ?? {0})"
+        "var connection = await (this._dataSource ?? {0})"
             + ".OpenConnectionAsync(cancellationToken).ConfigureAwait(false);\n"
+            + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.Factory),
         nameof(CandidateMember.Method),
         false,
         false,
-        "await using var connection = this._dataSource() ?? {0};\n"
+        "var connection = this._dataSource() ?? {0};\n" + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.Factory),
         nameof(CandidateMember.Method),
         false,
         true,
-        "await using var connection = this._dataSource(cancellationToken) ?? {0};\n"
+        "var connection = this._dataSource(cancellationToken) ?? {0};\n" + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.Factory),
         nameof(CandidateMember.Method),
         true,
         false,
-        "await using var connection = await this._dataSource().ConfigureAwait(false) ?? {0};\n"
+        "var connection = await this._dataSource().ConfigureAwait(false) ?? {0};\n" + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.Factory),
         nameof(CandidateMember.Method),
         true,
         true,
-        "await using var connection = await this._dataSource(cancellationToken).ConfigureAwait(false) ?? {0};\n"
+        "var connection = await this._dataSource(cancellationToken).ConfigureAwait(false) ?? {0};\n" + ConnectionScope
     )]
     [InlineData(
         nameof(ConnectionSourceKind.Borrowed),
@@ -1872,7 +1881,7 @@ public sealed class QueryMethodWriterTests
                 }
             )
             .ShouldContain(
-                "    await using var connection = new global::Microsoft.Data.SqlClient.SqlConnection("
+                "    var connection = new global::Microsoft.Data.SqlClient.SqlConnection("
                     + "this._dataSource ?? "
                     + NullSource
                     + ");\n"
@@ -1906,12 +1915,77 @@ public sealed class QueryMethodWriterTests
                 + "global::System.Threading.CancellationToken cancellationToken)\n"
                 + "    {\n"
                 + "        const string sql = \"SELECT id, name FROM users WHERE id = @id\";\n"
-                + "        await using var connection = await (this._dataSource ?? "
+                + "        var connection = await (this._dataSource ?? "
                 + NullSource
                 + ").OpenConnectionAsync(cancellationToken).ConfigureAwait(false);\n"
         );
         text.ShouldNotContain("static");
         text[..call].ShouldNotContain("connection");
+    }
+
+    // A struct's local function reaches neither this nor a primary-constructor parameter, so a struct repository's
+    // stream reads its source, a value or a factory's method group, before the iterator, which captures the local.
+    [Theory]
+    [InlineData(
+        nameof(ConnectionSourceKind.DataSource),
+        nameof(CandidateMember.Field),
+        "var connection = await (source ?? "
+    )]
+    [InlineData(nameof(ConnectionSourceKind.Factory), nameof(CandidateMember.Method), "var connection = source() ?? ")]
+    public void Append_StructRepositoryStream_ReadsTheSourceBeforeTheIterator(
+        string kindName,
+        string memberName,
+        string acquire
+    )
+    {
+        var source = TestModels.Source(
+            Enum.Parse<ConnectionSourceKind>(kindName),
+            Enum.Parse<CandidateMember>(memberName),
+            inStruct: true
+        );
+
+        var text = WriteAsPlanned(
+            Repository with
+            {
+                Shape = ResultShape.Many,
+                Collection = CollectionKind.IAsyncEnumerable,
+                Source = source,
+            }
+        );
+
+        text.ShouldContain(
+            "    global::System.ArgumentNullException.ThrowIfNull(parameters);\n\n"
+                + "    var source = this._dataSource;\n"
+                + "    return ReadRows(parameters, cancellationToken);\n\n"
+                + "    async global::System.Collections.Generic.IAsyncEnumerable<global::App.GetUserDto> ReadRows(\n"
+        );
+        text.ShouldContain("        " + acquire);
+        text[text.IndexOf("ReadRows(\n", StringComparison.Ordinal)..].ShouldNotContain("this.");
+    }
+
+    // A struct repository's method that does not stream reaches its source where it is: an asynchronous method of a
+    // struct may read this.
+    [Fact]
+    public void Append_StructRepositoryNotStreaming_ReadsTheSourceWhereItIs() =>
+        WriteAsPlanned(Repository with { Source = TestModels.Source(inStruct: true) })
+            .ShouldContain("    var connection = await (this._dataSource ?? ");
+
+    // A token named as the local of the source's value takes no name from it.
+    [Fact]
+    public void Append_StructRepositoryStreamTokenNamedSource_RenamesTheLocal()
+    {
+        var text = WriteAsPlanned(
+            Repository with
+            {
+                Shape = ResultShape.Many,
+                Collection = CollectionKind.IAsyncEnumerable,
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT id, name FROM "), Token("source")),
+                Source = TestModels.Source(inStruct: true),
+            }
+        );
+
+        text.ShouldContain("    var source1 = this._dataSource;\n");
+        text.ShouldContain("        var connection = await (source1 ?? ");
     }
 
     // A stream with nothing to check returns its iterator at once, with no blank line before.
@@ -1967,9 +2041,11 @@ public sealed class QueryMethodWriterTests
         var text = WriteAsPlanned(Repository with { Source = source });
 
         text.ShouldContain(
-            "    await using var connection1 = await (connection ?? throw new global::System.InvalidOperationException("
+            "    var connection1 = await (connection ?? throw new global::System.InvalidOperationException("
                 + "\"The connection source 'connection' of 'App.UserRepository' is null.\"))"
                 + ".OpenConnectionAsync(cancellationToken).ConfigureAwait(false);\n"
+                + "    await using var connectionScope = "
+                + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection1, false);\n"
                 + "    var wasClosed = connection1.State == global::System.Data.ConnectionState.Closed;\n"
         );
         text.ShouldContain("        var command = connection1.CreateCommand();\n");

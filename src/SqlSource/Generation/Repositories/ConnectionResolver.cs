@@ -291,9 +291,25 @@ internal static class ConnectionResolver
 
         public void FailAll() => FailEach(Needed.Select(static database => database.Name));
 
-        // The member is the database's connection, unless its type is a driver's of another engine.
+        // The member is the database's connection, unless it is a parameter that an argument of the methods hides, or
+        // its type is a driver's of another engine.
         public void Take(NeededDatabase database, ConnectionCandidate candidate)
         {
+            if (candidate.Member == CandidateMember.Parameter && IsAnArgumentsName(candidate.Name))
+            {
+                Report(
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.ConnectionParameterHidden,
+                        candidate.Location,
+                        TypeName,
+                        candidate.Name,
+                        database.Name
+                    )
+                );
+                Fail(database.Name);
+                return;
+            }
+
             if (DriverEngineOf(candidate.DeclaredTypeName) is { } other && other != database.Engine)
             {
                 Report(
@@ -334,7 +350,8 @@ internal static class ConnectionResolver
                 candidate.IsAsync,
                 candidate.TakesCancellationToken,
                 LeadingNameOf(candidate),
-                TypeName
+                TypeName,
+                type.IsStruct
             );
 
         // The name the access starts with, which an argument or a local of the method could hide: a parameter's own,
@@ -379,6 +396,11 @@ internal static class ConnectionResolver
                 CandidateType.Unsupported => throw UnexpectedEnumValueException.Of(type),
                 _ => throw UnexpectedEnumValueException.Of(type),
             };
+
+        // Whether a repository's method can have an argument of the name, other than a token's, which SQLSRC275
+        // refuses: its input model or its cancellation token.
+        private static bool IsAnArgumentsName(string name) =>
+            name is MethodArguments.Parameters or MethodArguments.CancellationToken;
 
         // The engine whose driver declares the type, or null for a type of neither driver, such as one of
         // System.Data.Common: matched by the namespace of the type's metadata name.

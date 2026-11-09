@@ -41,6 +41,11 @@ internal sealed class QueryMethodLocals
             Transaction = string.Empty;
         }
 
+        ConnectionScope = source is null or { Kind: ConnectionSourceKind.Borrowed }
+            ? string.Empty
+            : names.Take("connectionScope");
+        Source = streams && source is { InStruct: true } ? names.Take("source") : string.Empty;
+
         Sql = names.Take("sql");
         WasClosed = names.Take("wasClosed");
         Command = names.Take("command");
@@ -99,6 +104,14 @@ internal sealed class QueryMethodLocals
 
     // The transaction the body runs the query in: the argument, or empty for a repository's method, which takes none.
     public string Transaction { get; }
+
+    // The scope that disposes the connection a repository's method made, or empty when it borrows one or takes it.
+    public string ConnectionScope { get; }
+
+    // The value of a struct repository's source, or the delegate of its method, which the streaming method reads before
+    // its iterator, since a local function of a struct reaches neither this nor a primary-constructor parameter.  Empty
+    // for any other method.
+    public string Source { get; }
 
     public string Sql { get; }
 

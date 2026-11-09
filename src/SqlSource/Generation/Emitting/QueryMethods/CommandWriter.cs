@@ -153,49 +153,47 @@ internal static class CommandWriter
         _ = builder.Append('\n');
     }
 
-    // The statement that gets a repository's method its connection from its source, into the connection's local: a
-    // new connection of the engine's driver from a connection string, one opened from a data source, the one a factory
-    // returns, each disposed when the method ends, or a borrowed one, which is not.  A source that is null throws.
+    // The statements that get a repository's method its connection from its source, into the connection's local: a
+    // new connection of the engine's driver from a connection string, one opened from a data source, or the one a
+    // factory returns, each disposed when the method ends, as the command and the reader are, or a borrowed one, which
+    // is not.  A source that is null throws.
     private static void AppendAcquire(in QueryMethodContext context, ConnectionSource source, string indent)
     {
         var builder = context.Builder;
-        var connection = context.Locals.Connection;
-        _ = builder.Append(indent);
+        var locals = context.Locals;
+        var access = locals.Source.Length > 0 ? locals.Source : source.AccessText;
+        _ = builder.Append(indent).Append("var ").Append(locals.Connection).Append(" = ");
         switch (source.Kind)
         {
             case ConnectionSourceKind.ConnectionString:
-                _ = AsyncSpelling
-                    .AppendUsingLocal(builder, connection)
-                    .Append("new ")
-                    .Append(context.Method.Engine.ConnectionTypeText())
-                    .Append('(');
-                AppendSourceOrThrow(builder, source);
+                _ = builder.Append("new ").Append(context.Method.Engine.ConnectionTypeText()).Append('(');
+                AppendSourceOrThrow(builder, source, access);
                 _ = builder.Append(')');
                 break;
             case ConnectionSourceKind.DataSource:
-                _ = AsyncSpelling.AppendAwait(AsyncSpelling.AppendUsingLocal(builder, connection)).Append('(');
-                AppendSourceOrThrow(builder, source);
+                _ = AsyncSpelling.AppendAwait(builder).Append('(');
+                AppendSourceOrThrow(builder, source, access);
                 _ = builder.Append(").OpenConnectionAsync(").Append(MethodArguments.CancellationToken);
                 _ = AsyncSpelling.AppendAwaitedEnd(builder);
                 break;
             case ConnectionSourceKind.Factory:
-                _ = AsyncSpelling.AppendUsingLocal(builder, connection);
-                AppendSourceOrThrow(builder, source);
-                break;
             case ConnectionSourceKind.Borrowed:
-                _ = builder.Append("var ").Append(connection).Append(" = ");
-                AppendSourceOrThrow(builder, source);
+                AppendSourceOrThrow(builder, source, access);
                 break;
             default:
                 throw UnexpectedEnumValueException.Of(source.Kind);
         }
 
         _ = builder.Append(";\n");
+        if (locals.ConnectionScope.Length > 0)
+        {
+            _ = AsyncSpelling.AppendUsing(builder, indent, locals.ConnectionScope, locals.Connection);
+        }
     }
 
-    // The source's value, or the exception that says it is null: its member read, or called with the token when it
-    // takes one, and awaited when it is an asynchronous factory.
-    private static void AppendSourceOrThrow(StringBuilder builder, ConnectionSource source)
+    // The source's value, or the exception that says it is null: its member, or the local a struct's streaming method
+    // read it into, read, or called with the token when it takes one, and awaited when it is an asynchronous factory.
+    private static void AppendSourceOrThrow(StringBuilder builder, ConnectionSource source, string access)
     {
         var isAwaited = source is { Kind: ConnectionSourceKind.Factory, IsAsync: true };
         if (isAwaited)
@@ -203,7 +201,7 @@ internal static class CommandWriter
             _ = AsyncSpelling.AppendAwait(builder);
         }
 
-        _ = builder.Append(source.AccessText);
+        _ = builder.Append(access);
         if (source.Member == CandidateMember.Method)
         {
             _ = builder.Append('(');

@@ -69,6 +69,33 @@ public sealed class RepositoryDiagnosticsTests
         run.Sources.Keys.ShouldNotContain(MethodsFile);
     }
 
+    // The method's argument would hide the parameter, so the parameter cannot give the connection.
+    [Fact]
+    public void Run_ConnectionParameterNamedAsAnArgument_ReportsSqlsrc036()
+    {
+        const string Source = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample(NpgsqlDataSource cancellationToken);
+            }
+            """;
+
+        var run = RepositoryRuns.Run(UsersFile, [Entry(UsersFile, "GetUser", [], [Column("id")])], Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC036 /app/Repo/Sample.cs(7,50)-(7,67): 'cancellationToken' of 'App.Sample' is the "
+                    + "primary-constructor parameter that gives the database 'postgres' its connection, and the "
+                    + "repository methods have an argument named 'cancellationToken', which hides it.  Rename the "
+                    + "parameter, or store it in a field or property and give the connection from that.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodsFile);
+    }
+
     // The members come before the primary constructor's parameters, so the parameter that the type stores in a field
     // is not captured a second time, which the compiler would warn of.
     [Fact]
@@ -91,7 +118,7 @@ public sealed class RepositoryDiagnosticsTests
         var run = RepositoryRuns.Run(UsersFile, [Entry(UsersFile, "GetUser", [], [Column("id")])], Source);
 
         run.ShouldBeClean();
-        run.Sources[MethodsFile].ShouldContain("await using var connection = await (this._dataSource ?? ");
+        run.Sources[MethodsFile].ShouldContain("var connection = await (this._dataSource ?? ");
     }
 
     // A query's database is the one its settings name, so a member marked for the settings file's database gives its

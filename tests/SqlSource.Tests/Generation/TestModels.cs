@@ -126,6 +126,7 @@ internal static class TestModels
         string access = "this._dataSource",
         bool isAsync = false,
         bool takesCancellationToken = false,
-        string? leadingName = null
-    ) => new(kind, member, name, access, isAsync, takesCancellationToken, leadingName, "App.UserRepository");
+        string? leadingName = null,
+        bool inStruct = false
+    ) => new(kind, member, name, access, isAsync, takesCancellationToken, leadingName, "App.UserRepository", inStruct);
 }

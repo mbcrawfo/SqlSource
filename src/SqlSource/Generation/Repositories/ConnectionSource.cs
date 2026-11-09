@@ -23,6 +23,10 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="TypeName">
 /// The repository's name, as a diagnostic gives it, which the method's exception names when the member is null.
 /// </param>
+/// <param name="InStruct">
+/// Whether the repository is a struct, whose local functions reach neither <c>this</c> nor a primary-constructor
+/// parameter, so that a streaming method reads the source before its iterator.
+/// </param>
 internal sealed record ConnectionSource(
     ConnectionSourceKind Kind,
     CandidateMember Member,
@@ -31,5 +35,6 @@ internal sealed record ConnectionSource(
     bool IsAsync,
     bool TakesCancellationToken,
     string? LeadingName,
-    string TypeName
+    string TypeName,
+    bool InStruct
 );

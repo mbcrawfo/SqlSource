@@ -83,7 +83,7 @@ public sealed class CachingRepositoryTests
         result.Diagnostics.ShouldBeEmpty();
         CachingScene
             .MethodsOf(result, RepositoryMethods)
-            .ShouldContain("await using var connection = new global::Npgsql.NpgsqlConnection(this.Name ?? ");
+            .ShouldContain("var connection = new global::Npgsql.NpgsqlConnection(this.Name ?? ");
     }
 
     // The repository's declaration is not read again, since its file did not change, and the step still sees the

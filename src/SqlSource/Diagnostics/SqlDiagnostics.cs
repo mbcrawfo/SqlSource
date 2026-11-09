@@ -416,6 +416,20 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the type in full, {1} the parameter and {2} the database.  Reported at the parameter.
+    public static readonly DiagnosticDescriptor ConnectionParameterHidden = new(
+        id: "SQLSRC036",
+        title: "Connection parameter is hidden by a method argument",
+        messageFormat: "'{1}' of '{0}' is the primary-constructor parameter that gives the database '{2}' its "
+            + "connection, and the repository methods have an argument named '{1}', which hides it.  Rename the "
+            + "parameter, or store it in a field or property and give the connection from that.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc036",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1363,6 +1377,7 @@ internal static class SqlDiagnostics
             ConnectionOfAnotherEngine,
             RepositoryIsStatic,
             RepositoryInterfaceNameTaken,
+            ConnectionParameterHidden,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

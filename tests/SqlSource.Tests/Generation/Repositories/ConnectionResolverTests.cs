@@ -41,7 +41,8 @@ public sealed class ConnectionResolverTests
                 false,
                 false,
                 null,
-                "App.UserRepository"
+                "App.UserRepository",
+                false
             )
         );
     }
@@ -270,6 +271,46 @@ public sealed class ConnectionResolverTests
         ]);
         resolution.FailedDatabases.ShouldBe(["sales"]);
         resolution.Sources.ShouldBeEmpty();
+    }
+
+    // A repository's method has an argument of the name, which would hide the parameter inside it.
+    [Theory]
+    [InlineData("parameters")]
+    [InlineData("cancellationToken")]
+    public void Resolve_ParameterNamedAsAnArgument_ReportsSqlsrc036(string name)
+    {
+        var candidate = Candidate(name, CandidateType.DataSource, CandidateMember.Parameter);
+
+        var resolution = Resolve([candidate], Main);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.ConnectionParameterHidden);
+        diagnostic.Location.ShouldBe(candidate.Location);
+        diagnostic.Arguments.ShouldBe(["App.UserRepository", name, "main"]);
+        resolution.FailedDatabases.ShouldBe(["main"]);
+        resolution.Sources.ShouldBeEmpty();
+    }
+
+    // A member is reached through this, which no argument hides.
+    [Fact]
+    public void Resolve_FieldNamedAsAnArgument_IsTheSource() =>
+        Resolve([Candidate("parameters", CandidateType.DataSource)], Main)
+            .Sources.ShouldHaveSingleItem()
+            .Source.AccessText.ShouldBe("this.parameters");
+
+    // The resolution says whether the repository is a struct, whose streaming methods read the source first.
+    [Fact]
+    public void Resolve_StructRepository_SaysSo()
+    {
+        var type = TestModels.Type(types: [new TypeDeclaration("struct", "Repo", "Repo", "", 0)]);
+
+        var resolution = ConnectionResolver.Resolve(
+            type,
+            Shape(Candidate("dataSource", CandidateType.DataSource, CandidateMember.Parameter)),
+            [Main]
+        );
+
+        resolution.Sources.ShouldHaveSingleItem().Source.InStruct.ShouldBeTrue();
     }
 
     [Fact]

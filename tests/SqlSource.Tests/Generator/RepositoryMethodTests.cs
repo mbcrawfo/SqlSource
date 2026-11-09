@@ -34,10 +34,12 @@ public sealed class RepositoryMethodTests
                 + "            global::System.Threading.CancellationToken cancellationToken = default)\n"
         );
         methods.ShouldContain(
-            "            await using var connection = await (dataSource ?? "
+            "            var connection = await (dataSource ?? "
                 + "throw new global::System.InvalidOperationException("
                 + "\"The connection source 'dataSource' of 'App.Sample' is null.\"))"
                 + ".OpenConnectionAsync(cancellationToken).ConfigureAwait(false);\n"
+                + "            await using var connectionScope = "
+                + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);\n"
         );
         methods.ShouldNotContain("static");
         methods.ShouldNotContain("transaction");
@@ -74,8 +76,8 @@ public sealed class RepositoryMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodsFile];
-        methods.ShouldContain("await using var connection = await (main ?? ");
-        methods.ShouldContain("await using var connection = new global::Npgsql.NpgsqlConnection(reports ?? ");
+        methods.ShouldContain("var connection = await (main ?? ");
+        methods.ShouldContain("var connection = new global::Npgsql.NpgsqlConnection(reports ?? ");
         methods
             .IndexOf("(main ?? ", System.StringComparison.Ordinal)
             .ShouldBeLessThan(methods.IndexOf(" GetReport(", System.StringComparison.Ordinal));
@@ -191,7 +193,7 @@ public sealed class RepositoryMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodsFile];
-        methods.ShouldContain("await using var connection1 = await (connection ?? ");
+        methods.ShouldContain("var connection1 = await (connection ?? ");
         methods.ShouldContain("var command = connection1.CreateCommand();\n");
     }
 

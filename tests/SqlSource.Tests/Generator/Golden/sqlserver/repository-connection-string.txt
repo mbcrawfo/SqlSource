@@ -91,7 +91,8 @@ namespace App
         {
             global::System.ArgumentNullException.ThrowIfNull(parameters);
             const string sql = "SELECT id, name FROM users WHERE id = @id;";
-            await using var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+            var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+            await using var connectionScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
@@ -161,7 +162,8 @@ namespace App
         {
             global::System.ArgumentNullException.ThrowIfNull(parameters);
             const string sql = "SELECT id, name FROM users WHERE id > @id;";
-            await using var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+            var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+            await using var connectionScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
@@ -224,7 +226,8 @@ namespace App
                 [global::System.Runtime.CompilerServices.EnumeratorCancellation] global::System.Threading.CancellationToken cancellationToken)
             {
                 const string sql = "SELECT id, name FROM users;";
-                await using var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+                var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+                await using var connectionScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);
                 var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
                 if (wasClosed)
                 {
