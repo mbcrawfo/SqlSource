@@ -102,7 +102,7 @@ public sealed class QuerySettingsTests
         Keep.Over(Sort).Parameters.ShouldBe(Keep.Parameters.Over(Sort.Parameters));
 
     [Fact]
-    public void KeepsComments_IsTheLevelsResolvedKeepComments()
+    public void KeepsComments_OfALevel_IsTheLevelsResolvedKeepComments()
     {
         Keep.KeepsComments.ShouldBeTrue();
         Sort.KeepsComments.ShouldBeFalse();
@@ -475,7 +475,7 @@ public sealed class QuerySettingsTests
 
     // The markers' entry for a library wins over the file's level's, a default included, which hides the file's.
     [Fact]
-    public void ResolveLibraries_MarkersOverFile()
+    public void ResolveLibraries_MarkersOverFile_GivesTheMarkersEntry()
     {
         var markers = Libraries(LibraryState.Default, SettingPlace.Query);
         var file = Libraries(LibraryState.On, SettingsFile);

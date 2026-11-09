@@ -297,7 +297,7 @@ public sealed class SqlFileParserMarkerTests
 
     // The header says off and the query on: the query's entry is its own, and a query with no marker has the header's.
     [Fact]
-    public void LibraryTypes_InTheHeaderAndAQuery_MergePerLibrary()
+    public void Parse_LibraryTypesInTheHeaderAndAQuery_MergePerLibrary()
     {
         var blocks = Blocks(
             "-- library-types: nodatime=off\n-- name: A\n-- library-types: nodatime=on\nSELECT 1\n"
@@ -313,7 +313,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void LibraryTypes_OfAFileWithNoName_IsAtTheQuery()
+    public void Parse_LibraryTypesOfAFileWithNoName_IsAtTheQuery()
     {
         var entry = LibraryEntry(Blocks("-- library-types: nodatime=default\nSELECT 1\n").ShouldHaveSingleItem());
 
@@ -323,7 +323,7 @@ public sealed class SqlFileParserMarkerTests
 
     // The same library twice with one state is no conflict, so it is one entry.
     [Fact]
-    public void LibraryTypes_SameEntryTwiceOnOneLine()
+    public void Parse_LibraryTypesWithTheSameEntryTwiceOnOneLine_IsOneEntry()
     {
         var block = Blocks("-- name: Q\n-- library-types: nodatime=on   nodatime=on\nSELECT 1\n")
             .ShouldHaveSingleItem();
@@ -334,7 +334,7 @@ public sealed class SqlFileParserMarkerTests
 
     // Two libraries share a line, each with its own state, in the order of the libraries.
     [Fact]
-    public void LibraryTypes_SeveralEntriesOnOneLine()
+    public void Parse_LibraryTypesWithSeveralEntriesOnOneLine_AreInTheOrderOfTheLibraries()
     {
         var block = Blocks("-- name: Q\n-- library-types: json=on netTopologySuite=on nodatime=off\nSELECT 1\n")
             .ShouldHaveSingleItem();
@@ -357,7 +357,7 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("jsons=on")]
     [InlineData("=on")]
     [InlineData("")]
-    public void LibraryTypes_Invalid_IsSQLSRC111(string value)
+    public void Parse_InvalidLibraryTypes_IsSQLSRC111(string value)
     {
         var text = "-- name: Q\n-- library-types:" + (value.Length == 0 ? "" : " " + value) + "\nSELECT 1\n";
 
@@ -373,7 +373,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void LibraryTypes_ConflictInAScope_IsSQLSRC112()
+    public void Parse_LibraryTypesInConflictInAScope_IsSQLSRC112()
     {
         const string Text = "-- name: Q\n-- library-types: nodatime=on\n-- library-types: nodatime=off\nSELECT 1\n";
 
@@ -388,7 +388,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void LibraryTypes_EntryCarriesTheMarkersLineSpan()
+    public void Parse_LibraryTypesEntry_CarriesTheMarkersLineSpan()
     {
         const string Text = "-- library-types: nodatime=off\n\n-- name: Q\n-- library-types:   nodatime=on\nSELECT 1\n";
 
@@ -404,7 +404,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void LibraryTypes_EntryOfTheHeader_CarriesTheMarkersLineSpan()
+    public void Parse_LibraryTypesEntryOfTheHeader_CarriesTheMarkersLineSpan()
     {
         const string Text = "\n-- library-types: nodatime=off\n-- name: Q\nSELECT 1\n";
 

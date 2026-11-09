@@ -786,7 +786,7 @@ public sealed class SharedModelTests
     // A type at CodeGen and a type at Models, of one namespace, each with a query of one model name.  A property that a
     // library row types is the library's at CodeGen and the base map's at Models, so the two models of one name differ.
     [Fact]
-    public void SharedModel_CodeGenWithLibrary_AndModels_IsSQLSRC257()
+    public void Run_SharedModelOfCodeGenWithLibraryAndModels_IsSQLSRC257()
     {
         var run = Run(TwoOutputsSource, TwoOutputsFiles, references: WithThePlugin);
 
@@ -803,7 +803,7 @@ public sealed class SharedModelTests
 
     // The library off at the project's root gives both types the base map's, so the model is shared.
     [Fact]
-    public void SharedModel_LibraryOffAtRoot_IsShared()
+    public void Run_SharedModelWithLibraryOffAtRoot_IsShared()
     {
         var run = Run(
             TwoOutputsSource,
@@ -821,7 +821,7 @@ public sealed class SharedModelTests
     // Two queries at CodeGen of one type, one of which turns the library off: the properties differ as a CodeGen type's
     // and a Models type's do.
     [Fact]
-    public void SharedModel_TwoCodeGenQueries_LibraryOnAndOff_IsSQLSRC257()
+    public void Run_SharedModelOfTwoCodeGenQueriesWithLibraryOnAndOff_IsSQLSRC257()
     {
         const string Source = """
             using SqlSource;
@@ -858,7 +858,7 @@ public sealed class SharedModelTests
     // A type at CodeGen and a type at Models, each with a query whose @ids is an integer[], of one input model name.
     // The array is an IEnumerable<int> at CodeGen and an int[] at Models, so the two models of one name differ.
     [Fact]
-    public void SharedInputModel_CodeGenAndModelsWithAnArrayParameter_IsSqlsrc257()
+    public void Run_SharedInputModelOfCodeGenAndModelsWithAnArrayParameter_IsSqlsrc257()
     {
         var ids = ArrayOf(Int4, "_int4");
         var a = new SqlFile(
@@ -890,7 +890,7 @@ public sealed class SharedModelTests
     // A list is an IEnumerable of its element at CodeGen and at Models alike, so a model of one name shared by a type
     // at each is one model.
     [Fact]
-    public void SharedInputModel_ListInBothOutputs_IsOneModel()
+    public void Run_SharedInputModelOfAListInBothOutputs_IsOneModel()
     {
         var a = new SqlFile(
             APath,
@@ -915,7 +915,7 @@ public sealed class SharedModelTests
 
     // A list is an IEnumerable of its element and a scalar is the element, so a model of one name differs.
     [Fact]
-    public void SharedInputModel_ListAndScalarOfOneName_IsSqlsrc257()
+    public void Run_SharedInputModelOfAListAndAScalar_IsSqlsrc257()
     {
         var a = new SqlFile(APath, "-- name: FindA\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id IN @ids;\n");
         var b = new SqlFile(BPath, "-- name: FindB\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id = @ids;\n");

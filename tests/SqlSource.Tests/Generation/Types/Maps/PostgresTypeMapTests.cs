@@ -779,7 +779,7 @@ public sealed class PostgresTypeMapTests
     [InlineData(Noda + "Instant")]
     [InlineData(Noda + "Instant[]")]
     [InlineData(NodaRange + "Instant>")]
-    public void Gives_LibraryTypeIsForeign(string text) => PostgresTypeMap.Gives(text).ShouldBeFalse();
+    public void Gives_ALibraryTypesText_IsForeign(string text) => PostgresTypeMap.Gives(text).ShouldBeFalse();
 
     // A cell is the C# type the mapping gives, or "!" and the kind of its failure.
     private static void ShouldMapTo(TypeMapping mapping, string expected, bool isValueType, string key)

@@ -18,6 +18,6 @@ public sealed class MethodHostTests
         );
 
     [Fact]
-    public void Default_IsAPublicMethodOfTheExtensionClass() =>
+    public void Default_OfAMethodHost_IsAPublicMethodOfTheExtensionClass() =>
         default(MethodHost).ShouldBe(new MethodHost(Visibility.Public, MemberLocation.ExtensionClass, null));
 }

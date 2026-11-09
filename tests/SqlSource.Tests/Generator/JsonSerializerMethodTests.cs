@@ -835,7 +835,7 @@ public sealed class JsonSerializerMethodTests
     [Theory]
     [InlineData("Npgsql 10", "jsonb")]
     [InlineData("SqlClient 7", "json")]
-    public void Run_OverrideToAClassSharedByModelsAndCodeGen(string driver, string key)
+    public void Run_OverrideToAClassSharedByModelsAndCodeGen_UsesTheClassInEach(string driver, string key)
     {
         var isSqlServer = IsSqlServer(driver);
         SidecarType database = isSqlServer ? SqlServerJson : Jsonb;

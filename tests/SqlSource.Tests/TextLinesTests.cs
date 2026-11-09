@@ -30,7 +30,7 @@ public sealed class TextLinesTests
     [InlineData("x", 0, 1)]
     [InlineData("x", 1, 0)]
     [InlineData("", 0, 0)]
-    public void LineSpanOf_IsTheSourceTextsLineSpan(string text, int start, int length)
+    public void LineSpanOf_ASpanOfText_IsTheSourceTextsLineSpan(string text, int start, int length)
     {
         var span = new TextSpan(start, length);
 

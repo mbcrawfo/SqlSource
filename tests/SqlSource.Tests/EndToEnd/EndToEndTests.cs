@@ -81,66 +81,66 @@ public sealed class EndToEndTests
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void ProjectWithValidationOff_QueryWithoutAGeneratorParameter_AcceptsAnArgumentWithoutText(string filter) =>
+    public void Search_WithValidationOffAndNoGeneratorParameter_AcceptsAnArgumentWithoutText(string filter) =>
         TokenQueries
             .Search("id", "users", filter)
             .ShouldBe("SELECT id\nFROM users\nWHERE " + filter + "\nORDER BY users.id;");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithoutAGeneratorParameter_FailsOnANullArgumentWhereItIsRead() =>
+    public void Search_WithValidationOffAndNoGeneratorParameter_FailsOnANullArgumentWhereItIsRead() =>
         Should.Throw<NullReferenceException>(() => TokenQueries.Search("id", null!, "1 = 1"));
 
     [Theory]
     [InlineData("")]
     [InlineData(" \t")]
-    public void ProjectWithValidationOff_QueryThatResetsItsParameters_RejectsAnArgumentWithoutText(string filter) =>
+    public void Checked_WithValidationOffAndResetParameters_RejectsAnArgumentWithoutText(string filter) =>
         Should.Throw<ArgumentException>(() => TokenQueries.Checked("users", filter)).ParamName.ShouldBe("filter");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryThatResetsItsParameters_RejectsANullArgument() =>
+    public void Checked_WithValidationOffAndResetParameters_RejectsANullArgument() =>
         Should.Throw<ArgumentNullException>(() => TokenQueries.Checked(null!, "1 = 1")).ParamName.ShouldBe("table");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryThatResetsItsParameters_ReturnsTheSqlForArgumentsWithText() =>
+    public void Checked_WithValidationOffAndResetParameters_ReturnsTheSqlForArgumentsWithText() =>
         TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
 
     // The sqlsource.json of this folder sets the dialect to postgres.  ANSI would end the string at the quote after the
     // backslash and take the rest of the line for a comment.
     [Fact]
-    public void ProjectWithADialect_FileWithoutItsOwn_IsReadByTheDialectOfTheSettingsFile() =>
+    public void ByProject_ADialectAndAFileWithoutItsOwn_IsReadByTheDialectOfTheSettingsFile() =>
         DialectQueries.ByProject.ShouldBe("SELECT E'it'\n    '\\'s -- not a comment' AS note;");
 
     // The header of ByHeader.sql says mysql.  That the file is read as MySQL shows the header over the settings file.
     [Fact]
-    public void ProjectWithADialect_FileWithAHeader_IsReadByTheDialectOfItsHeader() =>
+    public void ByHeader_ADialectAndAFileWithAHeader_IsReadByTheDialectOfItsHeader() =>
         DialectQueries.ByHeader.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
 
     // The header of ByOption.sql names an option after the dialect, with a comma.  Plain MySQL would not close the
     // string, so this project would not build.
     [Fact]
-    public void ProjectWithADialect_FileWithAnOptionInItsHeader_IsReadByThatOption() =>
+    public void ByOption_ADialectAndAFileWithAnOptionInItsHeader_IsReadByThatOption() =>
         DialectQueries.ByOption.ShouldBe("SELECT 'C:\\temp\\' AS path;");
 
     [Fact]
-    public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
+    public void ByMarker_ADialectAndAFileWithAMarker_IsReadByTheDialectItNames() =>
         DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
     // The header of Kept.sql gives every generator parameter its default, then turns token-validation off and
     // keep-comments on.  The settings file does not keep comments, so that the comment is there shows the header
     // reaching the generator and turning keep-comments on over the settings file.
     [Fact]
-    public void ProjectWithParameters_FileWithAHeader_KeepsTheCommentItsHeaderTurnsOn() =>
+    public void Kept_ParametersAndAFileWithAHeader_KeepsTheCommentItsHeaderTurnsOn() =>
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
     // Plain.sql has no header, so the settings file's generator parameters apply.  Without keep-comments it leaves the
     // comment out, and with token-validation=off the method takes the blank text of its token, which it would throw on
     // otherwise.
     [Fact]
-    public void ProjectWithParameters_FileWithoutAHeader_UsesTheParametersOfTheSettingsFile() =>
+    public void Plain_ParametersAndAFileWithoutAHeader_UsesTheParametersOfTheSettingsFile() =>
         ParameterQueries.Plain("").ShouldBe("SELECT 2   AS two;");
 
     [Fact]
-    public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
+    public void Search_Call_AllocatesTheStringItReturnsAndNothingElse()
     {
         // The first call creates the delegate that the method then keeps.
         var expected = TokenQueries.Search("id, name", "users", "name LIKE @pattern");

@@ -121,7 +121,7 @@ public sealed class ToolDiagnosticsTests
     }
 
     [Fact]
-    public void BundleMessages_FormatWithTheirArguments()
+    public void Format_BundleMessages_AreFormattedWithTheirArguments()
     {
         Format(ToolDiagnostics.BundleCannotBeRead, "the reason").ShouldBe("The bundle cannot be read: the reason");
         Format(ToolDiagnostics.BundleOfNewerTool, "format", 3, 2)
@@ -136,7 +136,7 @@ public sealed class ToolDiagnosticsTests
     }
 
     [Fact]
-    public void DiagnoseMessages_FormatWithTheirArguments()
+    public void Format_DiagnoseMessages_AreFormattedWithTheirArguments()
     {
         Format(ToolDiagnostics.QueryNotInFile, "GetUser", "/work/App/Users.sql", "the reason")
             .ShouldBe("There is no query 'GetUser' to diagnose in '/work/App/Users.sql': the reason");

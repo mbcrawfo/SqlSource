@@ -98,7 +98,7 @@ public sealed class LibraryProbeTests
 
     // Of two references named NodaTime, the newer gives the version.
     [Fact]
-    public void Read_RecordsNodaTimesVersion()
+    public void Read_TwoNodaTimeReferences_RecordsTheNewerVersion()
     {
         var probe = LibraryProbe.Read(
             CompilationOf(
@@ -194,7 +194,7 @@ public sealed class LibraryProbeTests
     }
 
     [Fact]
-    public void MissingAssembliesOf_NamesThePluginOnPostgres()
+    public void MissingAssembliesOf_NodaTime_NamesThePluginOnPostgres()
     {
         LibraryProbe.MissingAssembliesOf(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql).ShouldBe("Npgsql.NodaTime");
         LibraryProbe.MissingAssembliesOf(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBe("NodaTime");
@@ -235,7 +235,7 @@ public sealed class LibraryProbeTests
     }
 
     [Fact]
-    public void MissingAssembliesOf_NamesSystemTextJson()
+    public void MissingAssembliesOf_Json_NamesSystemTextJson()
     {
         LibraryProbe.MissingAssembliesOf(SqlLibrary.Json, DatabaseEngine.PostgreSql).ShouldBe("System.Text.Json");
         LibraryProbe.MissingAssembliesOf(SqlLibrary.Json, DatabaseEngine.SqlServer).ShouldBe("System.Text.Json");

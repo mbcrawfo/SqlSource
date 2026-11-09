@@ -70,7 +70,7 @@ public sealed class RowBufferTests
     // The project's one buffer, in a file of its own: Roslyn's EmbeddedAttribute keeps it from any other assembly that
     // sees this one's internals, so two projects that each have it do not clash.
     [Fact]
-    public void Source_DeclaresAnEmbeddedInternalStructInNamespaceSqlSource()
+    public void Source_OfTheRowBuffer_DeclaresAnEmbeddedInternalStructInNamespaceSqlSource()
     {
         RowBuffer.Source.ShouldBe(GeneratedFile.RowBuffer);
         RowBuffer.Source.ShouldStartWith(GeneratedText.Header + "\nnamespace SqlSource\n{\n");

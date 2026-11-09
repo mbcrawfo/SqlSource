@@ -23,7 +23,7 @@ public sealed class SqlListSegmentsTests
             .Segments.ShouldBe([Literal("WHERE id IN "), List("@ids"), Literal(";")]);
 
     [Fact]
-    public void Split_NullTestAndListUse() =>
+    public void Split_ANullTestAndAListUse_GivesANullTestSegmentAndAListSegment() =>
         Blocks("-- name: Q\nWHERE (@ids IS NULL OR id NOT IN @IDS)\n")
             .ShouldHaveSingleItem()
             .Segments.ShouldBe([

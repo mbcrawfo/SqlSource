@@ -96,7 +96,7 @@ public sealed class LibraryDiagnosticsTests
     };
 
     [Fact]
-    public void On_InSettingsFile_WithoutPlugin_IsReportedAtTheMember()
+    public void Run_OnInSettingsFileWithoutPlugin_IsReportedAtTheMember()
     {
         var run = RunEvents(ListEvents, [NpgsqlReferences.Npgsql10], NodaTimeIs("on"));
 
@@ -104,7 +104,7 @@ public sealed class LibraryDiagnosticsTests
     }
 
     [Fact]
-    public void On_InMarker_IsReportedAtTheMarkersLine()
+    public void Run_OnInMarker_IsReportedAtTheMarkersLine()
     {
         var run = RunEvents("-- library-types: nodatime=on\n\n" + ListEvents, [NpgsqlReferences.Npgsql10]);
 
@@ -113,7 +113,7 @@ public sealed class LibraryDiagnosticsTests
 
     // Two types claim two files, each of one query that the project's settings file reaches: one error.
     [Fact]
-    public void On_ReachingTwoTypesAndFiles_IsReportedOnce()
+    public void Run_OnReachingTwoTypesAndFiles_IsReportedOnce()
     {
         const string TwoTypes = """
             using SqlSource;
@@ -152,7 +152,7 @@ public sealed class LibraryDiagnosticsTests
 
     // One place that reaches a query of each engine is one error for each, naming the assemblies that engine needs.
     [Fact]
-    public void On_ReachingBothEngines_IsReportedOncePerEngine()
+    public void Run_OnReachingBothEngines_IsReportedOncePerEngine()
     {
         var users = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
         var orders = new SqlFile(
@@ -180,7 +180,7 @@ public sealed class LibraryDiagnosticsTests
 
     // The switch is for codegen queries: a query at models has the base map's types, whatever it says.
     [Fact]
-    public void On_ModelsClaimOnly_IsNotReported()
+    public void Run_OnForAModelsClaimOnly_IsNotReported()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
 
@@ -197,7 +197,7 @@ public sealed class LibraryDiagnosticsTests
     }
 
     [Fact]
-    public void On_WithPlugin_IsNotReported()
+    public void Run_OnWithPlugin_IsNotReported()
     {
         var run = RunEvents(
             ListEvents,
@@ -213,7 +213,7 @@ public sealed class LibraryDiagnosticsTests
     }
 
     [Fact]
-    public void Off_WithoutPlugin_IsNotReported()
+    public void Run_OffWithoutPlugin_IsNotReported()
     {
         var run = RunEvents(ListEvents, [NpgsqlReferences.Npgsql10], NodaTimeIs("off"));
 
@@ -221,7 +221,7 @@ public sealed class LibraryDiagnosticsTests
     }
 
     [Fact]
-    public void On_QueriesKeepTheirMethods_WithBaseTypes()
+    public void Run_OnWithoutPlugin_KeepsTheQueriesMethodsWithBaseTypes()
     {
         var run = RunEvents(ListEvents, [NpgsqlReferences.Npgsql10], NodaTimeIs("on"));
 

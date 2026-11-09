@@ -108,7 +108,7 @@ public sealed class SqlFileParserTests
     [Theory]
     [InlineData("-- name: A\n-- generator: keep-comments=off\nSELECT 1 -- dropped\n")]
     [InlineData("-- generator: default\n\n-- name: A\nSELECT 1 -- dropped\n")]
-    public void Parse_QueryTurnsKeepCommentsOff_UnderAChainThatKeepsThem_DropsTheComment(string text)
+    public void Parse_QueryTurningKeepCommentsOffUnderAChainThatKeepsThem_DropsTheComment(string text)
     {
         var block = SqlFileParser.Parse(text, "Query.sql", commentsWanted: true).Blocks.ShouldHaveSingleItem();
 

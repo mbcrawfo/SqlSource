@@ -36,7 +36,7 @@ public sealed class GeneratorParameterChoicesTests
             .ShouldBe((GeneratorParameterList.Defaults & GeneratorParameters.KeepComments) != 0);
 
     [Fact]
-    public void With_Default_OfAnOnByDefaultParameter_TurnsItOn() =>
+    public void With_DefaultOfAnOnByDefaultParameter_TurnsItOn() =>
         GeneratorParameterChoices
             .None.With(GeneratorParameters.ArrayPool, GeneratorParameterState.Default)
             .StateOf(GeneratorParameters.ArrayPool)
@@ -54,7 +54,7 @@ public sealed class GeneratorParameterChoicesTests
             );
 
     [Fact]
-    public void Reset_Over_AnOffBelow_TurnsItBackOn() =>
+    public void Over_ResetOverAnOffBelow_TurnsItBackOn() =>
         GeneratorParameterChoices
             .Reset.Over(GeneratorParameterChoices.None.With(GeneratorParameters.ArrayPool, GeneratorParameterState.Off))
             .StateOf(GeneratorParameters.ArrayPool)
