@@ -57,7 +57,20 @@ internal static class HeaderWriter
                     _ => throw UnexpectedEnumValueException.Of(method.Shape),
                 }
         );
-        if (method.Shape == ResultShape.One)
+        if (method.Batch is not null && method.Shape is ResultShape.One or ResultShape.OneOptional)
+        {
+            XmlDocWriter.AppendException(
+                builder,
+                indent,
+                ExceptionCref,
+                method.Shape == ResultShape.One
+                    ? "An item returned no rows, or more than one.  Its <c>ItemIndex</c> is the item's position, "
+                        + "counted from 0."
+                    : "An item returned more than one row.  Its <c>ItemIndex</c> is the item's position, counted "
+                        + "from 0."
+            );
+        }
+        else if (method.Shape == ResultShape.One)
         {
             XmlDocWriter.AppendException(
                 builder,

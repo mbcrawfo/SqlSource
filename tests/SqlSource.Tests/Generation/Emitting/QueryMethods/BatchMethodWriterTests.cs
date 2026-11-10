@@ -62,7 +62,8 @@ public sealed class BatchMethodWriterTests
                     /// <param name="cancellationToken">Cancels the query.</param>
                     /// <returns>The row of each item that returned one, in the order of the items.</returns>
                     /// <exception cref="T:SqlSource.UnexpectedRowCountException">↩
-                    The query returned more than one row.</exception>
+                    An item returned more than one row.  Its <c>ItemIndex</c> is the item's position, ↩
+                    counted from 0.</exception>
                     /// <exception cref="T:SqlSource.CollectionItemException">↩
                     The database raised an error for an item.  Its <c>InnerException</c> is the database's ↩
                     exception and its <c>ItemIndex</c> is the item's position, counted from 0.</exception>

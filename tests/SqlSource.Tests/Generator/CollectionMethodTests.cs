@@ -103,6 +103,27 @@ public sealed class CollectionMethodTests
         methods[1].Collection.ShouldBe(CollectionKind.Array);
     }
 
+    // End to end: the query method streams, and the collection method beside it, an overload that takes the items,
+    // returns an array.
+    [Fact]
+    public void Run_StreamingCollectionType_WritesTheCollectionMethodReturningAnArray()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: collection-method\n-- collection-type: IAsyncEnumerable\n"
+                + "-- name: AddUser -> many\nINSERT INTO users (id) VALUES (@id) RETURNING id;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "AddUser", [Parameter("id")], [Column("id")])]);
+
+        run.ShouldBeClean();
+        var source = run.Sources[MethodRuns.MethodsFile];
+        source.ShouldContain("global::System.Collections.Generic.IAsyncEnumerable<");
+        CountOf(source, "global::System.Threading.Tasks.Task<").ShouldBe(1);
+        source.ShouldContain("[]> AddUser(\n");
+        source.ShouldContain("AddUserParams> parameters,\n");
+    }
+
     [Fact]
     public void Run_TransactionSerializable_IsTheSecondMethodsMode()
     {

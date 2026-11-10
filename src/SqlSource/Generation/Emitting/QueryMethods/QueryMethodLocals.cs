@@ -32,6 +32,7 @@ internal sealed class QueryMethodLocals
         bool streams,
         ExecutionCapabilities capabilities,
         ConnectionSource? source,
+        // A flag, as streams is, since the locals are built from values and not from the method.
         bool takesItems = false
     )
     {

@@ -26,7 +26,8 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="takesItems">
 /// Whether the method is a collection method, <see cref="QueryMethod.Batch" />, which takes an
-/// <c>IEnumerable</c> of the input model.
+/// <c>IEnumerable</c> of the input model.  A flag, as <paramref name="streams" /> and
+/// <paramref name="takesConnection" /> are, since this type is built from values and its tests have no method.
 /// </param>
 internal readonly struct MethodArguments(
     MethodInput? input,
