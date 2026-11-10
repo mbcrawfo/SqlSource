@@ -20,15 +20,6 @@ public sealed class QuerySettingsTests
     private static readonly SettingsLevel Sort = TestModels.ParametersOn(GeneratorParameters.SortInput);
 
     [Fact]
-    public void Resolve_NoLevel_HasTransactionOnAndNoCollectionMethod()
-    {
-        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
-
-        settings.Transaction.ShouldBe(TransactionMode.On);
-        settings.CollectionMethod.ShouldBeFalse();
-    }
-
-    [Fact]
     public void Resolve_NoLevelSaysAnything_GivesTheDefaults()
     {
         var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
@@ -45,6 +36,8 @@ public sealed class QuerySettingsTests
         settings.ValidateTokens.ShouldBeTrue();
         settings.UseArrayPool.ShouldBeTrue();
         settings.PadsLists.ShouldBeTrue();
+        settings.CollectionMethod.ShouldBeFalse();
+        settings.Transaction.ShouldBe(TransactionMode.On);
     }
 
     [Fact]

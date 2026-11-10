@@ -224,6 +224,6 @@ public sealed class GeneratorParameterListTests
         GeneratorParameterList.ReadElements([element], [], []).ValueOf(GeneratorParameters.Transaction).ShouldBe(value);
 
     [Fact]
-    public void ReadElements_CollectionMethod_IsASwitchOffByDefault() =>
+    public void Resolve_NoChoices_HasCollectionMethodOff() =>
         GeneratorParameterChoices.None.Resolve().IsOn(GeneratorParameters.CollectionMethod).ShouldBeFalse();
 }
