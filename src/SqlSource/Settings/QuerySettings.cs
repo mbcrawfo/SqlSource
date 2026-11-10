@@ -79,6 +79,12 @@ internal readonly record struct QuerySettings(
     /// <summary>Whether the query's method pads each list query parameter to a fixed size.</summary>
     public bool PadsLists => Parameters.IsOn(GeneratorParameters.ListPadding);
 
+    /// <summary>Whether a query that returns many rows also gets a method that runs it for a collection.</summary>
+    public bool CollectionMethod => Parameters.IsOn(GeneratorParameters.CollectionMethod);
+
+    /// <summary>How a collection method wraps its runs in a transaction.</summary>
+    public TransactionMode Transaction => (TransactionMode)Parameters.Get(GeneratorParameters.Transaction);
+
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file

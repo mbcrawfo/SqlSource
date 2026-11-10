@@ -3,7 +3,8 @@ using System;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The generator parameters: the switches a level can name, each on or off.  Most are off by default;
+/// The generator parameters a level can name: switches, each on or off, and <see cref="Transaction" />, which takes
+/// one of several words.  Most switches are off by default;
 /// <see cref="TokenValidation" />, <see cref="TableModels" />, <see cref="ArrayPool" /> and <see cref="ListPadding" />
 /// are on, and <see cref="GeneratorParameterList.Defaults" /> names them.
 /// </summary>
@@ -45,4 +46,16 @@ internal enum GeneratorParameters
     /// <c>list-padding</c>: a list query parameter's values are sent padded to a fixed size.  On by default.
     /// </summary>
     ListPadding = 128,
+
+    /// <summary>
+    /// <c>collection-method</c>: a query that returns many rows also gets a method that takes a collection of
+    /// inputs and runs the query for each.  Off by default.
+    /// </summary>
+    CollectionMethod = 256,
+
+    /// <summary>
+    /// <c>transaction</c>: how a collection method wraps its runs in a transaction, one of the words of
+    /// <see cref="TransactionMode" />.  It is not a switch, and is <see cref="TransactionMode.On" /> by default.
+    /// </summary>
+    Transaction = 512,
 }
