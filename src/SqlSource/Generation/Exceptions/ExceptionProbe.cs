@@ -7,10 +7,10 @@ using Microsoft.CodeAnalysis;
 namespace SqlSource.Generation.Exceptions;
 
 /// <summary>
-/// Whether a referenced assembly gives the project its exceptions: a copy of <c>UnexpectedRowCountException</c> or
-/// <c>TransactionRolledBackException</c> in an assembly the project references, which it sees because the copy is
-/// public or because the assembly grants it <c>InternalsVisibleTo</c>.  A copy it cannot see is no copy.  The value is
-/// equal from one edit to the next, so nothing after the probe runs again.
+/// Whether a referenced assembly gives the project its exceptions: a copy of <c>UnexpectedRowCountException</c>,
+/// <c>TransactionRolledBackException</c> or <c>CollectionItemException</c> in an assembly the project references, which
+/// it sees because the copy is public or because the assembly grants it <c>InternalsVisibleTo</c>.  A copy it cannot
+/// see is no copy.  The value is equal from one edit to the next, so nothing after the probe runs again.
 /// </summary>
 /// <param name="Origin">Where the project's exceptions come from.</param>
 /// <param name="Assemblies">
@@ -30,7 +30,8 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
     {
         var rowCounts = Seen(compilation, ExceptionSource.UnexpectedRowCountMetadataName);
         var rolledBacks = Seen(compilation, ExceptionSource.TransactionRolledBackMetadataName);
-        if (rowCounts.IsEmpty && rolledBacks.IsEmpty)
+        var collectionItems = Seen(compilation, ExceptionSource.CollectionItemMetadataName);
+        if (rowCounts.IsEmpty && rolledBacks.IsEmpty && collectionItems.IsEmpty)
         {
             return None;
         }
@@ -38,20 +39,25 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
         cancellationToken.ThrowIfCancellationRequested();
         var assemblies = rowCounts
             .Concat(rolledBacks)
+            .Concat(collectionItems)
             .Select(static type => type.ContainingAssembly.Name)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToImmutableArray();
-        return new ExceptionProbe(OriginOf(compilation, assemblies.Length, rowCounts, rolledBacks), new(assemblies));
+        return new ExceptionProbe(
+            OriginOf(compilation, assemblies.Length, rowCounts, rolledBacks, collectionItems),
+            new(assemblies)
+        );
     }
 
-    // Two or more assemblies are SeenTwice.  One is Referenced when it gives both, each an exception that can be
+    // Two or more assemblies are SeenTwice.  One is Referenced when it gives all three, each an exception that can be
     // created with the constructor the generated methods call, and OtherShape otherwise.
     private static ExceptionOrigin OriginOf(
         Compilation compilation,
         int assemblies,
         ImmutableArray<INamedTypeSymbol> rowCounts,
-        ImmutableArray<INamedTypeSymbol> rolledBacks
+        ImmutableArray<INamedTypeSymbol> rolledBacks,
+        ImmutableArray<INamedTypeSymbol> collectionItems
     )
     {
         if (assemblies > 1)
@@ -62,10 +68,13 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
         return
             rowCounts.Length == 1
             && rolledBacks.Length == 1
+            && collectionItems.Length == 1
             && IsThrowable(rowCounts[0])
             && IsThrowable(rolledBacks[0])
+            && IsThrowable(collectionItems[0])
             && HasConstructor(compilation, rowCounts[0], IsBoolean)
             && HasConstructor(compilation, rolledBacks[0], IsException)
+            && HasCollectionItemConstructor(compilation, collectionItems[0])
             ? ExceptionOrigin.Referenced
             : ExceptionOrigin.OtherShape;
     }
@@ -118,6 +127,29 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
         return false;
     }
 
+    // Whether the type has a constructor that the project can call as CollectionItemException(string queryName,
+    // int itemIndex, System.Data.Common.DbException inner).
+    private static bool HasCollectionItemConstructor(Compilation compilation, INamedTypeSymbol type)
+    {
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            var parameters = constructor.Parameters;
+            if (
+                parameters.Length == 3
+                && parameters.All(static parameter => parameter.RefKind == RefKind.None)
+                && parameters[0].Type.SpecialType == SpecialType.System_String
+                && parameters[1].Type.SpecialType == SpecialType.System_Int32
+                && IsDbException(parameters[2].Type)
+                && compilation.IsSymbolAccessibleWithin(constructor, compilation.Assembly)
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // Whether a method can create the type and throw it: a class that is not abstract and derives from
     // System.Exception.
     private static bool IsThrowable(INamedTypeSymbol type)
@@ -140,6 +172,25 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
 
     // UnexpectedRowCountException(string queryName, bool moreThanOne).
     private static bool IsBoolean(ITypeSymbol type) => type.SpecialType == SpecialType.System_Boolean;
+
+    // The parameter of CollectionItemException(string queryName, int itemIndex, System.Data.Common.DbException inner).
+    private static bool IsDbException(ITypeSymbol type) =>
+        type
+            is INamedTypeSymbol
+            {
+                Name: "DbException",
+                Arity: 0,
+                ContainingType: null,
+                ContainingNamespace:
+                {
+                    Name: "Common",
+                    ContainingNamespace:
+                    {
+                        Name: "Data",
+                        ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
+                    },
+                },
+            };
 
     // TransactionRolledBackException(string queryName, System.Exception innerException).
     private static bool IsException(ITypeSymbol type) =>

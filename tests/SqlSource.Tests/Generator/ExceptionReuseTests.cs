@@ -41,6 +41,10 @@ public sealed class ExceptionReuseTests
                     catch (SqlSource.TransactionRolledBackException)
                     {
                     }
+                    catch (SqlSource.CollectionItemException e)
+                    {
+                        _ = e.ItemIndex;
+                    }
                 }
             }
         }
@@ -81,6 +85,7 @@ public sealed class ExceptionReuseTests
         var exceptions = run.Sources[ExceptionSource.HintName];
         exceptions.ShouldContain("internal sealed class UnexpectedRowCountException ");
         exceptions.ShouldContain("internal sealed class TransactionRolledBackException ");
+        exceptions.ShouldContain("internal sealed class CollectionItemException ");
         var attribute = run.Sources[AttributeSource.HintName];
         attribute.ShouldNotContain("UnexpectedRowCountException");
         attribute.ShouldNotContain("TransactionRolledBackException");
@@ -97,6 +102,7 @@ public sealed class ExceptionReuseTests
         var exceptions = run.Sources[ExceptionSource.HintName];
         exceptions.ShouldContain("public sealed class UnexpectedRowCountException ");
         exceptions.ShouldContain("public sealed class TransactionRolledBackException ");
+        exceptions.ShouldContain("public sealed class CollectionItemException ");
         exceptions.ShouldNotContain("internal ");
     }
 
@@ -112,6 +118,7 @@ public sealed class ExceptionReuseTests
         var exceptions = run.Sources[ExceptionSource.HintName];
         exceptions.ShouldContain("internal sealed class UnexpectedRowCountException ");
         exceptions.ShouldContain("internal sealed class TransactionRolledBackException ");
+        exceptions.ShouldContain("internal sealed class CollectionItemException ");
         exceptions.ShouldNotContain("public sealed class");
     }
 
@@ -422,22 +429,46 @@ public sealed class ExceptionReuseTests
     {
         string[] sources =
         [
-            Old(RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")),
+            Old(RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne") + Item()),
             Old(
                 RowCount("System.InvalidOperationException", "string queryName")
                     + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+                    + Item()
             ),
             Old(
                 RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
                     + RolledBack("System.InvalidOperationException", "string queryName")
+                    + Item()
             ),
             Old(
                 RowCount("System.Object", "string queryName, bool moreThanOne")
                     + RolledBack("System.Object", "string queryName, System.Exception inner")
+                    + Item("System.Object")
             ),
             Old(
                 RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne", "abstract")
                     + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+                    + Item()
+            ),
+            // The exceptions of a version before CollectionItemException, with no third.
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                    + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+            ),
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                    + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+                    + Item(parameters: "string queryName, int itemIndex")
+            ),
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                    + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+                    + Item(parameters: "string queryName, int itemIndex, System.Exception inner")
+            ),
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                    + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+                    + Item("System.Object")
             ),
             Old(
                 RowCount(
@@ -451,7 +482,8 @@ public sealed class ExceptionReuseTests
                         "string queryName, System.Exception inner",
                         accessibility: "public",
                         constructorAccessibility: "internal"
-                    ),
+                    )
+                    + Item(accessibility: "public", constructorAccessibility: "internal"),
                 internalsVisible: false
             ),
         ];
@@ -529,6 +561,22 @@ public sealed class ExceptionReuseTests
         + " { "
         + constructorAccessibility
         + " TransactionRolledBackException("
+        + parameters
+        + ") { } } ";
+
+    // A copy of CollectionItemException of this base and constructor, with the accessibility of each as given.
+    private static string Item(
+        string baseType = "System.Data.Common.DbException",
+        string parameters = "string queryName, int itemIndex, System.Data.Common.DbException inner",
+        string accessibility = "internal",
+        string constructorAccessibility = "public"
+    ) =>
+        accessibility
+        + " sealed class CollectionItemException : "
+        + baseType
+        + " { "
+        + constructorAccessibility
+        + " CollectionItemException("
         + parameters
         + ") { } } ";
 

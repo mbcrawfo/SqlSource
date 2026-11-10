@@ -579,9 +579,38 @@ namespace SqlSource
         }
 
         /// <summary>
+        /// Creates the exception for a query that ran over a collection, at one of its items.
+        /// </summary>
+        /// <param name="queryName">The name of the query.</param>
+        /// <param name="moreThanOne">
+        /// <c>true</c> if the query returned more than one row for the item, <c>false</c> if it returned none.
+        /// </param>
+        /// <param name="itemIndex">The item's position in the collection, counted from 0.</param>
+        public UnexpectedRowCountException(string queryName, bool moreThanOne, int itemIndex)
+            : base(
+                "The query '"
+                    + queryName
+                    + "' returned "
+                    + (moreThanOne ? "more than one row" : "no rows")
+                    + " for item "
+                    + itemIndex.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
+                    + "."
+            )
+        {
+            QueryName = queryName;
+            ItemIndex = itemIndex;
+        }
+
+        /// <summary>
         /// The name of the query.
         /// </summary>
         public string QueryName { get; }
+
+        /// <summary>
+        /// The position of the item that the query returned the wrong number of rows for, counted from 0, or
+        /// <c>null</c> when the query did not run over a collection.
+        /// </summary>
+        public int? ItemIndex { get; }
     }
 
     /// <summary>
@@ -612,6 +641,81 @@ namespace SqlSource
         /// The name of the query.
         /// </summary>
         public string QueryName { get; }
+    }
+
+    /// <summary>
+    /// What a generated method that runs a query over a collection throws when the database reports an error at
+    /// one of its items.  Its inner exception is the driver's own, and it passes on what
+    /// <see cref="global::System.Data.Common.DbException" /> lets it, so a caller that catches that, or tests
+    /// <c>IsTransient</c>, sees the same.
+    /// </summary>
+    internal sealed class CollectionItemException : global::System.Data.Common.DbException
+    {
+#if NET6_0_OR_GREATER
+        private readonly string _sqlState;
+
+        private readonly bool _isTransient;
+
+        private readonly global::System.Data.Common.DbBatchCommand _batchCommand;
+#endif
+
+        /// <summary>
+        /// Creates the exception for a query.
+        /// </summary>
+        /// <param name="queryName">The name of the query.</param>
+        /// <param name="itemIndex">The item's position in the collection, counted from 0.</param>
+        /// <param name="inner">The exception that the driver threw.</param>
+        public CollectionItemException(
+            string queryName,
+            int itemIndex,
+            global::System.Data.Common.DbException inner
+        )
+            : base(
+                "The query '"
+                    + queryName
+                    + "' failed at item "
+                    + itemIndex.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
+                    + ": "
+                    + inner.Message,
+                inner
+            )
+        {
+            QueryName = queryName;
+            ItemIndex = itemIndex;
+#if NET6_0_OR_GREATER
+            _sqlState = inner.SqlState;
+            _isTransient = inner.IsTransient;
+            _batchCommand = inner.BatchCommand;
+#endif
+            HResult = inner.HResult;
+        }
+
+        /// <summary>
+        /// The name of the query.
+        /// </summary>
+        public string QueryName { get; }
+
+        /// <summary>
+        /// The position of the item that the database reported the error at, counted from 0.
+        /// </summary>
+        public int ItemIndex { get; }
+
+#if NET6_0_OR_GREATER
+        /// <summary>
+        /// The inner exception's <c>SqlState</c>.
+        /// </summary>
+        public override string SqlState => _sqlState;
+
+        /// <summary>
+        /// The inner exception's <c>IsTransient</c>.
+        /// </summary>
+        public override bool IsTransient => _isTransient;
+
+        /// <summary>
+        /// The inner exception's batch command.
+        /// </summary>
+        protected override global::System.Data.Common.DbBatchCommand DbBatchCommand => _batchCommand;
+#endif
     }
 }
 
