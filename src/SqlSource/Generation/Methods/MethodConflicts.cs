@@ -272,6 +272,9 @@ internal sealed record MethodConflicts(
     private static List<DroppedMethod> FindClashes(List<MethodSignature> extensions, List<DiagnosticInfo> diagnostics)
     {
         var dropped = new List<DroppedMethod>();
+        // A type's query method and its collection method are two signatures of one name, which clash together: the
+        // type is reported, and drops the name, once.
+        var reported = new HashSet<(string TypeKey, string Name)>();
         foreach (var name in extensions.GroupBy(static signature => (signature.Namespace, signature.Name)))
         {
             var methods = name.OrderBy(static method => method.TypeKey, StringComparer.Ordinal).ToList();
@@ -282,7 +285,7 @@ internal sealed record MethodConflicts(
 
             foreach (var method in methods)
             {
-                if (ClashOf(method, methods) is not { } because)
+                if (ClashOf(method, methods) is not { } because || !reported.Add((method.TypeKey, method.Name)))
                 {
                     continue;
                 }

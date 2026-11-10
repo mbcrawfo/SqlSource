@@ -325,7 +325,7 @@ The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about convert
 
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models`, `methods` or `repository`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `methods` or `repository` its method.
 
-`SQLSRC297` is reported by the build, as `SQLSRC272` is, at the name of a query whose output is `methods` or `repository`, once for the query, when it turns on `collection-method`, has parameters and gives `transaction` an isolation level that its database does not have.  The query keeps its method and gets no collection method; its models are still generated.
+`SQLSRC297` is reported by the build, at the name of a query whose output is `methods` or `repository`, once for the query.  Unlike the ids above, it costs the query only its collection method, not its method.
 
 ## SQLSRC001
 
@@ -3617,6 +3617,6 @@ A query that turns on the `collection-method` generator parameter, and has param
 /work/App/Queries/Users.sql(2,10): error SQLSRC297: The query 'AddUser' asks for the transaction isolation level 'snapshot', which PostgreSQL does not have
 ```
 
-Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, or `on`, which begins the transaction at the database's default level.  The error is at the query's name, and the query keeps its own method; only its collection method is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
+Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, or `on`, which begins the transaction at the database's default level.  The query keeps its own method; only its collection method is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
 
 See: [Generator parameters](settings.md#setting-generator-parameters)

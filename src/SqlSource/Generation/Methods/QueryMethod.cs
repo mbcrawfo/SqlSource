@@ -69,7 +69,9 @@ internal sealed record QueryMethod(
 
     /// <summary>
     /// How the method runs its query once for each item of a collection, in batches, when it is the collection method
-    /// of a query: the query's method with this set, placed right after it.  Null for the query's own method.
+    /// of a query: the query's method with this set, placed right after it.  Null for the query's own method.  A
+    /// type's methods may then hold two of one name, the query method and its collection method, so a consumer of
+    /// <see cref="TypeMethods.Methods" /> must not key them by name alone.
     /// </summary>
     public BatchCall? Batch { get; init; }
 }

@@ -195,6 +195,7 @@ public sealed class CollectionMethodTests
             Sidecars.Of(b, Entry(b, "AddUser", [], [Column("id")]))
         );
 
+        // One for each query: the type's two methods give one report, as MethodConflictsTests holds.
         run.Problems().Count.ShouldBe(2);
         run.Problems().ShouldAllBe(problem => problem.StartsWith("SQLSRC274 ", System.StringComparison.Ordinal));
         run.Sources.Keys.ShouldNotContain("App.First.Queries-Methods.g.cs");
