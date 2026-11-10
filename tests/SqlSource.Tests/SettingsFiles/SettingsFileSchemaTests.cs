@@ -173,18 +173,21 @@ public sealed class SettingsFileSchemaTests
         Pattern(Properties.GetProperty(key)).ShouldBe(expected);
     }
 
-    // A parameter's name, alone or with a state, or default alone, as GeneratorParameterList.ReadWord reads a word.
+    // A parameter's name, alone or with one of its words or default, or default alone, as
+    // GeneratorParameterList.ReadWord reads a word.
     [Fact]
     public void Schema_PatternOfGeneratorParameters_IsGeneratedFromTheParameters()
     {
-        var names = GeneratorParameterList.Definitions.Select(name => CaseFree(name.Name));
-        var states = Enum.GetValues<GeneratorParameterState>().Select(state => CaseFree(SettingValue.NameOf(state)));
+        var alternatives = GeneratorParameterList.Definitions.Select(definition =>
+            CaseFree(definition.Name)
+            + "(?:=(?:"
+            + string.Join("|", definition.Words.Append(GeneratorParameterList.Default).Select(CaseFree))
+            + "))?"
+        );
         var expected =
             @"^\s*(?:(?:"
-            + string.Join("|", names)
-            + ")(?:=(?:"
-            + string.Join("|", states)
-            + "))?|"
+            + string.Join("|", alternatives)
+            + ")|"
             + CaseFree(GeneratorParameterList.Default)
             + @")?\s*$";
 
