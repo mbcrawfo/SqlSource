@@ -183,8 +183,9 @@ public sealed class QueryTyperTests
             "geography",
             "Reference NetTopologySuite.IO.SqlServerBytes, with NetTopologySuite 2.5.0 or later, and turn the "
                 + "netTopologySuite library on, to read it as "
-                + "NetTopologySuite's Geometry in a methods query, or reference the package Microsoft.SqlServer.Types "
-                + "and map it with the type override, as geography=Microsoft.SqlServer.Types.SqlGeography"
+                + "NetTopologySuite's Geometry in a methods or repository query, or reference the package "
+                + "Microsoft.SqlServer.Types and map it with the type override, as "
+                + "geography=Microsoft.SqlServer.Types.SqlGeography"
         );
 
     [Fact]

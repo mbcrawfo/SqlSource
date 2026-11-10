@@ -33,19 +33,29 @@ internal static class ConnectionCandidateReader
     /// <summary>
     /// The candidates of the type, in the order they are declared, the type's own members first, then each base
     /// type's, then the primary constructor's parameters.  Only the marked ones when any is, and the parameters only
-    /// when no member is one.
+    /// when no member is one, and then only those that no argument of the base type and no initializer of a field,
+    /// property or event of the type reads, since a method that captured one of those would make the compiler warn
+    /// in the user's code (CS9107, CS9124).
     /// </summary>
     /// <param name="type">The repository.</param>
-    /// <param name="compilation">The compilation, which says which members of a base type the type can reach.</param>
+    /// <param name="compilation">
+    /// The compilation, which says which members of a base type the type can reach and what an initializer reads.
+    /// </param>
     /// <param name="fallback">The location of a member that has none in source: the type's attribute.</param>
+    /// <param name="heldParameters">
+    /// The names of the parameters the conventions would take but that such an argument or initializer reads, in the
+    /// order they are declared.  Empty unless the candidates are the parameters.
+    /// </param>
     /// <param name="cancellationToken">Cancels the read.</param>
     public static EquatableArray<ConnectionCandidate> Read(
         INamedTypeSymbol type,
         Compilation compilation,
         LocationInfo fallback,
+        out EquatableArray<string> heldParameters,
         CancellationToken cancellationToken
     )
     {
+        heldParameters = EquatableArray<string>.Empty;
         var members = new List<ConnectionCandidate>();
 
         // The names of the more derived types' members: a member of a base type that one of them overrides or hides is
@@ -70,8 +80,9 @@ internal static class ConnectionCandidateReader
             derivedNames.UnionWith(currentMembers.Select(static member => member.Name));
         }
 
-        var parameters = ReadParameters(type, fallback, cancellationToken);
-        var all = members.Concat(parameters).ToList();
+        var primary = PrimaryConstructorOf(type, cancellationToken);
+        var parameters = ReadParameters(primary, fallback);
+        var all = members.Concat(parameters.Select(static parameter => parameter.Candidate)).ToList();
         if (all.Any(static candidate => candidate.IsMarked))
         {
             return new EquatableArray<ConnectionCandidate>(
@@ -79,7 +90,27 @@ internal static class ConnectionCandidateReader
             );
         }
 
-        return new EquatableArray<ConnectionCandidate>((members.Count > 0 ? members : parameters).ToImmutableArray());
+        if (members.Count > 0)
+        {
+            return new EquatableArray<ConnectionCandidate>(members.ToImmutableArray());
+        }
+
+        var taken = ImmutableArray.CreateBuilder<ConnectionCandidate>();
+        var held = ImmutableArray.CreateBuilder<string>();
+        foreach (var (symbol, candidate) in parameters)
+        {
+            if (IsReadBesides(symbol, type, compilation, cancellationToken))
+            {
+                held.Add(candidate.Name);
+            }
+            else
+            {
+                taken.Add(candidate);
+            }
+        }
+
+        heldParameters = new EquatableArray<string>(held.ToImmutable());
+        return new EquatableArray<ConnectionCandidate>(taken.ToImmutable());
     }
 
     // A member of a base type that the type can use: a property whose getter it can call.
@@ -152,30 +183,110 @@ internal static class ConnectionCandidateReader
         return OwnerOf(member) is { } owner ? candidate with { Name = owner.Name } : candidate;
     }
 
-    // The primary constructor's parameters: those of the instance constructor that the type's declaration itself
-    // declares.  Roslyn 4.14 has no public flag for it.
-    private static List<ConnectionCandidate> ReadParameters(
-        INamedTypeSymbol type,
-        LocationInfo fallback,
-        CancellationToken cancellationToken
-    )
-    {
-        var parameters = new List<ConnectionCandidate>();
-        var primary = type.InstanceConstructors.FirstOrDefault(constructor =>
+    // The primary constructor: the instance constructor that the type's declaration itself declares.  Roslyn 4.14 has
+    // no public flag for it.
+    private static IMethodSymbol? PrimaryConstructorOf(INamedTypeSymbol type, CancellationToken cancellationToken) =>
+        type.InstanceConstructors.FirstOrDefault(constructor =>
             !constructor.IsImplicitlyDeclared
             && constructor.DeclaringSyntaxReferences.Any(reference =>
                 reference.GetSyntax(cancellationToken) is TypeDeclarationSyntax { ParameterList: not null }
             )
         );
+
+    // The primary constructor's parameters that are candidates, each with its symbol.
+    private static List<(IParameterSymbol Symbol, ConnectionCandidate Candidate)> ReadParameters(
+        IMethodSymbol? primary,
+        LocationInfo fallback
+    )
+    {
+        var parameters = new List<(IParameterSymbol, ConnectionCandidate)>();
         foreach (var parameter in primary?.Parameters ?? ImmutableArray<IParameterSymbol>.Empty)
         {
             if (Held(parameter, CandidateMember.Parameter, parameter.Type, false, false, fallback) is { } candidate)
             {
-                parameters.Add(candidate);
+                parameters.Add((parameter, candidate));
             }
         }
 
         return parameters;
+    }
+
+    // Whether an argument that the type's declaration passes to its base type, or the initializer of one of the type's
+    // fields, properties or events, reads the parameter: the compiler warns of a parameter that a method captures and
+    // that the type also passes on so (CS9107) or stores so (CS9124).  An identifier of the parameter's name is bound
+    // only then, so the semantic model is asked of no other.
+    private static bool IsReadBesides(
+        IParameterSymbol parameter,
+        INamedTypeSymbol type,
+        Compilation compilation,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var reference in type.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax declaration)
+            {
+                continue;
+            }
+
+            SemanticModel? model = null;
+            foreach (var expression in InitialValuesOf(declaration))
+            {
+                foreach (var identifier in expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+                {
+                    if (identifier.Identifier.ValueText != parameter.Name)
+                    {
+                        continue;
+                    }
+
+                    model ??= compilation.GetSemanticModel(declaration.SyntaxTree);
+                    if (
+                        SymbolEqualityComparer.Default.Equals(
+                            model.GetSymbolInfo(identifier, cancellationToken).Symbol,
+                            parameter
+                        )
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // The arguments of the declaration's base type, and the initializers of its fields, properties and events.
+    private static IEnumerable<ExpressionSyntax> InitialValuesOf(TypeDeclarationSyntax declaration)
+    {
+        foreach (var baseType in declaration.BaseList?.Types ?? default)
+        {
+            if (baseType is PrimaryConstructorBaseTypeSyntax { ArgumentList: var arguments })
+            {
+                foreach (var argument in arguments.Arguments)
+                {
+                    yield return argument.Expression;
+                }
+            }
+        }
+
+        foreach (var member in declaration.Members)
+        {
+            if (member is BaseFieldDeclarationSyntax field)
+            {
+                foreach (var variable in field.Declaration.Variables)
+                {
+                    if (variable.Initializer is { Value: var value })
+                    {
+                        yield return value;
+                    }
+                }
+            }
+            else if (member is PropertyDeclarationSyntax { Initializer.Value: var initial })
+            {
+                yield return initial;
+            }
+        }
     }
 
     // A field, property or parameter: a string named by the conventions, a data source, or, when marked, a connection.

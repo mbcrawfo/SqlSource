@@ -1,33 +1,20 @@
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using SqlSource.Generation;
 using SqlSource.Generation.Repositories;
 using SqlSource.Testing.Generator;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generation.Repositories;
 
-// The members of a repository that can give its connection, and the name of its interface, as the generator reads them
-// from the compilation into its RepositoryShapes step.
+// The members of a repository that can give its connection, as the generator reads them from the compilation into its
+// RepositoryShapes step.
 public sealed class ConnectionCandidateReaderTests
 {
-    private const string Usings = """
-        using System.Data.Common;
-        using System.Threading;
-        using System.Threading.Tasks;
-        using Npgsql;
-        using SqlSource;
-
-        """;
-
     [Fact]
     public void Read_PrimaryConstructorDataSource_IsAParameterCandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -51,7 +38,7 @@ public sealed class ConnectionCandidateReaderTests
     [InlineData("ConnectionString")]
     public void Read_FieldNamedConnectionString_IsAConnectionStringCandidate(string name)
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             $$"""
             namespace App
             {
@@ -74,7 +61,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_FieldNotNamedByTheConvention_IsNotACandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -94,7 +81,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_NullableDataSourceField_IsADataSourceCandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             #nullable enable
             namespace App
@@ -116,7 +103,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedStringMethod_IsAConnectionString()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -139,7 +126,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedSyncFactory_IsAFactoryOfItsConnectionType()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -164,7 +151,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedTaskFactory_IsAsync()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -192,7 +179,7 @@ public sealed class ConnectionCandidateReaderTests
     [InlineData("private readonly int Open = 0;")]
     public void Read_MarkedMemberOfAnotherShape_IsUnsupported(string member)
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             $$"""
             namespace App
             {
@@ -216,7 +203,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedAccessor_IsUnsupportedAndNamedForItsProperty()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -242,7 +229,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedExplicitImplementation_IsUnsupported()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -270,7 +257,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedOverloads_AreEachACandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -296,7 +283,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_BaseMemberHiddenByTheRepository_IsNotACandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -320,7 +307,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_OverrideOfAMarkedBaseMethod_IsMarkedWithTheBasesDatabase()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -351,7 +338,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_OverrideOfAMarkedBaseProperty_IsMarked()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -383,7 +370,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedProtectedMemberOfAReferencedBase_IsInherited()
     {
-        var library = Library(
+        var library = RepositoryShapes.Library(
             """
             namespace Library
             {
@@ -396,7 +383,7 @@ public sealed class ConnectionCandidateReaderTests
             """
         );
 
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -424,7 +411,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_ParameterStoredInAField_KeepsTheFieldAlone()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -440,12 +427,89 @@ public sealed class ConnectionCandidateReaderTests
         var candidate = shape.Candidates.ShouldHaveSingleItem();
         candidate.Name.ShouldBe("_dataSource");
         candidate.Member.ShouldBe(CandidateMember.Field);
+        shape.HeldParameters.ShouldBeEmpty();
+    }
+
+    // A method that captured a parameter that the type also passes to its base type, or that an initializer reads,
+    // would make the compiler warn in the user's code (CS9107, CS9124), so the conventions leave it alone, in every
+    // part of the type.
+    [Theory]
+    [InlineData(
+        "public partial class UserRepository(string connectionString) : Base(connectionString);\n"
+            + "public abstract class Base\n{\n    protected Base(string value) { }\n}"
+    )]
+    [InlineData(
+        "public partial class UserRepository(string connectionString)\n{\n"
+            + "    private readonly string _value = connectionString;\n}"
+    )]
+    [InlineData(
+        "public partial class UserRepository(string connectionString)\n{\n"
+            + "    private int Length { get; } = connectionString.Length;\n}"
+    )]
+    [InlineData(
+        "public partial class UserRepository(string connectionString)\n{\n"
+            + "    private event System.Func<string>? Read = () => connectionString;\n}"
+    )]
+    [InlineData(
+        "public partial class UserRepository(string connectionString);\n"
+            + "public partial class UserRepository\n{\n    private readonly string _value = connectionString;\n}"
+    )]
+    public void Read_ParameterPassedOnOrStored_IsHeld(string declarations)
+    {
+        var shape = RepositoryShapes.Of("namespace App\n{\n[SqlSourceGenerate]\n" + declarations + "\n}\n");
+
+        shape.Candidates.ShouldBeEmpty();
+        shape.HeldParameters.ShouldBe(["connectionString"]);
+    }
+
+    // Only the parameter itself counts: one that a method alone reads, or a member of its name that an initializer
+    // reads, leaves it a candidate.
+    [Theory]
+    [InlineData(
+        "public partial class UserRepository(string connectionString)\n{\n"
+            + "    public int Length() => connectionString.Length;\n}"
+    )]
+    [InlineData(
+        "public partial class UserRepository(string connectionString)\n{\n"
+            + "    private readonly int _length = Other.connectionString.Length;\n}\n"
+            + "public static class Other\n{\n    public static string connectionString = \"\";\n}"
+    )]
+    public void Read_ParameterNotPassedOnOrStored_IsACandidate(string declarations)
+    {
+        var shape = RepositoryShapes.Of("namespace App\n{\n[SqlSourceGenerate]\n" + declarations + "\n}\n");
+
+        shape.Candidates.ShouldHaveSingleItem().Name.ShouldBe("connectionString");
+        shape.HeldParameters.ShouldBeEmpty();
+    }
+
+    // A marked parameter is the user's choice, so it is taken though the type passes it on.
+    [Fact]
+    public void Read_MarkedParameterPassedOn_IsACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class UserRepository([SqlSourceConnection] string connectionString)
+                    : Base(connectionString);
+
+                public abstract class Base
+                {
+                    protected Base(string value) { }
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldHaveSingleItem().IsMarked.ShouldBeTrue();
+        shape.HeldParameters.ShouldBeEmpty();
     }
 
     [Fact]
     public void Read_RecordPositionalString_IsItsPropertyAlone()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -464,7 +528,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedFactory_IsAsyncAndTakesTheToken()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -491,7 +555,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedDbConnectionProperty_IsAConnection()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -515,7 +579,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_UnmarkedDbConnection_IsNotACandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -534,7 +598,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedMethodWithTwoParameters_IsUnsupported()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -558,7 +622,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_MarkedMemberWithDatabase_CarriesIt()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -578,7 +642,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_ProtectedBaseMember_IsInherited()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -602,7 +666,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_PrivateBaseMember_IsNotACandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -624,7 +688,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_BasePropertyWithAPrivateGetter_IsNotACandidate()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -645,7 +709,7 @@ public sealed class ConnectionCandidateReaderTests
     [Fact]
     public void Read_AnyMarked_DropsConventionCandidates()
     {
-        var shape = ShapeOf(
+        var shape = RepositoryShapes.Of(
             """
             namespace App
             {
@@ -665,232 +729,5 @@ public sealed class ConnectionCandidateReaderTests
         candidate.Name.ShouldBe("Open");
         candidate.IsAsync.ShouldBeFalse();
         candidate.TakesCancellationToken.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Read_InterfaceNameTakenByAClass_CarriesTheTakenBy()
-    {
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                [SqlSourceGenerate]
-                public partial class UserRepository(NpgsqlDataSource dataSource);
-
-                public class IUserRepository;
-            }
-            """
-        );
-
-        shape.InterfaceName.ShouldBe("IUserRepository");
-        shape.InterfaceTakenBy.ShouldBe("the class App.IUserRepository");
-    }
-
-    // The user adds members to the generated interface by declaring another part of it.
-    [Fact]
-    public void Read_InterfaceNameIsAPartialInterface_IsNotTaken()
-    {
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                [SqlSourceGenerate]
-                public partial class UserRepository(NpgsqlDataSource dataSource);
-
-                public partial interface IUserRepository
-                {
-                    void Extra();
-                }
-            }
-            """
-        );
-
-        shape.InterfaceTakenBy.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Read_InterfaceNameTakenByAReferencedType_CarriesTheTakenBy()
-    {
-        var library = Library("namespace App { public interface IUserRepository; }");
-
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                [SqlSourceGenerate]
-                public partial class UserRepository(NpgsqlDataSource dataSource);
-            }
-            """,
-            references: [library]
-        );
-
-        shape.InterfaceTakenBy.ShouldBe("the interface App.IUserRepository of the assembly Library");
-    }
-
-    [Fact]
-    public void Read_InterfaceNameTakenByAMemberOfTheContainingType_CarriesTheTakenBy()
-    {
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                public partial class Outer
-                {
-                    [SqlSourceGenerate]
-                    public partial class Repository(NpgsqlDataSource dataSource);
-
-                    public void IRepository() { }
-                }
-            }
-            """
-        );
-
-        shape.InterfaceTakenBy.ShouldBe("the method App.Outer.IRepository()");
-    }
-
-    [Fact]
-    public void Read_NoInterfaceSettings_IsOnAndNamedForTheType()
-    {
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                [SqlSourceGenerate]
-                public partial class UserRepository(NpgsqlDataSource dataSource);
-            }
-            """
-        );
-
-        shape.TypeKey.ShouldBe("App.UserRepository");
-        shape.InterfaceOn.ShouldBeTrue();
-        shape.InterfaceName.ShouldBe("IUserRepository");
-        shape.InterfaceTakenBy.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Read_InterfaceNameWritten_ReplacesTheDefault()
-    {
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                [SqlSourceGenerate(InterfaceName = "IUsers")]
-                public partial class UserRepository(NpgsqlDataSource dataSource);
-
-                public class IUserRepository;
-            }
-            """
-        );
-
-        shape.InterfaceName.ShouldBe("IUsers");
-        shape.InterfaceTakenBy.ShouldBeNull();
-    }
-
-    [Theory]
-    [InlineData("", null, true)]
-    [InlineData("", "false", false)]
-    [InlineData("GenerateInterface = false", null, false)]
-    [InlineData("GenerateInterface = true", "false", true)]
-    public void Read_GenerateInterface_OverridesTheProjectSwitchWhenWritten(
-        string argument,
-        string? property,
-        bool interfaceOn
-    )
-    {
-        var shape = ShapeOf(
-            $$"""
-            namespace App
-            {
-                [SqlSourceGenerate({{argument}})]
-                public partial class UserRepository(NpgsqlDataSource dataSource);
-            }
-            """,
-            new Dictionary<string, string?> { [RepositoryInterfaces.PropertyName] = property }
-        );
-
-        shape.InterfaceOn.ShouldBe(interfaceOn);
-    }
-
-    [Fact]
-    public void Read_StaticType_HasNoCandidates()
-    {
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                [SqlSourceGenerate]
-                public static partial class UserQueries
-                {
-                    private static readonly string ConnectionString = "";
-                }
-            }
-            """
-        );
-
-        shape.Candidates.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Read_NestedGenericType_IsFoundByItsMetadataName()
-    {
-        var shape = ShapeOf(
-            """
-            namespace App
-            {
-                public partial class Outer
-                {
-                    [SqlSourceGenerate]
-                    public partial class Repository<T>(NpgsqlDataSource dataSource);
-
-                    public struct IRepository<T>;
-                }
-            }
-            """
-        );
-
-        shape.Candidates.ShouldHaveSingleItem().Name.ShouldBe("dataSource");
-        shape.InterfaceTakenBy.ShouldBe("the struct App.Outer.IRepository<T>");
-    }
-
-    private static RepositoryShape ShapeOf(
-        string source,
-        IReadOnlyDictionary<string, string?>? properties = null,
-        MetadataReference[]? references = null
-    )
-    {
-        var run = GeneratorHarness.Run(
-            OutputKind.Repository,
-            [new SourceFile(GeneratorHarness.SourcePath, Usings + source)],
-            [],
-            references: [NpgsqlReferences.Npgsql10, .. references ?? []],
-            properties: properties
-        );
-
-        run.CompilationErrors.ShouldBeEmpty();
-        return StepOutputs
-            .Single<EquatableArray<RepositoryShape>>(run, TrackingNames.RepositoryShapes)
-            .ShouldHaveSingleItem();
-    }
-
-    // An assembly named Library, with the generated attributes, as a project that uses SqlSource builds it, emitted to
-    // an image as a build references it.
-    private static PortableExecutableReference Library(string source)
-    {
-        var compilation = GeneratorHarness.CreateCompilation(
-            [
-                new SourceFile("/lib/Attributes.cs", AttributeSource.Text),
-                new SourceFile("/lib/Embedded.cs", GeneratedFile.EmbeddedAttribute),
-                new SourceFile("/lib/Library.cs", source),
-            ],
-            references: [NpgsqlReferences.Npgsql10],
-            assemblyName: "Library"
-        );
-        using var image = new MemoryStream();
-        var emitted = compilation.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
-        emitted
-            .Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.ToString())
-            .ShouldBeEmpty();
-        return MetadataReference.CreateFromImage(image.ToArray());
     }
 }

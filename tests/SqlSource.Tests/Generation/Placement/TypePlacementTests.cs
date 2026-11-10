@@ -329,9 +329,10 @@ public sealed class TypePlacementTests
                 "ListUsers",
                 "App.UserRepository",
                 "private",
-                "the file header",
+                "which the file header sets",
                 "extension-class",
-                "an extension method is public or internal"
+                "an extension method is public or internal",
+                "-- visibility: or -- member-location:"
             ),
         ]);
         placement.Usable.ShouldBe([false]);
@@ -430,9 +431,37 @@ public sealed class TypePlacementTests
                 "GetUser",
                 "App.UserRepository",
                 "protected",
-                "the file header",
+                "which the file header sets",
                 PlacementChecks.TextOf(location),
-                reason
+                reason,
+                "-- visibility: or -- member-location:"
+            ),
+        ]);
+        placement.Usable.ShouldBe([false]);
+    }
+
+    // A repository method is always on the type, so the error says to write the visibility alone.
+    [Fact]
+    public void Of_ProtectedRepositoryQueryOnAStruct_ReportsSqlsrc123WithTheVisibilityAlone()
+    {
+        var type = TestModels.Type(types: [new TypeDeclaration("struct", "UserRepository", "UserRepository", "", 0)]);
+        var files = Files(
+            File("Users.sql", Query("GetUser", output: OutputKind.Repository, visibility: Visibility.Protected))
+        );
+
+        var (placement, diagnostics) = Analyse(type, files);
+
+        diagnostics.ShouldBe([
+            DiagnosticInfo.Create(
+                SqlDiagnostics.VisibilityNotFit,
+                At("Users.sql", 0),
+                "GetUser",
+                "App.UserRepository",
+                "protected",
+                "which the file header sets",
+                "class",
+                "'App.UserRepository' is a struct, which cannot have protected members",
+                "-- visibility:"
             ),
         ]);
         placement.Usable.ShouldBe([false]);

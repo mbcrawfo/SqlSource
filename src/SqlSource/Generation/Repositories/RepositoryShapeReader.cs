@@ -38,12 +38,20 @@ internal static class RepositoryShapeReader
             var symbol = compilation.GetTypeByMetadataName(type.MetadataName);
             var interfaceOn = type.GenerateInterface ?? interfacesOn;
             var interfaceName = type.InterfaceName ?? ("I" + type.Name);
+            var heldParameters = EquatableArray<string>.Empty;
             shapes.Add(
                 new RepositoryShape(
                     HintName.NameOf(type),
                     symbol is null || type.IsStatic
                         ? EquatableArray<ConnectionCandidate>.Empty
-                        : ConnectionCandidateReader.Read(symbol, compilation, type.AttributeLocation, token),
+                        : ConnectionCandidateReader.Read(
+                            symbol,
+                            compilation,
+                            type.AttributeLocation,
+                            out heldParameters,
+                            token
+                        ),
+                    heldParameters,
                     interfaceOn,
                     interfaceName,
                     symbol is not null && interfaceOn ? FindTaken(symbol, interfaceName, compilation, token) : null
@@ -106,7 +114,9 @@ internal static class RepositoryShapeReader
             return TargetTypeReader.MetadataNameOf(container) + "+";
         }
 
-        return type.ContainingNamespace is { IsGlobalNamespace: false } ns ? ns.ToDisplayString() + "." : string.Empty;
+        return type.ContainingNamespace is { IsGlobalNamespace: false } ns
+            ? TargetTypeReader.MetadataNameOf(ns) + "."
+            : string.Empty;
     }
 
     private static string MemberKindOf(ISymbol member) =>

@@ -739,6 +739,7 @@ The error is at the type's `[SqlSourceGenerate]`, once for each database without
 
 - Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`, or mark the member that gives the connection `[SqlSourceConnection]`.
 - When a member is marked, no other is found by its name or type: mark the one for this database too.
+- A primary-constructor parameter that the type also passes to its base type, or uses to initialize a field or property, is not found by its name or type, and the message names it: keep the value in a field or property named `connectionString` or of a `DbDataSource` type, or mark the parameter `[SqlSourceConnection]`.
 - When the type's repository queries use more than one database, no member is found by its name or type, since nothing says which database it is for: mark one member for each, `[SqlSourceConnection(Database = "reports")]`.
 - Or set the queries' [output](settings.md#setting-output) to `methods`, whose methods take the connection as an argument.
 
@@ -1429,7 +1430,7 @@ See: [Where the members go](generator.md#locations)
 
 **Visibility does not fit the member location**
 
-A query's visibility and its [member location](generator.md#locations) together are something C# cannot write.  The message names the query, the type that claims the file, the visibility, where it was written, the member location and the reason, one of these:
+A query's visibility and its [member location](generator.md#locations) together are something C# cannot write.  The message names the query, the type that claims the file, the visibility, where it was written, or that it is the default of the `repository` output, the member location and the reason, one of these:
 
 - the member location is `extension-class` and the visibility `private` or `protected`: the extension class is a class of the namespace, and its methods are public or internal;
 - the member location is `extension-class` and the visibility `public`, the type is not public, or a type around it is not, and the query's method takes or returns a model, as one with parameters or rows does: the type's models are internal then, and a public method cannot take them.  A query method with no parameters and no rows takes no models and fits, and so does one whose models the type shares with a public type, which makes them public;
@@ -1463,6 +1464,14 @@ A query method that writes no visibility takes its nested class's, which another
 ```
 
 Give the method a class of its own with `-- nested-class:`, or put it on the type or in the extension class with `-- member-location:`: `-- visibility: internal` on it would give the class two visibilities, [SQLSRC124](#sqlsrc124).
+
+A repository method that writes no visibility is `public`, the default of the `repository` output, which does not fit its models on a type reachable as protected, the fourth reason.  The error is at the query's `-- member-location:` marker, else at its name, and leaves out that method alone.  Here `App.Outer.UserRepository` is a `protected` class nested in a public one:
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC123: The query 'GetUser' of 'App.Outer.UserRepository' cannot be public, the default of the repository output, at the member location class, because 'App.Outer.UserRepository' is reachable as protected, so its models are internal, which a method reachable from another assembly cannot take or return.  Write -- visibility: on the query.
+```
+
+Write `-- visibility: internal` on the query, or in the file header for every query of the file.  A repository method is always on the type, so the message of a repository query says to write `-- visibility:` alone.
 
 See: [Where the methods go](generator.md#method-location)
 
@@ -3331,7 +3340,7 @@ The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a 
 /work/App/sqlsource.json(5,5): error SQLSRC281: NodaTime is on for the PostgreSQL query methods it reaches here, but the project does not reference Npgsql.NodaTime.  Reference Npgsql.NodaTime, or turn NodaTime off for these queries.
 ```
 
-Reference the package the message names from the project.  Or, where the error points, set the library to `off`, or remove the entry, for those queries: a library that nothing turns on is on only where the project references what it needs.  The error is reported at the entry that says `on`, the member of the settings file or the line of the marker, once for each database whose `methods` queries it reaches, however many queries, files and types those are.  A query whose output is `models` or `sql` is not reported.  The queries keep their methods and their models, with the C# types they have while the library is off.
+Reference the package the message names from the project.  Or, where the error points, set the library to `off`, or remove the entry, for those queries: a library that nothing turns on is on only where the project references what it needs.  The error is reported at the entry that says `on`, the member of the settings file or the line of the marker, once for each database whose `methods` or `repository` queries it reaches, however many queries, files and types those are.  A query whose output is `models` or `sql` is not reported.  The queries keep their methods and their models, with the C# types they have while the library is off.
 
 See: [Library types](settings.md#setting-library-types)
 

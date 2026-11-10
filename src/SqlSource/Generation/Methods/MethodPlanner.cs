@@ -500,7 +500,8 @@ internal static class MethodPlanner
 
     // SQLSRC123 for a method that cannot take or return its internal models, at the marker that wrote its visibility,
     // else at its member location's, else at its name.  A nested class's visibility that another query wrote names the
-    // first usable query of the class that writes one, as the placement takes it.  The default of a location is never
+    // first usable query of the class that writes one, as the placement takes it.  A repository query that writes none
+    // has the repository's default, public, which the error names.  The default of any other location is never
     // refused, so a query that writes none is in such a class, and the null for one that is not is never given.
     private static DiagnosticInfo? ModelsNotFit(
         TargetType type,
@@ -510,16 +511,21 @@ internal static class MethodPlanner
     )
     {
         var (_, _, query, settings, placement) = usable;
-        string place;
+        string source;
         LocationInfo location;
         if (settings.WrittenVisibility is { } written)
         {
-            place = PlaceText.Of(written.Place);
+            source = PlacementChecks.WrittenBy(PlaceText.Of(written.Place));
             location = query.VisibilityMarker ?? query.MemberLocationMarker ?? query.NameLocation;
         }
         else if (WriterOf(queries, placement.NestedClass) is { } writer)
         {
-            place = writer;
+            source = PlacementChecks.WrittenBy(writer);
+            location = query.MemberLocationMarker ?? query.NameLocation;
+        }
+        else if (settings.Output == OutputKind.Repository)
+        {
+            source = PlacementChecks.RepositoryDefault;
             location = query.MemberLocationMarker ?? query.NameLocation;
         }
         else
@@ -533,9 +539,10 @@ internal static class MethodPlanner
             query.Name,
             PlacementChecks.NameOf(type),
             PlacementChecks.KeywordOf(placement.Visibility),
-            place,
+            source,
             PlacementChecks.TextOf(placement.Location),
-            reason
+            reason,
+            PlacementChecks.VisibilityFixOf(settings.Output)
         );
     }
 

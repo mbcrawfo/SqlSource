@@ -447,9 +447,10 @@ internal sealed class TypePlacement
                         query.Name,
                         TypeName,
                         PlacementChecks.KeywordOf(written.Value),
-                        PlaceText.Of(written.Place),
+                        PlacementChecks.WrittenBy(PlaceText.Of(written.Place)),
                         PlacementChecks.TextOf(location),
-                        reason
+                        reason,
+                        PlacementChecks.VisibilityFixOf(settings.Output)
                     )
                 );
                 isUsable = false;

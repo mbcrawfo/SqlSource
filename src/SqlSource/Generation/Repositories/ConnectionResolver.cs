@@ -67,7 +67,7 @@ internal static class ConnectionResolver
                             type.AttributeLocation,
                             resolving.TypeName,
                             database.Name,
-                            NoConnectionAdvice(database.Name, needed.Count, marked)
+                            NoConnectionAdvice(database.Name, needed.Count, marked, shape.HeldParameters)
                         )
                     );
                     resolving.Fail(database.Name);
@@ -222,8 +222,14 @@ internal static class ConnectionResolver
     }
 
     // What SQLSRC028 says to add: a marked member for this database when the type uses several, a marked member when
-    // one is marked already, since no convention then applies, and the conventions' members otherwise.
-    private static string NoConnectionAdvice(string database, int databases, bool marked)
+    // one is marked already, since no convention then applies, a field or property for a parameter the conventions
+    // would take but that the type stores or passes on, and the conventions' members otherwise.
+    private static string NoConnectionAdvice(
+        string database,
+        int databases,
+        bool marked,
+        EquatableArray<string> heldParameters
+    )
     {
         if (databases > 1)
         {
@@ -233,11 +239,31 @@ internal static class ConnectionResolver
                 + "\")].";
         }
 
-        return marked
-            ? "A member is marked [SqlSourceConnection], so no other is chosen by its name or type: mark the member "
-                + "that gives this database's connection [SqlSourceConnection]."
-            : "Add a string field, property or primary-constructor parameter named connectionString, or one of a "
-                + "DbDataSource type, or mark the member that gives the connection [SqlSourceConnection].";
+        if (marked)
+        {
+            return "A member is marked [SqlSourceConnection], so no other is chosen by its name or type: mark the "
+                + "member that gives this database's connection [SqlSourceConnection].";
+        }
+
+        if (heldParameters.Count > 0)
+        {
+            var one = heldParameters.Count == 1;
+            return "The primary-constructor "
+                + (one ? "parameter " : "parameters ")
+                + QuotedList(heldParameters)
+                + (one ? " is" : " are")
+                + " not chosen by "
+                + (one ? "its" : "their")
+                + " name or type, since the type also uses "
+                + (one ? "it" : "them")
+                + " to initialize a field or property, or passes "
+                + (one ? "it" : "them")
+                + " to its base type: keep the value in a field or property named connectionString or of a "
+                + "DbDataSource type, or mark the parameter [SqlSourceConnection].";
+        }
+
+        return "Add a string field, property or primary-constructor parameter named connectionString, or one of a "
+            + "DbDataSource type, or mark the member that gives the connection [SqlSourceConnection].";
     }
 
     private static string QuotedList(IEnumerable<string> names) =>

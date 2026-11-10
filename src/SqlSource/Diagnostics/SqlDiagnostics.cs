@@ -697,14 +697,16 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the query, {1} the type in full, {2} the visibility, {3} the place that wrote it, as "the file header",
-    // {4} the location, and {5} why the two do not fit, as "an extension method is public or internal".  Reported at
-    // the query's own -- visibility: marker, else at its -- member-location: marker, else at its name.
+    // {0} is the query, {1} the type in full, {2} the visibility, {3} where it comes from, as "which the file header
+    // sets" or "the default of the repository output", {4} the location, {5} why the two do not fit, as "an extension
+    // method is public or internal", and {6} the markers that can fix it: "-- visibility: or -- member-location:", or
+    // "-- visibility:" for a repository query, whose method is always on the type.  Reported at the query's own
+    // -- visibility: marker, else at its -- member-location: marker, else at its name.
     public static readonly DiagnosticDescriptor VisibilityNotFit = new(
         id: "SQLSRC123",
         title: "Visibility does not fit the member location",
-        messageFormat: "The query '{0}' of '{1}' cannot be {2}, which {3} sets, at the member location {4}, because "
-            + "{5}.  Write -- visibility: or -- member-location: on the query.",
+        messageFormat: "The query '{0}' of '{1}' cannot be {2}, {3}, at the member location {4}, because {5}.  Write "
+            + "{6} on the query.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -757,7 +759,7 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the list, with its prefix, as written where it is reported, and {1} where it stands.  Reported at the use,
-    // for a query whose output is Methods alone.
+    // for a query whose output is Methods or Repository alone, which have a method.
     public static readonly DiagnosticDescriptor NegatedListRefusedEmpty = new(
         id: "SQLSRC127",
         title: "Negated list stands where SQL Server refuses an empty list",
@@ -1302,8 +1304,8 @@ internal static class SqlDiagnostics
 
     // {0} is the package, as "NodaTime" or "NetTopologySuite.IO.SqlServerBytes", {1} the version the project
     // references, as "3.1.8", and {2} the oldest that SqlSource supports.  Reported with no position, once for the
-    // project and package, when a methods query uses a library that needs the package; the queries that use it get no
-    // method.  The package is an argument, so every package's floor shares it.
+    // project and package, when a query with a method uses a library that needs the package; the queries that use it
+    // get no method.  The package is an argument, so every package's floor shares it.
     public static readonly DiagnosticDescriptor LibraryBelowTheFloor = new(
         id: "SQLSRC282",
         title: "A library is older than SqlSource supports",
@@ -1322,7 +1324,7 @@ internal static class SqlDiagnostics
     // type; "'<the type>' is a type of System.Text.Json, which is read without the serializer"; or "'<the type>' is a
     // type that the driver reads, which the serializer never takes", each with "its element '<the element>'" in place
     // of "'<the type>'" for an array on an array that holds JSON.  Reported at the query's name, by ConversionPlanner,
-    // for methods queries only, once for each column and parameter whose place says json.
+    // for queries with a method only, once for each column and parameter whose place says json.
     public static readonly DiagnosticDescriptor JsonOptInNotApplicable = new(
         id: "SQLSRC283",
         title: "JSON opt-in does not apply",

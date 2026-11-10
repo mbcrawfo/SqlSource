@@ -1001,7 +1001,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(usesRowBuffer, AddRowBuffer);
 
-        // The engines of the project's methods queries, which almost never change.
+        // The engines of the project's queries with a method, which almost never change.
         var methodEngines = typeMethods
             .Select(static (methods, _) => methods.MethodEngines)
             .Collect()
@@ -1033,7 +1033,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
 
-        // The libraries that the methods queries use, each once for each engine, which almost never change.
+        // The libraries that the queries with a method use, each once for each engine, which almost never change.
         var usedLibraries = typeMethods
             .Select(static (methods, _) => methods.UsedLibraries)
             .Collect()
@@ -1097,7 +1097,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    // SQLSRC282 for each package that the libraries a methods query uses need on its engine and that the project
+    // SQLSRC282 for each package that the libraries a query with a method uses need on its engine and that the project
     // references older than its floor, each once: NetTopologySuite, used on both engines, is one error.
     private static void ReportLibrariesBelowTheFloor(
         SourceProductionContext output,
@@ -1139,7 +1139,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // SQLSRC273 for each engine that a methods query has and whose driver the project does not reference.
+    // SQLSRC273 for each engine that a query with a method has and whose driver the project does not reference.
     private static void ReportMissingDrivers(
         SourceProductionContext output,
         (MethodEngines Engines, (NpgsqlProbe Npgsql, SqlClientProbe SqlClient) Probes) input

@@ -79,6 +79,25 @@ internal static class PlacementChecks
             _ => throw UnexpectedEnumValueException.Of(location),
         };
 
+    /// <summary>
+    /// Where a visibility that <c>SQLSRC123</c> refuses comes from: "which the file header sets", as
+    /// <see cref="PlaceText" /> names the place that wrote it.
+    /// </summary>
+    /// <param name="place">The place, as <see cref="PlaceText.Of" /> gives it.</param>
+    public static string WrittenBy(string place) => "which " + place + " sets";
+
+    /// <summary>
+    /// Where a repository query's visibility comes from when no place writes one, as <c>SQLSRC123</c> says it.
+    /// </summary>
+    public const string RepositoryDefault = "the default of the repository output";
+
+    /// <summary>
+    /// The markers that <c>SQLSRC123</c> says to write: only <c>-- visibility:</c> for a repository query, whose method
+    /// is always on the type, and <c>-- member-location:</c> beside it for any other.
+    /// </summary>
+    public static string VisibilityFixOf(OutputKind output) =>
+        output == OutputKind.Repository ? "-- visibility:" : "-- visibility: or -- member-location:";
+
     /// <summary>The visibility as C# writes it, which is also how a marker writes it.</summary>
     public static string KeywordOf(Visibility visibility) =>
         visibility switch

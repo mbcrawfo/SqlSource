@@ -48,7 +48,8 @@ public sealed class LibraryTypeTests
     private const string ShapeHasNoCSharpType =
         $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'shape' has the type 'geometry', which "
         + "SqlSource cannot give a C# type.  Reference Npgsql.NetTopologySuite to read it as NetTopologySuite's "
-        + "Geometry in a methods query, or map it with the type override, as public.geometry=<a C# type>.";
+        + "Geometry in a methods or repository query, or map it with the type override, as "
+        + "public.geometry=<a C# type>.";
 
     private const string ListPlaces = "-- name: ListPlaces\nSELECT place, shape FROM places;\n";
 
@@ -57,8 +58,8 @@ public sealed class LibraryTypeTests
         $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'place' has the type 'geography', which "
         + "SqlSource cannot give a C# type.  Reference NetTopologySuite.IO.SqlServerBytes, with NetTopologySuite "
         + "2.5.0 or later, and turn the netTopologySuite library on, to read it as NetTopologySuite's Geometry in a "
-        + "methods query, or reference the package Microsoft.SqlServer.Types and map it with the type override, as "
-        + "geography=Microsoft.SqlServer.Types.SqlGeography.";
+        + "methods or repository query, or reference the package Microsoft.SqlServer.Types and map it with the type "
+        + "override, as geography=Microsoft.SqlServer.Types.SqlGeography.";
 
     private static readonly PostgresType Timestamptz = Catalog("timestamptz") with
     {

@@ -1,9 +1,13 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
+using System.Linq;
+using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -127,6 +131,212 @@ public sealed class RepositoryDiagnosticsTests
 
         run.ShouldBeClean();
         run.Sources[MethodsFile].ShouldContain("var connection = await (this._dataSource ?? ");
+    }
+
+    // A method that captured a parameter that the type also passes to its base type (CS9107), or uses to initialize a
+    // field that is no source (CS9124), would make the compiler warn in the user's code, so the parameter is not
+    // chosen, and the type has no connection.
+    [Theory]
+    [InlineData(
+        """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    protected RepositoryBase(NpgsqlDataSource source) { }
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample(NpgsqlDataSource dataSource) : RepositoryBase(dataSource);
+            }
+            """,
+        "(11,6)-(11,37)",
+        "dataSource"
+    )]
+    [InlineData(
+        """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample(string connectionString)
+                {
+                    private readonly string _value = connectionString;
+
+                    public override string ToString() => _value;
+                }
+            }
+            """,
+        "(5,6)-(5,37)",
+        "connectionString"
+    )]
+    public async Task Run_ParameterPassedOnOrStored_ReportsSqlsrc028AndCompilesWithoutCapture(
+        string source,
+        string attribute,
+        string parameter
+    )
+    {
+        SqlFile[] files = [UsersFile, Sidecars.Of(UsersFile, Entry(UsersFile, "GetUser", [], [Column("id")]))];
+
+        var run = RepositoryRuns.Run(UsersFile, [Entry(UsersFile, "GetUser", [], [Column("id")])], source);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Repository,
+            source,
+            files,
+            [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC028 /app/Repo/Sample.cs"
+                    + attribute
+                    + ": 'App.Sample' has no connection for the database 'postgres', which its repository queries "
+                    + "use.  The primary-constructor parameter '"
+                    + parameter
+                    + "' is not chosen by its name or type, since the type also uses it to initialize a field or "
+                    + "property, or passes it to its base type: keep the value in a field or property named "
+                    + "connectionString or of a DbDataSource type, or mark the parameter [SqlSourceConnection].  Or "
+                    + "set the output of its repository queries to methods.",
+            ]);
+        run.Sources[MethodsFile].ShouldNotContain(" async ");
+        build.Where(IsCaptureWarning).ShouldBeEmpty();
+    }
+
+    // A marked parameter is the user's choice, so its methods capture it though the type passes it on, and the
+    // compiler's warning of that is the user's to see.
+    [Fact]
+    public async Task Run_MarkedParameterPassedOn_UsesTheParameter()
+    {
+        const string Source = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                public abstract class RepositoryBase
+                {
+                    protected RepositoryBase(NpgsqlDataSource source) { }
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample([SqlSourceConnection] NpgsqlDataSource dataSource)
+                    : RepositoryBase(dataSource);
+            }
+            """;
+        SqlFile[] files = [UsersFile, Sidecars.Of(UsersFile, Entry(UsersFile, "GetUser", [], [Column("id")]))];
+
+        var run = RepositoryRuns.Run(UsersFile, [Entry(UsersFile, "GetUser", [], [Column("id")])], Source);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Repository,
+            Source,
+            files,
+            [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain("var connection = await (dataSource ?? ");
+        build.Where(IsCaptureWarning).ShouldHaveSingleItem().ShouldStartWith("CS9107 /app/Repo/Sample.cs(13,");
+    }
+
+    // A repository nested in a public Outer, in a Middle of the accessibility when it is not empty, whose primary
+    // constructor takes the data source of its methods.
+    private static string NestedRepository(string middle, string accessibility) =>
+        "using Npgsql;\nusing SqlSource;\n\nnamespace App\n{\n    public partial class Outer\n    {\n"
+        + (middle.Length > 0 ? "        " + middle + " partial class Middle\n        {\n" : string.Empty)
+        + "        [SqlSourceGenerate(Source = \".\")]\n        "
+        + accessibility
+        + " partial class Sample(NpgsqlDataSource dataSource);\n"
+        + (middle.Length > 0 ? "        }\n" : string.Empty)
+        + "    }\n}\n";
+
+    // The entry of GetUser, which takes an id and reads it, written for the file's hash.
+    private static SidecarEntry UserEntry(SqlFile file) => Entry(file, "GetUser", [Parameter("id")], [Column("id")]);
+
+    // The compiler's warning of a parameter that the type captures and also passes to its base type, or stores.
+    private static bool IsCaptureWarning(string diagnostic) =>
+        diagnostic.StartsWith("CS9107 ", System.StringComparison.Ordinal)
+        || diagnostic.StartsWith("CS9124 ", System.StringComparison.Ordinal);
+
+    // The default visibility of a repository method is public, which a derived type of another assembly reaches on a
+    // type nested as protected or protected internal, or in one, so the method could not take the type's internal
+    // models (CS0051).  The query that writes no visibility is refused at its name, or at its member-location marker,
+    // its method alone left out.
+    [Theory]
+    [InlineData("", "protected", "", "App.Outer.Sample", "(1,10)-(1,17)")]
+    [InlineData("", "protected internal", "", "App.Outer.Sample", "(1,10)-(1,17)")]
+    [InlineData("protected", "public", "", "App.Outer.Middle.Sample", "(1,10)-(1,17)")]
+    [InlineData("", "protected", "-- member-location: class\n", "App.Outer.Sample", "(2,1)-(2,26)")]
+    public void Run_DefaultVisibilityReachableAsProtectedWithModels_ReportsSqlsrc123(
+        string middle,
+        string accessibility,
+        string marker,
+        string type,
+        string span
+    )
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser -> one-optional\n" + marker + "SELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [UserEntry(file)], NestedRepository(middle, accessibility));
+
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC123 /app/Repo/Users.sql{span}: The query 'GetUser' of '{type}' cannot be public, the default "
+                    + $"of the repository output, at the member location class, because '{type}' is reachable as "
+                    + "protected, so its models are internal, which a method reachable from another assembly cannot "
+                    + "take or return.  Write -- visibility: on the query.",
+            ]);
+        run.Sources.Values.ShouldAllBe(source => !source.Contains(" async ", System.StringComparison.Ordinal));
+    }
+
+    // A public type of the namespace makes its models public, which its public method takes.
+    [Fact]
+    public void Run_DefaultVisibilityOfAPublicTypeWithModels_WritesThePublicMethod()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [UserEntry(file)]);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile]
+            .ShouldContain(" public async global::System.Threading.Tasks.Task<global::App.GetUserDto?> ");
+    }
+
+    // A method that takes and returns no model fits the default on a type reachable as protected, and so does an
+    // internal one with models.
+    [Theory]
+    [InlineData("", "DELETE FROM users;", false, "public async global::System.Threading.Tasks.Task<int> GetUser(")]
+    [InlineData(
+        "-- visibility: internal\n",
+        "SELECT id FROM users WHERE id = @id;",
+        true,
+        "internal async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser("
+    )]
+    public void Run_ReachableAsProtectedWithAMethodThatFits_WritesIt(
+        string marker,
+        string sql,
+        bool hasModels,
+        string signature
+    )
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n" + marker + sql + "\n");
+        var entry = hasModels ? UserEntry(file) : Entry(file, "GetUser", [], null);
+
+        var run = RepositoryRuns.Run(file, [entry], NestedRepository("", "protected"));
+
+        run.ShouldBeClean();
+        run.Sources["App.Outer.Sample-Methods.g.cs"].ShouldContain(signature);
     }
 
     // A query's database is the one its settings name, so a member marked for the settings file's database gives its

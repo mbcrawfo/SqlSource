@@ -83,6 +83,39 @@ public sealed class RepositoryMethodTests
             .ShouldBeLessThan(methods.IndexOf(" GetReport(", System.StringComparison.Ordinal));
     }
 
+    // Two names that differ only in case are one database, so each query finds the source that was resolved for the
+    // spelling of the first.
+    [Fact]
+    public void Run_DatabaseSpelledInTwoCases_GivesEachQueryItsMethod()
+    {
+        const string Source = """
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Sample([SqlSourceConnection(Database = "main")] NpgsqlDataSource dataSource);
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- database: Main\nSELECT id FROM users;\n"
+                + "-- name: GetReport\n-- database: MAIN\nSELECT id FROM reports;\n"
+        );
+
+        var run = RepositoryRuns.Run(
+            file,
+            [Entry(file, "GetUser", [], [Column("id")]), Entry(file, "GetReport", [], [Column("id")])],
+            Source
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        methods.ShouldContain(" GetUser(\n");
+        methods.ShouldContain(" GetReport(\n");
+    }
+
     // A repository's method is on the type, so a member of the type takes its name.
     [Fact]
     public void Run_RepositoryMethodNamedLikeAMember_ReportsSqlsrc274()

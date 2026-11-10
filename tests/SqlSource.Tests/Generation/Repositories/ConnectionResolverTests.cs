@@ -82,6 +82,33 @@ public sealed class ConnectionResolverTests
         resolution.Sources.ShouldBeEmpty();
     }
 
+    // A parameter that the conventions would take, but that the type passes on or stores, is named with what to do.
+    [Theory]
+    [InlineData(
+        new[] { "connectionString" },
+        "The primary-constructor parameter 'connectionString' is not chosen by its name or type, since the type also "
+            + "uses it to initialize a field or property, or passes it to its base type: keep the value in a field or "
+            + "property named connectionString or of a DbDataSource type, or mark the parameter [SqlSourceConnection]."
+    )]
+    [InlineData(
+        new[] { "connectionString", "dataSource" },
+        "The primary-constructor parameters 'connectionString', 'dataSource' are not chosen by their name or type, "
+            + "since the type also uses them to initialize a field or property, or passes them to its base type: keep "
+            + "the value in a field or property named connectionString or of a DbDataSource type, or mark the "
+            + "parameter [SqlSourceConnection]."
+    )]
+    public void Resolve_HeldParameters_ReportsSqlsrc028NamingThem(string[] held, string advice)
+    {
+        var shape = Shape() with { HeldParameters = TestSidecars.Of(held) };
+
+        var resolution = ConnectionResolver.Resolve(TestModels.Type(), shape, [Main]);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.RepositoryHasNoConnection);
+        diagnostic.Arguments.ShouldBe(["App.UserRepository", "main", advice]);
+        resolution.FailedDatabases.ShouldBe(["main"]);
+    }
+
     // Without a mark, no convention says which database a member is for.
     [Fact]
     public void Resolve_TwoDatabasesWithoutMarks_ReportsSqlsrc028ForEach()
@@ -498,7 +525,7 @@ public sealed class ConnectionResolverTests
         ConnectionResolver.Resolve(TestModels.Type(), Shape(candidates), needed);
 
     private static RepositoryShape Shape(params ConnectionCandidate[] candidates) =>
-        new("App.UserRepository", TestSidecars.Of(candidates), true, "IUserRepository", null);
+        new("App.UserRepository", TestSidecars.Of(candidates), [], true, "IUserRepository", null);
 
     // A candidate declared at a place of its own in the type's file, a field of a string unless the test says
     // otherwise.
