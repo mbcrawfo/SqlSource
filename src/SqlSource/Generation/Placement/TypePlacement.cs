@@ -481,7 +481,7 @@ internal sealed class TypePlacement
 
         // What a query's method adds to its name: Async under async-method-suffix.  A constant adds nothing.
         private static string Suffix(QuerySettings settings) =>
-            settings.Output.HasMethod() && (settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0
+            settings.Output.HasMethod() && settings.Parameters.IsOn(GeneratorParameters.AsyncMethodSuffix)
                 ? AsyncSuffix
                 : string.Empty;
 

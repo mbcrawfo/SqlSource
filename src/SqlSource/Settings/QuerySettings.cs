@@ -8,7 +8,7 @@ namespace SqlSource.Settings;
 /// The settings in effect for one query, from its markers and its file's level: the same for every type that claims
 /// its file.
 /// </summary>
-/// <param name="Parameters">The generator parameters that are on.</param>
+/// <param name="Parameters">The value of each generator parameter.</param>
 /// <param name="Output">
 /// What is generated for the query: whether it needs an entry in its file's sidecar, and whether it gets models.
 /// </param>
@@ -27,7 +27,7 @@ namespace SqlSource.Settings;
 /// </param>
 /// <param name="NestedClass">The name of the class that holds the query's members in a nested class.</param>
 internal readonly record struct QuerySettings(
-    GeneratorParameters Parameters,
+    GeneratorParameterValues Parameters,
     OutputKind Output,
     string InputModelSuffix,
     string OutputModelSuffix,
@@ -68,22 +68,22 @@ internal readonly record struct QuerySettings(
         };
 
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
-    public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
+    public bool KeepComments => Parameters.IsOn(GeneratorParameters.KeepComments);
 
     /// <summary>Whether the query's token method and query method check that each token's argument has text.</summary>
-    public bool ValidateTokens => (Parameters & GeneratorParameters.TokenValidation) != 0;
+    public bool ValidateTokens => Parameters.IsOn(GeneratorParameters.TokenValidation);
 
     /// <summary>Whether the query's method may read its rows into buffers from the shared array pool.</summary>
-    public bool UseArrayPool => (Parameters & GeneratorParameters.ArrayPool) != 0;
+    public bool UseArrayPool => Parameters.IsOn(GeneratorParameters.ArrayPool);
 
     /// <summary>Whether the query's method pads each list query parameter to a fixed size.</summary>
-    public bool PadsLists => (Parameters & GeneratorParameters.ListPadding) != 0;
+    public bool PadsLists => Parameters.IsOn(GeneratorParameters.ListPadding);
 
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file
-    /// that has a setting gives it.  The generator parameters merge per parameter instead: each is on or off as the
-    /// most specific level that names it says, else its default.  The type override, the column types, the library
+    /// that has a setting gives it.  The generator parameters merge per parameter instead: each has the value of the
+    /// most specific level that names it, else its default.  The type override, the column types, the library
     /// types and the database are not among them: <see cref="ResolveTypeOverrides" />,
     /// <see cref="ResolveColumnTypes" />, <see cref="ResolveLibraries" /> and <see cref="ResolveDatabase" /> give them.
     /// </summary>

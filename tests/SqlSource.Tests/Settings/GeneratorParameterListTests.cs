@@ -99,9 +99,9 @@ public sealed class GeneratorParameterListTests
     public void All_OfTheList_IsTheUnionOfTheNamedParameters()
     {
         var union = GeneratorParameters.None;
-        foreach (var (_, parameter) in GeneratorParameterList.Names)
+        foreach (var definition in GeneratorParameterList.Definitions)
         {
-            union |= parameter;
+            union |= definition.Parameter;
         }
 
         GeneratorParameterList.All.ShouldBe(union);
@@ -128,6 +128,22 @@ public sealed class GeneratorParameterListTests
         GeneratorParameterList
             .ReadElements(["keep-comments", "keep-comments=off"], invalid, repeated)
             .ShouldBe(KeepCommentsOn);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBe([(1, 0)]);
+    }
+
+    // The default is another value than any word's, even where it is the same in effect.
+    [Theory]
+    [InlineData([new[] { "keep-comments=off", "keep-comments=default" }])]
+    [InlineData([new[] { "keep-comments=default", "keep-comments=off" }])]
+    [InlineData([new[] { "keep-comments", "keep-comments=default" }])]
+    public void ReadElements_DefaultBesideAValue_IsARepeatAndTheFirstApplies(string[] elements)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        var choices = GeneratorParameterList.ReadElements(elements, invalid, repeated);
+
+        choices.ShouldBe(GeneratorParameterList.ReadElements([elements[0]], [], []));
         invalid.ShouldBeEmpty();
         repeated.ShouldBe([(1, 0)]);
     }
@@ -173,5 +189,30 @@ public sealed class GeneratorParameterListTests
         }
 
         found.ShouldBe(["keep-comments", "default"]);
+    }
+
+    [Fact]
+    public void Definitions_AreInFlagOrderAndWithinTheSlots()
+    {
+        GeneratorParameterList.Definitions.Length.ShouldBeLessThanOrEqualTo(16);
+        for (var index = 0; index < GeneratorParameterList.Definitions.Length; index++)
+        {
+            GeneratorParameterList.Definitions[index].Parameter.ShouldBe((GeneratorParameters)(1 << index));
+        }
+    }
+
+    [Theory]
+    [InlineData("Keep-Comments=OFF")]
+    [InlineData(" keep-comments=Off ")]
+    public void ReadElements_AValueInAnyCase_IsRead(string element)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList
+            .ReadElements([element], invalid, repeated)
+            .ShouldBe(
+                GeneratorParameterChoices.None.With(GeneratorParameters.KeepComments, GeneratorParameterState.Off)
+            );
+        invalid.ShouldBeEmpty();
     }
 }

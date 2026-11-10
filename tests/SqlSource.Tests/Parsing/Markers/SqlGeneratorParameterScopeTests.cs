@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
@@ -38,8 +39,11 @@ public sealed class SqlGeneratorParameterScopeTests
         var (scope, errors) = Read(line);
 
         errors.ShouldBeEmpty();
-        ((int)scope.Parameters.Named).ShouldBe(named);
-        ((int)scope.Parameters.On).ShouldBe(on);
+        scope.Parameters.ShouldBe(
+            GeneratorParameterChoices
+                .None.With((GeneratorParameters)named, GeneratorParameterState.Off)
+                .With((GeneratorParameters)on, GeneratorParameterState.On)
+        );
     }
 
     [Theory]
@@ -82,6 +86,12 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData(new[] { "-- generator: keep-comments keep-comments=off" }, "keep-comments=off", true)]
     [InlineData(new[] { "-- generator: keep-comments=default keep-comments=off" }, "keep-comments=off", false)]
     [InlineData(new[] { "-- generator: keep-comments=off", "-- generator: keep-comments" }, "keep-comments", false)]
+    [InlineData(new[] { "-- generator: keep-comments=off keep-comments=default" }, "keep-comments=default", false)]
+    [InlineData(
+        new[] { "-- generator: keep-comments", "-- generator: keep-comments=default" },
+        "keep-comments=default",
+        true
+    )]
     public void Read_OneOptionInTwoStates_ConflictsAtTheLater(string[] lines, string later, bool keepsComments)
     {
         var (scope, errors) = Read(lines);
@@ -153,9 +163,28 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData("keep-comments=")]
     [InlineData("sort-input=true")]
     [InlineData("keep-comments=off=on")]
+    public void Read_ParameterWithAValueNotInItsList_IsInvalidAndNamesTheValues(string word)
+    {
+        var line = "-- generator: " + word;
+        var name = word[..word.IndexOf('=', StringComparison.Ordinal)];
+
+        var (scope, errors) = Read(line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.InvalidMarkerValue,
+                TextSpans.Of(line, word, last: true),
+                word,
+                ".  The values of " + name + " are on, off and default"
+            ),
+        ]);
+        scope.Parameters.IsEmpty.ShouldBeTrue();
+    }
+
+    [Theory]
     [InlineData("default=")]
     [InlineData("default=off")]
-    public void Read_ParameterWithAValueThatIsNoState_IsInvalid(string word)
+    public void Read_DefaultWithAValue_IsInvalidWithNoValues(string word)
     {
         var line = "-- generator: " + word;
 

@@ -25,10 +25,12 @@ public sealed class QuerySettingsTests
         var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
 
         settings.Parameters.ShouldBe(
-            GeneratorParameters.TokenValidation
-                | GeneratorParameters.TableModels
-                | GeneratorParameters.ArrayPool
-                | GeneratorParameters.ListPadding
+            SwitchValues.Of(
+                GeneratorParameters.TokenValidation
+                    | GeneratorParameters.TableModels
+                    | GeneratorParameters.ArrayPool
+                    | GeneratorParameters.ListPadding
+            )
         );
         settings.KeepComments.ShouldBeFalse();
         settings.ValidateTokens.ShouldBeTrue();
@@ -43,7 +45,9 @@ public sealed class QuerySettingsTests
         QuerySettings
             .Resolve(Sort, Keep)
             .Parameters.ShouldBe(
-                GeneratorParameterList.Defaults | GeneratorParameters.KeepComments | GeneratorParameters.SortInput
+                SwitchValues.Of(
+                    GeneratorParameterList.Defaults | GeneratorParameters.KeepComments | GeneratorParameters.SortInput
+                )
             );
     }
 
@@ -56,14 +60,14 @@ public sealed class QuerySettingsTests
         var settings = QuerySettings.Resolve(off, file);
 
         settings.KeepComments.ShouldBeFalse();
-        settings.Parameters.ShouldBe(GeneratorParameterList.Defaults | GeneratorParameters.SortInput);
+        settings.Parameters.ShouldBe(SwitchValues.Of(GeneratorParameterList.Defaults | GeneratorParameters.SortInput));
     }
 
     [Fact]
     public void Resolve_MarkersThatReset_HideTheFile() =>
         QuerySettings
             .Resolve(new SettingsLevel { Parameters = GeneratorParameterChoices.Reset }, Keep)
-            .Parameters.ShouldBe(GeneratorParameterList.Defaults);
+            .Parameters.ShouldBe(GeneratorParameterValues.Defaults);
 
     [Fact]
     public void Resolve_TokenValidationOff_TurnsValidationOff() =>

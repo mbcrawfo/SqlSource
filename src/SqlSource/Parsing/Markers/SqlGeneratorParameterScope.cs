@@ -19,20 +19,17 @@ internal sealed class SqlGeneratorParameterScope
     // Whether a word of the scope is "default".
     private bool _reset;
 
-    // The parameters the scope's words have turned on, turned off and given their default.  Each parameter is in one
-    // of them at most: a word that would put it in another is a contradiction.
-    private GeneratorParameters _on;
+    // The values the scope's words have given, and the parameters they have given their default.  Each parameter is
+    // in one of them at most, with one value: a word that would give it another is a contradiction.
+    private GeneratorParameterChoices _written;
 
-    private GeneratorParameters _off;
-
-    private GeneratorParameters _default;
+    private GeneratorParameters _defaulted;
 
     /// <summary>What the scope's words say about the generator parameters: empty when they name none.</summary>
     public GeneratorParameterChoices Parameters =>
-        (_reset ? GeneratorParameterChoices.Reset : GeneratorParameterChoices.None)
-            .With(_on, GeneratorParameterState.On)
-            .With(_off, GeneratorParameterState.Off)
-            .With(_default, GeneratorParameterState.Default);
+        _written
+            .With(_defaulted, GeneratorParameterState.Default)
+            .Over(_reset ? GeneratorParameterChoices.Reset : GeneratorParameterChoices.None);
 
     /// <summary>
     /// Applies the generator parameters of one <c>-- generator:</c> marker to this scope, adding any problems to
@@ -58,54 +55,49 @@ internal sealed class SqlGeneratorParameterScope
             var span = new TextSpan(marker.ValueSpan.Start + words.Start, words.Length);
             var word = words.Current.ToString();
             errors.Add(
-                problem == SqlParseErrorKind.InvalidMarkerValue
-                    ? SqlParseError.Create(problem, span, word, string.Empty)
-                    : SqlParseError.Create(problem, span, word)
+                problem.Kind == SqlParseErrorKind.InvalidMarkerValue
+                    ? SqlParseError.Create(problem.Kind, span, word, problem.Help)
+                    : SqlParseError.Create(problem.Kind, span, word)
             );
         }
     }
 
-    private SqlParseErrorKind? Apply(ReadOnlySpan<char> word)
+    // The problem of a word, with the help that ends an invalid value's message, or null when it applies.
+    private (SqlParseErrorKind Kind, string Help)? Apply(ReadOnlySpan<char> word)
     {
-        var kind = GeneratorParameterList.ReadWord(word, out var parameter, out var state);
+        var kind = GeneratorParameterList.ReadWord(word, out var definition, out var value);
         switch (kind)
         {
             case GeneratorWordKind.Default:
                 _reset = true;
                 return null;
             case GeneratorWordKind.UnknownName:
-                return SqlParseErrorKind.UnknownGeneratorParameter;
+                return (SqlParseErrorKind.UnknownGeneratorParameter, string.Empty);
             case GeneratorWordKind.InvalidState:
-                return SqlParseErrorKind.InvalidMarkerValue;
+                return (SqlParseErrorKind.InvalidMarkerValue, definition?.ValuesHelp ?? string.Empty);
             case GeneratorWordKind.Parameter:
                 break;
             default:
                 throw UnexpectedEnumValueException.Of(kind);
         }
 
-        // The same state again is no contradiction.
-        ref var states = ref StatesOf(state);
-        if (((_on | _off | _default) & ~states & parameter) != GeneratorParameters.None)
+        // The same value again is no contradiction, and the default is another value than any word's.
+        var parameter = definition!.Parameter;
+        var defaulted = (_defaulted & parameter) != GeneratorParameters.None;
+        if (_written.ValueOf(parameter) is { } earlier ? earlier != value : defaulted && value is not null)
         {
-            return SqlParseErrorKind.ConflictingSettings;
+            return (SqlParseErrorKind.ConflictingSettings, string.Empty);
         }
 
-        states |= parameter;
+        if (value is { } given)
+        {
+            _written = _written.With(parameter, given);
+        }
+        else
+        {
+            _defaulted |= parameter;
+        }
+
         return null;
-    }
-
-    private ref GeneratorParameters StatesOf(GeneratorParameterState state)
-    {
-        switch (state)
-        {
-            case GeneratorParameterState.On:
-                return ref _on;
-            case GeneratorParameterState.Off:
-                return ref _off;
-            case GeneratorParameterState.Default:
-                return ref _default;
-            default:
-                throw UnexpectedEnumValueException.Of(state);
-        }
     }
 }

@@ -135,13 +135,16 @@ public sealed class SettingsFileSchemaTests
         var names = Choices(Properties.GetProperty(SettingsFileKeys.GeneratorParameters).GetProperty("items"));
 
         // One name for each parameter: an alias added to the list fails here, and is a choice for the schema to make.
-        var parameters = GeneratorParameterList.Names.Select(name => name.Parameter).ToArray();
+        var parameters = GeneratorParameterList.Definitions.Select(name => name.Parameter).ToArray();
         parameters.ShouldBeUnique();
         parameters.ShouldBe(
             Enum.GetValues<GeneratorParameters>().Where(parameter => parameter != GeneratorParameters.None),
             ignoreOrder: true
         );
-        names.ShouldBe([.. GeneratorParameterList.Names.Select(name => name.Name), GeneratorParameterList.Default]);
+        names.ShouldBe([
+            .. GeneratorParameterList.Definitions.Select(name => name.Name),
+            GeneratorParameterList.Default,
+        ]);
     }
 
     [Fact]
@@ -170,18 +173,21 @@ public sealed class SettingsFileSchemaTests
         Pattern(Properties.GetProperty(key)).ShouldBe(expected);
     }
 
-    // A parameter's name, alone or with a state, or default alone, as GeneratorParameterList.ReadWord reads a word.
+    // A parameter's name, alone or with one of its words or default, or default alone, as
+    // GeneratorParameterList.ReadWord reads a word.
     [Fact]
     public void Schema_PatternOfGeneratorParameters_IsGeneratedFromTheParameters()
     {
-        var names = GeneratorParameterList.Names.Select(name => CaseFree(name.Name));
-        var states = Enum.GetValues<GeneratorParameterState>().Select(state => CaseFree(SettingValue.NameOf(state)));
+        var alternatives = GeneratorParameterList.Definitions.Select(definition =>
+            CaseFree(definition.Name)
+            + "(?:=(?:"
+            + string.Join("|", definition.Words.Append(GeneratorParameterList.Default).Select(CaseFree))
+            + "))?"
+        );
         var expected =
             @"^\s*(?:(?:"
-            + string.Join("|", names)
-            + ")(?:=(?:"
-            + string.Join("|", states)
-            + "))?|"
+            + string.Join("|", alternatives)
+            + ")|"
             + CaseFree(GeneratorParameterList.Default)
             + @")?\s*$";
 

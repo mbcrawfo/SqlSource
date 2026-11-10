@@ -94,7 +94,7 @@ internal sealed record SettingsLevel
     /// <summary>
     /// Whether <c>keep-comments</c> is on in this level, over the defaults of the parameters it does not name.
     /// </summary>
-    public bool KeepsComments => (Parameters.Resolve() & GeneratorParameters.KeepComments) != 0;
+    public bool KeepsComments => Parameters.Resolve().IsOn(GeneratorParameters.KeepComments);
 
     /// <summary>
     /// This level over <paramref name="other" />: each member from this level when it has one, and from

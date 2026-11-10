@@ -69,7 +69,9 @@ public sealed class GeneratorHarnessTests
         file.File.Errors.ShouldBeEmpty();
         file.File.Level.Parameters.Resolve()
             .ShouldBe(
-                GeneratorParameterList.Defaults | GeneratorParameters.SortOutput | GeneratorParameters.KeepComments
+                GeneratorParameterValues
+                    .Defaults.With(GeneratorParameters.SortOutput, GeneratorParameterValues.On)
+                    .With(GeneratorParameters.KeepComments, GeneratorParameterValues.On)
             );
     }
 

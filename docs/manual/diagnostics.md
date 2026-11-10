@@ -1104,9 +1104,9 @@ See: [Generator parameters](settings.md#setting-generator-parameters)
 
 **Marker value is not valid**
 
-A generator parameter has a state it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
 
-- A generator parameter's state is `on`, `off` or `default`: `keep-comments=true` is this error, and so is `default` followed by `=`, as in `default=on`.  See [generator parameters](settings.md#setting-generator-parameters).
+- A generator parameter's value is one of its own words, `on` or `off` for every parameter today, or `default`, and the message lists them: `keep-comments=true` is this error, and so is `default` followed by `=`, as in `default=on`.  See [generator parameters](settings.md#setting-generator-parameters).
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of a settings file's `dialect`, in [SQLSRC019](#sqlsrc019).  The value is the rest of the line, so nothing else may follow it.
 
