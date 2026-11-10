@@ -38,8 +38,11 @@ public sealed class SqlGeneratorParameterScopeTests
         var (scope, errors) = Read(line);
 
         errors.ShouldBeEmpty();
-        ((int)scope.Parameters.Named).ShouldBe(named);
-        ((int)scope.Parameters.On).ShouldBe(on);
+        scope.Parameters.ShouldBe(
+            GeneratorParameterChoices
+                .None.With((GeneratorParameters)named, GeneratorParameterState.Off)
+                .With((GeneratorParameters)on, GeneratorParameterState.On)
+        );
     }
 
     [Theory]

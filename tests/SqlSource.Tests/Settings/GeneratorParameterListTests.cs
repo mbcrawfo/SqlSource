@@ -99,9 +99,9 @@ public sealed class GeneratorParameterListTests
     public void All_OfTheList_IsTheUnionOfTheNamedParameters()
     {
         var union = GeneratorParameters.None;
-        foreach (var (_, parameter) in GeneratorParameterList.Names)
+        foreach (var definition in GeneratorParameterList.Definitions)
         {
-            union |= parameter;
+            union |= definition.Parameter;
         }
 
         GeneratorParameterList.All.ShouldBe(union);
@@ -173,5 +173,30 @@ public sealed class GeneratorParameterListTests
         }
 
         found.ShouldBe(["keep-comments", "default"]);
+    }
+
+    [Fact]
+    public void Definitions_AreInFlagOrderAndWithinTheSlots()
+    {
+        GeneratorParameterList.Definitions.Length.ShouldBeLessThanOrEqualTo(16);
+        for (var index = 0; index < GeneratorParameterList.Definitions.Length; index++)
+        {
+            GeneratorParameterList.Definitions[index].Parameter.ShouldBe((GeneratorParameters)(1 << index));
+        }
+    }
+
+    [Theory]
+    [InlineData("Keep-Comments=OFF")]
+    [InlineData(" keep-comments=Off ")]
+    public void ReadElements_AValueInAnyCase_IsRead(string element)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        GeneratorParameterList
+            .ReadElements([element], invalid, repeated)
+            .ShouldBe(
+                GeneratorParameterChoices.None.With(GeneratorParameters.KeepComments, GeneratorParameterState.Off)
+            );
+        invalid.ShouldBeEmpty();
     }
 }

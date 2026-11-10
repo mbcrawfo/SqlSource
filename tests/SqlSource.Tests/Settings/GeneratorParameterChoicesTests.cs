@@ -11,7 +11,7 @@ public sealed class GeneratorParameterChoicesTests
     {
         default(GeneratorParameterChoices).IsEmpty.ShouldBeTrue();
         GeneratorParameterChoices.None.IsEmpty.ShouldBeTrue();
-        GeneratorParameterChoices.None.Resolve().ShouldBe(GeneratorParameterList.Defaults);
+        GeneratorParameterChoices.None.Resolve().ShouldBe(GeneratorParameterValues.Defaults);
     }
 
     [Fact]
@@ -47,10 +47,12 @@ public sealed class GeneratorParameterChoicesTests
         GeneratorParameterChoices
             .Reset.Resolve()
             .ShouldBe(
-                GeneratorParameters.TokenValidation
-                    | GeneratorParameters.TableModels
-                    | GeneratorParameters.ArrayPool
-                    | GeneratorParameters.ListPadding
+                GeneratorParameterValues.Of(
+                    GeneratorParameters.TokenValidation
+                        | GeneratorParameters.TableModels
+                        | GeneratorParameters.ArrayPool
+                        | GeneratorParameters.ListPadding
+                )
             );
 
     [Fact]
@@ -80,8 +82,8 @@ public sealed class GeneratorParameterChoicesTests
             .Over(GeneratorParameterChoices.None.With(GeneratorParameters.KeepComments, GeneratorParameterState.On))
             .Resolve();
 
-        resolved.HasFlag(GeneratorParameters.KeepComments).ShouldBeTrue();
-        resolved.HasFlag(GeneratorParameters.SortInput).ShouldBeTrue();
+        resolved.IsOn(GeneratorParameters.KeepComments).ShouldBeTrue();
+        resolved.IsOn(GeneratorParameters.SortInput).ShouldBeTrue();
     }
 
     [Fact]
@@ -93,7 +95,7 @@ public sealed class GeneratorParameterChoicesTests
 
         merged.Named.ShouldBe(GeneratorParameterList.All);
         merged.StateOf(GeneratorParameters.KeepComments).HasValue.ShouldBeTrue();
-        merged.Resolve().ShouldBe(GeneratorParameterList.Defaults);
+        merged.Resolve().ShouldBe(GeneratorParameterValues.Defaults);
     }
 
     [Fact]
@@ -105,6 +107,45 @@ public sealed class GeneratorParameterChoicesTests
         twice.ShouldBe(once);
         GeneratorParameterChoices
             .None.With(GeneratorParameters.KeepComments, GeneratorParameterState.Off)
-            .ShouldBe(new GeneratorParameterChoices(GeneratorParameters.KeepComments, GeneratorParameters.None));
+            .ShouldBe(
+                new GeneratorParameterChoices(
+                    GeneratorParameters.KeepComments,
+                    default(GeneratorParameterValues).With(
+                        GeneratorParameters.KeepComments,
+                        GeneratorParameterValues.Off
+                    )
+                )
+            );
     }
+
+    // Equal choices compare equal however they were built, or the generator's cache misses.
+    [Fact]
+    public void With_ThenOverNone_EqualsItself() =>
+        GeneratorParameterChoices
+            .None.With(GeneratorParameters.KeepComments, GeneratorParameterState.Off)
+            .Over(GeneratorParameterChoices.None)
+            .ShouldBe(
+                GeneratorParameterChoices.None.With(GeneratorParameters.KeepComments, GeneratorParameterState.Off)
+            );
+
+    [Fact]
+    public void Reset_OverAnything_IsReset() =>
+        GeneratorParameterChoices
+            .Reset.Over(GeneratorParameterChoices.None.With(GeneratorParameters.SortInput, GeneratorParameterState.On))
+            .ShouldBe(GeneratorParameterChoices.Reset);
+
+    [Fact]
+    public void With_AValue_IsReadBackByValueOf() =>
+        GeneratorParameterChoices
+            .None.With(GeneratorParameters.SortInput, GeneratorParameterValues.Off)
+            .ValueOf(GeneratorParameters.SortInput)
+            .ShouldBe(GeneratorParameterValues.Off);
+
+    [Fact]
+    public void ValueOf_NotNamed_IsNull() =>
+        GeneratorParameterChoices.None.ValueOf(GeneratorParameters.SortInput).ShouldBeNull();
+
+    [Fact]
+    public void Resolve_NamesNothing_IsTheDefaults() =>
+        GeneratorParameterChoices.None.Resolve().ShouldBe(GeneratorParameterValues.Of(GeneratorParameterList.Defaults));
 }

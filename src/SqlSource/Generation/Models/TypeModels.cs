@@ -164,7 +164,7 @@ internal static class TypeModels
             if (
                 !isInput
                 && marker is null
-                && (settings.Parameters & GeneratorParameters.TableModels) != 0
+                && settings.Parameters.IsOn(GeneratorParameters.TableModels)
                 && query.Table is { } matched
                 && PropertyNames.FromTable(matched, SqlDescribableDialects.EngineOf(file.Dialect)) is { } fromTable
             )
@@ -191,7 +191,7 @@ internal static class TypeModels
         }
 
         var parameter = isInput ? GeneratorParameters.SortInput : GeneratorParameters.SortOutput;
-        var isSorted = (settings.Parameters & parameter) != 0;
+        var isSorted = settings.Parameters.IsOn(parameter);
         if (!settings.Output.HasMethod())
         {
             properties = ForOtherOutputs(properties);

@@ -4,17 +4,17 @@ using System.Collections.Generic;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The names of the generator parameters, how a word of them is read, and a list of them as a settings file writes it.
-/// This is the only place the names are known.
+/// The generator parameters, how a word of them is read, and a list of them as a settings file writes it.  This is
+/// the only place the parameters are defined.
 /// </summary>
 /// <remarks>
 /// <para>
 /// A level's list is words, and each word is read by <see cref="ReadWord" />: a parameter's name, alone for
-/// <c>on</c> or followed by <c>=on</c>, <c>=off</c> or <c>=default</c>, or <c>default</c> alone, which gives every
-/// parameter its default at that level.  A level names only the parameters it changes, as
+/// <c>on</c> or followed by <c>=</c> and one of its words or <c>default</c>, or <c>default</c> alone, which gives
+/// every parameter its default at that level.  A level names only the parameters it changes, as
 /// <see cref="GeneratorParameterChoices" />: the levels merge per parameter, the nearer over the farther.  Its other
-/// words apply over its <c>default</c>, wherever that stands.  One parameter given two different states in one level
-/// is a contradiction; the same state given twice is not.
+/// words apply over its <c>default</c>, wherever that stands.  One parameter given two different values in one level
+/// is a contradiction, <c>default</c> against any other value included; the same value given twice is not.
 /// </para>
 /// <para>
 /// A <c>-- generator:</c> marker walks the words of its line, with <see cref="Words" />, and reports its problems in
@@ -39,7 +39,10 @@ internal static class GeneratorParameterList
         | GeneratorParameters.ArrayPool
         | GeneratorParameters.ListPadding;
 
-    /// <summary>The parameters that are on when no level says otherwise.</summary>
+    /// <summary>
+    /// The parameters that are on or off and are on when no level says otherwise.  Their definitions say so too, and a
+    /// test holds <see cref="GeneratorParameterValues.Defaults" /> to this.
+    /// </summary>
     public const GeneratorParameters Defaults =
         GeneratorParameters.TokenValidation
         | GeneratorParameters.TableModels
@@ -47,43 +50,46 @@ internal static class GeneratorParameterList
         | GeneratorParameters.ListPadding;
 
     /// <summary>
-    /// Each name of a parameter, with the parameter.  The schema of a settings file repeats them in its list and its
-    /// patterns, and a test compares the two.
+    /// Each parameter, in the order of its flag: the definition at index <c>i</c> is the flag <c>1 &lt;&lt; i</c>.  The
+    /// schema of a settings file repeats the names and the words in its list and its patterns, and a test compares
+    /// the two.
     /// </summary>
-    internal static readonly (string Name, GeneratorParameters Parameter)[] Names =
+    internal static readonly GeneratorParameterDefinition[] Definitions =
     [
-        ("keep-comments", GeneratorParameters.KeepComments),
-        ("token-validation", GeneratorParameters.TokenValidation),
-        ("sort-input", GeneratorParameters.SortInput),
-        ("sort-output", GeneratorParameters.SortOutput),
-        ("table-models", GeneratorParameters.TableModels),
-        ("async-method-suffix", GeneratorParameters.AsyncMethodSuffix),
-        ("array-pool", GeneratorParameters.ArrayPool),
-        ("list-padding", GeneratorParameters.ListPadding),
+        GeneratorParameterDefinition.Switch("keep-comments", GeneratorParameters.KeepComments, onByDefault: false),
+        GeneratorParameterDefinition.Switch("token-validation", GeneratorParameters.TokenValidation, onByDefault: true),
+        GeneratorParameterDefinition.Switch("sort-input", GeneratorParameters.SortInput, onByDefault: false),
+        GeneratorParameterDefinition.Switch("sort-output", GeneratorParameters.SortOutput, onByDefault: false),
+        GeneratorParameterDefinition.Switch("table-models", GeneratorParameters.TableModels, onByDefault: true),
+        GeneratorParameterDefinition.Switch(
+            "async-method-suffix",
+            GeneratorParameters.AsyncMethodSuffix,
+            onByDefault: false
+        ),
+        GeneratorParameterDefinition.Switch("array-pool", GeneratorParameters.ArrayPool, onByDefault: true),
+        GeneratorParameterDefinition.Switch("list-padding", GeneratorParameters.ListPadding, onByDefault: true),
     ];
 
-    private static readonly GeneratorParameterState[] States =
-    [
-        GeneratorParameterState.On,
-        GeneratorParameterState.Off,
-        GeneratorParameterState.Default,
-    ];
+    /// <summary>The definition of <paramref name="parameter" />, one flag.</summary>
+    public static GeneratorParameterDefinition Find(GeneratorParameters parameter) =>
+        Definitions[GeneratorParameterDefinition.SlotOf(parameter)];
 
     /// <summary>
-    /// Reads one word, ignoring case: a parameter's name, alone or followed by <c>=on</c>, <c>=off</c> or
-    /// <c>=default</c>, or <see cref="Default" /> alone.  <paramref name="parameter" /> and <paramref name="state" />
-    /// are set when the word is a <see cref="GeneratorWordKind.Parameter" />.  The name is what stands before the first
-    /// <c>=</c>, so a word whose name is no parameter is <see cref="GeneratorWordKind.UnknownName" /> whatever
-    /// follows.
+    /// Reads one word, ignoring case: a parameter's name, alone for <c>on</c> or followed by <c>=</c> and one of its
+    /// words or <c>default</c>, or <see cref="Default" /> alone.  <paramref name="definition" /> is the parameter's
+    /// whenever the name before the first <c>=</c> is a parameter's, so that a value that is not one of its words can
+    /// be reported with them, and null otherwise.  <paramref name="value" /> is the index of the word, or null for
+    /// <c>default</c>, when the word is a <see cref="GeneratorWordKind.Parameter" />.  A word whose name is no
+    /// parameter is <see cref="GeneratorWordKind.UnknownName" /> whatever follows.
     /// </summary>
     public static GeneratorWordKind ReadWord(
         ReadOnlySpan<char> word,
-        out GeneratorParameters parameter,
-        out GeneratorParameterState state
+        out GeneratorParameterDefinition? definition,
+        out int? value
     )
     {
-        parameter = GeneratorParameters.None;
-        state = GeneratorParameterState.On;
+        definition = null;
+        value = null;
         var separator = word.IndexOf('=');
         var name = separator < 0 ? word : word.Slice(0, separator);
         if (name.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase))
@@ -91,17 +97,24 @@ internal static class GeneratorParameterList
             return separator < 0 ? GeneratorWordKind.Default : GeneratorWordKind.InvalidState;
         }
 
-        if (!TryFind(name, out var found))
+        if (TryFind(name) is not { } found)
         {
             return GeneratorWordKind.UnknownName;
         }
 
-        if (separator >= 0 && !TryReadState(word.Slice(separator + 1), out state))
+        definition = found;
+        var text = separator < 0 ? "on".AsSpan() : word.Slice(separator + 1);
+        if (separator >= 0 && text.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase))
+        {
+            return GeneratorWordKind.Parameter;
+        }
+
+        if (!found.TryReadValue(text, out var read))
         {
             return GeneratorWordKind.InvalidState;
         }
 
-        parameter = found;
+        value = read;
         return GeneratorWordKind.Parameter;
     }
 
@@ -114,8 +127,8 @@ internal static class GeneratorParameterList
     /// <summary>
     /// Reads a list written as an array, as a settings file writes it, each element one word read by
     /// <see cref="ReadWord" />.  An element is trimmed, and one that is empty or white space is skipped, so no word at
-    /// all names nothing.  The index of a word that is no parameter, or whose state is not valid, is added to
-    /// <paramref name="invalid" />, and the other words apply.  A word that gives a parameter another state than an
+    /// all names nothing.  The index of a word that is no parameter, or whose value is not valid, is added to
+    /// <paramref name="invalid" />, and the other words apply.  A word that gives a parameter another value than an
     /// earlier word gave it is added to <paramref name="repeated" />, with the index of that earlier word, and the
     /// earlier applies.  <c>default</c> gives every parameter its default, and the other words apply over it, wherever
     /// it stands.
@@ -128,8 +141,9 @@ internal static class GeneratorParameterList
     {
         var reset = false;
         var choices = GeneratorParameterChoices.None;
-        // Beside each parameter written, the index of the first element that wrote it, and its state.
-        var written = new List<(GeneratorParameters Parameter, GeneratorParameterState State, int Index)>();
+        // Beside each parameter written, the index of the first element that wrote it, and its value: null for its
+        // default.
+        var written = new List<(GeneratorParameters Parameter, int? Value, int Index)>();
         for (var index = 0; index < elements.Count; index++)
         {
             var word = elements[index].AsSpan().Trim();
@@ -138,20 +152,21 @@ internal static class GeneratorParameterList
                 continue;
             }
 
-            var kind = ReadWord(word, out var parameter, out var state);
+            var kind = ReadWord(word, out var definition, out var value);
             switch (kind)
             {
                 case GeneratorWordKind.Default:
                     reset = true;
                     break;
                 case GeneratorWordKind.Parameter:
+                    var parameter = definition!.Parameter;
                     var first = IndexOf(written, parameter);
                     if (first < 0)
                     {
-                        written.Add((parameter, state, index));
-                        choices = choices.With(parameter, state);
+                        written.Add((parameter, value, index));
+                        choices = choices.With(parameter, value ?? definition.Default);
                     }
-                    else if (written[first].State != state)
+                    else if (written[first].Value != value)
                     {
                         repeated.Add((index, written[first].Index));
                     }
@@ -170,7 +185,7 @@ internal static class GeneratorParameterList
     }
 
     private static int IndexOf(
-        List<(GeneratorParameters Parameter, GeneratorParameterState State, int Index)> written,
+        List<(GeneratorParameters Parameter, int? Value, int Index)> written,
         GeneratorParameters parameter
     )
     {
@@ -186,35 +201,17 @@ internal static class GeneratorParameterList
     }
 
     // Finds a parameter by its name, ignoring case.
-    private static bool TryFind(ReadOnlySpan<char> name, out GeneratorParameters parameter)
+    private static GeneratorParameterDefinition? TryFind(ReadOnlySpan<char> name)
     {
-        foreach (var (candidate, value) in Names)
+        foreach (var definition in Definitions)
         {
-            if (name.Equals(candidate.AsSpan(), StringComparison.OrdinalIgnoreCase))
+            if (name.Equals(definition.Name.AsSpan(), StringComparison.OrdinalIgnoreCase))
             {
-                parameter = value;
-                return true;
+                return definition;
             }
         }
 
-        parameter = GeneratorParameters.None;
-        return false;
-    }
-
-    // Reads on, off or default, ignoring case.
-    private static bool TryReadState(ReadOnlySpan<char> text, out GeneratorParameterState state)
-    {
-        foreach (var candidate in States)
-        {
-            if (text.Equals(SettingValue.NameOf(candidate).AsSpan(), StringComparison.OrdinalIgnoreCase))
-            {
-                state = candidate;
-                return true;
-            }
-        }
-
-        state = GeneratorParameterState.On;
-        return false;
+        return null;
     }
 
     /// <summary>Walks the words of a text.  <see cref="Start" /> is an offset into that text.</summary>
@@ -274,7 +271,7 @@ internal static class GeneratorParameterList
 /// </summary>
 internal enum GeneratorWordKind
 {
-    /// <summary>A parameter's name, with a state or without one, which is <c>on</c>.</summary>
+    /// <summary>A parameter's name, with a value or without one, which is <c>on</c>.</summary>
     Parameter,
 
     /// <summary><see cref="GeneratorParameterList.Default" /> alone: every parameter's default.</summary>
@@ -284,7 +281,7 @@ internal enum GeneratorWordKind
     UnknownName,
 
     /// <summary>
-    /// A parameter's name followed by <c>=</c> and a text that is not <c>on</c>, <c>off</c> or <c>default</c>, or
+    /// A parameter's name followed by <c>=</c> and a text that is not one of its words or <c>default</c>, or
     /// <see cref="GeneratorParameterList.Default" /> followed by <c>=</c> and anything.
     /// </summary>
     InvalidState,

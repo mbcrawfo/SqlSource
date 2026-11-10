@@ -135,13 +135,16 @@ public sealed class SettingsFileSchemaTests
         var names = Choices(Properties.GetProperty(SettingsFileKeys.GeneratorParameters).GetProperty("items"));
 
         // One name for each parameter: an alias added to the list fails here, and is a choice for the schema to make.
-        var parameters = GeneratorParameterList.Names.Select(name => name.Parameter).ToArray();
+        var parameters = GeneratorParameterList.Definitions.Select(name => name.Parameter).ToArray();
         parameters.ShouldBeUnique();
         parameters.ShouldBe(
             Enum.GetValues<GeneratorParameters>().Where(parameter => parameter != GeneratorParameters.None),
             ignoreOrder: true
         );
-        names.ShouldBe([.. GeneratorParameterList.Names.Select(name => name.Name), GeneratorParameterList.Default]);
+        names.ShouldBe([
+            .. GeneratorParameterList.Definitions.Select(name => name.Name),
+            GeneratorParameterList.Default,
+        ]);
     }
 
     [Fact]
@@ -174,7 +177,7 @@ public sealed class SettingsFileSchemaTests
     [Fact]
     public void Schema_PatternOfGeneratorParameters_IsGeneratedFromTheParameters()
     {
-        var names = GeneratorParameterList.Names.Select(name => CaseFree(name.Name));
+        var names = GeneratorParameterList.Definitions.Select(name => CaseFree(name.Name));
         var states = Enum.GetValues<GeneratorParameterState>().Select(state => CaseFree(SettingValue.NameOf(state)));
         var expected =
             @"^\s*(?:(?:"

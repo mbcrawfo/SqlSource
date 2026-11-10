@@ -84,7 +84,9 @@ public sealed class SettingsFileReaderRobustnessTests
         asElement
             .Level.Parameters.Resolve()
             .ShouldBe(
-                GeneratorParameterList.Defaults | GeneratorParameters.KeepComments | GeneratorParameters.SortInput
+                GeneratorParameterValues.Of(
+                    GeneratorParameterList.Defaults | GeneratorParameters.KeepComments | GeneratorParameters.SortInput
+                )
             );
         var wrongType = asElement.Errors.ShouldHaveSingleItem();
         wrongType.Kind.ShouldBe(SettingsFileErrorKind.WrongType);

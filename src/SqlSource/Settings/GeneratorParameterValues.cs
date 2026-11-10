@@ -19,6 +19,30 @@ internal readonly record struct GeneratorParameterValues(ulong Packed)
 
     private const ulong SlotBits = 0xF;
 
+    /// <summary>Every parameter at its default.</summary>
+    public static GeneratorParameterValues Defaults { get; } = OfDefaults();
+
+    /// <summary>
+    /// Each parameter that is on or off <c>on</c> when it is in <paramref name="on" />, and <c>off</c> otherwise; a
+    /// parameter of other words at its default.
+    /// </summary>
+    public static GeneratorParameterValues Of(GeneratorParameters on)
+    {
+        var values = default(GeneratorParameterValues);
+        foreach (var definition in GeneratorParameterList.Definitions)
+        {
+            var value = definition.Default;
+            if (definition.IsSwitch)
+            {
+                value = (on & definition.Parameter) != GeneratorParameters.None ? On : Off;
+            }
+
+            values = values.With(definition.Parameter, value);
+        }
+
+        return values;
+    }
+
     /// <summary>The value of <paramref name="parameter" />, one flag.</summary>
     public int Get(GeneratorParameters parameter) => (int)((Packed >> Shift(parameter)) & SlotBits);
 
@@ -42,6 +66,17 @@ internal readonly record struct GeneratorParameterValues(ulong Packed)
     {
         var slots = SlotsOf(mask);
         return new((Packed & slots) | (lower.Packed & ~slots));
+    }
+
+    private static GeneratorParameterValues OfDefaults()
+    {
+        var values = default(GeneratorParameterValues);
+        foreach (var definition in GeneratorParameterList.Definitions)
+        {
+            values = values.With(definition.Parameter, definition.Default);
+        }
+
+        return values;
     }
 
     private static int Shift(GeneratorParameters parameter) => GeneratorParameterDefinition.SlotOf(parameter) * 4;

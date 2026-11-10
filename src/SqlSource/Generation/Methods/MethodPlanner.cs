@@ -423,7 +423,7 @@ internal static class MethodPlanner
         }
 
         problems.AddRange(FindTokenProblems(query, source));
-        var name = query.Name + ((settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0 ? AsyncSuffix : "");
+        var name = query.Name + (settings.Parameters.IsOn(GeneratorParameters.AsyncMethodSuffix) ? AsyncSuffix : "");
         var host = HostOf(placement);
         var reason =
             FindTakenReason(input, name, host, written, queries.Placement.NestedClasses)
@@ -902,7 +902,7 @@ internal static class MethodPlanner
             model.TypeText,
             model.Kind is ModelKind.Record or ModelKind.SealedRecord,
             new EquatableArray<MethodColumn>(columns.MoveToImmutable()),
-            ConstructorOrder(properties, (settings.Parameters & GeneratorParameters.SortOutput) != 0)
+            ConstructorOrder(properties, settings.Parameters.IsOn(GeneratorParameters.SortOutput))
         );
         return !isBlocked;
     }
