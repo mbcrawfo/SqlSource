@@ -1357,6 +1357,21 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc284"
     );
 
+    // {0} is the query, {1} the isolation level as the transaction parameter writes it, read-uncommitted or snapshot,
+    // and {2} the database that does not have it, PostgreSQL.  Reported at the query's name, by MethodPlanner, for a
+    // query that asks for a collection method and takes parameters; the query keeps its method and gets no collection
+    // method.
+    public static readonly DiagnosticDescriptor UnsupportedTransactionIsolation = new(
+        id: "SQLSRC297",
+        title: "Transaction isolation level is not the database's",
+        messageFormat: "The query '{0}' asks for the transaction isolation level '{1}', which {2} does not have",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc297",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -1463,7 +1478,8 @@ internal static class SqlDiagnostics
             LibraryNotReferenced,
             LibraryBelowTheFloor,
             JsonOptInNotApplicable,
-            ShortNameFindsAPackagesType
+            ShortNameFindsAPackagesType,
+            UnsupportedTransactionIsolation
         );
 
     /// <summary>

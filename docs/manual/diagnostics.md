@@ -289,6 +289,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC295](#sqlsrc295) | Bundle is not a raw bundle |
 | [SQLSRC296](#sqlsrc296) | Raw bundle is not reproduced by this version |
 
+**The collection method of a query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC297](#sqlsrc297) | Transaction isolation level is not the database's |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  [SQLSRC028](#sqlsrc028) to [SQLSRC037](#sqlsrc037) are about a type that claims a query whose output is `repository`, at its `[SqlSourceGenerate]` or at the member they name, and never about a type whose queries are all of other outputs.  Each of [SQLSRC028](#sqlsrc028) to [SQLSRC034](#sqlsrc034) but the warning [SQLSRC031](#sqlsrc031), and [SQLSRC036](#sqlsrc036), leaves the repository queries of the databases it is about without a method until it is fixed; their models are still generated.  [SQLSRC035](#sqlsrc035) and [SQLSRC037](#sqlsrc037) cost the type only its interface.  Ids from 101 to 127 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 296 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120 and [SQLSRC126](#sqlsrc126), under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file, and [SQLSRC127](#sqlsrc127), which depends on the query's output.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
@@ -318,6 +324,8 @@ The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about convert
 `SQLSRC283` is reported by the build, as `SQLSRC279` and `SQLSRC280` are, at the name of a query whose output is `methods` or `repository`, once for each column and parameter whose C# type you chose with the word `json` before it where the opt-in does not apply.  The query gets no method until it is fixed; its models are still generated.  A query whose output is `models` reads the word and gets none of it.
 
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models`, `methods` or `repository`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `methods` or `repository` its method.
+
+`SQLSRC297` is reported by the build, as `SQLSRC272` is, at the name of a query whose output is `methods` or `repository`, once for the query, when it turns on `collection-method`, has parameters and gives `transaction` an isolation level that its database does not have.  The query keeps its method and gets no collection method; its models are still generated.
 
 ## SQLSRC001
 
@@ -3598,3 +3606,17 @@ See: [When a bundle cannot be made safe](tool.md#raw-bundle)
 Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and scrub the bundle again.  When it names the same version twice, the bundle was edited by hand or damaged: make the raw bundle again with `diagnose --no-obfuscate`.
 
 See: [When a bundle cannot be made safe](tool.md#raw-bundle), [Checking a bundle with `replay`](tool.md#replay)
+
+## SQLSRC297
+
+**Transaction isolation level is not the database's**
+
+A query that turns on the `collection-method` generator parameter, and has parameters, sets the `transaction` generator parameter to an isolation level that its database does not have.  PostgreSQL has no `read-uncommitted` and no `snapshot`, so a query of the `postgres` dialect cannot ask for either; SQL Server has all five levels.  The message names the query, the level and the database.
+
+```console
+/work/App/Queries/Users.sql(2,10): error SQLSRC297: The query 'AddUser' asks for the transaction isolation level 'snapshot', which PostgreSQL does not have
+```
+
+Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, or `on`, which begins the transaction at the database's default level.  The error is at the query's name, and the query keeps its own method; only its collection method is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
+
+See: [Generator parameters](settings.md#setting-generator-parameters)

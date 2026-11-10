@@ -484,10 +484,55 @@ internal static class MethodPlanner
             problems,
             query.Name,
             query.NameLocation,
-            [method],
+            AddCollectionMethod(method, settings, problems),
             isUsable,
             WarningIdsOf(models, methodInput, methodOutput)
         );
+    }
+
+    // The query's method, and after it its collection method when the query asks for one and takes parameters, which
+    // are the items.  It has the query method's name by design, so it is not checked against the names again, and it
+    // reads its rows into an array where the query method streams them.  An isolation level that the query's database
+    // does not have costs the query only this method, and is reported as a problem that does not stop the query's own.
+    private static ImmutableArray<QueryMethod> AddCollectionMethod(
+        QueryMethod method,
+        QuerySettings settings,
+        List<DiagnosticInfo> problems
+    )
+    {
+        if (!settings.CollectionMethod || method.Input is null)
+        {
+            return [method];
+        }
+
+        var transaction = settings.Transaction;
+        if (
+            method.Engine == DatabaseEngine.PostgreSql
+            && transaction is TransactionMode.ReadUncommitted or TransactionMode.Snapshot
+        )
+        {
+            problems.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.UnsupportedTransactionIsolation,
+                    method.NameLocation,
+                    method.QueryName,
+                    transaction == TransactionMode.Snapshot ? "snapshot" : "read-uncommitted",
+                    "PostgreSQL"
+                )
+            );
+            return [method];
+        }
+
+        return
+        [
+            method,
+            method with
+            {
+                Batch = new BatchCall(transaction),
+                Collection =
+                    method.Collection == CollectionKind.IAsyncEnumerable ? CollectionKind.Array : method.Collection,
+            },
+        ];
     }
 
     // Whether the query's input or output model, when it has one, is internal.  A model with no assignment is not: its
@@ -1085,6 +1130,13 @@ internal static class MethodPlanner
             for (var index = 0; index < plan.Methods.Length; index++)
             {
                 var method = plan.Methods[index];
+                // A collection method shares its query method's name by design, which is no clash of the query with
+                // itself.
+                if (method.Batch is not null)
+                {
+                    continue;
+                }
+
                 if (!byName.TryGetValue(KeyOf(method), out var queries))
                 {
                     queries = [];
@@ -1102,16 +1154,20 @@ internal static class MethodPlanner
             {
                 if (byName[KeyOf(method)] is { Count: > 1 } queries)
                 {
-                    var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
-                    diagnostics.Add(
-                        DiagnosticInfo.Create(
-                            SqlDiagnostics.MethodNameTaken,
-                            plan.NameLocation,
-                            plan.QueryName,
-                            method.Name,
-                            "the method of the query '" + other + "' has that name too"
-                        )
-                    );
+                    // The collection method clashes where its query's method does, which reports it once.
+                    if (method.Batch is null)
+                    {
+                        var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
+                        diagnostics.Add(
+                            DiagnosticInfo.Create(
+                                SqlDiagnostics.MethodNameTaken,
+                                plan.NameLocation,
+                                plan.QueryName,
+                                method.Name,
+                                "the method of the query '" + other + "' has that name too"
+                            )
+                        );
+                    }
                 }
                 else if (plan.IsDriverUsable)
                 {

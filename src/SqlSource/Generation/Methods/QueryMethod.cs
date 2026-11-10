@@ -66,7 +66,19 @@ internal sealed record QueryMethod(
     /// takes no connection, transaction or command timeout.  Null for any other method, which takes its connection.
     /// </summary>
     public ConnectionSource? Source { get; init; }
+
+    /// <summary>
+    /// How the method runs its query once for each item of a collection, in batches, when it is the collection method
+    /// of a query: the query's method with this set, placed right after it.  Null for the query's own method.
+    /// </summary>
+    public BatchCall? Batch { get; init; }
 }
+
+/// <summary>
+/// What makes a method a query's collection method.
+/// </summary>
+/// <param name="Transaction">How the method wraps its batches in a transaction: the query's <c>transaction</c>.</param>
+internal sealed record BatchCall(TransactionMode Transaction);
 
 /// <summary>
 /// The input model of a query's method.
