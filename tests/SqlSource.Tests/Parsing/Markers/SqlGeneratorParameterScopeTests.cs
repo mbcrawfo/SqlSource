@@ -86,6 +86,12 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData(new[] { "-- generator: keep-comments keep-comments=off" }, "keep-comments=off", true)]
     [InlineData(new[] { "-- generator: keep-comments=default keep-comments=off" }, "keep-comments=off", false)]
     [InlineData(new[] { "-- generator: keep-comments=off", "-- generator: keep-comments" }, "keep-comments", false)]
+    [InlineData(new[] { "-- generator: keep-comments=off keep-comments=default" }, "keep-comments=default", false)]
+    [InlineData(
+        new[] { "-- generator: keep-comments", "-- generator: keep-comments=default" },
+        "keep-comments=default",
+        true
+    )]
     public void Read_OneOptionInTwoStates_ConflictsAtTheLater(string[] lines, string later, bool keepsComments)
     {
         var (scope, errors) = Read(lines);

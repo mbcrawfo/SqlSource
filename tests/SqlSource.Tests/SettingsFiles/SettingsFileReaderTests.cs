@@ -42,7 +42,7 @@ public sealed class SettingsFileReaderTests
         file.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.PostgreSql, SqlDialectOptions.None));
         file.Level.Parameters.Resolve()
             .ShouldBe(
-                GeneratorParameterValues.Of(
+                SwitchValues.Of(
                     GeneratorParameterList.Defaults
                         | GeneratorParameters.KeepComments
                         | GeneratorParameters.AsyncMethodSuffix
@@ -257,7 +257,7 @@ public sealed class SettingsFileReaderTests
 
         parameters
             .Level.Parameters.Resolve()
-            .ShouldBe(GeneratorParameterValues.Of(GeneratorParameterList.Defaults | GeneratorParameters.KeepComments));
+            .ShouldBe(SwitchValues.Of(GeneratorParameterList.Defaults | GeneratorParameters.KeepComments));
         parameters.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.WrongType,
@@ -342,7 +342,7 @@ public sealed class SettingsFileReaderTests
         empty.Level.ShouldBeSameAs(SettingsLevel.None);
         misspelt
             .Level.Parameters.Resolve()
-            .ShouldBe(GeneratorParameterValues.Of(GeneratorParameterList.Defaults | GeneratorParameters.SortInput));
+            .ShouldBe(SwitchValues.Of(GeneratorParameterList.Defaults | GeneratorParameters.SortInput));
         misspelt.Errors.ShouldBe([
             new SettingsFileError(
                 SettingsFileErrorKind.InvalidValue,

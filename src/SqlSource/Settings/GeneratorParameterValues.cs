@@ -22,27 +22,6 @@ internal readonly record struct GeneratorParameterValues(ulong Packed)
     /// <summary>Every parameter at its default.</summary>
     public static GeneratorParameterValues Defaults { get; } = OfDefaults();
 
-    /// <summary>
-    /// Each parameter that is on or off <c>on</c> when it is in <paramref name="on" />, and <c>off</c> otherwise; a
-    /// parameter of other words at its default.
-    /// </summary>
-    public static GeneratorParameterValues Of(GeneratorParameters on)
-    {
-        var values = default(GeneratorParameterValues);
-        foreach (var definition in GeneratorParameterList.Definitions)
-        {
-            var value = definition.Default;
-            if (definition.IsSwitch)
-            {
-                value = (on & definition.Parameter) != GeneratorParameters.None ? On : Off;
-            }
-
-            values = values.With(definition.Parameter, value);
-        }
-
-        return values;
-    }
-
     /// <summary>The value of <paramref name="parameter" />, one flag.</summary>
     public int Get(GeneratorParameters parameter) => (int)((Packed >> Shift(parameter)) & SlotBits);
 
@@ -55,9 +34,6 @@ internal readonly record struct GeneratorParameterValues(ulong Packed)
 
     /// <summary>Whether <paramref name="parameter" />, one flag, is <c>on</c>.</summary>
     public bool IsOn(GeneratorParameters parameter) => Get(parameter) == On;
-
-    /// <summary>These values with every slot outside <paramref name="mask" /> zero.</summary>
-    public GeneratorParameterValues Keep(GeneratorParameters mask) => new(Packed & SlotsOf(mask));
 
     /// <summary>
     /// These values in the slots of <paramref name="mask" />, and <paramref name="lower" />'s elsewhere.

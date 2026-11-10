@@ -47,7 +47,7 @@ public sealed class GeneratorParameterChoicesTests
         GeneratorParameterChoices
             .Reset.Resolve()
             .ShouldBe(
-                GeneratorParameterValues.Of(
+                SwitchValues.Of(
                     GeneratorParameters.TokenValidation
                         | GeneratorParameters.TableModels
                         | GeneratorParameters.ArrayPool
@@ -147,5 +147,5 @@ public sealed class GeneratorParameterChoicesTests
 
     [Fact]
     public void Resolve_NamesNothing_IsTheDefaults() =>
-        GeneratorParameterChoices.None.Resolve().ShouldBe(GeneratorParameterValues.Of(GeneratorParameterList.Defaults));
+        GeneratorParameterChoices.None.Resolve().ShouldBe(SwitchValues.Of(GeneratorParameterList.Defaults));
 }

@@ -45,7 +45,7 @@ public sealed class SqlFileParserMarkerTests
         Blocks(text)
             .ShouldHaveSingleItem()
             .Markers.Parameters.Resolve()
-            .ShouldBe(GeneratorParameterValues.Of(GeneratorParameterList.Defaults | (GeneratorParameters)expected));
+            .ShouldBe(SwitchValues.Of(GeneratorParameterList.Defaults | (GeneratorParameters)expected));
 
     [Fact]
     public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()

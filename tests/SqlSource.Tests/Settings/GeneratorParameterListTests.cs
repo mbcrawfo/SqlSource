@@ -132,6 +132,22 @@ public sealed class GeneratorParameterListTests
         repeated.ShouldBe([(1, 0)]);
     }
 
+    // The default is another value than any word's, even where it is the same in effect.
+    [Theory]
+    [InlineData([new[] { "keep-comments=off", "keep-comments=default" }])]
+    [InlineData([new[] { "keep-comments=default", "keep-comments=off" }])]
+    [InlineData([new[] { "keep-comments", "keep-comments=default" }])]
+    public void ReadElements_DefaultBesideAValue_IsARepeatAndTheFirstApplies(string[] elements)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        var choices = GeneratorParameterList.ReadElements(elements, invalid, repeated);
+
+        choices.ShouldBe(GeneratorParameterList.ReadElements([elements[0]], [], []));
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBe([(1, 0)]);
+    }
+
     [Fact]
     public void ReadElements_OneOptionInOneStateTwice_IsNoRepeat()
     {

@@ -67,6 +67,20 @@ public sealed class GeneratorParameterDefinitionTests
             )
         );
 
+    [Fact]
+    public void Constructor_SixteenWords_IsAllowed()
+    {
+        var many = new GeneratorParameterDefinition(
+            "many",
+            GeneratorParameters.SortInput,
+            [.. Enumerable.Range(0, 16).Select(index => "w" + index)],
+            15
+        );
+
+        many.TryReadValue("w15".AsSpan(), out var last).ShouldBeTrue();
+        last.ShouldBe(15);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(2)]

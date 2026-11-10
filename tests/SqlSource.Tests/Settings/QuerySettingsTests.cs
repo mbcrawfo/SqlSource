@@ -25,7 +25,7 @@ public sealed class QuerySettingsTests
         var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None);
 
         settings.Parameters.ShouldBe(
-            GeneratorParameterValues.Of(
+            SwitchValues.Of(
                 GeneratorParameters.TokenValidation
                     | GeneratorParameters.TableModels
                     | GeneratorParameters.ArrayPool
@@ -45,7 +45,7 @@ public sealed class QuerySettingsTests
         QuerySettings
             .Resolve(Sort, Keep)
             .Parameters.ShouldBe(
-                GeneratorParameterValues.Of(
+                SwitchValues.Of(
                     GeneratorParameterList.Defaults | GeneratorParameters.KeepComments | GeneratorParameters.SortInput
                 )
             );
@@ -60,9 +60,7 @@ public sealed class QuerySettingsTests
         var settings = QuerySettings.Resolve(off, file);
 
         settings.KeepComments.ShouldBeFalse();
-        settings.Parameters.ShouldBe(
-            GeneratorParameterValues.Of(GeneratorParameterList.Defaults | GeneratorParameters.SortInput)
-        );
+        settings.Parameters.ShouldBe(SwitchValues.Of(GeneratorParameterList.Defaults | GeneratorParameters.SortInput));
     }
 
     [Fact]

@@ -84,7 +84,7 @@ public sealed class SettingsFileReaderRobustnessTests
         asElement
             .Level.Parameters.Resolve()
             .ShouldBe(
-                GeneratorParameterValues.Of(
+                SwitchValues.Of(
                     GeneratorParameterList.Defaults | GeneratorParameters.KeepComments | GeneratorParameters.SortInput
                 )
             );

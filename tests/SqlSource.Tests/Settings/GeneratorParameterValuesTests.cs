@@ -50,18 +50,6 @@ public sealed class GeneratorParameterValuesTests
     }
 
     [Fact]
-    public void Keep_ZeroesEverySlotOutsideTheMask()
-    {
-        var values = default(GeneratorParameterValues)
-            .With(GeneratorParameters.KeepComments, 1)
-            .With(GeneratorParameters.SortInput, 3);
-
-        values
-            .Keep(GeneratorParameters.SortInput)
-            .ShouldBe(default(GeneratorParameterValues).With(GeneratorParameters.SortInput, 3));
-    }
-
-    [Fact]
     public void IsOn_IsTheValueOn()
     {
         var values = default(GeneratorParameterValues).With(

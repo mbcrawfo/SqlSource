@@ -55,10 +55,6 @@ internal sealed class GeneratorParameterDefinition
     /// <summary>The position of <see cref="Parameter" />'s one bit: its slot of four bits in a value.</summary>
     public int Slot { get; }
 
-    /// <summary>Whether the parameter is on or off: its words are <c>on</c> and <c>off</c> alone.</summary>
-    public bool IsSwitch =>
-        Words.Count == 2 && Words[GeneratorParameterValues.On] == "on" && Words[GeneratorParameterValues.Off] == "off";
-
     /// <summary>The end of the message of a value that is not one of <see cref="Words" />, which lists them.</summary>
     public string ValuesHelp { get; }
 

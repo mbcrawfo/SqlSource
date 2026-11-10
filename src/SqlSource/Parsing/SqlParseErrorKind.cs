@@ -1,4 +1,5 @@
 using SqlSource.Parsing.Markers;
+using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Parsing;
@@ -48,13 +49,14 @@ internal enum SqlParseErrorKind
     EmptyGeneratorLine,
 
     /// <summary>
-    /// A generator parameter has a value, which none takes; or a <c>-- dialect:</c> or <c>-- name:</c> marker, or
-    /// a marker that <see cref="SqlMarkerScope" /> reads, lacks a value it needs or has one that is not valid.
-    /// Two arguments: the generator parameter as written, or the marker as <see cref="SqlMarkerReader.Describe" />
-    /// gives it; and the help that ends the message, empty but for a type override whose key is written in brackets,
-    /// which <see cref="TypeOverrideGrammar.BracketHelp" /> gives, a <c>-- library-types:</c> marker, whose help lists
-    /// the libraries and the states, and a query's <c>-- column:</c> that names a column's source, which says to map
-    /// it in the file header.
+    /// A generator parameter has a value that is not one of its words; or a <c>-- dialect:</c> or <c>-- name:</c>
+    /// marker, or a marker that <see cref="SqlMarkerScope" /> reads, lacks a value it needs or has one that is not
+    /// valid.  Two arguments: the generator parameter as written, or the marker as
+    /// <see cref="SqlMarkerReader.Describe" /> gives it; and the help that ends the message, empty but for a generator
+    /// parameter's value, whose help, <see cref="GeneratorParameterDefinition.ValuesHelp" />, lists its words, a type
+    /// override whose key is written in brackets, which <see cref="TypeOverrideGrammar.BracketHelp" /> gives, a
+    /// <c>-- library-types:</c> marker, whose help lists the libraries and the states, and a query's
+    /// <c>-- column:</c> that names a column's source, which says to map it in the file header.
     /// </summary>
     InvalidMarkerValue,
 
