@@ -50,6 +50,17 @@ public sealed class TypePlacementTests
         PlacementOf(placement, 0, 0).NestedClass.ShouldBeNull();
     }
 
+    [Fact]
+    public void Of_RepositoryQueryOnAnInternalType_IsPublicOnTheType()
+    {
+        var files = Files(File("Users.sql", Query("GetUser", output: OutputKind.Repository)));
+
+        var (placement, diagnostics) = Analyse(TestModels.Type(isPublic: false), files);
+
+        diagnostics.ShouldBeEmpty();
+        PlacementOf(placement, 0, 0).ShouldBe(new QueryPlacement(MemberLocation.Class, Visibility.Public, null));
+    }
+
     // The nested class is ignored away from a nested class.
     [Fact]
     public void Of_NestedClassWrittenUnderClass_IsIgnored()
@@ -219,20 +230,53 @@ public sealed class TypePlacementTests
                 At("Users.sql", 0),
                 "GetUser",
                 "App.UserRepository",
+                "extension class",
                 "the settings file '/app/sqlsource.json'",
-                "sql"
+                "sql",
+                "Only a query method extends the connection.  Use class or nested-class."
             ),
             DiagnosticInfo.Create(
                 SqlDiagnostics.MemberLocationNotFit,
                 At("Users.sql", 3),
                 "ListUsers",
                 "App.UserRepository",
+                "extension class",
                 "the settings file '/app/sqlsource.json'",
-                "models"
+                "models",
+                "Only a query method extends the connection.  Use class or nested-class."
             ),
         ]);
         placement.Usable.ShouldBe([false]);
         placement.NestedClasses.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Of_QueryMarkerOfTheNestedClassOnARepositoryQuery_ReportsSqlsrc122AtTheMarker()
+    {
+        var query = Query(
+            "GetUser",
+            output: OutputKind.Repository,
+            location: MemberLocation.NestedClass,
+            place: SettingPlace.Query
+        ) with
+        {
+            MemberLocationMarker = At("Users.sql", 1),
+        };
+
+        var (_, diagnostics) = Analyse(TestModels.Type(), Files(File("Users.sql", query)));
+
+        diagnostics.ShouldBe([
+            DiagnosticInfo.Create(
+                SqlDiagnostics.MemberLocationNotFit,
+                At("Users.sql", 1),
+                "GetUser",
+                "App.UserRepository",
+                "nested class",
+                "its own marker",
+                "repository",
+                "A repository method is an instance method of the type.  Use class."
+            ),
+        ]);
     }
 
     [Fact]
@@ -256,15 +300,17 @@ public sealed class TypePlacementTests
                 At("Users.sql", 1),
                 "GetUser",
                 "App.UserRepository",
+                "extension class",
                 "its own marker",
-                "sql"
+                "sql",
+                "Only a query method extends the connection.  Use class or nested-class."
             ),
         ]);
     }
 
     // A header's visibility reaches every query of the file, including one whose location it does not fit.
     [Fact]
-    public void Of_HeaderPrivateWithACodeGenQuery_ReportsSqlsrc123NamingTheHeader()
+    public void Of_HeaderPrivateWithAMethodsQuery_ReportsSqlsrc123NamingTheHeader()
     {
         var files = Files(
             File(
@@ -283,9 +329,10 @@ public sealed class TypePlacementTests
                 "ListUsers",
                 "App.UserRepository",
                 "private",
-                "the file header",
+                "which the file header sets",
                 "extension-class",
-                "an extension method is public or internal"
+                "an extension method is public or internal",
+                "-- visibility: or -- member-location:"
             ),
         ]);
         placement.Usable.ShouldBe([false]);
@@ -384,9 +431,37 @@ public sealed class TypePlacementTests
                 "GetUser",
                 "App.UserRepository",
                 "protected",
-                "the file header",
+                "which the file header sets",
                 PlacementChecks.TextOf(location),
-                reason
+                reason,
+                "-- visibility: or -- member-location:"
+            ),
+        ]);
+        placement.Usable.ShouldBe([false]);
+    }
+
+    // A repository method is always on the type, so the error says to write the visibility alone.
+    [Fact]
+    public void Of_ProtectedRepositoryQueryOnAStruct_ReportsSqlsrc123WithTheVisibilityAlone()
+    {
+        var type = TestModels.Type(types: [new TypeDeclaration("struct", "UserRepository", "UserRepository", "", 0)]);
+        var files = Files(
+            File("Users.sql", Query("GetUser", output: OutputKind.Repository, visibility: Visibility.Protected))
+        );
+
+        var (placement, diagnostics) = Analyse(type, files);
+
+        diagnostics.ShouldBe([
+            DiagnosticInfo.Create(
+                SqlDiagnostics.VisibilityNotFit,
+                At("Users.sql", 0),
+                "GetUser",
+                "App.UserRepository",
+                "protected",
+                "which the file header sets",
+                "class",
+                "'App.UserRepository' is a struct, which cannot have protected members",
+                "-- visibility:"
             ),
         ]);
         placement.Usable.ShouldBe([false]);
@@ -620,7 +695,7 @@ public sealed class TypePlacementTests
     public void Of_DeclaredNameOffTheTypeOrForAMethod_IsNoErrorHere(bool isMethod)
     {
         var query = isMethod
-            ? Query("Get", output: OutputKind.CodeGen, location: MemberLocation.Class)
+            ? Query("Get", output: OutputKind.Methods, location: MemberLocation.Class)
             : Query("Get", output: OutputKind.Sql, location: MemberLocation.NestedClass);
         var files = Files(File("Users.sql", query));
 
@@ -763,10 +838,10 @@ public sealed class TypePlacementTests
         );
 
     // A query whose markers give what the test writes, from the file header unless the place says otherwise, at the
-    // first line of Users.sql unless the test gives another place.  Its output is CodeGen unless the test says.
+    // first line of Users.sql unless the test gives another place.  Its output is Methods unless the test says.
     private static SqlQuery Query(
         string name,
-        OutputKind output = OutputKind.CodeGen,
+        OutputKind output = OutputKind.Methods,
         MemberLocation? location = null,
         Visibility? visibility = null,
         string? nestedClass = null,

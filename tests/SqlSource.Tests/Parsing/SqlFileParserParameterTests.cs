@@ -864,13 +864,13 @@ public sealed class SqlFileParserParameterTests
     // A list that a NOT reaches is sent empty as a subquery, which SQL Server refuses inside an aggregate.  Only a
     // method sends a list, so the error is the method's, and the file still parses.
     [Fact]
-    public void Parse_SqlServerNegatedListInAnAggregate_HasACodeGenError()
+    public void Parse_SqlServerNegatedListInAnAggregate_HasAMethodsError()
     {
         const string Text = "-- name: Q\nSELECT COUNT(IIF(id NOT IN @ids, 1, NULL)) AS c FROM t\n";
 
         Blocks(Text, dialect: SqlDialect.SqlServer)
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBe([RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate")]);
+            .MethodErrors.ShouldBe([RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate")]);
     }
 
     // The error names where the list stands, and an aggregate before the clause around it.
@@ -888,7 +888,7 @@ public sealed class SqlFileParserParameterTests
 
         Blocks(text, dialect: SqlDialect.SqlServer)
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBe([RefusedEmpty(TextSpans.Of(text, "@ids"), "@ids", place)]);
+            .MethodErrors.ShouldBe([RefusedEmpty(TextSpans.Of(text, "@ids"), "@ids", place)]);
     }
 
     [Fact]
@@ -899,7 +899,7 @@ public sealed class SqlFileParserParameterTests
 
         Blocks(Text, dialect: SqlDialect.SqlServer)
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBe([
+            .MethodErrors.ShouldBe([
                 RefusedEmpty(TextSpans.Of(Text, "@ids"), "@ids", "inside an aggregate"),
                 RefusedEmpty(TextSpans.Of(Text, "@IDS"), "@IDS", "inside an aggregate"),
             ]);
@@ -912,7 +912,7 @@ public sealed class SqlFileParserParameterTests
     public void Parse_SqlServerNegatedListInAWindowedAggregate_HasNone(string sql) =>
         Blocks("-- name: Q\n" + sql + "\n", dialect: SqlDialect.SqlServer)
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBeEmpty();
+            .MethodErrors.ShouldBeEmpty();
 
     [Theory]
     [InlineData("SELECT COUNT(IIF(id IN @ids, 1, NULL)) AS c FROM t")]
@@ -921,7 +921,7 @@ public sealed class SqlFileParserParameterTests
     public void Parse_SqlServerListThatTakesAnEmptyForm_HasNone(string sql) =>
         Blocks("-- name: Q\n" + sql + "\n", dialect: SqlDialect.SqlServer)
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBeEmpty();
+            .MethodErrors.ShouldBeEmpty();
 
     // A NOT ends at the clause after it, so the NOT of a WHERE never reaches a list in the HAVING after it.
     [Fact]
@@ -932,7 +932,7 @@ public sealed class SqlFileParserParameterTests
                 dialect: SqlDialect.SqlServer
             )
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBeEmpty();
+            .MethodErrors.ShouldBeEmpty();
 
     // A name the query declares is a variable of the batch, and no list.
     [Fact]
@@ -942,7 +942,7 @@ public sealed class SqlFileParserParameterTests
                 dialect: SqlDialect.SqlServer
             )
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBeEmpty();
+            .MethodErrors.ShouldBeEmpty();
 
     [Fact]
     public void Parse_PostgresNegatedListInAnAggregate_HasNone() =>
@@ -951,5 +951,5 @@ public sealed class SqlFileParserParameterTests
                 dialect: SqlDialect.PostgreSql
             )
             .ShouldHaveSingleItem()
-            .CodeGenErrors.ShouldBeEmpty();
+            .MethodErrors.ShouldBeEmpty();
 }

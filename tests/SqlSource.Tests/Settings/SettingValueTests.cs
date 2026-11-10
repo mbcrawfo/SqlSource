@@ -37,15 +37,21 @@ public sealed class SettingValueTests
     [Theory]
     [InlineData("sql", 0)]
     [InlineData("Models", 1)]
-    [InlineData("codegen", 2)]
-    [InlineData("code-gen", 2)]
-    [InlineData("CodeGen", 2)]
+    [InlineData("methods", 2)]
+    [InlineData("me-thods", 2)]
+    [InlineData("Methods", 2)]
+    [InlineData("repository", 3)]
+    [InlineData("Re-pository", 3)]
     public void TryReadChoice_Output_IsRead(string value, int expected)
     {
         SettingValue.TryReadChoice<OutputKind>(value.AsSpan(), out var output).ShouldBeTrue();
 
         ((int)output).ShouldBe(expected);
     }
+
+    [Fact]
+    public void TryReadChoice_Codegen_IsNotRead() =>
+        SettingValue.TryReadChoice<OutputKind>("codegen".AsSpan(), out _).ShouldBeFalse();
 
     [Theory]
     [InlineData("class", 1)]
@@ -185,7 +191,7 @@ public sealed class SettingValueTests
     // An internal enum cannot be the parameter of a public test method, so a row gives the member's name.
     [InlineData("Sql", "sql")]
     [InlineData("Models", "models")]
-    [InlineData("CodeGen", "codegen")]
+    [InlineData("Methods", "methods")]
     public void NameOf_Member_IsItsNameInLowerCaseWhichTryReadChoiceReads(string member, string expected)
     {
         var output = Enum.Parse<OutputKind>(member);

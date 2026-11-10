@@ -7,8 +7,8 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 /// <param name="Query">The query as the generator's parser read it.</param>
 /// <param name="NeedsEntry">
-/// Whether a sidecar must hold an entry for it: its output is <c>Models</c> or <c>CodeGen</c> for a type that claims
-/// its file.
+/// Whether a sidecar must hold an entry for it: its output, for a type that claims its file, is not <c>Sql</c>, but
+/// <c>Models</c>, <c>Methods</c> or <c>Repository</c>.
 /// </param>
 /// <param name="Database">
 /// The database it belongs to, in the spelling the run first met.  Null for a query that needs no entry, which

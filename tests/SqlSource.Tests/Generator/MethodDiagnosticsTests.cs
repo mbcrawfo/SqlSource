@@ -12,7 +12,7 @@ namespace SqlSource.Tests.Generator;
 // The problems of one type's methods: a shape that needs rows on a statement that has none (SQLSRC272), a token named
 // as a fixed argument (SQLSRC275), a method's name that something else takes (SQLSRC274), and a list after a NOT where
 // SQL Server refuses an empty one (SQLSRC127).  A query with one gets no method, and the rest of the project still
-// compiles with no warning in what is generated.  Each run is at CodeGen, under postgres on Npgsql 10 but for those of
+// compiles with no warning in what is generated.  Each run is at Methods, under postgres on Npgsql 10 but for those of
 // SQLSRC127, under mssql on SqlClient 7.
 public sealed class MethodDiagnosticsTests
 {
@@ -249,7 +249,7 @@ public sealed class MethodDiagnosticsTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
-    // A CodeGen query on the type has no constant there, so its name is judged as its method's.
+    // A methods query on the type has no constant there, so its name is judged as its method's.
     [Fact]
     public void Run_QueryNamedAsTheTypeUnderClass_IsSqlsrc274()
     {

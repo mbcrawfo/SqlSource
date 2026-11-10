@@ -268,7 +268,7 @@ internal static class SqlFileParser
                     MemberLocationMarker = scope?.MemberLocationMarker,
                     VisibilityMarker = scope?.VisibilityMarker,
                     DeclaredVariables = query.DeclaredVariables,
-                    CodeGenErrors = FindRefusedEmptyLists(query),
+                    MethodErrors = FindRefusedEmptyLists(query),
                 }
             );
         }
@@ -385,8 +385,8 @@ internal static class SqlFileParser
 
         // A list that a NOT reaches is sent empty as a subquery, which SQL Server refuses inside an aggregate, a GROUP
         // BY and an OUTPUT clause, so the method would throw for an empty list there.  Only a method sends a list, so
-        // these are errors of the CodeGen output alone, which the method planner reports.  The places are read for SQL
-        // Server alone, and are None for a use that is not a list.
+        // these are errors of the outputs with a method alone, which the method planner reports.  The places are read
+        // for SQL Server alone, and are None for a use that is not a list.
         private static EquatableArray<SqlParseError> FindRefusedEmptyLists(BuiltQuery query)
         {
             // Created at the first error: most queries have none.

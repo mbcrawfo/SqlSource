@@ -12,7 +12,7 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generator;
 
 // The arrays of a converted type: an array whose element an override chose is converted element by element, an array
-// override with its own converter is converted whole, and a NULL element is kept or named.  Each run is at CodeGen
+// override with its own converter is converted whole, and a NULL element is kept or named.  Each run is at Methods
 // under postgres on Npgsql 10.  The cases are shared with ConverterMethodTests through ConverterCases.
 public sealed class ConverterArrayTests
 {

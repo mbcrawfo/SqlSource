@@ -387,14 +387,14 @@ public sealed class ModelShapeTests
         AllTypesQueries.InsertAllTypesForDapper.ShouldEndWith("@dateArrayValue, @emailValue\n)\nRETURNING *;");
     }
 
-    // A query whose output is codegen has its method and no constant: the type that claims it declares no field, and
+    // A query whose output is methods has its method and no constant: the type that claims it declares no field, and
     // no nested class, the class Sql where a constant goes by default.
     [Theory]
     [InlineData(typeof(AccountQueries))]
     [InlineData(typeof(Reporting.AccountReports))]
     [InlineData(typeof(InvoiceQueries))]
     [InlineData(typeof(CubeQueries))]
-    public void Build_CodeGenOutput_GivesNoConstant(Type type)
+    public void Build_MethodsOutput_GivesNoConstant(Type type)
     {
         const BindingFlags Declared =
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly;

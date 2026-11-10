@@ -9,7 +9,8 @@ namespace SqlSource.Generation.Emitting;
 
 /// <summary>
 /// Writes the file of one type's methods: a partial declaration of the type with the methods on it and those of the
-/// classes nested in it, then the extension class beside the type.
+/// classes nested in it, then the repository's interface beside the type, which that declaration implements, then the
+/// extension class beside the type.
 /// </summary>
 internal static class MethodEmitter
 {
@@ -21,8 +22,8 @@ internal static class MethodEmitter
     private const string PragmaEnd = " // A converter or a mapped type is obsolete or experimental.\n";
 
     /// <summary>
-    /// Writes the file of <paramref name="methods" />, or no source when no method is left, and whether a method it
-    /// keeps reads its rows into the project's <see cref="RowBuffer" />.
+    /// Writes the file of <paramref name="methods" />, or no source when no method is left and the type gets no
+    /// interface, and whether a method it keeps reads its rows into the project's <see cref="RowBuffer" />.
     /// </summary>
     /// <param name="methods">The type's methods.</param>
     /// <param name="dropped">The <see cref="QueryMethod.Name" />s of the extension methods to leave out.</param>
@@ -30,14 +31,21 @@ internal static class MethodEmitter
     /// Whether the extension class cannot be written, which leaves out every method under
     /// <see cref="MemberLocation.ExtensionClass" />.
     /// </param>
+    /// <param name="interfaceBlocked">
+    /// Whether the repository's interface cannot be written, since something else that SqlSource writes has its name.
+    /// </param>
     public static (string HintName, string? Source, bool UsesRowBuffer) Emit(
         TypeMethods methods,
         EquatableArray<string> dropped,
-        bool extensionClassBlocked
+        bool extensionClassBlocked,
+        bool interfaceBlocked
     )
     {
         var (onType, extensions) = Keep(methods.Methods, dropped, extensionClassBlocked);
-        var writesType = onType.Count > 0;
+        var interfaceName = interfaceBlocked ? null : methods.InterfaceName;
+        // The interface is written when every method of the repository failed, so that code that names it does not
+        // fail too.
+        var writesType = onType.Count > 0 || interfaceName is not null;
         if (!writesType && extensions.Count == 0)
         {
             return (methods.HintName, null, false);
@@ -64,7 +72,7 @@ internal static class MethodEmitter
         var usesRowBuffer = false;
         if (writesType)
         {
-            usesRowBuffer |= AppendOnType(builder, depth, methods, onType);
+            usesRowBuffer |= AppendOnType(builder, depth, methods, interfaceName, onType);
         }
 
         if (extensions.Count > 0)
@@ -86,16 +94,28 @@ internal static class MethodEmitter
     }
 
     // The partial declaration of the type, with its own methods and then each nested class's, as a static partial
-    // class with the accessibility that the type's file gives it too.
-    private static bool AppendOnType(StringBuilder builder, int depth, TypeMethods methods, List<QueryMethod> onType)
+    // class with the accessibility that the type's file gives it too, then the repository's interface, in the types
+    // the type is nested in, which the type's declaration implements.
+    private static bool AppendOnType(
+        StringBuilder builder,
+        int depth,
+        TypeMethods methods,
+        string? interfaceName,
+        List<QueryMethod> onType
+    )
     {
         var start = depth;
-        foreach (var declaration in methods.Types)
+        var last = methods.Types.Count - 1;
+        for (var index = 0; index <= last; index++)
         {
+            var declaration = methods.Types[index];
+            var header = "partial " + declaration.Keyword + " " + declaration.Name + declaration.TypeParameters;
             TypeEmitter.Open(
                 builder,
                 depth++,
-                "partial " + declaration.Keyword + " " + declaration.Name + declaration.TypeParameters
+                index == last && interfaceName is not null
+                    ? header + " : " + InterfaceOf(methods, interfaceName)
+                    : header
             );
         }
 
@@ -137,6 +157,13 @@ internal static class MethodEmitter
             }
         }
 
+        _ = builder.Append(TypeEmitter.GetIndent(--depth)).Append("}\n");
+        if (interfaceName is not null)
+        {
+            _ = builder.Append('\n');
+            AppendInterface(builder, depth, methods, interfaceName, onType);
+        }
+
         while (depth > start)
         {
             _ = builder.Append(TypeEmitter.GetIndent(--depth)).Append("}\n");
@@ -144,6 +171,76 @@ internal static class MethodEmitter
 
         return usesRowBuffer;
     }
+
+    // The reference to the interface from the type's base list: from global::, through the types the type is nested
+    // in, with their type parameters, and with the type's own, so that it means the interface beside the type.
+    private static string InterfaceOf(TypeMethods methods, string name)
+    {
+        var reference = new StringBuilder("global::");
+        if (methods.NamespaceText.Length > 0)
+        {
+            _ = reference.Append(methods.NamespaceText).Append('.');
+        }
+
+        for (var index = 0; index < methods.Types.Count - 1; index++)
+        {
+            _ = reference.Append(methods.Types[index].Name).Append(methods.Types[index].TypeParameters).Append('.');
+        }
+
+        return reference
+            .Append(CodeNameOf(name))
+            .Append(methods.Types[methods.Types.Count - 1].TypeParameters)
+            .ToString();
+    }
+
+    // The repository's interface: a summary that names the type, then a partial interface of the type's accessibility,
+    // public or internal, and its type parameters, without their constraints, whose members are the type's public
+    // repository methods.
+    private static void AppendInterface(
+        StringBuilder builder,
+        int depth,
+        TypeMethods methods,
+        string name,
+        List<QueryMethod> onType
+    )
+    {
+        var indent = TypeEmitter.GetIndent(depth);
+        _ = builder
+            .Append(indent)
+            .Append("/// <summary>\n")
+            .Append(indent)
+            .Append("/// The public repository methods of <c>")
+            .Append(XmlDocWriter.Escape(methods.DisplayName))
+            .Append("</c>, which it implements.\n")
+            .Append(indent)
+            .Append("/// </summary>\n");
+        TypeEmitter.Open(
+            builder,
+            depth,
+            (methods.InterfaceIsPublic ? "public" : "internal")
+                + " partial interface "
+                + CodeNameOf(name)
+                + methods.Types[methods.Types.Count - 1].TypeParameters
+        );
+        var memberIndent = TypeEmitter.GetIndent(depth + 1);
+        var isFirst = true;
+        foreach (var method in onType.Where(static method => IsInterfaceMember(method)))
+        {
+            TypeEmitter.Separate(builder, ref isFirst);
+            QueryMethodWriter.AppendInterfaceMember(builder, memberIndent, method);
+        }
+
+        _ = builder.Append(indent).Append("}\n");
+    }
+
+    // A member of the interface: a repository's public method on the type.
+    private static bool IsInterfaceMember(QueryMethod method) =>
+        method is { Source: not null, Host: { Location: MemberLocation.Class, Accessibility: Visibility.Public } };
+
+    // The interface's name as code writes it: a keyword after an @, a contextual one too, since C# refuses some of them
+    // as the name of a type, such as file, scoped and required, and extension, which this compiler may not know.
+    private static string CodeNameOf(string name) =>
+        SqlIdentifier.IsReservedKeyword(name) || SqlIdentifier.IsContextualKeyword(name) ? "@" + name : name;
 
     // The extension class, which takes the widest accessibility of the type's extension methods.
     private static bool AppendExtensionClass(

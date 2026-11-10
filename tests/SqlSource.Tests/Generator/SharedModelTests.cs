@@ -49,15 +49,15 @@ public sealed class SharedModelTests
         "-- name: GetUser\nSELECT id FROM users;\n"
     );
 
-    // ListEvents at CodeGen by its file's header, in A, and at the run's Models, in B.
-    private static readonly SqlFile CodeGenEvents = new(
+    // ListEvents at Methods by its file's header, in A, and at the run's Models, in B.
+    private static readonly SqlFile MethodsEvents = new(
         APath,
-        "-- output: codegen\n\n-- name: ListEvents\nSELECT at FROM events;\n"
+        "-- output: methods\n\n-- name: ListEvents\nSELECT at FROM events;\n"
     );
 
     private static readonly SqlFile ModelsEvents = new(BPath, "-- name: ListEvents\nSELECT at FROM events;\n");
 
-    // A type that claims CodeGenEvents and a type that claims ModelsEvents, in one namespace.
+    // A type that claims MethodsEvents and a type that claims ModelsEvents, in one namespace.
     private const string TwoOutputsSource = """
         using SqlSource;
 
@@ -87,11 +87,11 @@ public sealed class SharedModelTests
         Name = "timestamp with time zone",
     };
 
-    // CodeGenEvents and ModelsEvents, each with its sidecar.
+    // MethodsEvents and ModelsEvents, each with its sidecar.
     private static SqlFile[] TwoOutputsFiles =>
         [
-            CodeGenEvents,
-            Sidecars.Of(CodeGenEvents, EntryOf(CodeGenEvents, "ListEvents")),
+            MethodsEvents,
+            Sidecars.Of(MethodsEvents, EntryOf(MethodsEvents, "ListEvents")),
             ModelsEvents,
             Sidecars.Of(ModelsEvents, EntryOf(ModelsEvents, "ListEvents")),
         ];
@@ -783,10 +783,10 @@ public sealed class SharedModelTests
         ModelsOf(run).Queries.ShouldHaveSingleItem().ColumnNames.ShouldBeNull();
     }
 
-    // A type at CodeGen and a type at Models, of one namespace, each with a query of one model name.  A property that a
-    // library row types is the library's at CodeGen and the base map's at Models, so the two models of one name differ.
+    // A type at Methods and a type at Models, of one namespace, each with a query of one model name.  A property that a
+    // library row types is the library's at Methods and the base map's at Models, so the two models of one name differ.
     [Fact]
-    public void Run_SharedModelOfCodeGenWithLibraryAndModels_IsSQLSRC257()
+    public void Run_SharedModelOfMethodsWithLibraryAndModels_IsSQLSRC257()
     {
         var run = Run(TwoOutputsSource, TwoOutputsFiles, references: WithThePlugin);
 
@@ -818,10 +818,10 @@ public sealed class SharedModelTests
         run.Sources["App.ListEventsDto-Model.g.cs"].ShouldContain("(global::System.DateTime At);");
     }
 
-    // Two queries at CodeGen of one type, one of which turns the library off: the properties differ as a CodeGen type's
+    // Two queries at Methods of one type, one of which turns the library off: the properties differ as a methods type's
     // and a Models type's do.
     [Fact]
-    public void Run_SharedModelOfTwoCodeGenQueriesWithLibraryOnAndOff_IsSQLSRC257()
+    public void Run_SharedModelOfTwoMethodsQueriesWithLibraryOnAndOff_IsSQLSRC257()
     {
         const string Source = """
             using SqlSource;
@@ -842,7 +842,7 @@ public sealed class SharedModelTests
             Source,
             [a, Sidecars.Of(a, EntryOf(a, "GetA")), b, Sidecars.Of(b, EntryOf(b, "GetB"))],
             settings: /*lang=json,strict*/
-            """{"output": "CodeGen"}""",
+            """{"output": "Methods"}""",
             references: WithThePlugin
         );
 
@@ -855,15 +855,15 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBe(["App.Event-Model.g.cs"]);
     }
 
-    // A type at CodeGen and a type at Models, each with a query whose @ids is an integer[], of one input model name.
-    // The array is an IEnumerable<int> at CodeGen and an int[] at Models, so the two models of one name differ.
+    // A type at Methods and a type at Models, each with a query whose @ids is an integer[], of one input model name.
+    // The array is an IEnumerable<int> at Methods and an int[] at Models, so the two models of one name differ.
     [Fact]
-    public void Run_SharedInputModelOfCodeGenAndModelsWithAnArrayParameter_IsSqlsrc257()
+    public void Run_SharedInputModelOfMethodsAndModelsWithAnArrayParameter_IsSqlsrc257()
     {
         var ids = ArrayOf(Int4, "_int4");
         var a = new SqlFile(
             APath,
-            "-- output: codegen\n\n-- name: FindA\n-- input-model: IdFilter\nSELECT 1 WHERE 1 = ANY (@ids);\n"
+            "-- output: methods\n\n-- name: FindA\n-- input-model: IdFilter\nSELECT 1 WHERE 1 = ANY (@ids);\n"
         );
         var b = new SqlFile(BPath, "-- name: FindB\n-- input-model: IdFilter\nSELECT 1 WHERE 1 = ANY (@ids);\n");
 
@@ -887,14 +887,14 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBe(["App.IdFilter-Model.g.cs"]);
     }
 
-    // A list is an IEnumerable of its element at CodeGen and at Models alike, so a model of one name shared by a type
+    // A list is an IEnumerable of its element at Methods and at Models alike, so a model of one name shared by a type
     // at each is one model.
     [Fact]
     public void Run_SharedInputModelOfAListInBothOutputs_IsOneModel()
     {
         var a = new SqlFile(
             APath,
-            "-- output: codegen\n\n-- name: FindA\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id IN @ids;\n"
+            "-- output: methods\n\n-- name: FindA\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id IN @ids;\n"
         );
         var b = new SqlFile(BPath, "-- name: FindB\n-- input-model: IdFilter\nSELECT 1 FROM t WHERE id IN @ids;\n");
 

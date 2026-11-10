@@ -8,6 +8,10 @@ namespace SqlSource.Generation;
 /// </summary>
 /// <param name="Namespace">The namespace as it is written in code.  Empty for the global namespace.</param>
 /// <param name="Types">The containing types from the outermost to the type itself.  Never empty.</param>
+/// <param name="MetadataName">
+/// The name that <c>Compilation.GetTypeByMetadataName</c> finds the type by: the namespace, then each type's metadata
+/// name, with its arity, from the outermost, joined by <c>+</c>.
+/// </param>
 /// <param name="IsPublic">
 /// Whether the type and every type it is nested in are declared <c>public</c>, which makes its models public.
 /// </param>
@@ -23,6 +27,10 @@ namespace SqlSource.Generation;
 /// not.  A protected member of a sealed class gives the compiler's warning CS0628.
 /// </param>
 /// <param name="Source">The attribute's <c>Source</c>, or null when it is not set or is empty.</param>
+/// <param name="GenerateInterface">
+/// The attribute's <c>GenerateInterface</c>, or null when it is not written, which leaves the project's switch.
+/// </param>
+/// <param name="InterfaceName">The attribute's <c>InterfaceName</c>, or null when it is not set or is empty.</param>
 /// <param name="FilePath">The path of the source file that carries the attribute.</param>
 /// <param name="AttributeLocation">Where the attribute is.</param>
 /// <param name="TakenNames">
@@ -34,11 +42,14 @@ namespace SqlSource.Generation;
 internal sealed record TargetType(
     string Namespace,
     EquatableArray<TypeDeclaration> Types,
+    string MetadataName,
     bool IsPublic,
     bool IsReachableAsProtected,
     bool IsStatic,
     bool IsSealed,
     string? Source,
+    bool? GenerateInterface,
+    string? InterfaceName,
     string FilePath,
     LocationInfo AttributeLocation,
     EquatableArray<string> TakenNames,

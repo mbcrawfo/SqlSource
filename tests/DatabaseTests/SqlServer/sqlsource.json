@@ -4,7 +4,7 @@
   // The logical database that a query is described against, unless its file names another.
   "database": "app",
   // What a query generates: its method and its models, which need an entry in the sidecar beside its file.
-  "output": "CodeGen",
+  "output": "Methods",
   // The suffix of the model of a query's parameters.
   "inputModelSuffix": "Args",
   // The kind of type that a query's input model is.

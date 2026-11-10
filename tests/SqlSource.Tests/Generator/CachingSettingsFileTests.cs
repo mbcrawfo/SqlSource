@@ -171,6 +171,27 @@ public sealed class CachingSettingsFileTests
         OutputReasonsAfter(result, TrackingNames.PublicExceptions).ShouldAllBeCached();
     }
 
+    // Another property changed: whether the repositories get interfaces is read again, and comes out equal, so no
+    // output after it runs again.
+    [Fact]
+    public void Run_BuildFolderChanged_LeavesTheRepositoryInterfacesUnchanged()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, _usersSettings, _ordersSettings);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(
+                    properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/app/obj/" }
+                )
+            ),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.RepositoryInterfaces).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        OutputReasonsAfter(result, TrackingNames.RepositoryInterfaces).ShouldAllBeCached();
+    }
+
     // What the IDE does when any property or an .editorconfig changes: new options, and the same folders of the build.
     // The folders are read again and come out equal, and nothing after them runs.
     [Fact]

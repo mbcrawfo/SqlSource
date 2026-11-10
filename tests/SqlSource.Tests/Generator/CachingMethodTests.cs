@@ -20,7 +20,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The caching of the methods: which types' methods an edit makes the generator write again.  Users is claimed by
-// UserQueries and Orders by OrderQueries, both in the namespace App and at CodeGen, so each type has one method, in its
+// UserQueries and Orders by OrderQueries, both in the namespace App and at Methods, so each type has one method, in its
 // extension class unless the test says otherwise.  One test adds AdminQueries, in the namespace App.Admin, which claims
 // Users too.
 public sealed class CachingMethodTests
@@ -377,7 +377,7 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.MethodDiagnostics).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.SettingsFileLibraryUses).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.SettingsFileLibraryDiagnostics).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.CodeGenEngines).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.MethodEngines).ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
     // The project's settings file turns NodaTime on, which the project does not reference, so SQLSRC281 is at its
@@ -389,7 +389,7 @@ public sealed class CachingMethodTests
     {
         var compilation = MethodsCompilation(UserQueries());
         var project = ProjectFile(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             "postgres", /*lang=json,strict*/
             "{\"libraryTypes\": {\"nodaTime\": \"on\"}}"
         );
@@ -517,10 +517,10 @@ public sealed class CachingMethodTests
             );
     }
 
-    // The project's settings file puts both types at Models, so the project has no CodeGen query, and then the header
-    // of Users puts UserQueries at CodeGen: its query's engine is now among those of the project's methods.
+    // The project's settings file puts both types at Models, so the project has no methods query, and then the header
+    // of Users puts UserQueries at Methods: its query's engine is now among those of the project's methods.
     [Fact]
-    public void Run_TypeTurnedToCodeGen_FindsTheEnginesAgain()
+    public void Run_TypeTurnedToMethods_FindsTheEnginesAgain()
     {
         var compilation = MethodsCompilation(UserQueries());
         var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
@@ -532,12 +532,12 @@ public sealed class CachingMethodTests
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();
 
         var result = Run(
-            EditUsers(driver, usersSidecar, "GetUser", "-- output: codegen\n\n" + SqlTexts.GetUser),
+            EditUsers(driver, usersSidecar, "GetUser", "-- output: methods\n\n" + SqlTexts.GetUser),
             compilation
         );
 
         result.Diagnostics.ShouldBeEmpty();
-        AllReasons(result, TrackingNames.CodeGenEngines).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.MethodEngines).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.MethodOutput)
             .ShouldBe(
                 UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
@@ -558,7 +558,7 @@ public sealed class CachingMethodTests
         );
         var usersSidecar = SqlServerSidecar(users, "GetUser", TestSidecars.SqlServer("nvarchar(50)", 100, 0));
         var driver = CreateDriver(
-                ProjectFile(OutputKind.CodeGen, "mssql"),
+                ProjectFile(OutputKind.Methods, "mssql"),
                 [users, _scene.Orders, usersSidecar, SqlServerSidecar(_scene.Orders, "GetOrder", null)]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
@@ -721,7 +721,7 @@ public sealed class CachingMethodTests
         GeneratedFiles(result).ShouldContain(OrderMethods);
     }
 
-    // Both types at CodeGen under postgres on Npgsql 10 with this assembly of NodaTime and its plugin, Users reading a
+    // Both types at Methods under postgres on Npgsql 10 with this assembly of NodaTime and its plugin, Users reading a
     // timestamptz and Orders an int4: the compilation, and the driver after a first run that reports nothing.
     private (CSharpCompilation Compilation, GeneratorDriver Driver) FirstRunWithSyntheticNodaTime(
         MetadataReference nodaTime
@@ -761,7 +761,7 @@ public sealed class CachingMethodTests
     // Users with this text.
     private InMemoryAdditionalText UsersAt(string text) => new(_scene.Users.Path, text);
 
-    // Both types at CodeGen under mssql, on SqlClient 7 with NodaTime 3.3.7, with this Users and its sidecar, and
+    // Both types at Methods under mssql, on SqlClient 7 with NodaTime 3.3.7, with this Users and its sidecar, and
     // Orders with a sidecar of one column of int: the compilation, and the driver after a first run that reports
     // nothing.
     private (CSharpCompilation Compilation, GeneratorDriver Driver) FirstRunWithNodaTime(
@@ -774,7 +774,7 @@ public sealed class CachingMethodTests
             references: [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
         );
         var driver = CreateDriver(
-                ProjectFile(OutputKind.CodeGen, "mssql"),
+                ProjectFile(OutputKind.Methods, "mssql"),
                 [users, _scene.Orders, usersSidecar, SqlServerSidecar(_scene.Orders, "GetOrder", null)]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);

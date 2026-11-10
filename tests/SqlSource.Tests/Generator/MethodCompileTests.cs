@@ -8,6 +8,7 @@ using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -288,5 +289,346 @@ public sealed class MethodCompileTests
         methods.ShouldContain("parameter.Precision = 12;\n");
         methods.ShouldContain("global::Microsoft.Data.SqlTypes.SqlVector<float>.CreateNull(3);\n");
         methods.ShouldContain("if (parameter.Value is byte[] { Length: > 4 })\n");
+    }
+
+    // A repository of each kind of connection source, for each engine: a connection string from a primary-constructor
+    // parameter and from a method, which takes the token or not, a data source of the driver's type and of
+    // DbDataSource, a factory that returns its connection and one that returns a task of it, and a borrowed connection,
+    // through an instance member, a static member of a generic type and a parameter.  Each claims a postgres file and
+    // an mssql file of a query that reads one row, one of many and one that streams.
+    [Fact]
+    public void Run_RepositoryOfEachKind_CompilesWithoutWarnings()
+    {
+        const string Source = """
+            using System.Data.Common;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Microsoft.Data.SqlClient;
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Strings(
+                    [SqlSourceConnection(Database = "postgres")] string postgres,
+                    [SqlSourceConnection(Database = "mssql")] string? sqlServer
+                );
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class StringMethods
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    private string Postgres() => "";
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private static string? SqlServer(CancellationToken cancellationToken) => null;
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class DataSources
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    private readonly NpgsqlDataSource _postgres = NpgsqlDataSource.Create("");
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private DbDataSource? SqlServer { get; set; }
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Factories
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    private static NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private async ValueTask<SqlConnection?> OpenAsync(CancellationToken cancellationToken)
+                    {
+                        await Task.Delay(0, cancellationToken).ConfigureAwait(false);
+                        return new SqlConnection();
+                    }
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial class Borrowed<T>(
+                    [SqlSourceConnection(Database = "mssql")] SqlConnection sqlServer
+                )
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    private static DbConnection? Postgres { get; set; }
+                }
+            }
+            """;
+        var run = RunRepositories(Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Strings-Methods.g.cs"].ShouldContain("new global::Npgsql.NpgsqlConnection(postgres ?? ");
+        run.Sources["App.Strings-Methods.g.cs"]
+            .ShouldContain("new global::Microsoft.Data.SqlClient.SqlConnection(sqlServer ?? ");
+        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(this.Postgres() ?? ");
+        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(StringMethods.SqlServer(cancellationToken) ?? ");
+        run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("await (this._postgres ?? ");
+        run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("await (this.SqlServer ?? ");
+        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("= Factories.Open() ?? ");
+        run.Sources["App.Factories-Methods.g.cs"]
+            .ShouldContain("= await this.OpenAsync(cancellationToken).ConfigureAwait(false) ?? ");
+        run.Sources["App.Borrowed-1-Methods.g.cs"].ShouldContain("var connection = Borrowed<T>.Postgres ?? ");
+        run.Sources["App.Borrowed-1-Methods.g.cs"].ShouldContain("var connection = sqlServer ?? ");
+    }
+
+    // A struct repository of each kind, whose streaming methods read the source before their iterator, which cannot
+    // reach this or a primary-constructor parameter of a struct.
+    [Fact]
+    public void Run_StructRepositoryOfEachKind_CompilesWithoutWarnings()
+    {
+        const string Source = """
+            using System.Data.Common;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Microsoft.Data.SqlClient;
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct Strings(
+                    [SqlSourceConnection(Database = "postgres")] string postgres,
+                    [SqlSourceConnection(Database = "mssql")] string? sqlServer
+                );
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct StringMethods
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    private static string Postgres() => "";
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private readonly string? SqlServer(CancellationToken cancellationToken) => null;
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct DataSources
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    private NpgsqlDataSource? Postgres { get; set; }
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private DbDataSource? _sqlServer;
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial record struct Factories
+                {
+                    [SqlSourceConnection(Database = "postgres")]
+                    private readonly NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private readonly ValueTask<SqlConnection?> OpenAsync(CancellationToken cancellationToken) =>
+                        new(new SqlConnection());
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct Borrowed(
+                    [SqlSourceConnection(Database = "postgres")] DbConnection postgres
+                )
+                {
+                    [SqlSourceConnection(Database = "mssql")]
+                    public SqlConnection? SqlServer { get; set; }
+                }
+            }
+            """;
+
+        var run = RunRepositories(Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Strings-Methods.g.cs"].ShouldContain("var source = postgres;\n");
+        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("var self = this;\n");
+        run.Sources["App.StringMethods-Methods.g.cs"].ShouldContain("(self.SqlServer(cancellationToken) ?? ");
+        run.Sources["App.DataSources-Methods.g.cs"].ShouldContain("var source = this._sqlServer;\n");
+        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("var self = this;\n");
+        run.Sources["App.Factories-Methods.g.cs"]
+            .ShouldContain("= await self.OpenAsync(cancellationToken).ConfigureAwait(false) ?? ");
+        run.Sources["App.Borrowed-Methods.g.cs"].ShouldContain("var connection = source ?? ");
+    }
+
+    // A struct's marked factory beside an unmarked overload of it, which a method group of the name could not convert
+    // to a delegate, is called through a copy of the struct, where the call resolves the overload as written.
+    [Fact]
+    public void Run_StructRepositoryWithAnOverloadedFactory_CompilesWithoutWarnings()
+    {
+        const string Source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Microsoft.Data.SqlClient;
+            using Npgsql;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = ".")]
+                public partial struct Factories
+                {
+                    public readonly NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "postgres")]
+                    public readonly NpgsqlConnection Open(CancellationToken cancellationToken) => new();
+
+                    public readonly Task<SqlConnection> OpenAsync() => Task.FromResult(new SqlConnection());
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    public readonly Task<SqlConnection> OpenAsync(CancellationToken cancellationToken) =>
+                        Task.FromResult(new SqlConnection());
+                }
+
+                [SqlSourceGenerate(Source = ".")]
+                public partial record struct RecordFactories
+                {
+                    public readonly NpgsqlConnection Open() => new();
+
+                    [SqlSourceConnection(Database = "postgres")]
+                    public readonly NpgsqlConnection Open(CancellationToken cancellationToken) => new();
+
+                    public readonly SqlConnection OpenSqlServer() => new();
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    public readonly SqlConnection OpenSqlServer(CancellationToken cancellationToken) => new();
+                }
+            }
+            """;
+
+        var run = RunRepositories(Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.Factories-Methods.g.cs"].ShouldContain("= self.Open(cancellationToken) ?? ");
+        run.Sources["App.Factories-Methods.g.cs"]
+            .ShouldContain("= await self.OpenAsync(cancellationToken).ConfigureAwait(false) ?? ");
+        run.Sources["App.RecordFactories-Methods.g.cs"].ShouldContain("= self.OpenSqlServer(cancellationToken) ?? ");
+    }
+
+    // A repository of a type that the interface's declaration and the base list of the type's part must repeat: a
+    // generic type with a constraint, which the interface leaves out, a type nested in a generic class, whose
+    // interface is its sibling, internal as the type is, a generic type nested in one, and a struct, a record and a
+    // record struct.
+    [Theory]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial class Repo<T>\n        where T : class\n"
+            + "    {\n{0}    }",
+        "partial class Repo<T> : global::App.IRepo<T>\n",
+        "    public partial interface IRepo<T>\n"
+    )]
+    [InlineData(
+        "public partial class Outer<U>\n    {\n        [SqlSourceGenerate(Source = \".\")]\n"
+            + "        internal partial class Repo\n        {\n{0}        }\n    }",
+        "partial class Repo : global::App.Outer<U>.IRepo\n",
+        "        internal partial interface IRepo\n"
+    )]
+    [InlineData(
+        "public partial class Outer<U>\n    {\n        [SqlSourceGenerate(Source = \".\")]\n"
+            + "        public partial class Repo<T>\n        {\n{0}        }\n    }",
+        "partial class Repo<T> : global::App.Outer<U>.IRepo<T>\n",
+        "        public partial interface IRepo<T>\n"
+    )]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial struct Repo\n    {\n{0}    }",
+        "partial struct Repo : global::App.IRepo\n",
+        "    public partial interface IRepo\n"
+    )]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial record Repo\n    {\n{0}    }",
+        "partial record Repo : global::App.IRepo\n",
+        "    public partial interface IRepo\n"
+    )]
+    [InlineData(
+        "[SqlSourceGenerate(Source = \".\")]\n    public partial record struct Repo\n    {\n{0}    }",
+        "partial record struct Repo : global::App.IRepo\n",
+        "    public partial interface IRepo\n"
+    )]
+    public void Run_RepositoryOnAwkwardTypes_Compiles(string declaration, string implements, string contract)
+    {
+        const string Members = """
+                    [SqlSourceConnection(Database = "postgres")]
+                    private static string Postgres() => "";
+
+                    [SqlSourceConnection(Database = "mssql")]
+                    private static string SqlServer() => "";
+
+            """;
+        var source =
+            "using SqlSource;\n\nnamespace App\n{\n    "
+            + declaration.Replace("{0}", Members, StringComparison.Ordinal)
+            + "\n}\n";
+
+        var run = RunRepositories(source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources.Single(pair => pair.Key.EndsWith("-Methods.g.cs", StringComparison.Ordinal)).Value;
+        methods.ShouldContain(implements);
+        methods.ShouldContain(contract);
+        methods.ShouldContain(" FindUser(\n");
+        methods.ShouldContain(" StreamDocuments(\n");
+    }
+
+    // The repositories of the source, at Repository, claiming a postgres file and an mssql file of a query that reads
+    // one row, one of many and one that streams, with both drivers referenced.
+    private static GeneratorRun RunRepositories(string source)
+    {
+        var postgres = new SqlFile(
+            GeneratorHarness.UsersPath,
+            """
+            -- name: FindUser -> one-optional
+            SELECT id, name FROM users WHERE id = @id;
+            -- name: ListUsers
+            SELECT id, name FROM users;
+            -- name: StreamUsers
+            -- collection-type: IAsyncEnumerable
+            SELECT id, name FROM users;
+
+            """
+        );
+        var sqlServer = new SqlFile(
+            "/app/Repo/Documents.sql",
+            """
+            -- dialect: mssql
+            -- name: FindDocument -> one-optional
+            SELECT id, title FROM documents WHERE id = @id;
+            -- name: ListDocuments
+            SELECT id, title FROM documents;
+            -- name: StreamDocuments
+            -- collection-type: IAsyncEnumerable
+            SELECT id, title FROM documents;
+
+            """
+        );
+        SidecarColumn[] users = [Column("id"), Column("name", Text, nullable: true)];
+        SidecarColumn[] documents =
+        [
+            TestSidecars.Column(0, "id", TestSidecars.SqlServer()),
+            TestSidecars.Column(1, "title", TestSidecars.SqlServer("nvarchar", 200), nullable: true),
+        ];
+        SidecarParameter[] sqlServerId = [TestSidecars.Parameter(0, "id", TestSidecars.SqlServer(), false)];
+
+        return GeneratorHarness.Run(
+            OutputKind.Repository,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [
+                postgres,
+                Sidecars.Of(
+                    postgres,
+                    Entry(postgres, "FindUser", [Parameter("id")], users),
+                    Entry(postgres, "ListUsers", [], users),
+                    Entry(postgres, "StreamUsers", [], users)
+                ),
+                sqlServer,
+                Sidecars.Of(
+                    sqlServer,
+                    MethodRuns.SqlServerEntry(sqlServer, "FindDocument", sqlServerId, documents),
+                    MethodRuns.SqlServerEntry(sqlServer, "ListDocuments", [], documents),
+                    MethodRuns.SqlServerEntry(sqlServer, "StreamDocuments", [], documents)
+                ),
+            ],
+            references: [NpgsqlReferences.Npgsql10, SqlClientReferences.SqlClient7],
+            dialect: "postgres"
+        );
     }
 }

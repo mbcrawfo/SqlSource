@@ -14,6 +14,7 @@ using SqlSource.Generation.Exceptions;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
+using SqlSource.Generation.Repositories;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using SqlSource.Generation.Types.Drivers;
@@ -46,6 +47,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var fileLevels = ReadSettings(claims.SqlFiles, settingsFiles);
         var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.ClaimedPaths);
         var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, fileLevels);
+        var repositories = ReadRepositories(context, typeQueries);
         var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, parsedFiles, claims.RepeatedPaths);
         var typing = TypeFiles(context, sidecars.Checks, parsedFiles.Sorted, fileLevels);
         var converters = FindConverters(context, typing.MappedTypeConverters, typing.TypingLibraryProbe);
@@ -72,7 +74,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             typing.SqlClientProbe,
             typing.LibraryProbe,
             typing.TypingLibraryProbe,
-            converters
+            converters,
+            repositories
         );
     }
 
@@ -355,6 +358,43 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
             )
             .WithTrackingName(TrackingNames.TypeQueries);
+    }
+
+    // The candidates for a repository's connection and the settings and name of its interface, of each type that has a
+    // repository query.  The read runs on every compilation, as the lookups of the models' names do: a base type, or a
+    // type with the interface's name, may be declared in a file that ForAttributeWithMetadataName does not read again.
+    // Its value is equal until a candidate or an interface's settings change, and a type with no repository query
+    // costs it nothing.
+    private static IncrementalValueProvider<EquatableArray<RepositoryShape>> ReadRepositories(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeQueries> typeQueries
+    )
+    {
+        var interfacesOn = context
+            .AnalyzerConfigOptionsProvider.Select(
+                static (options, _) => RepositoryInterfaces.Read(options.GlobalOptions)
+            )
+            .WithTrackingName(TrackingNames.RepositoryInterfaces);
+
+        // The types that have a repository query, which is the same value until one comes or goes, or the declaration
+        // of one changes.  A type's node runs again only when its queries or their levels change.
+        var repositoryTypes = typeQueries
+            .Select(static (type, _) => RepositoryTypes.Of(type))
+            .WhereNotNull()
+            .Collect()
+            .Select(static (types, _) => new EquatableArray<TargetType>(types))
+            .WithTrackingName(TrackingNames.RepositoryTypes);
+
+        var shapes = repositoryTypes
+            .Combine(context.CompilationProvider)
+            .Combine(interfacesOn)
+            .Select(
+                static (input, cancellationToken) =>
+                    RepositoryShapeReader.Read(input.Left.Left, input.Left.Right, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.RepositoryShapes);
+
+        return shapes;
     }
 
     // What every type needs of each file, and the check of each claimed file's sidecar against it.
@@ -822,7 +862,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
         IncrementalValueProvider<LibraryProbe> libraryProbe,
         IncrementalValueProvider<LibraryProbe> typingLibraryProbe,
-        IncrementalValueProvider<ConverterSet> converters
+        IncrementalValueProvider<ConverterSet> converters,
+        IncrementalValueProvider<EquatableArray<RepositoryShape>> repositories
     )
     {
         // Whether each engine's driver allows its methods, and whether SQL Server's spatial read path can be taken,
@@ -843,19 +884,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
         // queries and its names, its files' models, the models its queries got, the drivers, the converters of the
-        // types that its type overrides, column types and markers chose, or the libraries below their floor.
+        // types that its type overrides, column types and markers chose, the libraries below their floor, or its
+        // repository's shape.
         var typeMethods = typeQueries
             .Combine(allFileModels.Combine(assignments))
             .Combine(drivers.Combine(converters.Combine(librariesBelowTheFloor)))
+            .Combine(repositories)
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
-                        input.Left.Left,
+                        input.Left.Left.Left,
+                        input.Left.Left.Right.Left,
+                        input.Left.Left.Right.Right,
                         input.Left.Right.Left,
-                        input.Left.Right.Right,
-                        input.Right.Left,
-                        input.Right.Right.Left,
-                        input.Right.Right.Right
+                        input.Left.Right.Right.Left,
+                        input.Left.Right.Right.Right,
+                        input.Right
                     )
             )
             .WithTrackingName(TrackingNames.MethodsInput)
@@ -876,6 +920,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (each, _) => ExtensionClassNamesOf(each))
             .WithTrackingName(TrackingNames.ExtensionClassNames);
 
+        // Every type's repository interface, where it goes, which almost never changes.
+        var interfaces = typeMethods
+            .Select(static (methods, _) => InterfaceSignature.Of(methods))
+            .WhereNotNull()
+            .Collect()
+            .Select(static (each, _) => ToSortedInterfaces(each))
+            .WithTrackingName(TrackingNames.InterfaceSignatures);
+
         // Those names that the project has already, as a type or a namespace.  Like the lookup of the models' names, it
         // runs on every run, since the driver gives a new compilation each time, and its value is equal until a type or
         // a namespace of a name appears or goes.
@@ -888,11 +940,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.TakenExtensionClasses);
 
         // A step of its own, since it sees every type's methods at once: where the methods of two types are compared,
-        // and each extension class's name with the project's and the models'.
+        // each extension class's name with the project's and the models', and each interface's name with the models',
+        // the extension classes' and the other interfaces'.
         var conflicts = signatures
+            .Combine(interfaces)
             .Combine(takenExtensionClasses)
             .Combine(modelNames)
-            .Select(static (input, _) => MethodConflicts.Find(input.Left.Left, input.Left.Right, input.Right))
+            .Select(
+                static (input, _) =>
+                    MethodConflicts.Find(input.Left.Left.Left, input.Left.Left.Right, input.Left.Right, input.Right)
+            )
             .WithTrackingName(TrackingNames.MethodConflicts);
 
         // Each type's file, from its own slice of the conflicts, so that a clash re-emits only the types it touches.
@@ -903,10 +960,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     (
                         Methods: input.Left,
                         Dropped: input.Right.DroppedOf(input.Left.TypeKey),
-                        Blocked: input.Right.IsBlocked(input.Left.TypeKey)
+                        Blocked: input.Right.IsBlocked(input.Left.TypeKey),
+                        InterfaceBlocked: input.Right.IsInterfaceBlocked(input.Left.TypeKey)
                     )
             )
-            .Select(static (input, _) => MethodEmitter.Emit(input.Methods, input.Dropped, input.Blocked))
+            .Select(
+                static (input, _) =>
+                    MethodEmitter.Emit(input.Methods, input.Dropped, input.Blocked, input.InterfaceBlocked)
+            )
             .WithTrackingName(TrackingNames.MethodOutput);
 
         // The problems of every type's methods together, each once: a file that two types claim gives both the same
@@ -949,15 +1010,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(usesRowBuffer, AddRowBuffer);
 
-        // The engines of the project's CodeGen queries, which almost never change.
-        var codeGenEngines = typeMethods
-            .Select(static (methods, _) => methods.CodeGenEngines)
+        // The engines of the project's queries with a method, which almost never change.
+        var methodEngines = typeMethods
+            .Select(static (methods, _) => methods.MethodEngines)
             .Collect()
-            .Select(static (engines, _) => engines.Aggregate(CodeGenEngines.None, static (all, engine) => all | engine))
-            .WithTrackingName(TrackingNames.CodeGenEngines);
+            .Select(static (engines, _) => engines.Aggregate(MethodEngines.None, static (all, engine) => all | engine))
+            .WithTrackingName(TrackingNames.MethodEngines);
 
         // Not located, and once for the project and engine, however many of its queries need the driver.
-        context.RegisterSourceOutput(codeGenEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
+        context.RegisterSourceOutput(methodEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
 
         // The libraries whose generated conversion a method calls, each once, which almost never change.
         var conversionLibraries = typeMethods
@@ -981,7 +1042,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
 
-        // The libraries that the CodeGen queries use, each once for each engine, which almost never change.
+        // The libraries that the queries with a method use, each once for each engine, which almost never change.
         var usedLibraries = typeMethods
             .Select(static (methods, _) => methods.UsedLibraries)
             .Collect()
@@ -1045,7 +1106,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    // SQLSRC282 for each package that the libraries a CodeGen query uses need on its engine and that the project
+    // SQLSRC282 for each package that the libraries a query with a method uses need on its engine and that the project
     // references older than its floor, each once: NetTopologySuite, used on both engines, is one error.
     private static void ReportLibrariesBelowTheFloor(
         SourceProductionContext output,
@@ -1087,16 +1148,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // SQLSRC273 for each engine that a CodeGen query has and whose driver the project does not reference.
+    // SQLSRC273 for each engine that a query with a method has and whose driver the project does not reference.
     private static void ReportMissingDrivers(
         SourceProductionContext output,
-        (CodeGenEngines Engines, (NpgsqlProbe Npgsql, SqlClientProbe SqlClient) Probes) input
+        (MethodEngines Engines, (NpgsqlProbe Npgsql, SqlClientProbe SqlClient) Probes) input
     )
     {
         foreach (var engine in DatabaseEngines.All)
         {
             if (
-                (input.Engines & engine.ToCodeGenEngines()) != 0
+                (input.Engines & engine.ToMethodEngines()) != 0
                 && !DriverProbes.Of(engine, input.Probes.Npgsql, input.Probes.SqlClient).Referenced
             )
             {
@@ -1142,6 +1203,10 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ThenBy(static signature => signature.Name, StringComparer.Ordinal)
                 .ToImmutableArray()
         );
+
+    // The interfaces of the types that get one, sorted ordinally by the type's key.
+    private static EquatableArray<InterfaceSignature> ToSortedInterfaces(ImmutableArray<InterfaceSignature> each) =>
+        new(each.OrderBy(static signature => signature.TypeKey, StringComparer.Ordinal).ToImmutableArray());
 
     // The distinct full names of the extension classes, in ordinal order.
     private static EquatableArray<string> ExtensionClassNamesOf(EquatableArray<MethodSignature> signatures) =>

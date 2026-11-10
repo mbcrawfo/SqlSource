@@ -40,7 +40,7 @@ public sealed class LibraryTypeTests
 
     private const string ListShapes = "-- name: ListShapes\nSELECT shape FROM maps;\n";
 
-    // The project at Models, which the run would have at CodeGen.
+    // The project at Models, which the run would have at Methods.
     private const string AtModels = /*lang=json,strict*/
         """{"output": "Models"}""";
 
@@ -48,7 +48,8 @@ public sealed class LibraryTypeTests
     private const string ShapeHasNoCSharpType =
         $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'shape' has the type 'geometry', which "
         + "SqlSource cannot give a C# type.  Reference Npgsql.NetTopologySuite to read it as NetTopologySuite's "
-        + "Geometry in a codegen query, or map it with the type override, as public.geometry=<a C# type>.";
+        + "Geometry in a methods or repository query, or map it with the type override, as "
+        + "public.geometry=<a C# type>.";
 
     private const string ListPlaces = "-- name: ListPlaces\nSELECT place, shape FROM places;\n";
 
@@ -57,8 +58,8 @@ public sealed class LibraryTypeTests
         $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'place' has the type 'geography', which "
         + "SqlSource cannot give a C# type.  Reference NetTopologySuite.IO.SqlServerBytes, with NetTopologySuite "
         + "2.5.0 or later, and turn the netTopologySuite library on, to read it as NetTopologySuite's Geometry in a "
-        + "codegen query, or reference the package Microsoft.SqlServer.Types and map it with the type override, as "
-        + "geography=Microsoft.SqlServer.Types.SqlGeography.";
+        + "methods or repository query, or reference the package Microsoft.SqlServer.Types and map it with the type "
+        + "override, as geography=Microsoft.SqlServer.Types.SqlGeography.";
 
     private static readonly PostgresType Timestamptz = Catalog("timestamptz") with
     {
@@ -353,7 +354,7 @@ public sealed class LibraryTypeTests
 
     // SQL Server has NodaTime's rows, and the library is on only when something says so.
     [Fact]
-    public void Run_SqlServerNodaTimeOn_GivesCodeGenModelsNodaTimeTypes()
+    public void Run_SqlServerNodaTimeOn_GivesMethodsModelsNodaTimeTypes()
     {
         var run = RunDates(
             "-- library-types: nodatime=on\n\n-- name: ListDates\nSELECT d FROM dates;\n",
@@ -422,7 +423,7 @@ public sealed class LibraryTypeTests
     [Theory]
     [InlineData("10.0.3", "3.3.7", true)]
     [InlineData("8.0.3", "3.1.9", false)]
-    public void Run_CodeGenNodaTime_CompilesWithoutWarnings(string npgsql, string nodaTime, bool newest)
+    public void Run_MethodsNodaTime_CompilesWithoutWarnings(string npgsql, string nodaTime, bool newest)
     {
         var tstz = Timestamptz;
         var tsrange = Catalog("tsrange", SidecarValues.Kind.Range, Catalog("timestamp"));
@@ -668,7 +669,7 @@ public sealed class LibraryTypeTests
     // schema, of an array of geometry and of a domain over it.  Without the library none has a C# type, so the row
     // stays, with nothing beside it, and the query keeps the failure of its first column for a claim at Models.
     [Fact]
-    public void Run_PostgisColumnsInCodegen_AreGeometry()
+    public void Run_PostgisColumnsInMethods_AreGeometry()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
         var entry = Entry(
@@ -939,7 +940,7 @@ public sealed class LibraryTypeTests
     private static string Settings(string key, JsonObject value) =>
         GeneratorHarness.Json(new JsonObject { [key] = value });
 
-    // ListEvents of this text at CodeGen, with these references and the project's settings, and the folder's settings
+    // ListEvents of this text at Methods, with these references and the project's settings, and the folder's settings
     // file when it is given.
     private static GeneratorRun RunEvents(
         string text,
@@ -967,7 +968,7 @@ public sealed class LibraryTypeTests
             [TestSidecars.Column(0, "d", TestSidecars.SqlServer("date", 3), nullable: true)]
         );
 
-    // ListDates of this text at CodeGen under mssql.
+    // ListDates of this text at Methods under mssql.
     private static GeneratorRun RunDates(string text, MetadataReference[] references)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, text);

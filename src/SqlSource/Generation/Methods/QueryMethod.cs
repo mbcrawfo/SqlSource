@@ -1,5 +1,6 @@
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Models;
+using SqlSource.Generation.Repositories;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
@@ -59,6 +60,12 @@ internal sealed record QueryMethod(
     /// extension class.
     /// </summary>
     public MethodHost Host { get; init; }
+
+    /// <summary>
+    /// The member that gives the method its connection, for a repository's method, which is an instance method that
+    /// takes no connection, transaction or command timeout.  Null for any other method, which takes its connection.
+    /// </summary>
+    public ConnectionSource? Source { get; init; }
 }
 
 /// <summary>

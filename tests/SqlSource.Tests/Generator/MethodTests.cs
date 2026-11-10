@@ -13,8 +13,8 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// The method of each query whose output is CodeGen: where it goes, how it is named, and which models it reads and
-// binds.  Each run is at CodeGen under postgres on Npgsql 10, with an entry written for each query's current hash, and
+// The method of each query whose output is Methods: where it goes, how it is named, and which models it reads and
+// binds.  Each run is at Methods under postgres on Npgsql 10, with an entry written for each query's current hash, and
 // every method must compile without a warning.
 public sealed class MethodTests
 {
@@ -70,7 +70,7 @@ public sealed class MethodTests
     }
 
     [Fact]
-    public void Run_CodeGenQuery_IsAnExtensionMethodOfTheTypesExtensionClass()
+    public void Run_MethodsQuery_IsAnExtensionMethodOfTheTypesExtensionClass()
     {
         var run = MethodRuns.Run(Users, UsersEntries);
 
@@ -240,14 +240,14 @@ public sealed class MethodTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
     }
 
-    // A CodeGen query has no member in the nested class, so it may have the nested class's name: its method goes into
-    // the extension class, alone, beside another CodeGen query, or beside a query at sql whose constant the nested
+    // A methods query has no member in the nested class, so it may have the nested class's name: its method goes into
+    // the extension class, alone, beside another methods query, or beside a query at sql whose constant the nested
     // class holds.
     [Theory]
     [InlineData("")]
     [InlineData("-- name: GetUser\nSELECT id FROM users;\n")]
     [InlineData("-- name: GetName\n-- output: sql\nSELECT name FROM users;\n")]
-    public void Run_CodeGenQueryNamedLikeTheNestedClass_IsAMethodOfTheExtensionClass(string other)
+    public void Run_MethodsQueryNamedLikeTheNestedClass_IsAMethodOfTheExtensionClass(string other)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Sql\nSELECT id FROM users;\n" + other);
         var entries = new List<SidecarEntry> { Entry(file, "Sql", [], [Column("id")]) };
@@ -274,10 +274,10 @@ public sealed class MethodTests
         }
     }
 
-    // A CodeGen query whose method goes into the extension class has no member on the type, so it may have the
+    // A methods query whose method goes into the extension class has no member on the type, so it may have the
     // type's name, beside a query at sql whose constant is on the type.
     [Fact]
-    public void Run_CodeGenQueryNamedLikeTheTypeInTheExtensionClass_IsAMethodOfTheExtensionClass()
+    public void Run_MethodsQueryNamedLikeTheTypeInTheExtensionClass_IsAMethodOfTheExtensionClass()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -295,7 +295,7 @@ public sealed class MethodTests
             .ShouldContain("        public const string GetName = \"SELECT name FROM users;\";\n");
     }
 
-    // A query at sql still has a constant in the nested class, so it cannot have its name, and its file, the CodeGen
+    // A query at sql still has a constant in the nested class, so it cannot have its name, and its file, the Methods
     // query of it too, is left out.
     [Fact]
     public void Run_SqlQueryNamedLikeTheNestedClass_IsSqlsrc009()
@@ -324,7 +324,7 @@ public sealed class MethodTests
             GeneratorHarness.UsersPath,
             "-- name: GetName\n-- output: sql\nSELECT name FROM users WHERE id = @id;\n"
                 + "-- name: GetEmail\n-- output: models\nSELECT email FROM users WHERE id = @id;\n"
-                + "-- name: GetUser\n-- output: codegen\nSELECT id, name FROM users WHERE id = @id;\n"
+                + "-- name: GetUser\n-- output: methods\nSELECT id, name FROM users WHERE id = @id;\n"
         );
 
         var run = GeneratorHarness.Run(
@@ -408,7 +408,7 @@ public sealed class MethodTests
         var lines = new SqlFile("/app/Repo/Lines.sql", "-- name: GetLine\nSELECT id FROM lines;\n");
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
             [
                 Users,
@@ -638,7 +638,7 @@ public sealed class MethodTests
         var stale = Users with { Text = "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id AND 1 = 1;\n" };
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [stale, Sidecars.Of(stale, UsersEntries)],
             references: [NpgsqlReferences.Npgsql10],

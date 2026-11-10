@@ -29,6 +29,13 @@ internal static class SqlIdentifier
     /// </summary>
     public static bool IsReservedKeyword(string value) => SyntaxFacts.GetKeywordKind(value) != SyntaxKind.None;
 
+    /// <summary>
+    /// True for a contextual keyword such as <c>file</c> or <c>where</c>, and for <c>extension</c>, which is one from
+    /// C# 14, whatever this compiler knows of it.
+    /// </summary>
+    public static bool IsContextualKeyword(string value) =>
+        SyntaxFacts.GetContextualKeywordKind(value) != SyntaxKind.None || value == "extension";
+
     /// <summary>True when <paramref name="value" /> can be the name of a generated member or parameter.</summary>
     public static bool IsUsableName(string value) => IsValid(value) && !IsReservedKeyword(value);
 

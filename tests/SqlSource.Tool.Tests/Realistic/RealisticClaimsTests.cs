@@ -35,7 +35,7 @@ public sealed class RealisticClaimsTests
             .ShouldBe([new RealisticClaim("ABMethod", "a-b")]);
 
     [Theory]
-    [InlineData("Output = GeneratorOutput.CodeGen", "Output")]
+    [InlineData("Output = GeneratorOutput.Methods", "Output")]
     [InlineData("Missing = 1", "Missing")]
     public void Parse_ClaimWithAnArgumentOtherThanSource_ThrowsNamingTheClassAndTheArgument(
         string argument,

@@ -11,7 +11,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Testing.Generator;
 
-// The harness of the method tests of tests/SqlSource.Tests/Generator/: a run at CodeGen, under postgres on Npgsql 10 or
+// The harness of the method tests of tests/SqlSource.Tests/Generator/: a run at Methods, under postgres on Npgsql 10 or
 // under mssql on SqlClient 7, the entries written for a query's current hash, and the methods the generator gave.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
@@ -25,7 +25,7 @@ internal static class MethodRuns
     // The name of the file of Source's methods.
     public const string MethodsFile = "App.Sample-Methods.g.cs";
 
-    // The source and the file with its sidecar of these entries, at CodeGen under postgres, on Npgsql 10 unless the
+    // The source and the file with its sidecar of these entries, at Methods under postgres, on Npgsql 10 unless the
     // references are given.  The output and the dialect are the project's settings file, with the entries of settings,
     // a JSON object, over them, and the other files are the run's beside the file and its sidecar.
     public static GeneratorRun Run(
@@ -39,7 +39,7 @@ internal static class MethodRuns
         SqlFile[]? otherFiles = null
     ) =>
         GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
             [file, Sidecars.Of(file, entries), .. otherFiles ?? []],
             languageVersion: languageVersion,
@@ -48,18 +48,18 @@ internal static class MethodRuns
             settings: settings
         );
 
-    // The source and these files, each sidecar among them, at CodeGen under postgres on Npgsql 10: the run of a test
+    // The source and these files, each sidecar among them, at Methods under postgres on Npgsql 10: the run of a test
     // with more than one file.
     public static GeneratorRun Run(string source, params SqlFile[] files) =>
         GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
             files,
             references: [NpgsqlReferences.Npgsql10],
             dialect: "postgres"
         );
 
-    // The first of the files, a .sql file, with its sidecar, and the others, at CodeGen under postgres on Npgsql 10, on
+    // The first of the files, a .sql file, with its sidecar, and the others, at Methods under postgres on Npgsql 10, on
     // App.Sample, with the generator parameters of the project's settings file.  The entry of ListUsers has the rows id
     // and name, or none.
     public static GeneratorRun ListUsers(SqlFile[] files, string? generatorParameters, bool hasRows = true)
@@ -70,7 +70,7 @@ internal static class MethodRuns
             : null;
 
         return GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [.. files, Sidecars.Of(file, ModelRuns.Entry(file, "ListUsers", [], rows))],
             references: [NpgsqlReferences.Npgsql10],

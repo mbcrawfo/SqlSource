@@ -4,7 +4,7 @@
 -- tools/describe-end-to-end.sh in a database of its own before it describes the queries.  A change to it is followed
 -- by a run of that script, which writes the sidecars again.
 
--- An email address, an alias type over nvarchar.  CodeGen/UserQueries.sql maps it to the C# type EmailAddress.  A table
+-- An email address, an alias type over nvarchar.  Methods/UserQueries.sql maps it to the C# type EmailAddress.  A table
 -- can use the type only in a batch after the one that creates it, so GO ends this one.
 CREATE TYPE dbo.Email FROM nvarchar(200);
 GO
@@ -35,7 +35,7 @@ CREATE TABLE order_lines (
 );
 
 -- Where and when an order arrived, the carrier's details, a JSON object, and its events, a JSON array.  json is a type
--- of SQL Server 2025, the version docker-compose.yml starts.  CodeGen/DeliveryQueries.sql reads location as
+-- of SQL Server 2025, the version docker-compose.yml starts.  Methods/DeliveryQueries.sql reads location as
 -- NetTopologySuite's Geometry, details as the C# class DeliveryDetails and events as a JsonElement.
 CREATE TABLE deliveries (
     order_id int PRIMARY KEY REFERENCES orders (id),

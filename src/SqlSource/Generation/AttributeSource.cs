@@ -30,11 +30,20 @@ internal static class AttributeSource
 
     public const string ConverterAttributeMetadataName = "SqlSource.SqlSourceConverterAttribute";
 
+    public const string ConnectionAttributeMetadataName = "SqlSource.SqlSourceConnectionAttribute";
+
     public const string SourceProperty = "Source";
+
+    public const string GenerateInterfaceProperty = "GenerateInterface";
+
+    public const string InterfaceNameProperty = "InterfaceName";
+
+    public const string DatabaseProperty = "Database";
 
     // SqlSourceGenerateAttribute is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.
     // SqlSourceConverterAttribute is not [Conditional]: a library's converters are found in its metadata by the
-    // projects that reference it.
+    // projects that reference it.  Nor is SqlSourceConnectionAttribute: a repository's connection may be a member of a
+    // base class in a referenced assembly.
     //
     // This file goes into every project that references the package, including one that targets a framework older
     // than .NET 8 and so compiles as C# 7.3.  It therefore uses nothing newer: no "#nullable" and no "string?".  Such
@@ -62,6 +71,31 @@ internal static class AttributeSource
             }
 
             /// <summary>
+            /// Marks the member, or the primary-constructor parameter, that gives a repository its connection: a
+            /// connection string, a <c>DbDataSource</c>, a <c>DbConnection</c> that the repository borrows, or a method
+            /// that returns a new <c>DbConnection</c>, or a task of one, and takes nothing or a
+            /// <c>CancellationToken</c>.  It is not conditional, unlike <see cref="SqlSourceGenerateAttribute" />: a
+            /// repository finds a marked member of a base class in a referenced assembly in its metadata.
+            /// </summary>
+            [global::Microsoft.CodeAnalysis.Embedded]
+            [global::System.AttributeUsage(
+                global::System.AttributeTargets.Field
+                    | global::System.AttributeTargets.Property
+                    | global::System.AttributeTargets.Method
+                    | global::System.AttributeTargets.Parameter,
+                AllowMultiple = false,
+                Inherited = false
+            )]
+            internal sealed class SqlSourceConnectionAttribute : global::System.Attribute
+            {
+                /// <summary>
+                /// The database whose queries use the connection, as the <c>database</c> setting names it.  Needed
+                /// only when the repository's queries use more than one database.
+                /// </summary>
+                public string Database { get; set; }
+            }
+
+            /// <summary>
             /// Generates code for each query in the <c>.sql</c> files of the type.
             /// </summary>
             [global::Microsoft.CodeAnalysis.Embedded]
@@ -79,6 +113,18 @@ internal static class AttributeSource
                 /// that folder, <c>UserRepository.sql</c> for <c>UserRepository</c>.
                 /// </summary>
                 public string Source { get; set; }
+
+                /// <summary>
+                /// Whether a repository gets its interface, which overrides the project's
+                /// <c>SqlSourceRepositoryInterfaces</c> when it is written.
+                /// </summary>
+                public bool GenerateInterface { get; set; }
+
+                /// <summary>
+                /// The name of a repository's interface.  The default is the type's name after an <c>I</c>,
+                /// <c>IUserRepository</c> for <c>UserRepository</c>.
+                /// </summary>
+                public string InterfaceName { get; set; }
             }
         }
 

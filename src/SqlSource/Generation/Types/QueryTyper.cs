@@ -396,7 +396,7 @@ internal static class QueryTyper
     // edited by hand, and describing again mends it.  A type that a library's row gives keeps beside it the type it
     // has without the library.  When that one fails because the type has no C# type without a library, as PostGIS's
     // geometry has none, the row is kept with nothing beside it, and the failure's diagnostic is the query's
-    // withoutLibraryFailure, the first one, for the claims whose output is not CodeGen.  Any other failure, as of a
+    // withoutLibraryFailure, the first one, for the claims whose output is not Methods.  Any other failure, as of a
     // driver the project lacks, is the type's, and the row is not used.
     private static PropertyType? TypeOf(
         SidecarType? type,

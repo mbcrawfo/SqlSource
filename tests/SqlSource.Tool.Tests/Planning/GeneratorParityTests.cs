@@ -226,7 +226,7 @@ public sealed class GeneratorParityTests : IDisposable
         ),
         ["an ansi file whose first query is at sql"] = new(
             "ansi",
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [("One.sql", "-- name: First\n-- output: sql\nSELECT 1;\n\n-- name: Second\nSELECT 2;\n")]
         ),
         ["tokens without a default under postgres"] = new(
@@ -243,7 +243,7 @@ public sealed class GeneratorParityTests : IDisposable
         ),
         ["both in one file"] = new(
             "sqlite",
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [
                 (
                     "Find.sql",

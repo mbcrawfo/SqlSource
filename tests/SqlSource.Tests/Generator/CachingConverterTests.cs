@@ -17,7 +17,7 @@ using static SqlSource.Testing.Generator.StepReasons;
 namespace SqlSource.Tests.Generator;
 
 // The caching of the project's converters: what an edit to a converter, or to the code beside it, makes the generator
-// find, plan and write again.  UserQueries and OrderQueries are in the namespace App and at CodeGen under postgres, so
+// find, plan and write again.  UserQueries and OrderQueries are in the namespace App and at Methods under postgres, so
 // each type has one method, in its extension class.  Users overrides int4 with App.UserId, whose converters are on
 // App.Conversions, so UserQueries' method reads its column through ToUserId; Orders has no override.
 public sealed class CachingConverterTests

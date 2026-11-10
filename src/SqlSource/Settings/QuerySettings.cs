@@ -54,11 +54,18 @@ internal readonly record struct QuerySettings(
 
     /// <summary>
     /// Where the query's members go: the one written, else the default of its output, a nested class for the output
-    /// that has no method and the extension class for the one that has.
+    /// that has no method, the extension class for a method that extends the connection, and the type for the
+    /// repository.
     /// </summary>
     public MemberLocation MemberLocation =>
         WrittenMemberLocation?.Value
-        ?? (Output == OutputKind.CodeGen ? MemberLocation.ExtensionClass : MemberLocation.NestedClass);
+        ?? Output switch
+        {
+            OutputKind.Methods => MemberLocation.ExtensionClass,
+            OutputKind.Repository => MemberLocation.Class,
+            OutputKind.Sql or OutputKind.Models => MemberLocation.NestedClass,
+            _ => throw UnexpectedEnumValueException.Of(Output),
+        };
 
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
@@ -83,7 +90,7 @@ internal readonly record struct QuerySettings(
     public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel file) =>
         new(
             markers.Parameters.Over(file.Parameters).Resolve(),
-            markers.Output ?? file.Output ?? OutputKind.CodeGen,
+            ResolveOutput(markers, file),
             markers.InputModelSuffix ?? file.InputModelSuffix ?? DefaultInputModelSuffix,
             markers.OutputModelSuffix ?? file.OutputModelSuffix ?? DefaultOutputModelSuffix,
             markers.ModelNamespace ?? file.ModelNamespace,
@@ -131,6 +138,14 @@ internal readonly record struct QuerySettings(
     /// </summary>
     public static EquatableArray<LibrarySetting> ResolveLibraries(SettingsLevel markers, SettingsLevel file) =>
         LibrarySettings.Over(markers.LibraryTypes, file.LibraryTypes) ?? EquatableArray<LibrarySetting>.Empty;
+
+    /// <summary>
+    /// The output of a query: the markers', then the file's level's, else <see cref="OutputKind.Repository" />.  The
+    /// file's level is the chain of its folder.  <see cref="Resolve" /> gives it too; a step that needs only the
+    /// output asks this, without resolving the rest.
+    /// </summary>
+    public static OutputKind ResolveOutput(SettingsLevel markers, SettingsLevel file) =>
+        markers.Output ?? file.Output ?? OutputKind.Repository;
 
     /// <summary>
     /// The database of a query: the markers', then the file's level's, else the name of the dialect, which the caller

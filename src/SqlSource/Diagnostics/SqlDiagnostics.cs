@@ -304,6 +304,145 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the type in full, {1} the database, and {2} what to add, which depends on whether the type uses one
+    // database and marks a member.  Reported at the type's attribute, once for each database that has no connection.
+    public static readonly DiagnosticDescriptor RepositoryHasNoConnection = new(
+        id: "SQLSRC028",
+        title: "Repository has no connection",
+        messageFormat: "'{0}' has no connection for the database '{1}', which its repository queries use.  {2}  Or set "
+            + "the output of its repository queries to methods.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc028",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the database, and {2} the members, each quoted, in the order they are declared.
+    // Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor RepositoryHasManyConnections = new(
+        id: "SQLSRC029",
+        title: "Repository has more than one connection",
+        messageFormat: "'{0}' has more than one connection for the database '{1}': {2}.  Mark only the one to use "
+            + "[SqlSourceConnection].",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc029",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the member, and {2} the databases, each quoted.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionNeedsDatabase = new(
+        id: "SQLSRC030",
+        title: "Connection needs a database",
+        messageFormat: "'{1}' of '{0}' is marked [SqlSourceConnection] without a Database, and the repository queries "
+            + "of '{0}' use more than one database: {2}.  Set its Database to the one it connects to.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc030",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // A warning a project may configure: the member gives no repository method its connection, and no method is left
+    // out for it.  The type's own code may use the member for queries of another output, and an error would break the
+    // build of a type whose queries of that database move to the output methods for a while.  {0} is the type in full,
+    // {1} the member, {2} its Database, and {3} the databases the queries use, each quoted.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionDatabaseNotUsed = new(
+        id: "SQLSRC031",
+        title: "Connection's database is not used",
+        messageFormat: "'{1}' of '{0}' is marked [SqlSourceConnection] for the database '{2}', and no repository query "
+            + "of '{0}' uses it: they use {3}.  Correct its Database, or remove the mark.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc031"
+    );
+
+    // {0} is the type in full and {1} the member.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionMemberNotSupported = new(
+        id: "SQLSRC032",
+        title: "Connection member is not supported",
+        messageFormat: "'{1}' of '{0}' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, "
+            + "property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a method "
+            + "that is not generic, takes nothing or a CancellationToken, and returns a string, a DbConnection, or a "
+            + "Task or ValueTask of a DbConnection.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc032",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the member, {2} its type, {3} the database, {4} the database's engine and {5} that
+    // engine's driver.  Reported at the member.
+    public static readonly DiagnosticDescriptor ConnectionOfAnotherEngine = new(
+        id: "SQLSRC033",
+        title: "Connection is of another database engine",
+        messageFormat: "'{1}' of '{0}' is a '{2}', of another engine's driver, and the database '{3}' is {4}.  Give "
+            + "the database a connection of {5}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc033",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full.  Reported at the type's attribute, once for the type.
+    public static readonly DiagnosticDescriptor RepositoryIsStatic = new(
+        id: "SQLSRC034",
+        title: "Repository is static",
+        messageFormat: "'{0}' is static, and the method of a repository query is an instance method.  Set the output "
+            + "of its repository queries to methods, or remove static.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc034",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the interface's name, and {2} what has that name, as
+    // "the class App.IUserRepository".  Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor RepositoryInterfaceNameTaken = new(
+        id: "SQLSRC035",
+        title: "Repository interface name is taken",
+        messageFormat: "'{0}' cannot get its interface '{1}', because {2} already has that name.  Set InterfaceName "
+            + "on its [SqlSourceGenerate] to another name, or set GenerateInterface to false.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc035",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full, {1} the parameter and {2} the database.  Reported at the parameter.
+    public static readonly DiagnosticDescriptor ConnectionParameterHidden = new(
+        id: "SQLSRC036",
+        title: "Connection parameter is hidden by a method argument",
+        messageFormat: "'{1}' of '{0}' is the primary-constructor parameter that gives the database '{2}' its "
+            + "connection, and the repository methods have an argument named '{1}', which hides it.  Rename the "
+            + "parameter, or store it in a field or property and give the connection from that.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc036",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the type in full and {1} the InterfaceName as it is written.  Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor RepositoryInterfaceNameNotValid = new(
+        id: "SQLSRC037",
+        title: "Repository interface name is not valid",
+        messageFormat: "'{0}' cannot get its interface '{1}', because the name is not a C# identifier.  Set "
+            + "InterfaceName on its [SqlSourceGenerate] to an identifier, without an @ or a namespace, or remove it.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc037",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -549,9 +688,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MemberLocationNotFit = new(
         id: "SQLSRC122",
         title: "Member location does not fit the query",
-        messageFormat: "The query '{0}' of '{1}' cannot go in the extension class, which {2} sets, because its output "
-            + "is {3} and only a query method extends the connection.  Use class or nested-class.  Write "
-            + "-- visibility: or -- member-location: on the query.",
+        messageFormat: "The query '{0}' of '{1}' cannot go in the {2}, which {3} sets, because its output "
+            + "is {4}.  {5}  Write -- visibility: or -- member-location: on the query.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -559,14 +697,16 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the query, {1} the type in full, {2} the visibility, {3} the place that wrote it, as "the file header",
-    // {4} the location, and {5} why the two do not fit, as "an extension method is public or internal".  Reported at
-    // the query's own -- visibility: marker, else at its -- member-location: marker, else at its name.
+    // {0} is the query, {1} the type in full, {2} the visibility, {3} where it comes from, as "which the file header
+    // sets" or "the default of the repository output", {4} the location, {5} why the two do not fit, as "an extension
+    // method is public or internal", and {6} the markers that can fix it: "-- visibility: or -- member-location:", or
+    // "-- visibility:" for a repository query, whose method is always on the type.  Reported at the query's own
+    // -- visibility: marker, else at its -- member-location: marker, else at its name.
     public static readonly DiagnosticDescriptor VisibilityNotFit = new(
         id: "SQLSRC123",
         title: "Visibility does not fit the member location",
-        messageFormat: "The query '{0}' of '{1}' cannot be {2}, which {3} sets, at the member location {4}, because "
-            + "{5}.  Write -- visibility: or -- member-location: on the query.",
+        messageFormat: "The query '{0}' of '{1}' cannot be {2}, {3}, at the member location {4}, because {5}.  Write "
+            + "{6} on the query.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -619,7 +759,7 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the list, with its prefix, as written where it is reported, and {1} where it stands.  Reported at the use,
-    // for a query whose output is CodeGen alone.
+    // for a query whose output is Methods or Repository alone, which have a method.
     public static readonly DiagnosticDescriptor NegatedListRefusedEmpty = new(
         id: "SQLSRC127",
         title: "Negated list stands where SQL Server refuses an empty list",
@@ -1033,8 +1173,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor DriverNotReferenced = new(
         id: "SQLSRC273",
         title: "Driver is not referenced",
-        messageFormat: "A query for {0} has the output codegen, and this project does not reference {1}, which its "
-            + "method needs.  Reference {1}, or set the output to models.",
+        messageFormat: "A query for {0} has the output methods or repository, and this project does not reference {1}, "
+            + "which its method needs.  Reference {1}, or set the output to models.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -1055,12 +1195,12 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the token's name and {1} the query.
+    // {0} is the token's name, {1} the query and {2} what has the name: the arguments a query method can have, or what
+    // a repository's method reaches its connection through.
     public static readonly DiagnosticDescriptor TokenNamedAsAnArgument = new(
         id: "SQLSRC275",
         title: "Token is named as an argument of the method",
-        messageFormat: "The token '{0}' of the query '{1}' has the name of an argument that a query method can "
-            + "have: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.",
+        messageFormat: "The token '{0}' of the query '{1}' has the name of {2}.  Rename the token.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -1164,8 +1304,8 @@ internal static class SqlDiagnostics
 
     // {0} is the package, as "NodaTime" or "NetTopologySuite.IO.SqlServerBytes", {1} the version the project
     // references, as "3.1.8", and {2} the oldest that SqlSource supports.  Reported with no position, once for the
-    // project and package, when a codegen query uses a library that needs the package; the queries that use it get no
-    // method.  The package is an argument, so every package's floor shares it.
+    // project and package, when a query with a method uses a library that needs the package; the queries that use it
+    // get no method.  The package is an argument, so every package's floor shares it.
     public static readonly DiagnosticDescriptor LibraryBelowTheFloor = new(
         id: "SQLSRC282",
         title: "A library is older than SqlSource supports",
@@ -1184,7 +1324,7 @@ internal static class SqlDiagnostics
     // type; "'<the type>' is a type of System.Text.Json, which is read without the serializer"; or "'<the type>' is a
     // type that the driver reads, which the serializer never takes", each with "its element '<the element>'" in place
     // of "'<the type>'" for an array on an array that holds JSON.  Reported at the query's name, by ConversionPlanner,
-    // for codegen queries only, once for each column and parameter whose place says json.
+    // for queries with a method only, once for each column and parameter whose place says json.
     public static readonly DiagnosticDescriptor JsonOptInNotApplicable = new(
         id: "SQLSRC283",
         title: "JSON opt-in does not apply",
@@ -1244,6 +1384,16 @@ internal static class SqlDiagnostics
             OnlineToolCannotRun,
             OnlineToolCannotRunOffline,
             OnlineToolFailedSilently,
+            RepositoryHasNoConnection,
+            RepositoryHasManyConnections,
+            ConnectionNeedsDatabase,
+            ConnectionDatabaseNotUsed,
+            ConnectionMemberNotSupported,
+            ConnectionOfAnotherEngine,
+            RepositoryIsStatic,
+            RepositoryInterfaceNameTaken,
+            ConnectionParameterHidden,
+            RepositoryInterfaceNameNotValid,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

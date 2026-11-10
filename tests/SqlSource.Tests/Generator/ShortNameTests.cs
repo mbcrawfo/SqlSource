@@ -516,9 +516,9 @@ public sealed class ShortNameTests
 
     // The warning leaves the query its method, which reads the column through the type's converters.
     [Fact]
-    public void Run_CodeGenQuery_IsSqlsrc284AndGetsItsMethod()
+    public void Run_MethodsQuery_IsSqlsrc284AndGetsItsMethod()
     {
-        var run = RunBrought(OutputKind.CodeGen, OverrideFiles(Int8), Override("int8", "AccountId"));
+        var run = RunBrought(OutputKind.Methods, OverrideFiles(Int8), Override("int8", "AccountId"));
 
         run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC284 ");
         run.Sources[MethodRuns.MethodsFile]

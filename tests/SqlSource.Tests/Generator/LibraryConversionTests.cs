@@ -14,7 +14,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The class of a library's conversions, SqlSource.NodaTimeConversions or SqlSource.JsonConversions, which a project
-// gets once, in a file of its own, when a method of a CodeGen query calls one of its conversions, and never otherwise.
+// gets once, in a file of its own, when a method of a methods query calls one of its conversions, and never otherwise.
 // Each run is under mssql on SqlClient 7 with NodaTime 3.3.7, unless it says otherwise, with an entry written for each
 // query's current hash.
 public sealed class LibraryConversionTests
@@ -86,7 +86,7 @@ public sealed class LibraryConversionTests
         [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")];
 
     [Fact]
-    public void Run_NodaTimeOnAndACodeGenQuery_EmitsTheClass()
+    public void Run_NodaTimeOnAndAMethodsQuery_EmitsTheClass()
     {
         var run = RunDates(NodaTimeOn + FindDates, WithNodaTime);
 
@@ -99,7 +99,7 @@ public sealed class LibraryConversionTests
 
     // The class's file starts as every generated file does.
     [Fact]
-    public void Run_NodaTimeOnAndACodeGenQuery_EmitsAFileThatStartsAsAGeneratedOne()
+    public void Run_NodaTimeOnAndAMethodsQuery_EmitsAFileThatStartsAsAGeneratedOne()
     {
         var run = RunDates(NodaTimeOn + FindDates, WithNodaTime);
 
@@ -564,7 +564,7 @@ public sealed class LibraryConversionTests
 
     // A type at Models, with json on, calls nothing: its models keep the type map's string.
     [Fact]
-    public void Run_NoCodeGenUse_EmitsNoJsonConversions()
+    public void Run_NoMethodsUse_EmitsNoJsonConversions()
     {
         var run = RunSqlServerDocs("-- output: models\n" + JsonOn + FindDocs, SqlServerJson);
 
@@ -645,7 +645,7 @@ public sealed class LibraryConversionTests
         };
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, SerializedSource)],
             [file, Sidecars.Of(file, entry, serializedEntry)],
             supportedFramework: !net8,
@@ -761,7 +761,7 @@ public sealed class LibraryConversionTests
     }
 
     // The query of the text, FindDocs, whose column and parameter doc are not null and maybe_doc can be, all of the
-    // type, at CodeGen under mssql on the source, App.Sample unless another is given.
+    // type, at Methods under mssql on the source, App.Sample unless another is given.
     private static GeneratorRun RunSqlServerDocs(string text, SqlServerType type, string? source = null)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, text);
@@ -782,7 +782,7 @@ public sealed class LibraryConversionTests
         );
     }
 
-    // FindDates, or the query of the text, whose column and parameter d are a not-null date, at CodeGen under mssql on
+    // FindDates, or the query of the text, whose column and parameter d are a not-null date, at Methods under mssql on
     // the source, App.Sample unless another is given.
     private static GeneratorRun RunDates(string text, MetadataReference[] references, string? source = null)
     {

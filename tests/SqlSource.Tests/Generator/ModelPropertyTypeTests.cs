@@ -12,9 +12,9 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The C# type a property of a model is declared with, where it is not the type the parameter's or column's type maps
-// to: a PostgreSQL array parameter is an IEnumerable<T> of its element in a CodeGen query's input model, which its
+// to: a PostgreSQL array parameter is an IEnumerable<T> of its element in a methods query's input model, which its
 // method sends whatever the sequence, and stays an array at Models, where a library hands the value to Npgsql as it is.
-// Each run is under postgres on Npgsql 10, at CodeGen unless it says Models, with an entry written for each query's
+// Each run is under postgres on Npgsql 10, at Methods unless it says Models, with an entry written for each query's
 // current hash.
 public sealed class ModelPropertyTypeTests
 {
@@ -25,9 +25,9 @@ public sealed class ModelPropertyTypeTests
     private static readonly PostgresType IntArray = ArrayOf(Int4, "_int4");
 
     [Fact]
-    public void InputModel_PostgresArrayParameter_IsIEnumerableInCodeGen()
+    public void InputModel_PostgresArrayParameter_IsIEnumerableInMethods()
     {
-        var run = RunIds(OutputKind.CodeGen, "", nullable: false);
+        var run = RunIds(OutputKind.Methods, "", nullable: false);
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("public sealed record FindIdsParams(" + Enumerable + "int> Ids);");
@@ -45,7 +45,7 @@ public sealed class ModelPropertyTypeTests
     [Fact]
     public void InputModel_NullablePostgresArrayParameter_IsNullableIEnumerable()
     {
-        var run = RunIds(OutputKind.CodeGen, "-- param: @ids null\n", nullable: true);
+        var run = RunIds(OutputKind.Methods, "-- param: @ids null\n", nullable: true);
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "int>? Ids);");
@@ -54,7 +54,7 @@ public sealed class ModelPropertyTypeTests
     [Fact]
     public void InputModel_ArrayWithNullableElementOverride_IsIEnumerableOfNullable()
     {
-        var run = RunIds(OutputKind.CodeGen, "-- type-override: int4[]=int?[]\n", nullable: false);
+        var run = RunIds(OutputKind.Methods, "-- type-override: int4[]=int?[]\n", nullable: false);
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "int?> Ids);");
@@ -65,7 +65,7 @@ public sealed class ModelPropertyTypeTests
     public void InputModel_ArrayWithListOverride_IsTakenAsWritten()
     {
         var run = RunIds(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             "-- type-override: int4[]=System.Collections.Generic.List<int>\n",
             nullable: false
         );
@@ -79,7 +79,7 @@ public sealed class ModelPropertyTypeTests
     [Fact]
     public void InputModel_ArrayParameterWithMarkerClrType_IsTakenAsWritten()
     {
-        var run = RunIds(OutputKind.CodeGen, "-- param: @ids -> int[]\n", nullable: false);
+        var run = RunIds(OutputKind.Methods, "-- param: @ids -> int[]\n", nullable: false);
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("(int[] Ids);");
@@ -99,7 +99,7 @@ public sealed class ModelPropertyTypeTests
         var entry = Entry(file, "FindIds", [Parameter(entryName, IntArray, false)], null);
 
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [file, handEdited ? Sidecars.HandEdited(file, entry) : Sidecars.Of(file, entry)],
             references: [NpgsqlReferences.Npgsql10],
@@ -110,10 +110,10 @@ public sealed class ModelPropertyTypeTests
         run.Sources[ParamsModel].ShouldContain("(int[] Ids);");
     }
 
-    // An array of a library's type is an IEnumerable of it at CodeGen, and at Models, which has the base map's type
+    // An array of a library's type is an IEnumerable of it at Methods, and at Models, which has the base map's type
     // without the library, the base map's array, so both of the other outputs' changes apply to the one property.
     [Theory]
-    [InlineData(nameof(OutputKind.CodeGen), Enumerable + "global::NodaTime.Instant> Ids")]
+    [InlineData(nameof(OutputKind.Methods), Enumerable + "global::NodaTime.Instant> Ids")]
     [InlineData(nameof(OutputKind.Models), "global::System.DateTime[] Ids")]
     public void InputModel_ArrayParameterOfALibrarysType_IsItsOutputsType(string output, string expected)
     {
@@ -212,7 +212,7 @@ public sealed class ModelPropertyTypeTests
     // A list parameter is an IEnumerable of its element at every output, whose type is the one an ordinary parameter of
     // the described type has.
     [Theory]
-    [InlineData(nameof(OutputKind.CodeGen))]
+    [InlineData(nameof(OutputKind.Methods))]
     [InlineData(nameof(OutputKind.Models))]
     public void InputModel_ListParameter_IsIEnumerableOfTheElement(string output)
     {
@@ -225,7 +225,7 @@ public sealed class ModelPropertyTypeTests
     [Fact]
     public void InputModel_ListWithNullTest_IsNullable()
     {
-        var run = RunList(OutputKind.CodeGen, "(@ids IS NULL OR id IN @ids)", "", nullable: null);
+        var run = RunList(OutputKind.Methods, "(@ids IS NULL OR id IN @ids)", "", nullable: null);
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "int>? Ids);");
@@ -233,7 +233,7 @@ public sealed class ModelPropertyTypeTests
 
     // The tool writes the marker's null into the sidecar, as nullable.
     [Theory]
-    [InlineData(nameof(OutputKind.CodeGen))]
+    [InlineData(nameof(OutputKind.Methods))]
     [InlineData(nameof(OutputKind.Models))]
     public void InputModel_ListWithNullMarker_IsNullable(string output)
     {
@@ -247,7 +247,7 @@ public sealed class ModelPropertyTypeTests
     public void InputModel_ListWithMarkerClrType_IsIEnumerableOfThatType()
     {
         var run = RunList(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             "id IN @ids",
             "-- param: @ids -> AccountId\n",
             nullable: null,
@@ -261,17 +261,17 @@ public sealed class ModelPropertyTypeTests
     [Fact]
     public void InputModel_ListWithTypeOverride_IsIEnumerableOfTheOverride()
     {
-        var run = RunList(OutputKind.CodeGen, "id IN @ids", "-- type-override: int4=long\n", nullable: null);
+        var run = RunList(OutputKind.Methods, "id IN @ids", "-- type-override: int4=long\n", nullable: null);
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("(" + Enumerable + "long> Ids);");
     }
 
-    // A list of a library's type is an IEnumerable of the library's type at CodeGen and of the base map's without it.
+    // A list of a library's type is an IEnumerable of the library's type at Methods and of the base map's without it.
     [Theory]
-    [InlineData(nameof(OutputKind.CodeGen), Enumerable + "global::NodaTime.Instant> Ids")]
+    [InlineData(nameof(OutputKind.Methods), Enumerable + "global::NodaTime.Instant> Ids")]
     [InlineData(nameof(OutputKind.Models), Enumerable + "global::System.DateTime> Ids")]
-    public void InputModel_ListOfNodaTimeInCodeGen_TakesTheLibrarysElement(string output, string expected)
+    public void InputModel_ListOfNodaTimeInMethods_TakesTheLibrarysElement(string output, string expected)
     {
         var file = ListFile("at IN @ids", "");
         var instant = Catalog("timestamptz") with { Name = "timestamp with time zone" };

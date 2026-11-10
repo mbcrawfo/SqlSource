@@ -117,12 +117,12 @@ public sealed class QuerySettingsTests
     }
 
     [Fact]
-    public void Resolve_Output_IsCodeGenUnlessALevelSaysOtherwise()
+    public void Resolve_Output_IsRepositoryUnlessALevelSaysOtherwise()
     {
         var sql = new SettingsLevel { Output = OutputKind.Sql };
         var models = new SettingsLevel { Output = OutputKind.Models };
 
-        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None).Output.ShouldBe(OutputKind.CodeGen);
+        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None).Output.ShouldBe(OutputKind.Repository);
         QuerySettings.Resolve(SettingsLevel.None, sql).Output.ShouldBe(OutputKind.Sql);
         QuerySettings.Resolve(models, sql).Output.ShouldBe(OutputKind.Models);
     }
@@ -193,7 +193,8 @@ public sealed class QuerySettingsTests
     // An internal enum cannot be the parameter of a public test method, so a row gives the names.
     [InlineData("Sql", "NestedClass")]
     [InlineData("Models", "NestedClass")]
-    [InlineData("CodeGen", "ExtensionClass")]
+    [InlineData("Methods", "ExtensionClass")]
+    [InlineData("Repository", "Class")]
     public void MemberLocation_NoLevelWritesOne_IsTheDefaultOfTheOutput(string output, string expected)
     {
         var level = new SettingsLevel { Output = Enum.Parse<OutputKind>(output) };
@@ -206,7 +207,7 @@ public sealed class QuerySettingsTests
 
     [Theory]
     [InlineData("Sql")]
-    [InlineData("CodeGen")]
+    [InlineData("Methods")]
     public void MemberLocation_ALevelWritesOne_IsItWhateverTheOutput(string output)
     {
         var file = new SettingsLevel

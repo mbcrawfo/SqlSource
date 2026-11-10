@@ -5,7 +5,7 @@
 1. **Small and representative.**  A few queries in each folder show the common path and a few of the settings a user reaches for.  Coverage belongs in the end-to-end projects under `tests/`, never here.
 2. **No tests, and nothing runs.**  The project is a library in `SqlSource.slnx` that compiles.  Its classes call the generated code as a user's code would, so a stale sidecar or a model that changes shape breaks the build.
 3. **Only what the manual recommends.**  The project file, its `sqlsource.json`, the queries and the code are what a user may copy, so code read through Dapper follows every point of [the recipe](../docs/manual/recipes.md#models-through-dapper).
-4. **One folder per output**, `Sql/`, `Models/` and `CodeGen/`: the file header of `Sql/CountQueries.sql` sets `sql`, and `Models/sqlsource.json` sets `models` for its folder.  In `Sql/` and `CodeGen/` each class takes the `.sql` file named for it, the default; `Models/` has one class that takes its folder with `Source = "."`, so both forms are shown.  `CodeGen/` uses the default output.
+4. **One folder per output**, `Sql/`, `Models/`, `Methods/` and `Repository/`: the file header of `Sql/CountQueries.sql` sets `sql`, and `Models/sqlsource.json` sets `models` for its folder.  In `Sql/`, `Methods/` and `Repository/` each class takes the `.sql` file named for it, the default; `Models/` has one class that takes its folder with `Source = "."`, so both forms are shown.  `Methods/` sets `methods` in its own `sqlsource.json`, and `Repository/` takes the default.
 5. **Anything only the repository needs is marked.**  The project file references the generator as the package adds it, with `ReferenceOutputAssembly="false"`, imports the package's props and targets by path, and keeps `SQLSRC240` a warning; its comments and the README say what a user writes instead.
 
 ## Keeping them current
@@ -17,6 +17,6 @@
 
 ## Adding a database
 
-A new database gets a project of its own, `examples/<Engine>Examples`, by the pattern of `PostgresExamples` and `SqlServerExamples`: its Compose file and `schema.sql`, the three folders, a README, an entry in `SqlSource.slnx` under `/examples/`, and its sidecars written by the same script.
+A new database gets a project of its own, `examples/<Engine>Examples`, by the pattern of `PostgresExamples` and `SqlServerExamples`: its Compose file and `schema.sql`, the four folders, a README, an entry in `SqlSource.slnx` under `/examples/`, and its sidecars written by the same script.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

@@ -12,5 +12,8 @@ internal enum OutputKind
     Models = 1,
 
     /// <summary><see cref="Models" />, and the method that runs the query.</summary>
-    CodeGen = 2,
+    Methods = 2,
+
+    /// <summary><see cref="Models" />, and an instance method of the type that gets its own connection.</summary>
+    Repository = 3,
 }

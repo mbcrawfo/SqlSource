@@ -339,7 +339,7 @@ public sealed class SettingsFileSchemaTests
     // The reader trims a value, ignores case and, in a choice, hyphens, spaces and tabs anywhere; a blank value sets
     // nothing and is no error.  The schema's patterns must accept each such spelling.
     [Theory]
-    [InlineData(SettingsFileKeys.Output, "\" Code-Gen \"")]
+    [InlineData(SettingsFileKeys.Output, "\" Me-thods \"")]
     [InlineData(SettingsFileKeys.InputModelType, "\"SEALED record\"")]
     [InlineData(SettingsFileKeys.CollectionType, "\"i-read-only-list\"")]
     [InlineData(SettingsFileKeys.MemberLocation, "\" Nested-Class \"")]
@@ -351,7 +351,7 @@ public sealed class SettingsFileSchemaTests
     [InlineData(SettingsFileKeys.Dialect, "\"tsql\"")]
     [InlineData(SettingsFileKeys.Dialect, "\"  \"")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"  Keep-Comments \", \"\"]")]
-    [InlineData(SettingsFileKeys.Output, "\"\\tcode-gen\\n\"")]
+    [InlineData(SettingsFileKeys.Output, "\"\\tme-thods\\n\"")]
     [InlineData(SettingsFileKeys.Dialect, "\"mysql\\t,\\tansi-quotes\"")]
     [InlineData(SettingsFileKeys.Dialect, "\"mysql , ansi-quotes\"")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"\"]")]
@@ -419,6 +419,9 @@ public sealed class SettingsFileSchemaTests
     )]
     [InlineData( /*lang=json,strict*/
         """{"output": "bogus"}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"output": "codegen"}"""
     )]
     [InlineData( /*lang=json,strict*/
         """{"output": "-"}"""

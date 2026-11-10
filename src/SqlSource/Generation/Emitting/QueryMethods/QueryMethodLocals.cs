@@ -1,34 +1,55 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using SqlSource.Generation.Methods;
+using SqlSource.Generation.Repositories;
 
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// The names of the locals of a query's method and of its lambdas' parameters, none of which an argument has, and of
-/// the connection and the transaction the method runs its query on.  The locals that read rows are named only for a
-/// method that reads them, whose output is given, the value of a converted parameter, or of an array its property
-/// holds as any sequence, only for a method that has one, the element of an array and its value only for a method that
-/// converts one by element, the iterator only for a method that streams, the flag of a row being yielded only for one
-/// whose <see cref="ExecutionCapabilities" /> drain when its loop is left at a row, the exception its catch takes only
-/// for one whose capabilities check for a rollback at its read or after a database error, the flag of a later error
-/// only for one whose capabilities check after a database error, the result of a read only for one of those that
-/// streams, and the names of its lists only for a method that has one.
+/// the connection and the transaction the method runs its query on: the arguments' own, or, for a repository's method,
+/// a local of the connection, which the name its source's access starts with does not take either, and no transaction.
+/// The locals that read rows are named only for a method that reads them, whose output is given, the value of a
+/// converted parameter, or of an array its property holds as any sequence, only for a method that has one, the element
+/// of an array and its value only for a method that converts one by element, the iterator only for a method that
+/// streams, the flag of a row being yielded only for one whose <see cref="ExecutionCapabilities" /> drain when its loop
+/// is left at a row, the exception its catch takes only for one whose capabilities check for a rollback at its read or
+/// after a database error, the flag of a later error only for one whose capabilities check after a database error, the
+/// result of a read only for one of those that streams, and the names of its lists only for a method that has one.
 /// </summary>
 internal sealed class QueryMethodLocals
 {
+    // How the access of an instance member starts.
+    private const string This = "this.";
+
     public QueryMethodLocals(
         MethodArguments arguments,
         MethodInput? input,
         MethodOutput? output,
         bool streams,
-        ExecutionCapabilities capabilities
+        ExecutionCapabilities capabilities,
+        ConnectionSource? source
     )
     {
-        Connection = MethodArguments.Connection;
-        Transaction = MethodArguments.Transaction;
-        var names = new LocalNames(Seed(arguments));
+        var names = new LocalNames(Seed(arguments, source));
+        if (arguments.TakesConnection)
+        {
+            Connection = MethodArguments.Connection;
+            Transaction = MethodArguments.Transaction;
+        }
+        else
+        {
+            Connection = names.Take("connection");
+            Transaction = string.Empty;
+        }
+
+        ConnectionScope = source is null or { Kind: ConnectionSourceKind.Borrowed }
+            ? string.Empty
+            : names.Take("connectionScope");
+        (SourceLocal, SourceValue, SourceAccess) = SourceOf(source, streams, names);
+
         Sql = names.Take("sql");
         WasClosed = names.Take("wasClosed");
         Command = names.Take("command");
@@ -81,12 +102,27 @@ internal sealed class QueryMethodLocals
         Lists = ListLocals.Of(input, names);
     }
 
-    // The connection and the transaction the body runs the query on, today the arguments themselves.  A receiver other
-    // than the connection would take local names for them here, from the method's LocalNames, and copy into them once,
-    // at the start of the method (docs/architecture/generator.md, "Adding a kind of method").
+    // The connection the body runs the query on: the argument, or the local a repository's method gets it into from its
+    // source (docs/architecture/generator.md, "Adding a kind of method").
     public string Connection { get; }
 
+    // The transaction the body runs the query in: the argument, or empty for a repository's method, which takes none.
     public string Transaction { get; }
+
+    // The scope that disposes the connection a repository's method made, or empty when it borrows one or takes it.
+    public string ConnectionScope { get; }
+
+    // The local that a struct repository's streaming method declares before its iterator, since a local function of a
+    // struct reaches neither this nor a primary-constructor parameter: the source's value, or a copy of the struct for
+    // an instance method, through which overloads resolve as written.  Empty, as SourceValue is, for any other method.
+    public string SourceLocal { get; }
+
+    // What SourceLocal is set to: the source's access, or this.
+    public string SourceValue { get; }
+
+    // The source as the body reaches it: its access, or through SourceLocal.  Empty for a method that takes its
+    // connection.
+    public string SourceAccess { get; }
 
     public string Sql { get; }
 
@@ -138,6 +174,40 @@ internal sealed class QueryMethodLocals
     // The names of what the method declares for its lists, or null when it has none.
     public ListLocals? Lists { get; }
 
+    // The local of a struct repository's streaming method, its value, and the source as the body reaches it.  A static
+    // method is reached through its type, which the iterator can reach.
+    private static (string Local, string Value, string Access) SourceOf(
+        ConnectionSource? source,
+        bool streams,
+        LocalNames names
+    )
+    {
+        if (source is null)
+        {
+            return (string.Empty, string.Empty, string.Empty);
+        }
+
+        if (!streams || !source.InStruct)
+        {
+            return (string.Empty, string.Empty, source.AccessText);
+        }
+
+        if (source.Member != CandidateMember.Method)
+        {
+            var local = names.Take("source");
+            return (local, source.AccessText, local);
+        }
+
+        // An instance member's access is this, a dot and its name; a static one's starts with its type.
+        if (!source.AccessText.StartsWith(This, StringComparison.Ordinal))
+        {
+            return (string.Empty, string.Empty, source.AccessText);
+        }
+
+        var self = names.Take("self");
+        return (self, "this", self + source.AccessText.Substring(This.Length - 1));
+    }
+
     // Whether a parameter's binding matches its value as one that can be null: one bound through a converter, or an
     // array that its property holds as any sequence.
     private static bool MatchesAValue(MethodInput? input) =>
@@ -148,12 +218,17 @@ internal sealed class QueryMethodLocals
         (input is not null && input.Parameters.Any(static parameter => parameter.Write is { IsByElement: true }))
         || (output is not null && output.Columns.Any(static column => column.Read is { IsByElement: true }));
 
-    // The names of the method's arguments, which no local may take.
-    private static IEnumerable<string> Seed(MethodArguments arguments)
+    // The names of the method's arguments, and the name its source's access starts with, which no local may take.
+    private static IEnumerable<string> Seed(MethodArguments arguments, ConnectionSource? source)
     {
         foreach (var argument in arguments)
         {
             yield return argument.Name;
+        }
+
+        if (source?.LeadingName is { } leadingName)
+        {
+            yield return leadingName;
         }
     }
 }

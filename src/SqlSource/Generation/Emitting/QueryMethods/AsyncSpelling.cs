@@ -11,7 +11,8 @@ internal static class AsyncSpelling
 {
     /// <summary>
     /// The modifiers of the local iterator of a streaming method: <c>static async</c>, or <c>async</c> for one that
-    /// captures the locals the method counts its lists into before it returns the iterator.
+    /// captures the locals the method counts its lists into before it returns the iterator, or the member or parameter
+    /// a repository's method gets its connection from.
     /// </summary>
     internal static string IteratorModifiersOf(bool captures) => captures ? "async " : "static async ";
 
@@ -19,6 +20,11 @@ internal static class AsyncSpelling
     // imports no namespace, so it is called by its class.
     private const string ConfigureAwaitOfDisposable =
         "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(";
+
+    /// <summary>
+    /// Appends <c>await </c>, which the caller follows with a call and <see cref="AppendAwaitedEnd" />.
+    /// </summary>
+    public static StringBuilder AppendAwait(StringBuilder builder) => builder.Append("await ");
 
     /// <summary>
     /// Appends <c>await target.member(</c>, which the caller follows with the arguments and
@@ -49,9 +55,16 @@ internal static class AsyncSpelling
     /// <summary>
     /// Appends <c> async Task</c>, or <c> async Task&lt;resultType&gt;</c> when the method returns a result.
     /// </summary>
-    public static StringBuilder AppendTaskType(StringBuilder builder, string? resultType)
+    public static StringBuilder AppendTaskType(StringBuilder builder, string? resultType) =>
+        AppendTask(builder.Append(" async "), resultType);
+
+    /// <summary>
+    /// Appends <c>Task</c>, or <c>Task&lt;resultType&gt;</c> when the method returns a result, without <c>async</c>:
+    /// the type that a member of a repository's interface returns.
+    /// </summary>
+    public static StringBuilder AppendTask(StringBuilder builder, string? resultType)
     {
-        _ = builder.Append(" async global::System.Threading.Tasks.Task");
+        _ = builder.Append("global::System.Threading.Tasks.Task");
         return resultType is null ? builder : builder.Append('<').Append(resultType).Append('>');
     }
 }

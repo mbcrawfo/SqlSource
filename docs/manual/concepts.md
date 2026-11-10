@@ -1,6 +1,6 @@
 # Concepts
 
-SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: for a described query its models, a type for its parameters and a type for its rows, and by default a method that runs it; or a string constant, or a method where the query has tokens, that holds its SQL for your own code to run.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  On a machine with a connection, the build [runs the tool itself](tool.md#running-in-the-build) before it compiles.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
+SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: for a described query its models, a type for its parameters and a type for its rows, and by default a method of a [repository](#repository) that runs it; or a string constant, or a method where the query has tokens, that holds its SQL for your own code to run.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  On a machine with a connection, the build [runs the tool itself](tool.md#running-in-the-build) before it compiles.  A query whose [output](#output) is `models`, `methods` or `repository`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
 
 ```mermaid
 flowchart LR
@@ -60,13 +60,19 @@ A file named `sqlsource.json` that sets [settings](settings.md#all-settings), su
 
 #### Output
 
-The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](generator.md#models), or its models and a [query method](#query-method), the default.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
+The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](generator.md#models), or its models and a [query method](#query-method), which by default is a [repository](#repository)'s.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
 
 <a id="query-method"></a>
 
 #### Query method
 
-What a described query whose [output](#output) is `codegen` becomes: an asynchronous method that opens a connection when it is closed, sends the query's parameters, runs it and reads its rows into its models.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
+What a described query whose [output](#output) is `repository` or `methods` becomes: an asynchronous method that sends the query's parameters, runs it and reads its rows into its models.  Under `repository` it is an instance method of a [repository](#repository), which gets its own connection; under `methods` it takes the connection, and opens it when it is closed.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
+
+<a id="repository"></a>
+
+#### Repository
+
+A type marked `[SqlSourceGenerate]` whose queries have the output `repository`, the default.  Each such query is an instance method of the type, which gets a connection from a member of the type, its connection source, such as a connection string or a data source, so the code that calls it passes none.  The type also gets an interface of those methods, for code that takes a repository and a test that fakes one.  See [repository methods](generator.md#repository-methods).
 
 <a id="token-method"></a>
 
@@ -108,7 +114,7 @@ The set of rules by which SqlSource reads a `.sql` file: where a comment or a st
 
 #### Logical database
 
-A name for one particular database your queries run against, such as `billing`.  The tool uses it to choose which connection to describe a query through, and a sidecar records it.  A query belongs to the logical database its markers or settings name, and to the one named after its dialect when they name none.  See [the database setting](settings.md#setting-database).
+A name for one particular database your queries run against, such as `billing`.  The tool uses it to choose which connection to describe a query through, a sidecar records it, and a [repository](#repository) that uses several marks a connection source for each.  A query belongs to the logical database its markers or settings name, and to the one named after its dialect when they name none.  See [the database setting](settings.md#setting-database).
 
 The two answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
 

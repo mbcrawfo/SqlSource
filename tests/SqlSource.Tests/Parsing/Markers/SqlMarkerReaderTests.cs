@@ -29,7 +29,7 @@ public sealed class SqlMarkerReaderTests
     [InlineData("--PARAM:@a", "Param:@a")]
     [InlineData("-- param:", "Param:")]
     [InlineData("-- output: sql", "Output:sql")]
-    [InlineData("-- OUTPUT:code-gen", "Output:code-gen")]
+    [InlineData("-- OUTPUT:me-thods", "Output:me-thods")]
     [InlineData("-- database: a", "Database:a")]
     [InlineData("--Database:  billing-v2 ", "Database:billing-v2")]
     [InlineData("-- input-model-suffix: A", "InputModelSuffix:A")]

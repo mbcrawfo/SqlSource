@@ -662,7 +662,7 @@ public sealed class CachingTypeTests
 
     // NetTopologySuite's version is for its floor, as NodaTime's is: 2.5.0 and 2.6.0 both have ConcaveHull and one
     // identity, so the reference changes the version alone, and no file is typed again nor the drivers decided again.
-    // The queries are at CodeGen, the only output that reads PostGIS's geometry.
+    // The queries are at Methods, the only output that reads PostGIS's geometry.
     [Fact]
     public void NetTopologySuiteVersion_Changed_TypesNoFileAgain()
     {
@@ -674,7 +674,7 @@ public sealed class CachingTypeTests
         );
         var driver = _scene.FirstRunWithTypes(
             compilation,
-            ProjectFile(OutputKind.CodeGen, "postgres"),
+            ProjectFile(OutputKind.Methods, "postgres"),
             GeometrySidecar(_scene.Users, "GetUser"),
             GeometrySidecar(_scene.Orders, "GetOrder")
         );
@@ -689,7 +689,7 @@ public sealed class CachingTypeTests
     }
 
     // NetTopologySuite.IO.SqlServerBytes's version is for its floor too, and two versions above it change the version
-    // alone, so no SQL Server file is typed again nor the drivers decided again.  The queries are at CodeGen, the only
+    // alone, so no SQL Server file is typed again nor the drivers decided again.  The queries are at Methods, the only
     // output that reads SQL Server's geography.
     [Fact]
     public void SqlServerBytesVersion_Changed_TypesNoFileAgain()
@@ -702,7 +702,7 @@ public sealed class CachingTypeTests
         );
         var driver = _scene.FirstRunWithTypes(
             compilation,
-            ProjectFile(OutputKind.CodeGen, "mssql", NetTopologySuiteOn),
+            ProjectFile(OutputKind.Methods, "mssql", NetTopologySuiteOn),
             GeographySidecar(_scene.Users, "GetUser"),
             GeographySidecar(_scene.Orders, "GetOrder")
         );
@@ -719,7 +719,7 @@ public sealed class CachingTypeTests
         AllReasons(result, TrackingNames.MethodDrivers).ShouldAllBeCached();
     }
 
-    // The two types of the scene, with no constant to read, since a query at CodeGen has none, and these references.
+    // The two types of the scene, with no constant to read, since a query at Methods has none, and these references.
     private static CSharpCompilation MethodsWith(params MetadataReference[] references) =>
         GeneratorHarness.CreateCompilation(
             [

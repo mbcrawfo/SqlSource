@@ -14,7 +14,7 @@ namespace SqlSource.Tests.Generator;
 
 // SQL Server's spatial read path: a geography or geometry read as one of NetTopologySuite's geometries is read through
 // the column's stream and bound as SqlBytes, by the shared instances of SqlSource.NetTopologySuiteConversions, which a
-// project gets once, in a file of its own, when a method of a CodeGen query calls one.  Each run is under mssql on
+// project gets once, in a file of its own, when a method of a methods query calls one.  Each run is under mssql on
 // SqlClient 7 with NetTopologySuite 2.6.0 and NetTopologySuite.IO.SqlServerBytes 2.1.0, unless it says otherwise, with
 // an entry written for each query's current hash.
 public sealed class SpatialConversionTests
@@ -246,7 +246,7 @@ public sealed class SpatialConversionTests
             userType: new SqlServerUserType("sys", name, "Microsoft.SqlServer.Types, Version=11.0.0.0")
         );
 
-    // FindPlaces of the text at CodeGen under mssql, with these references, settings and other files.
+    // FindPlaces of the text at Methods under mssql, with these references, settings and other files.
     private static GeneratorRun RunPlaces(
         string text,
         MetadataReference[] references,

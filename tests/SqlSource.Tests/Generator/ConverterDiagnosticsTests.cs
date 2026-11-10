@@ -563,12 +563,12 @@ public sealed class ConverterDiagnosticsTests
             ]);
     }
 
-    // The converters are found whatever the output, so a CodeGen project without a query gets the error too.
+    // The converters are found whatever the output, so a methods project without a query gets the error too.
     [Fact]
-    public void Run_ConverterUnderCodeGenWithoutQueries_ReportsSqlsrc277()
+    public void Run_ConverterUnderMethodsWithoutQueries_ReportsSqlsrc277()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             FaultySource(
                 "public static class Conversions",
                 "[SqlSourceConverter] public static void ToEmail(string value) { }"

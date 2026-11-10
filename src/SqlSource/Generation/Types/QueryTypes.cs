@@ -15,7 +15,7 @@ namespace SqlSource.Generation.Types;
 /// <param name="WithoutLibraryFailure">
 /// The query's first failure without its libraries, or null when it has none: set when a library's row typed a
 /// parameter or column that has no C# type without the library, which then has <c>Library</c> set and
-/// <c>WithoutLibrary</c> null.  A claim whose output is not <c>CodeGen</c> gets no models of the query and this
+/// <c>WithoutLibrary</c> null.  A claim whose output is not <c>Methods</c> gets no models of the query and this
 /// diagnostic instead; the diagnostics of the file's types do not hold it.
 /// </param>
 internal sealed record QueryTypes(

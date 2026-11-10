@@ -30,10 +30,10 @@ public sealed class PlacementDiagnosticsTests
     // A file of the type that no error reaches, whose constant the type keeps.
     private static readonly SqlFile Kept = new("/app/Repo/Kept.sql", "-- name: Kept\n-- output: sql\nSELECT 9;\n");
 
-    // The sql constant goes to a private nested class, and the codegen query, whose method goes to the extension
+    // The sql constant goes to a private nested class, and the methods query, whose method goes to the extension
     // class by default, cannot be private there.  The message names the header and suggests a marker on the query.
     [Fact]
-    public void Run_HeaderPrivateWithACodeGenQuery_ReportsSqlsrc123NamingTheHeader()
+    public void Run_HeaderPrivateWithAMethodsQuery_ReportsSqlsrc123NamingTheHeader()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -58,7 +58,7 @@ public sealed class PlacementDiagnosticsTests
 
     // The fix the message suggests: the query's own visibility, which the header's does not reach.
     [Fact]
-    public void Run_HeaderPrivateWithAVisibilityOnTheCodeGenQuery_PlacesBoth()
+    public void Run_HeaderPrivateWithAVisibilityOnTheMethodsQuery_PlacesBoth()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -97,6 +97,45 @@ public sealed class PlacementDiagnosticsTests
                 Sqlsrc122("(4,10)-(4,19)", "ListUsers", "the settings file '/app/Repo/sqlsource.json'"),
             ]);
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
+    }
+
+    [Theory]
+    [InlineData("extension-class", "(2,1)-(2,36)", "extension class")]
+    [InlineData("nested-class", "(2,1)-(2,33)", "nested class")]
+    public void Run_NonClassMarkerOnARepositoryQuery_ReportsSqlsrc122AtTheMarker(
+        string location,
+        string span,
+        string named
+    )
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Repository,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile(GeneratorHarness.UsersPath, $"-- name: GetUser\n-- member-location: {location}\nSELECT 1;\n"),
+            Kept
+        );
+
+        // The query has no entry either, which is SQLSRC241, so only the diagnostic under test is picked out.
+        run.Diagnostics.Where(IsSqlsrc122)
+            .ShouldBe([
+                $"SQLSRC122 {GeneratorHarness.UsersPath}{span}: The query 'GetUser' of 'App.Sample' cannot go in the "
+                    + $"{named}, which its own marker sets, because its output is repository.  A repository method "
+                    + "is an instance method of the type.  Use class.  Write -- visibility: or -- member-location: on "
+                    + "the query.",
+            ]);
+    }
+
+    [Fact]
+    public void Run_ClassMarkerOnARepositoryQuery_ReportsNothing()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Repository,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- member-location: class\nSELECT 1;\n"),
+            Kept
+        );
+
+        run.Diagnostics.Where(IsSqlsrc122).ShouldBeEmpty();
     }
 
     // A query's own marker is where the error is, and the type keeps the members of its other file.
@@ -343,7 +382,7 @@ public sealed class PlacementDiagnosticsTests
         run.Problems()
             .ShouldBe([
                 "SQLSRC241 /app/Repo/Users.sql(1,10)-(1,17): The query 'GetUser' has no entry in the sidecar of its "
-                    + "file, and its output 'codegen' needs one.  Run 'sqlsource describe'.",
+                    + "file, and its output 'methods' needs one.  Run 'sqlsource describe'.",
             ]);
     }
 
@@ -713,11 +752,11 @@ public sealed class PlacementDiagnosticsTests
             .Order(StringComparer.Ordinal)
             .ShouldBe([
                 "SQLSRC122 /app/Repo/Users.sql(3,10)-(3,20): The query 'CountUsers' of 'App.Other' cannot go in the "
-                    + "extension class, which the file header sets, because its output is sql and only a query method "
+                    + "extension class, which the file header sets, because its output is sql.  Only a query method "
                     + "extends the connection.  Use class or nested-class.  Write -- visibility: or "
                     + "-- member-location: on the query.",
                 "SQLSRC122 /app/Repo/Users.sql(3,10)-(3,20): The query 'CountUsers' of 'App.Sample' cannot go in the "
-                    + "extension class, which the file header sets, because its output is sql and only a query method "
+                    + "extension class, which the file header sets, because its output is sql.  Only a query method "
                     + "extends the connection.  Use class or nested-class.  Write -- visibility: or "
                     + "-- member-location: on the query.",
             ]);
@@ -817,10 +856,12 @@ public sealed class PlacementDiagnosticsTests
             + "-- visibility: or -- member-location: on the query.";
     }
 
+    private static bool IsSqlsrc122(string diagnostic) => diagnostic.StartsWith("SQLSRC122", StringComparison.Ordinal);
+
     // SQLSRC122 at a query at sql, set by the place.
     private static string Sqlsrc122(string span, string query, string place) =>
         $"SQLSRC122 {GeneratorHarness.UsersPath}{span}: The query '{query}' of 'App.Sample' cannot go in the "
-        + $"extension class, which {place} sets, because its output is sql and only a query method extends the "
+        + $"extension class, which {place} sets, because its output is sql.  Only a query method extends the "
         + "connection.  Use class or nested-class.  Write -- visibility: or -- member-location: on the query.";
 
     // The entry of GetUser, which takes an id and reads it, written for the file's hash.

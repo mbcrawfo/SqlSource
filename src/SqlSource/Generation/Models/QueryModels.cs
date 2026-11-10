@@ -36,7 +36,7 @@ namespace SqlSource.Generation.Models;
 /// </param>
 /// <param name="WithoutLibraryFailure">
 /// The query's first failure without its libraries, as its types have it, or null: a claim whose output is not
-/// <c>CodeGen</c> gets no models of the query, and this diagnostic, from <c>TypeModels.LibraryFailuresOf</c>.
+/// <c>Methods</c> gets no models of the query, and this diagnostic, from <c>TypeModels.LibraryFailuresOf</c>.
 /// </param>
 internal sealed record QueryModels(
     string Name,

@@ -7,7 +7,7 @@ namespace SqlSource.Generation;
 
 /// <summary>
 /// One query of a <c>.sql</c> file.  It becomes a constant, or a method when its SQL has a token, and its models when
-/// its output asks for them; when its output is <c>CodeGen</c>, the method that runs it takes the place of the
+/// its output asks for them; when its output is <c>Methods</c>, the method that runs it takes the place of the
 /// constant.
 /// </summary>
 /// <param name="Name">The query's name, a valid C# identifier.</param>
@@ -86,9 +86,10 @@ internal sealed record SqlQuery(
     public EquatableArray<string> DeclaredVariables { get; init; }
 
     /// <summary>
-    /// The errors of the query's SQL that are errors only when its output is <see cref="OutputKind.CodeGen" />: a list
-    /// that its method would send in a form the database refuses.  <c>MethodPlanner</c> reports them and gives the
-    /// query no method.  Empty when there are none.
+    /// The errors of the query's SQL that are errors only when its output has a method,
+    /// <see cref="OutputKind.Methods" /> or <see cref="OutputKind.Repository" />: a list that its method would send in
+    /// a form the database refuses.  <c>MethodPlanner</c> reports them and gives the query no method.  Empty when
+    /// there are none.
     /// </summary>
-    public EquatableArray<DiagnosticInfo> CodeGenErrors { get; init; }
+    public EquatableArray<DiagnosticInfo> MethodErrors { get; init; }
 }

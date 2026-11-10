@@ -15,6 +15,12 @@ internal static class TrackingNames
 
     public const string TargetTypes = nameof(TargetTypes);
 
+    public const string RepositoryInterfaces = nameof(RepositoryInterfaces);
+
+    public const string RepositoryTypes = nameof(RepositoryTypes);
+
+    public const string RepositoryShapes = nameof(RepositoryShapes);
+
     public const string SqlPaths = nameof(SqlPaths);
 
     public const string CompilePaths = nameof(CompilePaths);
@@ -135,6 +141,8 @@ internal static class TrackingNames
 
     public const string ExtensionClassNames = nameof(ExtensionClassNames);
 
+    public const string InterfaceSignatures = nameof(InterfaceSignatures);
+
     public const string TakenExtensionClasses = nameof(TakenExtensionClasses);
 
     public const string MethodConflicts = nameof(MethodConflicts);
@@ -149,7 +157,7 @@ internal static class TrackingNames
 
     public const string SettingsFileLibraryDiagnostics = nameof(SettingsFileLibraryDiagnostics);
 
-    public const string CodeGenEngines = nameof(CodeGenEngines);
+    public const string MethodEngines = nameof(MethodEngines);
 
     public const string ConversionLibraries = nameof(ConversionLibraries);
 

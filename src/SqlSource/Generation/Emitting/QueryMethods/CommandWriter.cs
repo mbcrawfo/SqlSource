@@ -1,13 +1,15 @@
+using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
+using SqlSource.Generation.Repositories;
 
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the body of a query's method that runs its command, the phase of <see cref="QueryMethodWriter" /> after
-/// <see cref="HeaderWriter" />: the refusal of a completed transaction, the SQL, the opening of a closed connection,
-/// the command and the binding of its parameters, and the closing of the connection in a <c>finally</c>.
-/// <see cref="RowsWriter" /> writes the execution between them.
+/// <see cref="HeaderWriter" />: the refusal of a completed transaction, the SQL, for a repository's method the
+/// connection from its source, the opening of a closed connection, the command and the binding of its parameters, and
+/// the closing of the connection in a <c>finally</c>.  <see cref="RowsWriter" /> writes the execution between them.
 /// </summary>
 internal static class CommandWriter
 {
@@ -34,6 +36,10 @@ internal static class CommandWriter
         }
 
         AppendSql(in context, indent);
+        if (context.Method.Source is { } source)
+        {
+            AppendAcquire(in context, source, indent);
+        }
 
         _ = builder
             .Append(indent)
@@ -123,22 +129,99 @@ internal static class CommandWriter
             .Append(".CommandText = ")
             .Append(locals.Sql)
             .Append(";\n")
-            .Append(builtAtRunTime ? indent + SqlFromTokensEnd : string.Empty)
-            .Append(indent)
-            .Append(locals.Command)
-            .Append(".Transaction = ")
-            .Append(locals.Transaction)
-            .Append(";\n");
-        QueryMethodWriter.AppendIf(builder, indent, MethodArguments.CommandTimeout + ".HasValue");
-        _ = builder
-            .Append(indent)
-            .Append(GeneratedText.Indent)
-            .Append(locals.Command)
-            .Append(".CommandTimeout = ")
-            .Append(MethodArguments.CommandTimeout)
-            .Append(".Value;\n");
-        QueryMethodWriter.AppendEnd(builder, indent);
+            .Append(builtAtRunTime ? indent + SqlFromTokensEnd : string.Empty);
+        // A repository's method takes neither a transaction nor a timeout, and leaves the command's own.
+        if (context.Arguments.TakesConnection)
+        {
+            _ = builder
+                .Append(indent)
+                .Append(locals.Command)
+                .Append(".Transaction = ")
+                .Append(locals.Transaction)
+                .Append(";\n");
+            QueryMethodWriter.AppendIf(builder, indent, MethodArguments.CommandTimeout + ".HasValue");
+            _ = builder
+                .Append(indent)
+                .Append(GeneratedText.Indent)
+                .Append(locals.Command)
+                .Append(".CommandTimeout = ")
+                .Append(MethodArguments.CommandTimeout)
+                .Append(".Value;\n");
+            QueryMethodWriter.AppendEnd(builder, indent);
+        }
+
         _ = builder.Append('\n');
+    }
+
+    // The statements that get a repository's method its connection from its source, into the connection's local: a
+    // new connection of the engine's driver from a connection string, one opened from a data source, or the one a
+    // factory returns, each disposed when the method ends, as the command and the reader are, or a borrowed one, which
+    // is not.  A source that is null throws.
+    private static void AppendAcquire(in QueryMethodContext context, ConnectionSource source, string indent)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var access = locals.SourceAccess;
+        _ = builder.Append(indent).Append("var ").Append(locals.Connection).Append(" = ");
+        switch (source.Kind)
+        {
+            case ConnectionSourceKind.ConnectionString:
+                _ = builder.Append("new ").Append(context.Method.Engine.ConnectionTypeText()).Append('(');
+                AppendSourceOrThrow(builder, source, access);
+                _ = builder.Append(')');
+                break;
+            case ConnectionSourceKind.DataSource:
+                _ = AsyncSpelling.AppendAwait(builder).Append('(');
+                AppendSourceOrThrow(builder, source, access);
+                _ = builder.Append(").OpenConnectionAsync(").Append(MethodArguments.CancellationToken);
+                _ = AsyncSpelling.AppendAwaitedEnd(builder);
+                break;
+            case ConnectionSourceKind.Factory:
+            case ConnectionSourceKind.Borrowed:
+                AppendSourceOrThrow(builder, source, access);
+                break;
+            default:
+                throw UnexpectedEnumValueException.Of(source.Kind);
+        }
+
+        _ = builder.Append(";\n");
+        if (locals.ConnectionScope.Length > 0)
+        {
+            _ = AsyncSpelling.AppendUsing(builder, indent, locals.ConnectionScope, locals.Connection);
+        }
+    }
+
+    // The source's value, or the exception that says it is null: its member, as the method reaches it, read, or called
+    // with the token when it takes one, and awaited when it is an asynchronous factory.
+    private static void AppendSourceOrThrow(StringBuilder builder, ConnectionSource source, string access)
+    {
+        var isAwaited = source is { Kind: ConnectionSourceKind.Factory, IsAsync: true };
+        if (isAwaited)
+        {
+            _ = AsyncSpelling.AppendAwait(builder);
+        }
+
+        _ = builder.Append(access);
+        if (source.Member == CandidateMember.Method)
+        {
+            _ = builder.Append('(');
+            if (source.TakesCancellationToken)
+            {
+                _ = builder.Append(MethodArguments.CancellationToken);
+            }
+
+            _ = isAwaited ? AsyncSpelling.AppendAwaitedEnd(builder) : builder.Append(')');
+        }
+
+        _ = builder
+            .Append(" ?? throw new global::System.InvalidOperationException(")
+            .Append(
+                SymbolDisplay.FormatLiteral(
+                    "The connection source '" + source.MemberName + "' of '" + source.TypeName + "' is null.",
+                    quote: true
+                )
+            )
+            .Append(')');
     }
 
     // Each parameter of the input, in a block of its own, bound by the binder of the method's engine.  A list binds

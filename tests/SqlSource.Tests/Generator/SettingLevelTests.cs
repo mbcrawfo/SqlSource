@@ -12,8 +12,8 @@ namespace SqlSource.Tests.Generator;
 // reported where it was written.  Without a dialect no query can have models, so they change only the diagnostics.
 //
 // Every run without a dialect leaves the output unset, since the output's levels are among what these tests compare,
-// unless it says otherwise.  So a query whose output is the default, codegen, is SQLSRC209 at its name, and gets
-// neither a method nor a constant.  The settings that change a method are run at codegen under postgres, through
+// unless it says otherwise.  So a query whose output is the default, repository, is SQLSRC209 at its name, and gets
+// neither a method nor a constant.  The settings that change a method are run at methods under postgres, through
 // MethodRuns, with an entry for the query.
 public sealed class SettingLevelTests
 {
@@ -77,11 +77,6 @@ public sealed class SettingLevelTests
         }
     }
 
-    // Every level below the project's file.  Codegen is both the default and the output MethodRuns gives the project,
-    // so a project's file of codegen would decide nothing.
-    public static TheoryData<SettingLevel> LevelsBelowTheProjectFile =>
-        [SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
-
     // Every level of a setting.
     public static TheoryData<SettingLevel> Levels =>
         [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Header, SettingLevel.Query];
@@ -133,37 +128,38 @@ public sealed class SettingLevelTests
         run.Sources[GeneratorHarness.SampleFile].ShouldContain("\"SELECT 1;\"");
     }
 
-    // Sql at each level, below which the project's file says codegen, so that the level is what decides: the query is a
+    // Sql at each level, below which the project's file says methods, so that the level is what decides: the query is a
     // constant, with no method and no model.  At sql the query needs no entry, and one would be SQLSRC245.
     [Theory]
     [MemberData(nameof(Levels))]
     public void Run_SqlOutputAtEachLevel_GivesAConstant(SettingLevel level)
     {
-        var run = RunWithOutputAt(level, "Sql", belowIt: "CodeGen", withEntry: false);
+        var run = RunWithOutputAt(level, "Sql", belowIt: "Methods", withEntry: false);
 
         run.Sources[GeneratorHarness.SampleFile].ShouldContain(GetUserConstant);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
         ModelRuns.ModelFiles(run).ShouldBeEmpty();
     }
 
-    // Models at each level, below which the project's file says codegen: the query is a constant with its models.
+    // Models at each level, below which the project's file says methods: the query is a constant with its models.
     [Theory]
     [MemberData(nameof(Levels))]
     public void Run_ModelsOutputAtEachLevel_GivesAConstantAndTheModels(SettingLevel level)
     {
-        var run = RunWithOutputAt(level, "Models", belowIt: "CodeGen", withEntry: true);
+        var run = RunWithOutputAt(level, "Models", belowIt: "Methods", withEntry: true);
 
         run.Sources[GeneratorHarness.SampleFile].ShouldContain(GetUserConstant);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
         ModelRuns.ModelFiles(run).ShouldBe([ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 
-    // CodeGen at each level below the project's file, which says sql: the query is a method with its models.
+    // Methods at each level, below which the project's file says sql, so that the level is what decides, the project's
+    // file included, whose methods then win over the default, repository: the query is a method with its models.
     [Theory]
-    [MemberData(nameof(LevelsBelowTheProjectFile))]
-    public void Run_CodeGenOutputAtEachLevel_GivesAMethodAndTheModels(SettingLevel level)
+    [MemberData(nameof(Levels))]
+    public void Run_MethodsOutputAtEachLevel_GivesAMethodAndTheModels(SettingLevel level)
     {
-        var run = RunWithOutputAt(level, "CodeGen", belowIt: "Sql", withEntry: true);
+        var run = RunWithOutputAt(level, "Methods", belowIt: "Sql", withEntry: true);
 
         run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUser(\n");
@@ -344,7 +340,7 @@ public sealed class SettingLevelTests
 
     // Users with the output at the level, and the other output at the project's file below it unless the level is the
     // project's file, with an entry of GetUser when one is given.  An output of the project's file among the settings
-    // replaces the one MethodRuns gives the project, codegen.
+    // replaces the one MethodRuns gives the project, methods.
     private static GeneratorRun RunWithOutputAt(SettingLevel level, string output, string belowIt, bool withEntry)
     {
         var settings = new LevelSettings();

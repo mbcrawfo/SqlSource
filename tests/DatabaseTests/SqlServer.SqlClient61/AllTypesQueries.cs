@@ -2,7 +2,7 @@ namespace SqlSource.DatabaseTests.SqlServer.SqlClient61;
 
 // The queries of every type of the type map that SQL Server 2017 has, linked from the end-to-end project: their
 // methods, extension methods of the connection in AllTypesQueriesExtensions, and their models under SqlClient 6.1,
-// which Dapper reads.  The linked file's folder takes the end-to-end project's settings file, whose output is codegen,
+// which Dapper reads.  The linked file's folder takes the end-to-end project's settings file, whose output is methods,
 // which this claim keeps.  The file's ForDapper copies, at the output models, put their constants on the type by their
 // -- member-location: markers, for the Dapper test.
 [SqlSourceGenerate(Source = "../SqlServer/EndToEnd/Queries/AllTypes.sql")]

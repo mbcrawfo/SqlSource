@@ -52,7 +52,7 @@ public sealed class MethodArgumentsTests
 
     [Fact]
     public void GetEnumerator_WithoutInput_LeavesTheInputOut() =>
-        Enumerate(new MethodArguments(null, ["orderBy", "await"], streams: false))
+        Enumerate(new MethodArguments(null, ["orderBy", "await"], streams: false, takesConnection: true))
             .ConvertAll(static argument => argument.Role)
             .ShouldBe([
                 ArgumentRole.Receiver,
@@ -62,6 +62,29 @@ public sealed class MethodArgumentsTests
                 ArgumentRole.CommandTimeout,
                 ArgumentRole.Cancellation,
             ]);
+
+    // A repository's method gets its own connection, so it takes no connection, transaction or command timeout.
+    [Fact]
+    public void Of_Repository_IsInputTokensAndCancellation()
+    {
+        var method = Emitting.QueryMethods.QueryMethodWriterTests.GetUser with { Source = TestModels.Source() };
+
+        var arguments = Enumerate(MethodArguments.Of(method, ["orderBy", "await"]));
+
+        arguments
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([ArgumentRole.Input, ArgumentRole.Token, ArgumentRole.Token, ArgumentRole.Cancellation]);
+        arguments
+            .ConvertAll(static argument => argument.Name)
+            .ShouldBe(["parameters", "orderBy", "await", "cancellationToken"]);
+        MethodArguments.Of(method, []).TakesConnection.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Of_RepositoryWithoutInputOrTokens_IsTheCancellationAlone() =>
+        Enumerate(new MethodArguments(null, [], streams: true, takesConnection: false))
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([ArgumentRole.Cancellation]);
 
     [Fact]
     public void GetEnumerator_Streams_DocumentsTheReceiverForTheLoop()
@@ -150,26 +173,27 @@ public sealed class MethodArgumentsTests
     public void GetEnumerator_AndEachForm_AllocatesNothing()
     {
         var arguments = Of();
+        var withoutConnection = new MethodArguments(Input, ["orderBy", "await"], false, false);
         var builder = new StringBuilder(4096);
         var roles = 0;
         for (var round = 0; round < 10; round++)
         {
-            roles += Round(arguments, builder);
+            roles += Round(arguments, builder) + Round(withoutConnection, builder);
         }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var round = 0; round < 1_000; round++)
         {
-            roles += Round(arguments, builder);
+            roles += Round(arguments, builder) + Round(withoutConnection, builder);
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         allocated.ShouldBe(0);
-        roles.ShouldBe(1_010 * 7);
+        roles.ShouldBe(1_010 * (7 + 4));
     }
 
-    private static MethodArguments Of(bool streams = false) => new(Input, ["orderBy", "await"], streams);
+    private static MethodArguments Of(bool streams = false) => new(Input, ["orderBy", "await"], streams, true);
 
     private static List<MethodArgument> Enumerate(MethodArguments arguments)
     {
@@ -194,6 +218,7 @@ public sealed class MethodArgumentsTests
 
         _ = builder.Clear();
         arguments.AppendDeclaration(builder, "    ", default);
+        arguments.AppendInterfaceDeclaration(builder, "    ");
         arguments.AppendIteratorDeclaration(builder, "    ");
         arguments.AppendCall(builder);
         return count;

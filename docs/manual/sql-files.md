@@ -31,13 +31,13 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- token:` | Gives a token a default | no | yes | [Defaults](parameters-and-tokens.md#token-marker) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](parameters-and-tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
-| `-- output:` | What is generated for a query: its SQL alone (`sql`), its SQL and its models (`models`), or its models and a method that runs it (`codegen`).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](settings.md#setting-output) |
+| `-- output:` | What is generated for a query: its SQL alone (`sql`), its SQL and its models (`models`), its models and a method that takes a connection and runs it (`methods`), or its models and an instance method of the type that gets its own connection and runs it (`repository`, the default).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](settings.md#setting-output) |
 | `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
 | `-- model-namespace:` | The namespace of the models | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
 | `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](settings.md#setting-model-type) |
 | `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](settings.md#setting-model-name) |
 | `-- collection-type:` | The type that a query's method returns many rows in | yes | yes | [Collection type](settings.md#setting-collection-type) |
-| `-- member-location:` | Where a query's members go: in a class nested in the type (`nested-class`), on the type (`class`), or, for a query method, in the extension class (`extension-class`) | yes | yes | [Where the members go](settings.md#setting-member-location) |
+| `-- member-location:` | Where a query's members go: in a class nested in the type (`nested-class`), on the type (`class`), or, for a `methods` query's method, in the extension class (`extension-class`) | yes | yes | [Where the members go](settings.md#setting-member-location) |
 | `-- visibility:` | How visible a query's members are, or its nested class: `public`, `internal`, `protected` or `private` | yes | yes | [Visibility](settings.md#setting-visibility) |
 | `-- nested-class:` | The name of the class nested in the type that holds a query's members | yes | yes | [Name of the nested class](settings.md#setting-nested-class) |
 | `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
@@ -63,7 +63,7 @@ A `-- name:` line begins a query.  The query runs to the next `-- name:` line or
 - The name is a C# identifier, and not a reserved keyword such as `class`.  Anything else is [SQLSRC103](diagnostics.md#sqlsrc103).  `get-user` is not a name.
 - Names are case-sensitive: `GetUser` and `getUser` are two queries.
 - A name is used once in a file ([SQLSRC104](diagnostics.md#sqlsrc104)), and once among all the files of one type ([SQLSRC008](diagnostics.md#sqlsrc008)).
-- The name of a query is not the name of the class its members go in: its nested class, `Sql` unless [it is named otherwise](settings.md#setting-nested-class), for a query of any output, or the type itself when the constant or token method of a query whose output is `sql` or `models` goes on it ([SQLSRC009](diagnostics.md#sqlsrc009)).  The other names a query method cannot have are where [the methods go](generator.md#method-location).  See [the generator](generator.md#locations).
+- The name of a query is not the name of the class its members go in: its nested class, `Sql` unless [it is named otherwise](settings.md#setting-nested-class), for a query of any output, or the type itself when the constant or token method of a query whose output is `sql` or `models` goes on it ([SQLSRC009](diagnostics.md#sqlsrc009)).  The other names a query method cannot have are with [a repository method's signature](generator.md#repository-signature) and where [the `methods` methods go](generator.md#method-location).  See [the generator](generator.md#locations).
 - The query has SQL in it.  A query that holds only comments and markers is [SQLSRC113](diagnostics.md#sqlsrc113).
 
 The marker may be followed by `->` and a result shape: see [result shapes](#result-shapes).  The name ends at the `->`.
@@ -80,7 +80,7 @@ SELECT id, name FROM users WHERE id = @id;
 UPDATE users SET name = @name WHERE id = @id;
 ```
 
-A name can be followed by `->` and one of five shapes, which say what the [method](generator.md#query-methods) of a query whose output is `codegen` returns:
+A name can be followed by `->` and one of five shapes, which say what the [method](generator.md#query-methods) of a query whose output is `methods` or `repository` returns:
 
 | Shape | The method returns |
 |----|----|
@@ -191,7 +191,7 @@ Writing a marker twice in one place is fine when the value is the same.  The wor
 
 A comment of yours that happens to start with one of the words and a colon, such as `-- summary: see the ticket`, is read as a marker.  Reword it.
 
-An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves the query without models: under the output `models` it keeps its constant or token method, and under `codegen` it gets no method until it is fixed.  See [which queries get a method](generator.md#which-methods) and [diagnostics](diagnostics.md).
+An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves the query without models: under the output `models` it keeps its constant or token method, and under `methods` or `repository` it gets no method until it is fixed.  See [which queries get a method](generator.md#which-methods) and [diagnostics](diagnostics.md).
 
 <a id="known-issues"></a>
 

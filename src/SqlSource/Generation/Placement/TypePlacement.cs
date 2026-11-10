@@ -77,7 +77,12 @@ internal sealed class TypePlacement
 
         return new QueryPlacement(
             location,
-            settings.WrittenVisibility?.Value ?? PlacementChecks.DefaultVisibility(location, _type.IsPublic),
+            settings.WrittenVisibility?.Value
+                ?? (
+                    settings.Output == OutputKind.Repository
+                        ? Visibility.Public
+                        : PlacementChecks.DefaultVisibility(location, _type.IsPublic)
+                ),
             null
         );
     }
@@ -280,7 +285,7 @@ internal sealed class TypePlacement
             var leftOut = new List<int>();
             foreach (var (fileIndex, query, settings) in UsableQueries(MemberLocation.Class))
             {
-                if (settings.Output == OutputKind.CodeGen || !classes.Contains(query.Name))
+                if (settings.Output.HasMethod() || !classes.Contains(query.Name))
                 {
                     continue;
                 }
@@ -402,12 +407,14 @@ internal sealed class TypePlacement
                 isUsable = false;
             }
 
-            // A constant or a token method extends nothing.  Its location was written, since its default is a nested
-            // class.
+            // A constant or a token method extends nothing, and a repository method is a member of the type.  The
+            // location was written, since the default of neither is the one refused.
             if (
-                location == MemberLocation.ExtensionClass
-                && settings.Output != OutputKind.CodeGen
-                && settings.WrittenMemberLocation is { } writtenLocation
+                settings.WrittenMemberLocation is { } writtenLocation
+                && (
+                    (location == MemberLocation.ExtensionClass && settings.Output != OutputKind.Methods)
+                    || (location == MemberLocation.NestedClass && settings.Output == OutputKind.Repository)
+                )
             )
             {
                 diagnostics?.Add(
@@ -416,8 +423,12 @@ internal sealed class TypePlacement
                         query.MemberLocationMarker ?? query.NameLocation,
                         query.Name,
                         TypeName,
+                        location == MemberLocation.NestedClass ? "nested class" : "extension class",
                         PlaceText.Of(writtenLocation.Place),
-                        OutputText(settings.Output)
+                        SettingValue.NameOf(settings.Output),
+                        settings.Output == OutputKind.Repository
+                            ? "A repository method is an instance method of the type.  Use class."
+                            : "Only a query method extends the connection.  Use class or nested-class."
                     )
                 );
                 return false;
@@ -436,9 +447,10 @@ internal sealed class TypePlacement
                         query.Name,
                         TypeName,
                         PlacementChecks.KeywordOf(written.Value),
-                        PlaceText.Of(written.Place),
+                        PlacementChecks.WrittenBy(PlaceText.Of(written.Place)),
                         PlacementChecks.TextOf(location),
-                        reason
+                        reason,
+                        PlacementChecks.VisibilityFixOf(settings.Output)
                     )
                 );
                 isUsable = false;
@@ -454,7 +466,7 @@ internal sealed class TypePlacement
             location switch
             {
                 MemberLocation.NestedClass => settings.NestedClass,
-                MemberLocation.Class => settings.Output == OutputKind.CodeGen ? null : type.Name,
+                MemberLocation.Class => settings.Output.HasMethod() ? null : type.Name,
                 MemberLocation.ExtensionClass => null,
                 _ => throw UnexpectedEnumValueException.Of(location),
             };
@@ -464,12 +476,12 @@ internal sealed class TypePlacement
         // first, and the method planner judges a method's name.
         private bool IsDeclaredOnType(QuerySettings settings, MemberLocation location, string name) =>
             location == MemberLocation.Class
-            && settings.Output != OutputKind.CodeGen
+            && !settings.Output.HasMethod()
             && SortedSearch.IndexOf(type.TakenNames, name, static taken => taken, StringComparer.Ordinal) >= 0;
 
         // What a query's method adds to its name: Async under async-method-suffix.  A constant adds nothing.
         private static string Suffix(QuerySettings settings) =>
-            settings.Output == OutputKind.CodeGen && (settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0
+            settings.Output.HasMethod() && (settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0
                 ? AsyncSuffix
                 : string.Empty;
 
@@ -478,15 +490,6 @@ internal sealed class TypePlacement
             name.Length == member.Length + suffix.Length
             && name.StartsWith(member, StringComparison.Ordinal)
             && name.EndsWith(suffix, StringComparison.Ordinal);
-
-        private static string OutputText(OutputKind output) =>
-            output switch
-            {
-                OutputKind.Sql => "sql",
-                OutputKind.Models => "models",
-                OutputKind.CodeGen => "codegen",
-                _ => throw UnexpectedEnumValueException.Of(output),
-            };
 
         // Every file that has a query in one of the classes, left out.
         private void LeaveOutFilesOf(HashSet<string> classes)

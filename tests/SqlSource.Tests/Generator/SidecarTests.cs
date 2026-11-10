@@ -155,6 +155,31 @@ public sealed class SidecarTests
         UsableEntries(withoutEntry).ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Run_RepositoryQueryWithoutAnEntry_ReportsSqlsrc241()
+    {
+        // The type has a connection and the project its driver, so that the query's entry is its one problem.
+        var source = new SourceFile(
+            GeneratorHarness.SourcePath,
+            GeneratorHarness
+                .SampleSource(null)
+                .Replace("class Sample;", "class Sample(string connectionString);", StringComparison.Ordinal)
+        );
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Repository,
+            [source],
+            [GeneratorHarness.UsersFile],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'repository' needs one.  Run 'sqlsource describe'.",
+        ]);
+    }
+
     // An entry of another engine than the file's is never usable, whether SqlSource knows the engine, as mssql, or
     // not, as oracle, which is no crash either.
     [Theory]

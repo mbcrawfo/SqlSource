@@ -39,7 +39,7 @@ public sealed class GeneratorHarnessTests
     public void Run_SettingsEntry_WinsOverTheOutput()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             [GeneratorHarness.SampleSourceFile],
             [GeneratorHarness.UsersFile],
             dialect: "postgres",
@@ -94,11 +94,11 @@ public sealed class GeneratorHarnessTests
 
     // The spelling is the tests' own, so a change to the generator's spelling fails a test.  A test's data cannot be of
     // the generator's internal type, so the member is found by its spelling.  A Sql or Models run puts its members on
-    // the type, and a CodeGen run leaves its methods in the extension class.
+    // the type, and a methods run leaves its methods in the extension class.
     [Theory]
     [InlineData("Sql", ",\n  \"memberLocation\": \"class\"")]
     [InlineData("Models", ",\n  \"memberLocation\": \"class\"")]
-    [InlineData("CodeGen", "")]
+    [InlineData("Methods", "")]
     public void Run_Output_IsSpelledAsAUserWritesIt(string spelled, string location)
     {
         var run = GeneratorHarness.Run(Enum.Parse<OutputKind>(spelled), GeneratorHarness.SampleSource(null));

@@ -10,9 +10,9 @@ namespace SqlSource.Testing.Generator.Corpus;
 // The cases of the golden corpus of query methods: for each engine of CorpusEngine.All, the shared scenarios and then
 // the engine's own, each named `<engine>/<scenario>`, the path of its golden file under GoldenFiles.Folder.  See "The
 // golden corpus of query methods" in tests/README.md.  The shared scenarios are here and, by theme, in the other parts
-// of this class: CorpusTokenScenarios.cs, CorpusTypeScenarios.cs, CorpusConverterScenarios.cs, CorpusListScenarios.cs
-// and CorpusLibraryScenarios.cs.  The scenarios only one engine has, which CorpusEngine.cs lists, are in
-// CorpusLibraryScenarios.cs and CorpusEngineScenarios.cs.
+// of this class: CorpusTokenScenarios.cs, CorpusTypeScenarios.cs, CorpusConverterScenarios.cs, CorpusListScenarios.cs,
+// CorpusLibraryScenarios.cs and CorpusRepositoryScenarios.cs.  The scenarios only one engine has, which
+// CorpusEngine.cs lists, are in CorpusLibraryScenarios.cs and CorpusEngineScenarios.cs.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
@@ -36,6 +36,10 @@ internal static partial class QueryMethodCorpus
         new("diagnostics", Diagnostics),
         new("lists", Lists),
         new("lists-no-padding", ListsWithoutPadding),
+        new("repository-connection-string", RepositoryOfConnectionString),
+        new("repository-data-source", RepositoryOfDataSource),
+        new("repository-factory", RepositoryOfFactory),
+        new("repository-borrowed", RepositoryOfBorrowed),
         new(
             "public-exceptions",
             engine =>

@@ -122,7 +122,7 @@ internal enum SqlParseErrorKind
     /// <summary>
     /// A list of a SQL Server query that a <c>NOT</c> reaches stands inside an aggregate, a <c>GROUP BY</c> or an
     /// <c>OUTPUT</c> clause, where SQL Server refuses the subquery an empty list is sent as.  An error only for a query
-    /// whose output is <c>CodeGen</c>, since only its method sends a list.  Arguments: the parameter, with its prefix,
+    /// whose output is <c>Methods</c>, since only its method sends a list.  Arguments: the parameter, with its prefix,
     /// as written there; and where it stands, which ends the first sentence's clause.
     /// </summary>
     NegatedListRefusedEmpty,

@@ -281,15 +281,15 @@ public sealed class TypeEmitterTests
         source.ShouldNotContain("SELECT 2;");
     }
 
-    // A CodeGen query has no member in the type its member would go in, so its file is usable, and a query at sql of
+    // A methods query has no member in the type its member would go in, so its file is usable, and a query at sql of
     // the file keeps its constant.
     [Theory]
     [InlineData(false, "Sql")]
     [InlineData(true, "UserRepository")]
-    public void Emit_CodeGenQueryNamedLikeTheTypeItsMemberWouldGoIn_IsAllowed(bool direct, string name)
+    public void Emit_MethodsQueryNamedLikeTheTypeItsMemberWouldGoIn_IsAllowed(bool direct, string name)
     {
         var output = Emit(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             TestModels.Type(),
             Placement(direct, 1),
             File(
@@ -521,11 +521,11 @@ public sealed class TypeEmitterTests
         );
     }
 
-    // A CodeGen query's method takes the place of its constant, whether it gets one or not.
+    // A methods query's method takes the place of its constant, whether it gets one or not.
     [Fact]
-    public void Emit_CodeGenQuery_WritesNoConstant()
+    public void Emit_MethodsQuery_WritesNoConstant()
     {
-        var output = EmitOnType(OutputKind.CodeGen, File("Users.sql", TestModels.Query("GetUser", "SELECT 1;")));
+        var output = EmitOnType(OutputKind.Methods, File("Users.sql", TestModels.Query("GetUser", "SELECT 1;")));
 
         output.Diagnostics.ShouldBeEmpty();
         output.Source.ShouldBe(
@@ -543,9 +543,9 @@ public sealed class TypeEmitterTests
     }
 
     [Fact]
-    public void Emit_CodeGenTokenQuery_WritesNoTokenMethod()
+    public void Emit_MethodsTokenQuery_WritesNoTokenMethod()
     {
-        var output = EmitOnType(OutputKind.CodeGen, File("Users.sql", TokenQuery("ListFrom")));
+        var output = EmitOnType(OutputKind.Methods, File("Users.sql", TokenQuery("ListFrom")));
 
         output.Diagnostics.ShouldBeEmpty();
         output.Source.ShouldBe(
@@ -563,10 +563,10 @@ public sealed class TypeEmitterTests
     }
 
     [Fact]
-    public void Emit_NestedTypeOfOnlyCodeGenQueries_WritesNoNestedClass()
+    public void Emit_NestedTypeOfOnlyMethodsQueries_WritesNoNestedClass()
     {
         var output = Emit(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             TestModels.Type(),
             File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"), TokenQuery("ListFrom"))
         );
@@ -586,12 +586,12 @@ public sealed class TypeEmitterTests
         );
     }
 
-    // The project's output is CodeGen, and two queries' markers say Sql and Models.
+    // The project's output is Methods, and two queries' markers say Sql and Models.
     [Fact]
-    public void Emit_MixedSqlModelsAndCodeGen_WritesTheSqlAndModelsConstantsAlone()
+    public void Emit_MixedSqlModelsAndMethods_WritesTheSqlAndModelsConstantsAlone()
     {
         var output = Emit(
-            OutputKind.CodeGen,
+            OutputKind.Methods,
             TestModels.Type(),
             File(
                 "Users.sql",

@@ -99,7 +99,7 @@ public sealed class SqlFileParserMarkerTests
     [Theory]
     [InlineData("-- output: models\n-- database: billing\n-- name: Q\nSELECT 1\n", "Models", "billing")]
     [InlineData("-- output: models\n-- name: Q\n-- output: SQL\n-- database: app\nSELECT 1\n", "Sql", "app")]
-    [InlineData("-- database: billing\n-- name: Q\n-- output: code-gen\nSELECT 1\n", "CodeGen", "billing")]
+    [InlineData("-- database: billing\n-- name: Q\n-- output: me-thods\nSELECT 1\n", "Methods", "billing")]
     [InlineData("-- output: sql\n-- output: Sql\n-- database: a\n-- database: a\nSELECT 1\n", "Sql", "a")]
     public void Parse_OutputAndDatabaseMarkers_AreCarriedWithTheQuerysOverThePreambles(
         string text,

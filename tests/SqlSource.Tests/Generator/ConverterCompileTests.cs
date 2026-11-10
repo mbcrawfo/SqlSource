@@ -16,7 +16,7 @@ namespace SqlSource.Tests.Generator;
 // reference type, nullable and not, in a query of each shape, on PostgreSQL arrays converted element by element, of
 // elements written nullable too, and as a whole, and on SqlClient a vector read and bound through one.
 // The compilation reports every warning wave, so the converted code compiles with no error and no warning in what is
-// generated.  Each run is at CodeGen.
+// generated.  Each run is at Methods.
 public sealed class ConverterCompileTests
 {
     // UserId, a value type over a long; Email, a value type over a string; and Name, a reference type over a string.

@@ -80,7 +80,7 @@ public sealed class GeneratedSourceWarningTests
     // the consumer cannot fix: CA1018 under an AnalysisMode, an error with TreatWarningsAsErrors, or IDE0161.  So every
     // file of a run that gives each kind of file starts with it, on every Roslyn the generator supports.
     [Fact]
-    public void Run_CodeGenQueryWithModelsAndPooledRows_StartsEveryFileWithTheGeneratedHeader()
+    public void Run_MethodsQueryWithModelsAndPooledRows_StartsEveryFileWithTheGeneratedHeader()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
         var columns = new[] { Column("id"), Column("name", Text, nullable: true) };

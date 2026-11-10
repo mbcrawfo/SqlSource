@@ -12,10 +12,11 @@
 ## Queries and tests
 
 - **A query writes its parameters in camelCase, `@accountId`**, so that an input model binds through Dapper.
-- **A Dapper test runs the constant of a copy of its query in the same file, `<Query>ForDapper`, marked `-- output: models` and naming the original's models by `-- input-model:` and `-- output-model:` unless they are a table's or hold an array parameter, with `-- member-location: class`**, which puts the constant on the type, since a `codegen` query has a method and no constant.  `VariantCopyTests` holds each copy's SQL to its original's.
+- **A Dapper test runs the constant of a copy of its query in the same file, `<Query>ForDapper`, marked `-- output: models` and naming the original's models by `-- input-model:` and `-- output-model:` unless they are a table's or hold an array parameter, with `-- member-location: class`**, which puts the constant on the type, since a `methods` query has a method and no constant.  `VariantCopyTests` holds each copy's SQL to its original's.
 - **A variant of a query, under another generator parameter, collection type, output or member location, is a copy of it in its file, `<Query><Variant>`, never a second claim of the file**, since a file gives every claim the same settings.
 - **A test of a method calls the method, never Dapper in its place**; one that reads asserts the values of at least one row, `NULL`s included.
 - **Every test takes its data source from `EndToEndSources`**, and a test that writes runs in a transaction that is rolled back.
+- **A test of a repository method, which takes no transaction, writes only a column's own value**, as `TouchNote` of `Queries/Repository.sql` does, so that it leaves the seed as it was.
 - **A test that must show that a commit succeeds commits only into a temporary table of its own connection**, as the transaction test of `EndToEnd/StreamingQueryTests.cs` does, since a rollback cannot show that the transaction was not aborted.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
 - **A change to `EndToEnd/ListQueryTests.cs` changes its copy in `tests/DatabaseTests/Postgres.Npgsql8` too**, which runs the same lists on Npgsql 8.

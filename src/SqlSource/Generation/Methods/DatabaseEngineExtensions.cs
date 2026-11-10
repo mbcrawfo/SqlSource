@@ -4,12 +4,12 @@ namespace SqlSource.Generation.Methods;
 
 internal static class DatabaseEngineExtensions
 {
-    /// <summary>The flag of the engine's queries in <see cref="CodeGenEngines" />.</summary>
-    public static CodeGenEngines ToCodeGenEngines(this DatabaseEngine engine) =>
+    /// <summary>The flag of the engine's queries in <see cref="MethodEngines" />.</summary>
+    public static MethodEngines ToMethodEngines(this DatabaseEngine engine) =>
         engine switch
         {
-            DatabaseEngine.PostgreSql => CodeGenEngines.Postgres,
-            DatabaseEngine.SqlServer => CodeGenEngines.SqlServer,
+            DatabaseEngine.PostgreSql => MethodEngines.Postgres,
+            DatabaseEngine.SqlServer => MethodEngines.SqlServer,
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
 
@@ -30,6 +30,18 @@ internal static class DatabaseEngineExtensions
         {
             DatabaseEngine.PostgreSql => "Npgsql",
             DatabaseEngine.SqlServer => "Microsoft.Data.SqlClient",
+            _ => throw UnexpectedEnumValueException.Of(engine),
+        };
+
+    /// <summary>
+    /// The engine's driver's connection, from <c>global::</c>, which a repository's method makes from a connection
+    /// string.
+    /// </summary>
+    public static string ConnectionTypeText(this DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => "global::Npgsql.NpgsqlConnection",
+            DatabaseEngine.SqlServer => "global::Microsoft.Data.SqlClient.SqlConnection",
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
 }
