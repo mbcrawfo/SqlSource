@@ -308,7 +308,7 @@ public sealed class ConnectionResolverTests
     {
         var candidate = Candidate(name, CandidateType.DataSource, CandidateMember.Parameter);
 
-        var resolution = Resolve([candidate], Main);
+        var resolution = Resolve([candidate], Main with { TakesParameters = true });
 
         var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
         diagnostic.Descriptor.ShouldBe(SqlDiagnostics.ConnectionParameterHidden);
@@ -316,6 +316,28 @@ public sealed class ConnectionResolverTests
         diagnostic.Arguments.ShouldBe(["App.UserRepository", name, "main"]);
         resolution.FailedDatabases.ShouldBe(["main"]);
         resolution.Sources.ShouldBeEmpty();
+    }
+
+    // No query of the database has an input model, so no method has an argument named parameters.
+    [Fact]
+    public void Resolve_ParameterNamedParametersWithoutAnInputModel_IsTheSource()
+    {
+        var resolution = Resolve([Candidate("parameters", CandidateType.DataSource, CandidateMember.Parameter)], Main);
+
+        resolution.Diagnostics.ShouldBeEmpty();
+        resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("parameters");
+    }
+
+    // Every method takes a cancellation token, whatever its query.
+    [Fact]
+    public void Resolve_ParameterNamedCancellationTokenWithoutAnInputModel_ReportsSqlsrc036()
+    {
+        var resolution = Resolve(
+            [Candidate("cancellationToken", CandidateType.DataSource, CandidateMember.Parameter)],
+            Main
+        );
+
+        resolution.Diagnostics.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.ConnectionParameterHidden);
     }
 
     // A member is reached through this, which no argument hides.

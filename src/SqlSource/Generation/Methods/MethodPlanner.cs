@@ -236,7 +236,7 @@ internal static class MethodPlanner
         var served = new ServedConverters(input.Converters);
         // The type's repository is resolved once, before its queries, and only when it has a repository query.
         ConnectionResolution? resolution = null;
-        if (input.Repository is { } shape && NeededDatabases(typeQueries, queries) is { } needed)
+        if (input.Repository is { } shape && NeededDatabases(input, queries) is { } needed)
         {
             resolution = ConnectionResolver.Resolve(typeQueries.Type.Type, shape, needed);
             diagnostics.AddRange(resolution.Diagnostics);
@@ -280,9 +280,11 @@ internal static class MethodPlanner
     // The databases of the type's repository queries in a file of a describable dialect, by the query's markers and
     // its file's level, else its dialect's name, each once by DatabaseName.Comparer, in the order of the queries, with
     // its first query's spelling and engine, or null when there is none, so that a type without one allocates nothing.
-    // A query of any other dialect has no entry, so it needs no connection.
-    private static List<NeededDatabase>? NeededDatabases(TypeQueries typeQueries, UsableQuerySequence queries)
+    // A database takes parameters when one of its queries has an input model, as TryReadInput reads it.  A query of
+    // any other dialect has no entry, so it needs no connection.
+    private static List<NeededDatabase>? NeededDatabases(MethodsInput input, UsableQuerySequence queries)
     {
+        var typeQueries = input.Type;
         List<NeededDatabase>? needed = null;
         foreach (var usable in queries)
         {
@@ -293,10 +295,17 @@ internal static class MethodPlanner
             }
 
             var name = DatabaseOf(typeQueries, usable, file);
+            var takesParameters =
+                input.Files[usable.FileIndex].Find(usable.QueryIndex, usable.Query.Name) is { Input: not null };
             needed ??= [];
-            if (!needed.Exists(database => DatabaseName.Comparer.Equals(database.Name, name)))
+            var index = needed.FindIndex(database => DatabaseName.Comparer.Equals(database.Name, name));
+            if (index < 0)
             {
-                needed.Add(new NeededDatabase(name, SqlDescribableDialects.EngineOf(file.Dialect)));
+                needed.Add(new NeededDatabase(name, SqlDescribableDialects.EngineOf(file.Dialect), takesParameters));
+            }
+            else if (takesParameters && !needed[index].TakesParameters)
+            {
+                needed[index] = needed[index] with { TakesParameters = true };
             }
         }
 

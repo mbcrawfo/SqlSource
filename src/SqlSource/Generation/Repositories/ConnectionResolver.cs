@@ -321,7 +321,7 @@ internal static class ConnectionResolver
         // its type is a driver's of another engine.
         public void Take(NeededDatabase database, ConnectionCandidate candidate)
         {
-            if (candidate.Member == CandidateMember.Parameter && IsAnArgumentsName(candidate.Name))
+            if (candidate.Member == CandidateMember.Parameter && IsAnArgumentsName(candidate.Name, database))
             {
                 Report(
                     DiagnosticInfo.Create(
@@ -426,10 +426,12 @@ internal static class ConnectionResolver
                 _ => throw UnexpectedEnumValueException.Of(type),
             };
 
-        // Whether a repository's method can have an argument of the name, other than a token's, which SQLSRC275
-        // refuses: its input model or its cancellation token.
-        private static bool IsAnArgumentsName(string name) =>
-            name is MethodArguments.Parameters or MethodArguments.CancellationToken;
+        // Whether a repository's method of the database can have an argument of the name, other than a token's, which
+        // SQLSRC275 refuses: its cancellation token, which every method takes, or its input model, which only a query
+        // with parameters has.
+        private static bool IsAnArgumentsName(string name, NeededDatabase database) =>
+            name == MethodArguments.CancellationToken
+            || (name == MethodArguments.Parameters && database.TakesParameters);
 
         // The engine whose driver declares the type, or null for a type of neither driver, such as one of
         // System.Data.Common: matched by the namespace of the type's metadata name.

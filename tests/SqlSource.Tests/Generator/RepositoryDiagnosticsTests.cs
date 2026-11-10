@@ -108,6 +108,70 @@ public sealed class RepositoryDiagnosticsTests
         run.Sources[MethodsFile].ShouldNotContain(" async ");
     }
 
+    private static readonly SqlFile ParameterizedFile = new(
+        GeneratorHarness.UsersPath,
+        "-- name: GetUser -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+    );
+
+    private const string ParametersSource = """
+        using Npgsql;
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate(Source = ".")]
+            public partial class Sample(NpgsqlDataSource parameters);
+        }
+        """;
+
+    // A query with parameters has an input model, whose argument is named parameters, which hides the parameter.
+    [Fact]
+    public void Run_ConnectionParameterNamedParametersWithAQueryThatHasParameters_ReportsSqlsrc036()
+    {
+        var run = RepositoryRuns.Run(
+            ParameterizedFile,
+            [Entry(ParameterizedFile, "GetUser", [Parameter("id")], [Column("id")])],
+            ParametersSource
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC036 /app/Repo/Sample.cs(7,50)-(7,60): 'parameters' of 'App.Sample' is the "
+                    + "primary-constructor parameter that gives the database 'postgres' its connection, and the "
+                    + "repository methods have an argument named 'parameters', which hides it.  Rename the "
+                    + "parameter, or store it in a field or property and give the connection from that.",
+            ]);
+    }
+
+    // The database takes parameters when any of its queries does, not only its first.
+    [Fact]
+    public void Run_ConnectionParameterNamedParametersWithALaterQueryThatHasParameters_ReportsSqlsrc036()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: CountUsers\nSELECT id FROM users;\n\n"
+                + "-- name: GetUser -> one-optional\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RepositoryRuns.Run(
+            file,
+            [Entry(file, "CountUsers", [], [Column("id")]), Entry(file, "GetUser", [Parameter("id")], [Column("id")])],
+            ParametersSource
+        );
+
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC036 ");
+    }
+
+    // No method takes an input model, so no argument is named parameters and the parameter is the connection.
+    [Fact]
+    public void Run_ConnectionParameterNamedParametersWithOnlyParameterlessQueries_IsTheSource()
+    {
+        var run = RepositoryRuns.Run(UsersFile, [Entry(UsersFile, "GetUser", [], [Column("id")])], ParametersSource);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain("var connection = await (parameters ?? ");
+    }
+
     // The members come before the primary constructor's parameters, so the parameter that the type stores in a field
     // is not captured a second time, which the compiler would warn of.
     [Fact]

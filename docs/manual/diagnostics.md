@@ -918,7 +918,7 @@ See: [The interface](generator.md#repository-interface), [repository interfaces]
 
 **Connection parameter is hidden by a method argument**
 
-The primary-constructor parameter that gives a database its connection is named `parameters` or `cancellationToken`, the name of an argument of the type's repository methods.  Inside a method the argument hides the parameter, so the method could not reach its connection.
+The primary-constructor parameter that gives a database its connection is named `cancellationToken`, which every repository method takes as an argument, or `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.  Inside a method the argument hides the parameter, so the method could not reach its connection.
 
 ```csharp
 [SqlSourceGenerate]
