@@ -13,10 +13,10 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// UnexpectedRowCountException and TransactionRolledBackException: a project writes them, internal or public, unless one
-// referenced assembly that it sees gives it both, which it then uses, so that a project that sees another's internals
-// catches the other's by type.  Each test that builds across the boundary runs on an image, as a build references a
-// project, and on a compilation, as an IDE does.
+// UnexpectedRowCountException, TransactionRolledBackException and CollectionItemException: a project writes them,
+// internal or public, unless one referenced assembly that it sees gives it all three, which it then uses, so that a
+// project that sees another's internals catches the other's by type.  Each test that builds across the boundary runs
+// on an image, as a build references a project, and on a compilation, as an IDE does.
 public sealed class ExceptionReuseTests
 {
     private const string InternalsVisible =
