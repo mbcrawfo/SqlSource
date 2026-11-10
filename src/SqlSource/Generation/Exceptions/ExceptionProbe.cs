@@ -174,32 +174,30 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
     private static bool IsBoolean(ITypeSymbol type) => type.SpecialType == SpecialType.System_Boolean;
 
     // The parameter of CollectionItemException(string queryName, int itemIndex, System.Data.Common.DbException inner).
-    private static bool IsDbException(ITypeSymbol type) =>
-        type
-            is INamedTypeSymbol
-            {
-                Name: "DbException",
-                Arity: 0,
-                ContainingType: null,
-                ContainingNamespace:
-                {
-                    Name: "Common",
-                    ContainingNamespace:
-                    {
-                        Name: "Data",
-                        ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
-                    },
-                },
-            };
+    private static bool IsDbException(ITypeSymbol type) => IsTopLevel(type, "DbException", "System", "Data", "Common");
 
     // TransactionRolledBackException(string queryName, System.Exception innerException).
-    private static bool IsException(ITypeSymbol type) =>
-        type
-            is INamedTypeSymbol
+    private static bool IsException(ITypeSymbol type) => IsTopLevel(type, "Exception", "System");
+
+    // Whether the type is the non-generic type of the name, not nested, in the namespace of the parts, outermost first.
+    private static bool IsTopLevel(ITypeSymbol type, string name, params string[] namespaceParts)
+    {
+        if (type is not INamedTypeSymbol { Arity: 0, ContainingType: null } named || named.Name != name)
+        {
+            return false;
+        }
+
+        var container = named.ContainingNamespace;
+        for (var i = namespaceParts.Length - 1; i >= 0; i--)
+        {
+            if (container is null || container.Name != namespaceParts[i])
             {
-                Name: "Exception",
-                Arity: 0,
-                ContainingType: null,
-                ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true },
-            };
+                return false;
+            }
+
+            container = container.ContainingNamespace;
+        }
+
+        return container is { IsGlobalNamespace: true };
+    }
 }

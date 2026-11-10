@@ -218,9 +218,9 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor ExceptionsSeenTwice = new(
         id: "SQLSRC022",
         title: "Exceptions are seen in two assemblies",
-        messageFormat: "This project sees UnexpectedRowCountException or TransactionRolledBackException in more than "
-            + "one referenced assembly: {0}.  Use SqlSource in one project that the others reference and that grants "
-            + "them InternalsVisibleTo, so that they all use its exceptions.",
+        messageFormat: "This project sees UnexpectedRowCountException, TransactionRolledBackException or "
+            + "CollectionItemException in more than one referenced assembly: {0}.  Use SqlSource in one project that "
+            + "the others reference and that grants them InternalsVisibleTo, so that they all use its exceptions.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -231,8 +231,9 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor ExceptionsOfAnotherShape = new(
         id: "SQLSRC023",
         title: "Exceptions come from another version of SqlSource",
-        messageFormat: "The UnexpectedRowCountException and TransactionRolledBackException that this project sees in "
-            + "{0} are not those of this version of SqlSource.  Use the same version of SqlSource in both projects.",
+        messageFormat: "The UnexpectedRowCountException, TransactionRolledBackException and CollectionItemException "
+            + "that this project sees in {0} are not those of this version of SqlSource.  Use the same version of "
+            + "SqlSource in both projects.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

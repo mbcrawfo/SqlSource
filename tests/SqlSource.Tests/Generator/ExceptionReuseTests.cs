@@ -326,9 +326,10 @@ public sealed class ExceptionReuseTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC022 (1,1)-(1,1): This project sees UnexpectedRowCountException or TransactionRolledBackException in "
-                + "more than one referenced assembly: OtherA, OtherB.  Use SqlSource in one project that the others "
-                + "reference and that grants them InternalsVisibleTo, so that they all use its exceptions.",
+            "SQLSRC022 (1,1)-(1,1): This project sees UnexpectedRowCountException, TransactionRolledBackException or "
+                + "CollectionItemException in more than one referenced assembly: OtherA, OtherB.  Use SqlSource in one "
+                + "project that the others reference and that grants them InternalsVisibleTo, so that they all use its "
+                + "exceptions.",
         ]);
         run.Sources.Keys.ShouldContain(ExceptionSource.HintName);
         run.CompilationErrors.ShouldBeEmpty();
@@ -515,9 +516,9 @@ public sealed class ExceptionReuseTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC023 (1,1)-(1,1): The UnexpectedRowCountException and TransactionRolledBackException that this "
-                + "project sees in Old are not those of this version of SqlSource.  Use the same version of SqlSource "
-                + "in both projects.",
+            "SQLSRC023 (1,1)-(1,1): The UnexpectedRowCountException, TransactionRolledBackException and "
+                + "CollectionItemException that this project sees in Old are not those of this version of SqlSource.  "
+                + "Use the same version of SqlSource in both projects.",
         ]);
         run.Sources.Keys.ShouldContain(ExceptionSource.HintName);
         run.CompilationErrors.ShouldBeEmpty();
