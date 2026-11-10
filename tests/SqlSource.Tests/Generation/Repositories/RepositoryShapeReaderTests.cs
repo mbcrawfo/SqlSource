@@ -31,7 +31,7 @@ public sealed class RepositoryShapeReaderTests
         shape.InterfaceTakenBy.ShouldBe("the class App.IUserRepository");
     }
 
-    // The user adds members to the generated interface by declaring another part of it.
+    // The user adds members to the generated interface by declaring another part of it, which the type implements.
     [Fact]
     public void Read_InterfaceNameIsAPartialInterface_IsNotTaken()
     {
@@ -40,7 +40,10 @@ public sealed class RepositoryShapeReaderTests
             namespace App
             {
                 [SqlSourceGenerate]
-                public partial class UserRepository(NpgsqlDataSource dataSource);
+                public partial class UserRepository(NpgsqlDataSource dataSource)
+                {
+                    public void Extra() { }
+                }
 
                 public partial interface IUserRepository
                 {

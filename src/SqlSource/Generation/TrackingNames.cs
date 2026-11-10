@@ -17,6 +17,8 @@ internal static class TrackingNames
 
     public const string RepositoryInterfaces = nameof(RepositoryInterfaces);
 
+    public const string RepositoryTypes = nameof(RepositoryTypes);
+
     public const string RepositoryShapes = nameof(RepositoryShapes);
 
     public const string SqlPaths = nameof(SqlPaths);

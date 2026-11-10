@@ -11,27 +11,28 @@ using SqlSource.Generation.Emitting;
 namespace SqlSource.Generation.Repositories;
 
 /// <summary>
-/// Reads each marked type's <see cref="RepositoryShape" /> from the compilation.  It runs on every compilation, since a
-/// type's base types and the name of its interface may be declared in files that no edit of the type's own file
-/// touches, and it gives an equal value until a candidate or the interface's settings change.
+/// Reads the <see cref="RepositoryShape" /> of each type that has a repository query, as <see cref="RepositoryTypes" />
+/// says, from the compilation.  It runs on every compilation, since a type's base types and the name of its interface
+/// may be declared in files that no edit of the type's own file touches, and it gives an equal value until a candidate
+/// or the interface's settings change.  A type with no repository query costs it nothing.
 /// </summary>
 internal static class RepositoryShapeReader
 {
     /// <summary>
     /// The shape of each of the types, sorted ordinally by <see cref="RepositoryShape.TypeKey" />.
     /// </summary>
-    /// <param name="types">Every type marked with the generated attribute.</param>
+    /// <param name="types">The types that have a repository query, from <see cref="RepositoryTypes" />.</param>
     /// <param name="compilation">The compilation the types are in.</param>
     /// <param name="interfacesOn">The project's <c>SqlSourceRepositoryInterfaces</c>.</param>
     /// <param name="token">Cancels the read.</param>
     public static EquatableArray<RepositoryShape> Read(
-        ImmutableArray<TargetType> types,
+        EquatableArray<TargetType> types,
         Compilation compilation,
         bool interfacesOn,
         CancellationToken token
     )
     {
-        var shapes = ImmutableArray.CreateBuilder<RepositoryShape>(types.Length);
+        var shapes = ImmutableArray.CreateBuilder<RepositoryShape>(types.Count);
         foreach (var type in types)
         {
             token.ThrowIfCancellationRequested();

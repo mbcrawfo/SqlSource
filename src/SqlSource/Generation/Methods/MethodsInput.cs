@@ -104,7 +104,8 @@ internal sealed record MethodsInput(
     /// <param name="converters">Every converter of the project.</param>
     /// <param name="librariesBelowTheFloor">The libraries that the project references older than their floor.</param>
     /// <param name="repositories">
-    /// Every type's shape, sorted ordinally by its key, of which the type takes its own when it has a repository query.
+    /// The shape of every type that has a repository query, sorted ordinally by its key, of which the type takes its
+    /// own when it is one of them.
     /// </param>
     public static MethodsInput Gather(
         TypeQueries type,
@@ -132,25 +133,8 @@ internal sealed record MethodsInput(
             drivers,
             ConvertersOf(slice, converters),
             librariesBelowTheFloor,
-            ClaimsRepositoryQuery(type) ? ShapeOf(repositories, key) : null
+            RepositoryTypes.ClaimsRepositoryQuery(type) ? ShapeOf(repositories, key) : null
         );
-    }
-
-    // Whether a query of one of the type's files has the output Repository, by its markers and its file's level.
-    private static bool ClaimsRepositoryQuery(TypeQueries type)
-    {
-        for (var index = 0; index < type.Files.Count; index++)
-        {
-            foreach (var query in type.Files[index].Queries)
-            {
-                if (QuerySettings.ResolveOutput(query.Markers, type.FileSettings[index]) == OutputKind.Repository)
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     // The first shape of the key, by a search of the sorted shapes.  Two types whose hint names are ambiguous share a
