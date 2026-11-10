@@ -72,6 +72,26 @@ public sealed class RepositoryShapeReaderTests
         shape.InterfaceTakenBy.ShouldBe("the interface App.IUserRepository of the assembly Library");
     }
 
+    // A type of a referenced assembly that the project cannot see hides nothing.
+    [Fact]
+    public void Read_InterfaceNameOfAnInternalReferencedType_IsNotTaken()
+    {
+        var library = RepositoryShapes.Library("namespace App { internal interface IUserRepository; }");
+
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class UserRepository(NpgsqlDataSource dataSource);
+            }
+            """,
+            references: [library]
+        );
+
+        shape.InterfaceTakenBy.ShouldBeNull();
+    }
+
     [Fact]
     public void Read_InterfaceNameTakenByAMemberOfTheContainingType_CarriesTheTakenBy()
     {

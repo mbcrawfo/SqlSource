@@ -173,23 +173,24 @@ public sealed class MethodArgumentsTests
     public void GetEnumerator_AndEachForm_AllocatesNothing()
     {
         var arguments = Of();
+        var withoutConnection = new MethodArguments(Input, ["orderBy", "await"], false, false);
         var builder = new StringBuilder(4096);
         var roles = 0;
         for (var round = 0; round < 10; round++)
         {
-            roles += Round(arguments, builder);
+            roles += Round(arguments, builder) + Round(withoutConnection, builder);
         }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var round = 0; round < 1_000; round++)
         {
-            roles += Round(arguments, builder);
+            roles += Round(arguments, builder) + Round(withoutConnection, builder);
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         allocated.ShouldBe(0);
-        roles.ShouldBe(1_010 * 7);
+        roles.ShouldBe(1_010 * (7 + 4));
     }
 
     private static MethodArguments Of(bool streams = false) => new(Input, ["orderBy", "await"], streams, true);
@@ -217,6 +218,7 @@ public sealed class MethodArgumentsTests
 
         _ = builder.Clear();
         arguments.AppendDeclaration(builder, "    ", default);
+        arguments.AppendInterfaceDeclaration(builder, "    ");
         arguments.AppendIteratorDeclaration(builder, "    ");
         arguments.AppendCall(builder);
         return count;

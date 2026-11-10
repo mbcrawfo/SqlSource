@@ -3190,7 +3190,7 @@ See: [Query methods](generator.md#query-methods)
 
 The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  It is taken when it is:
 
-- under the default [member location](generator.md#locations) `extension-class`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
+- under the [member location](generator.md#locations) `extension-class`, the default of the output `methods`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
 - for a `repository` query, also the name of the member of a base type, or the primary-constructor parameter, that its method gets its connection from, which the method would hide;
 - for a public method of a `repository` query, also the name of the type's [interface](#sqlsrc035), which holds the method too, and whose member cannot have its name; the interface is still generated, without the method;
@@ -3232,7 +3232,7 @@ See: [Query methods](generator.md#query-methods)
 
 **Extension class name is taken**
 
-Under the default [member location](generator.md#locations) `extension-class`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
+Under the [member location](generator.md#locations) `extension-class`, the default of the output `methods`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
 
 - the project already has a type of the class's full name, or a namespace of it, such as a class `App.SampleExtensions` that you wrote;
 - SqlSource writes a model of that full name, named by `-- output-model:` or `-- input-model:`, or by a query's name and a suffix, or a model in a namespace of that name;
