@@ -74,7 +74,7 @@ internal sealed class SqlGeneratorParameterScope
             case GeneratorWordKind.UnknownName:
                 return (SqlParseErrorKind.UnknownGeneratorParameter, string.Empty);
             case GeneratorWordKind.InvalidState:
-                return (SqlParseErrorKind.InvalidMarkerValue, string.Empty);
+                return (SqlParseErrorKind.InvalidMarkerValue, definition?.ValuesHelp ?? string.Empty);
             case GeneratorWordKind.Parameter:
                 break;
             default:

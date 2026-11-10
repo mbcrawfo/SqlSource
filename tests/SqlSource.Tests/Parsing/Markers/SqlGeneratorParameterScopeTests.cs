@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
@@ -156,9 +157,28 @@ public sealed class SqlGeneratorParameterScopeTests
     [InlineData("keep-comments=")]
     [InlineData("sort-input=true")]
     [InlineData("keep-comments=off=on")]
+    public void Read_ParameterWithAValueNotInItsList_IsInvalidAndNamesTheValues(string word)
+    {
+        var line = "-- generator: " + word;
+        var name = word[..word.IndexOf('=', StringComparison.Ordinal)];
+
+        var (scope, errors) = Read(line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.InvalidMarkerValue,
+                TextSpans.Of(line, word, last: true),
+                word,
+                ".  The values of " + name + " are on, off and default"
+            ),
+        ]);
+        scope.Parameters.IsEmpty.ShouldBeTrue();
+    }
+
+    [Theory]
     [InlineData("default=")]
     [InlineData("default=off")]
-    public void Read_ParameterWithAValueThatIsNoState_IsInvalid(string word)
+    public void Read_DefaultWithAValue_IsInvalidWithNoValues(string word)
     {
         var line = "-- generator: " + word;
 
