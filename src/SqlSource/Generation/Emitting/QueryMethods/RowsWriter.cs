@@ -278,6 +278,10 @@ internal static class RowsWriter
         context.Method.Shape switch
         {
             ResultShape.Many => GetCollectionType(context.Method.Collection, context.Method.Output!.TypeText),
+            ResultShape.One or ResultShape.OneOptional when context.Method.Batch is not null => GetCollectionType(
+                context.Method.Collection,
+                context.Method.Output!.TypeText
+            ),
             ResultShape.One => context.Method.Output!.TypeText,
             ResultShape.OneOptional => context.Method.Output!.TypeText + "?",
             ResultShape.RowCount => "int",

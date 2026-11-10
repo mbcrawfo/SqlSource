@@ -238,7 +238,7 @@ internal static class CommandWriter
                 GeneratedText.Deeper(indent),
                 locals.Command,
                 locals.Parameter,
-                MethodArguments.Parameters,
+                locals.Input,
                 locals.ConversionNames
             );
             var list = 0;

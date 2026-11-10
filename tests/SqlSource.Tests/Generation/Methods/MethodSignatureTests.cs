@@ -4,6 +4,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Placement;
 using SqlSource.Parsing.Tokens;
+using SqlSource.Settings;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tests.Generation.Emitting.QueryMethods;
 using Xunit;
@@ -37,6 +38,17 @@ public sealed class MethodSignatureTests
                 }
             )
             .ShouldBeEmpty();
+
+    // The collection method is an overload of its query method, so a call can tell them apart.
+    [Fact]
+    public void Of_BatchMethod_DiffersFromItsQueryMethod()
+    {
+        var query = QueryMethodWriterTests.GetUser;
+        var batch = query with { Batch = new BatchCall(TransactionMode.On) };
+
+        KeyOf(batch).ShouldBe("global::System.Collections.Generic.IEnumerable<global::App.GetUserParams>,string");
+        KeyOf(batch).ShouldNotBe(KeyOf(query));
+    }
 
     private static string KeyOf(QueryMethod method)
     {

@@ -16,11 +16,18 @@ internal static class HeaderWriter
     // ambiguous (CS0419), since a cref is bound without regard to accessibility.
     private const string ExceptionCref = "T:SqlSource.UnexpectedRowCountException";
 
+    private const string ItemExceptionCref = "T:SqlSource.CollectionItemException";
+
     internal static void AppendDocumentation(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var method = context.Method;
-        XmlDocWriter.AppendMember(builder, indent, method.SummaryXml, MethodWriter.GetSql(method.Segments));
+        XmlDocWriter.AppendMember(
+            builder,
+            indent,
+            method.Batch is null ? method.SummaryXml : method.SummaryXml + "\n" + BatchSummaryOf(method.Shape),
+            MethodWriter.GetSql(method.Segments)
+        );
         foreach (var argument in context.Arguments)
         {
             if (argument.DocumentationXml is { } documentationXml)
@@ -36,17 +43,19 @@ internal static class HeaderWriter
         XmlDocWriter.AppendReturns(
             builder,
             indent,
-            method.Shape switch
-            {
-                ResultShape.Many when context.Streams =>
-                    "The rows the query returns, each read as the loop asks for it.",
-                ResultShape.Many => "The rows the query returned.",
-                ResultShape.One => "The row.",
-                ResultShape.OneOptional => "The row, or null when there is none.",
-                ResultShape.RowCount => "The number of rows the query affected.",
-                ResultShape.None => "A task that completes when the query has run.",
-                _ => throw UnexpectedEnumValueException.Of(method.Shape),
-            }
+            method.Batch is not null
+                ? BatchReturnsOf(method.Shape)
+                : method.Shape switch
+                {
+                    ResultShape.Many when context.Streams =>
+                        "The rows the query returns, each read as the loop asks for it.",
+                    ResultShape.Many => "The rows the query returned.",
+                    ResultShape.One => "The row.",
+                    ResultShape.OneOptional => "The row, or null when there is none.",
+                    ResultShape.RowCount => "The number of rows the query affected.",
+                    ResultShape.None => "A task that completes when the query has run.",
+                    _ => throw UnexpectedEnumValueException.Of(method.Shape),
+                }
         );
         if (method.Shape == ResultShape.One)
         {
@@ -62,9 +71,45 @@ internal static class HeaderWriter
             XmlDocWriter.AppendException(builder, indent, ExceptionCref, "The query returned more than one row.");
         }
 
+        if (method.Batch is not null)
+        {
+            XmlDocWriter.AppendException(
+                builder,
+                indent,
+                ItemExceptionCref,
+                "The database raised an error for an item.  Its <c>InnerException</c> is the database's exception and "
+                    + "its <c>ItemIndex</c> is the item's position, counted from 0."
+            );
+        }
+
         ListWriter.AppendDocumentation(in context, indent);
         ExecutionCapabilityWriter.AppendDocumentation(in context, indent);
     }
+
+    // What a collection method does, by what its query returns, after the query's own summary.
+    private static string BatchSummaryOf(ResultShape shape) =>
+        shape switch
+        {
+            ResultShape.Many or ResultShape.One or ResultShape.OneOptional =>
+                "Runs the query once for each item of <paramref name=\"parameters\" /> and returns the rows of every "
+                    + "item, in the order of the items.",
+            ResultShape.RowCount =>
+                "Runs the query once for each item of <paramref name=\"parameters\" /> and returns the number of rows "
+                    + "they affected.",
+            ResultShape.None => "Runs the query once for each item of <paramref name=\"parameters\" />, in order.",
+            _ => throw UnexpectedEnumValueException.Of(shape),
+        };
+
+    private static string BatchReturnsOf(ResultShape shape) =>
+        shape switch
+        {
+            ResultShape.Many => "The rows of every item, in the order of the items.",
+            ResultShape.One => "The row of each item, in the order of the items.",
+            ResultShape.OneOptional => "The row of each item that returned one, in the order of the items.",
+            ResultShape.RowCount => "The number of rows the query affected, summed over the items.",
+            ResultShape.None => "A task that completes when the query has run for every item.",
+            _ => throw UnexpectedEnumValueException.Of(shape),
+        };
 
     internal static void AppendSignature(in QueryMethodContext context, string indent)
     {
@@ -120,7 +165,8 @@ internal static class HeaderWriter
 
     // The receiver, which a repository's method does not have, and the input are refused when null, and under
     // validate-tokens each token's text when it is null or white space; then each list is read and counted, and the
-    // number of parameters checked against the limit.
+    // number of parameters checked against the limit, except in a collection method, whose items are checked one by
+    // one.
     internal static void AppendChecks(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
@@ -143,7 +189,11 @@ internal static class HeaderWriter
             }
         }
 
-        ListCountWriter.AppendCounts(in context, indent);
+        // A collection method checks each item as it is added to its batch, which its body writes.
+        if (context.Method.Batch is null)
+        {
+            ListCountWriter.AppendCounts(in context, indent);
+        }
     }
 
     // A streaming method's return of a call to its iterator, after a blank line when checks come before it, then the

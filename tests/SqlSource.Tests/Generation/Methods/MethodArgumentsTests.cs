@@ -80,6 +80,36 @@ public sealed class MethodArgumentsTests
         MethodArguments.Of(method, []).TakesConnection.ShouldBeFalse();
     }
 
+    // A collection method takes the items in the place of the input, with the input's name, and no new name
+    // is reserved.
+    [Fact]
+    public void Of_BatchMethod_TakesTheItemsAsParameters()
+    {
+        var method = Emitting.QueryMethods.QueryMethodWriterTests.GetUser with
+        {
+            Batch = new BatchCall(TransactionMode.On),
+        };
+
+        var arguments = Enumerate(MethodArguments.Of(method, ["orderBy"]));
+
+        arguments
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([
+                ArgumentRole.Receiver,
+                ArgumentRole.Input,
+                ArgumentRole.Token,
+                ArgumentRole.Transaction,
+                ArgumentRole.CommandTimeout,
+                ArgumentRole.Cancellation,
+            ]);
+        arguments[1].Name.ShouldBe("parameters");
+        arguments[1].TypeText.ShouldBe("global::System.Collections.Generic.IEnumerable<global::App.GetUserParams>");
+        arguments[1].DocumentationXml.ShouldBe("The items to run the query for, in order.");
+        Enumerate(MethodArguments.Of(method with { Source = TestModels.Source() }, ["orderBy"]))
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([ArgumentRole.Input, ArgumentRole.Token, ArgumentRole.Cancellation]);
+    }
+
     [Fact]
     public void Of_RepositoryWithoutInputOrTokens_IsTheCancellationAlone() =>
         Enumerate(new MethodArguments(null, [], streams: true, takesConnection: false))

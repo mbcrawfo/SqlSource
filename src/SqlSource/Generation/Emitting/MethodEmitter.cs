@@ -296,13 +296,6 @@ internal static class MethodEmitter
         var extensions = new List<QueryMethod>();
         foreach (var method in methods)
         {
-            // A collection method has the signature of its query's method until it is given one of its own, so it is
-            // left out here, which leaves it out of the class, the interface and the extension class alike.
-            if (method.Batch is not null)
-            {
-                continue;
-            }
-
             if (!method.Host.IsExtension)
             {
                 onType.Add(method);

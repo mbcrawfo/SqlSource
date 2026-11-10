@@ -1696,7 +1696,8 @@ public sealed class QueryMethodWriterTests
             Token("exception"),
             Token("raisedLater"),
             Token("hasRow"),
-            Token("yield")
+            Token("yield"),
+            Token("item")
         );
         var withVector = GetUser.Output! with
         {
@@ -1732,6 +1733,18 @@ public sealed class QueryMethodWriterTests
                             Segments = index % 4 < 2 ? awkward : GetUser.Segments,
                             Input = index % 3 == 0 ? null : GetUser.Input,
                         };
+                        // A collection method, which takes the items and never streams, for some of those that have an
+                        // input.
+                        if (method.Input is not null && index % 5 < 2)
+                        {
+                            method = method with
+                            {
+                                Batch = new BatchCall(TransactionMode.On),
+                                Collection =
+                                    collection == CollectionKind.IAsyncEnumerable ? CollectionKind.Array : collection,
+                            };
+                        }
+
                         QueryMethodWriter.Append(builder, "        ", method);
                     }
                 }

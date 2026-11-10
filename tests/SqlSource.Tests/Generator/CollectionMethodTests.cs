@@ -40,10 +40,10 @@ public sealed class CollectionMethodTests
         methods[1].ShouldBe(methods[0] with { Batch = new BatchCall(TransactionMode.On) });
     }
 
-    // Until the collection method has a signature of its own it is not written, so the run has no duplicate member,
-    // under either output.
+    // The collection method is written beside the query method, as an overload of it, in the extension class, the
+    // repository's class and the repository's interface, and the generated code compiles with no warning.
     [Fact]
-    public void Run_CollectionMethodUnderMethodsAndRepository_WritesOneMethod()
+    public void Run_CollectionMethodUnderMethodsAndRepository_WritesTheOverloadBesideTheQueryMethod()
     {
         var file = AddUser();
         var entries = new[] { Entry(file, "AddUser", [Parameter("id")], [Column("id")]) };
@@ -53,9 +53,11 @@ public sealed class CollectionMethodTests
 
         methods.ShouldBeClean();
         repository.ShouldBeClean();
-        CountOf(methods.Sources[MethodRuns.MethodsFile], " AddUser(\n").ShouldBe(1);
-        // The method of the type and the member of its interface.
-        CountOf(repository.Sources[MethodRuns.MethodsFile], " AddUser(\n").ShouldBe(2);
+        CountOf(methods.Sources[MethodRuns.MethodsFile], " AddUser(\n").ShouldBe(2);
+        // The method of the type and the member of its interface, for each of the two.
+        CountOf(repository.Sources[MethodRuns.MethodsFile], " AddUser(\n").ShouldBe(4);
+        CountOf(methods.Sources[MethodRuns.MethodsFile], "AddUserParams> parameters,\n").ShouldBe(1);
+        CountOf(repository.Sources[MethodRuns.MethodsFile], "AddUserParams> parameters,\n").ShouldBe(2);
         MethodsOf(repository).Length.ShouldBe(2);
         _ = MethodsOf(repository)[1].Batch.ShouldNotBeNull();
     }

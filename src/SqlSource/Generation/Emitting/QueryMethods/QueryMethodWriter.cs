@@ -73,6 +73,13 @@ internal static class QueryMethodWriter
         _ = builder.Append(indent).Append("{\n");
         var checksStart = builder.Length;
         HeaderWriter.AppendChecks(in context, bodyIndent);
+        if (context.Method.Batch is not null)
+        {
+            AppendInterimBatchBody(builder, bodyIndent);
+            AppendEnd(builder, indent);
+            return;
+        }
+
         if (!streams)
         {
             CommandWriter.AppendBody(in context, bodyIndent);
@@ -89,6 +96,16 @@ internal static class QueryMethodWriter
         AppendEnd(builder, bodyIndent);
         ListWriter.AppendHelpers(in context, bodyIndent);
         AppendEnd(builder, indent);
+    }
+
+    // What a collection method does until its body is written: it awaits, so that the asynchronous method it is gives
+    // no CS1998, and throws.
+    private static void AppendInterimBatchBody(StringBuilder builder, string indent)
+    {
+        _ = AsyncSpelling
+            .AppendAwait(builder.Append(indent))
+            .Append("global::System.Threading.Tasks.Task.CompletedTask.ConfigureAwait(false);\n");
+        _ = builder.Append(indent).Append("throw new global::System.NotImplementedException();\n");
     }
 
     internal static void AppendIf(StringBuilder builder, string indent, string condition) =>
@@ -112,7 +129,8 @@ internal static class QueryMethodWriter
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
             streams,
             capabilities,
-            method.Source
+            method.Source,
+            method.Batch is not null
         );
         return new QueryMethodContext(
             builder,
