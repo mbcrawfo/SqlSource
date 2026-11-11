@@ -29,8 +29,8 @@ internal sealed class AsyncCallSpelling : CallSpelling
     internal static string IteratorModifiersOf(bool captures) => captures ? "async " : "static async ";
 
     /// <inheritdoc />
-    public override StringBuilder AppendCallStart(StringBuilder builder, string target, DriverCall call) =>
-        builder.Append("await ").Append(target).Append('.').Append(MemberOf(call)).Append('(');
+    public override StringBuilder AppendCallMember(StringBuilder builder, DriverCall call) =>
+        builder.Append('.').Append(MemberOf(call)).Append('(');
 
     /// <inheritdoc />
     public override StringBuilder AppendToken(StringBuilder builder, string token, bool afterArgument) =>

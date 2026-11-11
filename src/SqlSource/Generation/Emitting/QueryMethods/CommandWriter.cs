@@ -204,9 +204,9 @@ internal static class CommandWriter
                 break;
             case ConnectionSourceKind.DataSource:
                 // The data source, or its throw, is the call's target, in parentheses.
-                var dataSource = new StringBuilder("(");
-                AppendSourceOrThrow(dataSource, spelling, source, access);
-                _ = spelling.AppendCallStart(builder, dataSource.Append(')').ToString(), DriverCall.OpenConnection);
+                _ = spelling.AppendAwait(builder).Append('(');
+                AppendSourceOrThrow(builder, spelling, source, access);
+                _ = spelling.AppendCallMember(builder.Append(')'), DriverCall.OpenConnection);
                 _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
                 _ = spelling.AppendCallEnd(builder);
                 break;

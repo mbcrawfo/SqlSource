@@ -45,6 +45,38 @@ public sealed class CallSpellingTests
         Sync.AppendCallStart(new StringBuilder(), "c", call).ToString().ShouldBe(synchronous);
     }
 
+    [Theory]
+    [InlineData(nameof(DriverCall.Open), ".OpenAsync(", ".Open(")]
+    [InlineData(nameof(DriverCall.OpenConnection), ".OpenConnectionAsync(", ".OpenConnection(")]
+    [InlineData(nameof(DriverCall.Dispose), ".DisposeAsync(", ".Dispose(")]
+    public void AppendCallMember_Call_IsTheMemberAloneOfEachSpelling(
+        string callName,
+        string awaited,
+        string synchronous
+    )
+    {
+        var call = Enum.Parse<DriverCall>(callName);
+
+        Async.AppendCallMember(new StringBuilder("t"), call).ToString().ShouldBe("t" + awaited);
+        Sync.AppendCallMember(new StringBuilder("t"), call).ToString().ShouldBe("t" + synchronous);
+    }
+
+    // The start of a call is the await, the target and the member, so the member alone follows a target written into
+    // the builder, as a data source's expression is.
+    [Fact]
+    public void AppendCallStart_EveryCall_IsTheAwaitTheTargetAndTheMember()
+    {
+        foreach (var spelling in new[] { Async, Sync })
+        {
+            foreach (var call in Enum.GetValues<DriverCall>())
+            {
+                var expected = spelling.AppendCallMember(spelling.AppendAwait(new StringBuilder()).Append("(c)"), call);
+
+                spelling.AppendCallStart(new StringBuilder(), "(c)", call).ToString().ShouldBe(expected.ToString());
+            }
+        }
+    }
+
     [Fact]
     public void AppendCallStart_EveryCall_HasAnAsynchronousAndASynchronousSpelling()
     {
@@ -57,13 +89,13 @@ public sealed class CallSpellingTests
     }
 
     [Fact]
-    public void AppendCallStart_ValueOfNoMember_Throws()
+    public void AppendCallMember_ValueOfNoMember_Throws()
     {
         _ = Should.Throw<UnexpectedEnumValueException>(() =>
-            Async.AppendCallStart(new StringBuilder(), "c", (DriverCall)12)
+            Async.AppendCallMember(new StringBuilder(), (DriverCall)12)
         );
         _ = Should.Throw<UnexpectedEnumValueException>(() =>
-            Sync.AppendCallStart(new StringBuilder(), "c", (DriverCall)12)
+            Sync.AppendCallMember(new StringBuilder(), (DriverCall)12)
         );
     }
 

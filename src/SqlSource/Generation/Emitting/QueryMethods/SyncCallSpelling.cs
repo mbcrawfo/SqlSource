@@ -15,8 +15,8 @@ internal sealed class SyncCallSpelling : CallSpelling
     private SyncCallSpelling() { }
 
     /// <inheritdoc />
-    public override StringBuilder AppendCallStart(StringBuilder builder, string target, DriverCall call) =>
-        builder.Append(target).Append('.').Append(MemberOf(call)).Append('(');
+    public override StringBuilder AppendCallMember(StringBuilder builder, DriverCall call) =>
+        builder.Append('.').Append(MemberOf(call)).Append('(');
 
     /// <inheritdoc />
     public override StringBuilder AppendToken(StringBuilder builder, string token, bool afterArgument) => builder;

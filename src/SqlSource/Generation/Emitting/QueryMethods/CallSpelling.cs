@@ -25,7 +25,14 @@ internal abstract class CallSpelling
     /// target.ReadAsync(</c> or <c>target.Read(</c>.  The caller follows it with the arguments, the token's
     /// <see cref="AppendToken" /> among them, and <see cref="AppendCallEnd" />.
     /// </summary>
-    public abstract StringBuilder AppendCallStart(StringBuilder builder, string target, DriverCall call);
+    public StringBuilder AppendCallStart(StringBuilder builder, string target, DriverCall call) =>
+        AppendCallMember(AppendAwait(builder).Append(target), call);
+
+    /// <summary>
+    /// Appends the member of a call of the driver, after a target the caller has written after
+    /// <see cref="AppendAwait" />, up to its opening parenthesis: <c>.ReadAsync(</c> or <c>.Read(</c>.
+    /// </summary>
+    public abstract StringBuilder AppendCallMember(StringBuilder builder, DriverCall call);
 
     /// <summary>
     /// Appends a call's cancellation token, after a comma when an argument comes before it, or nothing for a method
