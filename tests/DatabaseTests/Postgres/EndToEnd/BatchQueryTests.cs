@@ -373,6 +373,7 @@ public sealed class BatchQueryTests(PostgresDatabases postgres)
         thrown.InnerException.ShouldBeOfType<PostgresException>().SqlState.ShouldBe("23505");
         (await CountNotesAsync(connection, token)).ShouldBe(ChunkSize);
         (await MaxNoteIdAsync(connection, token)).ShouldBe(FirstId + ChunkSize - 1);
+        await ShouldBeInNoTransactionAsync(connection, token);
     }
 
     // Item 1,200 repeats the first's id, in the second chunk, under the method's own transaction: it rolls back the
@@ -441,6 +442,7 @@ public sealed class BatchQueryTests(PostgresDatabases postgres)
 
         thrown.SqlState.ShouldBe("23505");
         (await CountNotesAsync(connection, token)).ShouldBe(0);
+        await ShouldBeInNoTransactionAsync(connection, token);
     }
 
     // The method runs in the caller's transaction, whose own read sees the rows, and neither commits nor ends it: the
