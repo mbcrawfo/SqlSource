@@ -45,7 +45,7 @@
       ]
     },
     "generatorParameters": {
-      "description": "The generator parameters this folder changes, one word for each element: a parameter's name, which turns it on, or its name with `=` and one of its values, `on` or `off`, or `=default`, matched ignoring case. Each parameter not named keeps the state the folders above give it. `default` gives every parameter its default, and the other words apply over it. `[]` changes nothing.",
+      "description": "The generator parameters this folder changes, one word for each element: a parameter's name, which turns it on, or its name with `=` and one of its values, `on` or `off`, and for `transaction` also `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`, or `=default`, matched ignoring case. Each parameter not named keeps the value the folders above give it. `default` gives every parameter its default, and the other words apply over it. `[]` changes nothing.",
       "type": "array",
       "items": {
         "type": "string",

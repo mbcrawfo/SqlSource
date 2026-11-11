@@ -24,7 +24,7 @@ public sealed class ExceptionReuseTests
     private const string InternalsVisible =
         "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n";
 
-    // Code that names both exceptions, as a caller that catches them does.
+    // Code that names the three exceptions, as a caller that catches them does.
     private const string CatchSource = """
         namespace Caller
         {
@@ -190,6 +190,10 @@ public sealed class ExceptionReuseTests
     [InlineData("SqlSource.UnexpectedRowCountException", "CS0419", true)]
     [InlineData("SqlSource.UnexpectedRowCountException.QueryName", "CS1574", false)]
     [InlineData("SqlSource.UnexpectedRowCountException.QueryName", "CS1574", true)]
+    [InlineData("SqlSource.CollectionItemException", "CS0419", false)]
+    [InlineData("SqlSource.CollectionItemException", "CS0419", true)]
+    [InlineData("SqlSource.CollectionItemException.ItemIndex", "CS1574", false)]
+    [InlineData("SqlSource.CollectionItemException.ItemIndex", "CS1574", true)]
     public async Task Build_UserCrefWithAStrangersCopyReferenced_IsAWarning(
         string cref,
         string id,
@@ -208,6 +212,10 @@ public sealed class ExceptionReuseTests
     [InlineData("SqlSource.UnexpectedRowCountException", true)]
     [InlineData("SqlSource.UnexpectedRowCountException.QueryName", false)]
     [InlineData("SqlSource.UnexpectedRowCountException.QueryName", true)]
+    [InlineData("SqlSource.CollectionItemException", false)]
+    [InlineData("SqlSource.CollectionItemException", true)]
+    [InlineData("SqlSource.CollectionItemException.ItemIndex", false)]
+    [InlineData("SqlSource.CollectionItemException.ItemIndex", true)]
     public async Task Build_UserCrefWithTheFriendsCopyAlone_HasNoDiagnostic(string cref, bool compilationReference)
     {
         var (diagnostics, sources) = await BuildWithCref(cref, compilationReference, withStranger: false);
@@ -222,6 +230,10 @@ public sealed class ExceptionReuseTests
     [InlineData("T:SqlSource.UnexpectedRowCountException", true)]
     [InlineData("P:SqlSource.UnexpectedRowCountException.QueryName", false)]
     [InlineData("P:SqlSource.UnexpectedRowCountException.QueryName", true)]
+    [InlineData("T:SqlSource.CollectionItemException", false)]
+    [InlineData("T:SqlSource.CollectionItemException", true)]
+    [InlineData("P:SqlSource.CollectionItemException.ItemIndex", false)]
+    [InlineData("P:SqlSource.CollectionItemException.ItemIndex", true)]
     public async Task Build_UserCrefAsADocumentationIdWithAStrangersCopyReferenced_HasNoDiagnostic(
         string cref,
         bool compilationReference

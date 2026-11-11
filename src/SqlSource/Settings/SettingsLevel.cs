@@ -22,8 +22,8 @@ internal sealed record SettingsLevel
     public static SettingsLevel None { get; } = new();
 
     /// <summary>
-    /// What the level says about the generator parameters: the ones it names, each on or off.  Merged per parameter,
-    /// not taken whole, and empty when the level names none.
+    /// What the level says about the generator parameters: the ones it names, each given one of its values.  Merged
+    /// per parameter, not taken whole, and empty when the level names none.
     /// </summary>
     public GeneratorParameterChoices Parameters { get; init; }
 
