@@ -48,8 +48,8 @@ internal enum GeneratorParameters
     ListPadding = 128,
 
     /// <summary>
-    /// <c>collection-method</c>: a query that returns many rows also gets a method that takes a collection of
-    /// inputs and runs the query for each.  Off by default.
+    /// <c>collection-method</c>: a query with parameters whose output is <c>methods</c> or <c>repository</c> also
+    /// gets a collection method, which takes a collection of inputs and runs the query for each.  Off by default.
     /// </summary>
     CollectionMethod = 256,
 
