@@ -247,6 +247,18 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         rows.ShouldBe([SeedNotes[1]]);
     }
 
+    [Fact]
+    public async Task FindNote_Empty_ReturnsEmpty()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var rows = await connection.FindNote([], cancellationToken: token);
+
+        rows.ShouldBeEmpty();
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
     // The ids 1 to 4 in turn, over two chunks: the three notes in order, and nothing for 4, which no note has.
     [Fact]
     public async Task FindNote_OneThousandAndOneItems_LeavesOutTheMissingInOrder()
@@ -607,6 +619,26 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         (await CountNotesAsync(connection, null, token)).ShouldBe(0);
     }
 
+    // Item 1,200 repeats the first's id, in the second chunk of the caller's transaction: the transaction holds every
+    // other item until the caller rolls it back, after which nothing is left.
+    [Fact]
+    public async Task InsertNote_DuplicateKeyInTheSecondChunkOfTheCallersTransaction_LeavesItsRollbackToTheCaller()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.App(sqlServer), token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+
+        var thrown = await Should.ThrowAsync<CollectionItemException>(() =>
+            connection.InsertNote(DuplicateInTheSecondChunk(), Notes, transaction, cancellationToken: token)
+        );
+        var during = await CountNotesAsync(connection, transaction, token);
+        await transaction.RollbackAsync(token);
+
+        thrown.ItemIndex.ShouldBe(1200);
+        during.ShouldBe(1499);
+        (await CountNotesAsync(connection, null, token)).ShouldBe(0);
+    }
+
     // Under XACT_ABORT ON the duplicate key rolls back the caller's transaction itself, so the method throws it at its
     // item as it is, and does not report a rollback, which no later error caused: the transaction has completed, its
     // Connection is null, and nothing is left.
@@ -728,11 +760,85 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         rows.ShouldBe([new FindAccountWhenPositiveDto(2), new FindAccountWhenPositiveDto(1)]);
     }
 
+    // The query's second statement returns an empty result set of the same one column, which the guard cannot tell from
+    // the next item's: over two items the second reads it as its own, and the guard refuses the batch at its end, where
+    // the second item's own result set is left, so no row is returned.
+    [Fact]
+    public async Task FindAccountThenEmpty_SameWidthResultSet_ThrowsAtTheEndOfTheBatch()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            connection.FindAccountThenEmpty(
+                [new FindAccountThenEmptyArgs(1), new FindAccountThenEmptyArgs(2)],
+                cancellationToken: token
+            )
+        );
+
+        thrown.Message.ShouldStartWith(
+            "The query 'FindAccountThenEmpty' returned a result set of another shape for item 1,"
+        );
+    }
+
+    // The same query under one: the second item reads the empty result set as its own and throws for its missing row
+    // before the guard is reached.
+    [Fact]
+    public async Task GetAccountThenEmpty_SameWidthResultSet_ThrowsUnexpectedRowCount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<UnexpectedRowCountException>(() =>
+            connection.GetAccountThenEmpty(
+                [new GetAccountThenEmptyArgs(1), new GetAccountThenEmptyArgs(2)],
+                cancellationToken: token
+            )
+        );
+
+        thrown.ItemIndex.ShouldBe(1);
+    }
+
+    // The second statement returns one column of text, which the second item reads as its id and cannot: SqlClient's
+    // cast error is thrown before the guard is reached.
+    [Fact]
+    public async Task FindAccountThenText_SameWidthResultSetOfAnotherType_ThrowsTheCastError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        _ = await Should.ThrowAsync<InvalidCastException>(() =>
+            connection.FindAccountThenText(
+                [new FindAccountThenTextArgs(1), new FindAccountThenTextArgs(2)],
+                cancellationToken: token
+            )
+        );
+    }
+
+    // The insert's second statement returns a result set of another width, which the guard refuses at the second item,
+    // after the first item's insert: the method's own transaction is rolled back, and the table is left empty.
+    [Fact]
+    public async Task InsertNoteThenOther_ResultSetOfAnotherWidth_RollsBackTheMethodsTransaction()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.App(sqlServer), token);
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            connection.InsertNoteThenOther(Items(2), Notes, cancellationToken: token)
+        );
+
+        thrown.Message.ShouldStartWith(
+            "The query 'InsertNoteThenOther' returned a result set of another shape for item 1,"
+        );
+        (await CountNotesAsync(connection, null, token)).ShouldBe(0);
+        await ShouldBeInNoTransactionAsync(connection, token);
+    }
+
     // The first chunk's items read the accounts of alice and carol, and the last item, in the second chunk, reads
     // bob's, whose row a second connection holds, and waits on its lock until the token is cancelled: the method's
-    // transaction is rolled back, the first chunk's rows with it.  The batch has sent the result sets of the second
-    // chunk's earlier items, so the wait is in a read, whose cancel SqlClient throws as a TaskCanceledException, as
-    // RunTimeArgumentTests shows of a query method's read.
+    // transaction is rolled back, the first chunk's rows with it.  An insert that returns rows through OUTPUT sends its
+    // columns before it reads bob's row, so the wait is in the read of the item's first row, whose cancel SqlClient
+    // throws as a TaskCanceledException, as RunTimeArgumentTests says of a SELECT.
     [Fact]
     public async Task InsertNote_TokenCancelledInTheSecondChunk_RollsBackTheFirst()
     {

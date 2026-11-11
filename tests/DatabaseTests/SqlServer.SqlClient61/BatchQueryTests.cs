@@ -20,7 +20,7 @@ public sealed class BatchQueryTests(AppContainer app)
     // The error number of a duplicate key.
     private const int DuplicateKey = 2627;
 
-    // The third item repeats the first's id, which the primary key refuses, and the rollback takes the first two.
+    // The third item repeats the first's id, which the primary key refuses, and the rollback takes the others.
     private static readonly NoteToAdd[] Items =
     [
         new(101, "First.", 1),

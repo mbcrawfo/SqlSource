@@ -75,6 +75,33 @@ SELECT 2 AS other, 3 AS third;
 IF @id > 0
     SELECT id FROM dbo.accounts WHERE id = @id;
 
+-- name: FindAccountThenEmpty
+-- summary: The account that an id names, and then an empty result set of the same one column, which a collection method
+-- summary: reads as the next item's, and refuses only when the batch has a result set left after the last item's.
+SELECT id FROM dbo.accounts WHERE id = @id;
+SELECT id FROM dbo.accounts WHERE id = 0;
+
+-- name: GetAccountThenEmpty -> one
+-- summary: FindAccountThenEmpty again, under one, which throws for the empty result set it reads as the next item's.
+SELECT id FROM dbo.accounts WHERE id = @id;
+SELECT id FROM dbo.accounts WHERE id = 0;
+
+-- name: FindAccountThenText
+-- summary: The account that an id names, and then a result set of one column of text, which a collection method reads
+-- summary: as the next item's, and fails to read as an id.
+SELECT id FROM dbo.accounts WHERE id = @id;
+SELECT N'other' AS other;
+
+-- name: InsertNoteThenOther -> one
+-- summary: Adds a note as InsertNote does, and then returns a result set of one column, which a collection method
+-- summary: refuses as the next item's, after the first item's insert, which the rollback of its transaction undoes.
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+SELECT 2 AS other;
+
 -- name: InsertNoteSerializable -> one
 -- summary: Adds a note as InsertNote does, in a transaction of its own at the level serializable, and returns its id
 -- summary: and, as its kind, the isolation level of the transaction it ran in, as sys.dm_exec_sessions numbers it.
