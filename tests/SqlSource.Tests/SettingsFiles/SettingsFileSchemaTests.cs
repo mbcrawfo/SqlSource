@@ -141,8 +141,9 @@ public sealed class SettingsFileSchemaTests
             Enum.GetValues<GeneratorParameters>().Where(parameter => parameter != GeneratorParameters.None),
             ignoreOrder: true
         );
+        // A name alone is the word on, so only a parameter that takes on is in the list.
         names.ShouldBe([
-            .. GeneratorParameterList.Definitions.Select(name => name.Name),
+            .. GeneratorParameterList.Definitions.Where(TakesItsNameAlone).Select(name => name.Name),
             GeneratorParameterList.Default,
         ]);
     }
@@ -173,7 +174,7 @@ public sealed class SettingsFileSchemaTests
         Pattern(Properties.GetProperty(key)).ShouldBe(expected);
     }
 
-    // A parameter's name, alone or with one of its words or default, or default alone, as
+    // A parameter's name with one of its words or default, or alone when on is one of its words, or default alone, as
     // GeneratorParameterList.ReadWord reads a word.
     [Fact]
     public void Schema_PatternOfGeneratorParameters_IsGeneratedFromTheParameters()
@@ -182,7 +183,8 @@ public sealed class SettingsFileSchemaTests
             CaseFree(definition.Name)
             + "(?:=(?:"
             + string.Join("|", definition.Words.Append(GeneratorParameterList.Default).Select(CaseFree))
-            + "))?"
+            + "))"
+            + (TakesItsNameAlone(definition) ? "?" : string.Empty)
         );
         var expected =
             @"^\s*(?:(?:"
@@ -364,6 +366,7 @@ public sealed class SettingsFileSchemaTests
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"default\"]")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \" Keep-Comments=OFF \", \"sort-input=Default\"]")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"Sort-Input\", \"\", \" DEFAULT \", \"array-pool=off\"]")]
+    [InlineData(SettingsFileKeys.GeneratorParameters, "[\"transaction\", \" Method-Type=SYNC \"]")]
     [InlineData(
         SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
         "{\"nodaTime\": \"on\"}"
@@ -464,6 +467,9 @@ public sealed class SettingsFileSchemaTests
     )]
     [InlineData( /*lang=json,strict*/
         """{"generatorParameters": ["keep-comments = off"]}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"generatorParameters": ["method-type"]}"""
     )]
     [InlineData( /*lang=json,strict*/
         """{"typeOverrides": {"int4": ""}}"""
@@ -614,6 +620,10 @@ public sealed class SettingsFileSchemaTests
             : Regex.Escape(character.ToString());
 
     private static string CaseFree(string name) => string.Concat(name.Select(CaseFree));
+
+    // Whether GeneratorParameterList.ReadWord reads the parameter's name alone, which it reads as the word on.
+    private static bool TakesItsNameAlone(GeneratorParameterDefinition definition) =>
+        definition.TryReadValue("on", out _);
 
     // The pattern of a choice that is required: the choice's pattern without the empty spelling.
     private static string RequiredChoicePattern(string[] names) =>
