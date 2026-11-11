@@ -301,6 +301,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC297](#sqlsrc297) | Transaction isolation level is not the database's |
 
+**A query's synchronous method**
+
+| Id | Title |
+|----|----|
+| [SQLSRC298](#sqlsrc298) | A stream has no synchronous method |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  [SQLSRC028](#sqlsrc028) to [SQLSRC037](#sqlsrc037) are about a type that claims a query whose output is `repository`, at its `[SqlSourceGenerate]` or at the member they name, and never about a type whose queries are all of other outputs.  Each of [SQLSRC028](#sqlsrc028) to [SQLSRC034](#sqlsrc034) but the warning [SQLSRC031](#sqlsrc031), and [SQLSRC036](#sqlsrc036), leaves the repository queries of the databases it is about without a method until it is fixed; their models are still generated.  [SQLSRC035](#sqlsrc035) and [SQLSRC037](#sqlsrc037) cost the type only its interface.  Ids from 101 to 127 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 296 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120 and [SQLSRC126](#sqlsrc126), under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file, and [SQLSRC127](#sqlsrc127), which depends on the query's output.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
@@ -332,6 +338,8 @@ The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about convert
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models`, `methods` or `repository`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `methods` or `repository` its method.
 
 `SQLSRC297` is reported by the build, at the name of a query whose output is `methods` or `repository`, once for the query.  Unlike the ids above, it costs the query only its collection method, not its method.
+
+`SQLSRC298` is reported by the build, at the name of a query whose output is `methods` or `repository`, once for the query, as `SQLSRC272` is.  The query gets no method and no collection method until it is fixed; its models are still generated.
 
 ## SQLSRC001
 
@@ -438,7 +446,7 @@ See: [Which files belong to a type](generator.md#files-of-a-type)
 
 **Query is named like its containing type**
 
-A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](generator.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise, and no query method there can have it either, with `Async` after the query's name under `async-method-suffix`.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
+A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](generator.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise, and no query method there can have it either.  An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `both`, and a synchronous method, under `sync` or `both`, has the query's name alone, so under `both` the class can have neither name, whatever the query's shape.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
 
 ```sql
 -- name: Sql
@@ -3216,7 +3224,7 @@ See: [Query methods](generator.md#query-methods)
 
 **Method name is taken**
 
-The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  It is taken when it is:
+The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  Under the generator parameter [`method-type`](settings.md#setting-generator-parameters) a synchronous method has the query's name alone, and under `both` an asynchronous method always has `Async` after it, whatever `async-method-suffix` says, so that it never has the name of the synchronous method beside it.  Each name of a query's methods is checked, and the message names the one that is taken; a query with one taken gets none of its methods.  It is taken when it is:
 
 - under the [member location](generator.md#locations) `extension-class`, the default of the output `methods`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
@@ -3232,7 +3240,7 @@ The message names the query, the method's name and what takes it.
 /work/App/Queries/Users.sql(1,10): error SQLSRC274: The method of the query 'Open' cannot be named 'Open', because DbConnection has a member of that name, which a call on a connection finds before the method.  Rename the query.
 ```
 
-Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For a query `Get` under `async-method-suffix` beside a query `GetAsync` without it, rename one of them.  For the methods of two types, rename one of the queries, or write `-- member-location: class` in the files of one of the types to put its methods on the type itself.  The error is reported at the query's name, and the query's models are still generated.
+Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For a query `Get` under `async-method-suffix` beside a query `GetAsync` without it, or for `Get` and `GetAsync` under `method-type=both`, rename one of them.  For the methods of two types, rename one of the queries, or write `-- member-location: class` in the files of one of the types to put its methods on the type itself.  The error is reported at the query's name, and the query's models are still generated.
 
 See: [Query methods](generator.md#query-methods)
 
@@ -3640,3 +3648,17 @@ A query that turns on the `collection-method` generator parameter, and has param
 Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, `on`, which begins the transaction at the database's default level, or `off`, which begins none.  The query keeps its own method; only its [collection method](generator.md#collection-methods) is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
 
 See: [A collection method's transactions](generator.md#collection-transactions)
+
+## SQLSRC298
+
+**A stream has no synchronous method**
+
+A query whose output is `methods` or `repository` streams its rows, with the [collection type](settings.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`, and the generator parameter [`method-type`](settings.md#setting-generator-parameters) is `sync`.  A stream reads each row as the caller asks for it, which only an asynchronous method can do, so there is no synchronous one.  The message names the query.
+
+```console
+/work/App/Queries/Users.sql(3,10): error SQLSRC298: The query 'ListUsers' streams its rows as an IAsyncEnumerable, which has no synchronous method; give it method-type=async or method-type=both
+```
+
+Write `-- generator: method-type=async` in the query, or `method-type=both`, under which it keeps its stream, named with `Async` after the query's name, and gets no synchronous method.  Or give it a collection type that is read whole, such as `List`, which a synchronous method can return.  The query gets no method, and no [collection method](generator.md#collection-methods) either, until it is fixed; its models are still generated.  A query of another shape is not reported, whatever its collection type.
+
+See: [Collection type](settings.md#setting-collection-type)

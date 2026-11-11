@@ -1386,6 +1386,20 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the query.  Reported at the query's name, by MethodPlanner, for a query under method-type=sync whose
+    // method would stream its rows; the query gets no method, and no collection method either.
+    public static readonly DiagnosticDescriptor StreamNeedsAsyncMethod = new(
+        id: "SQLSRC298",
+        title: "A stream has no synchronous method",
+        messageFormat: "The query '{0}' streams its rows as an IAsyncEnumerable, which has no synchronous method; give "
+            + "it method-type=async or method-type=both",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc298",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -1494,7 +1508,8 @@ internal static class SqlDiagnostics
             LibraryBelowTheFloor,
             JsonOptInNotApplicable,
             ShortNameFindsAPackagesType,
-            UnsupportedTransactionIsolation
+            UnsupportedTransactionIsolation,
+            StreamNeedsAsyncMethod
         );
 
     /// <summary>

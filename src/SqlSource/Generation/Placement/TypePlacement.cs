@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
 namespace SqlSource.Generation.Placement;
@@ -14,8 +15,6 @@ namespace SqlSource.Generation.Placement;
 /// </summary>
 internal sealed class TypePlacement
 {
-    private const string AsyncSuffix = "Async";
-
     // What has the name of a member on the type, as SQLSRC125 says it.
     private const string DeclaredReason = "the type declares a member, a nested type or a type parameter of that name";
 
@@ -359,10 +358,7 @@ internal sealed class TypePlacement
         {
             var isUsable = true;
             var location = settings.MemberLocation;
-            if (
-                ContainerNameOf(settings, location) is { } container
-                && IsNamed(container, query.Name, Suffix(settings))
-            )
+            if (ContainerNameOf(settings, location) is { } container && IsNamedLike(container, query.Name, settings))
             {
                 diagnostics?.Add(
                     DiagnosticInfo.Create(
@@ -479,11 +475,16 @@ internal sealed class TypePlacement
             && !settings.Output.HasMethod()
             && SortedSearch.IndexOf(type.TakenNames, name, static taken => taken, StringComparer.Ordinal) >= 0;
 
-        // What a query's method adds to its name: Async under async-method-suffix.  A constant adds nothing.
-        private static string Suffix(QuerySettings settings) =>
-            settings.Output.HasMethod() && settings.Parameters.IsOn(GeneratorParameters.AsyncMethodSuffix)
-                ? AsyncSuffix
-                : string.Empty;
+        // Whether a member of the query would have the name: its constant's or token method's, or each name its
+        // methods can have, by MethodNames, whatever its shape.
+        private static bool IsNamedLike(string name, string query, QuerySettings settings) =>
+            settings.Output.HasMethod()
+                ? (MethodNames.HasSynchronous(settings) && IsNamed(name, query, string.Empty))
+                    || (
+                        MethodNames.HasAsynchronous(settings)
+                        && IsNamed(name, query, MethodNames.AsyncSuffixOf(settings))
+                    )
+                : IsNamed(name, query, string.Empty);
 
         // Whether the name is the member's with the suffix, with no string made.
         private static bool IsNamed(string name, string member, string suffix) =>

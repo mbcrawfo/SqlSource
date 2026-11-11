@@ -20,8 +20,8 @@ namespace SqlSource.Generation.Methods;
 /// <summary>
 /// Decides which queries of one type get a method, and what each method is written from, with the problems of those
 /// that cannot have one: <c>SQLSRC123</c> for a method that cannot take or return its internal models,
-/// <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, the errors of a query's SQL that are only a method's
-/// (<see cref="SqlQuery.MethodErrors" />), and, from
+/// <c>SQLSRC272</c>, <c>SQLSRC274</c>, <c>SQLSRC275</c> and <c>SQLSRC298</c>, the errors of a query's SQL that are
+/// only a method's (<see cref="SqlQuery.MethodErrors" />), and, from
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
@@ -35,8 +35,6 @@ namespace SqlSource.Generation.Methods;
 /// </summary>
 internal static class MethodPlanner
 {
-    private const string AsyncSuffix = "Async";
-
     private const string ExtensionsSuffix = "Extensions";
 
     /// <summary>
@@ -372,11 +370,11 @@ internal static class MethodPlanner
         };
 
     // The plan of one query whose output has a method, or null when it gets nothing and reports nothing here.  Every
-    // problem of its SQL, of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC274 and of its converters that the query has is
-    // reported, and any one leaves it no method.  Its conversions see the converters of the type's slice that serve
-    // its target.  The libraries it uses are added to the type's, and one older than its floor leaves it no method,
-    // beside its problems, which stay true once the library is updated.  A repository query without a connection gets
-    // no method either, beside its problems.
+    // problem of its SQL, of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC298, SQLSRC274 and of its converters that the query
+    // has is reported, and any one leaves it no method.  Each name of its methods, by its method-type, is checked.  Its
+    // conversions see the converters of the type's slice that serve its target.  The libraries it uses are added to the
+    // type's, and one older than its floor leaves it no method, beside its problems, which stay true once the library
+    // is updated.  A repository query without a connection gets no method either, beside its problems.
     private static Planned? Plan(
         QueryContext context,
         HashSet<(string? NestedClass, string Name)> written,
@@ -424,17 +422,20 @@ internal static class MethodPlanner
         }
 
         problems.AddRange(FindTokenProblems(query, source));
-        var name = query.Name + (settings.Parameters.IsOn(GeneratorParameters.AsyncMethodSuffix) ? AsyncSuffix : "");
+        var forms = FormsOf(query, settings, shape, problems);
         var host = HostOf(placement);
-        var reason =
-            FindTakenReason(input, name, host, written, queries.Placement.NestedClasses)
-            ?? FindTakenBySource(source, name)
-            ?? FindTakenByInterface(input.Type.Type.Type, interfaceName, source, host, name);
-        if (reason is not null)
+        foreach (var name in forms.Select(static form => form.Name))
         {
-            problems.Add(
-                DiagnosticInfo.Create(SqlDiagnostics.MethodNameTaken, query.NameLocation, query.Name, name, reason)
-            );
+            var reason =
+                FindTakenReason(input, name, host, written, queries.Placement.NestedClasses)
+                ?? FindTakenBySource(source, name)
+                ?? FindTakenByInterface(input.Type.Type.Type, interfaceName, source, host, name);
+            if (reason is not null)
+            {
+                problems.Add(
+                    DiagnosticInfo.Create(SqlDiagnostics.MethodNameTaken, query.NameLocation, query.Name, name, reason)
+                );
+            }
         }
 
         // The query's models are read whatever its other problems, so that it gets every problem of its converters too.
@@ -463,7 +464,7 @@ internal static class MethodPlanner
         }
 
         var method = new QueryMethod(
-            name,
+            forms[0].Name,
             query.Name,
             TypeEmitter.GetSummaryXml(query, file.FileName),
             shape,
@@ -480,24 +481,83 @@ internal static class MethodPlanner
         {
             Host = host,
             Source = source,
+            Synchrony = forms[0].Synchrony,
         };
         return new Planned(
             problems,
             query.Name,
             query.NameLocation,
-            AddCollectionMethod(method, query.Segments, settings, problems),
+            MethodsOf(method, forms, query.Segments, settings, problems),
             isUsable,
             WarningIdsOf(models, methodInput, methodOutput)
         );
     }
 
-    // The query's method, and after it its collection method when the query asks for one and takes parameters, which
-    // are the items.  It has the query method's name by design, so it is not checked against the names again, and it
-    // reads its rows into an array where the query method streams them.  An isolation level that the query's database
-    // does not have costs the query only this method, and is reported as a problem that does not stop the query's own.
-    // Npgsql refuses a batch command whose text ends in a line comment after its final semicolon, which keep-comments
-    // can leave, so a PostgreSQL collection method sends the query's SQL without comments, plainSegments.
-    private static ImmutableArray<QueryMethod> AddCollectionMethod(
+    // The forms of the query's methods, in their order, by its method-type and MethodNames: under sync a synchronous
+    // method named as the query, under async an asynchronous one, and under both the two, the asynchronous one named
+    // with Async.  A stream has no synchronous method: under both it keeps its asynchronous one, and under sync it gets
+    // SQLSRC298 and none, so that it takes no name.  In this part a repository's method is asynchronous under any.
+    private static List<MethodForm> FormsOf(
+        SqlQuery query,
+        QuerySettings settings,
+        ResultShape shape,
+        List<DiagnosticInfo> problems
+    )
+    {
+        var forms = new List<MethodForm>(2);
+        var streams = shape == ResultShape.Many && settings.CollectionType == CollectionKind.IAsyncEnumerable;
+        if (streams && settings.MethodType == MethodType.Sync)
+        {
+            problems.Add(DiagnosticInfo.Create(SqlDiagnostics.StreamNeedsAsyncMethod, query.NameLocation, query.Name));
+            return forms;
+        }
+
+        if (!streams && MethodNames.HasSynchronous(settings))
+        {
+            forms.Add(new MethodForm(MethodSynchrony.Synchronous, query.Name));
+        }
+
+        if (MethodNames.HasAsynchronous(settings))
+        {
+            forms.Add(new MethodForm(MethodSynchrony.Asynchronous, MethodNames.AsyncNameOf(query.Name, settings)));
+        }
+
+        return forms;
+    }
+
+    // The query's methods, one of each form, the first of which is the method, and after them its collection method.
+    private static ImmutableArray<QueryMethod> MethodsOf(
+        QueryMethod method,
+        List<MethodForm> forms,
+        EquatableArray<SqlSegment> plainSegments,
+        QuerySettings settings,
+        List<DiagnosticInfo> problems
+    )
+    {
+        var methods = ImmutableArray.CreateBuilder<QueryMethod>(forms.Count + 1);
+        methods.Add(method);
+        for (var index = 1; index < forms.Count; index++)
+        {
+            methods.Add(method with { Name = forms[index].Name, Synchrony = forms[index].Synchrony });
+        }
+
+        if (CollectionMethodOf(methods[methods.Count - 1], plainSegments, settings, problems) is { } collection)
+        {
+            methods.Add(collection);
+        }
+
+        return methods.ToImmutable();
+    }
+
+    // The collection method of the query, which follows its last method, when the query asks for one and takes
+    // parameters, which are the items, or null.  It has that method's name by design, so it is not checked against the
+    // names again, and it reads its rows into an array where the query method streams them.  In this part it is
+    // asynchronous, also beside a synchronous method, whose overload it is by its items.  An isolation level that the
+    // query's database does not have costs the query only this method, and is reported as a problem that does not
+    // stop the query's own.  Npgsql refuses a batch command whose text ends in a line comment after its final
+    // semicolon, which keep-comments can leave, so a PostgreSQL collection method sends the query's SQL without
+    // comments, plainSegments.
+    private static QueryMethod? CollectionMethodOf(
         QueryMethod method,
         EquatableArray<SqlSegment> plainSegments,
         QuerySettings settings,
@@ -506,7 +566,7 @@ internal static class MethodPlanner
     {
         if (!settings.CollectionMethod || method.Input is null)
         {
-            return [method];
+            return null;
         }
 
         var transaction = settings.Transaction;
@@ -524,25 +584,22 @@ internal static class MethodPlanner
                     "PostgreSQL"
                 )
             );
-            return [method];
+            return null;
         }
 
-        return
-        [
-            method,
-            method with
+        return method with
+        {
+            Synchrony = MethodSynchrony.Asynchronous,
+            Batch = new BatchCall(transaction),
+            Collection =
+                method.Collection == CollectionKind.IAsyncEnumerable ? CollectionKind.Array : method.Collection,
+            Segments = method.Engine switch
             {
-                Batch = new BatchCall(transaction),
-                Collection =
-                    method.Collection == CollectionKind.IAsyncEnumerable ? CollectionKind.Array : method.Collection,
-                Segments = method.Engine switch
-                {
-                    DatabaseEngine.PostgreSql => plainSegments,
-                    DatabaseEngine.SqlServer => method.Segments,
-                    _ => throw UnexpectedEnumValueException.Of(method.Engine),
-                },
+                DatabaseEngine.PostgreSql => plainSegments,
+                DatabaseEngine.SqlServer => method.Segments,
+                _ => throw UnexpectedEnumValueException.Of(method.Engine),
             },
-        ];
+        };
     }
 
     // Whether the query's input or output model, when it has one, is internal.  A model with no assignment is not: its
@@ -1121,9 +1178,9 @@ internal static class MethodPlanner
             .Split(',')
             .Any(parameter => string.Equals(parameter.Trim().TrimStart('@'), name, StringComparison.Ordinal));
 
-    // The planned queries in order: the problems of each, then, for each of its methods in order, SQLSRC274 at each of
-    // two or more methods of one name among every query's, and the rest of the methods when their driver allows them,
-    // with the ids of their warnings and the libraries whose conversions they call.
+    // The planned queries in order: the problems of each, then SQLSRC274 at each of its methods whose name two or more
+    // queries' methods have, which leaves it none, or else its methods when their driver allows them, with the ids of
+    // their warnings and the libraries whose conversions they call.
     private static void AddPlanned(
         List<Planned> planned,
         ImmutableArray<QueryMethod>.Builder methods,
@@ -1140,8 +1197,8 @@ internal static class MethodPlanner
             for (var index = 0; index < plan.Methods.Length; index++)
             {
                 var method = plan.Methods[index];
-                // A collection method shares its query method's name by design, which is no clash of the query with
-                // itself.
+                // A collection method shares the name of the method it follows by design, which is no clash of the
+                // query with itself, and clashes where that method does.
                 if (method.Batch is not null)
                 {
                     continue;
@@ -1160,31 +1217,39 @@ internal static class MethodPlanner
         foreach (var plan in planned)
         {
             diagnostics.AddRange(plan.Problems);
+            var clashes = false;
             foreach (var method in plan.Methods)
             {
-                if (byName[KeyOf(method)] is { Count: > 1 } queries)
+                if (method.Batch is null && byName[KeyOf(method)] is { Count: > 1 } queries)
                 {
-                    // The collection method clashes where its query's method does, which reports it once.
-                    if (method.Batch is null)
-                    {
-                        var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
-                        diagnostics.Add(
-                            DiagnosticInfo.Create(
-                                SqlDiagnostics.MethodNameTaken,
-                                plan.NameLocation,
-                                plan.QueryName,
-                                method.Name,
-                                "the method of the query '" + other + "' has that name too"
-                            )
-                        );
-                    }
+                    var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
+                    diagnostics.Add(
+                        DiagnosticInfo.Create(
+                            SqlDiagnostics.MethodNameTaken,
+                            plan.NameLocation,
+                            plan.QueryName,
+                            method.Name,
+                            "the method of the query '" + other + "' has that name too"
+                        )
+                    );
+                    clashes = true;
                 }
-                else if (plan.IsDriverUsable)
-                {
-                    methods.Add(method);
-                    warningIds.UnionWith(plan.WarningIds);
-                    AddConversionLibraries(method, ref conversionLibraries);
-                }
+            }
+
+            if (clashes || !plan.IsDriverUsable)
+            {
+                continue;
+            }
+
+            foreach (var method in plan.Methods)
+            {
+                methods.Add(method);
+                AddConversionLibraries(method, ref conversionLibraries);
+            }
+
+            if (plan.Methods.Length > 0)
+            {
+                warningIds.UnionWith(plan.WarningIds);
             }
         }
     }
@@ -1322,6 +1387,9 @@ internal static class MethodPlanner
 
     // One query's problems and its methods, one today or none when it cannot have one, with whether its driver allows
     // them and the ids of the warnings they give.
+    // One method of a query, before its collection method: whether it is synchronous, and its name.
+    private readonly record struct MethodForm(MethodSynchrony Synchrony, string Name);
+
     private sealed record Planned(
         List<DiagnosticInfo> Problems,
         string QueryName,
