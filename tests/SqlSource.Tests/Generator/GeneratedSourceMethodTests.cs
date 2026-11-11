@@ -223,6 +223,21 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("size")]
     [InlineData("digits")]
     [InlineData("power")]
+    [InlineData("items")]
+    [InlineData("itemIndex")]
+    [InlineData("first")]
+    [InlineData("more")]
+    [InlineData("batch")]
+    [InlineData("batchScope")]
+    [InlineData("result")]
+    [InlineData("affected")]
+    [InlineData("ownsTransaction")]
+    [InlineData("ownTransaction")]
+    [InlineData("error")]
+    [InlineData("failed")]
+    [InlineData("isolationLevel")]
+    [InlineData("isolationCommand")]
+    [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.RunInNestedClass(
@@ -322,6 +337,21 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("size")]
     [InlineData("digits")]
     [InlineData("power")]
+    [InlineData("items")]
+    [InlineData("itemIndex")]
+    [InlineData("first")]
+    [InlineData("more")]
+    [InlineData("batch")]
+    [InlineData("batchScope")]
+    [InlineData("result")]
+    [InlineData("affected")]
+    [InlineData("ownsTransaction")]
+    [InlineData("ownTransaction")]
+    [InlineData("error")]
+    [InlineData("failed")]
+    [InlineData("isolationLevel")]
+    [InlineData("isolationCommand")]
+    [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
@@ -337,11 +367,18 @@ public sealed class GeneratedSourceMethodTests
         methods.ShouldContain("global::App.UserId.FromDatabase(");
         methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
-        methods.ShouldNotContain("static " + name + " =>");
-        methods.ShouldNotContain("is { } " + name + " ?");
+        // C# is case-sensitive, and a collection method's pattern variable is item1, which Item1 does not hide.
+        methods.ShouldNotContain("static " + name + " =>", Case.Sensitive);
+        methods.ShouldNotContain("is { } " + name + " ?", Case.Sensitive);
         // A list's local takes the name list0 unless a token has it, and then list01.
         methods.ShouldContain(name == "list0" ? "var list01 = parameters.Members;" : "var list0 = parameters.Members;");
         methods.ShouldContain(".ParameterName = \"members_\" + ");
+        // Each query has its collection method, whose enumerator takes the name items unless a token has it, and then
+        // items1.
+        methods.ShouldContain(" ProbeCount(\n");
+        methods.Split(".CreateBatch();\n").Length.ShouldBe(5);
+        var items = name == "items" ? "items1" : "items";
+        methods.ShouldContain("using var " + items + " = parameters.GetEnumerator();");
 
         var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.CSharp12);
 
@@ -364,6 +401,23 @@ public sealed class GeneratedSourceMethodTests
             .ShouldContain(name == "raisedLater" ? "var raisedLater1 = false;" : "var raisedLater = false;");
         // The local of a read takes the name hasRow unless a token has it, and then hasRow1.
         sqlServer.Sources[MethodRuns.MethodsFile].ShouldContain(name == "hasRow" ? "bool hasRow1;" : "bool hasRow;");
+        // The collection method at a level keeps the session's level in isolationLevel, and reads and restores it by
+        // isolationCommand in isolationScope, each unless a token has the name, and then with a 1.
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(name == "isolationLevel" ? "var isolationLevel1 = 0;" : "var isolationLevel = 0;");
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                name == "isolationCommand"
+                    ? "var isolationCommand1 = connection.CreateCommand();"
+                    : "var isolationCommand = connection.CreateCommand();"
+            );
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                name == "isolationScope" ? "await using var isolationScope1 =" : "await using var isolationScope ="
+            );
     }
 
     // A list's use is a segment of its own, and the token method of a type writes it as the SQL wrote it, in the

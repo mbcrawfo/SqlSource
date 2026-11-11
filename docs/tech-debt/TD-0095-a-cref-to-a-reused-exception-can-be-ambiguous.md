@@ -2,7 +2,7 @@
 
 ## Problem
 
-A project that uses a referenced copy of `UnexpectedRowCountException` and `TransactionRolledBackException` declares no copy in source ([`ExceptionProbe`](../../src/SqlSource/Generation/Exceptions/ExceptionProbe.cs) gives `Referenced`).  The compiler binds a `cref` without regard to accessibility.  So when the project also references another assembly built with SqlSource whose internal copy it cannot see, a bound cref in the project's own documentation comments finds both copies: one that names either exception, such as `<exception cref="UnexpectedRowCountException"/>`, gets CS0419, and one that names a member of either, such as `<see cref="UnexpectedRowCountException.QueryName"/>` or a constructor, gets CS1574.  Before the exceptions were reused, the project's own source copy always won the lookup and nothing was reported.
+A project that uses a referenced copy of `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException` declares no copy in source ([`ExceptionProbe`](../../src/SqlSource/Generation/Exceptions/ExceptionProbe.cs) gives `Referenced`).  The compiler binds a `cref` without regard to accessibility.  So when the project also references another assembly built with SqlSource whose internal copy it cannot see, a bound cref in the project's own documentation comments finds both copies: one that names any of the three, such as `<exception cref="UnexpectedRowCountException"/>`, gets CS0419, and one that names a member of one, such as `<see cref="UnexpectedRowCountException.QueryName"/>` or a constructor, gets CS1574.  Before the exceptions were reused, the project's own source copy always won the lookup and nothing was reported.
 
 The generated methods avoid this by writing documentation IDs (`T:SqlSource.UnexpectedRowCountException`) in [`HeaderWriter`](../../src/SqlSource/Generation/Emitting/QueryMethods/HeaderWriter.cs).  A user's own crefs cannot be changed by the generator; the workaround is the documentation ID of what the cref names, `T:` for an exception, `P:` or `M:` for a member.  `ExceptionReuseTests.Build_UserCrefWithAStrangersCopyReferenced_IsAWarning` pins the behaviour, `Build_UserCrefWithTheFriendsCopyAlone_HasNoDiagnostic` that the stranger's copy is its cause, and `Build_UserCrefAsADocumentationIdWithAStrangersCopyReferenced_HasNoDiagnostic` the workaround.
 
@@ -20,4 +20,4 @@ Investigate making the copies that a project cannot see invisible to cref bindin
 
 ## Trigger
 
-A user report of CS0419 at a cref to `UnexpectedRowCountException` or `TransactionRolledBackException`, or of CS1574 at a cref to a member of either.
+A user report of CS0419 at a cref to `UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException`, or of CS1574 at a cref to a member of one of them.

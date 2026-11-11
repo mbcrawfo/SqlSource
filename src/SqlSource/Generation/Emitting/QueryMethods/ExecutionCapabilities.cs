@@ -36,4 +36,22 @@ internal enum ExecutionCapabilities
     /// batch and reports a transaction that a later error there rolled back.
     /// </summary>
     ChecksRollbackAfterDatabaseError = 16,
+
+    /// <summary>
+    /// A collection method's chunk takes a database error that names none of its commands as the error of the first
+    /// command that did not complete.
+    /// </summary>
+    FindsFailedItemByCompletion = 32,
+
+    /// <summary>
+    /// A collection method's chunk checks that each command has a result set of the output's columns, and that none
+    /// follows the last command's.
+    /// </summary>
+    ChecksResultSetsMatchItems = 64,
+
+    /// <summary>
+    /// A collection method that begins its own transaction reads the session's isolation level first, and sets the
+    /// session back to it after the transaction ends, before the connection is closed.
+    /// </summary>
+    RestoresSessionIsolation = 128,
 }

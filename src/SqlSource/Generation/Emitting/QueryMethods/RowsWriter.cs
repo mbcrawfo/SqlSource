@@ -81,14 +81,7 @@ internal static class RowsWriter
         {
             var (buffer, result) = GetBuffer(in context, output.TypeText);
             _ = builder.Append(indent).Append("var ").Append(locals.Rows).Append(" = ").Append(buffer).Append(";\n");
-            _ = builder.Append(indent).Append("while (");
-            AppendRead(in context);
-            _ = builder.Append(")\n").Append(indent).Append("{\n");
-            RowReaderWriter.AppendVectorChecks(in context, innerIndent, output);
-            _ = builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
-            RowReaderWriter.AppendRow(in context, output);
-            _ = builder.Append(");\n");
-            QueryMethodWriter.AppendEnd(builder, indent);
+            AppendReadLoop(in context, indent, output);
             _ = builder.Append('\n');
             AppendDrain(in context, indent);
             _ = builder.Append(indent).Append("return ").Append(result).Append(";\n");
@@ -113,11 +106,8 @@ internal static class RowsWriter
         RowReaderWriter.AppendVectorChecks(in context, indent, output);
         _ = builder.Append(indent).Append("var ").Append(locals.Row).Append(" = ");
         RowReaderWriter.AppendRow(in context, output);
-        _ = builder.Append(";\n").Append(indent).Append("if (");
-        AppendRead(in context);
-        _ = builder.Append(")\n").Append(indent).Append("{\n");
-        AppendThrow(in context, innerIndent, moreThanOne: true);
-        QueryMethodWriter.AppendEnd(builder, indent);
+        _ = builder.Append(";\n");
+        AppendSecondRowThrow(in context, indent);
         _ = builder.Append('\n');
         AppendDrain(in context, indent);
         _ = builder.Append(indent).Append("return ").Append(locals.Row).Append(";\n");
@@ -255,7 +245,42 @@ internal static class RowsWriter
         }
     }
 
-    private static void AppendRead(in QueryMethodContext context)
+    // The loop that reads every row into the buffer, after its checks: a many query method's, or a collection
+    // method's of each result set.
+    internal static void AppendReadLoop(in QueryMethodContext context, string indent, MethodOutput output)
+    {
+        var builder = context.Builder;
+        _ = builder.Append(indent).Append("while (");
+        AppendRead(in context);
+        _ = builder.Append(")\n").Append(indent).Append("{\n");
+        AppendAdd(in context, GeneratedText.Deeper(indent), output);
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    // The row's checks, then its addition to the buffer.
+    internal static void AppendAdd(in QueryMethodContext context, string indent, MethodOutput output)
+    {
+        var builder = context.Builder;
+        RowReaderWriter.AppendVectorChecks(in context, indent, output);
+        _ = builder.Append(indent).Append(context.Locals.Rows).Append(".Add(");
+        RowReaderWriter.AppendRow(in context, output);
+        _ = builder.Append(");\n");
+    }
+
+    // The read of a second row, which throws UnexpectedRowCountException, with the item's position in a collection
+    // method.
+    internal static void AppendSecondRowThrow(in QueryMethodContext context, string indent, string? itemIndex = null)
+    {
+        var builder = context.Builder;
+        _ = builder.Append(indent).Append("if (");
+        AppendRead(in context);
+        _ = builder.Append(")\n").Append(indent).Append("{\n");
+        AppendThrow(in context, GeneratedText.Deeper(indent), moreThanOne: true, itemIndex);
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    // An awaited read of the next row, as a condition: a query method's, or a collection method's of each result set.
+    internal static void AppendRead(in QueryMethodContext context)
     {
         _ = AsyncSpelling
             .AppendAwaitedCall(context.Builder, context.Locals.Reader, "ReadAsync")
@@ -263,14 +288,24 @@ internal static class RowsWriter
         _ = AsyncSpelling.AppendAwaitedEnd(context.Builder);
     }
 
-    private static void AppendThrow(in QueryMethodContext context, string indent, bool moreThanOne) =>
+    // The throw of UnexpectedRowCountException, with the item's position, an expression, in a collection method.
+    internal static void AppendThrow(
+        in QueryMethodContext context,
+        string indent,
+        bool moreThanOne,
+        string? itemIndex = null
+    )
+    {
         _ = context
             .Builder.Append(indent)
             .Append("throw new ")
             .Append(ExceptionType)
             .Append('(')
             .Append(SymbolDisplay.FormatLiteral(context.Method.QueryName, quote: true))
-            .Append(moreThanOne ? ", true);\n" : ", false);\n");
+            .Append(moreThanOne ? ", true" : ", false");
+        _ = itemIndex is null ? context.Builder : context.Builder.Append(", ").Append(itemIndex);
+        _ = context.Builder.Append(");\n");
+    }
 
     // The type the task gives, or for a streaming method the IAsyncEnumerable it returns; null for a task that gives
     // nothing.
@@ -278,6 +313,10 @@ internal static class RowsWriter
         context.Method.Shape switch
         {
             ResultShape.Many => GetCollectionType(context.Method.Collection, context.Method.Output!.TypeText),
+            ResultShape.One or ResultShape.OneOptional when context.Method.Batch is not null => GetCollectionType(
+                context.Method.Collection,
+                context.Method.Output!.TypeText
+            ),
             ResultShape.One => context.Method.Output!.TypeText,
             ResultShape.OneOptional => context.Method.Output!.TypeText + "?",
             ResultShape.RowCount => "int",
@@ -302,8 +341,9 @@ internal static class RowsWriter
             _ => throw UnexpectedEnumValueException.Of(collection),
         };
 
-    // The buffer the rows are read into, and the expression that gives the collection from it.
-    private static (string Buffer, string Result) GetBuffer(in QueryMethodContext context, string row)
+    // The buffer the rows are read into, and the expression that gives the collection from it: a many query method's,
+    // or a collection method's of any shape that reads rows.
+    internal static (string Buffer, string Result) GetBuffer(in QueryMethodContext context, string row)
     {
         var method = context.Method;
         var rows = context.Locals.Rows;

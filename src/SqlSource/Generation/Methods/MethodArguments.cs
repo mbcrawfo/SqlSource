@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using SqlSource.Generation.Emitting;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation.Methods;
 
@@ -9,9 +10,10 @@ namespace SqlSource.Generation.Methods;
 /// The arguments of a query's method, in their order: the receiver, which is the connection, the input model when
 /// the query has parameters, a <c>string</c> for each token, then the transaction, the command's timeout and the
 /// cancellation token.  A repository's method, which gets its own connection, has neither the receiver, the
-/// transaction nor the timeout.  Everything that spells them reads this, so an argument is added here alone, as
+/// transaction nor the timeout.  A collection method takes the items, a sequence of the input model, in place of the
+/// input model.  Everything that spells them reads this, so an argument is added here alone, as
 /// <c>docs/architecture/generator.md#extending-query-methods</c> says.  Building it and walking it allocates
-/// nothing, and its forms write into the builder.
+/// nothing, except the type of a collection method's items, and its forms write into the builder.
 /// </summary>
 /// <param name="input">The input model, or null when the query has no parameters.</param>
 /// <param name="tokens">The token names, as <see cref="MethodWriter.GetTokens" /> gives them.</param>
@@ -23,7 +25,18 @@ namespace SqlSource.Generation.Methods;
 /// Whether the method takes its connection, its transaction and its command's timeout: false for a repository's
 /// method, whose <see cref="QueryMethod.Source" /> gives its connection.
 /// </param>
-internal readonly struct MethodArguments(MethodInput? input, List<string> tokens, bool streams, bool takesConnection)
+/// <param name="batch">
+/// How a collection method runs its items, its <see cref="QueryMethod.Batch" />, or null for a query method: a
+/// collection method takes an <c>IEnumerable</c> of the input model, and its transaction's documentation says what a
+/// null transaction does under its mode.
+/// </param>
+internal readonly struct MethodArguments(
+    MethodInput? input,
+    List<string> tokens,
+    bool streams,
+    bool takesConnection,
+    BatchCall? batch = null
+)
 {
     /// <summary>The receiver's name.</summary>
     public const string Connection = "connection";
@@ -47,6 +60,10 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
     private const string CancellationType = "global::System.Threading.CancellationToken";
 
     private const string ParametersXml = "The query's parameters.";
+
+    private const string ItemsXml = "The items to run the query for, in order.";
+
+    private const string ItemsType = "global::System.Collections.Generic.IEnumerable<";
 
     // The attribute that marks the iterator's token as the one WithCancellation gives.
     private const string EnumeratorCancellation = "[global::System.Runtime.CompilerServices.EnumeratorCancellation] ";
@@ -92,6 +109,20 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
         "The transaction to run the query in, or null."
     );
 
+    // A collection method's transaction, which it begins itself when none is given, unless its mode is off.
+    private static readonly MethodArgument OwnedTransactionArgument = TransactionArgument with
+    {
+        DocumentationXml =
+            "The transaction to run every item in, or null for the method to begin one of its own, which it commits "
+            + "after the last item and rolls back when anything throws, unless a <c>System.Transactions</c> "
+            + "transaction is open.",
+    };
+
+    private static readonly MethodArgument UnownedTransactionArgument = TransactionArgument with
+    {
+        DocumentationXml = "The transaction to run every item in, or null to run them in none.",
+    };
+
     private static readonly MethodArgument CommandTimeoutArgument = new(
         ArgumentRole.CommandTimeout,
         CommandTimeout,
@@ -114,6 +145,8 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
 
     private readonly bool _streams = streams;
 
+    private readonly BatchCall? _batch = batch;
+
     /// <summary>
     /// Whether the method takes its connection, its transaction and its command's timeout, which a repository's method
     /// does not.
@@ -124,7 +157,7 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
     /// The arguments of the method, with its tokens as <see cref="MethodWriter.GetTokens" /> gives them.
     /// </summary>
     public static MethodArguments Of(QueryMethod method, List<string> tokens) =>
-        new(method.Input, tokens, method.Streams, method.Source is null);
+        new(method.Input, tokens, method.Streams, method.Source is null, method.Batch);
 
     /// <summary>Whether no token may take the name, since an argument of some method has it.  Case counts.</summary>
     public static bool IsReserved(string name) => Array.IndexOf(ReservedNames, name) >= 0;
@@ -287,12 +320,19 @@ internal readonly struct MethodArguments(MethodInput? input, List<string> tokens
                 < 0 => new MethodArgument(
                     ArgumentRole.Input,
                     Parameters,
-                    _arguments._input!.TypeText,
+                    _arguments._batch is not null
+                        ? ItemsType + _arguments._input!.TypeText + ">"
+                        : _arguments._input!.TypeText,
                     null,
-                    ParametersXml
+                    _arguments._batch is not null ? ItemsXml : ParametersXml
                 ),
                 _ when afterTokens == _trailing - 1 => CancellationArgument,
-                0 => TransactionArgument,
+                0 => _arguments._batch switch
+                {
+                    null => TransactionArgument,
+                    { Transaction: TransactionMode.Off } => UnownedTransactionArgument,
+                    _ => OwnedTransactionArgument,
+                },
                 _ => CommandTimeoutArgument,
             };
             return true;

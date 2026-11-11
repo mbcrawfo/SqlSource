@@ -27,8 +27,6 @@ internal static class CommandWriter
     // the indent of the method's body.
     internal static void AppendBody(in QueryMethodContext context, string indent)
     {
-        var builder = context.Builder;
-        var locals = context.Locals;
         var blockIndent = GeneratedText.Deeper(indent);
         if (context.Capabilities.Has(ExecutionCapabilities.RefusesCompletedTransaction))
         {
@@ -36,6 +34,20 @@ internal static class CommandWriter
         }
 
         AppendSql(in context, indent);
+        AppendOpen(in context, indent);
+        AppendCommand(in context, blockIndent);
+        AppendBindings(in context, blockIndent);
+        RowsWriter.AppendExecution(in context, blockIndent);
+        AppendClose(in context, indent);
+    }
+
+    // For a repository's method the connection from its source, then the opening of a closed connection and the start
+    // of the try whose finally, AppendClose's, closes it again, at the indent of the method's body.  A collection
+    // method opens and closes its connection as a query method does.
+    internal static void AppendOpen(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
         if (context.Method.Source is { } source)
         {
             AppendAcquire(in context, source, indent);
@@ -49,20 +61,29 @@ internal static class CommandWriter
             .Append(locals.Connection)
             .Append(".State == global::System.Data.ConnectionState.Closed;\n");
         QueryMethodWriter.AppendIf(builder, indent, locals.WasClosed);
-        _ = builder.Append(blockIndent);
+        _ = builder.Append(GeneratedText.Deeper(indent));
         _ = AsyncSpelling
             .AppendAwaitedCall(builder, locals.Connection, "OpenAsync")
             .Append(MethodArguments.CancellationToken);
         _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
         QueryMethodWriter.AppendEnd(builder, indent);
         _ = builder.Append('\n').Append(indent).Append("try\n").Append(indent).Append("{\n");
+    }
 
-        AppendCommand(in context, blockIndent);
-        AppendBindings(in context, blockIndent);
-
-        RowsWriter.AppendExecution(in context, blockIndent);
-
+    // The end of AppendOpen's try, and its finally, which closes the connection when the method opened it, after a
+    // collection method that restores the session's isolation level has restored it.
+    internal static void AppendClose(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var blockIndent = GeneratedText.Deeper(indent);
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
+        if (context.Capabilities.Has(ExecutionCapabilities.RestoresSessionIsolation))
+        {
+            ExecutionCapabilityWriter.AppendIsolationLevelRestore(in context, blockIndent);
+            _ = builder.Append('\n');
+        }
+
         QueryMethodWriter.AppendIf(builder, blockIndent, locals.WasClosed);
         _ = builder.Append(blockIndent).Append(GeneratedText.Indent);
         _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Connection, "CloseAsync");
@@ -72,8 +93,9 @@ internal static class CommandWriter
     }
 
     // The SQL the constant would have held, or, with tokens, the string the token method would have returned, built
-    // by the same code, which with lists writes each use of a list as the list's values.
-    private static void AppendSql(in QueryMethodContext context, string indent)
+    // by the same code, which with lists writes each use of a list as the list's values.  A collection method writes it
+    // once, or for each item when its lists make each item's SQL its own.
+    internal static void AppendSql(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var segments = context.Method.Segments;
@@ -105,15 +127,12 @@ internal static class CommandWriter
         _ = builder.Append(";\n");
     }
 
-    // A command whose SQL is built at run time, from the text of its tokens or for the values of its lists, is what
-    // CA2100 flags, and its tokens are text that the caller chooses, and its lists' uses the query's own text, so the
-    // assignment turns the rule off around itself and nothing else.
+    // The command, disposed when the method ends, its SQL, and for a method that takes its connection its transaction
+    // and its timeout.
     private static void AppendCommand(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var locals = context.Locals;
-        var builtAtRunTime = context.Tokens.Count > 0 || locals.Lists is not null;
-        var start = context.Tokens.Count > 0 ? SqlFromTokensStart : SqlFromListsStart;
         _ = builder
             .Append(indent)
             .Append("var ")
@@ -122,14 +141,7 @@ internal static class CommandWriter
             .Append(locals.Connection)
             .Append(".CreateCommand();\n");
         _ = AsyncSpelling.AppendUsing(builder, indent, locals.CommandScope, locals.Command);
-        _ = builder
-            .Append(builtAtRunTime ? indent + start : string.Empty)
-            .Append(indent)
-            .Append(locals.Command)
-            .Append(".CommandText = ")
-            .Append(locals.Sql)
-            .Append(";\n")
-            .Append(builtAtRunTime ? indent + SqlFromTokensEnd : string.Empty);
+        AppendCommandText(in context, indent);
         // A repository's method takes neither a transaction nor a timeout, and leaves the command's own.
         if (context.Arguments.TakesConnection)
         {
@@ -151,6 +163,25 @@ internal static class CommandWriter
         }
 
         _ = builder.Append('\n');
+    }
+
+    // The assignment of the SQL to the command, a query method's or a collection method's batch command.  A command
+    // whose SQL is built at run time, from the text of its tokens or for the values of its lists, is what CA2100 flags,
+    // and its tokens are text that the caller chooses, and its lists' uses the query's own text, so the assignment
+    // turns the rule off around itself and nothing else.
+    internal static void AppendCommandText(in QueryMethodContext context, string indent)
+    {
+        var locals = context.Locals;
+        var builtAtRunTime = context.Tokens.Count > 0 || locals.Lists is not null;
+        var start = context.Tokens.Count > 0 ? SqlFromTokensStart : SqlFromListsStart;
+        _ = context
+            .Builder.Append(builtAtRunTime ? indent + start : string.Empty)
+            .Append(indent)
+            .Append(locals.Command)
+            .Append(".CommandText = ")
+            .Append(locals.Sql)
+            .Append(";\n")
+            .Append(builtAtRunTime ? indent + SqlFromTokensEnd : string.Empty);
     }
 
     // The statements that get a repository's method its connection from its source, into the connection's local: a
@@ -224,9 +255,10 @@ internal static class CommandWriter
             .Append(')');
     }
 
-    // Each parameter of the input, in a block of its own, bound by the binder of the method's engine.  A list binds
+    // Each parameter of the input, in a block of its own, bound by the binder of the method's engine into the command,
+    // a query method's or a collection method's batch command, from the input, the argument or the item.  A list binds
     // each of its values, and its null test.
-    private static void AppendBindings(in QueryMethodContext context, string indent)
+    internal static void AppendBindings(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var locals = context.Locals;
@@ -238,7 +270,7 @@ internal static class CommandWriter
                 GeneratedText.Deeper(indent),
                 locals.Command,
                 locals.Parameter,
-                MethodArguments.Parameters,
+                locals.Input,
                 locals.ConversionNames
             );
             var list = 0;

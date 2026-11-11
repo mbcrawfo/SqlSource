@@ -17,6 +17,17 @@ UPDATE users
 SET email = @email
 WHERE id = @userId;
 
+-- name: AddUser -> one
+-- summary: Adds a user and returns their id.
+-- one: the method returns the new user's id.  The generator parameter collection-method also gives the query a
+-- collection method, an overload of AddUser that takes a collection of AddUserParams, adds every user in one
+-- transaction of its own and returns their ids, in the order of the items.  The query returns one result set, that of
+-- its OUTPUT clause, which a collection method on SQL Server needs.
+-- generator: collection-method
+INSERT INTO users (name, email)
+OUTPUT inserted.id
+VALUES (@name, @email);
+
 -- name: ListUsersNewestFirst
 -- summary: Every user, the newest first.
 -- A query that returns rows is many by default, and the marker gives its rows the collection type IReadOnlyList.

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
@@ -25,6 +26,31 @@ public sealed partial class UserQueries(DbConnection connection)
         EmailAddress email,
         CancellationToken cancellationToken = default
     ) => connection.ChangeUserEmail(new ChangeUserEmailParams(email, userId), cancellationToken: cancellationToken);
+
+    // one returns the row of the query's OUTPUT clause, which holds the new user's id.
+    public async Task<int> AddUserAsync(
+        string name,
+        EmailAddress email,
+        CancellationToken cancellationToken = default
+    ) =>
+        (
+            await connection
+                .AddUser(new AddUserParams(name, email), cancellationToken: cancellationToken)
+                .ConfigureAwait(false)
+        ).Id;
+
+    // The query's -- generator: collection-method gives AddUser a second method, which takes every user's input
+    // model and adds them all in one transaction of its own, sending up to 1,000 in each round trip.  It returns their
+    // rows in the order of the users, and a user the database refuses throws CollectionItemException, whose ItemIndex
+    // is its position, after the transaction has been rolled back.
+    public async Task<int[]> AddUsersAsync(
+        IEnumerable<AddUserParams> users,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var rows = await connection.AddUser(users, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return Array.ConvertAll(rows, row => row.Id);
+    }
 
     // The query's -- collection-type: marker makes its method return an IReadOnlyList.
     public Task<IReadOnlyList<ListUsersNewestFirstDto>> ListUsersNewestFirstAsync(

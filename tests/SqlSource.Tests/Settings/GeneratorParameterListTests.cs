@@ -215,4 +215,15 @@ public sealed class GeneratorParameterListTests
             );
         invalid.ShouldBeEmpty();
     }
+
+    [Theory]
+    [InlineData("transaction=serializable", 5)]
+    [InlineData("Transaction=READ-COMMITTED", 3)]
+    [InlineData("transaction", 0)]
+    public void ReadElements_TransactionValue_IsItsWord(string element, int value) =>
+        GeneratorParameterList.ReadElements([element], [], []).ValueOf(GeneratorParameters.Transaction).ShouldBe(value);
+
+    [Fact]
+    public void Resolve_NoChoices_HasCollectionMethodOff() =>
+        GeneratorParameterChoices.None.Resolve().IsOn(GeneratorParameters.CollectionMethod).ShouldBeFalse();
 }

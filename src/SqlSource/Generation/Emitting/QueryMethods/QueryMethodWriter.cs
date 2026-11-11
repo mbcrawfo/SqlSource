@@ -1,4 +1,5 @@
 using System.Text;
+using SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
@@ -10,8 +11,9 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// many query of <see cref="CollectionKind.IAsyncEnumerable" /> checks its arguments and returns a local iterator
 /// that does the rest as the loop asks for each row.  It builds the method's <see cref="QueryMethodContext" /> and
 /// writes the method in phases, in this order: <see cref="HeaderWriter" />, <see cref="CommandWriter" /> and
-/// <see cref="RowsWriter" />.  A new kind of method or a new engine follows <c>docs/architecture/generator.md</c>,
-/// "Extending query methods".
+/// <see cref="RowsWriter" />, or for a collection method, whose <see cref="QueryMethod.Batch" /> is set,
+/// <see cref="HeaderWriter" />, then <see cref="BatchWriter" /> and <see cref="BatchRowsWriter" />.  A new kind of
+/// method or a new engine follows <c>docs/architecture/generator.md</c>, "Extending query methods".
 /// </summary>
 /// <remarks>
 /// The arguments, their documentation and their checks come from <see cref="MethodArguments" />.  A token's argument
@@ -73,6 +75,14 @@ internal static class QueryMethodWriter
         _ = builder.Append(indent).Append("{\n");
         var checksStart = builder.Length;
         HeaderWriter.AppendChecks(in context, bodyIndent);
+        if (context.Method.Batch is not null)
+        {
+            BatchWriter.AppendBody(in context, bodyIndent);
+            ListWriter.AppendHelpers(in context, bodyIndent);
+            AppendEnd(builder, indent);
+            return;
+        }
+
         if (!streams)
         {
             CommandWriter.AppendBody(in context, bodyIndent);
@@ -112,7 +122,8 @@ internal static class QueryMethodWriter
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
             streams,
             capabilities,
-            method.Source
+            method.Source,
+            method.Batch is not null
         );
         return new QueryMethodContext(
             builder,

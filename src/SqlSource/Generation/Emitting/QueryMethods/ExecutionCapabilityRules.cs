@@ -1,3 +1,4 @@
+using SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
@@ -5,8 +6,8 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Decides the <see cref="ExecutionCapabilities" /> of a query's method, from its engine, its shape, whether it
-/// streams and whether it takes a transaction.  It runs in the output step, as the method is written, and its result
-/// is never cached.
+/// streams, whether it takes a transaction and whether it is a collection method.  It runs in the output step, as the
+/// method is written, and its result is never cached.
 /// </summary>
 internal static class ExecutionCapabilityRules
 {
@@ -59,8 +60,41 @@ internal static class ExecutionCapabilityRules
     /// an error that the caller is to see, which the reader's disposal would drop.
     /// </para>
     /// <para>
+    /// A collection method, whose <see cref="QueryMethod.Batch" /> is set, on SQL Server, has
+    /// <see cref="ExecutionCapabilities.RefusesCompletedTransaction" />, and neither drain: each result set of its
+    /// batch is an item's, so it has no later result to drain, and it never streams.  One that reads rows has
+    /// <see cref="ExecutionCapabilities.ChecksRollbackAtRead" /> and
+    /// <see cref="ExecutionCapabilities.ChecksRollbackAfterDatabaseError" />, for the caller's transaction, as a query
+    /// method has them: an item's error or an exception of the method's own leaves the rest of the chunk's batch to be
+    /// read, and an error there can roll the transaction back.  The transaction it begins itself is rolled back by its
+    /// body, <see cref="BatchWriter" />, whatever the flags.
+    /// </para>
+    /// <para>
+    /// SQL Server, <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" />, on a collection method that reads
+    /// rows: a statement of the query can return a result set of its own, which the reader cannot tell from the next
+    /// item's, so a result set without the output's columns, a command without one, or one after the last command's
+    /// is refused.  A method that reads no rows runs <c>ExecuteNonQueryAsync</c>, whose result sets do not matter.
+    /// </para>
+    /// <para>
+    /// A collection method on PostgreSQL, <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" />, of every
+    /// shape: Npgsql 10 names the command of a database error, <c>BatchCommand</c>, only when the connection string
+    /// sets <c>Include Failed Batched Command</c>, where Npgsql 8 and 9 always name it.  Npgsql sets a command's
+    /// <c>StatementType</c> when the command completes, and leaves the failed command and every command after it at
+    /// <c>Unknown</c>, with or without a reader, so the first command still at <c>Unknown</c> is the failed one.
+    /// </para>
+    /// <para>
+    /// SQL Server, <see cref="ExecutionCapabilities.RestoresSessionIsolation" />, on a collection method whose mode
+    /// begins a transaction of its own, every mode but <see cref="TransactionMode.Off" />:
+    /// <c>BeginTransactionAsync</c> sets the session's level, to the level it names or, under
+    /// <see cref="TransactionMode.On" />, to read committed, SqlClient's default, which SQL Server keeps after the
+    /// transaction ends, and the pool keeps when the connection is closed and opened again, so every later statement
+    /// outside a transaction on that session would run at the method's level.  The method reads the level before it
+    /// begins its transaction and sets it back after.  PostgreSQL's level is the transaction's alone.
+    /// </para>
+    /// <para>
     /// A repository's method, whose <see cref="QueryMethod.Source" /> gives its connection, takes no transaction, so it
-    /// has none of the flags about one, <see cref="TransactionFlags" />; it keeps the drains.
+    /// has none of the flags about one, <see cref="TransactionFlags" />; it keeps the drains, and the restore of the
+    /// session's level, which is about the transaction it begins itself.
     /// </para>
     /// </remarks>
     public static ExecutionCapabilities Of(QueryMethod method)
@@ -74,7 +108,22 @@ internal static class ExecutionCapabilityRules
         var readsRows = method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
         return method.Engine switch
         {
+            DatabaseEngine.PostgreSql when method.Batch is not null =>
+                ExecutionCapabilities.FindsFailedItemByCompletion,
             DatabaseEngine.PostgreSql => ExecutionCapabilities.None,
+            DatabaseEngine.SqlServer when method.Batch is { } batch => ExecutionCapabilities.RefusesCompletedTransaction
+                | (
+                    readsRows
+                        ? ExecutionCapabilities.ChecksRollbackAtRead
+                            | ExecutionCapabilities.ChecksRollbackAfterDatabaseError
+                            | ExecutionCapabilities.ChecksResultSetsMatchItems
+                        : ExecutionCapabilities.None
+                )
+                | (
+                    BeginsItsOwn(batch.Transaction)
+                        ? ExecutionCapabilities.RestoresSessionIsolation
+                        : ExecutionCapabilities.None
+                ),
             DatabaseEngine.SqlServer => ExecutionCapabilities.RefusesCompletedTransaction
                 | (
                     readsRows
@@ -87,6 +136,20 @@ internal static class ExecutionCapabilityRules
             _ => throw UnexpectedEnumValueException.Of(method.Engine),
         };
     }
+
+    // Whether the mode begins a transaction of the method's own when the caller has none.
+    private static bool BeginsItsOwn(TransactionMode mode) =>
+        mode switch
+        {
+            TransactionMode.Off => false,
+            TransactionMode.On
+            or TransactionMode.ReadUncommitted
+            or TransactionMode.ReadCommitted
+            or TransactionMode.RepeatableRead
+            or TransactionMode.Serializable
+            or TransactionMode.Snapshot => true,
+            _ => throw UnexpectedEnumValueException.Of(mode),
+        };
 
     /// <summary>
     /// Whether <paramref name="capabilities" /> holds <paramref name="flag" />, without the boxing of

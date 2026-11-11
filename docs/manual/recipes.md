@@ -9,6 +9,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Describe again after a schema change](#after-a-migration)
 - [Start the watcher with your editor](#start-the-watcher-with-your-editor)
 - [Run queries in a transaction](#queries-in-a-transaction)
+- [Insert many rows in one call](#insert-many-rows)
 - [Give a repository its connection from a service of your own](#connection-from-a-provider)
 - [Make a SQL Server repository from a connection string](#sql-server-repository)
 - [Give an id a type of its own](#strongly-typed-id)
@@ -296,6 +297,31 @@ public partial interface IAccountRepository
 A repository method takes no transaction, so the queries that run in one take the output `methods`, whose methods take the connection and the transaction, and a method of your own on the repository opens the connection, begins the transaction and calls them.  `GetAccount` runs alone, and stays a repository method.  Give every method the transaction: [the connection](generator.md#method-connection) says why.  A query that needs a command timeout takes `methods` in the same way, and its `commandTimeout`.
 
 Rules: [transactions and timeouts](generator.md#repository-transactions), [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [the interface](generator.md#repository-interface).
+
+<a id="insert-many-rows"></a>
+
+## Insert many rows in one call
+
+```sql postgres
+-- name: AddUser -> one
+-- generator: collection-method
+INSERT INTO users (name, email)
+VALUES (@name, @email)
+RETURNING id;
+```
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository(NpgsqlDataSource dataSource);
+
+// elsewhere
+var newUsers = signups.Select(signup => new AddUserParams(signup.Name, signup.Email));
+AddUserDto[] added = await users.AddUser(newUsers, cancellationToken);
+```
+
+`-- generator: collection-method` gives `AddUser` a second method, which takes the input model of every user, adds them all in one transaction of its own, 1,000 to a round trip, and returns their ids in the order of the users.  When the database refuses one, such as a user whose row breaks a constraint, it throws `CollectionItemException`, whose `ItemIndex` is that user's position, and no user is added.  The same query runs on SQL Server with `OUTPUT inserted.id` before `VALUES` in place of `RETURNING id`.  At the output `methods`, the method also takes a transaction that your code began, and runs in it.
+
+Rules: [collection methods](generator.md#collection-methods), [transactions](generator.md#collection-transactions), [`CollectionItemException`](generator.md#collection-item-exception).
 
 <a id="connection-from-a-provider"></a>
 
@@ -908,7 +934,7 @@ internal static partial class TestQueries;
 await Should.ThrowAsync<UnexpectedRowCountException>(() => users.GetActiveUser(new GetActiveUserParams(email)));
 ```
 
-The test project uses App's `UnexpectedRowCountException` and `TransactionRolledBackException`, whether it uses SqlSource or not, and the attributes of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
+The test project uses App's `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException`, whether it uses SqlSource or not, and the attributes of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
 
 Rules: [projects that share internals](generator.md#projects-that-share-internals).
 
@@ -918,6 +944,10 @@ Rules: [projects that share internals](generator.md#projects-that-share-internal
 
 ```xml
 <!-- Data.Shared.csproj: references the SqlSource package, and has no query -->
+<PropertyGroup>
+    <!-- .NET 6 or later, alone or beside an older target such as netstandard2.0 -->
+    <TargetFramework>net8.0</TargetFramework>
+</PropertyGroup>
 <ItemGroup>
     <InternalsVisibleTo Include="Data.Orders" />
     <InternalsVisibleTo Include="Data.Users" />
@@ -944,6 +974,6 @@ catch (UnexpectedRowCountException exception)
 }
 ```
 
-Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).
+Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).  Data.Shared targets .NET 6 or later, or adds such a target to its `TargetFrameworks`, so that its `CollectionItemException` passes on `SqlState`, `IsTransient` and `BatchCommand`; on `netstandard2.0` or `netstandard2.1` alone, a data project gets [SQLSRC038](diagnostics.md#sqlsrc038).
 
-Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022).
+Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022), [SQLSRC038](diagnostics.md#sqlsrc038).

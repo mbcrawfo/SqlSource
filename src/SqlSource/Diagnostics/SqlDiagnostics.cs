@@ -218,9 +218,9 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor ExceptionsSeenTwice = new(
         id: "SQLSRC022",
         title: "Exceptions are seen in two assemblies",
-        messageFormat: "This project sees UnexpectedRowCountException or TransactionRolledBackException in more than "
-            + "one referenced assembly: {0}.  Use SqlSource in one project that the others reference and that grants "
-            + "them InternalsVisibleTo, so that they all use its exceptions.",
+        messageFormat: "This project sees UnexpectedRowCountException, TransactionRolledBackException or "
+            + "CollectionItemException in more than one referenced assembly: {0}.  Use SqlSource in one project that "
+            + "the others reference and that grants them InternalsVisibleTo, so that they all use its exceptions.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -231,8 +231,9 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor ExceptionsOfAnotherShape = new(
         id: "SQLSRC023",
         title: "Exceptions come from another version of SqlSource",
-        messageFormat: "The UnexpectedRowCountException and TransactionRolledBackException that this project sees in "
-            + "{0} are not those of this version of SqlSource.  Use the same version of SqlSource in both projects.",
+        messageFormat: "The UnexpectedRowCountException, TransactionRolledBackException and CollectionItemException "
+            + "that this project sees in {0} are not those of this version of SqlSource.  Use the same version of "
+            + "SqlSource in both projects.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -440,6 +441,20 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc037",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the name of the assembly.
+    public static readonly DiagnosticDescriptor ExceptionsBeforeNet6 = new(
+        id: "SQLSRC038",
+        title: "Exceptions come from a framework before .NET 6",
+        messageFormat: "The CollectionItemException that this project sees in {0} was compiled for a framework "
+            + "before .NET 6, so it does not pass on the SqlState, IsTransient and BatchCommand of the database's "
+            + "error.  Make {0} target .NET 6 or later, or add such a target to its TargetFrameworks.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc038",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -1356,6 +1371,21 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc284"
     );
 
+    // {0} is the query, {1} the isolation level as the transaction parameter writes it, read-uncommitted or snapshot,
+    // and {2} the database that does not have it, PostgreSQL.  Reported at the query's name, by MethodPlanner, for a
+    // query that asks for a collection method and takes parameters; the query keeps its method and gets no collection
+    // method.
+    public static readonly DiagnosticDescriptor UnsupportedTransactionIsolation = new(
+        id: "SQLSRC297",
+        title: "Transaction isolation level is not the database's",
+        messageFormat: "The query '{0}' asks for the transaction isolation level '{1}', which {2} does not have",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc297",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -1394,6 +1424,7 @@ internal static class SqlDiagnostics
             RepositoryInterfaceNameTaken,
             ConnectionParameterHidden,
             RepositoryInterfaceNameNotValid,
+            ExceptionsBeforeNet6,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,
@@ -1462,7 +1493,8 @@ internal static class SqlDiagnostics
             LibraryNotReferenced,
             LibraryBelowTheFloor,
             JsonOptInNotApplicable,
-            ShortNameFindsAPackagesType
+            ShortNameFindsAPackagesType,
+            UnsupportedTransactionIsolation
         );
 
     /// <summary>

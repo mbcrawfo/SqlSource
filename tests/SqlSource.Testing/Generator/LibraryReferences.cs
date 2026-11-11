@@ -8,8 +8,9 @@ using Xunit;
 namespace SqlSource.Testing.Generator;
 
 // References to NodaTime, NetTopologySuite and their Npgsql plugins, and to NetTopologySuite's reader and writer of SQL
-// Server's bytes, for the probe of the libraries, and to .NET 8's reference assemblies, whose System.Text.Json is the
-// oldest that generated code compiles against.  The real ones are the packages that
+// Server's bytes, for the probe of the libraries, to .NET 8's reference assemblies, whose System.Text.Json is the
+// oldest that generated code compiles against, and to those of netstandard2.0 and netstandard2.1, which a project that
+// shares the exceptions may target.  The real ones are the packages that
 // this library downloads and does not reference: each is read as metadata from the NuGet folder, whose path the
 // assembly records, and never loaded.  A synthetic one is an assembly of any name and version, with the types the probe
 // looks for.
@@ -57,6 +58,31 @@ internal static class LibraryReferences
             .GetFiles(Path.Combine(PackageRoot, "microsoft.netcore.app.ref", "8.0.31", "ref", "net8.0"), "*.dll")
             .OrderBy(path => path, System.StringComparer.Ordinal)
             .Select(path => MetadataReference.CreateFromFile(path)),
+    ];
+
+    // The reference assembly of netstandard2.0, of NETStandard.Library at the version of the PackageDownload item: a
+    // project given it alone compiles as a netstandard2.0 project does.
+    public static MetadataReference[] NetStandard20Framework { get; } =
+    [
+        MetadataReference.CreateFromFile(
+            Path.Combine(
+                PackageRoot,
+                "netstandard.library",
+                "2.0.3",
+                "build",
+                "netstandard2.0",
+                "ref",
+                "netstandard.dll"
+            )
+        ),
+    ];
+
+    // The same for netstandard2.1, of NETStandard.Library.Ref.
+    public static MetadataReference[] NetStandard21Framework { get; } =
+    [
+        MetadataReference.CreateFromFile(
+            Path.Combine(PackageRoot, "netstandard.library.ref", "2.1.0", "ref", "netstandard2.1", "netstandard.dll")
+        ),
     ];
 
     // NetTopologySuite's geometries, whose classes derive from Geometry, as declarations, without ConcaveHull.

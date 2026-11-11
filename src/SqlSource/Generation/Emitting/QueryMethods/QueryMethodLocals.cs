@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Repositories;
 
@@ -17,23 +18,39 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// streams, the flag of a row being yielded only for one whose <see cref="ExecutionCapabilities" /> drain when its loop
 /// is left at a row, the exception its catch takes only for one whose capabilities check for a rollback at its read or
 /// after a database error, the flag of a later error only for one whose capabilities check after a database error, the
-/// result of a read only for one of those that streams, and the names of its lists only for a method that has one.
+/// result of a read only for one of those that streams, the names of its lists only for a method that has one, and the
+/// item and the names of its batches only for a collection method.
 /// </summary>
 internal sealed class QueryMethodLocals
 {
     // How the access of an instance member starts.
     private const string This = "this.";
 
+    /// <summary>
+    /// Takes the name of each local the method declares, for what it has.
+    /// </summary>
+    /// <param name="arguments">The method's arguments, whose names no local takes.</param>
+    /// <param name="input">The input model, or null when the query has no parameters.</param>
+    /// <param name="output">The output model of a method that reads rows, or null.</param>
+    /// <param name="streams">Whether the method streams its rows.</param>
+    /// <param name="capabilities">What the engine needs of the method beyond its command and its rows.</param>
+    /// <param name="source">The member that gives a repository's method its connection, or null.</param>
+    /// <param name="takesItems">
+    /// Whether the method is a collection method, which reads its parameters from each item.  A flag, as
+    /// <paramref name="streams" /> is, since the locals are built from values and not from the method.
+    /// </param>
     public QueryMethodLocals(
         MethodArguments arguments,
         MethodInput? input,
         MethodOutput? output,
         bool streams,
         ExecutionCapabilities capabilities,
-        ConnectionSource? source
+        ConnectionSource? source,
+        bool takesItems = false
     )
     {
         var names = new LocalNames(Seed(arguments, source));
+        Input = takesItems ? names.Take("item") : MethodArguments.Parameters;
         if (arguments.TakesConnection)
         {
             Connection = MethodArguments.Connection;
@@ -100,7 +117,12 @@ internal sealed class QueryMethodLocals
                 ? names.Take("hasRow")
                 : string.Empty;
         Lists = ListLocals.Of(input, names);
+        Batch = BatchLocals.Of(takesItems, names, capabilities);
     }
+
+    // What the bindings and the lists read the query's parameters from: the argument for a query method, and for a
+    // collection method the local that holds the item being run, whose name no argument or other local has.
+    public string Input { get; }
 
     // The connection the body runs the query on: the argument, or the local a repository's method gets it into from its
     // source (docs/architecture/generator.md, "Adding a kind of method").
@@ -173,6 +195,9 @@ internal sealed class QueryMethodLocals
 
     // The names of what the method declares for its lists, or null when it has none.
     public ListLocals? Lists { get; }
+
+    // The names of what a collection method declares to run its items in batches, or null for a query method.
+    public BatchLocals? Batch { get; }
 
     // The local of a struct repository's streaming method, its value, and the source as the body reaches it.  A static
     // method is reached through its type, which the iterator can reach.

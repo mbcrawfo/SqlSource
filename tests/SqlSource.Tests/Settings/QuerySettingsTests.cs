@@ -36,6 +36,8 @@ public sealed class QuerySettingsTests
         settings.ValidateTokens.ShouldBeTrue();
         settings.UseArrayPool.ShouldBeTrue();
         settings.PadsLists.ShouldBeTrue();
+        settings.CollectionMethod.ShouldBeFalse();
+        settings.Transaction.ShouldBe(TransactionMode.On);
     }
 
     [Fact]

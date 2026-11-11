@@ -80,6 +80,67 @@ public sealed class MethodArgumentsTests
         MethodArguments.Of(method, []).TakesConnection.ShouldBeFalse();
     }
 
+    // A collection method takes the items in the place of the input, with the input's name, and no new name
+    // is reserved.
+    [Fact]
+    public void Of_BatchMethod_TakesTheItemsAsParameters()
+    {
+        var method = Emitting.QueryMethods.QueryMethodWriterTests.GetUser with
+        {
+            Batch = new BatchCall(TransactionMode.On),
+        };
+
+        var arguments = Enumerate(MethodArguments.Of(method, ["orderBy"]));
+
+        arguments
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([
+                ArgumentRole.Receiver,
+                ArgumentRole.Input,
+                ArgumentRole.Token,
+                ArgumentRole.Transaction,
+                ArgumentRole.CommandTimeout,
+                ArgumentRole.Cancellation,
+            ]);
+        arguments[1].Name.ShouldBe("parameters");
+        arguments[1].TypeText.ShouldBe("global::System.Collections.Generic.IEnumerable<global::App.GetUserParams>");
+        arguments[1].DocumentationXml.ShouldBe("The items to run the query for, in order.");
+        Enumerate(MethodArguments.Of(method with { Source = TestModels.Source() }, ["orderBy"]))
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([ArgumentRole.Input, ArgumentRole.Token, ArgumentRole.Cancellation]);
+    }
+
+    // A collection method's transaction says what null does under its mode: under on or an isolation level the method
+    // begins its own, unless an ambient one is open, and under off it runs in none.  A query method's is unchanged.
+    [Theory]
+    [InlineData(
+        nameof(TransactionMode.On),
+        "The transaction to run every item in, or null for the method to begin one of its own, which it commits after "
+            + "the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is "
+            + "open."
+    )]
+    [InlineData(
+        nameof(TransactionMode.Serializable),
+        "The transaction to run every item in, or null for the method to begin one of its own, which it commits after "
+            + "the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is "
+            + "open."
+    )]
+    [InlineData(nameof(TransactionMode.Off), "The transaction to run every item in, or null to run them in none.")]
+    public void Of_BatchMethod_DocumentsTheTransactionByItsMode(string modeName, string expected)
+    {
+        var method = Emitting.QueryMethods.QueryMethodWriterTests.GetUser with
+        {
+            Batch = new BatchCall(Enum.Parse<TransactionMode>(modeName)),
+        };
+
+        Enumerate(MethodArguments.Of(method, ["orderBy"]))
+            .Find(static argument => argument.Role == ArgumentRole.Transaction)
+            .DocumentationXml.ShouldBe(expected);
+        Enumerate(MethodArguments.Of(Emitting.QueryMethods.QueryMethodWriterTests.GetUser, ["orderBy"]))
+            .Find(static argument => argument.Role == ArgumentRole.Transaction)
+            .DocumentationXml.ShouldBe("The transaction to run the query in, or null.");
+    }
+
     [Fact]
     public void Of_RepositoryWithoutInputOrTokens_IsTheCancellationAlone() =>
         Enumerate(new MethodArguments(null, [], streams: true, takesConnection: false))

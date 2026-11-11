@@ -53,6 +53,24 @@ public sealed class MethodConflictsTests
             ]);
     }
 
+    // A query method and its collection method are two signatures of one name in one type: the type is reported and
+    // drops the name once, not once for each signature, by this and not by the deduplication of equal diagnostics.
+    [Fact]
+    public void Find_TypeWithTwoSignaturesOfOneName_IsReportedAndDroppedOnce()
+    {
+        var query = Signature("App.First.Queries", "QueriesExtensions", "Get", parameterKey: "global::App.GetInput");
+        var collection = query with { ParameterKey = "global::System.Collections.Generic.IEnumerable<App.GetInput>" };
+        var other = Signature("App.Second.Queries", "QueriesExtensions", "Get", path: "b.sql");
+
+        var conflicts = Find([query, collection, other]);
+
+        conflicts.Dropped.ShouldBe([
+            new DroppedMethod("App.First.Queries", "Get"),
+            new DroppedMethod("App.Second.Queries", "Get"),
+        ]);
+        conflicts.Diagnostics.Count.ShouldBe(2);
+    }
+
     [Fact]
     public void Find_TwoExtensionClassesOfOneNamespaceWithOneSignature_DropsBothWithSqlsrc274()
     {

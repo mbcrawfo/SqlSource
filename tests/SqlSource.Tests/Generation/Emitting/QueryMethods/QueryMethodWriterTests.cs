@@ -1696,7 +1696,23 @@ public sealed class QueryMethodWriterTests
             Token("exception"),
             Token("raisedLater"),
             Token("hasRow"),
-            Token("yield")
+            Token("yield"),
+            Token("item"),
+            Token("items"),
+            Token("itemIndex"),
+            Token("first"),
+            Token("more"),
+            Token("batch"),
+            Token("batchScope"),
+            Token("result"),
+            Token("affected"),
+            Token("ownsTransaction"),
+            Token("ownTransaction"),
+            Token("error"),
+            Token("failed"),
+            Token("isolationLevel"),
+            Token("isolationCommand"),
+            Token("isolationScope")
         );
         var withVector = GetUser.Output! with
         {
@@ -1710,6 +1726,7 @@ public sealed class QueryMethodWriterTests
         };
         var asClass = withVector with { TypeText = "global::App.GetUserClass", IsRecord = false };
         var builder = new StringBuilder("namespace App\n{\n    internal static class Queries\n    {\n");
+        var modes = Enum.GetValues<TransactionMode>();
         var index = 0;
         foreach (var shape in Enum.GetValues<ResultShape>())
         {
@@ -1732,6 +1749,18 @@ public sealed class QueryMethodWriterTests
                             Segments = index % 4 < 2 ? awkward : GetUser.Segments,
                             Input = index % 3 == 0 ? null : GetUser.Input,
                         };
+                        // A collection method, which takes the items and never streams, for some of those that have an
+                        // input, in each transaction mode in turn.
+                        if (method.Input is not null && index % 5 < 2)
+                        {
+                            method = method with
+                            {
+                                Batch = new BatchCall(modes[index % modes.Length]),
+                                Collection =
+                                    collection == CollectionKind.IAsyncEnumerable ? CollectionKind.Array : collection,
+                            };
+                        }
+
                         QueryMethodWriter.Append(builder, "        ", method);
                     }
                 }
@@ -1768,6 +1797,17 @@ public sealed class QueryMethodWriterTests
                 internal sealed class UnexpectedRowCountException : global::System.InvalidOperationException
                 {
                     public UnexpectedRowCountException(string queryName, bool moreThanOne) { }
+
+                    public UnexpectedRowCountException(string queryName, bool moreThanOne, int itemIndex) { }
+                }
+
+                internal sealed class CollectionItemException : global::System.Data.Common.DbException
+                {
+                    public CollectionItemException(
+                        string queryName,
+                        int itemIndex,
+                        global::System.Data.Common.DbException inner
+                    ) { }
                 }
 
                 internal sealed class TransactionRolledBackException : global::System.InvalidOperationException

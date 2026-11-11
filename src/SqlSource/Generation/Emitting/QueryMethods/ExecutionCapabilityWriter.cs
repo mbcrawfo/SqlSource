@@ -5,10 +5,11 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the statements that a query's method's <see cref="ExecutionCapabilities" /> turn on: the refusal of a
-/// completed transaction, the catches that check for a rollback, and the loops that drain the later results, with
-/// the documentation of what they throw.  The phases of <see cref="QueryMethodWriter" /> keep the structure of the
-/// buffered and streamed reading, ask a flag at each point where one applies, and call in here.  Why each flag exists
-/// is said once, at <see cref="ExecutionCapabilityRules.Of" />.
+/// completed transaction, the catches that check for a rollback, the loops that drain the later results, and a
+/// collection method's search for its failed command, checks of its result sets, and read and restore of the session's
+/// isolation level, with the documentation of what they throw.  The phases of <see cref="QueryMethodWriter" /> keep
+/// the structure of the buffered and streamed reading, ask a flag at each point where one applies, and call in here.
+/// Why each flag exists is said once, at <see cref="ExecutionCapabilityRules.Of" />.
 /// </summary>
 internal static class ExecutionCapabilityWriter
 {
@@ -21,7 +22,22 @@ internal static class ExecutionCapabilityWriter
     // HeaderWriter names UnexpectedRowCountException.
     private const string RolledBackCref = "T:SqlSource.TransactionRolledBackException";
 
-    private const string CompletedTransactionType = "global::System.InvalidOperationException";
+    private const string InvalidOperationType = "global::System.InvalidOperationException";
+
+    // The query of the session's isolation level, as SQL Server numbers it.
+    private const string ReadIsolationLevel =
+        "SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID;";
+
+    // The levels that a restore sets, by the label of the number SQL Server gives each, its default, read committed,
+    // last, for 2 and any number it never reports.
+    private static readonly (string Label, string Level)[] RestoredLevels =
+    [
+        ("case 1", "READ UNCOMMITTED"),
+        ("case 3", "REPEATABLE READ"),
+        ("case 4", "SERIALIZABLE"),
+        ("case 5", "SNAPSHOT"),
+        ("default", "READ COMMITTED"),
+    ];
 
     /// <summary>
     /// Appends the <c>&lt;exception&gt;</c> of each exception that the capabilities throw.
@@ -35,7 +51,7 @@ internal static class ExecutionCapabilityWriter
             XmlDocWriter.AppendException(
                 builder,
                 indent,
-                CompletedTransactionType,
+                InvalidOperationType,
                 "The transaction has completed: it was committed or rolled back before the query ran."
             );
         }
@@ -60,6 +76,241 @@ internal static class ExecutionCapabilityWriter
                     + "query raised rolled back the transaction."
             );
         }
+
+        if (capabilities.Has(ExecutionCapabilities.ChecksResultSetsMatchItems))
+        {
+            XmlDocWriter.AppendException(
+                builder,
+                indent,
+                InvalidOperationType,
+                "A statement of the query returned a result set that is not an item's, or an item returned none: a "
+                    + "query whose statements return more than one result set, or none for an item, cannot run over a "
+                    + "collection."
+            );
+        }
+    }
+
+    /// <summary>
+    /// Appends the move to a chunk's next result set, after the first, and the check that it has the output's columns:
+    /// a command whose statements gave no result set, or a result set of other columns, which a statement of the query
+    /// returned, throws, naming the items from the chunk's first to the one whose result set was read, since a reader
+    /// skips a command without a result set and cannot tell which item's is missing or extra.
+    /// <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" /> turns it on, in place of the plain move.
+    /// </summary>
+    public static void AppendResultSetCheck(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var batch = locals.Batch!;
+        var columns = context.Method.Output!.Columns.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _ = builder.Append(indent).Append("if ((").Append(batch.Result).Append(" > 0 && !");
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, locals.Reader, "NextResultAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling
+            .AppendAwaitedEnd(builder)
+            .Append(")\n")
+            .Append(GeneratedText.Deeper(indent))
+            .Append("|| ")
+            .Append(locals.Reader)
+            .Append(".FieldCount != ")
+            .Append(columns)
+            .Append(")\n")
+            .Append(indent)
+            .Append("{\n");
+        AppendResultSetThrow(in context, GeneratedText.Deeper(indent), "(" + batch.First + " + " + batch.Result + ")");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends, after a blank line, the check that no result set follows the chunk's last command's, which a statement
+    /// of the query returned; it names the chunk's items, from its first to its last.
+    /// <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" /> turns it on.
+    /// </summary>
+    public static void AppendNoLaterResultSetCheck(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        _ = builder.Append('\n').Append(indent).Append("if (");
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, context.Locals.Reader, "NextResultAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(")\n").Append(indent).Append("{\n");
+        AppendResultSetThrow(in context, GeneratedText.Deeper(indent), "(" + context.Locals.Batch!.ItemIndex + " - 1)");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends the catch of a chunk's database error that names none of the batch's commands, after the catch of one
+    /// that names one: the failed item is that of the first command whose statement type Npgsql has not set, as it
+    /// sets it when a command completes, and an error after every command completed, which no item raised, is thrown
+    /// as it is.  A batch whose commands are not Npgsql's, which a connection that wraps Npgsql's makes, has no
+    /// statement type to read, so its error is thrown as it is too; a chunk holds at least one command, all made by
+    /// one batch, so the first tells.  <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" /> turns it on.
+    /// </summary>
+    public static void AppendFailedCommandSearch(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        var body = GeneratedText.Deeper(indent);
+        var condition = GeneratedText.Deeper(body);
+        var commands = batch.Batch + ".BatchCommands";
+        _ = builder
+            .Append(indent)
+            .Append("catch (global::Npgsql.PostgresException ")
+            .Append(batch.Error)
+            .Append(") when (")
+            .Append(commands)
+            .Append("[0] is global::Npgsql.NpgsqlBatchCommand)\n")
+            .Append(indent)
+            .Append("{\n")
+            .Append(body)
+            .Append("var ")
+            .Append(batch.Failed)
+            .Append(" = 0;\n")
+            .Append(body)
+            .Append("while (\n")
+            .Append(condition)
+            .Append(batch.Failed)
+            .Append(" < ")
+            .Append(commands)
+            .Append(".Count\n")
+            .Append(condition)
+            .Append("&& ((global::Npgsql.NpgsqlBatchCommand)")
+            .Append(commands)
+            .Append('[')
+            .Append(batch.Failed)
+            .Append("]).StatementType\n")
+            .Append(GeneratedText.Deeper(condition))
+            .Append("!= global::Npgsql.StatementType.Unknown\n")
+            .Append(body)
+            .Append(")\n")
+            .Append(body)
+            .Append("{\n")
+            .Append(condition)
+            .Append(batch.Failed)
+            .Append("++;\n");
+        QueryMethodWriter.AppendEnd(builder, body);
+        _ = builder.Append('\n');
+        QueryMethodWriter.AppendIf(builder, body, batch.Failed + " == " + commands + ".Count");
+        _ = builder.Append(condition).Append("throw;\n");
+        QueryMethodWriter.AppendEnd(builder, body);
+        _ = builder
+            .Append('\n')
+            .Append(body)
+            .Append("throw new global::SqlSource.CollectionItemException(")
+            .Append(SymbolDisplay.FormatLiteral(context.Method.QueryName, quote: true))
+            .Append(", ")
+            .Append(batch.First)
+            .Append(" + ")
+            .Append(batch.Failed)
+            .Append(", ")
+            .Append(batch.Error)
+            .Append(");\n");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends the declaration of the session's isolation level, 0 until the method reads it, before the connection is
+    /// opened, so that the <c>finally</c> that closes it sees it.
+    /// <see cref="ExecutionCapabilities.RestoresSessionIsolation" /> turns it on.
+    /// </summary>
+    public static void AppendIsolationLevelDeclaration(in QueryMethodContext context, string indent) =>
+        _ = context
+            .Builder.Append(indent)
+            .Append("var ")
+            .Append(context.Locals.Batch!.IsolationLevel)
+            .Append(" = 0;\n");
+
+    /// <summary>
+    /// Appends the read of the session's isolation level, when the method begins its own transaction, before it begins
+    /// it: SQL Server numbers it from 1, read uncommitted, to 5, snapshot, and every session may read its own row of
+    /// <c>sys.dm_exec_sessions</c>.  <see cref="ExecutionCapabilities.RestoresSessionIsolation" /> turns it on.
+    /// </summary>
+    public static void AppendIsolationLevelRead(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        var body = GeneratedText.Deeper(indent);
+        QueryMethodWriter.AppendIf(builder, indent, batch.OwnsTransaction);
+        AppendIsolationCommand(in context, body, ReadIsolationLevel);
+        _ = builder
+            .Append(body)
+            .Append(batch.IsolationLevel)
+            .Append(" = global::System.Convert.ToInt32(\n")
+            .Append(GeneratedText.Deeper(body));
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, batch.IsolationCommand, "ExecuteScalarAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling
+            .AppendAwaitedEnd(builder)
+            .Append(",\n")
+            .Append(GeneratedText.Deeper(body))
+            .Append(ListWriter.Invariant)
+            .Append('\n')
+            .Append(body)
+            .Append(");\n");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends the restore of the session's isolation level that <see cref="AppendIsolationLevelRead" /> read, in the
+    /// <c>finally</c> that closes the connection, before it is closed and after the transaction is disposed, with
+    /// <see cref="NoCancellation" /> so that it runs after a cancellation too.  It is skipped when the method read no
+    /// level, as when it began no transaction, and a restore that fails, as on a connection that is broken, is ignored,
+    /// so that the method's return or its first exception is what the caller sees.
+    /// <see cref="ExecutionCapabilities.RestoresSessionIsolation" /> turns it on.
+    /// </summary>
+    public static void AppendIsolationLevelRestore(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        var ifIndent = GeneratedText.Deeper(indent);
+        var tryIndent = GeneratedText.Deeper(ifIndent);
+        var caseIndent = GeneratedText.Deeper(tryIndent);
+        var statementIndent = GeneratedText.Deeper(caseIndent);
+        QueryMethodWriter.AppendIf(builder, indent, batch.IsolationLevel + " != 0");
+        _ = builder.Append(ifIndent).Append("try\n").Append(ifIndent).Append("{\n");
+        AppendIsolationCommand(in context, tryIndent, null);
+        // A statement for each level, each assigning its own literal, since CA2100 reports a CommandText that is not a
+        // literal, the arms of a switch expression of literals among them.
+        _ = builder
+            .Append(tryIndent)
+            .Append("switch (")
+            .Append(batch.IsolationLevel)
+            .Append(")\n")
+            .Append(tryIndent)
+            .Append("{\n");
+        foreach (var (label, level) in RestoredLevels)
+        {
+            _ = builder
+                .Append(caseIndent)
+                .Append(label)
+                .Append(":\n")
+                .Append(statementIndent)
+                .Append(batch.IsolationCommand)
+                .Append(".CommandText = ")
+                .Append(SymbolDisplay.FormatLiteral("SET TRANSACTION ISOLATION LEVEL " + level + ";", quote: true))
+                .Append(";\n")
+                .Append(statementIndent)
+                .Append("break;\n");
+        }
+
+        QueryMethodWriter.AppendEnd(builder, tryIndent);
+        _ = builder.Append('\n').Append(tryIndent);
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, batch.IsolationCommand, "ExecuteNonQueryAsync")
+            .Append(NoCancellation);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        QueryMethodWriter.AppendEnd(builder, ifIndent);
+        _ = builder
+            .Append(ifIndent)
+            .Append("catch\n")
+            .Append(ifIndent)
+            .Append("{\n")
+            .Append(tryIndent)
+            .Append("// The method's return, or its first exception, is what the caller sees.\n");
+        QueryMethodWriter.AppendEnd(builder, ifIndent);
+        QueryMethodWriter.AppendEnd(builder, indent);
     }
 
     /// <summary>
@@ -83,7 +334,7 @@ internal static class ExecutionCapabilityWriter
             .Append(indent)
             .Append(GeneratedText.Indent)
             .Append("throw new ")
-            .Append(CompletedTransactionType)
+            .Append(InvalidOperationType)
             .Append('(')
             .Append(
                 SymbolDisplay.FormatLiteral(
@@ -301,6 +552,76 @@ internal static class ExecutionCapabilityWriter
         AppendCheckedDrain(in context, innerIndent, NoCancellation);
         QueryMethodWriter.AppendEnd(builder, loopIndent);
         QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    // The throw of a result set that is not an item's, naming the query and the items from the chunk's first to the
+    // position given, an expression in parentheses: the item whose result set was read when the mismatch was found,
+    // since any item of them may have returned the result set that is missing or extra.
+    private static void AppendResultSetThrow(in QueryMethodContext context, string indent, string lastItemIndex)
+    {
+        var argumentIndent = GeneratedText.Deeper(indent);
+        var continued = GeneratedText.Deeper(argumentIndent);
+        _ = context
+            .Builder.Append(indent)
+            .Append("throw new ")
+            .Append(InvalidOperationType)
+            .Append("(\n")
+            .Append(argumentIndent)
+            .Append(
+                SymbolDisplay.FormatLiteral(
+                    "The query '"
+                        + context.Method.QueryName
+                        + "' returned a result set of another shape, or none, for one of the items from ",
+                    quote: true
+                )
+            )
+            .Append('\n')
+            .Append(continued)
+            .Append("+ ")
+            .Append(context.Locals.Batch!.First)
+            .Append(".ToString(")
+            .Append(ListWriter.Invariant)
+            .Append(")\n")
+            .Append(continued)
+            .Append("+ \" to \"\n")
+            .Append(continued)
+            .Append("+ ")
+            .Append(lastItemIndex)
+            .Append(".ToString(")
+            .Append(ListWriter.Invariant)
+            .Append(")\n")
+            .Append(continued)
+            .Append(
+                "+ \", so it cannot run over a collection: a query whose statements return more than one result set, "
+                    + "or none for an item, cannot.\"\n"
+            )
+            .Append(indent)
+            .Append(");\n");
+    }
+
+    // The command of the session's isolation level, made from the connection and disposed at the end of its block, with
+    // the SQL given, or none when the caller sets it.
+    private static void AppendIsolationCommand(in QueryMethodContext context, string indent, string? sql)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        _ = builder
+            .Append(indent)
+            .Append("var ")
+            .Append(batch.IsolationCommand)
+            .Append(" = ")
+            .Append(context.Locals.Connection)
+            .Append(".CreateCommand();\n");
+        _ = AsyncSpelling.AppendUsing(builder, indent, batch.IsolationScope, batch.IsolationCommand);
+        if (sql is not null)
+        {
+            _ = builder
+                .Append(indent)
+                .Append(batch.IsolationCommand)
+                .Append(".CommandText = ")
+                .Append(SymbolDisplay.FormatLiteral(sql, quote: true))
+                .Append(";\n");
+        }
     }
 
     // The drain loop with the token given, in a try followed by the catch of the database's error when the

@@ -8,14 +8,14 @@ The generator's are in `Diagnostics/SqlDiagnostics.cs`, and the errors of the `s
 - **Write each `new DiagnosticDescriptor(...)` out in full, with a literal id.**  The release-tracking analyzer reads the arguments, and a helper that builds descriptors hides them from it.
 - **`Diagnostics/SettingsFileDiagnostics.cs` is the one place a `SettingsFileError` becomes a diagnostic**, `SQLSRC015` to `SQLSRC020`, at the line and column of its span, for the build and the tool alike.
 - **An id below 100 is about the type or the project, one from 101 about a `.sql` file, and one from 200 about the snapshot or the tool** (`tests/SqlSource.Tests/Diagnostics/ToolDiagnosticsTests.cs` holds the tool's).
-- **`SQLSRC200` to `SQLSRC296` are taken.**
+- **`SQLSRC200` to `SQLSRC297` are taken.**
 - **Add a new `SqlParseErrorKind` at the end**: the parser ids follow its order, from `SQLSRC126` after the first twenty-one, since `SQLSRC122` to `SQLSRC125` are placement errors.
 
 ## Diagnostics with no position
 
-- **`SQLSRC022`, `SQLSRC023`, `SQLSRC247`, `SQLSRC248`, `SQLSRC267`, `SQLSRC268`, `SQLSRC273` and `SQLSRC282` have no position**, so they are reported with `Location.None` in an output step and never travel as a `DiagnosticInfo`.
+- **`SQLSRC022`, `SQLSRC023`, `SQLSRC038`, `SQLSRC247`, `SQLSRC248`, `SQLSRC267`, `SQLSRC268`, `SQLSRC273` and `SQLSRC282` have no position**, so they are reported with `Location.None` in an output step and never travel as a `DiagnosticInfo`.
 - **`SQLSRC247`, `SQLSRC248`, `SQLSRC267` and `SQLSRC268` are reported once for the project**, each pair by its own driver's probe and its own engine's `UsesPostgresEntries` or `UsesSqlServerEntries`, independently of the other.
-- **`SQLSRC022` and `SQLSRC023` are reported once for the project**, from `ExceptionProbe`, by the output that writes the exceptions' file.
+- **`SQLSRC022`, `SQLSRC023` and `SQLSRC038` are reported once for the project**, from `ExceptionProbe`, by the output that writes the exceptions' file.
 - **`SQLSRC273` is reported once for each engine** that the collected `MethodEngines` of the types' methods holds and whose probe finds no driver.
 - **`SQLSRC282` is reported once for each package** that `LibraryProbe.PackagesBelowTheFloor` gives for a library and engine of the collected `UsedLibraries`: by engine, so that an old NetTopologySuite.IO.SqlServerBytes, which only SQL Server's queries use, never reaches a PostgreSQL query.
 

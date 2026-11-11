@@ -37,7 +37,9 @@ internal static class GeneratorParameterList
         | GeneratorParameters.TableModels
         | GeneratorParameters.AsyncMethodSuffix
         | GeneratorParameters.ArrayPool
-        | GeneratorParameters.ListPadding;
+        | GeneratorParameters.ListPadding
+        | GeneratorParameters.CollectionMethod
+        | GeneratorParameters.Transaction;
 
     /// <summary>
     /// The parameters that are on or off and are on when no level says otherwise.  Their definitions say so too, and a
@@ -68,6 +70,17 @@ internal static class GeneratorParameterList
         ),
         GeneratorParameterDefinition.Switch("array-pool", GeneratorParameters.ArrayPool, onByDefault: true),
         GeneratorParameterDefinition.Switch("list-padding", GeneratorParameters.ListPadding, onByDefault: true),
+        GeneratorParameterDefinition.Switch(
+            "collection-method",
+            GeneratorParameters.CollectionMethod,
+            onByDefault: false
+        ),
+        new GeneratorParameterDefinition(
+            "transaction",
+            GeneratorParameters.Transaction,
+            ["on", "off", "read-uncommitted", "read-committed", "repeatable-read", "serializable", "snapshot"],
+            0
+        ),
     ];
 
     /// <summary>The definition of <paramref name="parameter" />, one flag.</summary>

@@ -93,8 +93,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8));
         });
 
-    // The exceptions' file, which every compilation gets unless one referenced assembly that it sees gives it both
-    // exceptions.  The probe, like the framework check, runs on every compilation, two lookups and nothing for each
+    // The exceptions' file, which every compilation gets unless one referenced assembly that it sees gives it all three
+    // exceptions.  The probe, like the framework check, runs on every compilation, three lookups and nothing for each
     // tree, and gives an equal value until a reference changes.
     private static void RegisterExceptions(IncrementalGeneratorInitializationContext context)
     {
@@ -1123,29 +1123,38 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
     }
 
-    // The exceptions' file, internal or public, unless a referenced assembly gives the project both, and SQLSRC022 or
-    // SQLSRC023, not located and once for the project, when the copies it sees are not one usable pair.
+    // The exceptions' file, internal or public, unless a referenced assembly gives the project all three, and
+    // SQLSRC022, SQLSRC023 or SQLSRC038, not located and once for the project, when the copies it sees are not one
+    // usable set.  Under SQLSRC038 the project uses the referenced copy, which its methods bind to, and writes none.
     private static void AddExceptions(SourceProductionContext output, (ExceptionProbe Probe, bool IsPublic) input)
     {
         var probe = input.Probe;
-        if (probe.Origin == ExceptionOrigin.Referenced)
+        switch (probe.Origin)
         {
-            return;
-        }
-
-        if (probe.Origin is ExceptionOrigin.SeenTwice or ExceptionOrigin.OtherShape)
-        {
-            var descriptor =
-                probe.Origin == ExceptionOrigin.SeenTwice
-                    ? SqlDiagnostics.ExceptionsSeenTwice
-                    : SqlDiagnostics.ExceptionsOfAnotherShape;
-            output.ReportDiagnostic(Diagnostic.Create(descriptor, Location.None, string.Join(", ", probe.Assemblies)));
+            case ExceptionOrigin.Own:
+                break;
+            case ExceptionOrigin.Referenced:
+                return;
+            case ExceptionOrigin.BeforeNet6:
+                Report(SqlDiagnostics.ExceptionsBeforeNet6);
+                return;
+            case ExceptionOrigin.SeenTwice:
+                Report(SqlDiagnostics.ExceptionsSeenTwice);
+                break;
+            case ExceptionOrigin.OtherShape:
+                Report(SqlDiagnostics.ExceptionsOfAnotherShape);
+                break;
+            default:
+                throw UnexpectedEnumValueException.Of(probe.Origin);
         }
 
         output.AddSource(
             ExceptionSource.HintName,
             SourceText.From(ExceptionSource.TextFor(input.IsPublic), Encoding.UTF8)
         );
+
+        void Report(DiagnosticDescriptor descriptor) =>
+            output.ReportDiagnostic(Diagnostic.Create(descriptor, Location.None, string.Join(", ", probe.Assemblies)));
     }
 
     // SQLSRC273 for each engine that a query with a method has and whose driver the project does not reference.

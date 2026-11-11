@@ -31,6 +31,18 @@ public sealed class VariantCopyTests
     [InlineData("Collections/Claimed.sql", "ListCollectedAccounts", "ListCollectedAccountsAsImmutableList")]
     [InlineData("Lists.sql", "ListAccountsByIds", "StreamAccountsByIds")]
     [InlineData("Lists.sql", "ListAccountsByIds", "ListAccountsByIdsNoPadding")]
+    [InlineData("Batches.sql", "InsertNote", "InsertNoteNoTransaction")]
+    [InlineData("Batches.sql", "InsertConvertedNote", "InsertConvertedNoteNoTransaction")]
+    [InlineData("Batches.sql", "InsertNote", "InsertNoteInRepository")]
+    [InlineData("Batches.sql", "InsertNoteRowCount", "InsertNoteQuietly")]
+    [InlineData("Batches.sql", "FindAccountThenEmpty", "GetAccountThenEmpty")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteReadUncommitted")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteReadCommitted")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteRepeatableRead")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteSnapshot")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteSerializableInRepository")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteDefaultLevel")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteDefaultLevelInRepository")]
     public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy) =>
         VariantCopies.ShouldShareHash(RepositoryPaths.EndToEndQueries, file, original, copy);
 }

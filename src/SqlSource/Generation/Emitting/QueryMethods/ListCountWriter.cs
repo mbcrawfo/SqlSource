@@ -33,7 +33,7 @@ internal static class ListCountWriter
                 .Append("var ")
                 .Append(list.Values)
                 .Append(" = ")
-                .Append(MethodArguments.Parameters)
+                .Append(context.Locals.Input)
                 .Append('.')
                 .Append(list.Parameter.Property)
                 .Append(";\n")

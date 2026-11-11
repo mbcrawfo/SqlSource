@@ -80,6 +80,15 @@ internal readonly record struct QuerySettings(
     public bool PadsLists => Parameters.IsOn(GeneratorParameters.ListPadding);
 
     /// <summary>
+    /// Whether a query with parameters whose output is <c>methods</c> or <c>repository</c> also gets a collection
+    /// method, which runs it for each item of a collection.
+    /// </summary>
+    public bool CollectionMethod => Parameters.IsOn(GeneratorParameters.CollectionMethod);
+
+    /// <summary>How a collection method wraps its runs in a transaction.</summary>
+    public TransactionMode Transaction => (TransactionMode)Parameters.Get(GeneratorParameters.Transaction);
+
+    /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file
     /// that has a setting gives it.  The generator parameters merge per parameter instead: each has the value of the

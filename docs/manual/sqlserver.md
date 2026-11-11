@@ -487,6 +487,34 @@ SQL Server has no arrays, so a [list parameter](parameters-and-tokens.md#list-pa
 - **A cancelled method throws as Microsoft.Data.SqlClient does**, and the method passes it on unchanged: `TaskCanceledException` when the token is cancelled before the call or once the server has begun to send the result, and `SqlException`, with `Number` `0` and a message that ends "Operation cancelled by user.", when it is cancelled while the command runs before that.  A `SELECT` usually begins its result before its first row, so a cancel while it waits for that row is a `TaskCanceledException`, and a cancel while an `UPDATE` waits on a lock is a `SqlException`.  A `catch (OperationCanceledException)` does not catch the second: check the token in a `catch (SqlException)` as well.
 - **The connection's commands must create Microsoft.Data.SqlClient's own parameters**, as those of `SqlConnection` do.  A connection that wraps a `SqlConnection` and creates parameters of its own is a [known issue](generator.md#known-issues).
 
+<a id="collection-methods"></a>
+
+### Collection methods
+
+```sql mssql
+-- name: AddOrder -> one
+-- generator: collection-method
+INSERT INTO dbo.orders (customer_id, placed_at, total, status)
+OUTPUT INSERTED.id
+VALUES (@customerId, @placedAt, @total, @status);
+```
+
+A query's [collection method](generator.md#collection-methods) runs its items through Microsoft.Data.SqlClient, 1,000 to a round trip.  What a failed item leaves in the database depends on the transaction the method runs in, and on `XACT_ABORT`:
+
+| The transaction | When an item fails |
+|----|----|
+| Its own, by `transaction=on`, the default, or an isolation level | Every item is rolled back, those of earlier round trips too, and nothing is left |
+| None, by `transaction=off` | SQL Server commits each item on its own.  With `XACT_ABORT` off, an error such as a duplicate key ends its item's statement alone: the other items of its round trip, those after it included, and the round trips before it stay, and the round trips after it do not run.  Under `SET XACT_ABORT ON` the error also stops its round trip, so the items after it do not run, and so does an error that ends the batch, such as a failed conversion, `CAST('x' AS int)`, with `XACT_ABORT` off |
+| The caller's, a `transaction` given at the output `methods` or an ambient one | The method leaves it to you.  With `XACT_ABORT` off, a duplicate key ends its item's statement alone, and the transaction stays open, with every other item of its round trip and of those before it, for you to commit or roll back.  An error that rolls the transaction back itself, nearly any under `SET XACT_ABORT ON`, or one that ends the batch, such as a failed conversion, `CAST('x' AS int)`, leaves nothing, and the transaction has completed: its `Connection` is null |
+
+- **A query whose statements return more than one result set cannot run over a collection** at the shapes `one`, `one-optional` and `many`, which read one result set for each item.  A statement that returns none, such as `SET NOCOUNT ON`, a `DECLARE` or an `UPDATE` without `OUTPUT`, is fine.  A query of two result sets, or one whose `SELECT` stands in an `IF` and returns no result set for some items, throws `InvalidOperationException`, "The query 'FindOrder' returned a result set of another shape, or none, for one of the items from 0 to 1, so it cannot run over a collection: a query whose statements return more than one result set, or none for an item, cannot.", and its own transaction is rolled back.  The items it names are those of the round trip up to where the mismatch showed, since the result set too many or missing can be any of theirs.  When the other result set has as many columns as the query's rows, the method throws the same at the end of the round trip, or, before that, an item reads it as its own and throws `UnexpectedRowCountException` or Microsoft.Data.SqlClient's `InvalidCastException`; either way it never returns its rows.  The shapes `none` and `rowcount` read no rows, so their result sets do not matter.
+- **Given a transaction, a method that reads rows can throw [`TransactionRolledBackException`](generator.md#transaction-rolled-back)**, as a query method does [above](#method-results): when it threw an exception of its own, or reached an item's error that left the transaction open, and a later error of the round trip then rolled the transaction back.  Its `InnerException` is the first exception: the method's own, such as `UnexpectedRowCountException`, or the [`CollectionItemException`](generator.md#collection-item-exception) of the item's error.  An error that rolled the transaction back itself is thrown as its `CollectionItemException`.
+- **A transaction that has completed is refused**, as for a query method, before anything runs.
+- **`rowcount` adds 0 for an item whose count is not reported**, under `SET NOCOUNT ON`, where a query method returns `-1`.
+- **The isolation level of the method's own transaction lasts for that transaction alone**, the level that `transaction` names, or read committed under `on`.  SQL Server keeps a level on the connection after a transaction ends, and the pool keeps it on a connection that is closed and opened again, so the method sets the connection back to the level it had before the call, whether the method returns or throws, and before it closes a connection it opened.  Later statements on the connection, and on the pooled connection opened next, run at the level they would have run at without the call.
+- **`transaction=snapshot` needs the database to allow it**: `ALTER DATABASE app SET ALLOW_SNAPSHOT_ISOLATION ON`.  Without it, SQL Server refuses the transaction's first item, with its error 3952.  SQL Server has all five levels, `read-uncommitted`, `read-committed`, its default, `repeatable-read`, `serializable` and `snapshot`.
+- **`commandTimeout`** is that of each round trip, and **a cancelled method throws as a query method does**, often `TaskCanceledException` when an item waits, as on a lock, for the rows it returns; either way, the method's own transaction is rolled back.
+
 <a id="known-issues"></a>
 
 ## Known issues
