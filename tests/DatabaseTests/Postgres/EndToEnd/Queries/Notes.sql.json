@@ -247,6 +247,68 @@
         }
       ]
     },
+    "GetAccountNoteCountSync": {
+      "hash": "f5c3a88691e71c85e9b0f9a63d3ee00f37bc8c93dcc0f2a2491b2e77e981321a",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "note_count",
+          "type": {
+            "name": "bigint",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int8"
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
     "ListDisplayNames": {
       "hash": "54de3cb48c00d72f3170699b95a2977d55f4b628622d4a52dbaa67169069afbe",
       "toolVersion": "0.1.0",

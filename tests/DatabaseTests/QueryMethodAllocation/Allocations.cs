@@ -38,6 +38,25 @@ internal static class Allocations
             );
     }
 
+    // InStateAsync for a synchronous test: opens the connection for Open, and leaves it as it is for Closed.
+    public static void InState(DbConnection connection, ConnectionState state)
+    {
+        if (state == ConnectionState.Open)
+        {
+            connection.Open();
+            return;
+        }
+
+        if (state != ConnectionState.Closed)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(state),
+                state,
+                "A test measures an open or a closed connection."
+            );
+        }
+    }
+
     // The generated method may allocate no more than the margin beyond the hand-written one.
     public static async Task ShouldAllocateNoMoreThanByHandAsync<TGenerated, TByHand>(
         Func<Task<TGenerated>> generated,
@@ -64,6 +83,45 @@ internal static class Allocations
         pairs.Generated.Bytes.ShouldBeGreaterThan(settings.LeastBytesPerCall);
         pairs.ByHand.Bytes.ShouldBeGreaterThan(settings.LeastBytesPerCall);
         pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-leastSavingInBytesPerCall);
+    }
+
+    // The generated synchronous method may allocate no more than the margin beyond the hand-written one.
+    public static void ShouldAllocateNoMoreThanByHand<TGenerated, TByHand>(
+        Func<TGenerated> generated,
+        Func<TByHand> byHand,
+        long marginInBytesPerCall,
+        MeasureSettings settings
+    )
+    {
+        var pairs = Measure(generated, byHand, settings);
+        pairs.Generated.Bytes.ShouldBeGreaterThan(settings.LeastBytesPerCall);
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(settings.LeastBytesPerCall);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(marginInBytesPerCall);
+    }
+
+    // The generated synchronous method must allocate at least the saving less than the hand-written one.
+    public static void ShouldSaveAtLeast<TGenerated, TByHand>(
+        Func<TGenerated> generated,
+        Func<TByHand> byHand,
+        long leastSavingInBytesPerCall,
+        MeasureSettings settings
+    )
+    {
+        var pairs = Measure(generated, byHand, settings);
+        pairs.Generated.Bytes.ShouldBeGreaterThan(settings.LeastBytesPerCall);
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(settings.LeastBytesPerCall);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-leastSavingInBytesPerCall);
+    }
+
+    private static CallPairs Measure<TGenerated, TByHand>(
+        Func<TGenerated> generated,
+        Func<TByHand> byHand,
+        MeasureSettings settings
+    )
+    {
+        var pairs = CallAllocations.Measure(generated, byHand, settings.WarmUpCalls, settings.Pairs);
+        TestContext.Current.TestOutputHelper?.WriteLine($"Of {settings.Pairs} pairs of calls, {pairs}.");
+        return pairs;
     }
 
     private static async Task<CallPairs> MeasureAsync<TGenerated, TByHand>(

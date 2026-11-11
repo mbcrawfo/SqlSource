@@ -6,6 +6,7 @@
 - **A compiler warning inside generated code is a bug.**  The driver tests collect them as `GeneratorRun.GeneratedCodeWarnings` and assert that there are none; a new kind of generated code gets a test that does the same.
 - **A library's class of conversions is written from the one table that gives its edges**, as `Generation/Converters/NodaTimeConversions.cs` does, so an edge never names a method the class lacks; it names the library's types as text alone, `global::`-qualified.  A new library adds its edges to `Of` and its text to `SourceOf` in `Generation/Converters/LibraryConverters.cs`, and declares its class with `ClassDeclaration` there, which marks it embedded.  `Generation/Converters/NetTopologySuiteConversions.cs` has no edges, only the instances of the spatial read path.  See [converters](../../../docs/architecture/generator.md#converters).
 - **A `methods` or `repository` query's only member is its method.**  `TypeEmitter` writes no constant or token method for it, and `Generation/Methods/MethodPlanner.cs` gives no method to one that fails a check, or to a `repository` query without a connection, so such a query gets neither; its models are unaffected.  See [query methods](../../../docs/architecture/generator.md#query-methods).
+- **The names a query's methods can have come only from `Methods/MethodNames.cs`**, by its output and `method-type`, which `Methods/MethodPlanner.cs` names its methods with and `Placement/TypePlacement.cs` checks against a nested class's name (`SQLSRC009`), so the two never disagree.
 
 ## Strategies
 

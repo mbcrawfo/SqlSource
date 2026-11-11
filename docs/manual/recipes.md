@@ -10,6 +10,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Start the watcher with your editor](#start-the-watcher-with-your-editor)
 - [Run queries in a transaction](#queries-in-a-transaction)
 - [Insert many rows in one call](#insert-many-rows)
+- [Run a query from code that does not await](#run-without-awaiting)
 - [Give a repository its connection from a service of your own](#connection-from-a-provider)
 - [Make a SQL Server repository from a connection string](#sql-server-repository)
 - [Give an id a type of its own](#strongly-typed-id)
@@ -322,6 +323,38 @@ AddUserDto[] added = await users.AddUser(newUsers, cancellationToken);
 `-- generator: collection-method` gives `AddUser` a second method, which takes the input model of every user, adds them all in one transaction of its own, 1,000 to a round trip, and returns their ids in the order of the users.  When the database refuses one, such as a user whose row breaks a constraint, it throws `CollectionItemException`, whose `ItemIndex` is that user's position, and no user is added.  The same query runs on SQL Server with `OUTPUT inserted.id` before `VALUES` in place of `RETURNING id`.  At the output `methods`, the method also takes a transaction that your code began, and runs in it.
 
 Rules: [collection methods](generator.md#collection-methods), [transactions](generator.md#collection-transactions), [`CollectionItemException`](generator.md#collection-item-exception).
+
+<a id="run-without-awaiting"></a>
+
+## Run a query from code that does not await
+
+```sql postgres
+-- output: methods
+
+-- name: GetUserName -> one-optional
+-- generator: method-type=both
+SELECT name
+FROM users
+WHERE id = @id;
+```
+
+```csharp
+// A command of a console tool, whose API is synchronous
+public int Run(int id)
+{
+    using var connection = dataSource.OpenConnection();
+    GetUserNameDto? user = connection.GetUserName(new GetUserNameParams(id));
+    Console.WriteLine(user?.Name ?? "no such user");
+    return user is null ? 1 : 0;
+}
+
+// Elsewhere, code that awaits
+GetUserNameDto? user = await connection.GetUserNameAsync(new GetUserNameParams(id), cancellationToken: cancellationToken);
+```
+
+`-- generator: method-type=both` gives `GetUserName` a synchronous method, `GetUserName`, which returns the row or null and takes no cancellation token, beside its asynchronous method, `GetUserNameAsync`.  `method-type=sync` gives it the synchronous method alone.  Write it in the file header, or in `generatorParameters` of the folder's `sqlsource.json`, for every query it reaches.  On PostgreSQL, the data source it runs on has no `Multiplexing=true`.
+
+Rules: [synchronous methods](generator.md#synchronous-methods), [generator parameters](settings.md#setting-generator-parameters).
 
 <a id="connection-from-a-provider"></a>
 

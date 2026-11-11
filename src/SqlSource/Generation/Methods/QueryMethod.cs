@@ -10,7 +10,9 @@ namespace SqlSource.Generation.Methods;
 /// <summary>
 /// What the method of one query needs: everything <c>QueryMethodWriter</c> writes it from.
 /// </summary>
-/// <param name="Name">The method's name: the query's, with <c>Async</c> after it under <c>async-method-suffix</c>.
+/// <param name="Name">
+/// The method's name, as <see cref="MethodNames" /> gives it: the query's for a synchronous method, and for an
+/// asynchronous one with <c>Async</c> after it under <c>async-method-suffix</c> or <c>method-type=both</c>.
 /// </param>
 /// <param name="QueryName">The query's name, as <c>UnexpectedRowCountException</c> names it.</param>
 /// <param name="SummaryXml">The summary as XML: already escaped, and the default when the query has none.</param>
@@ -74,6 +76,12 @@ internal sealed record QueryMethod(
     /// <see cref="TypeMethods.Methods" /> must not key them by name alone.
     /// </summary>
     public BatchCall? Batch { get; init; }
+
+    /// <summary>
+    /// Whether the method awaits its calls and returns a task, the default, or makes the synchronous calls and returns
+    /// its result.  A synchronous method takes no cancellation token and never streams.
+    /// </summary>
+    public MethodSynchrony Synchrony { get; init; }
 }
 
 /// <summary>

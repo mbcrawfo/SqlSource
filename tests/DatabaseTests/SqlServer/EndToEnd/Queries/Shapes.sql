@@ -29,6 +29,26 @@ FROM dbo.accounts
 WHERE name LIKE @name OR id = @accountId
 ORDER BY id;
 
+-- name: SearchAccountsSync -> many
+-- summary: SearchAccounts, by a synchronous method, for the allocation tests.
+-- generator: sort-input method-type=sync
+-- input-model: SearchAccountsFilter
+-- output-model: SearchAccountsView
+SELECT id, name
+FROM dbo.accounts
+WHERE name LIKE @name OR id = @accountId
+ORDER BY id;
+
+-- name: SearchAccountsUnpooledSync -> many
+-- summary: SearchAccountsUnpooled, by a synchronous method, for the allocation tests.
+-- generator: sort-input array-pool=off method-type=sync
+-- input-model: SearchAccountsFilter
+-- output-model: SearchAccountsView
+SELECT id, name
+FROM dbo.accounts
+WHERE name LIKE @name OR id = @accountId
+ORDER BY id;
+
 -- name: ListAccountColumns
 -- summary: Some columns of every account, in a class whose properties are sorted.
 -- generator: sort-output

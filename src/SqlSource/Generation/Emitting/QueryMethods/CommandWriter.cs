@@ -48,6 +48,7 @@ internal static class CommandWriter
     {
         var builder = context.Builder;
         var locals = context.Locals;
+        var spelling = context.Spelling;
         if (context.Method.Source is { } source)
         {
             AppendAcquire(in context, source, indent);
@@ -62,10 +63,9 @@ internal static class CommandWriter
             .Append(".State == global::System.Data.ConnectionState.Closed;\n");
         QueryMethodWriter.AppendIf(builder, indent, locals.WasClosed);
         _ = builder.Append(GeneratedText.Deeper(indent));
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, locals.Connection, "OpenAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = spelling.AppendCallStart(builder, locals.Connection, DriverCall.Open);
+        _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+        _ = spelling.AppendCallEnd(builder).Append(";\n");
         QueryMethodWriter.AppendEnd(builder, indent);
         _ = builder.Append('\n').Append(indent).Append("try\n").Append(indent).Append("{\n");
     }
@@ -86,8 +86,8 @@ internal static class CommandWriter
 
         QueryMethodWriter.AppendIf(builder, blockIndent, locals.WasClosed);
         _ = builder.Append(blockIndent).Append(GeneratedText.Indent);
-        _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Connection, "CloseAsync");
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, locals.Connection, DriverCall.Close);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         QueryMethodWriter.AppendEnd(builder, blockIndent);
         QueryMethodWriter.AppendEnd(builder, indent);
     }
@@ -140,7 +140,7 @@ internal static class CommandWriter
             .Append(" = ")
             .Append(locals.Connection)
             .Append(".CreateCommand();\n");
-        _ = AsyncSpelling.AppendUsing(builder, indent, locals.CommandScope, locals.Command);
+        _ = context.Spelling.AppendUsing(builder, indent, locals.CommandScope, locals.Command);
         AppendCommandText(in context, indent);
         // A repository's method takes neither a transaction nor a timeout, and leaves the command's own.
         if (context.Arguments.TakesConnection)
@@ -192,24 +192,27 @@ internal static class CommandWriter
     {
         var builder = context.Builder;
         var locals = context.Locals;
+        var spelling = context.Spelling;
         var access = locals.SourceAccess;
         _ = builder.Append(indent).Append("var ").Append(locals.Connection).Append(" = ");
         switch (source.Kind)
         {
             case ConnectionSourceKind.ConnectionString:
                 _ = builder.Append("new ").Append(context.Method.Engine.ConnectionTypeText()).Append('(');
-                AppendSourceOrThrow(builder, source, access);
+                AppendSourceOrThrow(builder, spelling, source, access);
                 _ = builder.Append(')');
                 break;
             case ConnectionSourceKind.DataSource:
-                _ = AsyncSpelling.AppendAwait(builder).Append('(');
-                AppendSourceOrThrow(builder, source, access);
-                _ = builder.Append(").OpenConnectionAsync(").Append(MethodArguments.CancellationToken);
-                _ = AsyncSpelling.AppendAwaitedEnd(builder);
+                // The data source, or its throw, is the call's target, in parentheses.
+                _ = spelling.AppendAwait(builder).Append('(');
+                AppendSourceOrThrow(builder, spelling, source, access);
+                _ = spelling.AppendCallMember(builder.Append(')'), DriverCall.OpenConnection);
+                _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+                _ = spelling.AppendCallEnd(builder);
                 break;
             case ConnectionSourceKind.Factory:
             case ConnectionSourceKind.Borrowed:
-                AppendSourceOrThrow(builder, source, access);
+                AppendSourceOrThrow(builder, spelling, source, access);
                 break;
             default:
                 throw UnexpectedEnumValueException.Of(source.Kind);
@@ -218,18 +221,23 @@ internal static class CommandWriter
         _ = builder.Append(";\n");
         if (locals.ConnectionScope.Length > 0)
         {
-            _ = AsyncSpelling.AppendUsing(builder, indent, locals.ConnectionScope, locals.Connection);
+            _ = spelling.AppendUsing(builder, indent, locals.ConnectionScope, locals.Connection);
         }
     }
 
     // The source's value, or the exception that says it is null: its member, as the method reaches it, read, or called
     // with the token when it takes one, and awaited when it is an asynchronous factory.
-    private static void AppendSourceOrThrow(StringBuilder builder, ConnectionSource source, string access)
+    private static void AppendSourceOrThrow(
+        StringBuilder builder,
+        CallSpelling spelling,
+        ConnectionSource source,
+        string access
+    )
     {
         var isAwaited = source is { Kind: ConnectionSourceKind.Factory, IsAsync: true };
         if (isAwaited)
         {
-            _ = AsyncSpelling.AppendAwait(builder);
+            _ = spelling.AppendAwait(builder);
         }
 
         _ = builder.Append(access);
@@ -238,10 +246,10 @@ internal static class CommandWriter
             _ = builder.Append('(');
             if (source.TakesCancellationToken)
             {
-                _ = builder.Append(MethodArguments.CancellationToken);
+                _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
             }
 
-            _ = isAwaited ? AsyncSpelling.AppendAwaitedEnd(builder) : builder.Append(')');
+            _ = isAwaited ? spelling.AppendCallEnd(builder) : builder.Append(')');
         }
 
         _ = builder

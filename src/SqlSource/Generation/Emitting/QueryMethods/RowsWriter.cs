@@ -19,24 +19,24 @@ internal static class RowsWriter
         var builder = context.Builder;
         var method = context.Method;
         var locals = context.Locals;
+        var spelling = context.Spelling;
         if (method.Shape is ResultShape.None or ResultShape.RowCount)
         {
             _ = builder.Append(indent).Append(method.Shape == ResultShape.RowCount ? "return " : string.Empty);
-            _ = AsyncSpelling
-                .AppendAwaitedCall(builder, locals.Command, "ExecuteNonQueryAsync")
-                .Append(MethodArguments.CancellationToken);
-            _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+            _ = spelling.AppendCallStart(builder, locals.Command, DriverCall.ExecuteNonQuery);
+            _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+            _ = spelling.AppendCallEnd(builder).Append(";\n");
             return;
         }
 
         var output = method.Output!;
         _ = builder.Append(indent).Append("var ").Append(locals.Reader).Append(" = ");
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, locals.Command, "ExecuteReaderAsync")
-            .Append("global::System.Data.CommandBehavior.Default, ")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
-        _ = AsyncSpelling.AppendUsing(builder, indent, locals.ReaderScope, locals.Reader);
+        _ = spelling
+            .AppendCallStart(builder, locals.Command, DriverCall.ExecuteReader)
+            .Append("global::System.Data.CommandBehavior.Default");
+        _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: true);
+        _ = spelling.AppendCallEnd(builder).Append(";\n");
+        _ = spelling.AppendUsing(builder, indent, locals.ReaderScope, locals.Reader);
 
         // A streaming method yields each row as it reads it, where any other reads them into its buffer and returns
         // the collection.
@@ -279,13 +279,13 @@ internal static class RowsWriter
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 
-    // An awaited read of the next row, as a condition: a query method's, or a collection method's of each result set.
+    // A read of the next row, as a condition: a query method's, or a collection method's of each result set.
     internal static void AppendRead(in QueryMethodContext context)
     {
-        _ = AsyncSpelling
-            .AppendAwaitedCall(context.Builder, context.Locals.Reader, "ReadAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(context.Builder);
+        var spelling = context.Spelling;
+        _ = spelling.AppendCallStart(context.Builder, context.Locals.Reader, DriverCall.Read);
+        _ = spelling.AppendToken(context.Builder, MethodArguments.CancellationToken, afterArgument: false);
+        _ = spelling.AppendCallEnd(context.Builder);
     }
 
     // The throw of UnexpectedRowCountException, with the item's position, an expression, in a collection method.
@@ -307,8 +307,8 @@ internal static class RowsWriter
         _ = context.Builder.Append(");\n");
     }
 
-    // The type the task gives, or for a streaming method the IAsyncEnumerable it returns; null for a task that gives
-    // nothing.
+    // The type the task gives, or a synchronous method returns, or for a streaming method the IAsyncEnumerable it
+    // returns; null for a task that gives nothing, or a method that returns void.
     internal static string? GetResultType(in QueryMethodContext context) =>
         context.Method.Shape switch
         {

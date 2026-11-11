@@ -7,6 +7,13 @@
 -- output-model: CollectedAccount
 SELECT id, name FROM accounts ORDER BY id;
 
+-- name: StreamAccountsBoth
+-- summary: StreamAccounts under method-type=both, which gives a stream its asynchronous method alone, named with Async
+-- summary: after it.
+-- generator: method-type=both
+-- output-model: CollectedAccount
+SELECT id, name FROM accounts ORDER BY id;
+
 -- name: StreamAccountsNamedFrom
 -- summary: The accounts from an id on, streamed, for a method that takes parameters.
 -- output-model: CollectedAccount

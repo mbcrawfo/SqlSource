@@ -414,6 +414,53 @@
           "computed": false
         }
       ]
+    },
+    "GetUserName": {
+      "hash": "3ca166bc0c878e870c5868b16eadf68ccf4250327835c94e77cf51b108986fb0",
+      "toolVersion": "0.1.0",
+      "database": "postgres",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "users",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

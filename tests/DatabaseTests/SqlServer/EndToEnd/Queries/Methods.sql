@@ -1,8 +1,17 @@
 -- The queries of the result shapes, a token, the counts that rowcount returns and the run-time arguments, claimed by
--- MethodQueries.  Every write runs in its tests in a transaction that is rolled back.
+-- MethodQueries.  Every write runs in its tests in a transaction that is rolled back.  A copy named with Sync after its
+-- original is the original under method-type=sync, which gives it a synchronous method in place of the asynchronous
+-- one, and GetAccountInRangeBoth is GetAccountInRange under both, which gives it the two.
 
 -- name: TouchAccount
 -- summary: Writes an account's status over itself: no rows, so its shape is rowcount, the one account it updates.
+UPDATE dbo.accounts
+SET status = status
+WHERE id = @accountId;
+
+-- name: TouchAccountSync
+-- summary: TouchAccount, by a synchronous method.
+-- generator: method-type=sync
 UPDATE dbo.accounts
 SET status = status
 WHERE id = @accountId;
@@ -13,8 +22,31 @@ UPDATE dbo.accounts
 SET status = @status
 WHERE id = @accountId;
 
+-- name: SetAccountStatusSync -> none
+-- summary: SetAccountStatus, by a synchronous method.
+-- generator: method-type=sync
+UPDATE dbo.accounts
+SET status = @status
+WHERE id = @accountId;
+
 -- name: GetAccountInRange -> one
 -- summary: The one account whose id is in a range, which a range of none or of two refuses.
+SELECT id, name
+FROM dbo.accounts
+WHERE id BETWEEN @firstId AND @lastId
+ORDER BY id;
+
+-- name: GetAccountInRangeSync -> one
+-- summary: GetAccountInRange, by a synchronous method.
+-- generator: method-type=sync
+SELECT id, name
+FROM dbo.accounts
+WHERE id BETWEEN @firstId AND @lastId
+ORDER BY id;
+
+-- name: GetAccountInRangeBoth -> one
+-- summary: GetAccountInRange, by a synchronous method and an asynchronous one, which is named with Async after it.
+-- generator: method-type=both
 SELECT id, name
 FROM dbo.accounts
 WHERE id BETWEEN @firstId AND @lastId
@@ -27,9 +59,26 @@ FROM dbo.accounts
 WHERE id BETWEEN @firstId AND @lastId
 ORDER BY id;
 
+-- name: FindAccountInRangeSync -> one-optional
+-- summary: FindAccountInRange, by a synchronous method.
+-- generator: method-type=sync
+SELECT id, name
+FROM dbo.accounts
+WHERE id BETWEEN @firstId AND @lastId
+ORDER BY id;
+
 -- name: ListAccountsWhere
 -- summary: The accounts that a filter keeps, by default those up to an id, which a filter of its own need not use.
 -- param: @lastId int
+SELECT id, name
+FROM dbo.accounts
+{{filter:WHERE id <= @lastId}}
+ORDER BY id;
+
+-- name: ListAccountsWhereSync
+-- summary: ListAccountsWhere, by a synchronous method, which takes the token as the asynchronous one does.
+-- param: @lastId int
+-- generator: method-type=sync
 SELECT id, name
 FROM dbo.accounts
 {{filter:WHERE id <= @lastId}}
@@ -123,6 +172,16 @@ WHERE id <= 2
 ORDER BY id;
 SELECT CAST('x' AS int);
 
+-- name: GetTwoThenFailConversionSync -> one
+-- summary: GetTwoThenFailConversion, by a synchronous method.
+-- output-model: CollectedAccount
+-- generator: method-type=sync
+SELECT id, name
+FROM dbo.accounts
+WHERE id <= 2
+ORDER BY id;
+SELECT CAST('x' AS int);
+
 -- name: GetTwoThenRaise -> one
 -- summary: Two accounts, which one refuses, and then an error that the refusal hides.
 -- GetTwoThenFailConversion with a THROW in the place of the failed conversion: with XACT_ABORT off the THROW leaves
@@ -151,6 +210,14 @@ SELECT CAST('x' AS int);
 -- The divide by zero is the database's error, and the method reads the failed conversion after it, which with
 -- XACT_ABORT off rolls back a transaction: its tests pin that the method reports the rollback, with the divide by
 -- zero inside it.
+SELECT id, 10 / (id - 2) AS quotient
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
+-- name: ListFailingAtSecondThenFailConversionSync
+-- summary: ListFailingAtSecondThenFailConversion, by a synchronous method.
+-- generator: method-type=sync
 SELECT id, 10 / (id - 2) AS quotient
 FROM dbo.accounts
 ORDER BY id;
@@ -204,11 +271,30 @@ ORDER BY id;
 SET CONTEXT_INFO 0x04;
 THROW 50000, 'after the rows', 1;
 
+-- name: RunThenRaiseSync -> none
+-- summary: RunThenRaise, by a synchronous method.
+-- generator: method-type=sync
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SET CONTEXT_INFO 0x04;
+THROW 50000, 'after the rows', 1;
+
 -- name: GetThenRaise -> one
 -- summary: The first account, a mark on the session, and then an error that the method throws.
 -- ListThenRaise under one, which reads its row and then reads again to see that there is no second: its test pins that
 -- the error is thrown by a method that reads one row too.
 -- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+WHERE id = 1;
+SET CONTEXT_INFO 0x05;
+THROW 50000, 'after the rows', 1;
+
+-- name: GetThenRaiseSync -> one
+-- summary: GetThenRaise, by a synchronous method.
+-- output-model: CollectedAccount
+-- generator: method-type=sync
 SELECT id, name
 FROM dbo.accounts
 WHERE id = 1;
@@ -252,11 +338,3 @@ USING (SELECT id FROM dbo.accounts WHERE id <= @lastId) AS s
 ON a.id = s.id
 WHEN MATCHED THEN UPDATE SET status = @status
 OUTPUT $action AS change, INSERTED.id;
-
--- name: ListAccountIdsCancellingOnRead
--- summary: The ids of the accounts, each read as a CancelOnRead, whose converter cancels the token of its test, so
--- that the read of the second row sees it cancelled.
--- type-override: int = SqlSource.DatabaseTests.SqlServer.EndToEnd.Types.CancelOnRead
-SELECT id
-FROM dbo.accounts
-ORDER BY id;

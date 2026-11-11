@@ -46,7 +46,7 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // MeasuresSqlServer, which runs alone on a container of its own, and the assembly runs no two tests at once, and it
 // skips under coverage, whose collector allocates in the process too.
 [Collection(MeasuresSqlServer.Name)]
-public sealed class AllocationTests(SqlServerApp sqlServer)
+public sealed partial class AllocationTests(SqlServerApp sqlServer)
 {
     // The SQL of SearchAccounts, as the generated method sends it.
     private const string SearchAccountsSql =
@@ -74,11 +74,13 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     // more than four pairs in five, on every one of four runs, three on SQL Server 2025 and one on 2017.
     // InsertNodaValues and GetNodaValues, each value converted to or from NodaTime's types, were 0 by the commonest
     // difference too, in more than four pairs in five, on both connections, on each of two runs on SQL Server 2025 when
-    // they were added.  The margin is below the 24 bytes of the smallest object of a 64-bit process, so that any object
-    // the generated method allocates for each call and the hand-written does not fails the test, and an extra object
-    // did, at 24 bytes, and an array of 64 bytes, at 88, failed both pairs of SearchAccounts.  It lets the generated
-    // method's state machine hold up to two more fields of 8 bytes than the hand-written one's.  Never raise it to make
-    // a change pass.
+    // they were added.  The synchronous pairs, the Sync copies of the same queries but StreamAccounts, allocated about
+    // 3.3 to 5.7 KB a call, and each generated method the same as its hand-written one, 0 in 499 or 500 of 500 pairs,
+    // on both connections, on each of two runs on SQL Server 2025 when they were added.  The margin is below the 24
+    // bytes of the smallest object of a 64-bit process, so that any object the generated method allocates for each
+    // call and the hand-written does not fails the test, and an extra object did, at 24 bytes, and an array of 64
+    // bytes, at 88, failed both pairs of SearchAccounts.  It lets the generated method's state machine hold up to two
+    // more fields of 8 bytes than the hand-written one's.  Never raise it to make a change pass.
     private const long MarginInBytesPerCall = 16;
 
     // A call allocates its command, its parameters, its reader and its rows: some kilobytes on the drivers that the
@@ -120,7 +122,9 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     // 2017; the next were -8,672 and -8,080, in some twenty pairs each, and a few of the 500 were far from any of them.
     // So 8,000 is 376 bytes below the commonest and 80 below the least of the next, room for the driver's paths and not
     // for a growth array, and far above 4,256, the saving of a pooled method that allocated even the largest growth
-    // array, of 512 elements, itself.  It is raised when the pool saves more and never lowered to make a change pass.
+    // array, of 512 elements, itself.  The synchronous NumbersAsArraySync saved 8,384 bytes, in all 500 pairs, on both
+    // connections, on each of two runs on SQL Server 2025.  It is raised when the pool saves more and never lowered to
+    // make a change pass.
     private const long LeastSavingInBytesPerCall = 8_000;
 
     // The bytes for each call that the pooled NumbersAsList must save on a few hundred rows against a List that grows
@@ -132,7 +136,9 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     // -6,216, in some ten to thirty pairs each.  So 5,500 is 420 bytes below the commonest and 124 below the least of
     // the next, room for the driver's paths and not for a buffer of 64 elements.  A ToList that did not return its last
     // buffer to the pool, the 512 elements of 4,120 bytes, saved 1,800 bytes only, at the commonest, which is far below
-    // 5,500 and fails the test.  It is raised when the pool saves more and never lowered to make a change pass.
+    // 5,500 and fails the test.  The synchronous NumbersAsListSync saved 5,928 bytes, in all 500 pairs, on both
+    // connections, on each of two runs on SQL Server 2025.  It is raised when the pool saves more and never lowered to
+    // make a change pass.
     private const long LeastListSavingInBytesPerCall = 5_500;
 
     // The bytes for each call that the pooled NumbersAsImmutableArray must save on a few hundred rows against an
@@ -144,7 +150,9 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     // 8,000 is 320 bytes below the commonest and 24 below the least of the next, room for the driver's paths and not
     // for a growth array.  A ToImmutableArray that copied the 300 rows a second time, an array of 2,424 bytes, saved
     // 5,896 bytes only, at the commonest, which is far below 8,000 and fails the test, as does one that did not return
-    // its last buffer.  It is raised when the pool saves more and never lowered to make a change pass.
+    // its last buffer.  The synchronous NumbersAsImmutableArraySync saved 8,328 bytes, in all 500 pairs, on both
+    // connections, on each of two runs on SQL Server 2025.  It is raised when the pool saves more and never lowered to
+    // make a change pass.
     private const long LeastImmutableArraySavingInBytesPerCall = 8_000;
 
     // A row of noda_values with a value in each column, so that every conversion runs, at an id that each call sets.

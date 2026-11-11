@@ -104,11 +104,10 @@ internal static class ExecutionCapabilityWriter
         var batch = locals.Batch!;
         var columns = context.Method.Output!.Columns.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
         _ = builder.Append(indent).Append("if ((").Append(batch.Result).Append(" > 0 && !");
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, locals.Reader, "NextResultAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling
-            .AppendAwaitedEnd(builder)
+        _ = context.Spelling.AppendCallStart(builder, locals.Reader, DriverCall.NextResult);
+        _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+        _ = context
+            .Spelling.AppendCallEnd(builder)
             .Append(")\n")
             .Append(GeneratedText.Deeper(indent))
             .Append("|| ")
@@ -131,10 +130,9 @@ internal static class ExecutionCapabilityWriter
     {
         var builder = context.Builder;
         _ = builder.Append('\n').Append(indent).Append("if (");
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, context.Locals.Reader, "NextResultAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(")\n").Append(indent).Append("{\n");
+        _ = context.Spelling.AppendCallStart(builder, context.Locals.Reader, DriverCall.NextResult);
+        _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+        _ = context.Spelling.AppendCallEnd(builder).Append(")\n").Append(indent).Append("{\n");
         AppendResultSetThrow(in context, GeneratedText.Deeper(indent), "(" + context.Locals.Batch!.ItemIndex + " - 1)");
         QueryMethodWriter.AppendEnd(builder, indent);
     }
@@ -238,11 +236,10 @@ internal static class ExecutionCapabilityWriter
             .Append(batch.IsolationLevel)
             .Append(" = global::System.Convert.ToInt32(\n")
             .Append(GeneratedText.Deeper(body));
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, batch.IsolationCommand, "ExecuteScalarAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling
-            .AppendAwaitedEnd(builder)
+        _ = context.Spelling.AppendCallStart(builder, batch.IsolationCommand, DriverCall.ExecuteScalar);
+        _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+        _ = context
+            .Spelling.AppendCallEnd(builder)
             .Append(",\n")
             .Append(GeneratedText.Deeper(body))
             .Append(ListWriter.Invariant)
@@ -297,10 +294,9 @@ internal static class ExecutionCapabilityWriter
 
         QueryMethodWriter.AppendEnd(builder, tryIndent);
         _ = builder.Append('\n').Append(tryIndent);
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, batch.IsolationCommand, "ExecuteNonQueryAsync")
-            .Append(NoCancellation);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, batch.IsolationCommand, DriverCall.ExecuteNonQuery);
+        _ = context.Spelling.AppendToken(builder, NoCancellation, afterArgument: false);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         QueryMethodWriter.AppendEnd(builder, ifIndent);
         _ = builder
             .Append(ifIndent)
@@ -377,8 +373,8 @@ internal static class ExecutionCapabilityWriter
             .Append(indent)
             .Append("{\n")
             .Append(blockIndent);
-        _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Reader, "DisposeAsync");
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, locals.Reader, DriverCall.Dispose);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         _ = builder
             .Append(blockIndent)
             .Append("if (")
@@ -449,8 +445,8 @@ internal static class ExecutionCapabilityWriter
         _ = builder.Append(blockIndent).Append("catch (global::System.Exception)\n").Append(blockIndent).Append("{\n");
         QueryMethodWriter.AppendEnd(builder, blockIndent);
         _ = builder.Append('\n').Append(blockIndent);
-        _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Reader, "DisposeAsync");
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, locals.Reader, DriverCall.Dispose);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         _ = builder
             .Append(blockIndent)
             .Append("if (")
@@ -612,7 +608,7 @@ internal static class ExecutionCapabilityWriter
             .Append(" = ")
             .Append(context.Locals.Connection)
             .Append(".CreateCommand();\n");
-        _ = AsyncSpelling.AppendUsing(builder, indent, batch.IsolationScope, batch.IsolationCommand);
+        _ = context.Spelling.AppendUsing(builder, indent, batch.IsolationScope, batch.IsolationCommand);
         if (sql is not null)
         {
             _ = builder
@@ -646,8 +642,9 @@ internal static class ExecutionCapabilityWriter
     {
         var builder = context.Builder;
         _ = builder.Append(indent).Append("while (");
-        _ = AsyncSpelling.AppendAwaitedCall(builder, context.Locals.Reader, "NextResultAsync").Append(token);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(")\n").Append(indent).Append("{\n");
+        _ = context.Spelling.AppendCallStart(builder, context.Locals.Reader, DriverCall.NextResult);
+        _ = context.Spelling.AppendToken(builder, token, afterArgument: false);
+        _ = context.Spelling.AppendCallEnd(builder).Append(")\n").Append(indent).Append("{\n");
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 }

@@ -636,13 +636,32 @@ public sealed class PlacementDiagnosticsTests
         type.ShouldContain(" const string Kept = \"SELECT 9;\";\n");
     }
 
-    // A query method in a nested class cannot have the class's name, with Async after it under async-method-suffix,
-    // since a member cannot have the name of the class that holds it.
+    // A query method in a nested class cannot have the class's name, with Async after it under async-method-suffix or
+    // method-type=both, since a member cannot have the name of the class that holds it.  Under both each of its two
+    // names is checked.
     [Theory]
     [InlineData("-- name: Sql\n-- member-location: nested-class\nSELECT id FROM users;\n", "Sql", "(1,10)-(1,13)")]
     [InlineData(
         "-- name: Get\n-- member-location: nested-class\n-- nested-class: GetAsync\n"
             + "-- generator: async-method-suffix\nSELECT id FROM users;\n",
+        "Get",
+        "(1,10)-(1,13)"
+    )]
+    [InlineData(
+        "-- name: Get\n-- member-location: nested-class\n-- nested-class: GetAsync\n"
+            + "-- generator: method-type=both\nSELECT id FROM users;\n",
+        "Get",
+        "(1,10)-(1,13)"
+    )]
+    [InlineData(
+        "-- name: Get\n-- member-location: nested-class\n-- nested-class: Get\n"
+            + "-- generator: method-type=both\nSELECT id FROM users;\n",
+        "Get",
+        "(1,10)-(1,13)"
+    )]
+    [InlineData(
+        "-- name: Get\n-- member-location: nested-class\n-- nested-class: Get\n"
+            + "-- generator: method-type=sync async-method-suffix\nSELECT id FROM users;\n",
         "Get",
         "(1,10)-(1,13)"
     )]

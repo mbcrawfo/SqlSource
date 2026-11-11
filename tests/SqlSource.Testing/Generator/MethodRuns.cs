@@ -145,19 +145,22 @@ internal static class MethodRuns
     // test, each bound through a converter, each with its collection method: Probe reads many rows, ProbeOne one and
     // ProbeStream streams its rows, each into a model of a column read through a converter and an array read through it
     // element by element, and ProbeCount counts them, so that the token sits beside every local, local function and
-    // lambda's parameter a method can have.
-    public static GeneratorRun RunTokenNamed(string token, LanguageVersion languageVersion)
+    // lambda's parameter a method can have.  Under the method-type given, the file's, ProbeStream, which a synchronous
+    // method never is, stays asynchronous.
+    public static GeneratorRun RunTokenNamed(string token, LanguageVersion languageVersion, string methodType = "async")
     {
         var where = "}} WHERE id = @id OR id = ANY(@ids) OR (@members IS NULL OR id IN @members);\n";
         var tokenMarker = "-- token: {{" + token + ":users}}\n";
         var body = tokenMarker + "SELECT id, ids FROM {{" + token + where;
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: int4=App.UserId\n-- generator: collection-method\n-- name: Probe\n"
+            "-- type-override: int4=App.UserId\n-- generator: collection-method method-type="
+                + methodType
+                + "\n-- name: Probe\n"
                 + body
                 + "-- name: ProbeOne -> one\n"
                 + body
-                + "-- name: ProbeStream\n-- collection-type: IAsyncEnumerable\n"
+                + "-- name: ProbeStream\n-- collection-type: IAsyncEnumerable\n-- generator: method-type=async\n"
                 + body
                 + "-- name: ProbeCount -> rowcount\n"
                 + tokenMarker
@@ -190,12 +193,20 @@ internal static class MethodRuns
     // A streaming query under mssql, on SqlClient 7, whose token has the name, beside a parameter, and a query whose
     // collection method begins its transaction at a level: SQL Server's iterator has locals of its own, the flag of a
     // row being yielded among them, and its collection method the session's isolation level and the command that reads
-    // and restores it, which RunTokenNamed's run has not.
-    public static GeneratorRun RunSqlServerTokenNamed(string token, LanguageVersion languageVersion)
+    // and restores it, which RunTokenNamed's run has not.  Under the method-type given, the file's, ProbeStream stays
+    // asynchronous.
+    public static GeneratorRun RunSqlServerTokenNamed(
+        string token,
+        LanguageVersion languageVersion,
+        string methodType = "async"
+    )
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: ProbeStream\n-- collection-type: IAsyncEnumerable\n-- token: {{"
+            "-- generator: method-type="
+                + methodType
+                + "\n\n-- name: ProbeStream\n-- collection-type: IAsyncEnumerable\n-- generator: method-type=async\n"
+                + "-- token: {{"
                 + token
                 + ":users}}\nSELECT id FROM {{"
                 + token

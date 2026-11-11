@@ -13,11 +13,11 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// The run-time arguments of the generated methods on SQL Server, through MethodQueries' methods on the seed of "app":
-// the transaction, which SqlClient requires of a command on a connection that has one, commandTimeout, and the
-// exception of a token cancelled before the call, while the command runs and during the read, each passed on as
-// SqlClient raises it.  Then the connection rule: the method opens a closed connection and closes it again, however
-// it ends, and leaves an open one open, with its transaction.
+// The run-time arguments of the generated methods on SQL Server, through MethodQueries' methods, and
+// CancellationQueries' for the read, on the seed of "app": the transaction, which SqlClient requires of a command on a
+// connection that has one, commandTimeout, and the exception of a token cancelled before the call, while the command
+// runs and during the read, each passed on as SqlClient raises it.  Then the connection rule: the method opens a closed
+// connection and closes it again, however it ends, and leaves an open one open, with its transaction.
 [Collection(UsesSqlServer.Name)]
 public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
 {

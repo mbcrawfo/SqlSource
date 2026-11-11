@@ -6,7 +6,8 @@ using SqlSource.Settings;
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
-/// Writes the asynchronous method of a query: it opens the connection when it is closed, binds each parameter with
+/// Writes the method of a query, asynchronous or synchronous as its <see cref="QueryMethod.Synchrony" /> says, spelled
+/// by the <see cref="CallSpelling" /> of that: it opens the connection when it is closed, binds each parameter with
 /// the <see cref="ParameterBinder" /> of its file's engine, runs the query and reads its rows as the shape says.  A
 /// many query of <see cref="CollectionKind.IAsyncEnumerable" /> checks its arguments and returns a local iterator
 /// that does the rest as the loop asks for each row.  It builds the method's <see cref="QueryMethodContext" /> and
@@ -134,7 +135,8 @@ internal static class QueryMethodWriter
             arguments,
             locals,
             capabilities,
-            streams
+            streams,
+            CallSpelling.For(method.Synchrony)
         );
     }
 }

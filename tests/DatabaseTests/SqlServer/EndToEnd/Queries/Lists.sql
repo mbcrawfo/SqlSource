@@ -10,6 +10,15 @@ FROM dbo.accounts
 WHERE id IN @ids
 ORDER BY id;
 
+-- name: ListAccountsByIdsSync
+-- summary: ListAccountsByIds, by a synchronous method.
+-- generator: method-type=sync
+-- output-model: ListedAccount
+SELECT id, name, status
+FROM dbo.accounts
+WHERE id IN @ids
+ORDER BY id;
+
 -- name: ListAccountsExcept
 -- summary: The accounts whose ids are not in a list.
 -- output-model: ListedAccount

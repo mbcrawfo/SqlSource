@@ -16,7 +16,7 @@ internal static partial class QueryMethodCorpus
     // query; and a list of decimals, whose values SQL Server rounds to its scale of 0 and whose empty form's null it
     // does not.  Each list's entry describes its element, as the tool writes it, with the name a PostgreSQL binding
     // sets.
-    private static GeneratorRun Lists(CorpusEngine engine)
+    private static GeneratorRun Lists(CorpusEngine engine, string? settings)
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -87,7 +87,8 @@ internal static partial class QueryMethodCorpus
                     engine.Entry(file, "ListOneShape", justIds, columns),
                     engine.Entry(file, "ListAmounts", [CorpusEngine.Parameter("amounts", engine.WholeDecimal)], columns)
                 ),
-            ]
+            ],
+            settings: settings
         );
     }
 

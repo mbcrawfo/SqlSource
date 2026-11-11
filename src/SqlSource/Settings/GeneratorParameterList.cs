@@ -39,7 +39,8 @@ internal static class GeneratorParameterList
         | GeneratorParameters.ArrayPool
         | GeneratorParameters.ListPadding
         | GeneratorParameters.CollectionMethod
-        | GeneratorParameters.Transaction;
+        | GeneratorParameters.Transaction
+        | GeneratorParameters.MethodType;
 
     /// <summary>
     /// The parameters that are on or off and are on when no level says otherwise.  Their definitions say so too, and a
@@ -81,6 +82,7 @@ internal static class GeneratorParameterList
             ["on", "off", "read-uncommitted", "read-committed", "repeatable-read", "serializable", "snapshot"],
             0
         ),
+        new GeneratorParameterDefinition("method-type", GeneratorParameters.MethodType, ["async", "sync", "both"], 0),
     ];
 
     /// <summary>The definition of <paramref name="parameter" />, one flag.</summary>

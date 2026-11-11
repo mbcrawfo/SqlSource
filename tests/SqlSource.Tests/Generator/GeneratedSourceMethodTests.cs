@@ -275,7 +275,8 @@ public sealed class GeneratedSourceMethodTests
     // Methods: one method reads many rows, the other one, and each binds a parameter and reads a column through a
     // converter, and an array element by element, so that value names the pattern variable of the binding and element
     // and item the static lambdas' parameter and pattern variable too.  C# lets a lambda's names hide the token's
-    // argument, so the text is checked for them as well.
+    // argument, so the text is checked for them as well.  Each runs under method-type=async and again under sync, whose
+    // synchronous methods have the same locals.
     [Theory]
     [InlineData("span")]
     [InlineData("state")]
@@ -354,7 +355,15 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
-        var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
+        ShouldCompileWithTokenNamed(name, "async");
+        ShouldCompileWithTokenNamed(name, "sync");
+    }
+
+    // The runs of RunTokenNamed and RunSqlServerTokenNamed under the method-type, with the names the token leaves the
+    // locals.
+    private static void ShouldCompileWithTokenNamed(string name, string methodType)
+    {
+        var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12, methodType);
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
@@ -380,7 +389,7 @@ public sealed class GeneratedSourceMethodTests
         var items = name == "items" ? "items1" : "items";
         methods.ShouldContain("using var " + items + " = parameters.GetEnumerator();");
 
-        var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.CSharp12);
+        var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.CSharp12, methodType);
 
         sqlServer.ShouldBeClean();
         // The flag of a row being yielded takes the name atRow unless a token has it, and then atRow1.
@@ -418,6 +427,13 @@ public sealed class GeneratedSourceMethodTests
             .ShouldContain(
                 name == "isolationScope" ? "await using var isolationScope1 =" : "await using var isolationScope ="
             );
+        // Under sync each query method but the stream is synchronous, and every collection method asynchronous.
+        var isSynchronous = methodType == "sync";
+        methods.Contains(" static int ProbeCount(\n", System.StringComparison.Ordinal).ShouldBe(isSynchronous);
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .Contains(" static int ProbeLevel(\n", System.StringComparison.Ordinal)
+            .ShouldBe(isSynchronous);
     }
 
     // A list's use is a segment of its own, and the token method of a type writes it as the SQL wrote it, in the

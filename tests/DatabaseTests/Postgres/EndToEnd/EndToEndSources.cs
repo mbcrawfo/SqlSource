@@ -36,6 +36,16 @@ internal static class EndToEndSources
         return builder.Build();
     }
 
+    // "app" as App sets it up, with Multiplexing=true, which Npgsql refuses synchronous commands on outside a
+    // transaction: SynchronousMethodTests pins what its synchronous methods do on it.
+    public static NpgsqlDataSource AppMultiplexing(PostgresDatabases postgres)
+    {
+        var builder = new NpgsqlDataSourceBuilder(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
+        builder.ConnectionStringBuilder.Multiplexing = true;
+        _ = builder.MapEnum<NoteKind>();
+        return builder.Build();
+    }
+
     // "app" as App sets it up, with Npgsql.NodaTime's plugin, which reads and writes the NodaTime types of the queries
     // of NodaTime/, whose folder turns the library back on: a data source the application builds for those methods.
     public static NpgsqlDataSource AppWithNodaTime(PostgresDatabases postgres)

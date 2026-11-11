@@ -160,10 +160,9 @@ internal static class BatchRowsWriter
         var builder = context.Builder;
         var batch = context.Locals.Batch!;
         _ = builder.Append(indent);
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, batch.Batch, "ExecuteNonQueryAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, batch.Batch, DriverCall.ExecuteNonQuery);
+        _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         if (context.Method.Shape != ResultShape.RowCount)
         {
             return;
@@ -192,12 +191,12 @@ internal static class BatchRowsWriter
         var locals = context.Locals;
         var batch = locals.Batch!;
         _ = builder.Append(indent).Append("var ").Append(locals.Reader).Append(" = ");
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, batch.Batch, "ExecuteReaderAsync")
-            .Append("global::System.Data.CommandBehavior.Default, ")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
-        _ = AsyncSpelling.AppendUsing(builder, indent, locals.ReaderScope, locals.Reader);
+        _ = context
+            .Spelling.AppendCallStart(builder, batch.Batch, DriverCall.ExecuteReader)
+            .Append("global::System.Data.CommandBehavior.Default");
+        _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: true);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendUsing(builder, indent, locals.ReaderScope, locals.Reader);
         if (!context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError))
         {
             AppendResultLoop(in context, indent);
@@ -243,10 +242,9 @@ internal static class BatchRowsWriter
         {
             QueryMethodWriter.AppendIf(builder, resultIndent, locals.Batch!.Result + " > 0");
             _ = builder.Append(GeneratedText.Deeper(resultIndent));
-            _ = AsyncSpelling
-                .AppendAwaitedCall(builder, locals.Reader, "NextResultAsync")
-                .Append(MethodArguments.CancellationToken);
-            _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+            _ = context.Spelling.AppendCallStart(builder, locals.Reader, DriverCall.NextResult);
+            _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+            _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
             QueryMethodWriter.AppendEnd(builder, resultIndent);
         }
 

@@ -409,7 +409,8 @@ public sealed class MethodWriterTests
     }
 
     // The same names as the token of a query's method under Methods, at the newest C#, as
-    // Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles of GeneratedSourceMethodTests runs them at C# 12.
+    // Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles of GeneratedSourceMethodTests runs them at C# 12, under
+    // method-type=async and sync.
     [Theory]
     [InlineData("span")]
     [InlineData("state")]
@@ -489,7 +490,15 @@ public sealed class MethodWriterTests
     [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp(string name)
     {
-        var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
+        ShouldCompileWithTokenNamed(name, "async");
+        ShouldCompileWithTokenNamed(name, "sync");
+    }
+
+    // The runs of RunTokenNamed and RunSqlServerTokenNamed under the method-type, with the names the token leaves the
+    // locals.
+    private static void ShouldCompileWithTokenNamed(string name, string methodType)
+    {
+        var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest, methodType);
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
@@ -515,7 +524,7 @@ public sealed class MethodWriterTests
         var items = name == "items" ? "items1" : "items";
         methods.ShouldContain("using var " + items + " = parameters.GetEnumerator();");
 
-        var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.Latest);
+        var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.Latest, methodType);
 
         sqlServer.ShouldBeClean();
         // The flag of a row being yielded takes the name atRow unless a token has it, and then atRow1.
@@ -553,6 +562,13 @@ public sealed class MethodWriterTests
             .ShouldContain(
                 name == "isolationScope" ? "await using var isolationScope1 =" : "await using var isolationScope ="
             );
+        // Under sync each query method but the stream is synchronous, and every collection method asynchronous.
+        var isSynchronous = methodType == "sync";
+        methods.Contains(" static int ProbeCount(\n", StringComparison.Ordinal).ShouldBe(isSynchronous);
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .Contains(" static int ProbeLevel(\n", StringComparison.Ordinal)
+            .ShouldBe(isSynchronous);
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);

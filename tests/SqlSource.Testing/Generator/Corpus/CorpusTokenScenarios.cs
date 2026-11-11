@@ -21,7 +21,7 @@ internal static partial class QueryMethodCorpus
     // another; two tokens, and a token with no -- token: marker, whose default is in the SQL; a stream and a one query
     // whose tokens are not checked; and a stream and a one query with a token named as each of a method's locals.  Each
     // takes @id.
-    private static GeneratorRun Tokens(CorpusEngine engine)
+    private static GeneratorRun Tokens(CorpusEngine engine, string? settings)
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -101,7 +101,8 @@ internal static partial class QueryMethodCorpus
             .ToArray();
         return engine.Run(
             [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
-            [file, Sidecars.Of(file, entries)]
+            [file, Sidecars.Of(file, entries)],
+            settings: settings
         );
     }
 }

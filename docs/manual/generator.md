@@ -226,7 +226,7 @@ A token method adds a line for each token and one for the result, and shows its 
 public static string ListFrom(string table, string orderBy)
 ```
 
-A [query method](#query-methods) has the same summary and remarks, a line for each of its arguments and one for what it returns, and, for the shapes `one` and `one-optional`, a line for the [exception](#unexpected-row-count) it throws.  On SQL Server, every method also has a line for the `InvalidOperationException` it throws when it is given a transaction that has [completed](sqlserver.md#method-results), and a method of the shapes `one`, `one-optional` and `many` one for [`TransactionRolledBackException`](#transaction-rolled-back).  A [collection method](#collection-methods) has a line for [`CollectionItemException`](#collection-item-exception), one for `UnexpectedRowCountException` under `one` and `one-optional`, and on SQL Server, when it reads rows, one for the `InvalidOperationException` of a query that returns [more than one result set](sqlserver.md#collection-methods).  The extension class of the methods has a summary that names the type, and so does a nested class that is `public` or `protected`.
+A [query method](#query-methods) has the same summary and remarks, a line for each of its arguments and one for what it returns, but for a [synchronous method](#synchronous-methods) of the shape `none`, which returns nothing, and, for the shapes `one` and `one-optional`, a line for the [exception](#unexpected-row-count) it throws.  On SQL Server, every method also has a line for the `InvalidOperationException` it throws when it is given a transaction that has [completed](sqlserver.md#method-results), and a method of the shapes `one`, `one-optional` and `many` one for [`TransactionRolledBackException`](#transaction-rolled-back).  A [collection method](#collection-methods) has a line for [`CollectionItemException`](#collection-item-exception), one for `UnexpectedRowCountException` under `one` and `one-optional`, and on SQL Server, when it reads rows, one for the `InvalidOperationException` of a query that returns [more than one result set](sqlserver.md#collection-methods).  The extension class of the methods has a summary that names the type, and so does a nested class that is `public` or `protected`.
 
 Every generated member is documented, so a project that treats a missing comment on a public member (CS1591) as an error gets none from generated code.
 
@@ -546,7 +546,7 @@ GetUserDto? user = await users.GetUser(new GetUserParams(42));
 GetUserDto? user = await connection.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](settings.md#setting-output) is `repository`, the default, or `methods` gets an asynchronous method that runs it, in place of its constant or token method.  The two outputs differ in where the connection comes from:
+A query whose [output](settings.md#setting-output) is `repository`, the default, or `methods` gets an asynchronous method that runs it, in place of its constant or token method, and at `methods` a [synchronous method](#synchronous-methods) instead or beside it when you ask for one.  The two outputs differ in where the connection comes from:
 
 | Output | The method | Called as |
 |----|----|----|
@@ -563,12 +563,12 @@ A query gets its method from a type that claims its file when, for that type:
 
 - **its output is `repository` or `methods`**;
 - **it has what its models need**: a current entry in its sidecar, a C# type for each column and parameter, and every model it needs, an input model when it has parameters and an output model when it returns rows.  A query with neither needs no model;
-- **its method can be written**: a result shape that its rows allow ([SQLSRC272](diagnostics.md#sqlsrc272)), a name that nothing else takes ([SQLSRC274](diagnostics.md#sqlsrc274)), no token named as an argument a query method can have ([SQLSRC275](diagnostics.md#sqlsrc275)), and, in the extension class, a class to hold it ([SQLSRC276](diagnostics.md#sqlsrc276));
+- **its method can be written**: a result shape that its rows allow ([SQLSRC272](diagnostics.md#sqlsrc272)), a name that nothing else takes, for each of its methods ([SQLSRC274](diagnostics.md#sqlsrc274)), no stream under `method-type=sync` ([SQLSRC298](diagnostics.md#sqlsrc298)), no token named as an argument a query method can have ([SQLSRC275](diagnostics.md#sqlsrc275)), and, in the extension class, a class to hold it ([SQLSRC276](diagnostics.md#sqlsrc276));
 - **for a repository query, its type has its connection**: the type is not static ([SQLSRC034](diagnostics.md#sqlsrc034)), and one member of it gives the connection of the query's database, as [the connection](#repository-connection) says ([SQLSRC028](diagnostics.md#sqlsrc028) to [SQLSRC033](diagnostics.md#sqlsrc033), [SQLSRC036](diagnostics.md#sqlsrc036));
 - **its [converters](settings.md#converters) serve it**: a column or parameter whose type a type override, a column type or a `-- param:` marker chose, and whose type has converters, has one it can use: of the direction it needs ([SQLSRC280](diagnostics.md#sqlsrc280)), between it and the type the driver reads when it is a type of yours that the driver never reads ([SQLSRC279](diagnostics.md#sqlsrc279)), and the only one of that direction, with nothing wrong with it ([SQLSRC277](diagnostics.md#sqlsrc277), [SQLSRC278](diagnostics.md#sqlsrc278));
 - **the project references the driver of its dialect** ([SQLSRC273](diagnostics.md#sqlsrc273)), at Npgsql 8.0 or later ([SQLSRC247](diagnostics.md#sqlsrc247)) or Microsoft.Data.SqlClient 6.1 or later ([SQLSRC267](diagnostics.md#sqlsrc267)).
 
-A query whose output is `repository` or `methods` that fails any of the others has an error, and gets neither its method nor a constant until it is fixed.  Its models are still generated when it has them, and the type's other queries get their methods.  A [placement error](#locations), such as a visibility that does not fit the query's member location ([SQLSRC123](diagnostics.md#sqlsrc123)), is different: it leaves the query's whole file without members and without models for the type.  A visibility that does not fit only the models the method takes or returns, also SQLSRC123, leaves out the method alone, as the others here do.  Each type that claims a file gets its own methods from it, by its own settings, and [where the methods go](#method-location) says when two such types give one `methods` method twice.  Only the queries of a dialect that can be described, `postgres` or `mssql`, have entries: a query of another dialect whose output is `repository` or `methods` is [SQLSRC209](diagnostics.md#sqlsrc209), and wants the output `sql`.  A statement that the tool cannot describe, such as PostgreSQL's `CALL` ([SQLSRC233](diagnostics.md#sqlsrc233)), gets no method either, so on PostgreSQL no method calls a procedure: give such a query `-- output: sql` and run its constant yourself.
+A query whose output is `repository` or `methods` that fails any of the others has an error, and gets neither its methods nor a constant until it is fixed.  Its models are still generated when it has them, and the type's other queries get their methods.  A [placement error](#locations), such as a visibility that does not fit the query's member location ([SQLSRC123](diagnostics.md#sqlsrc123)), is different: it leaves the query's whole file without members and without models for the type.  A visibility that does not fit only the models the method takes or returns, also SQLSRC123, leaves out the method alone, as the others here do.  Each type that claims a file gets its own methods from it, by its own settings, and [where the methods go](#method-location) says when two such types give one `methods` method twice.  Only the queries of a dialect that can be described, `postgres` or `mssql`, have entries: a query of another dialect whose output is `repository` or `methods` is [SQLSRC209](diagnostics.md#sqlsrc209), and wants the output `sql`.  A statement that the tool cannot describe, such as PostgreSQL's `CALL` ([SQLSRC233](diagnostics.md#sqlsrc233)), gets no method either, so on PostgreSQL no method calls a procedure: give such a query `-- output: sql` and run its constant yourself.
 
 <a id="repository-methods"></a>
 
@@ -623,7 +623,7 @@ public async Task<ListFromDto[]> ListFrom(
     CancellationToken cancellationToken = default)
 ```
 
-The method has the name of the query, with `Async` after it under the [generator parameter](settings.md#setting-generator-parameters) `async-method-suffix`: `ListFromAsync`.  Its arguments, in this order:
+The method has the name of the query, with `Async` after it under the [generator parameter](settings.md#setting-generator-parameters) `async-method-suffix`, `ListFromAsync`, and always under `method-type=both`, as [synchronous methods](#synchronous-methods) say.  Its arguments, in this order:
 
 | Argument | What it is |
 |----|----|
@@ -773,7 +773,7 @@ Under `class`, the methods are static methods of the type itself, which take the
 
 Under `nested-class`, the methods are public static methods of the nested class, which take the connection as their first argument, since a nested class cannot hold extension methods: `Sql.GetUser(connection, ...)` in the type's code, and `UserRepository.Sql.GetUser(connection, ...)` outside it when the class is `public` or `internal`.  A method is then not named like a constant or token method that another query of the type, in any of its files, puts in that class ([SQLSRC274](diagnostics.md#sqlsrc274)), nor like the class ([SQLSRC009](diagnostics.md#sqlsrc009)).
 
-Two methods of one name in one class, as those of a query `Get` under `async-method-suffix` and a query `GetAsync` without it, are SQLSRC274, and so are two methods of one name and one list of arguments in two extension classes of one namespace, which a call could not tell apart.  A type's methods, wherever they go, are in a file of their own among the generated files, named after the type's full name, `App.UserRepository-Methods.g.cs`.
+Two methods of one name in one class, as those of a query `Get` under `async-method-suffix` and a query `GetAsync` without it, or of a query `Get` under `method-type=both` and a query `GetAsync`, are SQLSRC274, and so are two methods of one name and one list of arguments in two extension classes of one namespace, which a call could not tell apart.  A type's methods, wherever they go, are in a file of their own among the generated files, named after the type's full name, `App.UserRepository-Methods.g.cs`.
 
 <a id="method-signature"></a>
 
@@ -789,7 +789,7 @@ internal static async Task<ListFromDto[]> ListFrom(
     CancellationToken cancellationToken = default)
 ```
 
-The method has the name of the query, with `Async` after it under the [generator parameter](settings.md#setting-generator-parameters) `async-method-suffix`: `ListFromAsync`.  Its arguments, in this order:
+The method has the name of the query, with `Async` after it under the [generator parameter](settings.md#setting-generator-parameters) `async-method-suffix`: `ListFromAsync`.  A [synchronous method](#synchronous-methods) has the query's name alone, and beside one, under `method-type=both`, the asynchronous method always has `Async` after it.  Its arguments, in this order:
 
 | Argument | What it is |
 |----|----|
@@ -818,7 +818,7 @@ The method opens the connection when its `State` is `Closed`, and closes it agai
 
 The [result shape](sql-files.md#result-shapes) after the query's name says what the method does with the rows.  Without one, a query that returns rows is `many`, and one that returns none is `rowcount`.
 
-What a query method returns, at either output, depends on the query's result shape:
+What a query method returns, at either output, depends on the query's result shape.  A [synchronous method](#synchronous-methods) returns what the task holds, with no `Task`, and nothing, `void`, for `none`:
 
 | Shape | Returns |
 |----|----|
@@ -878,7 +878,7 @@ What it returns depends on the query's [result shape](sql-files.md#result-shapes
 Its rows are read as a `many` method reads them, through .NET's shared array pool unless the query has `array-pool=off`.
 
 - **A query gets one when it gets a query method and has parameters.**  `collection-method` is off by default.  A query whose output is `repository` or `methods` gets its collection method beside its query method, and one that gets no query method, as when the method has an error, gets neither.  A query without parameters gets none, and no error, so a folder that turns `collection-method` on keeps its queries without parameters as they are.  Under the output `sql` or `models` the parameter does nothing.  A [`transaction`](#collection-transactions) that names an isolation level the query's database does not have is [SQLSRC297](diagnostics.md#sqlsrc297), which leaves the query its query method alone.
-- **It is an overload of the query method**, with its name, `Async` included under `async-method-suffix`, its visibility and its place, and the same arguments in the same order, but `IEnumerable<TParams> parameters`, of the query's input model, in place of `TParams parameters`.  A `methods` method still takes the connection, `transaction`, `commandTimeout` and `cancellationToken`, and a repository's takes `cancellationToken`; the repository's interface gets it beside the query method.  A [token](parameters-and-tokens.md#tokens) is one `string` argument, as in the query method, and its text is used for every item.  Once a query has one, a call of its query method that passes `new(...)`, `null` or `default` as the input model no longer compiles: either method takes it, so the call is ambiguous, the compiler's error CS0121.  Name the input model's type, as in `new AddUserParams("Ada", email)` or `default(AddUserParams)`.
+- **It is an overload of the query method**, with its name, `Async` included under `async-method-suffix`, its visibility and its place, and the same arguments in the same order, but `IEnumerable<TParams> parameters`, of the query's input model, in place of `TParams parameters`.  A `methods` method still takes the connection, `transaction`, `commandTimeout` and `cancellationToken`, and a repository's takes `cancellationToken`; the repository's interface gets it beside the query method.  A [token](parameters-and-tokens.md#tokens) is one `string` argument, as in the query method, and its text is used for every item.  Once a query has one, a call of its query method that passes `new(...)`, `null` or `default` as the input model no longer compiles: either method takes it, so the call is ambiguous, the compiler's error CS0121.  Name the input model's type, as in `new AddUserParams("Ada", email)` or `default(AddUserParams)`.  Under `method-type=sync` or `both`, its name is the one [synchronous methods](#synchronous-methods) give it.
 - **The collection is read once**, as the method goes, and never held whole, so it can be a LINQ query or an iterator of your own.  A null `parameters` throws `ArgumentNullException` before anything runs.  An empty collection returns an empty collection, `0` or a completed task, and opens no connection and begins no transaction.
 - **Each item is checked as the method reads it.**  A null item throws `ArgumentNullException`, "Item 1499 of the collection is null.", with the item's position, counted from 0, and an item's [list parameter](parameters-and-tokens.md#list-limit) throws as the query method's does.
 - **The items run 1,000 at a time.**  The method reads and checks up to 1,000 items, runs them, and only then reads the next 1,000.  So a bad item is found only after every round trip before its own has run: in the method's own transaction those items are rolled back, and under `transaction=off` or in the caller's transaction they stay.  To refuse the whole collection for one bad item there, check the items before the call.
@@ -917,6 +917,56 @@ The generator parameter `transaction` says which transaction a collection method
 - **An error that no item raised is the driver's own.**  One that the database raises after every item of a round trip has run, such as that of a PostgreSQL constraint declared `DEFERRABLE INITIALLY DEFERRED`, which is checked at the commit, is thrown as the driver's exception, as it is.
 - **Every other exception is the query method's**: `UnexpectedRowCountException`, whose message and `ItemIndex` name the item, a null in a column whose property cannot be null, a converter's exception.
 - **On SQL Server**, a method that reads rows and is given a transaction can throw [`TransactionRolledBackException`](#transaction-rolled-back), and a query whose statements return more than one result set throws `InvalidOperationException`: see [SQL Server](sqlserver.md#collection-methods).
+
+<a id="synchronous-methods"></a>
+
+### Synchronous methods
+
+```sql postgres
+-- output: methods
+
+-- name: GetUser -> one-optional
+-- generator: method-type=both
+SELECT id, name
+FROM users
+WHERE id = @id;
+```
+
+```csharp
+// Generated, shown without global::
+internal static GetUserDto? GetUser(
+    this DbConnection connection,
+    GetUserParams parameters,
+    DbTransaction? transaction = null,
+    int? commandTimeout = null)
+
+internal static async Task<GetUserDto?> GetUserAsync(
+    this DbConnection connection,
+    GetUserParams parameters,
+    DbTransaction? transaction = null,
+    int? commandTimeout = null,
+    CancellationToken cancellationToken = default)
+
+// Your code, where it does not await
+GetUserDto? user = connection.GetUser(new GetUserParams(42));
+```
+
+The [generator parameter](settings.md#setting-generator-parameters) `method-type` gives a query whose output is `methods` a synchronous method, for code that does not await, such as a console tool or a library whose API is synchronous.  Under `sync` the query gets a synchronous method in place of its asynchronous one, and under `both` it gets the two, as `GetUser` above does.  The default, `async`, gives the asynchronous method alone.  A synchronous method runs the query on the calling thread, with the driver's synchronous calls, and never waits on a task.
+
+- **Its name is the query's**, never with `Async` after it, whatever `async-method-suffix` says.  Under `both`, the asynchronous method's name always has `Async` after it, with or without `async-method-suffix`, since two methods that differ only by `cancellationToken`, an argument with a default, would make every call ambiguous.  Each of a query's names is checked as [where the methods go](#method-location) says, and one that something else takes is [SQLSRC274](diagnostics.md#sqlsrc274): the query gets none of its methods until it is fixed, or, for a clash with a method of another type in an extension class, none of that name.
+- **Its arguments are the asynchronous method's without `cancellationToken`**: the connection, the input model, a `string` for each [token](parameters-and-tokens.md#tokens), `transaction` and `commandTimeout`, as [the signature](#method-signature) says.  Nothing cancels it, as ADO.NET's synchronous calls take no token; `commandTimeout` still limits the command.  A token still cannot be named `cancellationToken`, under any `method-type` ([SQLSRC275](diagnostics.md#sqlsrc275)).
+- **It returns what the asynchronous method's task holds**, as [what each shape returns](#method-shapes) says: the collection for `many`, the row for `one`, the row or null for `one-optional`, the count for `rowcount`, and nothing, `void`, for `none`.
+- **It does what the asynchronous method does**: it opens a closed connection and closes it again before it returns or throws, as [the connection](#method-connection) says, runs in the `transaction` it is given, sends each parameter and reads each row in the same way, and throws the same exceptions, [`UnexpectedRowCountException`](#unexpected-row-count), the driver's exceptions and, on SQL Server, [`TransactionRolledBackException`](#transaction-rolled-back).  Its documentation in IntelliSense is the asynchronous method's, without `cancellationToken`, and for `none` without a line for what it returns.
+- **A stream has no synchronous method.**  A `many` query whose [collection type](settings.md#setting-collection-type) is `IAsyncEnumerable` gives each row to the caller's loop as it is read, which only an asynchronous method does.  Under `both` it gets its asynchronous method alone, named with `Async`, and under `sync` it is [SQLSRC298](diagnostics.md#sqlsrc298), and gets no method and no collection method.  For a synchronous method, give it a collection type that is read whole, such as `List`.
+- **On PostgreSQL**, a data source with `Multiplexing=true` refuses a synchronous method on a connection that has no transaction open: see [what a method reads and throws](postgresql.md#method-results).
+
+A query's [collection method](#collection-methods) stays asynchronous under `sync` and `both`.  Under `sync` it has the query's name, an overload of the synchronous method by its `IEnumerable` argument, and under `both` the asynchronous method's name, with `Async` after it.
+
+> **Coming in a later release.**  A synchronous collection method, which runs a query over a collection of its input models without a task.  See [what works today](README.md#what-works-today).
+
+A [repository method](#repository-methods) stays asynchronous too.  Under `sync` it is named as under `async`, and under `both` it gets its asynchronous method alone, named with `Async` after the query's name; the repository's interface has the same.
+
+> **Coming in a later release.**  Synchronous repository methods, and their members of the repository's interface, which get their connection from the repository without a task.  See [what works today](README.md#what-works-today).
 
 <a id="reading-rows"></a>
 

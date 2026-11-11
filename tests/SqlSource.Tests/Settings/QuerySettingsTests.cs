@@ -41,6 +41,10 @@ public sealed class QuerySettingsTests
     }
 
     [Fact]
+    public void MethodType_NoLevelNamesIt_IsAsync() =>
+        QuerySettings.Resolve(SettingsLevel.None, Keep).MethodType.ShouldBe(MethodType.Async);
+
+    [Fact]
     public void Resolve_Parameters_MergePerOption()
     {
         QuerySettings.Resolve(SettingsLevel.None, Keep).KeepComments.ShouldBeTrue();

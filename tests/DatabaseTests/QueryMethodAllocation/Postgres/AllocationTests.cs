@@ -45,7 +45,7 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
 // difference leaves out, and the class skips under coverage, whose collector allocates in the process too often for it
 // to leave out.
 [Collection(MeasuresPostgres.Name)]
-public sealed class AllocationTests(PostgresApp postgres)
+public sealed partial class AllocationTests(PostgresApp postgres)
 {
     // The bytes for each call that the generated method may allocate beyond the hand-written one, by the commonest
     // difference of a pair of calls, the same for every pair.  A call of the accounts queries allocated about 1.6 to
@@ -56,7 +56,9 @@ public sealed class AllocationTests(PostgresApp postgres)
     // allocated about 1.6 to 2.3 KB a call, and the generated method of each of their eight pairs, NumbersAsList,
     // IList, ICollection and ImmutableArray through the pool and under array-pool=off, allocated 16 bytes more than the
     // hand-written one on every run.  The streaming StreamAccounts allocated about 2.1 KB a call, the same as its
-    // hand-written iterator on every run.  A boxed value is 24 bytes.  The binding's own cost, the driver's for each
+    // hand-written iterator on every run.  The synchronous pairs, the Sync copies of the same queries, allocated about
+    // 0.7 to 1.7 KB a call, and each generated method the same as its hand-written one, 0 in all 500 pairs, on each of
+    // two runs when they were added.  A boxed value is 24 bytes.  The binding's own cost, the driver's for each
     // parameter and its DataTypeName, is in both sides alike.  So an extra boxed value, array or closure on each call
     // shows, a few of them exceed the margin, and the commonest difference does not move with the driver's share of a
     // call: an array of 64 bytes, 88 with its header, on each call of the generated methods failed every test of both
@@ -90,8 +92,8 @@ public sealed class AllocationTests(PostgresApp postgres)
     // bytes more than the hand-written one besides, as in the pairs above.  The commonest difference was -8,368 bytes,
     // in 499 or 500 of 500 pairs, on each of five runs.  So 8,000 is 368 bytes below what was measured, room for the
     // driver's paths and not for a growth array, and far above 4,248, the saving of a pooled method that allocated even
-    // the largest growth array, of 512 elements, itself.  It is raised when the pool saves more and never lowered to
-    // make a change pass.
+    // the largest growth array, of 512 elements, itself.  The synchronous NumbersAsArraySync saved 8,384 bytes, in all
+    // 500 pairs, on each of two runs.  It is raised when the pool saves more and never lowered to make a change pass.
     private const long LeastSavingInBytesPerCall = 8_000;
 
     // The bytes for each call that the pooled NumbersAsList must save on a few hundred rows against a List that grows
@@ -101,8 +103,9 @@ public sealed class AllocationTests(PostgresApp postgres)
     // the growth arrays less that array.  The commonest difference was -5,904 bytes, in 496 to 500 of 500 pairs, on
     // each of five runs.  So 5,500 is 404 bytes below what was measured, room for the driver's paths and not for a
     // buffer of 64 elements.  A ToList that did not return its last buffer to the pool, the 512 elements of 4,120
-    // bytes, saved 1,784 bytes only, which is far below 5,500 and fails the test.  It is raised when the pool saves
-    // more and never lowered to make a change pass.
+    // bytes, saved 1,784 bytes only, which is far below 5,500 and fails the test.  The synchronous NumbersAsListSync
+    // saved 5,928 bytes, in all 500 pairs, on each of two runs.  It is raised when the pool saves more and never
+    // lowered to make a change pass.
     private const long LeastListSavingInBytesPerCall = 5_500;
 
     // The bytes for each call that the pooled NumbersAsImmutableArray must save on a few hundred rows against an
@@ -112,8 +115,9 @@ public sealed class AllocationTests(PostgresApp postgres)
     // commonest difference was -8,304 bytes, in 494 to 500 of 500 pairs, on four of five runs, and -8,368, in 489, on
     // the fifth.  So 8,000 is 304 bytes below the least measured, room for the driver's paths and not for a growth
     // array.  A ToImmutableArray that copied the 300 rows a second time, an array of 2,424 bytes, saved 5,880 bytes
-    // only, which is far below 8,000 and fails the test, as does one that did not return its last buffer.  It is
-    // raised when the pool saves more and never lowered to make a change pass.
+    // only, which is far below 8,000 and fails the test, as does one that did not return its last buffer.  The
+    // synchronous NumbersAsImmutableArraySync saved 8,328 bytes, in all 500 pairs, on each of two runs.  It is raised
+    // when the pool saves more and never lowered to make a change pass.
     private const long LeastImmutableArraySavingInBytesPerCall = 8_000;
 
     private const string NumbersSql = "SELECT n FROM generate_series(1, @count) AS n ORDER BY n;";
