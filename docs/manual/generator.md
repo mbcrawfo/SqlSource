@@ -721,7 +721,7 @@ A type that claims a query whose output is `repository` gets a `partial interfac
 
 A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, in no transaction of yours, under the driver's default timeout.  A query that must run in a transaction with others, or that needs its own timeout, takes the output `methods` instead, in its own file or with `-- output: methods` on the query, and your own code in the repository opens a connection, begins the transaction and calls its [method that takes a connection](#methods-that-take-a-connection).  See [the recipe](recipes.md#queries-in-a-transaction).
 
-A repository's [collection method](#collection-methods) begins a transaction of its own, by the generator parameter `transaction`, and commits it before it returns, so that its items are added all together or not at all.  It begins none when an ambient transaction, such as a `TransactionScope`'s, is open, and runs in that one instead: see [transactions](#collection-transactions).
+A repository's [collection method](#collection-methods) begins a transaction of its own, by the generator parameter `transaction`, and commits it before it returns, so that its items are added all together or not at all.  It begins none when an ambient transaction, such as a `TransactionScope`'s, is open, and runs in that one instead, or, on a connection that is not in it, such as a borrowed connection opened before the scope, in no transaction at all, as under `transaction=off`: see [transactions](#collection-transactions).
 
 <a id="methods-that-take-a-connection"></a>
 
@@ -906,7 +906,7 @@ The generator parameter `transaction` says which transaction a collection method
 
 - **Its own transaction is all or nothing.**  It holds every item, and when anything throws, an item's database error, an exception of the method's own such as `UnexpectedRowCountException`, a null item or a cancellation, it is rolled back and nothing of any item is left.  When the database has already rolled it back, as SQL Server does at some errors, the method throws the first exception all the same.
 - **The caller's transaction is used as it is.**  A `methods` method given a `transaction` runs every item in it, whatever `transaction` says, and neither commits it nor rolls it back: after an exception, what ran is still in it, and whether to roll it back or commit it is yours to decide.  On SQL Server, a transaction that has completed is refused, as for a query method: see [the connection](#method-connection).
-- **So is an ambient transaction.**  When `System.Transactions.Transaction.Current` is set as the method starts, as inside a `TransactionScope`, the method begins none, whatever `transaction` says, and runs in that one, which a connection opened inside the scope takes part in.  That is the way to put a repository's collection method in a larger transaction, since it takes no `transaction`.
+- **So is an ambient transaction.**  When `System.Transactions.Transaction.Current` is set as the method starts, as inside a `TransactionScope`, the method begins none, whatever `transaction` says, and runs in that one, which a connection opened inside the scope takes part in.  A connection that is not in it, such as one opened before the scope and never enlisted, or one whose connection string turns enlisting off, runs the items in no transaction at all, as under `transaction=off`.  That is the way to put a repository's collection method in a larger transaction, since it takes no `transaction`.
 
 <a id="collection-failures"></a>
 
@@ -915,7 +915,7 @@ The generator parameter `transaction` says which transaction a collection method
 - **A database error at an item** is thrown as [`CollectionItemException`](#collection-item-exception), whose `ItemIndex` is the item's position, counted from 0, and whose `InnerException` is the driver's exception, a `PostgresException` or a `SqlException`.
 - **An error that no item raised is the driver's own.**  One that the database raises after every item of a round trip has run, such as that of a PostgreSQL constraint declared `DEFERRABLE INITIALLY DEFERRED`, which is checked at the commit, is thrown as the driver's exception, as it is.
 - **Every other exception is the query method's**: `UnexpectedRowCountException`, whose message and `ItemIndex` name the item, a null in a column whose property cannot be null, a converter's exception.
-- **On SQL Server**, a method given a transaction can throw [`TransactionRolledBackException`](#transaction-rolled-back), and a query whose statements return more than one result set throws `InvalidOperationException`: see [SQL Server](sqlserver.md#collection-methods).
+- **On SQL Server**, a method that reads rows and is given a transaction can throw [`TransactionRolledBackException`](#transaction-rolled-back), and a query whose statements return more than one result set throws `InvalidOperationException`: see [SQL Server](sqlserver.md#collection-methods).
 
 <a id="reading-rows"></a>
 

@@ -192,6 +192,24 @@ INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
 OUTPUT inserted.id, inserted.account_id, inserted.body
 SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
 
+-- name: InsertConvertedNoteNoTransaction -> one
+-- summary: InsertConvertedNote again, under transaction=off, so that a conversion that ends the batch does so outside
+-- summary: any transaction.
+-- generator: transaction=off
+-- param: @body nvarchar(max) not null
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT
+    @id,
+    id,
+    CASE WHEN @body LIKE N'int:%' THEN CONVERT(varchar(10), CAST(SUBSTRING(@body, 5, 10) AS int)) ELSE 'call' END,
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
 -- name: InsertNoteInRepository -> one
 -- summary: InsertNote again, at the output repository, as an instance method of BatchQueries that runs on its
 -- summary: borrowed connection and takes no transaction.

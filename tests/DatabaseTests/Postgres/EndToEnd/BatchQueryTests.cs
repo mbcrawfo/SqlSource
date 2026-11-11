@@ -23,8 +23,8 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // the seed's.
 //
 // A failure is run under each value of transaction that PostgreSQL has and under the caller's transaction: on, the
-// default, by InsertNote, at an item, in the second chunk, at a null item, at an item with no row and, by
-// InsertNoteAfterLock, at a cancellation; off by InsertNoteNoTransaction, in the second chunk, at a null item and at
+// default, by InsertNote, at an item, in the second chunk, at a null item, at an item with no row, at the commit and,
+// by InsertNoteAfterLock, at a cancellation; off by InsertNoteNoTransaction, in the second chunk, at a null item and at
 // the commit; each isolation level by its copy in the second chunk; and the caller's transaction at an item.
 [Collection(UsesPostgres.Name)]
 public sealed class BatchQueryTests(PostgresDatabases postgres)
@@ -438,6 +438,36 @@ public sealed class BatchQueryTests(PostgresDatabases postgres)
 
         var thrown = await Should.ThrowAsync<PostgresException>(() =>
             connection.InsertNoteNoTransaction(items, cancellationToken: token)
+        );
+
+        thrown.SqlState.ShouldBe("23505");
+        (await CountNotesAsync(connection, token)).ShouldBe(0);
+        await ShouldBeInNoTransactionAsync(connection, token);
+    }
+
+    // The same constraint under the method's own transaction, which it checks at the method's commit, after every item
+    // ran: no item raised it, so the method throws the database's error as it is, and nothing is left.
+    [Fact]
+    public async Task InsertNote_DeferredConstraintFailsAtTheCommit_ThrowsTheDatabasesError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using (
+            var create = new NpgsqlCommand(
+                "CREATE TEMPORARY TABLE notes (LIKE public.notes INCLUDING DEFAULTS INCLUDING IDENTITY, "
+                    + "UNIQUE (id) DEFERRABLE INITIALLY DEFERRED)",
+                connection
+            )
+        )
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        NoteToAdd[] items = [new(101, "First.", 1), new(101, "Again.", 2)];
+
+        var thrown = await Should.ThrowAsync<PostgresException>(() =>
+            connection.InsertNote(items, cancellationToken: token)
         );
 
         thrown.SqlState.ShouldBe("23505");

@@ -24,7 +24,8 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // A failure is run under each value of transaction and under the caller's transaction: on, the default, by InsertNote
 // at an item, in the second chunk, at a null item, at an item with no row, under XACT_ABORT ON, at a cancellation, and
 // by InsertConvertedNote at a conversion that ends the batch; off by InsertNoteNoTransaction at an item, which keeps
-// the items before and after it, in the second of three chunks, at a null item and under XACT_ABORT ON; each isolation
+// the items before and after it, in the second of three chunks, at a null item and under XACT_ABORT ON, and by
+// InsertConvertedNoteNoTransaction at a conversion that ends the batch; each isolation
 // level by its copy in the second chunk; and the caller's transaction at an item, with XACT_ABORT off and on, and with
 // a later conversion that rolls it back after an item's error and after an exception of the method's own.
 [Collection(UsesSqlServer.Name)]
@@ -444,6 +445,25 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
 
         thrown.ItemIndex.ShouldBe(2);
         (await IdsAsync(connection, null, token)).ShouldBe([101, 102]);
+        await ShouldBeInNoTransactionAsync(connection, token);
+    }
+
+    // A conversion that ends the batch, under transaction=off: the item before it has committed, and the error stops
+    // the batch, so the item after it never runs.
+    [Fact]
+    public async Task InsertConvertedNoteNoTransaction_ConversionAtItemOne_KeepsOnlyTheItemBefore()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.App(sqlServer), token);
+        NoteToAdd[] items = [new(101, "First.", 1), new(102, "int:x", 2), new(103, "Third.", 3)];
+
+        var thrown = await Should.ThrowAsync<CollectionItemException>(() =>
+            connection.InsertConvertedNoteNoTransaction(items, Notes, cancellationToken: token)
+        );
+
+        thrown.ItemIndex.ShouldBe(1);
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(ConversionFailed);
+        (await IdsAsync(connection, null, token)).ShouldBe([101]);
         await ShouldBeInNoTransactionAsync(connection, token);
     }
 

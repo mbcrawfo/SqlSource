@@ -3617,6 +3617,6 @@ A query that turns on the `collection-method` generator parameter, and has param
 /work/App/Queries/Users.sql(2,10): error SQLSRC297: The query 'AddUser' asks for the transaction isolation level 'snapshot', which PostgreSQL does not have
 ```
 
-Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, or `on`, which begins the transaction at the database's default level.  The query keeps its own method; only its [collection method](generator.md#collection-methods) is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
+Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, `on`, which begins the transaction at the database's default level, or `off`, which begins none.  The query keeps its own method; only its [collection method](generator.md#collection-methods) is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
 
 See: [A collection method's transactions](generator.md#collection-transactions)
