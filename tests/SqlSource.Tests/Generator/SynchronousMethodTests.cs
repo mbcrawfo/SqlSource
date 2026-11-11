@@ -319,4 +319,47 @@ public sealed class SynchronousMethodTests
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile].ShouldContain("public static global::App.GetUserDto GetUser(\n");
     }
+
+    // Another type's extension method of the same namespace takes the synchronous name under method-type=both.  A
+    // clash between two types' extension classes drops the methods of that name alone, so the query keeps GetAsync.
+    [Fact]
+    public void Run_MethodTypeBothAndAnotherTypesExtensionMethodOfTheSyncName_ReportsSQLSRC274AndKeepsGetAsync()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Source = "A.sql")]
+                public partial class First;
+
+                [SqlSourceGenerate(Source = "B.sql")]
+                public partial class Second;
+            }
+            """;
+        var a = new SqlFile("/app/Repo/A.sql", "-- generator: method-type=both\n-- name: Get\nSELECT id FROM users;\n");
+        var b = new SqlFile("/app/Repo/B.sql", "-- name: Get\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(
+            Source,
+            a,
+            Sidecars.Of(a, Entry(a, "Get", [], [Column("id")])),
+            b,
+            Sidecars.Of(b, Entry(b, "Get", [], [Column("id")]))
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/A.sql(2,10)-(2,13): The method of the query 'Get' cannot be named 'Get', because "
+                    + "the method of the query 'Get' of 'App.Second', in the class 'App.SecondExtensions' of the same "
+                    + "namespace, has that name and the same parameters.  Rename the query.",
+                "SQLSRC274 /app/Repo/B.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', because "
+                    + "the method of the query 'Get' of 'App.First', in the class 'App.FirstExtensions' of the same "
+                    + "namespace, has that name and the same parameters.  Rename the query.",
+            ]);
+        var first = run.Sources["App.First-Methods.g.cs"];
+        first.ShouldContain(" GetAsync(\n");
+        first.ShouldNotContain(" Get(\n");
+        run.Sources.Keys.ShouldNotContain("App.Second-Methods.g.cs");
+    }
 }
