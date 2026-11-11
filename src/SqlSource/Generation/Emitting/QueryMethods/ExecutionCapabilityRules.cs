@@ -83,8 +83,18 @@ internal static class ExecutionCapabilityRules
     /// <c>Unknown</c>, with or without a reader, so the first command still at <c>Unknown</c> is the failed one.
     /// </para>
     /// <para>
+    /// SQL Server, <see cref="ExecutionCapabilities.RestoresSessionIsolation" />, on a collection method whose mode
+    /// names an isolation level: <c>BeginTransactionAsync</c> at a level sets the session's level, which SQL Server
+    /// keeps after the transaction ends, and the pool keeps when the connection is closed and opened again, so every
+    /// later statement outside a transaction on that session would run at the method's level.  The method reads the
+    /// level before it begins its transaction and sets it back after.  A mode that names no level,
+    /// <see cref="TransactionMode.On" /> or <see cref="TransactionMode.Off" />, does not have it, and PostgreSQL's
+    /// level is the transaction's alone.
+    /// </para>
+    /// <para>
     /// A repository's method, whose <see cref="QueryMethod.Source" /> gives its connection, takes no transaction, so it
-    /// has none of the flags about one, <see cref="TransactionFlags" />; it keeps the drains.
+    /// has none of the flags about one, <see cref="TransactionFlags" />; it keeps the drains, and the restore of the
+    /// session's level, which is about the transaction it begins itself.
     /// </para>
     /// </remarks>
     public static ExecutionCapabilities Of(QueryMethod method)
@@ -101,12 +111,17 @@ internal static class ExecutionCapabilityRules
             DatabaseEngine.PostgreSql when method.Batch is not null =>
                 ExecutionCapabilities.FindsFailedItemByCompletion,
             DatabaseEngine.PostgreSql => ExecutionCapabilities.None,
-            DatabaseEngine.SqlServer when method.Batch is not null => ExecutionCapabilities.RefusesCompletedTransaction
+            DatabaseEngine.SqlServer when method.Batch is { } batch => ExecutionCapabilities.RefusesCompletedTransaction
                 | (
                     readsRows
                         ? ExecutionCapabilities.ChecksRollbackAtRead
                             | ExecutionCapabilities.ChecksRollbackAfterDatabaseError
                             | ExecutionCapabilities.ChecksResultSetsMatchItems
+                        : ExecutionCapabilities.None
+                )
+                | (
+                    NamesALevel(batch.Transaction)
+                        ? ExecutionCapabilities.RestoresSessionIsolation
                         : ExecutionCapabilities.None
                 ),
             DatabaseEngine.SqlServer => ExecutionCapabilities.RefusesCompletedTransaction
@@ -121,6 +136,19 @@ internal static class ExecutionCapabilityRules
             _ => throw UnexpectedEnumValueException.Of(method.Engine),
         };
     }
+
+    // Whether the mode names the isolation level its transaction begins at.
+    private static bool NamesALevel(TransactionMode mode) =>
+        mode switch
+        {
+            TransactionMode.On or TransactionMode.Off => false,
+            TransactionMode.ReadUncommitted
+            or TransactionMode.ReadCommitted
+            or TransactionMode.RepeatableRead
+            or TransactionMode.Serializable
+            or TransactionMode.Snapshot => true,
+            _ => throw UnexpectedEnumValueException.Of(mode),
+        };
 
     /// <summary>
     /// Whether <paramref name="capabilities" /> holds <paramref name="flag" />, without the boxing of

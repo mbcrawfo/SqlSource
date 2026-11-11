@@ -3,13 +3,14 @@ namespace SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 /// <summary>
 /// The names of what a collection method declares to run its items in batches, from its <see cref="LocalNames" />: the
 /// enumerator, the place of the next item and of a chunk's first, the batch and its scope, the place of a result set,
-/// the count of a rowcount, the transaction it owns, and the database's error and its command.  The item itself is
+/// the count of a rowcount, the transaction it owns, the session's isolation level and the command that reads and
+/// restores it, and the database's error and its command.  The item itself is
 /// <see cref="QueryMethodLocals.Input" />, and each batch command is <see cref="QueryMethodLocals.Command" />, so that
 /// the bindings and the lists read them as a query method's.  A query method has none of them.
 /// </summary>
 internal sealed class BatchLocals
 {
-    private BatchLocals(LocalNames names)
+    private BatchLocals(LocalNames names, ExecutionCapabilities capabilities)
     {
         Items = names.Take("items");
         ItemIndex = names.Take("itemIndex");
@@ -23,6 +24,10 @@ internal sealed class BatchLocals
         OwnTransaction = names.Take("ownTransaction");
         Error = names.Take("error");
         Failed = names.Take("failed");
+        var restores = capabilities.Has(ExecutionCapabilities.RestoresSessionIsolation);
+        IsolationLevel = restores ? names.Take("isolationLevel") : string.Empty;
+        IsolationCommand = restores ? names.Take("isolationCommand") : string.Empty;
+        IsolationScope = restores ? names.Take("isolationScope") : string.Empty;
     }
 
     /// <summary>The enumerator of the items, which the method walks once.</summary>
@@ -65,7 +70,20 @@ internal sealed class BatchLocals
     public string Failed { get; }
 
     /// <summary>
+    /// The session's isolation level before the method began its transaction, as SQL Server numbers it, or 0 when it
+    /// began none; empty unless the method <see cref="ExecutionCapabilities.RestoresSessionIsolation" />.
+    /// </summary>
+    public string IsolationLevel { get; }
+
+    /// <summary>The command that reads the session's isolation level, and the one that restores it.</summary>
+    public string IsolationCommand { get; }
+
+    /// <summary>The scope that disposes <see cref="IsolationCommand" />.</summary>
+    public string IsolationScope { get; }
+
+    /// <summary>
     /// The names of a collection method's locals, or null for a query method.
     /// </summary>
-    public static BatchLocals? Of(bool takesItems, LocalNames names) => takesItems ? new BatchLocals(names) : null;
+    public static BatchLocals? Of(bool takesItems, LocalNames names, ExecutionCapabilities capabilities) =>
+        takesItems ? new BatchLocals(names, capabilities) : null;
 }

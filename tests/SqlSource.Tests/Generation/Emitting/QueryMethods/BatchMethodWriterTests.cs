@@ -319,6 +319,128 @@ public sealed class BatchMethodWriterTests
                     + ", cancellationToken).ConfigureAwait(false)\n"
             );
 
+    // On SQL Server a mode that names a level reads the session's level before the method begins its own transaction,
+    // and sets it back in the finally that closes the connection, after the transaction is disposed and before the
+    // connection is closed, with no cancellation, ignoring a failure; a method that began none read none, and restores
+    // none.  A repository's method begins its own as well.
+    [Theory]
+    [InlineData(nameof(TransactionMode.ReadUncommitted), false)]
+    [InlineData(nameof(TransactionMode.ReadCommitted), false)]
+    [InlineData(nameof(TransactionMode.RepeatableRead), false)]
+    [InlineData(nameof(TransactionMode.Serializable), false)]
+    [InlineData(nameof(TransactionMode.Snapshot), false)]
+    [InlineData(nameof(TransactionMode.Serializable), true)]
+    [InlineData(nameof(TransactionMode.ReadUncommitted), true)]
+    public void Append_SqlServerIsolationLevel_RestoresTheSessionsLevel(string modeName, bool isRepository)
+    {
+        var method = Batch with
+        {
+            Engine = DatabaseEngine.SqlServer,
+            Batch = new BatchCall(System.Enum.Parse<TransactionMode>(modeName)),
+        };
+        var text = Write(isRepository ? Repository(method) : method);
+
+        text.ShouldContain("    var isolationLevel = 0;\n");
+        IndexOf(text, "var isolationLevel = 0;").ShouldBeLessThan(IndexOf(text, "var wasClosed"));
+        text.ShouldContain(
+            "        if (ownsTransaction)\n"
+                + "        {\n"
+                + "            var isolationCommand = connection.CreateCommand();\n"
+                + "            await using var isolationScope = "
+                + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait("
+                + "isolationCommand, false);\n"
+                + "            isolationCommand.CommandText = "
+                + "\"SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID;\";\n"
+                + "            isolationLevel = global::System.Convert.ToInt32(\n"
+                + "                await isolationCommand.ExecuteScalarAsync(cancellationToken)"
+                + ".ConfigureAwait(false),\n"
+                + "                global::System.Globalization.CultureInfo.InvariantCulture\n"
+                + "            );\n"
+                + "        }\n"
+        );
+        IndexOf(text, "isolationLevel = global::System.Convert")
+            .ShouldBeLessThan(IndexOf(text, "BeginTransactionAsync"));
+        text.ShouldContain(
+            "    finally\n"
+                + "    {\n"
+                + "        if (isolationLevel != 0)\n"
+                + "        {\n"
+                + "            try\n"
+                + "            {\n"
+                + "                var isolationCommand = connection.CreateCommand();\n"
+                + "                await using var isolationScope = "
+                + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait("
+                + "isolationCommand, false);\n"
+                + "                switch (isolationLevel)\n"
+                + "                {\n"
+                + "                    case 1:\n"
+                + "                        isolationCommand.CommandText = "
+                + "\"SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;\";\n"
+                + "                        break;\n"
+                + "                    case 3:\n"
+                + "                        isolationCommand.CommandText = "
+                + "\"SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;\";\n"
+                + "                        break;\n"
+                + "                    case 4:\n"
+                + "                        isolationCommand.CommandText = "
+                + "\"SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\";\n"
+                + "                        break;\n"
+                + "                    case 5:\n"
+                + "                        isolationCommand.CommandText = "
+                + "\"SET TRANSACTION ISOLATION LEVEL SNAPSHOT;\";\n"
+                + "                        break;\n"
+                + "                    default:\n"
+                + "                        isolationCommand.CommandText = "
+                + "\"SET TRANSACTION ISOLATION LEVEL READ COMMITTED;\";\n"
+                + "                        break;\n"
+                + "                }\n"
+                + "\n"
+                + "                await isolationCommand.ExecuteNonQueryAsync("
+                + "global::System.Threading.CancellationToken.None).ConfigureAwait(false);\n"
+                + "            }\n"
+                + "            catch\n"
+                + "            {\n"
+                + "                // The method's return, or its first exception, is what the caller sees.\n"
+                + "            }\n"
+                + "        }\n"
+                + "\n"
+                + "        if (wasClosed)\n"
+        );
+        IndexOf(text, "DisposeAsync()").ShouldBeLessThan(IndexOf(text, "if (isolationLevel != 0)"));
+        IndexOf(text, "if (isolationLevel != 0)").ShouldBeLessThan(IndexOf(text, "CloseAsync()"));
+    }
+
+    // A mode that names no level, on or off, and PostgreSQL, whose level is the transaction's alone, neither read nor
+    // restore the session's level.
+    [Theory]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), true)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.ReadCommitted), false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.RepeatableRead), false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), true)]
+    public void Append_NoLevelOrPostgreSql_LeavesTheSessionsLevelAlone(
+        string engineName,
+        string modeName,
+        bool isRepository
+    )
+    {
+        var method = Batch with
+        {
+            Engine = System.Enum.Parse<DatabaseEngine>(engineName),
+            Batch = new BatchCall(System.Enum.Parse<TransactionMode>(modeName)),
+        };
+        var text = Write(isRepository ? Repository(method) : method);
+
+        // PostgreSQL's transaction begins at System.Data.IsolationLevel, whose name differs from the local's by case.
+        text.ShouldNotContain("isolationLevel", Case.Sensitive);
+        text.ShouldNotContain("isolationCommand");
+        text.ShouldNotContain("sys.dm_exec_sessions");
+        text.ShouldNotContain("SET TRANSACTION ISOLATION LEVEL");
+    }
+
     // Under transaction=off each batch runs in the caller's transaction, if any, and the method begins none.
     [Fact]
     public void Append_TransactionOff_BeginsNone()

@@ -1709,7 +1709,10 @@ public sealed class QueryMethodWriterTests
             Token("ownsTransaction"),
             Token("ownTransaction"),
             Token("error"),
-            Token("failed")
+            Token("failed"),
+            Token("isolationLevel"),
+            Token("isolationCommand"),
+            Token("isolationScope")
         );
         var withVector = GetUser.Output! with
         {

@@ -277,11 +277,13 @@ public sealed class CollectionMethodTests
         CountOf(run.Sources[MethodRuns.MethodsFile], ".CreateBatch();\n").ShouldBe(1);
     }
 
-    // The settings that change the body's statements: no transaction, an isolation level, and no array pool.
+    // The settings that change the body's statements: no transaction, an isolation level, which on SQL Server also
+    // reads and restores the session's, and no array pool.
     [Theory]
     [InlineData("collection-method transaction=off", "methods", "postgres")]
     [InlineData("collection-method transaction=off", "repository", "mssql")]
     [InlineData("collection-method transaction=serializable", "methods", "mssql")]
+    [InlineData("collection-method transaction=read-uncommitted", "repository", "mssql")]
     [InlineData("collection-method transaction=repeatable-read", "repository", "postgres")]
     [InlineData("collection-method array-pool=off", "methods", "postgres")]
     public void Run_TransactionAndArrayPool_CompilesTheCollectionMethod(string parameters, string output, string engine)

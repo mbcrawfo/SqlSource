@@ -117,7 +117,7 @@ internal sealed class QueryMethodLocals
                 ? names.Take("hasRow")
                 : string.Empty;
         Lists = ListLocals.Of(input, names);
-        Batch = BatchLocals.Of(takesItems, names);
+        Batch = BatchLocals.Of(takesItems, names, capabilities);
     }
 
     // What the bindings and the lists read the query's parameters from: the argument for a query method, and for a

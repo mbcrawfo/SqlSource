@@ -116,6 +116,52 @@ public sealed class ExecutionCapabilityRulesTests
         ExecutionCapabilityRules.Of(method).ShouldBe((ExecutionCapabilities)expected);
     }
 
+    // On SQL Server a collection method whose mode names an isolation level restores the session's level after the
+    // transaction it begins at that level, a repository's method too, since it begins its own; under on and off, which
+    // name no level, it restores nothing, and on PostgreSQL, whose level is the transaction's alone, at no mode.
+    [Theory]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.ReadUncommitted), false, true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.ReadCommitted), false, true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.RepeatableRead), false, true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Serializable), false, true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Snapshot), false, true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Serializable), true, true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.ReadUncommitted), true, true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), false, false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), false, false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), true, false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), true, false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.ReadCommitted), false, false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.RepeatableRead), false, false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), true, false)]
+    public void Of_CollectionMethodAtAMode_RestoresTheSessionsIsolationOnlyAtALevelOnSqlServer(
+        string engineName,
+        string modeName,
+        bool isRepository,
+        bool restores
+    )
+    {
+        var method = QueryMethodWriterTests.GetUser with
+        {
+            Engine = Enum.Parse<DatabaseEngine>(engineName),
+            Collection = CollectionKind.Array,
+            Source = isRepository ? TestModels.Source() : null,
+            Batch = new BatchCall(Enum.Parse<TransactionMode>(modeName)),
+        };
+
+        ExecutionCapabilityRules.Of(method).Has(ExecutionCapabilities.RestoresSessionIsolation).ShouldBe(restores);
+    }
+
+    // A query method begins no transaction of its own, so it never restores the session's level.
+    [Theory]
+    [InlineData(nameof(DatabaseEngine.SqlServer))]
+    [InlineData(nameof(DatabaseEngine.PostgreSql))]
+    public void Of_QueryMethod_RestoresNoIsolation(string engineName) =>
+        ExecutionCapabilityRules
+            .Of(QueryMethodWriterTests.GetUser with { Engine = Enum.Parse<DatabaseEngine>(engineName) })
+            .Has(ExecutionCapabilities.RestoresSessionIsolation)
+            .ShouldBeFalse();
+
     // The values the theories above give as numbers.
     [Fact]
     public void Flags_AsNumbers_HaveTheValuesOfTheTheory()
@@ -127,6 +173,7 @@ public sealed class ExecutionCapabilityRulesTests
         ((int)(ExecutionCapabilities.DrainsLaterResults | ExecutionCapabilities.DrainsWhenLeftAtARow)).ShouldBe(10);
         ((int)ExecutionCapabilities.FindsFailedItemByCompletion).ShouldBe(32);
         ((int)ExecutionCapabilities.ChecksResultSetsMatchItems).ShouldBe(64);
+        ((int)ExecutionCapabilities.RestoresSessionIsolation).ShouldBe(128);
         (
             (int)(
                 ExecutionCapabilities.RefusesCompletedTransaction
@@ -145,6 +192,7 @@ public sealed class ExecutionCapabilityRulesTests
     [InlineData(nameof(ExecutionCapabilities.ChecksRollbackAfterDatabaseError))]
     [InlineData(nameof(ExecutionCapabilities.FindsFailedItemByCompletion))]
     [InlineData(nameof(ExecutionCapabilities.ChecksResultSetsMatchItems))]
+    [InlineData(nameof(ExecutionCapabilities.RestoresSessionIsolation))]
     public void Has_EachFlag_IsTrueOnlyWhenSet(string flagName)
     {
         var flag = Enum.Parse<ExecutionCapabilities>(flagName);
@@ -152,7 +200,8 @@ public sealed class ExecutionCapabilityRulesTests
             SqlServerReadsRows
             | ExecutionCapabilities.DrainsWhenLeftAtARow
             | ExecutionCapabilities.FindsFailedItemByCompletion
-            | ExecutionCapabilities.ChecksResultSetsMatchItems;
+            | ExecutionCapabilities.ChecksResultSetsMatchItems
+            | ExecutionCapabilities.RestoresSessionIsolation;
 
         flag.Has(flag).ShouldBeTrue();
         all.Has(flag).ShouldBeTrue();

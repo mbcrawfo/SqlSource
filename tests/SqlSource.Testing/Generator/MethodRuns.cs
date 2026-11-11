@@ -187,8 +187,10 @@ internal static class MethodRuns
         );
     }
 
-    // A streaming query under mssql, on SqlClient 7, whose token has the name, beside a parameter: SQL Server's
-    // iterator has locals of its own, the flag of a row being yielded among them, which RunTokenNamed's run has not.
+    // A streaming query under mssql, on SqlClient 7, whose token has the name, beside a parameter, and a query whose
+    // collection method begins its transaction at a level: SQL Server's iterator has locals of its own, the flag of a
+    // row being yielded among them, and its collection method the session's isolation level and the command that reads
+    // and restores it, which RunTokenNamed's run has not.
     public static GeneratorRun RunSqlServerTokenNamed(string token, LanguageVersion languageVersion)
     {
         var file = new SqlFile(
@@ -198,16 +200,28 @@ internal static class MethodRuns
                 + ":users}}\nSELECT id FROM {{"
                 + token
                 + "}} WHERE id = @id;\n"
+                + "-- name: ProbeLevel -> rowcount\n-- generator: collection-method transaction=serializable\n"
+                + "-- token: {{"
+                + token
+                + ":users}}\nUPDATE {{"
+                + token
+                + "}} SET id = id WHERE id = @id;\n"
         );
-        var entry = SqlServerEntry(
+        var stream = SqlServerEntry(
             file,
             "ProbeStream",
             [TestSidecars.Parameter(0, "id", TestSidecars.SqlServer())],
             [TestSidecars.Column(0, "id", TestSidecars.SqlServer())]
         );
+        var level = SqlServerEntry(
+            file,
+            "ProbeLevel",
+            [TestSidecars.Parameter(0, "id", TestSidecars.SqlServer())],
+            null
+        );
         return Run(
             file,
-            [entry],
+            [stream, level],
             references: [SqlClientReferences.SqlClient7],
             dialect: "mssql",
             languageVersion: languageVersion

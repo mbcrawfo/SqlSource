@@ -6,10 +6,10 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// <summary>
 /// Writes the statements that a query's method's <see cref="ExecutionCapabilities" /> turn on: the refusal of a
 /// completed transaction, the catches that check for a rollback, the loops that drain the later results, and a
-/// collection method's search for its failed command and checks of its result sets, with the documentation of what
-/// they throw.  The phases of <see cref="QueryMethodWriter" /> keep the structure of the buffered and streamed reading,
-/// ask a flag at each point where one applies, and call in here.  Why each flag exists is said once, at
-/// <see cref="ExecutionCapabilityRules.Of" />.
+/// collection method's search for its failed command, checks of its result sets, and read and restore of the session's
+/// isolation level, with the documentation of what they throw.  The phases of <see cref="QueryMethodWriter" /> keep
+/// the structure of the buffered and streamed reading, ask a flag at each point where one applies, and call in here.
+/// Why each flag exists is said once, at <see cref="ExecutionCapabilityRules.Of" />.
 /// </summary>
 internal static class ExecutionCapabilityWriter
 {
@@ -23,6 +23,21 @@ internal static class ExecutionCapabilityWriter
     private const string RolledBackCref = "T:SqlSource.TransactionRolledBackException";
 
     private const string InvalidOperationType = "global::System.InvalidOperationException";
+
+    // The query of the session's isolation level, as SQL Server numbers it.
+    private const string ReadIsolationLevel =
+        "SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID;";
+
+    // The levels that a restore sets, by the label of the number SQL Server gives each, its default, read committed,
+    // last, for 2 and any number it never reports.
+    private static readonly (string Label, string Level)[] RestoredLevels =
+    [
+        ("case 1", "READ UNCOMMITTED"),
+        ("case 3", "REPEATABLE READ"),
+        ("case 4", "SERIALIZABLE"),
+        ("case 5", "SNAPSHOT"),
+        ("default", "READ COMMITTED"),
+    ];
 
     /// <summary>
     /// Appends the <c>&lt;exception&gt;</c> of each exception that the capabilities throw.
@@ -191,6 +206,110 @@ internal static class ExecutionCapabilityWriter
             .Append(", ")
             .Append(batch.Error)
             .Append(");\n");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends the declaration of the session's isolation level, 0 until the method reads it, before the connection is
+    /// opened, so that the <c>finally</c> that closes it sees it.
+    /// <see cref="ExecutionCapabilities.RestoresSessionIsolation" /> turns it on.
+    /// </summary>
+    public static void AppendIsolationLevelDeclaration(in QueryMethodContext context, string indent) =>
+        _ = context
+            .Builder.Append(indent)
+            .Append("var ")
+            .Append(context.Locals.Batch!.IsolationLevel)
+            .Append(" = 0;\n");
+
+    /// <summary>
+    /// Appends the read of the session's isolation level, when the method begins its own transaction, before it begins
+    /// it: SQL Server numbers it from 1, read uncommitted, to 5, snapshot, and every session may read its own row of
+    /// <c>sys.dm_exec_sessions</c>.  <see cref="ExecutionCapabilities.RestoresSessionIsolation" /> turns it on.
+    /// </summary>
+    public static void AppendIsolationLevelRead(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        var body = GeneratedText.Deeper(indent);
+        QueryMethodWriter.AppendIf(builder, indent, batch.OwnsTransaction);
+        AppendIsolationCommand(in context, body, ReadIsolationLevel);
+        _ = builder
+            .Append(body)
+            .Append(batch.IsolationLevel)
+            .Append(" = global::System.Convert.ToInt32(\n")
+            .Append(GeneratedText.Deeper(body));
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, batch.IsolationCommand, "ExecuteScalarAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling
+            .AppendAwaitedEnd(builder)
+            .Append(",\n")
+            .Append(GeneratedText.Deeper(body))
+            .Append(ListWriter.Invariant)
+            .Append('\n')
+            .Append(body)
+            .Append(");\n");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends the restore of the session's isolation level that <see cref="AppendIsolationLevelRead" /> read, in the
+    /// <c>finally</c> that closes the connection, before it is closed and after the transaction is disposed, with
+    /// <see cref="NoCancellation" /> so that it runs after a cancellation too.  It is skipped when the method read no
+    /// level, as when it began no transaction, and a restore that fails, as on a connection that is broken, is ignored,
+    /// so that the method's return or its first exception is what the caller sees.
+    /// <see cref="ExecutionCapabilities.RestoresSessionIsolation" /> turns it on.
+    /// </summary>
+    public static void AppendIsolationLevelRestore(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        var ifIndent = GeneratedText.Deeper(indent);
+        var tryIndent = GeneratedText.Deeper(ifIndent);
+        var caseIndent = GeneratedText.Deeper(tryIndent);
+        var statementIndent = GeneratedText.Deeper(caseIndent);
+        QueryMethodWriter.AppendIf(builder, indent, batch.IsolationLevel + " != 0");
+        _ = builder.Append(ifIndent).Append("try\n").Append(ifIndent).Append("{\n");
+        AppendIsolationCommand(in context, tryIndent, null);
+        // A statement for each level, each assigning its own literal, since CA2100 reports a CommandText that is not a
+        // literal, the arms of a switch expression of literals among them.
+        _ = builder
+            .Append(tryIndent)
+            .Append("switch (")
+            .Append(batch.IsolationLevel)
+            .Append(")\n")
+            .Append(tryIndent)
+            .Append("{\n");
+        foreach (var (label, level) in RestoredLevels)
+        {
+            _ = builder
+                .Append(caseIndent)
+                .Append(label)
+                .Append(":\n")
+                .Append(statementIndent)
+                .Append(batch.IsolationCommand)
+                .Append(".CommandText = ")
+                .Append(SymbolDisplay.FormatLiteral("SET TRANSACTION ISOLATION LEVEL " + level + ";", quote: true))
+                .Append(";\n")
+                .Append(statementIndent)
+                .Append("break;\n");
+        }
+
+        QueryMethodWriter.AppendEnd(builder, tryIndent);
+        _ = builder.Append('\n').Append(tryIndent);
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, batch.IsolationCommand, "ExecuteNonQueryAsync")
+            .Append(NoCancellation);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        QueryMethodWriter.AppendEnd(builder, ifIndent);
+        _ = builder
+            .Append(ifIndent)
+            .Append("catch\n")
+            .Append(ifIndent)
+            .Append("{\n")
+            .Append(tryIndent)
+            .Append("// The method's return, or its first exception, is what the caller sees.\n");
+        QueryMethodWriter.AppendEnd(builder, ifIndent);
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 
@@ -478,6 +597,31 @@ internal static class ExecutionCapabilityWriter
             )
             .Append(indent)
             .Append(");\n");
+    }
+
+    // The command of the session's isolation level, made from the connection and disposed at the end of its block, with
+    // the SQL given, or none when the caller sets it.
+    private static void AppendIsolationCommand(in QueryMethodContext context, string indent, string? sql)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        _ = builder
+            .Append(indent)
+            .Append("var ")
+            .Append(batch.IsolationCommand)
+            .Append(" = ")
+            .Append(context.Locals.Connection)
+            .Append(".CreateCommand();\n");
+        _ = AsyncSpelling.AppendUsing(builder, indent, batch.IsolationScope, batch.IsolationCommand);
+        if (sql is not null)
+        {
+            _ = builder
+                .Append(indent)
+                .Append(batch.IsolationCommand)
+                .Append(".CommandText = ")
+                .Append(SymbolDisplay.FormatLiteral(sql, quote: true))
+                .Append(";\n");
+        }
     }
 
     // The drain loop with the token given, in a try followed by the catch of the database's error when the

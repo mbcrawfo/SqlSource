@@ -219,3 +219,21 @@ WHERE id = @accountId;
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
 OUTPUT inserted.id, inserted.account_id, inserted.body
 SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+
+-- name: InsertNoteSerializableInRepository -> one
+-- summary: InsertNoteSerializable again, at the output repository, as an instance method of BatchQueries that runs on
+-- summary: its borrowed connection and begins its own transaction at the level serializable.
+-- output: repository
+-- generator: transaction=serializable
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;

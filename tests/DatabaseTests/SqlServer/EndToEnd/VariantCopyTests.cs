@@ -40,6 +40,7 @@ public sealed class VariantCopyTests
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteReadCommitted")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteRepeatableRead")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteSnapshot")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteSerializableInRepository")]
     public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy) =>
         VariantCopies.ShouldShareHash(RepositoryPaths.EndToEndQueries, file, original, copy);
 }

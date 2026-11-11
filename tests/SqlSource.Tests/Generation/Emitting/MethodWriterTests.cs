@@ -367,6 +367,9 @@ public sealed class MethodWriterTests
     [InlineData("ownTransaction")]
     [InlineData("error")]
     [InlineData("failed")]
+    [InlineData("isolationLevel")]
+    [InlineData("isolationCommand")]
+    [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardName_CompilesOnTheNewestCSharp(string name)
     {
         var source = """
@@ -481,6 +484,9 @@ public sealed class MethodWriterTests
     [InlineData("ownTransaction")]
     [InlineData("error")]
     [InlineData("failed")]
+    [InlineData("isolationLevel")]
+    [InlineData("isolationCommand")]
+    [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
@@ -530,6 +536,23 @@ public sealed class MethodWriterTests
             .ShouldContain(name == "raisedLater" ? "var raisedLater1 = false;" : "var raisedLater = false;");
         // The local of a read takes the name hasRow unless a token has it, and then hasRow1.
         sqlServer.Sources[MethodRuns.MethodsFile].ShouldContain(name == "hasRow" ? "bool hasRow1;" : "bool hasRow;");
+        // The collection method at a level keeps the session's level in isolationLevel, and reads and restores it by
+        // isolationCommand in isolationScope, each unless a token has the name, and then with a 1.
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(name == "isolationLevel" ? "var isolationLevel1 = 0;" : "var isolationLevel = 0;");
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                name == "isolationCommand"
+                    ? "var isolationCommand1 = connection.CreateCommand();"
+                    : "var isolationCommand = connection.CreateCommand();"
+            );
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                name == "isolationScope" ? "await using var isolationScope1 =" : "await using var isolationScope ="
+            );
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);

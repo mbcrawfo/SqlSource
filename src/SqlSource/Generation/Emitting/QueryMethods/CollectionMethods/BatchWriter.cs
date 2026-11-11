@@ -11,7 +11,9 @@ namespace SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 /// runs the items in chunks of <see cref="ChunkSize" />, each a <c>DbBatch</c> of a command for each item, built and
 /// bound as a query method's command is.  <see cref="BatchRowsWriter" /> writes the running of each chunk and the
 /// reading of its result sets.  Its own transaction is committed after the last chunk, rolled back when anything
-/// throws, and disposed.
+/// throws, and disposed.  Under <see cref="ExecutionCapabilities.RestoresSessionIsolation" /> the session's isolation
+/// level is read before the transaction begins and set back in the <c>finally</c> that closes the connection, which
+/// <see cref="CommandWriter.AppendClose" /> writes.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -67,12 +69,23 @@ internal static class BatchWriter
             CommandWriter.AppendSql(in context, indent);
         }
 
+        var restoresIsolation = context.Capabilities.Has(ExecutionCapabilities.RestoresSessionIsolation);
         if (ownsTransaction)
         {
             AppendOwnsTransaction(in context, indent);
         }
 
+        if (restoresIsolation)
+        {
+            ExecutionCapabilityWriter.AppendIsolationLevelDeclaration(in context, indent);
+        }
+
         CommandWriter.AppendOpen(in context, indent);
+        if (restoresIsolation)
+        {
+            ExecutionCapabilityWriter.AppendIsolationLevelRead(in context, tryIndent);
+        }
+
         if (ownsTransaction)
         {
             AppendBegin(in context, tryIndent);

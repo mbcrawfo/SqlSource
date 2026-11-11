@@ -901,7 +901,7 @@ The generator parameter `transaction` says which transaction a collection method
 | `transaction` | The collection method |
 |----|----|
 | `on`, the default | Begins a transaction at the database's default isolation level, commits it after the last item, and rolls it back when anything throws |
-| `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot` | The same, at that isolation level.  PostgreSQL has no `read-uncommitted` and no `snapshot`, which are [SQLSRC297](diagnostics.md#sqlsrc297) there, and SQL Server's `snapshot` needs the database to allow it: see [SQL Server](sqlserver.md#collection-methods) |
+| `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot` | The same, at that isolation level, which holds for that transaction alone: the connection's later statements run at the level they ran at before the call.  PostgreSQL has no `read-uncommitted` and no `snapshot`, which are [SQLSRC297](diagnostics.md#sqlsrc297) there, and SQL Server's `snapshot` needs the database to allow it: see [SQL Server](sqlserver.md#collection-methods) |
 | `off` | Begins none: the items run as the database runs statements outside a transaction, so a failure leaves some of them in it, as the pages of [PostgreSQL](postgresql.md#collection-methods) and [SQL Server](sqlserver.md#collection-methods) say |
 
 - **Its own transaction is all or nothing.**  It holds every item, and when anything throws, an item's database error, an exception of the method's own such as `UnexpectedRowCountException`, a null item or a cancellation, it is rolled back and nothing of any item is left.  When the database has already rolled it back, as SQL Server does at some errors, the method throws the first exception all the same.

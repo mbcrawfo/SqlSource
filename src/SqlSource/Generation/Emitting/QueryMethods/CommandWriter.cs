@@ -70,13 +70,20 @@ internal static class CommandWriter
         _ = builder.Append('\n').Append(indent).Append("try\n").Append(indent).Append("{\n");
     }
 
-    // The end of AppendOpen's try, and its finally, which closes the connection when the method opened it.
+    // The end of AppendOpen's try, and its finally, which closes the connection when the method opened it, after a
+    // collection method that restores the session's isolation level has restored it.
     internal static void AppendClose(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var locals = context.Locals;
         var blockIndent = GeneratedText.Deeper(indent);
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
+        if (context.Capabilities.Has(ExecutionCapabilities.RestoresSessionIsolation))
+        {
+            ExecutionCapabilityWriter.AppendIsolationLevelRestore(in context, blockIndent);
+            _ = builder.Append('\n');
+        }
+
         QueryMethodWriter.AppendIf(builder, blockIndent, locals.WasClosed);
         _ = builder.Append(blockIndent).Append(GeneratedText.Indent);
         _ = AsyncSpelling.AppendAwaitedCall(builder, locals.Connection, "CloseAsync");

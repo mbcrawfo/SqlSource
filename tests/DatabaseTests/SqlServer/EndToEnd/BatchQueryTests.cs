@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -525,6 +526,134 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         await ShouldBeInNoTransactionAsync(connection, token);
     }
 
+    // A transaction begun at a level sets the session's level, which SQL Server keeps after the transaction ends, so
+    // the method sets it back to the level it found, the default or one the caller set, after it commits.  Each level
+    // runs from read committed and from repeatable read, so that every level differs from one of them, and the
+    // repository's copy runs too.  The connection is not pooled, since a test sets its session's level.
+    [Theory]
+    [MemberData(nameof(LevelsAndSessionLevels))]
+    public async Task InsertNoteAtALevel_OnAnOpenConnection_LeavesTheSessionsLevelAsItFound(string level, string before)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.AppUnpooled(sqlServer), token);
+        await SetSessionLevelAsync(connection, before, token);
+
+        var rows = await InsertAtLevelAsync(connection, level, Items(2), token);
+
+        rows.ShouldAllBe(row => row.Kind == LevelNumber(level).ToString(CultureInfo.InvariantCulture));
+        (await SessionLevelAsync(connection, null, token)).ShouldBe(LevelNumber(before));
+    }
+
+    // An item's error rolls the method's transaction back, and the method sets the session's level back all the same.
+    [Theory]
+    [MemberData(nameof(LevelsAndSessionLevels))]
+    public async Task InsertNoteAtALevel_DuplicateKeyAtItemTwo_LeavesTheSessionsLevelAsItFound(
+        string level,
+        string before
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.AppUnpooled(sqlServer), token);
+        await SetSessionLevelAsync(connection, before, token);
+
+        var thrown = await Should.ThrowAsync<CollectionItemException>(() =>
+            InsertAtLevelAsync(connection, level, DuplicateAtItemTwo(), token)
+        );
+
+        thrown.ItemIndex.ShouldBe(2);
+        (await CountNotesAsync(connection, null, token)).ShouldBe(0);
+        (await SessionLevelAsync(connection, null, token)).ShouldBe(LevelNumber(before));
+    }
+
+    // The pool keeps a session's level when the connection is closed and opened again, so a closed connection that the
+    // method opens and closes goes back to the pool at the level it came out at: on a pool of the test's own, the
+    // session is left at a level, the method runs on the closed connection, and the connection opened again is the
+    // same session at the same level.  The pool drops a session's temporary tables when it hands the session out
+    // again, and a snapshot transaction cannot write a global one in tempdb, so the notes are a table of app of the
+    // test's own, which it drops; the container ends with the run, so a table a failed run leaves does not outlive it.
+    [Theory]
+    [InlineData("read uncommitted", "repeatable read")]
+    [InlineData("read committed", "repeatable read")]
+    [InlineData("repeatable read", "serializable")]
+    [InlineData("serializable", "repeatable read")]
+    [InlineData("snapshot", "repeatable read")]
+    [InlineData("serializable, repository", "read committed")]
+    public async Task InsertNoteAtALevel_OnAClosedPooledConnection_LeavesThePooledSessionAsItFound(
+        string level,
+        string before
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        var unique = Guid.NewGuid().ToString("N");
+        var notes = "dbo.isolation_notes_" + unique;
+        await using var owner = await OpenWithNotesAsync(EndToEndSources.AppUnpooled(sqlServer), notes, token);
+        try
+        {
+            await using var connection = new SqlConnection(
+                new SqlConnectionStringBuilder(EndToEndSources.AppConnectionString(sqlServer))
+                {
+                    ApplicationName = "isolation " + unique,
+                }.ConnectionString
+            );
+            await connection.OpenAsync(token);
+            var session = connection.ServerProcessId;
+            await SetSessionLevelAsync(connection, before, token);
+            await connection.CloseAsync();
+
+            var rows = await InsertAtLevelAsync(connection, level, Items(2), token, notes);
+
+            connection.State.ShouldBe(ConnectionState.Closed);
+            rows.ShouldAllBe(row => row.Kind == LevelNumber(level).ToString(CultureInfo.InvariantCulture));
+            await connection.OpenAsync(token);
+            connection.ServerProcessId.ShouldBe(session);
+            (await SessionLevelAsync(connection, null, token)).ShouldBe(LevelNumber(before));
+        }
+        finally
+        {
+            await DropAsync(owner, notes, token);
+        }
+    }
+
+    // Given the caller's transaction, the method begins none, so it neither reads the session's level nor sets it: the
+    // caller's transaction keeps its level, repeatable read, where setting it back to the default would have changed
+    // it.
+    [Fact]
+    public async Task InsertNoteSerializable_InTheCallersRepeatableReadTransaction_LeavesItsLevel()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.AppUnpooled(sqlServer), token);
+        await using var transaction = await connection.BeginTransactionAsync(
+            System.Data.IsolationLevel.RepeatableRead,
+            token
+        );
+
+        var rows = await connection.InsertNoteSerializable(Items(2), Notes, transaction, cancellationToken: token);
+
+        rows.ShouldBe([new(FirstId, "3"), new(FirstId + 1, "3")]);
+        (await SessionLevelAsync(connection, transaction, token)).ShouldBe(3);
+    }
+
+    // Within an ambient transaction the method begins none either, so the scope's level, repeatable read, is kept.
+    [Fact]
+    public async Task InsertNoteSerializable_InARepeatableReadScope_LeavesItsLevel()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.AppUnpooled(sqlServer), token);
+        var options = new TransactionOptions { IsolationLevel = System.Transactions.IsolationLevel.RepeatableRead };
+        IReadOnlyList<IsolatedNote> rows;
+        int during;
+
+        using (new TransactionScope(TransactionScopeOption.Required, options, TransactionScopeAsyncFlowOption.Enabled))
+        {
+            connection.EnlistTransaction(Transaction.Current);
+            rows = await connection.InsertNoteSerializable(Items(2), Notes, cancellationToken: token);
+            during = await SessionLevelAsync(connection, null, token);
+        }
+
+        rows.ShouldBe([new(FirstId, "3"), new(FirstId + 1, "3")]);
+        during.ShouldBe(3);
+    }
+
     // A conversion that fails ends the batch and rolls back the method's transaction on the server, which leaves its
     // Connection null: the method skips its own rollback, which would throw, and throws the conversion at its item.
     [Fact]
@@ -1007,22 +1136,92 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         return connection;
     }
 
-    // The copy of InsertNoteSerializable at the level.
+    // The copy of InsertNoteSerializable at the level, or its repository's copy, into the notes given, Notes unless
+    // another is named.
     private static Task<IReadOnlyList<IsolatedNote>> InsertAtLevelAsync(
         SqlConnection connection,
         string level,
         NoteToAdd[] items,
-        CancellationToken token
+        CancellationToken token,
+        string notes = Notes
     ) =>
         level switch
         {
-            "read uncommitted" => connection.InsertNoteReadUncommitted(items, Notes, cancellationToken: token),
-            "read committed" => connection.InsertNoteReadCommitted(items, Notes, cancellationToken: token),
-            "repeatable read" => connection.InsertNoteRepeatableRead(items, Notes, cancellationToken: token),
-            "serializable" => connection.InsertNoteSerializable(items, Notes, cancellationToken: token),
-            "snapshot" => connection.InsertNoteSnapshot(items, Notes, cancellationToken: token),
+            "read uncommitted" => connection.InsertNoteReadUncommitted(items, notes, cancellationToken: token),
+            "read committed" => connection.InsertNoteReadCommitted(items, notes, cancellationToken: token),
+            "repeatable read" => connection.InsertNoteRepeatableRead(items, notes, cancellationToken: token),
+            "serializable" => connection.InsertNoteSerializable(items, notes, cancellationToken: token),
+            "snapshot" => connection.InsertNoteSnapshot(items, notes, cancellationToken: token),
+            "serializable, repository" => new BatchQueries(connection).InsertNoteSerializableInRepository(
+                items,
+                notes,
+                token
+            ),
             _ => throw new ArgumentOutOfRangeException(nameof(level), level, "No copy runs at this level."),
         };
+
+    // Each level of a copy, the repository's among them, with each level a session starts the method at: the default,
+    // read committed, and repeatable read, so that every level differs from one of them.
+    public static TheoryData<string, string> LevelsAndSessionLevels()
+    {
+        var data = new TheoryData<string, string>();
+        foreach (
+            var level in new[]
+            {
+                "read uncommitted",
+                "read committed",
+                "repeatable read",
+                "serializable",
+                "snapshot",
+                "serializable, repository",
+            }
+        )
+        {
+            data.Add(level, "read committed");
+            data.Add(level, "repeatable read");
+        }
+
+        return data;
+    }
+
+    // The number sys.dm_exec_sessions gives the level, or the level of the copy that the name gives.
+    private static int LevelNumber(string level) =>
+        level switch
+        {
+            "read uncommitted" => 1,
+            "read committed" => 2,
+            "repeatable read" => 3,
+            "serializable" or "serializable, repository" => 4,
+            "snapshot" => 5,
+            _ => throw new ArgumentOutOfRangeException(nameof(level), level, "No such level."),
+        };
+
+    // Sets the level of the session's later transactions and statements.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The level is one of the test's own constants."
+    )]
+    private static async Task SetSessionLevelAsync(SqlConnection connection, string level, CancellationToken token)
+    {
+        await using var set = new SqlCommand("SET TRANSACTION ISOLATION LEVEL " + level.ToUpperInvariant(), connection);
+        _ = await set.ExecuteNonQueryAsync(token);
+    }
+
+    // The session's level, as sys.dm_exec_sessions numbers it, read in the transaction given, if any.
+    private static async Task<int> SessionLevelAsync(
+        SqlConnection connection,
+        DbTransaction? transaction,
+        CancellationToken token
+    )
+    {
+        await using var read = new SqlCommand(
+            "SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID",
+            connection,
+            (SqlTransaction?)transaction
+        );
+        return (short)await read.ExecuteScalarAsync(token);
+    }
 
     // Four notes whose third repeats the first's id.
     private static NoteToAdd[] DuplicateAtItemTwo()
@@ -1057,21 +1256,43 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
 
     // Opens the connection and makes the temporary table Notes on it, empty, with the columns of dbo.notes that the
     // inserts write, and no identity, so that an insert writes the id it is given; it ends with the session.
-    private static async Task<SqlConnection> OpenWithTemporaryNotesAsync(
+    private static Task<SqlConnection> OpenWithTemporaryNotesAsync(SqlConnection connection, CancellationToken token) =>
+        OpenWithNotesAsync(connection, Notes, token);
+
+    // Opens the connection and makes the table of the name on it, as Notes is made: a temporary one, or one of app.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The name is Notes or one the test makes of a GUID."
+    )]
+    private static async Task<SqlConnection> OpenWithNotesAsync(
         SqlConnection connection,
+        string notes,
         CancellationToken token
     )
     {
         await connection.OpenAsync(token);
         await using var create = new SqlCommand(
             "CREATE TABLE "
-                + Notes
+                + notes
                 + " (id int PRIMARY KEY, account_id int NOT NULL, kind varchar(10) NOT NULL, "
                 + "body nvarchar(max) NOT NULL, written_at datetime2(3) NOT NULL)",
             connection
         );
         _ = await create.ExecuteNonQueryAsync(token);
         return connection;
+    }
+
+    // Drops the table of the name.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The name is one the test makes of a GUID."
+    )]
+    private static async Task DropAsync(SqlConnection connection, string table, CancellationToken token)
+    {
+        await using var drop = new SqlCommand("DROP TABLE " + table, connection);
+        _ = await drop.ExecuteNonQueryAsync(token);
     }
 
     private static async Task<int> CountNotesAsync(

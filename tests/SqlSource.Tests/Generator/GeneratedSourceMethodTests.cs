@@ -235,6 +235,9 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("ownTransaction")]
     [InlineData("error")]
     [InlineData("failed")]
+    [InlineData("isolationLevel")]
+    [InlineData("isolationCommand")]
+    [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.RunInNestedClass(
@@ -346,6 +349,9 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("ownTransaction")]
     [InlineData("error")]
     [InlineData("failed")]
+    [InlineData("isolationLevel")]
+    [InlineData("isolationCommand")]
+    [InlineData("isolationScope")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
@@ -395,6 +401,23 @@ public sealed class GeneratedSourceMethodTests
             .ShouldContain(name == "raisedLater" ? "var raisedLater1 = false;" : "var raisedLater = false;");
         // The local of a read takes the name hasRow unless a token has it, and then hasRow1.
         sqlServer.Sources[MethodRuns.MethodsFile].ShouldContain(name == "hasRow" ? "bool hasRow1;" : "bool hasRow;");
+        // The collection method at a level keeps the session's level in isolationLevel, and reads and restores it by
+        // isolationCommand in isolationScope, each unless a token has the name, and then with a 1.
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(name == "isolationLevel" ? "var isolationLevel1 = 0;" : "var isolationLevel = 0;");
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                name == "isolationCommand"
+                    ? "var isolationCommand1 = connection.CreateCommand();"
+                    : "var isolationCommand = connection.CreateCommand();"
+            );
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                name == "isolationScope" ? "await using var isolationScope1 =" : "await using var isolationScope ="
+            );
     }
 
     // A list's use is a segment of its own, and the token method of a type writes it as the SQL wrote it, in the
