@@ -608,7 +608,8 @@ public sealed class BatchMethodWriterTests
 
     // On SQL Server a statement of the query can return a result set of its own, which would take the place of the next
     // item's: each result set must have the output's columns, every command must have one, and none may follow the
-    // chunk's last, or the method throws, naming the query and the item.
+    // chunk's last, or the method throws, naming the query and the items from the chunk's first to the one whose result
+    // set was read, since the reader cannot tell which of them returned a result set too many or none.
     [Fact]
     public void Append_SqlServerMethodThatReadsRows_ChecksThatEachResultSetIsAnItems()
     {
@@ -623,11 +624,14 @@ public sealed class BatchMethodWriterTests
                 + "                                {\n"
                 + "                                    throw new global::System.InvalidOperationException(\n"
                 + "                                        \"The query 'GetUser' returned a result set of another "
-                + "shape for item \"\n"
+                + "shape, or none, for one of the items from \"\n"
+                + "                                            + first.ToString("
+                + "global::System.Globalization.CultureInfo.InvariantCulture)\n"
+                + "                                            + \" to \"\n"
                 + "                                            + (first + result).ToString("
                 + "global::System.Globalization.CultureInfo.InvariantCulture)\n"
                 + "                                            + \", so it cannot run over a collection: a query whose "
-                + "statements return more than one result set cannot.\"\n"
+                + "statements return more than one result set, or none for an item, cannot.\"\n"
                 + "                                    );\n"
                 + "                                }\n"
                 + "\n"
@@ -642,18 +646,21 @@ public sealed class BatchMethodWriterTests
                 + "                            {\n"
                 + "                                throw new global::System.InvalidOperationException(\n"
                 + "                                    \"The query 'GetUser' returned a result set of another "
-                + "shape for item \"\n"
+                + "shape, or none, for one of the items from \"\n"
+                + "                                        + first.ToString("
+                + "global::System.Globalization.CultureInfo.InvariantCulture)\n"
+                + "                                        + \" to \"\n"
                 + "                                        + (itemIndex - 1).ToString("
                 + "global::System.Globalization.CultureInfo.InvariantCulture)\n"
                 + "                                        + \", so it cannot run over a collection: a query whose "
-                + "statements return more than one result set cannot.\"\n"
+                + "statements return more than one result set, or none for an item, cannot.\"\n"
                 + "                                );\n"
                 + "                            }\n"
         );
         text.ShouldContain(
             "/// <exception cref=\"global::System.InvalidOperationException\">A statement of the query returned a "
-                + "result set that is not an item's: a query whose statements return more than one result set "
-                + "cannot run over a collection.</exception>\n"
+                + "result set that is not an item's, or an item returned none: a query whose statements return more "
+                + "than one result set, or none for an item, cannot run over a collection.</exception>\n"
         );
     }
 

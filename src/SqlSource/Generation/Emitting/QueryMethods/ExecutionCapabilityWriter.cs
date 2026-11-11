@@ -68,8 +68,9 @@ internal static class ExecutionCapabilityWriter
                 builder,
                 indent,
                 InvalidOperationType,
-                "A statement of the query returned a result set that is not an item's: a query whose statements "
-                    + "return more than one result set cannot run over a collection."
+                "A statement of the query returned a result set that is not an item's, or an item returned none: a "
+                    + "query whose statements return more than one result set, or none for an item, cannot run over a "
+                    + "collection."
             );
         }
     }
@@ -77,8 +78,9 @@ internal static class ExecutionCapabilityWriter
     /// <summary>
     /// Appends the move to a chunk's next result set, after the first, and the check that it has the output's columns:
     /// a command whose statements gave no result set, or a result set of other columns, which a statement of the query
-    /// returned, throws, naming the item.  <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" /> turns it on,
-    /// in place of the plain move.
+    /// returned, throws, naming the items from the chunk's first to the one whose result set was read, since a reader
+    /// skips a command without a result set and cannot tell which item's is missing or extra.
+    /// <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" /> turns it on, in place of the plain move.
     /// </summary>
     public static void AppendResultSetCheck(in QueryMethodContext context, string indent)
     {
@@ -107,7 +109,7 @@ internal static class ExecutionCapabilityWriter
 
     /// <summary>
     /// Appends, after a blank line, the check that no result set follows the chunk's last command's, which a statement
-    /// of the query returned; it names the chunk's last item.
+    /// of the query returned; it names the chunk's items, from its first to its last.
     /// <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" /> turns it on.
     /// </summary>
     public static void AppendNoLaterResultSetCheck(in QueryMethodContext context, string indent)
@@ -433,9 +435,10 @@ internal static class ExecutionCapabilityWriter
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 
-    // The throw of a result set that is not an item's, naming the query and the item at the position given, an
-    // expression in parentheses.
-    private static void AppendResultSetThrow(in QueryMethodContext context, string indent, string itemIndex)
+    // The throw of a result set that is not an item's, naming the query and the items from the chunk's first to the
+    // position given, an expression in parentheses: the item whose result set was read when the mismatch was found,
+    // since any item of them may have returned the result set that is missing or extra.
+    private static void AppendResultSetThrow(in QueryMethodContext context, string indent, string lastItemIndex)
     {
         var argumentIndent = GeneratedText.Deeper(indent);
         var continued = GeneratedText.Deeper(argumentIndent);
@@ -447,21 +450,31 @@ internal static class ExecutionCapabilityWriter
             .Append(argumentIndent)
             .Append(
                 SymbolDisplay.FormatLiteral(
-                    "The query '" + context.Method.QueryName + "' returned a result set of another shape for item ",
+                    "The query '"
+                        + context.Method.QueryName
+                        + "' returned a result set of another shape, or none, for one of the items from ",
                     quote: true
                 )
             )
             .Append('\n')
             .Append(continued)
             .Append("+ ")
-            .Append(itemIndex)
+            .Append(context.Locals.Batch!.First)
+            .Append(".ToString(")
+            .Append(ListWriter.Invariant)
+            .Append(")\n")
+            .Append(continued)
+            .Append("+ \" to \"\n")
+            .Append(continued)
+            .Append("+ ")
+            .Append(lastItemIndex)
             .Append(".ToString(")
             .Append(ListWriter.Invariant)
             .Append(")\n")
             .Append(continued)
             .Append(
-                "+ \", so it cannot run over a collection: a query whose statements return more than one result set "
-                    + "cannot.\"\n"
+                "+ \", so it cannot run over a collection: a query whose statements return more than one result set, "
+                    + "or none for an item, cannot.\"\n"
             )
             .Append(indent)
             .Append(");\n");

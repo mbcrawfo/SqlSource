@@ -723,10 +723,12 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
 
     // The query's second statement returns a result set of its own, which would take the place of the second item's.
     // With two items it is read as the second item's and refused for its columns; with one it follows the last item's.
+    // Either way the method names the items up to the one whose result set it read, since it cannot tell which of them
+    // returned it.
     [Theory]
     [InlineData(2, 1)]
     [InlineData(1, 0)]
-    public async Task TwoResultSetQuery_Throws(int count, int itemIndex)
+    public async Task TwoResultSetQuery_Throws(int count, int lastItemIndex)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
@@ -737,31 +739,43 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         );
 
         thrown.Message.ShouldBe(
-            "The query 'FindAccountThenOther' returned a result set of another shape for item "
-                + itemIndex.ToString(CultureInfo.InvariantCulture)
-                + ", so it cannot run over a collection: a query whose statements return more than one result set "
-                + "cannot."
+            "The query 'FindAccountThenOther' returned a result set of another shape, or none, for one of the items "
+                + "from 0 to "
+                + lastItemIndex.ToString(CultureInfo.InvariantCulture)
+                + ", so it cannot run over a collection: a query whose statements return more than one result set, or "
+                + "none for an item, cannot."
         );
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
-    // The second item's statement returns no result set, so the batch has fewer than its items, and the method refuses
-    // it at the item whose result set is missing.
-    [Fact]
-    public async Task FindAccountWhenPositive_ItemWithoutAResultSet_Throws()
+    // The missing item's statement returns no result set, so its chunk has fewer than its items, and SqlClient skips
+    // its command: each later item of the chunk reads the next one's result set, and the results run out at the
+    // chunk's last.  The method cannot tell which item returned none, so it names the chunk's items: the last of two,
+    // the first of three, and the first of the second chunk's two.
+    [Theory]
+    [InlineData(2, 1, 0, 1)]
+    [InlineData(3, 0, 0, 2)]
+    [InlineData(ChunkSize + 2, ChunkSize, ChunkSize, ChunkSize + 1)]
+    public async Task FindAccountWhenPositive_ItemWithoutAResultSet_ThrowsNamingItsChunksItems(
+        int count,
+        int missingItem,
+        int first,
+        int last
+    )
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
+        var items = Enumerable
+            .Range(0, count)
+            .Select(i => new FindAccountWhenPositiveArgs(i == missingItem ? -1 : (i % 3) + 1));
 
         var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
-            connection.FindAccountWhenPositive(
-                [new FindAccountWhenPositiveArgs(1), new FindAccountWhenPositiveArgs(-1)],
-                cancellationToken: token
-            )
+            connection.FindAccountWhenPositive(items, cancellationToken: token)
         );
 
         thrown.Message.ShouldStartWith(
-            "The query 'FindAccountWhenPositive' returned a result set of another shape for item 1,"
+            "The query 'FindAccountWhenPositive' returned a result set of another shape, or none, for one of the items "
+                + string.Create(CultureInfo.InvariantCulture, $"from {first} to {last},")
         );
     }
 
@@ -797,7 +811,8 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         );
 
         thrown.Message.ShouldStartWith(
-            "The query 'FindAccountThenEmpty' returned a result set of another shape for item 1,"
+            "The query 'FindAccountThenEmpty' returned a result set of another shape, or none, for one of the items "
+                + "from 0 to 1,"
         );
     }
 
@@ -848,7 +863,8 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         );
 
         thrown.Message.ShouldStartWith(
-            "The query 'InsertNoteThenOther' returned a result set of another shape for item 1,"
+            "The query 'InsertNoteThenOther' returned a result set of another shape, or none, for one of the items "
+                + "from 0 to 1,"
         );
         (await CountNotesAsync(connection, null, token)).ShouldBe(0);
         await ShouldBeInNoTransactionAsync(connection, token);
@@ -880,26 +896,29 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         await ShouldBeInNoTransactionAsync(connection, token);
     }
 
-    // The connection, enlisted in the scope's transaction, runs the method, which begins no transaction of its own: one
-    // of its own would have committed the rows.  The scope ends without Complete, which rolls them back, and the
+    // The connection, enlisted in the scope's transaction at read committed, runs the serializable copy, which begins
+    // no transaction of its own, so each item reports read committed, 2.  One of its own would not show in the rows
+    // that the scope keeps, since on SqlClient it nests in the scope's and its commit does not outlive it, but it would
+    // set the session to serializable, 4.  The scope ends without Complete, which rolls the rows back, and the
     // temporary table, made before the scope, is left empty.
     [Fact]
-    public async Task InsertNote_InATransactionScope_BeginsNoTransactionOfItsOwn()
+    public async Task InsertNoteSerializable_InAReadCommittedScope_RunsInTheScopesTransaction()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = await OpenWithTemporaryNotesAsync(EndToEndSources.App(sqlServer), token);
         var items = Items(3);
-        IReadOnlyList<BatchNote> rows;
+        var options = new TransactionOptions { IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted };
+        IReadOnlyList<IsolatedNote> rows;
         long during;
 
-        using (new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+        using (new TransactionScope(TransactionScopeOption.Required, options, TransactionScopeAsyncFlowOption.Enabled))
         {
             connection.EnlistTransaction(Transaction.Current);
-            rows = await connection.InsertNote(items, Notes, cancellationToken: token);
+            rows = await connection.InsertNoteSerializable(items, Notes, cancellationToken: token);
             during = await CountNotesAsync(connection, null, token);
         }
 
-        rows.ShouldBe(RowsOf(items));
+        rows.ShouldBe([new(FirstId, "2"), new(FirstId + 1, "2"), new(FirstId + 2, "2")]);
         during.ShouldBe(3);
         (await CountNotesAsync(connection, null, token)).ShouldBe(0);
     }
