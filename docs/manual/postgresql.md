@@ -491,6 +491,31 @@ In a query method, an array parameter takes any `IEnumerable<T>` of its element 
 - **A loop over [streamed rows](settings.md#streaming-rows) that ends early throws the error of a row it left unread.**  At a `break`, or an exception in the loop's body, the rows still to come are read, and a `PostgresException` that PostgreSQL raises for one of them, such as `22012` for a division by zero, is thrown when the loop ends, in place of the body's exception, and aborts the transaction the query ran in.  To keep the body's exception too, see [streamed rows](settings.md#streaming-rows).
 - **The connection's commands must take Npgsql's own parameters**, as those of `NpgsqlConnection` do.  A connection that wraps Npgsql's and creates parameters of its own is a [known issue](generator.md#known-issues).
 
+<a id="collection-methods"></a>
+
+### Collection methods
+
+```sql postgres
+-- name: AddEvent -> rowcount
+-- generator: collection-method transaction=off
+INSERT INTO events (kind, payload, happened_at)
+VALUES (@kind, @payload, @happenedAt);
+```
+
+A query's [collection method](generator.md#collection-methods) runs its items through Npgsql, 1,000 to a round trip.  What a failed item leaves in the database depends on the transaction the method runs in:
+
+| The transaction | When an item fails |
+|----|----|
+| Its own, by `transaction=on`, the default, or an isolation level | Every item is rolled back, those of earlier round trips too, and nothing is left |
+| None, by `transaction=off` | Each round trip's items run in a transaction that PostgreSQL begins for them alone, and commit or roll back together: the failed item's round trip is rolled back, the items before it included, the round trips before it stay committed, and those after it do not run |
+| The caller's, a `transaction` given at the output `methods` or an ambient one | The method leaves it to you.  PostgreSQL aborts a transaction at an error, so it takes no other command until you roll it back, and what ran in it is rolled back with it |
+
+- **The failed item is found on Npgsql 8, 9 and 10**, with nothing to add to the connection string.  Its position is the `ItemIndex` of [`CollectionItemException`](generator.md#collection-item-exception), whose `InnerException` is Npgsql's `PostgresException`, and whose `SqlState`, such as `23505` for a unique violation, is the error's.
+- **An error at a commit is no item's.**  A constraint declared `DEFERRABLE INITIALLY DEFERRED` is checked when the transaction commits, after every item has run, so its error is thrown as Npgsql's `PostgresException`, as it is, and the transaction is rolled back.  Under `transaction=off` that is the commit of each round trip.
+- **PostgreSQL has three isolation levels**: `read-committed`, its default, `repeatable-read` and `serializable`.  `read-uncommitted` and `snapshot` are [SQLSRC297](diagnostics.md#sqlsrc297).
+- **The SQL is sent without its comments**, even under [`keep-comments`](settings.md#setting-generator-parameters), so a comment that you keep for the database's logs reaches them from the query method alone.
+- **`commandTimeout`** is that of each round trip, and **a cancelled method throws `OperationCanceledException`**, as a query method does; either way, the method's own transaction is rolled back.
+
 <a id="known-issues"></a>
 
 ## Known issues

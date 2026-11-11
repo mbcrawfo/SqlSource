@@ -143,6 +143,72 @@
         }
       ]
     },
+    "AddUser": {
+      "hash": "76b2448938193c02c052e97caed191303c7d72af9da70d4b294d4cf659b99d5a",
+      "toolVersion": "0.1.0",
+      "database": "postgres",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "name",
+          "ordinal": 0,
+          "type": {
+            "name": "text",
+            "bindName": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "email",
+          "ordinal": 1,
+          "type": {
+            "name": "public.email",
+            "bindName": "public.email",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "email",
+            "base": {
+              "name": "text",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "text"
+            }
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "users",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        }
+      ]
+    },
     "ListUsersNewestFirst": {
       "hash": "84d1e954292d7144f20d0cfa0ffdeec99d3f853ff7e14dfb8eb4b225a677ba6b",
       "toolVersion": "0.1.0",
