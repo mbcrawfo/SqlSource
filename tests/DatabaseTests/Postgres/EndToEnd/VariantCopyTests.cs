@@ -22,6 +22,8 @@ public sealed class VariantCopyTests
     [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNameInternal")]
     [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNamePrivate")]
     [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNameNested")]
+    [InlineData("Batches.sql", "InsertNote", "InsertNoteNoTransaction")]
+    [InlineData("Batches.sql", "InsertNote", "InsertNoteInRepository")]
     [InlineData("Lists.sql", "ListAccountsByIds", "StreamAccountsByIds")]
     [InlineData("Lists.sql", "ListAccountsByIds", "ListAccountsByIdsNoPadding")]
     public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy) =>
