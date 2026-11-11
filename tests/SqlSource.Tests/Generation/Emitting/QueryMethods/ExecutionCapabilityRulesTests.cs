@@ -81,16 +81,19 @@ public sealed class ExecutionCapabilityRulesTests
     }
 
     // A collection method on SQL Server refuses the caller's completed transaction and nothing else: each result set of
-    // its batch is an item's, so it drains none, and it never streams.  On PostgreSQL, or as a repository's method,
-    // which takes no transaction, it has no flag.
+    // its batch is an item's, so it drains none, and it never streams; as a repository's method, which takes no
+    // transaction, it has no flag.  On PostgreSQL it finds the failed item by the first command that did not complete,
+    // whatever its shape, and as a repository's method too.
     [Theory]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), false, 1)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.One), false, 1)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), false, 1)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), true, 0)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.Many), false, 0)]
-    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.None), false, 0)]
-    public void Of_CollectionMethod_RefusesOnlyACompletedTransactionOnSqlServer(
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.Many), false, 32)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.None), false, 32)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.RowCount), false, 32)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.One), true, 32)]
+    public void Of_CollectionMethod_GivesItsEnginesFlags(
         string engineName,
         string shapeName,
         bool isRepository,
@@ -118,6 +121,7 @@ public sealed class ExecutionCapabilityRulesTests
         ((int)(SqlServerReadsRows | ExecutionCapabilities.DrainsWhenLeftAtARow)).ShouldBe(31);
         ((int)ExecutionCapabilities.DrainsLaterResults).ShouldBe(2);
         ((int)(ExecutionCapabilities.DrainsLaterResults | ExecutionCapabilities.DrainsWhenLeftAtARow)).ShouldBe(10);
+        ((int)ExecutionCapabilities.FindsFailedItemByCompletion).ShouldBe(32);
     }
 
     [Theory]
@@ -126,10 +130,14 @@ public sealed class ExecutionCapabilityRulesTests
     [InlineData(nameof(ExecutionCapabilities.ChecksRollbackAtRead))]
     [InlineData(nameof(ExecutionCapabilities.DrainsWhenLeftAtARow))]
     [InlineData(nameof(ExecutionCapabilities.ChecksRollbackAfterDatabaseError))]
+    [InlineData(nameof(ExecutionCapabilities.FindsFailedItemByCompletion))]
     public void Has_EachFlag_IsTrueOnlyWhenSet(string flagName)
     {
         var flag = Enum.Parse<ExecutionCapabilities>(flagName);
-        var all = SqlServerReadsRows | ExecutionCapabilities.DrainsWhenLeftAtARow;
+        var all =
+            SqlServerReadsRows
+            | ExecutionCapabilities.DrainsWhenLeftAtARow
+            | ExecutionCapabilities.FindsFailedItemByCompletion;
 
         flag.Has(flag).ShouldBeTrue();
         all.Has(flag).ShouldBeTrue();

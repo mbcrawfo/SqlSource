@@ -63,6 +63,72 @@ internal static class ExecutionCapabilityWriter
     }
 
     /// <summary>
+    /// Appends the catch of a chunk's database error that names none of the batch's commands, after the catch of one
+    /// that names one: the failed item is that of the first command whose statement type Npgsql has not set, as it
+    /// sets it when a command completes, and an error after every command completed, which no item raised, is thrown
+    /// as it is.  <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" /> turns it on.
+    /// </summary>
+    public static void AppendFailedCommandSearch(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        var body = GeneratedText.Deeper(indent);
+        var condition = GeneratedText.Deeper(body);
+        var commands = batch.Batch + ".BatchCommands";
+        _ = builder
+            .Append(indent)
+            .Append("catch (global::Npgsql.PostgresException ")
+            .Append(batch.Error)
+            .Append(")\n")
+            .Append(indent)
+            .Append("{\n")
+            .Append(body)
+            .Append("var ")
+            .Append(batch.Failed)
+            .Append(" = 0;\n")
+            .Append(body)
+            .Append("while (\n")
+            .Append(condition)
+            .Append(batch.Failed)
+            .Append(" < ")
+            .Append(commands)
+            .Append(".Count\n")
+            .Append(condition)
+            .Append("&& ((global::Npgsql.NpgsqlBatchCommand)")
+            .Append(commands)
+            .Append('[')
+            .Append(batch.Failed)
+            .Append("]).StatementType\n")
+            .Append(GeneratedText.Deeper(condition))
+            .Append("!= global::Npgsql.StatementType.Unknown\n")
+            .Append(body)
+            .Append(")\n")
+            .Append(body)
+            .Append("{\n")
+            .Append(condition)
+            .Append(batch.Failed)
+            .Append("++;\n");
+        QueryMethodWriter.AppendEnd(builder, body);
+        _ = builder.Append('\n');
+        QueryMethodWriter.AppendIf(builder, body, batch.Failed + " == " + commands + ".Count");
+        _ = builder.Append(condition).Append("throw;\n");
+        QueryMethodWriter.AppendEnd(builder, body);
+        _ = builder
+            .Append('\n')
+            .Append(body)
+            .Append("throw new global::SqlSource.CollectionItemException(")
+            .Append(SymbolDisplay.FormatLiteral(context.Method.QueryName, quote: true))
+            .Append(", ")
+            .Append(batch.First)
+            .Append(" + ")
+            .Append(batch.Failed)
+            .Append(", ")
+            .Append(batch.Error)
+            .Append(");\n");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
     /// Appends the refusal of a transaction whose <c>Connection</c> is null, which has completed, and a blank line,
     /// as the SQL follows it.  <see cref="ExecutionCapabilities.RefusesCompletedTransaction" /> turns it on.
     /// </summary>

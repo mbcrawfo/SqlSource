@@ -66,6 +66,13 @@ internal static class ExecutionCapabilityRules
     /// its body, <see cref="BatchWriter" />, not by these flags.
     /// </para>
     /// <para>
+    /// A collection method on PostgreSQL, <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" />, of every
+    /// shape: Npgsql 10 names the command of a database error, <c>BatchCommand</c>, only when the connection string
+    /// sets <c>Include Failed Batched Command</c>, where Npgsql 8 and 9 always name it.  Npgsql sets a command's
+    /// <c>StatementType</c> when the command completes, and leaves the failed command and every command after it at
+    /// <c>Unknown</c>, with or without a reader, so the first command still at <c>Unknown</c> is the failed one.
+    /// </para>
+    /// <para>
     /// A repository's method, whose <see cref="QueryMethod.Source" /> gives its connection, takes no transaction, so it
     /// has none of the flags about one, <see cref="TransactionFlags" />; it keeps the drains.
     /// </para>
@@ -81,6 +88,8 @@ internal static class ExecutionCapabilityRules
         var readsRows = method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
         return method.Engine switch
         {
+            DatabaseEngine.PostgreSql when method.Batch is not null =>
+                ExecutionCapabilities.FindsFailedItemByCompletion,
             DatabaseEngine.PostgreSql => ExecutionCapabilities.None,
             DatabaseEngine.SqlServer when method.Batch is not null => ExecutionCapabilities.RefusesCompletedTransaction,
             DatabaseEngine.SqlServer => ExecutionCapabilities.RefusesCompletedTransaction

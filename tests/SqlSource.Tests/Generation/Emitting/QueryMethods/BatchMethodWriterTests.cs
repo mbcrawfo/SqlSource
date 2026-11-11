@@ -424,6 +424,51 @@ public sealed class BatchMethodWriterTests
                     + "                }\n"
             );
 
+    // On PostgreSQL a database error that names no command of the batch, as Npgsql 10's names none unless the
+    // connection string asks it to, is the item of the first command that did not complete, whose statement type
+    // Npgsql has not set; an error after every command completed is thrown as it is.  It follows the catch of a named
+    // command, for every shape, a rowcount's that runs without a reader included.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many))]
+    [InlineData(nameof(ResultShape.RowCount))]
+    public void Append_PostgreSqlErrorThatNamesNoCommand_IsTheFirstCommandThatDidNotComplete(string shapeName)
+    {
+        var text = Write(WithShape(System.Enum.Parse<ResultShape>(shapeName)));
+
+        text.ShouldContain(
+            "                    );\n"
+                + "                }\n"
+                + "                catch (global::Npgsql.PostgresException error)\n"
+                + "                {\n"
+                + "                    var failed = 0;\n"
+                + "                    while (\n"
+                + "                        failed < batch.BatchCommands.Count\n"
+                + "                        && ((global::Npgsql.NpgsqlBatchCommand)batch.BatchCommands[failed])"
+                + ".StatementType\n"
+                + "                            != global::Npgsql.StatementType.Unknown\n"
+                + "                    )\n"
+                + "                    {\n"
+                + "                        failed++;\n"
+                + "                    }\n"
+                + "\n"
+                + "                    if (failed == batch.BatchCommands.Count)\n"
+                + "                    {\n"
+                + "                        throw;\n"
+                + "                    }\n"
+                + "\n"
+                + "                    throw new global::SqlSource.CollectionItemException("
+                + "\"GetUser\", first + failed, error);\n"
+                + "                }\n"
+        );
+        IndexOf(text, "catch (global::Npgsql.PostgresException error)")
+            .ShouldBeGreaterThan(IndexOf(text, "catch (global::System.Data.Common.DbException error) when ("));
+    }
+
+    // SqlClient names the failed command of every error, so SQL Server's method has no search.
+    [Fact]
+    public void Append_SqlServer_HasNoSearchForTheFailedCommand() =>
+        Write(WithShape(ResultShape.Many) with { Engine = DatabaseEngine.SqlServer }).ShouldNotContain("StatementType");
+
     // rowcount sums each command's count, leaving out the -1 of a statement that counts nothing; none runs each chunk.
     [Fact]
     public void Append_RowCount_SumsEachCommandsRecordsAffected()

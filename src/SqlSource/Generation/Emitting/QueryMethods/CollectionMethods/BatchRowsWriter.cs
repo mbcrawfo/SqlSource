@@ -73,7 +73,8 @@ internal static class BatchRowsWriter
     /// <summary>
     /// Appends the running of the chunk's batch and the reading of each command's result set, in a try whose catch
     /// throws a database error that names a command of the batch as <c>CollectionItemException</c>, at the position of
-    /// that command's item.
+    /// that command's item, and, under <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" />, whose second
+    /// catch finds the command of an error that names none.
     /// </summary>
     internal static void AppendExecution(in QueryMethodContext context, string indent)
     {
@@ -138,6 +139,10 @@ internal static class BatchRowsWriter
             .Append(innerIndent)
             .Append(");\n");
         QueryMethodWriter.AppendEnd(builder, indent);
+        if (context.Capabilities.Has(ExecutionCapabilities.FindsFailedItemByCompletion))
+        {
+            ExecutionCapabilityWriter.AppendFailedCommandSearch(in context, indent);
+        }
     }
 
     // The batch run without a reader; a rowcount method adds each command's count to its total, leaving out the -1 of a

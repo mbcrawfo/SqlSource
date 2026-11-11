@@ -36,4 +36,10 @@ internal enum ExecutionCapabilities
     /// batch and reports a transaction that a later error there rolled back.
     /// </summary>
     ChecksRollbackAfterDatabaseError = 16,
+
+    /// <summary>
+    /// A collection method's chunk takes a database error that names none of its commands as the error of the first
+    /// command that did not complete.
+    /// </summary>
+    FindsFailedItemByCompletion = 32,
 }

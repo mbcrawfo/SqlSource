@@ -58,7 +58,10 @@ internal sealed class BatchLocals
     /// <summary>The database's error that the catch of a chunk takes.</summary>
     public string Error { get; }
 
-    /// <summary>The batch command the database's error names.</summary>
+    /// <summary>
+    /// The batch command the database's error names, or, when it names none, the place in the batch of the command
+    /// that did not complete.
+    /// </summary>
     public string Failed { get; }
 
     /// <summary>
