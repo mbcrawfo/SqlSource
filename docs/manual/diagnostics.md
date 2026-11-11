@@ -65,6 +65,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC036](#sqlsrc036) | Connection parameter is hidden by a method argument |
 | [SQLSRC037](#sqlsrc037) | Repository interface name is not valid |
 
+**Projects that share SqlSource's exceptions across frameworks**
+
+| Id | Title |
+|----|----|
+| [SQLSRC038](#sqlsrc038) | Exceptions come from a framework before .NET 6 |
+
 **`.sql` files**
 
 | Id | Title |
@@ -959,6 +965,20 @@ public partial class UserRepository(NpgsqlDataSource dataSource);
 The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface; its repository methods are still generated.  Write the interface's name alone, such as `InterfaceName = "IUserStore"`, which is declared beside the type with the type's type parameters, or remove `InterfaceName` to get `I` and the type's name.
 
 See: [The interface](generator.md#repository-interface), [repository interfaces](settings.md#repository-interfaces)
+
+## SQLSRC038
+
+**Exceptions come from a framework before .NET 6**
+
+A project on .NET 6 or later that uses SqlSource takes its exceptions from a project it references, such as the [shared project](recipes.md#share-the-exceptions) of the recipe, and that project targets a framework before .NET 6, such as `netstandard2.0` or `netstandard2.1`.  Its `CollectionItemException` was built without the `SqlState`, `IsTransient` and `BatchCommand` that .NET 6 added to `DbException`, so it cannot pass on the database error's: a retry policy that tests `IsTransient` would never retry a deadlock.  The message names the project.  This project still uses that project's exceptions, so the error is the only one.
+
+```console
+CSC : error SQLSRC038: The CollectionItemException that this project sees in Data.Shared was compiled for a framework before .NET 6, so it does not pass on the SqlState, IsTransient and BatchCommand of the database's error.  Make Data.Shared target .NET 6 or later, or add such a target to its TargetFrameworks.
+```
+
+Make the project that holds the exceptions target .NET 6 or later, as `<TargetFramework>net8.0</TargetFramework>`, or add such a target beside the one it has, as `<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>`: a project on .NET 6 or later then gets the build for .NET 8.  The error has no file and line, because it is about the project's references.
+
+See: [Projects that share internals](generator.md#projects-that-share-internals)
 
 ## SQLSRC101
 

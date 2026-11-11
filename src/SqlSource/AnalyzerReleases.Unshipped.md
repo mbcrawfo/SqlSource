@@ -38,6 +38,7 @@ SQLSRC034 | SqlSource | Error | Repository is static
 SQLSRC035 | SqlSource | Error | Repository interface name is taken
 SQLSRC036 | SqlSource | Error | Connection parameter is hidden by a method argument
 SQLSRC037 | SqlSource | Error | Repository interface name is not valid
+SQLSRC038 | SqlSource | Error | Exceptions come from a framework before .NET 6
 SQLSRC101 | SqlSource | Error | Quote is not closed
 SQLSRC102 | SqlSource | Error | Comment is not closed
 SQLSRC103 | SqlSource | Error | Query name is not valid

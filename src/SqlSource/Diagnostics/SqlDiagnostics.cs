@@ -444,6 +444,20 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the name of the assembly.
+    public static readonly DiagnosticDescriptor ExceptionsBeforeNet6 = new(
+        id: "SQLSRC038",
+        title: "Exceptions come from a framework before .NET 6",
+        messageFormat: "The CollectionItemException that this project sees in {0} was compiled for a framework "
+            + "before .NET 6, so it does not pass on the SqlState, IsTransient and BatchCommand of the database's "
+            + "error.  Make {0} target .NET 6 or later, or add such a target to its TargetFrameworks.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc038",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1410,6 +1424,7 @@ internal static class SqlDiagnostics
             RepositoryInterfaceNameTaken,
             ConnectionParameterHidden,
             RepositoryInterfaceNameNotValid,
+            ExceptionsBeforeNet6,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

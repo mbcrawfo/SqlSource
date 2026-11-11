@@ -1,8 +1,10 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Exceptions;
@@ -524,6 +526,207 @@ public sealed class ExceptionReuseTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    // The message of SQLSRC038 for the assembly Shared.
+    private const string BeforeNet6Message =
+        "SQLSRC038 (1,1)-(1,1): The CollectionItemException that this project sees in Shared was compiled for a "
+        + "framework before .NET 6, so it does not pass on the SqlState, IsTransient and BatchCommand of the "
+        + "database's error.  Make Shared target .NET 6 or later, or add such a target to its TargetFrameworks.";
+
+    // The shared project of the manual's recipe, compiled for a framework before .NET 6, as SqlSource writes its
+    // exceptions there: its CollectionItemException has no SqlState, IsTransient or DbBatchCommand to pass on, and this
+    // project's DbException, of .NET 8 or later, has them.  The project reports it, uses the copy all the same, so that
+    // it sees one, and its methods compile against it.
+    [Theory]
+    [InlineData("netstandard2.0", false)]
+    [InlineData("netstandard2.0", true)]
+    [InlineData("netstandard2.1", false)]
+    [InlineData("netstandard2.1", true)]
+    public void Run_SharedProjectBeforeNet6_ReportsSqlsrc038AndUsesItsCopy(
+        string targetFrameworks,
+        bool compilationReference
+    )
+    {
+        var run = RunOwnQuery(SharedFor(targetFrameworks, compilationReference));
+
+        run.Diagnostics.ShouldBe([BeforeNet6Message]);
+        run.Sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        run.Sources.Keys.ShouldContain(MethodRuns.MethodsFile);
+        run.CompilationErrors.ShouldBeEmpty();
+        StepOutputs
+            .Single<ExceptionProbe>(run, TrackingNames.ExceptionProbe)
+            .ShouldBe(new ExceptionProbe(ExceptionOrigin.BeforeNet6, new(["Shared"])));
+    }
+
+    // The same project on .NET 8, or targeting netstandard2.1 and .NET 8, whose build for .NET 8 this project
+    // references, passes them on, and is used with no error.
+    [Theory]
+    [InlineData("net8.0", false)]
+    [InlineData("net8.0", true)]
+    [InlineData("netstandard2.1;net8.0", false)]
+    [InlineData("netstandard2.1;net8.0", true)]
+    public void Run_SharedProjectOnNet6OrLater_UsesItsCopy(string targetFrameworks, bool compilationReference)
+    {
+        var run = RunOwnQuery(SharedFor(targetFrameworks, compilationReference));
+
+        run.ShouldBeClean();
+        run.Sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        StepOutputs
+            .Single<ExceptionProbe>(run, TrackingNames.ExceptionProbe)
+            .ShouldBe(new ExceptionProbe(ExceptionOrigin.Referenced, new(["Shared"])));
+    }
+
+    // A project before .NET 6 has no SqlState, IsTransient or DbBatchCommand on its DbException, so a copy of the same
+    // framework has nothing to pass on that the project could read, and is used with no error.
+    [Theory]
+    [InlineData("netstandard2.0", false)]
+    [InlineData("netstandard2.0", true)]
+    [InlineData("netstandard2.1", false)]
+    [InlineData("netstandard2.1", true)]
+    public void Run_ProjectBeforeNet6OverACopyOfItsFramework_UsesItsCopy(
+        string targetFrameworks,
+        bool compilationReference
+    )
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, "public class Sample { }")],
+            [],
+            supportedFramework: false,
+            references: [.. FrameworkOf(targetFrameworks), SharedFor(targetFrameworks, compilationReference)]
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.Sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        StepOutputs
+            .Single<ExceptionProbe>(run, TrackingNames.ExceptionProbe)
+            .ShouldBe(new ExceptionProbe(ExceptionOrigin.Referenced, new(["Shared"])));
+    }
+
+    // The overrides of CollectionItemException that pass on the members of DbException from .NET 6.
+    private static readonly string[] Overrides =
+    [
+        "public override string SqlState => null;",
+        "public override bool IsTransient => false;",
+        "protected override System.Data.Common.DbBatchCommand DbBatchCommand => null;",
+    ];
+
+    // A copy that overrides two of the three members is reported for the third, whether it leaves it out or hides it
+    // with a member that is not an override, each as an image and as a compilation.
+    [Theory]
+    [InlineData("SqlState", "", false)]
+    [InlineData("SqlState", "", true)]
+    [InlineData("IsTransient", "", false)]
+    [InlineData("IsTransient", "", true)]
+    [InlineData("DbBatchCommand", "", false)]
+    [InlineData("DbBatchCommand", "", true)]
+    [InlineData("SqlState", "public new string SqlState => null;", false)]
+    [InlineData("SqlState", "public new string SqlState => null;", true)]
+    [InlineData("IsTransient", "public new bool IsTransient => false;", false)]
+    [InlineData("IsTransient", "public new bool IsTransient => false;", true)]
+    [InlineData("DbBatchCommand", "private System.Data.Common.DbBatchCommand DbBatchCommand => null;", false)]
+    [InlineData("DbBatchCommand", "private System.Data.Common.DbBatchCommand DbBatchCommand => null;", true)]
+    public void Run_CopyWithoutOneOverride_ReportsSqlsrc038(string missing, string instead, bool compilationReference)
+    {
+        var members = string.Join(
+            " ",
+            Overrides.Where(member => !member.Contains(" " + missing + " ", System.StringComparison.Ordinal))
+        );
+        var run = RunOwnQuery(SharedOf(members + " " + instead, compilationReference));
+
+        run.Diagnostics.ShouldBe([BeforeNet6Message]);
+        run.Sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
+    // The control: the copy with all three overrides is used.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_CopyWithEveryOverride_UsesItsCopy(bool compilationReference)
+    {
+        var run = RunOwnQuery(SharedOf(string.Join(" ", Overrides), compilationReference));
+
+        run.ShouldBeClean();
+        run.Sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+    }
+
+    // The assembly Shared on the runtime's .NET, with the three exceptions and these members of
+    // CollectionItemException.
+    private static MetadataReference SharedOf(string members, bool compilationReference)
+    {
+        var source = Old(
+            RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+                + Item(members: members)
+        );
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/shared/Shared.cs", source)],
+            assemblyName: "Shared"
+        );
+        return compilationReference ? compilation.ToMetadataReference() : ImageOf(compilation);
+    }
+
+    // This project, on the runtime's .NET, with a methods query of the shape one over the reference.
+    private static GeneratorRun RunOwnQuery(MetadataReference reference) =>
+        GeneratorHarness.Run(
+            OutputKind.Methods,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    "namespace App { [SqlSource.SqlSourceGenerate(Source = \".\")] internal partial class Sample; }\n"
+                ),
+            ],
+            [OwnFile, Sidecars.Of(OwnFile, Entry(OwnFile, "GetOne", [], [Column("id")]))],
+            references: [reference, NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+    // The assembly Shared, of the exceptions' file as SqlSource writes it, internal, with InternalsVisibleTo for this
+    // project, compiled as the SDK compiles it for the target frameworks, with the C# and the symbols it gives each.
+    // Of several, the one this project references is the last, .NET 8, as NuGet takes the nearest to the project's.
+    private static MetadataReference SharedFor(string targetFrameworks, bool compilationReference)
+    {
+        var frameworks = targetFrameworks.Split(';');
+        var framework = frameworks[^1];
+        string[] symbols = framework switch
+        {
+            "netstandard2.0" => ["NETSTANDARD", "NETSTANDARD2_0"],
+            "netstandard2.1" => ["NETSTANDARD", "NETSTANDARD2_1"],
+            "net8.0" => ["NET", "NET8_0", "NET8_0_OR_GREATER", "NET6_0_OR_GREATER"],
+            _ => throw new System.ArgumentOutOfRangeException(nameof(targetFrameworks), targetFrameworks, null),
+        };
+        var parseOptions = new CSharpParseOptions(
+            framework == "net8.0" ? LanguageVersion.CSharp12 : LanguageVersion.CSharp7_3,
+            DocumentationMode.Diagnose,
+            preprocessorSymbols: symbols
+        );
+        var compilation = GeneratorHarness.CreateCompilation(
+            [
+                new SourceFile("/shared/Properties.cs", InternalsVisible),
+                new SourceFile("/shared/" + ExceptionSource.HintName, ExceptionSource.TextFor(isPublic: false)),
+            ],
+            supportedFramework: false,
+            parseOptions: parseOptions,
+            references: FrameworkOf(framework),
+            assemblyName: "Shared"
+        );
+        compilation
+            .GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning)
+            .ShouldBeEmpty();
+        return compilationReference ? compilation.ToMetadataReference() : ImageOf(compilation);
+    }
+
+    // The reference assemblies of the target framework.
+    private static MetadataReference[] FrameworkOf(string framework) =>
+        framework switch
+        {
+            "netstandard2.0" => LibraryReferences.NetStandard20Framework,
+            "netstandard2.1" => LibraryReferences.NetStandard21Framework,
+            "net8.0" => LibraryReferences.Net8Framework,
+            _ => throw new System.ArgumentOutOfRangeException(nameof(framework), framework, null),
+        };
+
     // The source of Old: the declarations in the namespace SqlSource, with InternalsVisibleTo for this project unless
     // it is left out.
     private static string Old(string declarations, bool internalsVisible = true) =>
@@ -565,12 +768,14 @@ public sealed class ExceptionReuseTests
         + parameters
         + ") { } } ";
 
-    // A copy of CollectionItemException of this base and constructor, with the accessibility of each as given.
+    // A copy of CollectionItemException of this base and constructor, with the accessibility of each as given, and
+    // these other members.
     private static string Item(
         string baseType = "System.Data.Common.DbException",
         string parameters = "string queryName, int itemIndex, System.Data.Common.DbException inner",
         string accessibility = "internal",
-        string constructorAccessibility = "public"
+        string constructorAccessibility = "public",
+        string members = ""
     ) =>
         accessibility
         + " sealed class CollectionItemException : "
@@ -579,7 +784,9 @@ public sealed class ExceptionReuseTests
         + constructorAccessibility
         + " CollectionItemException("
         + parameters
-        + ") { } } ";
+        + ") { } "
+        + members
+        + " } ";
 
     // The compilation's image, as a build references a project.
     private static PortableExecutableReference ImageOf(Compilation compilation)

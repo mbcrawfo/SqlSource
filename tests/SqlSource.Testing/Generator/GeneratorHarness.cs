@@ -63,8 +63,12 @@ internal static class GeneratorHarness
 
     // The C# that the generator tests hand the compiler, the language of generated code.  Documentation comments are
     // checked, as they are in a project that builds a documentation file, so that a malformed or missing one in
-    // generated code is reported.
-    public static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12, DocumentationMode.Diagnose);
+    // generated code is reported.  NET6_0_OR_GREATER is defined, as the SDK defines it for a project on .NET 8 or
+    // later, so that the exceptions' file, and a project's copy that another one reuses, are those of such a project.
+    public static readonly CSharpParseOptions ParseOptions = new CSharpParseOptions(
+        LanguageVersion.CSharp12,
+        DocumentationMode.Diagnose
+    ).WithPreprocessorSymbols("NET6_0_OR_GREATER");
 
     // The assemblies of the runtime the tests run on, which is .NET 8 or later, without the test project's own when the
     // generator ran on it, as on tests/SqlSource.Tests and the database test projects: that one holds an internal

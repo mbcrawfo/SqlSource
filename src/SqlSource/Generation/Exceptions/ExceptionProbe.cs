@@ -15,15 +15,19 @@ namespace SqlSource.Generation.Exceptions;
 /// <param name="Origin">Where the project's exceptions come from.</param>
 /// <param name="Assemblies">
 /// The names of the referenced assemblies that have a copy the project sees, in ordinal order: none for
-/// <see cref="ExceptionOrigin.Own" />, one for <see cref="ExceptionOrigin.Referenced" /> and
-/// <see cref="ExceptionOrigin.OtherShape" />, and two or more for <see cref="ExceptionOrigin.SeenTwice" />.
+/// <see cref="ExceptionOrigin.Own" />, one for <see cref="ExceptionOrigin.Referenced" />,
+/// <see cref="ExceptionOrigin.OtherShape" /> and <see cref="ExceptionOrigin.BeforeNet6" />, and two or more for
+/// <see cref="ExceptionOrigin.SeenTwice" />.
 /// </param>
 internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<string> Assemblies)
 {
     private static readonly ExceptionProbe None = new(ExceptionOrigin.Own, EquatableArray<string>.Empty);
 
+    // The members of DbException from .NET 6 that CollectionItemException passes on from its inner exception.
+    private static readonly string[] PassedOn = ["SqlState", "IsTransient", "DbBatchCommand"];
+
     /// <summary>
-    /// Reads the probe from the compilation's references: two lookups by metadata name, and nothing for each syntax
+    /// Reads the probe from the compilation's references: three lookups by metadata name, and nothing for each syntax
     /// tree, since it runs on every edit.
     /// </summary>
     public static ExceptionProbe Read(Compilation compilation, CancellationToken cancellationToken)
@@ -51,7 +55,9 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
     }
 
     // Two or more assemblies are SeenTwice.  One is Referenced when it gives all three, each an exception that can be
-    // created with the constructor the generated methods call, and OtherShape otherwise.
+    // created with the constructor the generated methods call, and CollectionItemException with an override of each
+    // member that this project's DbException has to pass on; BeforeNet6 when it lacks one of those, and OtherShape
+    // otherwise.
     private static ExceptionOrigin OriginOf(
         Compilation compilation,
         int assemblies,
@@ -65,18 +71,43 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
             return ExceptionOrigin.SeenTwice;
         }
 
-        return
-            rowCounts.Length == 1
-            && rolledBacks.Length == 1
-            && collectionItems.Length == 1
-            && IsThrowable(rowCounts[0])
-            && IsThrowable(rolledBacks[0])
-            && IsThrowable(collectionItems[0])
-            && HasConstructor(compilation, rowCounts[0], IsBoolean)
-            && HasConstructor(compilation, rolledBacks[0], IsException)
-            && HasCollectionItemConstructor(compilation, collectionItems[0])
+        if (
+            rowCounts.Length != 1
+            || rolledBacks.Length != 1
+            || collectionItems.Length != 1
+            || !IsThrowable(rowCounts[0])
+            || !IsThrowable(rolledBacks[0])
+            || !IsThrowable(collectionItems[0])
+            || !HasConstructor(compilation, rowCounts[0], IsBoolean)
+            || !HasConstructor(compilation, rolledBacks[0], IsException)
+            || CollectionItemConstructor(compilation, collectionItems[0]) is not { } constructor
+        )
+        {
+            return ExceptionOrigin.OtherShape;
+        }
+
+        return PassesOn(collectionItems[0], constructor.Parameters[2].Type)
             ? ExceptionOrigin.Referenced
-            : ExceptionOrigin.OtherShape;
+            : ExceptionOrigin.BeforeNet6;
+    }
+
+    // Whether the copy of CollectionItemException overrides each member of PassedOn that the project's DbException
+    // has.  A copy compiled for a framework before .NET 6 has none of them, and passes nothing on to a project on .NET
+    // 6 or later, whose DbException has them all; one of a project before .NET 6 has nothing to pass on.
+    private static bool PassesOn(INamedTypeSymbol collectionItem, ITypeSymbol dbException)
+    {
+        foreach (var name in PassedOn)
+        {
+            if (
+                !dbException.GetMembers(name).IsEmpty
+                && !collectionItem.GetMembers(name).Any(static member => member.IsOverride)
+            )
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // The types of the name in a referenced assembly that the project can see, and name from global::, as the generated
@@ -127,9 +158,9 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
         return false;
     }
 
-    // Whether the type has a constructor that the project can call as CollectionItemException(string queryName,
-    // int itemIndex, System.Data.Common.DbException inner).
-    private static bool HasCollectionItemConstructor(Compilation compilation, INamedTypeSymbol type)
+    // The type's constructor that the project can call as CollectionItemException(string queryName, int itemIndex,
+    // System.Data.Common.DbException inner), whose last parameter is the project's DbException, or null.
+    private static IMethodSymbol? CollectionItemConstructor(Compilation compilation, INamedTypeSymbol type)
     {
         foreach (var constructor in type.InstanceConstructors)
         {
@@ -143,11 +174,11 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
                 && compilation.IsSymbolAccessibleWithin(constructor, compilation.Assembly)
             )
             {
-                return true;
+                return constructor;
             }
         }
 
-        return false;
+        return null;
     }
 
     // Whether a method can create the type and throw it: a class that is not abstract and derives from

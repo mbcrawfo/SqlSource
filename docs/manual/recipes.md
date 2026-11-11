@@ -944,6 +944,10 @@ Rules: [projects that share internals](generator.md#projects-that-share-internal
 
 ```xml
 <!-- Data.Shared.csproj: references the SqlSource package, and has no query -->
+<PropertyGroup>
+    <!-- .NET 6 or later, alone or beside an older target such as netstandard2.0 -->
+    <TargetFramework>net8.0</TargetFramework>
+</PropertyGroup>
 <ItemGroup>
     <InternalsVisibleTo Include="Data.Orders" />
     <InternalsVisibleTo Include="Data.Users" />
@@ -970,6 +974,6 @@ catch (UnexpectedRowCountException exception)
 }
 ```
 
-Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).
+Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).  Data.Shared targets .NET 6 or later, or adds such a target to its `TargetFrameworks`, so that its `CollectionItemException` passes on `SqlState`, `IsTransient` and `BatchCommand`; on `netstandard2.0` or `netstandard2.1` alone, a data project gets [SQLSRC038](diagnostics.md#sqlsrc038).
 
-Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022).
+Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022), [SQLSRC038](diagnostics.md#sqlsrc038).
