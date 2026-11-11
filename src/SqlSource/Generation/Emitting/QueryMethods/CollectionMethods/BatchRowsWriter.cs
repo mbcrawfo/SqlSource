@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
-namespace SqlSource.Generation.Emitting.QueryMethods;
+namespace SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 
 /// <summary>
 /// Writes what a collection method does with what it reads: the buffer its rows go into, or the count a rowcount
@@ -229,11 +229,7 @@ internal static class BatchRowsWriter
         switch (context.Method.Shape)
         {
             case ResultShape.Many:
-                _ = builder.Append(indent).Append("while (");
-                RowsWriter.AppendRead(in context);
-                _ = builder.Append(")\n").Append(indent).Append("{\n");
-                AppendAdd(in context, innerIndent, output);
-                QueryMethodWriter.AppendEnd(builder, indent);
+                RowsWriter.AppendReadLoop(in context, indent, output);
                 break;
             case ResultShape.One:
                 _ = builder.Append(indent).Append("if (!");
@@ -242,15 +238,15 @@ internal static class BatchRowsWriter
                 RowsWriter.AppendThrow(in context, innerIndent, moreThanOne: false, itemIndex);
                 QueryMethodWriter.AppendEnd(builder, indent);
                 _ = builder.Append('\n');
-                AppendAdd(in context, indent, output);
-                AppendSecondRowThrow(in context, indent, itemIndex);
+                RowsWriter.AppendAdd(in context, indent, output);
+                RowsWriter.AppendSecondRowThrow(in context, indent, itemIndex);
                 break;
             case ResultShape.OneOptional:
                 _ = builder.Append(indent).Append("if (");
                 RowsWriter.AppendRead(in context);
                 _ = builder.Append(")\n").Append(indent).Append("{\n");
-                AppendAdd(in context, innerIndent, output);
-                AppendSecondRowThrow(in context, innerIndent, itemIndex);
+                RowsWriter.AppendAdd(in context, innerIndent, output);
+                RowsWriter.AppendSecondRowThrow(in context, innerIndent, itemIndex);
                 QueryMethodWriter.AppendEnd(builder, indent);
                 break;
             // A method that reads no rows runs its batch without a reader and never reaches this switch; the shapes
@@ -261,26 +257,5 @@ internal static class BatchRowsWriter
             default:
                 throw UnexpectedEnumValueException.Of(context.Method.Shape);
         }
-    }
-
-    // The row's checks, then its addition to the buffer.
-    private static void AppendAdd(in QueryMethodContext context, string indent, MethodOutput output)
-    {
-        var builder = context.Builder;
-        RowReaderWriter.AppendVectorChecks(in context, indent, output);
-        _ = builder.Append(indent).Append(context.Locals.Rows).Append(".Add(");
-        RowReaderWriter.AppendRow(in context, output);
-        _ = builder.Append(");\n");
-    }
-
-    // The read of a second row, which throws.
-    private static void AppendSecondRowThrow(in QueryMethodContext context, string indent, string itemIndex)
-    {
-        var builder = context.Builder;
-        _ = builder.Append(indent).Append("if (");
-        RowsWriter.AppendRead(in context);
-        _ = builder.Append(")\n").Append(indent).Append("{\n");
-        RowsWriter.AppendThrow(in context, GeneratedText.Deeper(indent), moreThanOne: true, itemIndex);
-        QueryMethodWriter.AppendEnd(builder, indent);
     }
 }

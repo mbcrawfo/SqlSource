@@ -1,3 +1,4 @@
+using SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 

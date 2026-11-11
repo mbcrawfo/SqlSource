@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Emitting.QueryMethods;
+namespace SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 
 /// <summary>
 /// The names of what a collection method declares to run its items in batches, from its <see cref="LocalNames" />: the

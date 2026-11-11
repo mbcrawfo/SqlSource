@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
-namespace SqlSource.Generation.Emitting.QueryMethods;
+namespace SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 
 /// <summary>
 /// Writes the body of a collection method, whose <see cref="QueryMethod.Batch" /> is set, after the checks that

@@ -2,6 +2,7 @@ using System.Text;
 using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Emitting.QueryMethods;
+using SqlSource.Generation.Emitting.QueryMethods.CollectionMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
 using SqlSource.Parsing.Tokens;
@@ -58,7 +59,9 @@ public sealed class BatchMethodWriterTests
                     closed, and closed again when the method opened it.</param>
                     /// <param name="parameters">The items to run the query for, in order.</param>
                     /// <param name="orderBy">The text that replaces <c>{{orderBy}}</c>.</param>
-                    /// <param name="transaction">The transaction to run the query in, or null.</param>
+                    /// <param name="transaction">The transaction to run every item in, or null for the method to ↩
+                    begin one of its own, which it commits after the last item and rolls back when anything throws, ↩
+                    unless a <c>System.Transactions</c> transaction is open.</param>
                     /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
                     /// <param name="cancellationToken">Cancels the query.</param>
                     /// <returns>The row of each item that returned one, in the order of the items.</returns>

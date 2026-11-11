@@ -81,14 +81,7 @@ internal static class RowsWriter
         {
             var (buffer, result) = GetBuffer(in context, output.TypeText);
             _ = builder.Append(indent).Append("var ").Append(locals.Rows).Append(" = ").Append(buffer).Append(";\n");
-            _ = builder.Append(indent).Append("while (");
-            AppendRead(in context);
-            _ = builder.Append(")\n").Append(indent).Append("{\n");
-            RowReaderWriter.AppendVectorChecks(in context, innerIndent, output);
-            _ = builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
-            RowReaderWriter.AppendRow(in context, output);
-            _ = builder.Append(");\n");
-            QueryMethodWriter.AppendEnd(builder, indent);
+            AppendReadLoop(in context, indent, output);
             _ = builder.Append('\n');
             AppendDrain(in context, indent);
             _ = builder.Append(indent).Append("return ").Append(result).Append(";\n");
@@ -113,11 +106,8 @@ internal static class RowsWriter
         RowReaderWriter.AppendVectorChecks(in context, indent, output);
         _ = builder.Append(indent).Append("var ").Append(locals.Row).Append(" = ");
         RowReaderWriter.AppendRow(in context, output);
-        _ = builder.Append(";\n").Append(indent).Append("if (");
-        AppendRead(in context);
-        _ = builder.Append(")\n").Append(indent).Append("{\n");
-        AppendThrow(in context, innerIndent, moreThanOne: true);
-        QueryMethodWriter.AppendEnd(builder, indent);
+        _ = builder.Append(";\n");
+        AppendSecondRowThrow(in context, indent);
         _ = builder.Append('\n');
         AppendDrain(in context, indent);
         _ = builder.Append(indent).Append("return ").Append(locals.Row).Append(";\n");
@@ -253,6 +243,40 @@ internal static class RowsWriter
         {
             ExecutionCapabilityWriter.AppendDrainBeforeReturn(in context, indent);
         }
+    }
+
+    // The loop that reads every row into the buffer, after its checks: a many query method's, or a collection
+    // method's of each result set.
+    internal static void AppendReadLoop(in QueryMethodContext context, string indent, MethodOutput output)
+    {
+        var builder = context.Builder;
+        _ = builder.Append(indent).Append("while (");
+        AppendRead(in context);
+        _ = builder.Append(")\n").Append(indent).Append("{\n");
+        AppendAdd(in context, GeneratedText.Deeper(indent), output);
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    // The row's checks, then its addition to the buffer.
+    internal static void AppendAdd(in QueryMethodContext context, string indent, MethodOutput output)
+    {
+        var builder = context.Builder;
+        RowReaderWriter.AppendVectorChecks(in context, indent, output);
+        _ = builder.Append(indent).Append(context.Locals.Rows).Append(".Add(");
+        RowReaderWriter.AppendRow(in context, output);
+        _ = builder.Append(");\n");
+    }
+
+    // The read of a second row, which throws UnexpectedRowCountException, with the item's position in a collection
+    // method.
+    internal static void AppendSecondRowThrow(in QueryMethodContext context, string indent, string? itemIndex = null)
+    {
+        var builder = context.Builder;
+        _ = builder.Append(indent).Append("if (");
+        AppendRead(in context);
+        _ = builder.Append(")\n").Append(indent).Append("{\n");
+        AppendThrow(in context, GeneratedText.Deeper(indent), moreThanOne: true, itemIndex);
+        QueryMethodWriter.AppendEnd(builder, indent);
     }
 
     // An awaited read of the next row, as a condition: a query method's, or a collection method's of each result set.

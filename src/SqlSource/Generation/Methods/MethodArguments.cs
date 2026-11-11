@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using SqlSource.Generation.Emitting;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation.Methods;
 
@@ -24,17 +25,17 @@ namespace SqlSource.Generation.Methods;
 /// Whether the method takes its connection, its transaction and its command's timeout: false for a repository's
 /// method, whose <see cref="QueryMethod.Source" /> gives its connection.
 /// </param>
-/// <param name="takesItems">
-/// Whether the method is a collection method, <see cref="QueryMethod.Batch" />, which takes an
-/// <c>IEnumerable</c> of the input model.  A flag, as <paramref name="streams" /> and
-/// <paramref name="takesConnection" /> are, since this type is built from values and its tests have no method.
+/// <param name="batch">
+/// How a collection method runs its items, its <see cref="QueryMethod.Batch" />, or null for a query method: a
+/// collection method takes an <c>IEnumerable</c> of the input model, and its transaction's documentation says what a
+/// null transaction does under its mode.
 /// </param>
 internal readonly struct MethodArguments(
     MethodInput? input,
     List<string> tokens,
     bool streams,
     bool takesConnection,
-    bool takesItems = false
+    BatchCall? batch = null
 )
 {
     /// <summary>The receiver's name.</summary>
@@ -108,6 +109,20 @@ internal readonly struct MethodArguments(
         "The transaction to run the query in, or null."
     );
 
+    // A collection method's transaction, which it begins itself when none is given, unless its mode is off.
+    private static readonly MethodArgument OwnedTransactionArgument = TransactionArgument with
+    {
+        DocumentationXml =
+            "The transaction to run every item in, or null for the method to begin one of its own, which it commits "
+            + "after the last item and rolls back when anything throws, unless a <c>System.Transactions</c> "
+            + "transaction is open.",
+    };
+
+    private static readonly MethodArgument UnownedTransactionArgument = TransactionArgument with
+    {
+        DocumentationXml = "The transaction to run every item in, or null to run them in none.",
+    };
+
     private static readonly MethodArgument CommandTimeoutArgument = new(
         ArgumentRole.CommandTimeout,
         CommandTimeout,
@@ -130,7 +145,7 @@ internal readonly struct MethodArguments(
 
     private readonly bool _streams = streams;
 
-    private readonly bool _takesItems = takesItems;
+    private readonly BatchCall? _batch = batch;
 
     /// <summary>
     /// Whether the method takes its connection, its transaction and its command's timeout, which a repository's method
@@ -142,7 +157,7 @@ internal readonly struct MethodArguments(
     /// The arguments of the method, with its tokens as <see cref="MethodWriter.GetTokens" /> gives them.
     /// </summary>
     public static MethodArguments Of(QueryMethod method, List<string> tokens) =>
-        new(method.Input, tokens, method.Streams, method.Source is null, method.Batch is not null);
+        new(method.Input, tokens, method.Streams, method.Source is null, method.Batch);
 
     /// <summary>Whether no token may take the name, since an argument of some method has it.  Case counts.</summary>
     public static bool IsReserved(string name) => Array.IndexOf(ReservedNames, name) >= 0;
@@ -305,14 +320,19 @@ internal readonly struct MethodArguments(
                 < 0 => new MethodArgument(
                     ArgumentRole.Input,
                     Parameters,
-                    _arguments._takesItems
+                    _arguments._batch is not null
                         ? ItemsType + _arguments._input!.TypeText + ">"
                         : _arguments._input!.TypeText,
                     null,
-                    _arguments._takesItems ? ItemsXml : ParametersXml
+                    _arguments._batch is not null ? ItemsXml : ParametersXml
                 ),
                 _ when afterTokens == _trailing - 1 => CancellationArgument,
-                0 => TransactionArgument,
+                0 => _arguments._batch switch
+                {
+                    null => TransactionArgument,
+                    { Transaction: TransactionMode.Off } => UnownedTransactionArgument,
+                    _ => OwnedTransactionArgument,
+                },
                 _ => CommandTimeoutArgument,
             };
             return true;

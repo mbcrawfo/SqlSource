@@ -110,6 +110,37 @@ public sealed class MethodArgumentsTests
             .ShouldBe([ArgumentRole.Input, ArgumentRole.Token, ArgumentRole.Cancellation]);
     }
 
+    // A collection method's transaction says what null does under its mode: under on or an isolation level the method
+    // begins its own, unless an ambient one is open, and under off it runs in none.  A query method's is unchanged.
+    [Theory]
+    [InlineData(
+        nameof(TransactionMode.On),
+        "The transaction to run every item in, or null for the method to begin one of its own, which it commits after "
+            + "the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is "
+            + "open."
+    )]
+    [InlineData(
+        nameof(TransactionMode.Serializable),
+        "The transaction to run every item in, or null for the method to begin one of its own, which it commits after "
+            + "the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is "
+            + "open."
+    )]
+    [InlineData(nameof(TransactionMode.Off), "The transaction to run every item in, or null to run them in none.")]
+    public void Of_BatchMethod_DocumentsTheTransactionByItsMode(string modeName, string expected)
+    {
+        var method = Emitting.QueryMethods.QueryMethodWriterTests.GetUser with
+        {
+            Batch = new BatchCall(Enum.Parse<TransactionMode>(modeName)),
+        };
+
+        Enumerate(MethodArguments.Of(method, ["orderBy"]))
+            .Find(static argument => argument.Role == ArgumentRole.Transaction)
+            .DocumentationXml.ShouldBe(expected);
+        Enumerate(MethodArguments.Of(Emitting.QueryMethods.QueryMethodWriterTests.GetUser, ["orderBy"]))
+            .Find(static argument => argument.Role == ArgumentRole.Transaction)
+            .DocumentationXml.ShouldBe("The transaction to run the query in, or null.");
+    }
+
     [Fact]
     public void Of_RepositoryWithoutInputOrTokens_IsTheCancellationAlone() =>
         Enumerate(new MethodArguments(null, [], streams: true, takesConnection: false))
