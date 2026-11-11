@@ -291,8 +291,9 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
         thrown.Message.ShouldContain("Operation cancelled by user");
     }
 
-    // How many requests of the session wait on a lock: 1 while LockOfBob holds the row that the method updates.
-    private static string WaitingOnALock(string session) =>
+    // How many requests of the session wait on a lock: 1 while LockOfBob holds the row that the method updates, or that
+    // the collection method of BatchQueryTests reads.
+    internal static string WaitingOnALock(string session) =>
         "SELECT COUNT(*) FROM sys.dm_exec_requests AS r "
         + "JOIN sys.dm_exec_sessions AS s ON s.session_id = r.session_id "
         + $"WHERE {session} AND r.wait_type LIKE 'LCK[_]M[_]%'";
@@ -333,8 +334,9 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
     // Bob's row, changed by an update in a transaction of a connection of its own, so that another update of it waits
     // on the lock until the lock is disposed, which rolls the update back.  The tests of a command that runs wait on
     // it: a lock wait has no end of its own, where SQL Server ends a WAITFOR early when it runs short of threads, as it
-    // did on the busy runners of CI, and the method then returned its row.
-    private sealed class LockOfBob(SqlServerDatabases sqlServer) : IAsyncDisposable
+    // did on the busy runners of CI, and the method then returned its row.  BatchQueryTests holds it too, for an item
+    // that reads bob's account.
+    internal sealed class LockOfBob(SqlServerDatabases sqlServer) : IAsyncDisposable
     {
         private readonly SqlConnection _connection = EndToEndSources.App(sqlServer);
         private DbTransaction? _transaction;

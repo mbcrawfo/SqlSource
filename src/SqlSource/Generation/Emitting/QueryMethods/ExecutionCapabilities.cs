@@ -42,4 +42,10 @@ internal enum ExecutionCapabilities
     /// command that did not complete.
     /// </summary>
     FindsFailedItemByCompletion = 32,
+
+    /// <summary>
+    /// A collection method's chunk checks that each command has a result set of the output's columns, and that none
+    /// follows the last command's.
+    /// </summary>
+    ChecksResultSetsMatchItems = 64,
 }

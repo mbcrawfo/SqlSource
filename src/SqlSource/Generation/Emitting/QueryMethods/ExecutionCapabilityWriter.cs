@@ -5,10 +5,11 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the statements that a query's method's <see cref="ExecutionCapabilities" /> turn on: the refusal of a
-/// completed transaction, the catches that check for a rollback, and the loops that drain the later results, with
-/// the documentation of what they throw.  The phases of <see cref="QueryMethodWriter" /> keep the structure of the
-/// buffered and streamed reading, ask a flag at each point where one applies, and call in here.  Why each flag exists
-/// is said once, at <see cref="ExecutionCapabilityRules.Of" />.
+/// completed transaction, the catches that check for a rollback, the loops that drain the later results, and a
+/// collection method's search for its failed command and checks of its result sets, with the documentation of what
+/// they throw.  The phases of <see cref="QueryMethodWriter" /> keep the structure of the buffered and streamed reading,
+/// ask a flag at each point where one applies, and call in here.  Why each flag exists is said once, at
+/// <see cref="ExecutionCapabilityRules.Of" />.
 /// </summary>
 internal static class ExecutionCapabilityWriter
 {
@@ -21,7 +22,7 @@ internal static class ExecutionCapabilityWriter
     // HeaderWriter names UnexpectedRowCountException.
     private const string RolledBackCref = "T:SqlSource.TransactionRolledBackException";
 
-    private const string CompletedTransactionType = "global::System.InvalidOperationException";
+    private const string InvalidOperationType = "global::System.InvalidOperationException";
 
     /// <summary>
     /// Appends the <c>&lt;exception&gt;</c> of each exception that the capabilities throw.
@@ -35,7 +36,7 @@ internal static class ExecutionCapabilityWriter
             XmlDocWriter.AppendException(
                 builder,
                 indent,
-                CompletedTransactionType,
+                InvalidOperationType,
                 "The transaction has completed: it was committed or rolled back before the query ran."
             );
         }
@@ -60,6 +61,65 @@ internal static class ExecutionCapabilityWriter
                     + "query raised rolled back the transaction."
             );
         }
+
+        if (capabilities.Has(ExecutionCapabilities.ChecksResultSetsMatchItems))
+        {
+            XmlDocWriter.AppendException(
+                builder,
+                indent,
+                InvalidOperationType,
+                "A statement of the query returned a result set that is not an item's: a query whose statements "
+                    + "return more than one result set cannot run over a collection."
+            );
+        }
+    }
+
+    /// <summary>
+    /// Appends the move to a chunk's next result set, after the first, and the check that it has the output's columns:
+    /// a command whose statements gave no result set, or a result set of other columns, which a statement of the query
+    /// returned, throws, naming the item.  <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" /> turns it on,
+    /// in place of the plain move.
+    /// </summary>
+    public static void AppendResultSetCheck(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var batch = locals.Batch!;
+        var columns = context.Method.Output!.Columns.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _ = builder.Append(indent).Append("if ((").Append(batch.Result).Append(" > 0 && !");
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, locals.Reader, "NextResultAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling
+            .AppendAwaitedEnd(builder)
+            .Append(")\n")
+            .Append(GeneratedText.Deeper(indent))
+            .Append("|| ")
+            .Append(locals.Reader)
+            .Append(".FieldCount != ")
+            .Append(columns)
+            .Append(")\n")
+            .Append(indent)
+            .Append("{\n");
+        AppendResultSetThrow(in context, GeneratedText.Deeper(indent), "(" + batch.First + " + " + batch.Result + ")");
+        QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    /// <summary>
+    /// Appends, after a blank line, the check that no result set follows the chunk's last command's, which a statement
+    /// of the query returned; it names the chunk's last item.
+    /// <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" /> turns it on.
+    /// </summary>
+    public static void AppendNoLaterResultSetCheck(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        _ = builder.Append('\n').Append(indent).Append("if (");
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, context.Locals.Reader, "NextResultAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(")\n").Append(indent).Append("{\n");
+        AppendResultSetThrow(in context, GeneratedText.Deeper(indent), "(" + context.Locals.Batch!.ItemIndex + " - 1)");
+        QueryMethodWriter.AppendEnd(builder, indent);
     }
 
     /// <summary>
@@ -153,7 +213,7 @@ internal static class ExecutionCapabilityWriter
             .Append(indent)
             .Append(GeneratedText.Indent)
             .Append("throw new ")
-            .Append(CompletedTransactionType)
+            .Append(InvalidOperationType)
             .Append('(')
             .Append(
                 SymbolDisplay.FormatLiteral(
@@ -371,6 +431,40 @@ internal static class ExecutionCapabilityWriter
         AppendCheckedDrain(in context, innerIndent, NoCancellation);
         QueryMethodWriter.AppendEnd(builder, loopIndent);
         QueryMethodWriter.AppendEnd(builder, indent);
+    }
+
+    // The throw of a result set that is not an item's, naming the query and the item at the position given, an
+    // expression in parentheses.
+    private static void AppendResultSetThrow(in QueryMethodContext context, string indent, string itemIndex)
+    {
+        var argumentIndent = GeneratedText.Deeper(indent);
+        var continued = GeneratedText.Deeper(argumentIndent);
+        _ = context
+            .Builder.Append(indent)
+            .Append("throw new ")
+            .Append(InvalidOperationType)
+            .Append("(\n")
+            .Append(argumentIndent)
+            .Append(
+                SymbolDisplay.FormatLiteral(
+                    "The query '" + context.Method.QueryName + "' returned a result set of another shape for item ",
+                    quote: true
+                )
+            )
+            .Append('\n')
+            .Append(continued)
+            .Append("+ ")
+            .Append(itemIndex)
+            .Append(".ToString(")
+            .Append(ListWriter.Invariant)
+            .Append(")\n")
+            .Append(continued)
+            .Append(
+                "+ \", so it cannot run over a collection: a query whose statements return more than one result set "
+                    + "cannot.\"\n"
+            )
+            .Append(indent)
+            .Append(");\n");
     }
 
     // The drain loop with the token given, in a try followed by the catch of the database's error when the

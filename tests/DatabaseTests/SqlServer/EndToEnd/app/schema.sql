@@ -3,6 +3,11 @@
 -- hold GO alone.  Every batch runs on SQL Server 2017; the types that 2025 brings are in new-types.sql.  A change to it
 -- is followed by a run of tools/describe-end-to-end.sh, which writes the sidecars again.
 
+-- Snapshot isolation, which a collection method under transaction=snapshot begins its transaction at.  It changes no
+-- other level: READ_COMMITTED_SNAPSHOT stays off.
+ALTER DATABASE CURRENT SET ALLOW_SNAPSHOT_ISOLATION ON;
+GO
+
 -- The alias type of accounts.email, which a query's parameter and column name.
 CREATE TYPE dbo.Email FROM nvarchar(320) NOT NULL;
 GO

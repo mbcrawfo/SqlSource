@@ -595,7 +595,7 @@ public sealed class BatchMethodWriterTests
     }
 
     // On SQL Server the caller's completed transaction is refused before anything runs, and no drain reads later
-    // results, since each result set is an item's.
+    // results with the caller's token before a return, since each result set is an item's.
     [Fact]
     public void Append_SqlServer_RefusesACompletedTransactionAndDrainsNothing()
     {
@@ -603,8 +603,183 @@ public sealed class BatchMethodWriterTests
 
         IndexOf(text, "if (transaction is not null && transaction.Connection is null)")
             .ShouldBeLessThan(IndexOf(text, "using var items"));
-        text.ShouldNotContain("while (await reader.NextResultAsync(");
+        text.ShouldNotContain("while (await reader.NextResultAsync(cancellationToken)");
+    }
+
+    // On SQL Server a statement of the query can return a result set of its own, which would take the place of the next
+    // item's: each result set must have the output's columns, every command must have one, and none may follow the
+    // chunk's last, or the method throws, naming the query and the item.
+    [Fact]
+    public void Append_SqlServerMethodThatReadsRows_ChecksThatEachResultSetIsAnItems()
+    {
+        var text = Write(WithShape(ResultShape.Many) with { Engine = DatabaseEngine.SqlServer });
+
+        text.ShouldContain(
+            "                            for (var result = 0; result < itemIndex - first; result++)\n"
+                + "                            {\n"
+                + "                                if ((result > 0 && !await reader.NextResultAsync(cancellationToken)"
+                + ".ConfigureAwait(false))\n"
+                + "                                    || reader.FieldCount != 2)\n"
+                + "                                {\n"
+                + "                                    throw new global::System.InvalidOperationException(\n"
+                + "                                        \"The query 'GetUser' returned a result set of another "
+                + "shape for item \"\n"
+                + "                                            + (first + result).ToString("
+                + "global::System.Globalization.CultureInfo.InvariantCulture)\n"
+                + "                                            + \", so it cannot run over a collection: a query whose "
+                + "statements return more than one result set cannot.\"\n"
+                + "                                    );\n"
+                + "                                }\n"
+                + "\n"
+                + "                                while (await reader.ReadAsync(cancellationToken)"
+                + ".ConfigureAwait(false))\n"
+        );
+        text.ShouldContain(
+            "                            }\n"
+                + "\n"
+                + "                            if (await reader.NextResultAsync(cancellationToken)"
+                + ".ConfigureAwait(false))\n"
+                + "                            {\n"
+                + "                                throw new global::System.InvalidOperationException(\n"
+                + "                                    \"The query 'GetUser' returned a result set of another "
+                + "shape for item \"\n"
+                + "                                        + (itemIndex - 1).ToString("
+                + "global::System.Globalization.CultureInfo.InvariantCulture)\n"
+                + "                                        + \", so it cannot run over a collection: a query whose "
+                + "statements return more than one result set cannot.\"\n"
+                + "                                );\n"
+                + "                            }\n"
+        );
+        text.ShouldContain(
+            "/// <exception cref=\"global::System.InvalidOperationException\">A statement of the query returned a "
+                + "result set that is not an item's: a query whose statements return more than one result set "
+                + "cannot run over a collection.</exception>\n"
+        );
+    }
+
+    // PostgreSQL runs one statement for each command, and a method that reads no rows runs its batch without a reader,
+    // so neither checks its result sets.
+    [Theory]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.Many))]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount))]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.None))]
+    public void Append_MethodWithoutAResultSetCheck_ReadsEachResultSetAsItComes(string engineName, string shapeName)
+    {
+        var text = Write(
+            WithShape(System.Enum.Parse<ResultShape>(shapeName)) with
+            {
+                Engine = System.Enum.Parse<DatabaseEngine>(engineName),
+            }
+        );
+
+        text.ShouldNotContain("FieldCount");
+        text.ShouldNotContain("result set of another shape");
+    }
+
+    // With the caller's transaction, an exception of the method's own, its row count's, a row's or the result-set
+    // check's, is followed by the reader's disposal, which reads the rest of the batch, and is thrown inside
+    // TransactionRolledBackException when an error there rolled the transaction back, which leaves its Connection null.
+    [Fact]
+    public void Append_SqlServerGivenATransaction_ReportsARollbackAfterAnExceptionOfItsOwn()
+    {
+        var text = Write(WithShape(ResultShape.One) with { Engine = DatabaseEngine.SqlServer });
+
+        text.ShouldContain(
+            "                    catch (global::System.Exception exception) when (transaction is not null && exception "
+                + "is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))\n"
+                + "                    {\n"
+                + "                        await reader.DisposeAsync().ConfigureAwait(false);\n"
+                + "                        if (transaction.Connection is null)\n"
+                + "                        {\n"
+                + "                            throw new global::SqlSource.TransactionRolledBackException("
+                + "\"GetUser\", exception);\n"
+                + "                        }\n"
+                + "\n"
+                + "                        throw;\n"
+                + "                    }\n"
+        );
+        text.ShouldContain(
+            "/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">The query threw an exception of its "
+                + "own, or the database raised an error, its inner exception, and an error that the rest of the query "
+                + "raised then rolled back the transaction.</exception>\n"
+        );
+    }
+
+    // With the caller's transaction, a database error at an item is wrapped as CollectionItemException inside the
+    // reader's scope, and the rest of the batch is then read: an error there that rolled the transaction back throws
+    // TransactionRolledBackException with the item's error inside it, and an error that rolled it back itself, after
+    // which the batch ended, is thrown as it is, by the outer catch, which leaves a CollectionItemException alone.
+    [Fact]
+    public void Append_SqlServerGivenATransaction_ReportsARollbackByALaterErrorAfterTheItemsError()
+    {
+        var text = Write(WithShape(ResultShape.Many) with { Engine = DatabaseEngine.SqlServer });
+
+        text.ShouldContain(
+            "                await using var readerScope = global::System.Threading.Tasks"
+                + ".TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);\n"
+                + "                    try\n"
+                + "                    {\n"
+                + "                        try\n"
+                + "                        {\n"
+                + "                            for (var result = 0; result < itemIndex - first; result++)\n"
+        );
+        text.ShouldContain(
+            "                        }\n"
+                + "                        catch (global::System.Data.Common.DbException error) when (\n"
+                + "                            error is not global::SqlSource.CollectionItemException\n"
+                + "                            && error.BatchCommand is { } failed\n"
+                + "                            && batch.BatchCommands.Contains(failed)\n"
+                + "                        )\n"
+                + "                        {\n"
+                + "                            throw new global::SqlSource.CollectionItemException(\n"
+                + "                                \"GetUser\",\n"
+                + "                                first + batch.BatchCommands.IndexOf(failed),\n"
+                + "                                error\n"
+                + "                            );\n"
+                + "                        }\n"
+                + "                    }\n"
+                + "                    catch (global::System.Data.Common.DbException exception) when "
+                + "(transaction is not null)\n"
+                + "                    {\n"
+                + "                        var raisedLater = false;\n"
+                + "                        try\n"
+                + "                        {\n"
+                + "                            while (await reader.NextResultAsync("
+                + "global::System.Threading.CancellationToken.None).ConfigureAwait(false))\n"
+        );
+        text.ShouldContain(
+            "                        if (raisedLater && transaction.Connection is null)\n"
+                + "                        {\n"
+                + "                            throw new global::SqlSource.TransactionRolledBackException("
+                + "\"GetUser\", exception);\n"
+                + "                        }\n"
+        );
+    }
+
+    // A repository's method takes no transaction, so it checks its result sets and nothing of a rollback; a method
+    // that reads no rows runs ExecuteNonQueryAsync, which reads every result, and PostgreSQL's reader has no later
+    // result.
+    [Theory]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), true)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.None), false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.One), false)]
+    public void Append_MethodWithoutTheRollbackChecks_ThrowsNoTransactionRolledBackException(
+        string engineName,
+        string shapeName,
+        bool repository
+    )
+    {
+        var method = WithShape(System.Enum.Parse<ResultShape>(shapeName)) with
+        {
+            Engine = System.Enum.Parse<DatabaseEngine>(engineName),
+        };
+
+        var text = Write(repository ? Repository(method) : method);
+
         text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain("raisedLater");
+        CountOf(text, "catch (global::System.Data.Common.DbException error) when (").ShouldBe(1);
     }
 
     private static QueryMethod Repository(QueryMethod method) =>

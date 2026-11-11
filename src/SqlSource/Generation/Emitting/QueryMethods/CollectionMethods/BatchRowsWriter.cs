@@ -79,20 +79,32 @@ internal static class BatchRowsWriter
     internal static void AppendExecution(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
-        var batch = context.Locals.Batch!;
-        var innerIndent = GeneratedText.Deeper(indent);
-        var argumentIndent = GeneratedText.Deeper(innerIndent);
         _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
         if (context.Method.Shape is ResultShape.None or ResultShape.RowCount)
         {
-            AppendNonQuery(in context, innerIndent);
+            AppendNonQuery(in context, GeneratedText.Deeper(indent));
         }
         else
         {
-            AppendResultSets(in context, innerIndent);
+            AppendResultSets(in context, GeneratedText.Deeper(indent));
         }
 
         QueryMethodWriter.AppendEnd(builder, indent);
+        AppendItemErrorCatch(in context, indent);
+        if (context.Capabilities.Has(ExecutionCapabilities.FindsFailedItemByCompletion))
+        {
+            ExecutionCapabilityWriter.AppendFailedCommandSearch(in context, indent);
+        }
+    }
+
+    // The catch that throws a database error that names a command of the batch as CollectionItemException, at the
+    // position of that command's item, and leaves one that is a CollectionItemException already alone.
+    private static void AppendItemErrorCatch(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var batch = context.Locals.Batch!;
+        var innerIndent = GeneratedText.Deeper(indent);
+        var argumentIndent = GeneratedText.Deeper(innerIndent);
         _ = builder
             .Append(indent)
             .Append("catch (global::System.Data.Common.DbException ")
@@ -139,10 +151,6 @@ internal static class BatchRowsWriter
             .Append(innerIndent)
             .Append(");\n");
         QueryMethodWriter.AppendEnd(builder, indent);
-        if (context.Capabilities.Has(ExecutionCapabilities.FindsFailedItemByCompletion))
-        {
-            ExecutionCapabilityWriter.AppendFailedCommandSearch(in context, indent);
-        }
     }
 
     // The batch run without a reader; a rowcount method adds each command's count to its total, leaving out the -1 of a
@@ -173,14 +181,16 @@ internal static class BatchRowsWriter
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 
-    // The reader of the batch, disposed before the next chunk, and each command's result set read in order, the next
-    // reached with NextResultAsync.
+    // The reader of the batch, disposed before the next chunk, and the reading of its result sets.  Under
+    // ChecksRollbackAfterDatabaseError the reading is in a try whose catches check the caller's transaction once the
+    // rest of the batch is read, as a query method's do, inside it a try whose catch wraps an item's error first, so
+    // that a rollback reported for it holds the CollectionItemException; the outer try of AppendExecution leaves that
+    // alone and wraps the error that ExecuteReaderAsync throws.  ChecksRollbackAtRead never comes without it.
     private static void AppendResultSets(in QueryMethodContext context, string indent)
     {
         var builder = context.Builder;
         var locals = context.Locals;
         var batch = locals.Batch!;
-        var resultIndent = GeneratedText.Deeper(indent);
         _ = builder.Append(indent).Append("var ").Append(locals.Reader).Append(" = ");
         _ = AsyncSpelling
             .AppendAwaitedCall(builder, batch.Batch, "ExecuteReaderAsync")
@@ -188,17 +198,65 @@ internal static class BatchRowsWriter
             .Append(MethodArguments.CancellationToken);
         _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
         _ = AsyncSpelling.AppendUsing(builder, indent, locals.ReaderScope, locals.Reader);
+        if (!context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAfterDatabaseError))
+        {
+            AppendResultLoop(in context, indent);
+            return;
+        }
+
+        var checkIndent = GeneratedText.Deeper(indent);
+        var wrapIndent = GeneratedText.Deeper(checkIndent);
+        _ = builder
+            .Append(indent)
+            .Append("try\n")
+            .Append(indent)
+            .Append("{\n")
+            .Append(checkIndent)
+            .Append("try\n")
+            .Append(checkIndent)
+            .Append("{\n");
+        AppendResultLoop(in context, wrapIndent);
+        QueryMethodWriter.AppendEnd(builder, checkIndent);
+        AppendItemErrorCatch(in context, checkIndent);
+        QueryMethodWriter.AppendEnd(builder, indent);
+        ExecutionCapabilityWriter.AppendDatabaseErrorCheck(in context, indent);
+        if (context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead))
+        {
+            ExecutionCapabilityWriter.AppendRollbackCheck(in context, indent);
+        }
+    }
+
+    // Each command's result set read in order, the next reached with NextResultAsync, which, under
+    // ChecksResultSetsMatchItems, is checked to be the item's, as is the end of the batch after the last.
+    private static void AppendResultLoop(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var resultIndent = GeneratedText.Deeper(indent);
+        var checksResultSets = context.Capabilities.Has(ExecutionCapabilities.ChecksResultSetsMatchItems);
         AppendResultLoopStart(in context, indent);
-        QueryMethodWriter.AppendIf(builder, resultIndent, batch.Result + " > 0");
-        _ = builder.Append(GeneratedText.Deeper(resultIndent));
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, locals.Reader, "NextResultAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
-        QueryMethodWriter.AppendEnd(builder, resultIndent);
+        if (checksResultSets)
+        {
+            ExecutionCapabilityWriter.AppendResultSetCheck(in context, resultIndent);
+        }
+        else
+        {
+            QueryMethodWriter.AppendIf(builder, resultIndent, locals.Batch!.Result + " > 0");
+            _ = builder.Append(GeneratedText.Deeper(resultIndent));
+            _ = AsyncSpelling
+                .AppendAwaitedCall(builder, locals.Reader, "NextResultAsync")
+                .Append(MethodArguments.CancellationToken);
+            _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+            QueryMethodWriter.AppendEnd(builder, resultIndent);
+        }
+
         _ = builder.Append('\n');
         AppendResultSet(in context, resultIndent, context.Method.Output!);
         QueryMethodWriter.AppendEnd(builder, indent);
+        if (checksResultSets)
+        {
+            ExecutionCapabilityWriter.AppendNoLaterResultSetCheck(in context, indent);
+        }
     }
 
     // The loop over the commands of the chunk, up to the brace that opens its body.

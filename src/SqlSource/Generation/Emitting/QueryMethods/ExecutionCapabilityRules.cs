@@ -61,9 +61,19 @@ internal static class ExecutionCapabilityRules
     /// </para>
     /// <para>
     /// A collection method, whose <see cref="QueryMethod.Batch" /> is set, on SQL Server, has
-    /// <see cref="ExecutionCapabilities.RefusesCompletedTransaction" /> alone: each result set of its batch is an
-    /// item's, so it has no later result to drain, and it never streams.  What it checks of a transaction is written by
-    /// its body, <see cref="BatchWriter" />, not by these flags.
+    /// <see cref="ExecutionCapabilities.RefusesCompletedTransaction" />, and neither drain: each result set of its
+    /// batch is an item's, so it has no later result to drain, and it never streams.  One that reads rows has
+    /// <see cref="ExecutionCapabilities.ChecksRollbackAtRead" /> and
+    /// <see cref="ExecutionCapabilities.ChecksRollbackAfterDatabaseError" />, for the caller's transaction, as a query
+    /// method has them: an item's error or an exception of the method's own leaves the rest of the chunk's batch to be
+    /// read, and an error there can roll the transaction back.  The transaction it begins itself is rolled back by its
+    /// body, <see cref="BatchWriter" />, whatever the flags.
+    /// </para>
+    /// <para>
+    /// SQL Server, <see cref="ExecutionCapabilities.ChecksResultSetsMatchItems" />, on a collection method that reads
+    /// rows: a statement of the query can return a result set of its own, which the reader cannot tell from the next
+    /// item's, so a result set without the output's columns, a command without one, or one after the last command's
+    /// is refused.  A method that reads no rows runs <c>ExecuteNonQueryAsync</c>, whose result sets do not matter.
     /// </para>
     /// <para>
     /// A collection method on PostgreSQL, <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" />, of every
@@ -91,7 +101,14 @@ internal static class ExecutionCapabilityRules
             DatabaseEngine.PostgreSql when method.Batch is not null =>
                 ExecutionCapabilities.FindsFailedItemByCompletion,
             DatabaseEngine.PostgreSql => ExecutionCapabilities.None,
-            DatabaseEngine.SqlServer when method.Batch is not null => ExecutionCapabilities.RefusesCompletedTransaction,
+            DatabaseEngine.SqlServer when method.Batch is not null => ExecutionCapabilities.RefusesCompletedTransaction
+                | (
+                    readsRows
+                        ? ExecutionCapabilities.ChecksRollbackAtRead
+                            | ExecutionCapabilities.ChecksRollbackAfterDatabaseError
+                            | ExecutionCapabilities.ChecksResultSetsMatchItems
+                        : ExecutionCapabilities.None
+                ),
             DatabaseEngine.SqlServer => ExecutionCapabilities.RefusesCompletedTransaction
                 | (
                     readsRows
