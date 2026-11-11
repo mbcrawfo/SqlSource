@@ -1721,6 +1721,184 @@
           "computed": false
         }
       ]
+    },
+    "InsertNoteDefaultLevel": {
+      "hash": "2ec72c31f08f8fd3758eeb720b7dbe488844d92b2ca2d9291fe972834747c10a",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "body",
+          "ordinal": 1,
+          "type": {
+            "name": "nvarchar(max)",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "accountId",
+          "ordinal": 2,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "kind",
+          "type": {
+            "name": "varchar(10)",
+            "maxLength": 10,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "kind"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "InsertNoteDefaultLevelInRepository": {
+      "hash": "2ec72c31f08f8fd3758eeb720b7dbe488844d92b2ca2d9291fe972834747c10a",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "body",
+          "ordinal": 1,
+          "type": {
+            "name": "nvarchar(max)",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "accountId",
+          "ordinal": 2,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "kind",
+          "type": {
+            "name": "varchar(10)",
+            "maxLength": 10,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "kind"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

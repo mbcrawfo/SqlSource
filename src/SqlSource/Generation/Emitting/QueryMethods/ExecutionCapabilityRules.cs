@@ -84,12 +84,12 @@ internal static class ExecutionCapabilityRules
     /// </para>
     /// <para>
     /// SQL Server, <see cref="ExecutionCapabilities.RestoresSessionIsolation" />, on a collection method whose mode
-    /// names an isolation level: <c>BeginTransactionAsync</c> at a level sets the session's level, which SQL Server
-    /// keeps after the transaction ends, and the pool keeps when the connection is closed and opened again, so every
-    /// later statement outside a transaction on that session would run at the method's level.  The method reads the
-    /// level before it begins its transaction and sets it back after.  A mode that names no level,
-    /// <see cref="TransactionMode.On" /> or <see cref="TransactionMode.Off" />, does not have it, and PostgreSQL's
-    /// level is the transaction's alone.
+    /// begins a transaction of its own, every mode but <see cref="TransactionMode.Off" />:
+    /// <c>BeginTransactionAsync</c> sets the session's level, to the level it names or, under
+    /// <see cref="TransactionMode.On" />, to read committed, SqlClient's default, which SQL Server keeps after the
+    /// transaction ends, and the pool keeps when the connection is closed and opened again, so every later statement
+    /// outside a transaction on that session would run at the method's level.  The method reads the level before it
+    /// begins its transaction and sets it back after.  PostgreSQL's level is the transaction's alone.
     /// </para>
     /// <para>
     /// A repository's method, whose <see cref="QueryMethod.Source" /> gives its connection, takes no transaction, so it
@@ -120,7 +120,7 @@ internal static class ExecutionCapabilityRules
                         : ExecutionCapabilities.None
                 )
                 | (
-                    NamesALevel(batch.Transaction)
+                    BeginsItsOwn(batch.Transaction)
                         ? ExecutionCapabilities.RestoresSessionIsolation
                         : ExecutionCapabilities.None
                 ),
@@ -137,12 +137,13 @@ internal static class ExecutionCapabilityRules
         };
     }
 
-    // Whether the mode names the isolation level its transaction begins at.
-    private static bool NamesALevel(TransactionMode mode) =>
+    // Whether the mode begins a transaction of the method's own when the caller has none.
+    private static bool BeginsItsOwn(TransactionMode mode) =>
         mode switch
         {
-            TransactionMode.On or TransactionMode.Off => false,
-            TransactionMode.ReadUncommitted
+            TransactionMode.Off => false,
+            TransactionMode.On
+            or TransactionMode.ReadUncommitted
             or TransactionMode.ReadCommitted
             or TransactionMode.RepeatableRead
             or TransactionMode.Serializable

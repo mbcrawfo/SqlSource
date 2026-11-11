@@ -319,7 +319,8 @@ public sealed class BatchMethodWriterTests
                     + ", cancellationToken).ConfigureAwait(false)\n"
             );
 
-    // On SQL Server a mode that names a level reads the session's level before the method begins its own transaction,
+    // On SQL Server a mode that begins a transaction, on or a level, reads the session's level before the method begins
+    // its own transaction,
     // and sets it back in the finally that closes the connection, after the transaction is disposed and before the
     // connection is closed, with no cancellation, ignoring a failure; a method that began none read none, and restores
     // none.  A repository's method begins its own as well.
@@ -331,7 +332,9 @@ public sealed class BatchMethodWriterTests
     [InlineData(nameof(TransactionMode.Snapshot), false)]
     [InlineData(nameof(TransactionMode.Serializable), true)]
     [InlineData(nameof(TransactionMode.ReadUncommitted), true)]
-    public void Append_SqlServerIsolationLevel_RestoresTheSessionsLevel(string modeName, bool isRepository)
+    [InlineData(nameof(TransactionMode.On), false)]
+    [InlineData(nameof(TransactionMode.On), true)]
+    public void Append_SqlServerOwnTransaction_RestoresTheSessionsLevel(string modeName, bool isRepository)
     {
         var method = Batch with
         {
@@ -410,18 +413,18 @@ public sealed class BatchMethodWriterTests
         IndexOf(text, "if (isolationLevel != 0)").ShouldBeLessThan(IndexOf(text, "CloseAsync()"));
     }
 
-    // A mode that names no level, on or off, and PostgreSQL, whose level is the transaction's alone, neither read nor
+    // Off, which begins no transaction, and PostgreSQL, whose level is the transaction's alone, neither read nor
     // restore the session's level.
     [Theory]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), false)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), false)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), true)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), true)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.On), false)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.On), true)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.ReadCommitted), false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.RepeatableRead), false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), true)]
-    public void Append_NoLevelOrPostgreSql_LeavesTheSessionsLevelAlone(
+    public void Append_OffOrPostgreSql_LeavesTheSessionsLevelAlone(
         string engineName,
         string modeName,
         bool isRepository

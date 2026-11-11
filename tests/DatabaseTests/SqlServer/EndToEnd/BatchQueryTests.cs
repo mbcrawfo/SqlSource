@@ -526,10 +526,11 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         await ShouldBeInNoTransactionAsync(connection, token);
     }
 
-    // A transaction begun at a level sets the session's level, which SQL Server keeps after the transaction ends, so
-    // the method sets it back to the level it found, the default or one the caller set, after it commits.  Each level
-    // runs from read committed and from repeatable read, so that every level differs from one of them, and the
-    // repository's copy runs too.  The connection is not pooled, since a test sets its session's level.
+    // A transaction begun at a level, or under on at read committed, sets the session's level, which SQL Server keeps
+    // after the transaction ends, so the method sets it back to the level it found, the default or one the caller set,
+    // after it commits.  Each level runs from read committed and from repeatable read, so that every level differs from
+    // one of them, and the repositories' copies run too.  The connection is not pooled, since a test sets its session's
+    // level.
     [Theory]
     [MemberData(nameof(LevelsAndSessionLevels))]
     public async Task InsertNoteAtALevel_OnAnOpenConnection_LeavesTheSessionsLevelAsItFound(string level, string before)
@@ -578,6 +579,8 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
     [InlineData("serializable", "repeatable read")]
     [InlineData("snapshot", "repeatable read")]
     [InlineData("serializable, repository", "read committed")]
+    [InlineData("on", "repeatable read")]
+    [InlineData("on, repository", "serializable")]
     public async Task InsertNoteAtALevel_OnAClosedPooledConnection_LeavesThePooledSessionAsItFound(
         string level,
         string before
@@ -1136,8 +1139,8 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         return connection;
     }
 
-    // The copy of InsertNoteSerializable at the level, or its repository's copy, into the notes given, Notes unless
-    // another is named.
+    // The copy of InsertNoteSerializable at the level, or under on, whose transaction SqlClient begins at read
+    // committed, or the repository's copy of either, into the notes given, Notes unless another is named.
     private static Task<IReadOnlyList<IsolatedNote>> InsertAtLevelAsync(
         SqlConnection connection,
         string level,
@@ -1157,11 +1160,13 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
                 notes,
                 token
             ),
+            "on" => connection.InsertNoteDefaultLevel(items, notes, cancellationToken: token),
+            "on, repository" => new BatchQueries(connection).InsertNoteDefaultLevelInRepository(items, notes, token),
             _ => throw new ArgumentOutOfRangeException(nameof(level), level, "No copy runs at this level."),
         };
 
-    // Each level of a copy, the repository's among them, with each level a session starts the method at: the default,
-    // read committed, and repeatable read, so that every level differs from one of them.
+    // Each level of a copy, under on too, the repository's among them, with each level a session starts the method at:
+    // the default, read committed, and repeatable read, so that every level differs from one of them.
     public static TheoryData<string, string> LevelsAndSessionLevels()
     {
         var data = new TheoryData<string, string>();
@@ -1174,6 +1179,8 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
                 "serializable",
                 "snapshot",
                 "serializable, repository",
+                "on",
+                "on, repository",
             }
         )
         {
@@ -1184,12 +1191,13 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
         return data;
     }
 
-    // The number sys.dm_exec_sessions gives the level, or the level of the copy that the name gives.
+    // The number sys.dm_exec_sessions gives the level, or the level of the copy that the name gives, read committed
+    // under on.
     private static int LevelNumber(string level) =>
         level switch
         {
             "read uncommitted" => 1,
-            "read committed" => 2,
+            "read committed" or "on" or "on, repository" => 2,
             "repeatable read" => 3,
             "serializable" or "serializable, repository" => 4,
             "snapshot" => 5,

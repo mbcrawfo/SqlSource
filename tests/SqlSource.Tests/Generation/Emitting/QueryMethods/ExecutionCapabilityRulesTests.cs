@@ -83,16 +83,17 @@ public sealed class ExecutionCapabilityRulesTests
     // A collection method on SQL Server refuses the caller's completed transaction, and drains nothing, since each
     // result set of its batch is an item's and it never streams; one that reads rows checks for a rollback of the
     // caller's transaction as a query method does, and that each result set is an item's, and as a repository's method,
-    // which takes no transaction, only the second.  On PostgreSQL it finds the failed item by the first command that
-    // did not complete, whatever its shape, and as a repository's method too.
+    // which takes no transaction, only the second.  Under on, the mode of these rows, it begins a transaction of its
+    // own and restores the session's level after it, a repository's method too.  On PostgreSQL it finds the failed item
+    // by the first command that did not complete, whatever its shape, and as a repository's method too.
     [Theory]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), false, 85)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.One), false, 85)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.OneOptional), false, 85)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), false, 1)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.None), false, 1)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), true, 64)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), true, 0)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), false, 213)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.One), false, 213)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.OneOptional), false, 213)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), false, 129)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.None), false, 129)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), true, 192)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), true, 128)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.Many), false, 32)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.None), false, 32)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.RowCount), false, 32)]
@@ -116,9 +117,9 @@ public sealed class ExecutionCapabilityRulesTests
         ExecutionCapabilityRules.Of(method).ShouldBe((ExecutionCapabilities)expected);
     }
 
-    // On SQL Server a collection method whose mode names an isolation level restores the session's level after the
-    // transaction it begins at that level, a repository's method too, since it begins its own; under on and off, which
-    // name no level, it restores nothing, and on PostgreSQL, whose level is the transaction's alone, at no mode.
+    // On SQL Server a collection method whose mode begins a transaction of its own, at a level it names or under on,
+    // restores the session's level after it, a repository's method too, since it begins its own; under off, which
+    // begins none, it restores nothing, and on PostgreSQL, whose level is the transaction's alone, at no mode.
     [Theory]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.ReadUncommitted), false, true)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.ReadCommitted), false, true)]
@@ -127,14 +128,15 @@ public sealed class ExecutionCapabilityRulesTests
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Snapshot), false, true)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Serializable), true, true)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.ReadUncommitted), true, true)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), false, false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), false, true)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), false, false)]
-    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), true, false)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.On), true, true)]
     [InlineData(nameof(DatabaseEngine.SqlServer), nameof(TransactionMode.Off), true, false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.ReadCommitted), false, false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.RepeatableRead), false, false)]
     [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.Serializable), true, false)]
-    public void Of_CollectionMethodAtAMode_RestoresTheSessionsIsolationOnlyAtALevelOnSqlServer(
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(TransactionMode.On), false, false)]
+    public void Of_CollectionMethodAtAMode_RestoresTheSessionsIsolationOnlyWithItsOwnTransactionOnSqlServer(
         string engineName,
         string modeName,
         bool isRepository,
@@ -182,6 +184,9 @@ public sealed class ExecutionCapabilityRulesTests
                 | ExecutionCapabilities.ChecksResultSetsMatchItems
             )
         ).ShouldBe(85);
+        (
+            (int)(ExecutionCapabilities.RefusesCompletedTransaction | ExecutionCapabilities.RestoresSessionIsolation)
+        ).ShouldBe(129);
     }
 
     [Theory]

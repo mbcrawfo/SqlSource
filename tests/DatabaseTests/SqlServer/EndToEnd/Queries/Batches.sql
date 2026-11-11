@@ -237,3 +237,37 @@ SELECT
     SYSDATETIME()
 FROM dbo.accounts
 WHERE id = @accountId;
+
+-- name: InsertNoteDefaultLevel -> one
+-- summary: InsertNoteSerializable again, under transaction=on, whose transaction begins at read committed.
+-- generator: transaction=on
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
+-- name: InsertNoteDefaultLevelInRepository -> one
+-- summary: InsertNoteDefaultLevel again, at the output repository, as an instance method of BatchQueries that runs on
+-- summary: its borrowed connection.
+-- output: repository
+-- generator: transaction=on
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;

@@ -50,8 +50,8 @@ internal enum ExecutionCapabilities
     ChecksResultSetsMatchItems = 64,
 
     /// <summary>
-    /// A collection method that begins its own transaction at an isolation level reads the session's level first, and
-    /// sets the session back to it after the transaction ends, before the connection is closed.
+    /// A collection method that begins its own transaction reads the session's isolation level first, and sets the
+    /// session back to it after the transaction ends, before the connection is closed.
     /// </summary>
     RestoresSessionIsolation = 128,
 }
