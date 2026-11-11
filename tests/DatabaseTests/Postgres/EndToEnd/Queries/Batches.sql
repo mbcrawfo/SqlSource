@@ -3,11 +3,31 @@
 -- caller gives one or one is ambient.  The inserts name notes, and a test whose method commits makes a temporary table
 -- notes on its own connection, which PostgreSQL searches before public, so that the rows land there and the seed is
 -- left as it was.  Each insert writes the id it is given, so that a test can repeat one, and reads its account from
--- accounts, so that an item of an account that does not exist adds no row and returns none.
+-- accounts, so that an item of an account that does not exist adds no row and returns none.  A copy named with Sync
+-- after its original is the original under method-type=sync, which gives it a synchronous collection method in place
+-- of the asynchronous one, and one named with Both is under method-type=both, which gives it the two.
 -- generator: collection-method
 
 -- name: InsertNote -> one
 -- summary: Adds a note with the id it is given to the account that an id names, and returns it.
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, account_id, body;
+
+-- name: InsertNoteSync -> one
+-- summary: InsertNote, by a synchronous collection method.
+-- generator: method-type=sync
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, account_id, body;
+
+-- name: InsertNoteBoth -> one
+-- summary: InsertNote, by a synchronous collection method and an asynchronous one, which is named with Async after it.
+-- generator: method-type=both
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
@@ -20,8 +40,22 @@ RETURNING id, account_id, body;
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
 
+-- name: InsertNoteRowCountSync -> rowcount
+-- summary: InsertNoteRowCount, by a synchronous collection method.
+-- generator: method-type=sync
+-- input-model: NoteToAdd
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
+
 -- name: InsertNoteQuietly -> none
 -- summary: InsertNoteRowCount again, under none, which returns nothing.
+-- input-model: NoteToAdd
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
+
+-- name: InsertNoteQuietlySync -> none
+-- summary: InsertNoteQuietly, by a synchronous collection method.
+-- generator: method-type=sync
 -- input-model: NoteToAdd
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
@@ -31,8 +65,28 @@ SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
 -- output-model: BatchNote
 SELECT id, account_id, body FROM notes WHERE account_id = @accountId ORDER BY id;
 
+-- name: FindNotesSync
+-- summary: FindNotes, by a synchronous collection method.
+-- generator: method-type=sync
+-- output-model: BatchNote
+SELECT id, account_id, body FROM notes WHERE account_id = @accountId ORDER BY id;
+
+-- name: FindNotesStreamBoth
+-- summary: FindNotes as a stream under method-type=both, which gives a stream its asynchronous method alone, named
+-- summary: with Async after it, and a synchronous collection method and an asynchronous one, which return arrays.
+-- generator: method-type=both
+-- collection-type: IAsyncEnumerable
+-- output-model: BatchNote
+SELECT id, account_id, body FROM notes WHERE account_id = @accountId ORDER BY id;
+
 -- name: FindNote -> one-optional
 -- summary: The note that an id names, if there is one.
+-- output-model: BatchNote
+SELECT id, account_id, body FROM notes WHERE id = @id;
+
+-- name: FindNoteSync -> one-optional
+-- summary: FindNote, by a synchronous collection method.
+-- generator: method-type=sync
 -- output-model: BatchNote
 SELECT id, account_id, body FROM notes WHERE id = @id;
 
@@ -40,6 +94,15 @@ SELECT id, account_id, body FROM notes WHERE id = @id;
 -- summary: Adds a note as InsertNote does, in a transaction of its own at the level serializable, and returns its id
 -- summary: and the isolation level of the transaction it ran in.
 -- generator: transaction=serializable
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, current_setting('transaction_isolation') AS isolation;
+
+-- name: InsertNoteSerializableSync -> one
+-- summary: InsertNoteSerializable, by a synchronous collection method.
+-- generator: transaction=serializable method-type=sync
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
@@ -55,6 +118,15 @@ INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VAL
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
+-- name: InsertNoteReadCommittedSync -> one
+-- summary: InsertNoteReadCommitted, by a synchronous collection method.
+-- generator: transaction=read-committed method-type=sync
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, current_setting('transaction_isolation') AS isolation;
+
 -- name: InsertNoteRepeatableRead -> one
 -- summary: InsertNoteSerializable again, under transaction=repeatable-read.
 -- generator: transaction=repeatable-read
@@ -64,9 +136,27 @@ INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VAL
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
 
+-- name: InsertNoteRepeatableReadSync -> one
+-- summary: InsertNoteRepeatableRead, by a synchronous collection method.
+-- generator: transaction=repeatable-read method-type=sync
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, current_setting('transaction_isolation') AS isolation;
+
 -- name: InsertNoteNoTransaction -> one
 -- summary: InsertNote again, under transaction=off, so that each batch commits or rolls back on its own.
 -- generator: transaction=off
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, account_id, body;
+
+-- name: InsertNoteNoTransactionSync -> one
+-- summary: InsertNoteNoTransaction, by a synchronous collection method.
+-- generator: transaction=off method-type=sync
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
