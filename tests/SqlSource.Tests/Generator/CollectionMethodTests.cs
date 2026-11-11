@@ -3,8 +3,10 @@
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -224,6 +226,162 @@ public sealed class CollectionMethodTests
         run.Sources.Keys.ShouldNotContain("App.First.Queries-Methods.g.cs");
         run.Sources.Keys.ShouldNotContain("App.Second.Queries-Methods.g.cs");
     }
+
+    // Npgsql refuses a batch command whose text ends in a line comment after its final semicolon, which keep-comments
+    // can leave, so a PostgreSQL collection method sends the query's SQL without comments, and its query method keeps
+    // them.
+    [Fact]
+    public void Run_KeepCommentsOnPostgres_GivesTheCollectionMethodTheSqlWithoutComments()
+    {
+        var file = AddUser() with
+        {
+            Text =
+                "-- generator: collection-method keep-comments\n-- name: AddUser -> one\n"
+                + "INSERT INTO users (id) /* kept */ VALUES (@id) RETURNING id; -- done\n",
+        };
+
+        var run = Plan(file);
+
+        run.ShouldBeClean();
+        var methods = MethodsOf(run);
+        SqlOf(methods[0]).ShouldContain("/* kept */");
+        SqlOf(methods[1]).ShouldNotContain("/* kept */");
+        SqlOf(methods[1]).ShouldNotContain("-- done");
+    }
+
+    // SQL Server takes a comment in a batch command, so its collection method sends what its query method sends.
+    [Fact]
+    public void Run_KeepCommentsOnSqlServer_KeepsTheCommentsOfTheCollectionMethod()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: collection-method keep-comments\n-- name: AddUser -> one\n"
+                + "INSERT INTO dbo.users (id) /* kept */ OUTPUT inserted.id VALUES (@id);\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(file, [SqlServerAddUser(file, hasRows: true)]);
+
+        run.ShouldBeClean();
+        SqlOf(MethodsOf(run)[1]).ShouldContain("/* kept */");
+    }
+
+    // The collection method of each shape, beside its query method, compiles with no error and no warning, at both
+    // outputs that write methods and on both engines.
+    [Theory]
+    [MemberData(nameof(ShapesOutputsAndEngines))]
+    public void Run_EachShapeOutputAndEngine_CompilesTheCollectionMethod(string shape, string output, string engine)
+    {
+        var run = RunCollectionMethod(shape, output, engine, "collection-method");
+
+        run.ShouldBeClean();
+        CountOf(run.Sources[MethodRuns.MethodsFile], ".CreateBatch();\n").ShouldBe(1);
+    }
+
+    // The settings that change the body's statements: no transaction, an isolation level, and no array pool.
+    [Theory]
+    [InlineData("collection-method transaction=off", "methods", "postgres")]
+    [InlineData("collection-method transaction=off", "repository", "mssql")]
+    [InlineData("collection-method transaction=serializable", "methods", "mssql")]
+    [InlineData("collection-method transaction=repeatable-read", "repository", "postgres")]
+    [InlineData("collection-method array-pool=off", "methods", "postgres")]
+    public void Run_TransactionAndArrayPool_CompilesTheCollectionMethod(string parameters, string output, string engine)
+    {
+        foreach (var shape in new[] { "many", "one", "rowcount" })
+        {
+            var run = RunCollectionMethod(shape, output, engine, parameters);
+
+            run.ShouldBeClean();
+            CountOf(run.Sources[MethodRuns.MethodsFile], ".CreateBatch();\n").ShouldBe(1);
+        }
+    }
+
+    // A list's count, check and SQL are written for each item.
+    [Fact]
+    public void Run_QueryWithAList_CompilesTheCollectionMethod()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- generator: collection-method\n-- name: FindUsers -> many\n"
+                + "SELECT id FROM users WHERE id IN @ids OR @ids IS NULL;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "FindUsers", [Parameter("ids")], [Column("id")])]);
+
+        run.ShouldBeClean();
+        var source = run.Sources[MethodRuns.MethodsFile];
+        source.ShouldContain("var list0 = item.Ids;\n");
+        source.ShouldContain("var list0 = parameters.Ids;\n");
+    }
+
+    public static TheoryData<string, string, string> ShapesOutputsAndEngines()
+    {
+        var data = new TheoryData<string, string, string>();
+        foreach (var shape in new[] { "many", "one", "one-optional", "rowcount", "none" })
+        {
+            foreach (var output in new[] { "methods", "repository" })
+            {
+                foreach (var engine in new[] { "postgres", "mssql" })
+                {
+                    data.Add(shape, output, engine);
+                }
+            }
+        }
+
+        return data;
+    }
+
+    // AddUser of the shape with the generator parameters, under the output and on the engine, its entry with rows for
+    // a shape that reads them.
+    private static GeneratorRun RunCollectionMethod(string shape, string output, string engine, string parameters)
+    {
+        var readsRows = shape is "many" or "one" or "one-optional";
+        var markers = "-- generator: " + parameters + "\n-- name: AddUser -> " + shape + "\n";
+        if (engine == "postgres")
+        {
+            var file = new SqlFile(
+                GeneratorHarness.UsersPath,
+                markers + "INSERT INTO users (id) VALUES (@id)" + (readsRows ? " RETURNING id;\n" : ";\n")
+            );
+            SidecarEntry[] entries = [Entry(file, "AddUser", [Parameter("id")], readsRows ? [Column("id")] : null)];
+            return output == "methods" ? MethodRuns.Run(file, entries) : RepositoryRuns.Run(file, entries);
+        }
+
+        var sqlServerFile = new SqlFile(
+            GeneratorHarness.UsersPath,
+            markers + "INSERT INTO dbo.users (id)" + (readsRows ? " OUTPUT inserted.id" : "") + " VALUES (@id);\n"
+        );
+        SidecarEntry[] sqlServerEntries = [SqlServerAddUser(sqlServerFile, readsRows)];
+        return output == "methods"
+            ? MethodRuns.RunSqlServer(sqlServerFile, sqlServerEntries)
+            : RepositoryRuns.Run(
+                sqlServerFile,
+                sqlServerEntries,
+                SqlServerRepositorySource,
+                [SqlClientReferences.SqlClient7],
+                "mssql"
+            );
+    }
+
+    // A repository on SQL Server, whose methods make their connection from a connection string.
+    private const string SqlServerRepositorySource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate(Source = ".")]
+            public partial class Sample(string connectionString);
+        }
+        """;
+
+    private static SidecarEntry SqlServerAddUser(SqlFile file, bool hasRows) =>
+        MethodRuns.SqlServerEntry(
+            file,
+            "AddUser",
+            [TestSidecars.Parameter(0, "id", TestSidecars.SqlServer())],
+            hasRows ? [TestSidecars.Column(0, "id", TestSidecars.SqlServer())] : null
+        );
+
+    private static string SqlOf(QueryMethod method) => MethodWriter.GetSql(method.Segments);
 
     private static int CountOf(string text, string part)
     {

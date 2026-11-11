@@ -141,26 +141,30 @@ internal static class MethodRuns
         }
         """;
 
-    // Three queries whose token has the name, beside a parameter that can be null, an array and a list with a null
-    // test, each bound through a converter: Probe reads many rows, ProbeOne one and ProbeStream streams its rows, each
-    // into a model of a column read through a converter and an array read through it element by element, so that the
-    // token sits beside every local, local function and lambda's parameter a method can have.
+    // Four queries whose token has the name, beside a parameter that can be null, an array and a list with a null
+    // test, each bound through a converter, each with its collection method: Probe reads many rows, ProbeOne one and
+    // ProbeStream streams its rows, each into a model of a column read through a converter and an array read through it
+    // element by element, and ProbeCount counts them, so that the token sits beside every local, local function and
+    // lambda's parameter a method can have.
     public static GeneratorRun RunTokenNamed(string token, LanguageVersion languageVersion)
     {
-        var body =
-            "-- token: {{"
-            + token
-            + ":users}}\nSELECT id, ids FROM {{"
-            + token
-            + "}} WHERE id = @id OR id = ANY(@ids) OR (@members IS NULL OR id IN @members);\n";
+        var where = "}} WHERE id = @id OR id = ANY(@ids) OR (@members IS NULL OR id IN @members);\n";
+        var tokenMarker = "-- token: {{" + token + ":users}}\n";
+        var body = tokenMarker + "SELECT id, ids FROM {{" + token + where;
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: int4=App.UserId\n-- name: Probe\n"
+            "-- type-override: int4=App.UserId\n-- generator: collection-method\n-- name: Probe\n"
                 + body
                 + "-- name: ProbeOne -> one\n"
                 + body
                 + "-- name: ProbeStream\n-- collection-type: IAsyncEnumerable\n"
                 + body
+                + "-- name: ProbeCount -> rowcount\n"
+                + tokenMarker
+                + "UPDATE {{"
+                + token
+                + "}} SET id = id"
+                + where[2..]
         );
         var ids = ModelRuns.ArrayOf(ModelRuns.Int4, "_int4");
         SidecarParameter[] parameters =
@@ -176,6 +180,7 @@ internal static class MethodRuns
                 ModelRuns.Entry(file, "Probe", parameters, columns),
                 ModelRuns.Entry(file, "ProbeOne", parameters, columns),
                 ModelRuns.Entry(file, "ProbeStream", parameters, columns),
+                ModelRuns.Entry(file, "ProbeCount", parameters, null),
             ],
             TokenSource,
             languageVersion: languageVersion

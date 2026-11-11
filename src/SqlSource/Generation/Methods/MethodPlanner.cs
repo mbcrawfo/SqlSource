@@ -10,6 +10,7 @@ using SqlSource.Generation.Placement;
 using SqlSource.Generation.Repositories;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.Libraries;
@@ -484,7 +485,7 @@ internal static class MethodPlanner
             problems,
             query.Name,
             query.NameLocation,
-            AddCollectionMethod(method, settings, problems),
+            AddCollectionMethod(method, query.Segments, settings, problems),
             isUsable,
             WarningIdsOf(models, methodInput, methodOutput)
         );
@@ -494,8 +495,11 @@ internal static class MethodPlanner
     // are the items.  It has the query method's name by design, so it is not checked against the names again, and it
     // reads its rows into an array where the query method streams them.  An isolation level that the query's database
     // does not have costs the query only this method, and is reported as a problem that does not stop the query's own.
+    // Npgsql refuses a batch command whose text ends in a line comment after its final semicolon, which keep-comments
+    // can leave, so a PostgreSQL collection method sends the query's SQL without comments, plainSegments.
     private static ImmutableArray<QueryMethod> AddCollectionMethod(
         QueryMethod method,
+        EquatableArray<SqlSegment> plainSegments,
         QuerySettings settings,
         List<DiagnosticInfo> problems
     )
@@ -531,6 +535,12 @@ internal static class MethodPlanner
                 Batch = new BatchCall(transaction),
                 Collection =
                     method.Collection == CollectionKind.IAsyncEnumerable ? CollectionKind.Array : method.Collection,
+                Segments = method.Engine switch
+                {
+                    DatabaseEngine.PostgreSql => plainSegments,
+                    DatabaseEngine.SqlServer => method.Segments,
+                    _ => throw UnexpectedEnumValueException.Of(method.Engine),
+                },
             },
         ];
     }

@@ -5,8 +5,8 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Decides the <see cref="ExecutionCapabilities" /> of a query's method, from its engine, its shape, whether it
-/// streams and whether it takes a transaction.  It runs in the output step, as the method is written, and its result
-/// is never cached.
+/// streams, whether it takes a transaction and whether it is a collection method.  It runs in the output step, as the
+/// method is written, and its result is never cached.
 /// </summary>
 internal static class ExecutionCapabilityRules
 {
@@ -59,6 +59,12 @@ internal static class ExecutionCapabilityRules
     /// an error that the caller is to see, which the reader's disposal would drop.
     /// </para>
     /// <para>
+    /// A collection method, whose <see cref="QueryMethod.Batch" /> is set, on SQL Server, has
+    /// <see cref="ExecutionCapabilities.RefusesCompletedTransaction" /> alone: each result set of its batch is an
+    /// item's, so it has no later result to drain, and it never streams.  What it checks of a transaction is written by
+    /// its body, <see cref="BatchWriter" />, not by these flags.
+    /// </para>
+    /// <para>
     /// A repository's method, whose <see cref="QueryMethod.Source" /> gives its connection, takes no transaction, so it
     /// has none of the flags about one, <see cref="TransactionFlags" />; it keeps the drains.
     /// </para>
@@ -75,6 +81,7 @@ internal static class ExecutionCapabilityRules
         return method.Engine switch
         {
             DatabaseEngine.PostgreSql => ExecutionCapabilities.None,
+            DatabaseEngine.SqlServer when method.Batch is not null => ExecutionCapabilities.RefusesCompletedTransaction,
             DatabaseEngine.SqlServer => ExecutionCapabilities.RefusesCompletedTransaction
                 | (
                     readsRows

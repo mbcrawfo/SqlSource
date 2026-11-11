@@ -10,8 +10,9 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// many query of <see cref="CollectionKind.IAsyncEnumerable" /> checks its arguments and returns a local iterator
 /// that does the rest as the loop asks for each row.  It builds the method's <see cref="QueryMethodContext" /> and
 /// writes the method in phases, in this order: <see cref="HeaderWriter" />, <see cref="CommandWriter" /> and
-/// <see cref="RowsWriter" />.  A new kind of method or a new engine follows <c>docs/architecture/generator.md</c>,
-/// "Extending query methods".
+/// <see cref="RowsWriter" />, or for a collection method, whose <see cref="QueryMethod.Batch" /> is set,
+/// <see cref="HeaderWriter" />, then <see cref="BatchWriter" /> and <see cref="BatchRowsWriter" />.  A new kind of
+/// method or a new engine follows <c>docs/architecture/generator.md</c>, "Extending query methods".
 /// </summary>
 /// <remarks>
 /// The arguments, their documentation and their checks come from <see cref="MethodArguments" />.  A token's argument
@@ -75,7 +76,8 @@ internal static class QueryMethodWriter
         HeaderWriter.AppendChecks(in context, bodyIndent);
         if (context.Method.Batch is not null)
         {
-            AppendInterimBatchBody(builder, bodyIndent);
+            BatchWriter.AppendBody(in context, bodyIndent);
+            ListWriter.AppendHelpers(in context, bodyIndent);
             AppendEnd(builder, indent);
             return;
         }
@@ -96,16 +98,6 @@ internal static class QueryMethodWriter
         AppendEnd(builder, bodyIndent);
         ListWriter.AppendHelpers(in context, bodyIndent);
         AppendEnd(builder, indent);
-    }
-
-    // What a collection method does until its body is written: it awaits, so that the asynchronous method it is gives
-    // no CS1998, and throws.
-    private static void AppendInterimBatchBody(StringBuilder builder, string indent)
-    {
-        _ = AsyncSpelling
-            .AppendAwait(builder.Append(indent))
-            .Append("global::System.Threading.Tasks.Task.CompletedTask.ConfigureAwait(false);\n");
-        _ = builder.Append(indent).Append("throw new global::System.NotImplementedException();\n");
     }
 
     internal static void AppendIf(StringBuilder builder, string indent, string condition) =>

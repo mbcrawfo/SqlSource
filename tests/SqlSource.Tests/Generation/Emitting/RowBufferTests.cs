@@ -67,6 +67,26 @@ public sealed class RowBufferTests
             )
             .ShouldBeFalse();
 
+    // A collection method collects the rows of one and one-optional too, into the buffer a many method reads into.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many), true)]
+    [InlineData(nameof(ResultShape.One), true)]
+    [InlineData(nameof(ResultShape.OneOptional), true)]
+    [InlineData(nameof(ResultShape.RowCount), false)]
+    [InlineData(nameof(ResultShape.None), false)]
+    public void IsUsedBy_CollectionMethod_IsTrueForEachShapeThatReadsRows(string shapeName, bool expected)
+    {
+        var method = ListUsers with
+        {
+            Shape = Enum.Parse<ResultShape>(shapeName),
+            Batch = new BatchCall(TransactionMode.On),
+        };
+
+        RowBuffer.IsUsedBy(method).ShouldBe(expected);
+        RowBuffer.IsUsedBy(method with { UseArrayPool = false }).ShouldBeFalse();
+        RowBuffer.IsUsedBy(method with { Collection = CollectionKind.ImmutableList }).ShouldBeFalse();
+    }
+
     // The project's one buffer, in a file of its own: Roslyn's EmbeddedAttribute keeps it from any other assembly that
     // sees this one's internals, so two projects that each have it do not clash.
     [Fact]

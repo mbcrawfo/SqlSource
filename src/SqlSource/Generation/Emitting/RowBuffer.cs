@@ -5,9 +5,9 @@ using SqlSource.Settings;
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>
-/// The buffer a method of <see cref="ResultShape.Many" /> reads its rows into when it returns an array, a list, an
-/// immutable array or one of their interfaces: one struct for the project, in a file of its own, which rents its arrays
-/// from the shared pool.
+/// The buffer a method of <see cref="ResultShape.Many" />, or a collection method that reads rows, reads its rows into
+/// when it returns an array, a list, an immutable array or one of their interfaces: one struct for the project, in a
+/// file of its own, which rents its arrays from the shared pool.
 /// </summary>
 /// <remarks>
 /// It is internal and marked with Roslyn's <c>EmbeddedAttribute</c>, so that no other assembly, even one that sees the
@@ -126,14 +126,17 @@ internal static class RowBuffer
     ];
 
     /// <summary>
-    /// Whether the method reads its rows into the buffer: a method of <see cref="ResultShape.Many" /> that may use the
-    /// pool and returns an array, <c>IEnumerable&lt;T&gt;</c>, <c>IReadOnlyCollection&lt;T&gt;</c>,
-    /// <c>IReadOnlyList&lt;T&gt;</c>, <c>List&lt;T&gt;</c>, <c>IList&lt;T&gt;</c>, <c>ICollection&lt;T&gt;</c> or
-    /// <c>ImmutableArray&lt;T&gt;</c>: every type but <c>ImmutableList&lt;T&gt;</c>, <c>IImmutableList&lt;T&gt;</c> and
-    /// <c>IAsyncEnumerable&lt;T&gt;</c>, which buffers nothing.
+    /// Whether the method reads its rows into the buffer: a method of <see cref="ResultShape.Many" />, or a collection
+    /// method of any shape that reads rows, that may use the pool and returns an array, <c>IEnumerable&lt;T&gt;</c>,
+    /// <c>IReadOnlyCollection&lt;T&gt;</c>, <c>IReadOnlyList&lt;T&gt;</c>, <c>List&lt;T&gt;</c>, <c>IList&lt;T&gt;</c>,
+    /// <c>ICollection&lt;T&gt;</c> or <c>ImmutableArray&lt;T&gt;</c>: every type but <c>ImmutableList&lt;T&gt;</c>,
+    /// <c>IImmutableList&lt;T&gt;</c> and <c>IAsyncEnumerable&lt;T&gt;</c>, which buffers nothing.
     /// </summary>
     public static bool IsUsedBy(QueryMethod method) =>
-        method.Shape == ResultShape.Many
+        (
+            method.Shape == ResultShape.Many
+            || (method.Batch is not null && method.Shape is ResultShape.One or ResultShape.OneOptional)
+        )
         && method.UseArrayPool
         && method.Collection
             is CollectionKind.Array

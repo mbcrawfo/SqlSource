@@ -1,6 +1,7 @@
 using System;
 using Shouldly;
 using SqlSource.Generation.Emitting.QueryMethods;
+using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using Xunit;
 
@@ -74,6 +75,35 @@ public sealed class ExecutionCapabilityRulesTests
             Shape = Enum.Parse<ResultShape>(shapeName),
             Collection = Enum.Parse<CollectionKind>(collectionName),
             Source = TestModels.Source(),
+        };
+
+        ExecutionCapabilityRules.Of(method).ShouldBe((ExecutionCapabilities)expected);
+    }
+
+    // A collection method on SQL Server refuses the caller's completed transaction and nothing else: each result set of
+    // its batch is an item's, so it drains none, and it never streams.  On PostgreSQL, or as a repository's method,
+    // which takes no transaction, it has no flag.
+    [Theory]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), false, 1)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.One), false, 1)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.RowCount), false, 1)]
+    [InlineData(nameof(DatabaseEngine.SqlServer), nameof(ResultShape.Many), true, 0)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.Many), false, 0)]
+    [InlineData(nameof(DatabaseEngine.PostgreSql), nameof(ResultShape.None), false, 0)]
+    public void Of_CollectionMethod_RefusesOnlyACompletedTransactionOnSqlServer(
+        string engineName,
+        string shapeName,
+        bool isRepository,
+        int expected
+    )
+    {
+        var method = QueryMethodWriterTests.GetUser with
+        {
+            Engine = Enum.Parse<DatabaseEngine>(engineName),
+            Shape = Enum.Parse<ResultShape>(shapeName),
+            Collection = CollectionKind.Array,
+            Source = isRepository ? TestModels.Source() : null,
+            Batch = new BatchCall(TransactionMode.On),
         };
 
         ExecutionCapabilityRules.Of(method).ShouldBe((ExecutionCapabilities)expected);
