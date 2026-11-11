@@ -3,6 +3,7 @@
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -148,6 +149,60 @@ public sealed class GeneratorParameterLevelTests
         var query = StepOutputs.Single<ParsedSqlFile>(run, TrackingNames.ParsedFile).Queries.ShouldHaveSingleItem();
         query.KeptSegments.ShouldBeNull();
         query.KeptErrors.ShouldBeEmpty();
+    }
+
+    // method-type merges per parameter as the others do: the query's default hides the folder's settings file, which
+    // asks for sync, so the query has the default, async.
+    [Fact]
+    public void MethodType_SettingsFileSyncAndQueryDefault_IsAsync() =>
+        MethodTypeOf("method-type=default").ShouldBe(MethodType.Async);
+
+    // The run of the test above without the query's marker, so that it shows the settings file reaches the query.
+    [Fact]
+    public void MethodType_SettingsFileSyncAndNoQueryMarker_IsSync() => MethodTypeOf(null).ShouldBe(MethodType.Sync);
+
+    // method-type alone reads as method-type=on, and on is no word of it.
+    [Fact]
+    public void Run_MethodTypeMarkerWithoutAValue_IsAnInvalidValue()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [GeneratorHarness.SampleSourceFile],
+            [new SqlFile(GeneratorHarness.UsersPath, "-- generator: method-type\n" + SqlTexts.GetUser)]
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC111 {GeneratorHarness.UsersPath}(1,15)-(1,26): 'method-type' lacks a value it needs, has one it "
+                + "does not take, or has one that is not valid.  The values of method-type are async, sync, both and "
+                + "default",
+        ]);
+    }
+
+    // The method type of the one query of Users.sql, under method-type=sync in its folder's settings file and the
+    // query's own generator parameters, none where null.
+    private static MethodType MethodTypeOf(string? query)
+    {
+        var settings = new LevelSettings().At(
+            SettingLevel.FolderFile,
+            Setting.GeneratorParameters,
+            LevelSettings.WordsAt(SettingLevel.FolderFile, "method-type=sync")
+        );
+        if (query is not null)
+        {
+            _ = settings.At(SettingLevel.Query, Setting.GeneratorParameters, query);
+        }
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [GeneratorHarness.SampleSourceFile],
+            settings.Files(GeneratorHarness.UsersFile)
+        );
+
+        run.ShouldBeClean();
+        var type = StepOutputs.Single<TypeQueries>(run, TrackingNames.TypeQueries);
+        return QuerySettings
+            .Resolve(type.Files[0].Queries.ShouldHaveSingleItem().Markers, type.FileSettings[0])
+            .MethodType;
     }
 
     // The file Q.sql of this text at sql, claimed by Sample alone, under keep-comments given at the level.

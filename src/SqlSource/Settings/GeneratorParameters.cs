@@ -3,8 +3,8 @@ using System;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The generator parameters a level can name: switches, each on or off, and <see cref="Transaction" />, which takes
-/// one of several words.  Most switches are off by default;
+/// The generator parameters a level can name: switches, each on or off, and <see cref="Transaction" /> and
+/// <see cref="MethodType" />, which take one of several words.  Most switches are off by default;
 /// <see cref="TokenValidation" />, <see cref="TableModels" />, <see cref="ArrayPool" /> and <see cref="ListPadding" />
 /// are on, and <see cref="GeneratorParameterList.Defaults" /> names them.
 /// </summary>
@@ -58,4 +58,10 @@ internal enum GeneratorParameters
     /// <see cref="TransactionMode" />.  It is not a switch, and is <see cref="TransactionMode.On" /> by default.
     /// </summary>
     Transaction = 512,
+
+    /// <summary>
+    /// <c>method-type</c>: which methods a query whose output is <c>methods</c> or <c>repository</c> gets, one of the
+    /// words of <see cref="MethodType" />.  It is not a switch, and is <see cref="MethodType.Async" /> by default.
+    /// </summary>
+    MethodType = 1024,
 }

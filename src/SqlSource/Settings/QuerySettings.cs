@@ -88,6 +88,9 @@ internal readonly record struct QuerySettings(
     /// <summary>How a collection method wraps its runs in a transaction.</summary>
     public TransactionMode Transaction => (TransactionMode)Parameters.Get(GeneratorParameters.Transaction);
 
+    /// <summary>Which methods the query gets when its output is <c>methods</c> or <c>repository</c>.</summary>
+    public MethodType MethodType => (MethodType)Parameters.Get(GeneratorParameters.MethodType);
+
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the file's level, then the default.  The file's level is the chain of its folder, so the nearest settings file

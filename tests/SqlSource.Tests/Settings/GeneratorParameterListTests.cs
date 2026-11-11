@@ -223,6 +223,32 @@ public sealed class GeneratorParameterListTests
     public void ReadElements_TransactionValue_IsItsWord(string element, int value) =>
         GeneratorParameterList.ReadElements([element], [], []).ValueOf(GeneratorParameters.Transaction).ShouldBe(value);
 
+    [Theory]
+    [InlineData("method-type=async", 0)]
+    [InlineData("method-type=sync", 1)]
+    [InlineData("method-type=both", 2)]
+    [InlineData("Method-Type=SYNC", 1)]
+    [InlineData("METHOD-TYPE=Both", 2)]
+    public void ReadWord_MethodTypeWords_ReadsEachIndex(string word, int expected)
+    {
+        var kind = GeneratorParameterList.ReadWord(word.AsSpan(), out var definition, out var value);
+
+        kind.ShouldBe(GeneratorWordKind.Parameter);
+        definition.ShouldNotBeNull().Parameter.ShouldBe(GeneratorParameters.MethodType);
+        value.ShouldBe(expected);
+    }
+
+    // method-type alone reads as method-type=on, and on is no word of it.
+    [Fact]
+    public void ReadWord_MethodTypeAlone_IsInvalidState()
+    {
+        var kind = GeneratorParameterList.ReadWord("method-type".AsSpan(), out var definition, out var value);
+
+        kind.ShouldBe(GeneratorWordKind.InvalidState);
+        definition.ShouldNotBeNull().Parameter.ShouldBe(GeneratorParameters.MethodType);
+        value.ShouldBeNull();
+    }
+
     [Fact]
     public void Resolve_NoChoices_HasCollectionMethodOff() =>
         GeneratorParameterChoices.None.Resolve().IsOn(GeneratorParameters.CollectionMethod).ShouldBeFalse();

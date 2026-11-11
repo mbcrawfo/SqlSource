@@ -73,6 +73,7 @@ public sealed class DiagnosticsDocumentTests
             "list-padding",
             "collection-method",
             "transaction",
+            "method-type",
             "default",
         ];
         var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);
