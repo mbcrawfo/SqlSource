@@ -54,3 +54,13 @@ ORDER BY created_at, id;
 SELECT id, name
 FROM users
 ORDER BY {{orderBy:name}};
+
+-- name: GetUserName -> one-optional
+-- summary: The name of one user, or null when there is none.
+-- The generator parameter method-type=both gives the query a synchronous method, GetUserName, for code that does not
+-- await: it takes no cancellation token and returns the row itself, or null.  Beside it is its asynchronous method,
+-- which method-type=both names GetUserNameAsync, so that the two never share a name.
+-- generator: method-type=both
+SELECT name
+FROM users
+WHERE id = @id;

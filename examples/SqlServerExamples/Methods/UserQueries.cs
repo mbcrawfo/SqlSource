@@ -76,4 +76,16 @@ public sealed partial class UserQueries(DbConnection connection)
         string orderBy,
         CancellationToken cancellationToken = default
     ) => connection.ListUsersSortedBy(orderBy, cancellationToken: cancellationToken);
+
+    // The query's -- generator: method-type=both gives it a synchronous method, GetUserName, which runs on this thread
+    // and returns the row, or null, and takes no CancellationToken, for code that does not await.
+    public string? GetUserName(int id) => connection.GetUserName(new GetUserNameParams(id))?.Name;
+
+    // Its asynchronous method, which method-type=both names GetUserNameAsync whatever async-method-suffix says.
+    public async Task<string?> GetUserNameAsync(int id, CancellationToken cancellationToken = default) =>
+        (
+            await connection
+                .GetUserNameAsync(new GetUserNameParams(id), cancellationToken: cancellationToken)
+                .ConfigureAwait(false)
+        )?.Name;
 }
