@@ -18,7 +18,8 @@ internal readonly struct QueryMethodContext(
     MethodArguments arguments,
     QueryMethodLocals locals,
     ExecutionCapabilities capabilities,
-    bool streams
+    bool streams,
+    CallSpelling spelling
 )
 {
     /// <summary>The source being built.</summary>
@@ -50,4 +51,10 @@ internal readonly struct QueryMethodContext(
 
     /// <summary>Whether the method streams its rows, as <see cref="QueryMethod.Streams" /> says.</summary>
     public bool Streams { get; } = streams;
+
+    /// <summary>
+    /// How the method spells its calls, its disposal scopes and the type it returns, as its
+    /// <see cref="QueryMethod.Synchrony" /> asks.
+    /// </summary>
+    public CallSpelling Spelling { get; } = spelling;
 }

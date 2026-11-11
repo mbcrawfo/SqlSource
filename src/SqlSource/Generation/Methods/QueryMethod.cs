@@ -74,6 +74,12 @@ internal sealed record QueryMethod(
     /// <see cref="TypeMethods.Methods" /> must not key them by name alone.
     /// </summary>
     public BatchCall? Batch { get; init; }
+
+    /// <summary>
+    /// Whether the method awaits its calls and returns a task, the default, or makes the synchronous calls and returns
+    /// its result.  A synchronous method takes no cancellation token and never streams.
+    /// </summary>
+    public MethodSynchrony Synchrony { get; init; }
 }
 
 /// <summary>

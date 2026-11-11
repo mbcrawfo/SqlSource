@@ -325,6 +325,224 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("<exception");
     }
 
+    // A synchronous method is the asynchronous method's structure with the synchronous calls, a using for each
+    // await using, the result itself for its task, and no cancellation token.
+    [Fact]
+    public void Append_SynchronousOneOptional_IsTheWholeMethod()
+    {
+        var builder = new StringBuilder("before\n");
+
+        QueryMethodWriter.Append(builder, "    ", GetUser with { Synchrony = MethodSynchrony.Synchronous });
+
+        builder
+            .ToString()
+            .ShouldBe(
+                GeneratedFile.Joined(
+                    """
+                    before
+                        /// <summary>
+                        /// The <c>GetUser</c> query from <c>Users.sql</c>.
+                        /// </summary>
+                        /// <remarks>
+                        /// <code>
+                        /// SELECT id, name FROM users WHERE id = @id ORDER BY {{orderBy}}
+                        /// </code>
+                        /// </remarks>
+                        /// <param name="connection">The connection to run the query on.  ↩
+                    It is opened when it is closed, and closed again when the method opened it.</param>
+                        /// <param name="parameters">The query's parameters.</param>
+                        /// <param name="orderBy">The text that replaces <c>{{orderBy}}</c>.</param>
+                        /// <param name="transaction">The transaction to run the query in, or null.</param>
+                        /// <param name="commandTimeout">↩
+                    The command's timeout in seconds, or null for the driver's.</param>
+                        /// <returns>The row, or null when there is none.</returns>
+                        /// <exception cref="T:SqlSource.UnexpectedRowCountException">↩
+                    The query returned more than one row.</exception>
+                        public static global::App.GetUserDto? GetUser(
+                            this global::System.Data.Common.DbConnection connection,
+                            global::App.GetUserParams parameters,
+                            string orderBy,
+                            global::System.Data.Common.DbTransaction? transaction = null,
+                            int? commandTimeout = null)
+                        {
+                            global::System.ArgumentNullException.ThrowIfNull(connection);
+                            global::System.ArgumentNullException.ThrowIfNull(parameters);
+                            global::System.ArgumentException.ThrowIfNullOrWhiteSpace(orderBy);
+                            var sql = string.Create(
+                                checked(51 + orderBy.Length),
+                                orderBy,
+                                static (span, state) =>
+                                {
+                                    "SELECT id, name FROM users WHERE id = @id ORDER BY ".CopyTo(span);
+                                    span = span.Slice(51);
+                                    state.CopyTo(span);
+                                }
+                            );
+                            var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
+                            if (wasClosed)
+                            {
+                                connection.Open();
+                            }
+
+                            try
+                            {
+                                var command = connection.CreateCommand();
+                                using var commandScope = command;
+                                #pragma warning disable CA2100 // The text of a token is the caller's own choice.
+                                command.CommandText = sql;
+                                #pragma warning restore CA2100
+                                command.Transaction = transaction;
+                                if (commandTimeout.HasValue)
+                                {
+                                    command.CommandTimeout = commandTimeout.Value;
+                                }
+
+                                {
+                                    var parameter = new global::Npgsql.NpgsqlParameter<int>();
+                                    parameter.ParameterName = "id";
+                                    parameter.DataTypeName = "pg_catalog.int4";
+                                    parameter.TypedValue = parameters.Id;
+                                    command.Parameters.Add(parameter);
+                                }
+
+                                var reader = command.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                                using var readerScope = reader;
+                                if (!reader.Read())
+                                {
+                                    return null;
+                                }
+
+                                var row = new global::App.GetUserDto(reader.GetFieldValue<int>(0), ↩
+                    reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1));
+                                if (reader.Read())
+                                {
+                                    throw new global::SqlSource.UnexpectedRowCountException("GetUser", true);
+                                }
+
+                                return row;
+                            }
+                            finally
+                            {
+                                if (wasClosed)
+                                {
+                                    connection.Close();
+                                }
+                            }
+                        }
+
+                    """
+                )
+            );
+    }
+
+    // Each shape of a synchronous method returns what the asynchronous method's task holds, or void, and neither
+    // awaits nor takes a token.  A void method documents no return.
+    [Theory]
+    [InlineData(
+        nameof(ResultShape.Many),
+        "global::System.Collections.Generic.List<global::App.GetUserDto>",
+        "        while (reader.Read())\n",
+        "<returns>The rows the query returned.</returns>"
+    )]
+    [InlineData(
+        nameof(ResultShape.One),
+        "global::App.GetUserDto",
+        "        if (!reader.Read())\n",
+        "<returns>The row.</returns>"
+    )]
+    [InlineData(
+        nameof(ResultShape.OneOptional),
+        "global::App.GetUserDto?",
+        "        if (!reader.Read())\n",
+        "<returns>The row, or null when there is none.</returns>"
+    )]
+    [InlineData(nameof(ResultShape.None), "void", "        command.ExecuteNonQuery();\n    }\n", null)]
+    [InlineData(
+        nameof(ResultShape.RowCount),
+        "int",
+        "        return command.ExecuteNonQuery();\n    }\n",
+        "<returns>The number of rows the query affected.</returns>"
+    )]
+    public void Append_SynchronousEachShape_ReturnsTheResultWithoutAwaiting(
+        string shapeName,
+        string returns,
+        string execute,
+        string? returnsXml
+    )
+    {
+        var text = Write(
+            GetUser with
+            {
+                Shape = Enum.Parse<ResultShape>(shapeName),
+                Synchrony = MethodSynchrony.Synchronous,
+            }
+        );
+
+        text.ShouldContain("public static " + returns + " GetUser(\n");
+        text.ShouldContain(execute);
+        text.ShouldContain("        connection.Open();\n");
+        text.ShouldContain("            connection.Close();\n");
+        text.ShouldContain("    using var commandScope = command;\n");
+        text.Contains("<returns>", StringComparison.Ordinal).ShouldBe(returnsXml is not null);
+        if (returnsXml is not null)
+        {
+            text.ShouldContain("/// " + returnsXml + "\n");
+        }
+
+        ShouldNotAwait(text);
+    }
+
+    // A synchronous SQL Server method drains, checks its transaction and disposes its reader as the asynchronous one
+    // does, with the synchronous calls; the drain that took CancellationToken.None takes nothing.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many))]
+    [InlineData(nameof(ResultShape.One))]
+    [InlineData(nameof(ResultShape.OneOptional))]
+    public void Append_SynchronousSqlServerShapeReadingRows_DrainsAndDisposesSynchronously(string shapeName)
+    {
+        var text = Write(
+            SqlServerGetUser with
+            {
+                Shape = Enum.Parse<ResultShape>(shapeName),
+                Collection = CollectionKind.Array,
+                Synchrony = MethodSynchrony.Synchronous,
+            }
+        );
+
+        text.ShouldContain("            while (reader.NextResult())\n            {\n            }\n");
+        text.ShouldContain("                while (reader.NextResult())\n                {\n                }\n");
+        text.ShouldContain(
+            "            reader.Dispose();\n            if (raisedLater && transaction.Connection is null)\n"
+        );
+        text.ShouldContain("            reader.Dispose();\n            if (transaction.Connection is null)\n");
+        text.ShouldContain(CompletedTransactionCheck("    "));
+        text.ShouldContain(RolledBackAfterDatabaseErrorDocumentation);
+        ShouldNotAwait(text);
+    }
+
+    // A synchronous repository's member of its interface returns the result, or void, and ends after its last token.
+    [Fact]
+    public void AppendInterfaceMember_SynchronousRepositoryNone_ReturnsVoidAndTakesNoToken()
+    {
+        var builder = new StringBuilder();
+
+        QueryMethodWriter.AppendInterfaceMember(
+            builder,
+            string.Empty,
+            GetUser with
+            {
+                Shape = ResultShape.None,
+                Source = TestModels.Source(),
+                Synchrony = MethodSynchrony.Synchronous,
+            }
+        );
+
+        var text = builder.ToString();
+        text.ShouldEndWith("void GetUser(\n    global::App.GetUserParams parameters,\n    string orderBy);\n");
+        text.ShouldNotContain("<returns>");
+        ShouldNotAwait(text);
+    }
+
     [Theory]
     [InlineData(nameof(CollectionKind.Array), "global::App.GetUserDto[]", "RowBuffer", "rows.ToArray()")]
     [InlineData(
@@ -1762,6 +1980,20 @@ public sealed class QueryMethodWriterTests
                         }
 
                         QueryMethodWriter.Append(builder, "        ", method);
+
+                        // The synchronous method beside each that neither streams nor is a collection method.
+                        if (method.Batch is null && !method.Streams)
+                        {
+                            QueryMethodWriter.Append(
+                                builder,
+                                "        ",
+                                method with
+                                {
+                                    Name = method.Name + "Sync",
+                                    Synchrony = MethodSynchrony.Synchronous,
+                                }
+                            );
+                        }
                     }
                 }
             }
@@ -2006,6 +2238,16 @@ public sealed class QueryMethodWriterTests
         var builder = new StringBuilder();
         QueryMethodWriter.Append(builder, string.Empty, method, capabilities);
         return builder.ToString();
+    }
+
+    // No await, task, async call, ConfigureAwait or cancellation token, in any case.
+    private static void ShouldNotAwait(string text)
+    {
+        text.ShouldNotContain("async");
+        text.ShouldNotContain("await");
+        text.ShouldNotContain("Task");
+        text.ShouldNotContain("ConfigureAwait");
+        text.ShouldNotContain("cancellationToken");
     }
 
     private static void ShouldBalanceItsBraces(string text) =>

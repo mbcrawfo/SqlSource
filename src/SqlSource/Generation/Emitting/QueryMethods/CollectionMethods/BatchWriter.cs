@@ -138,14 +138,15 @@ internal static class BatchWriter
             .Append('\n')
             .Append(continued)
             .Append("? ");
-        _ = AsyncSpelling.AppendAwaitedCall(builder, context.Locals.Connection, "BeginTransactionAsync");
-        if (IsolationLevelOf(context.Method.Batch!.Transaction) is { } level)
+        _ = context.Spelling.AppendCallStart(builder, context.Locals.Connection, DriverCall.BeginTransaction);
+        var level = IsolationLevelOf(context.Method.Batch!.Transaction);
+        if (level is not null)
         {
-            _ = builder.Append("global::System.Data.IsolationLevel.").Append(level).Append(", ");
+            _ = builder.Append("global::System.Data.IsolationLevel.").Append(level);
         }
 
-        _ = builder.Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append('\n').Append(continued).Append(": null;\n");
+        _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: level is not null);
+        _ = context.Spelling.AppendCallEnd(builder).Append('\n').Append(continued).Append(": null;\n");
         _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
     }
 
@@ -201,7 +202,7 @@ internal static class BatchWriter
             .Append(" = ")
             .Append(locals.Connection)
             .Append(".CreateBatch();\n");
-        _ = AsyncSpelling.AppendUsing(builder, chunkIndent, batch.BatchScope, batch.Batch);
+        _ = context.Spelling.AppendUsing(builder, chunkIndent, batch.BatchScope, batch.Batch);
         AppendBatchTransaction(in context, chunkIndent, ownsTransaction);
         if (context.Arguments.TakesConnection)
         {
@@ -342,10 +343,9 @@ internal static class BatchWriter
         var ownTransaction = context.Locals.Batch!.OwnTransaction;
         QueryMethodWriter.AppendIf(builder, indent, ownTransaction + " is not null");
         _ = builder.Append(GeneratedText.Deeper(indent));
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, ownTransaction, "CommitAsync")
-            .Append(MethodArguments.CancellationToken);
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, ownTransaction, DriverCall.Commit);
+        _ = context.Spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 
@@ -361,10 +361,13 @@ internal static class BatchWriter
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("catch\n").Append(indent).Append("{\n");
         QueryMethodWriter.AppendIf(builder, catchIndent, ownTransaction + "?.Connection is not null");
         _ = builder.Append(ifIndent).Append("try\n").Append(ifIndent).Append("{\n").Append(tryIndent);
-        _ = AsyncSpelling
-            .AppendAwaitedCall(builder, ownTransaction, "RollbackAsync")
-            .Append("global::System.Threading.CancellationToken.None");
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, ownTransaction, DriverCall.Rollback);
+        _ = context.Spelling.AppendToken(
+            builder,
+            "global::System.Threading.CancellationToken.None",
+            afterArgument: false
+        );
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         QueryMethodWriter.AppendEnd(builder, ifIndent);
         _ = builder
             .Append(ifIndent)
@@ -380,8 +383,8 @@ internal static class BatchWriter
         _ = builder.Append(indent).Append("finally\n").Append(indent).Append("{\n");
         QueryMethodWriter.AppendIf(builder, catchIndent, ownTransaction + " is not null");
         _ = builder.Append(ifIndent);
-        _ = AsyncSpelling.AppendAwaitedCall(builder, ownTransaction, "DisposeAsync");
-        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = context.Spelling.AppendCallStart(builder, ownTransaction, DriverCall.Dispose);
+        _ = context.Spelling.AppendCallEnd(builder).Append(";\n");
         QueryMethodWriter.AppendEnd(builder, catchIndent);
         QueryMethodWriter.AppendEnd(builder, indent);
     }

@@ -147,6 +147,68 @@ public sealed class MethodArgumentsTests
             .ConvertAll(static argument => argument.Role)
             .ShouldBe([ArgumentRole.Cancellation]);
 
+    // A synchronous method takes the asynchronous method's arguments without the cancellation token.
+    [Fact]
+    public void Of_SynchronousMethod_TakesNoCancellationToken()
+    {
+        var method = Emitting.QueryMethods.QueryMethodWriterTests.GetUser with
+        {
+            Synchrony = MethodSynchrony.Synchronous,
+        };
+
+        Enumerate(MethodArguments.Of(method, ["orderBy", "await"]))
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([
+                ArgumentRole.Receiver,
+                ArgumentRole.Input,
+                ArgumentRole.Token,
+                ArgumentRole.Token,
+                ArgumentRole.Transaction,
+                ArgumentRole.CommandTimeout,
+            ]);
+        Enumerate(MethodArguments.Of(method with { Source = TestModels.Source() }, ["orderBy"]))
+            .ConvertAll(static argument => argument.Role)
+            .ShouldBe([ArgumentRole.Input, ArgumentRole.Token]);
+    }
+
+    [Fact]
+    public void AppendDeclaration_SynchronousMethod_EndsAfterTheCommandTimeout()
+    {
+        var builder = new StringBuilder();
+
+        Synchronous().AppendDeclaration(builder, "    ", default);
+
+        builder
+            .ToString()
+            .ShouldBe(
+                "        this global::System.Data.Common.DbConnection connection,\n"
+                    + "        global::App.P parameters,\n"
+                    + "        string orderBy,\n"
+                    + "        string @await,\n"
+                    + "        global::System.Data.Common.DbTransaction? transaction = null,\n"
+                    + "        int? commandTimeout = null)\n"
+            );
+    }
+
+    // A synchronous repository's method has no argument after its tokens, so the last token ends the member.
+    [Fact]
+    public void AppendInterfaceDeclaration_SynchronousRepositoryMethod_EndsAfterTheLastToken()
+    {
+        var builder = new StringBuilder();
+
+        new MethodArguments(
+            Input,
+            ["orderBy", "await"],
+            false,
+            false,
+            synchrony: MethodSynchrony.Synchronous
+        ).AppendInterfaceDeclaration(builder, "    ");
+
+        builder
+            .ToString()
+            .ShouldBe("        global::App.P parameters,\n        string orderBy,\n        string @await);\n");
+    }
+
     [Fact]
     public void GetEnumerator_Streams_DocumentsTheReceiverForTheLoop()
     {
@@ -235,26 +297,30 @@ public sealed class MethodArgumentsTests
     {
         var arguments = Of();
         var withoutConnection = new MethodArguments(Input, ["orderBy", "await"], false, false);
+        var synchronous = Synchronous();
         var builder = new StringBuilder(4096);
         var roles = 0;
         for (var round = 0; round < 10; round++)
         {
-            roles += Round(arguments, builder) + Round(withoutConnection, builder);
+            roles += Round(arguments, builder) + Round(withoutConnection, builder) + Round(synchronous, builder);
         }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var round = 0; round < 1_000; round++)
         {
-            roles += Round(arguments, builder) + Round(withoutConnection, builder);
+            roles += Round(arguments, builder) + Round(withoutConnection, builder) + Round(synchronous, builder);
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         allocated.ShouldBe(0);
-        roles.ShouldBe(1_010 * (7 + 4));
+        roles.ShouldBe(1_010 * (7 + 4 + 6));
     }
 
     private static MethodArguments Of(bool streams = false) => new(Input, ["orderBy", "await"], streams, true);
+
+    private static MethodArguments Synchronous() =>
+        new(Input, ["orderBy", "await"], false, true, synchrony: MethodSynchrony.Synchronous);
 
     private static List<MethodArgument> Enumerate(MethodArguments arguments)
     {

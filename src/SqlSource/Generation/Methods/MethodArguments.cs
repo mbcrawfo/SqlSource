@@ -10,10 +10,11 @@ namespace SqlSource.Generation.Methods;
 /// The arguments of a query's method, in their order: the receiver, which is the connection, the input model when
 /// the query has parameters, a <c>string</c> for each token, then the transaction, the command's timeout and the
 /// cancellation token.  A repository's method, which gets its own connection, has neither the receiver, the
-/// transaction nor the timeout.  A collection method takes the items, a sequence of the input model, in place of the
-/// input model.  Everything that spells them reads this, so an argument is added here alone, as
-/// <c>docs/architecture/generator.md#extending-query-methods</c> says.  Building it and walking it allocates
-/// nothing, except the type of a collection method's items, and its forms write into the builder.
+/// transaction nor the timeout, and a synchronous method has no cancellation token.  A collection method takes the
+/// items, a sequence of the input model, in place of the input model.  Everything that spells them reads this, so an
+/// argument is added here alone, as <c>docs/architecture/generator.md#extending-query-methods</c> says.  Building it
+/// and walking it allocates nothing, except the type of a collection method's items, and its forms write into the
+/// builder.
 /// </summary>
 /// <param name="input">The input model, or null when the query has no parameters.</param>
 /// <param name="tokens">The token names, as <see cref="MethodWriter.GetTokens" /> gives them.</param>
@@ -30,12 +31,17 @@ namespace SqlSource.Generation.Methods;
 /// collection method takes an <c>IEnumerable</c> of the input model, and its transaction's documentation says what a
 /// null transaction does under its mode.
 /// </param>
+/// <param name="synchrony">
+/// Whether the method is asynchronous, and takes a cancellation token, or synchronous, and takes none: its
+/// <see cref="QueryMethod.Synchrony" />.
+/// </param>
 internal readonly struct MethodArguments(
     MethodInput? input,
     List<string> tokens,
     bool streams,
     bool takesConnection,
-    BatchCall? batch = null
+    BatchCall? batch = null,
+    MethodSynchrony synchrony = MethodSynchrony.Asynchronous
 )
 {
     /// <summary>The receiver's name.</summary>
@@ -147,6 +153,8 @@ internal readonly struct MethodArguments(
 
     private readonly BatchCall? _batch = batch;
 
+    private readonly bool _takesCancellation = synchrony == MethodSynchrony.Asynchronous;
+
     /// <summary>
     /// Whether the method takes its connection, its transaction and its command's timeout, which a repository's method
     /// does not.
@@ -157,7 +165,7 @@ internal readonly struct MethodArguments(
     /// The arguments of the method, with its tokens as <see cref="MethodWriter.GetTokens" /> gives them.
     /// </summary>
     public static MethodArguments Of(QueryMethod method, List<string> tokens) =>
-        new(method.Input, tokens, method.Streams, method.Source is null, method.Batch);
+        new(method.Input, tokens, method.Streams, method.Source is null, method.Batch, method.Synchrony);
 
     /// <summary>Whether no token may take the name, since an argument of some method has it.  Case counts.</summary>
     public static bool IsReserved(string name) => Array.IndexOf(ReservedNames, name) >= 0;
@@ -238,10 +246,18 @@ internal readonly struct MethodArguments(
         }
     }
 
+    // Each argument on its own line, a comma after each but the last, and the end after the last, whatever its role.
     private void Append(StringBuilder builder, string indent, bool isExtension, bool isIterator, string end)
     {
+        var first = true;
         foreach (var argument in this)
         {
+            if (!first)
+            {
+                _ = builder.Append(",\n");
+            }
+
+            first = false;
             _ = builder.Append(indent).Append(GeneratedText.Indent);
             if (isExtension && argument.Role == ArgumentRole.Receiver)
             {
@@ -259,14 +275,14 @@ internal readonly struct MethodArguments(
             {
                 _ = builder.Append(" = ").Append(defaultText);
             }
-
-            _ = builder.Append(argument.Role == ArgumentRole.Cancellation ? end : ",\n");
         }
+
+        _ = builder.Append(end);
     }
 
     /// <summary>
     /// Walks the arguments: the receiver and the input when the method has them, the tokens, then the transaction and
-    /// the timeout when it has them, and the cancellation token.
+    /// the timeout when it has them, and the cancellation token when it has it.
     /// </summary>
     public struct Enumerator
     {
@@ -278,13 +294,17 @@ internal readonly struct MethodArguments(
 
         private readonly int _trailing;
 
+        // The position of the cancellation token after the tokens, which a synchronous method's walk never reaches.
+        private readonly int _cancellationPosition;
+
         private int _position;
 
         internal Enumerator(MethodArguments arguments)
         {
             _arguments = arguments;
             _leading = (arguments.TakesConnection ? 1 : 0) + (arguments._input is null ? 0 : 1);
-            _trailing = arguments.TakesConnection ? 3 : 1;
+            _cancellationPosition = arguments.TakesConnection ? 2 : 0;
+            _trailing = _cancellationPosition + (arguments._takesCancellation ? 1 : 0);
             _position = -1;
             Current = default;
         }
@@ -326,7 +346,7 @@ internal readonly struct MethodArguments(
                     null,
                     _arguments._batch is not null ? ItemsXml : ParametersXml
                 ),
-                _ when afterTokens == _trailing - 1 => CancellationArgument,
+                _ when afterTokens == _cancellationPosition => CancellationArgument,
                 0 => _arguments._batch switch
                 {
                     null => TransactionArgument,

@@ -14,8 +14,8 @@ internal static class ListCountWriter
 {
     /// <summary>
     /// Appends, for each list, the local that reads it once, its count and its size, and then the check of the total
-    /// against the engine's limit and the padding of each size.  It runs where the arguments are checked, before any
-    /// await and before a streaming method's iterator, so that the method throws when it is called.
+    /// against the engine's limit and the padding of each size.  It runs where the arguments are checked, before the
+    /// first call of the driver and before a streaming method's iterator, so that the method throws when it is called.
     /// </summary>
     internal static void AppendCounts(in QueryMethodContext context, string indent)
     {

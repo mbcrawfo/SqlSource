@@ -40,23 +40,27 @@ internal static class HeaderWriter
             }
         }
 
-        XmlDocWriter.AppendReturns(
-            builder,
-            indent,
-            method.Batch is not null
-                ? BatchReturnsOf(method.Shape)
-                : method.Shape switch
-                {
-                    ResultShape.Many when context.Streams =>
-                        "The rows the query returns, each read as the loop asks for it.",
-                    ResultShape.Many => "The rows the query returned.",
-                    ResultShape.One => "The row.",
-                    ResultShape.OneOptional => "The row, or null when there is none.",
-                    ResultShape.RowCount => "The number of rows the query affected.",
-                    ResultShape.None => "A task that completes when the query has run.",
-                    _ => throw UnexpectedEnumValueException.Of(method.Shape),
-                }
-        );
+        // A synchronous method of no result returns void, and documents no return.
+        if (method.Shape != ResultShape.None || method.Synchrony == MethodSynchrony.Asynchronous)
+        {
+            XmlDocWriter.AppendReturns(
+                builder,
+                indent,
+                method.Batch is not null
+                    ? BatchReturnsOf(method.Shape)
+                    : method.Shape switch
+                    {
+                        ResultShape.Many when context.Streams =>
+                            "The rows the query returns, each read as the loop asks for it.",
+                        ResultShape.Many => "The rows the query returned.",
+                        ResultShape.One => "The row.",
+                        ResultShape.OneOptional => "The row, or null when there is none.",
+                        ResultShape.RowCount => "The number of rows the query affected.",
+                        ResultShape.None => "A task that completes when the query has run.",
+                        _ => throw UnexpectedEnumValueException.Of(method.Shape),
+                    }
+            );
+        }
         if (method.Batch is not null && method.Shape is ResultShape.One or ResultShape.OneOptional)
         {
             XmlDocWriter.AppendException(
@@ -126,7 +130,7 @@ internal static class HeaderWriter
 
     internal static void AppendSignature(in QueryMethodContext context, string indent)
     {
-        // A streaming method is not asynchronous itself: it returns its iterator.
+        // A streaming method is not asynchronous itself: it returns its iterator.  It is never synchronous.
         var builder = context.Builder;
         _ = builder.Append(indent).Append(ModifiersOf(context.Host.Accessibility, context.Method.Source is null));
         if (context.Streams)
@@ -135,7 +139,7 @@ internal static class HeaderWriter
         }
         else
         {
-            _ = AsyncSpelling.AppendTaskType(builder, RowsWriter.GetResultType(in context)).Append(' ');
+            _ = context.Spelling.AppendReturnType(builder, RowsWriter.GetResultType(in context)).Append(' ');
         }
 
         _ = builder.Append(context.Method.Name).Append("(\n");
@@ -154,7 +158,7 @@ internal static class HeaderWriter
         }
         else
         {
-            _ = AsyncSpelling.AppendTask(builder, RowsWriter.GetResultType(in context)).Append(' ');
+            _ = context.Spelling.AppendInterfaceReturnType(builder, RowsWriter.GetResultType(in context)).Append(' ');
         }
 
         _ = builder.Append(context.Method.Name).Append("(\n");
@@ -240,7 +244,7 @@ internal static class HeaderWriter
         _ = builder
             .Append(");\n\n")
             .Append(indent)
-            .Append(AsyncSpelling.IteratorModifiersOf(captures))
+            .Append(AsyncCallSpelling.IteratorModifiersOf(captures))
             .Append(RowsWriter.GetResultType(in context))
             .Append(' ')
             .Append(locals.Iterator)
