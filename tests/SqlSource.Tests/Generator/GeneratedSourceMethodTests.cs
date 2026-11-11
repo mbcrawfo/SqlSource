@@ -424,16 +424,15 @@ public sealed class GeneratedSourceMethodTests
             );
         sqlServer
             .Sources[MethodRuns.MethodsFile]
-            .ShouldContain(
-                name == "isolationScope" ? "await using var isolationScope1 =" : "await using var isolationScope ="
-            );
-        // Under sync each query method but the stream is synchronous, and every collection method asynchronous.
-        var isSynchronous = methodType == "sync";
-        methods.Contains(" static int ProbeCount(\n", System.StringComparison.Ordinal).ShouldBe(isSynchronous);
+            .ShouldContain(name == "isolationScope" ? "using var isolationScope1 =" : "using var isolationScope =");
+        // Under sync each query method but the stream is synchronous, and so is every collection method: the query
+        // method and the collection method of ProbeCount and ProbeLevel, each.
+        var synchronousCount = methodType == "sync" ? 2 : 0;
+        methods.Split(" static int ProbeCount(\n").Length.ShouldBe(synchronousCount + 1);
         sqlServer
             .Sources[MethodRuns.MethodsFile]
-            .Contains(" static int ProbeLevel(\n", System.StringComparison.Ordinal)
-            .ShouldBe(isSynchronous);
+            .Split(" static int ProbeLevel(\n")
+            .Length.ShouldBe(synchronousCount + 1);
     }
 
     // A list's use is a segment of its own, and the token method of a type writes it as the SQL wrote it, in the

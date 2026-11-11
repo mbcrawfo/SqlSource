@@ -204,15 +204,12 @@ namespace App
         /// <param name="parameters">The items to run the query for, in order.</param>
         /// <param name="transaction">The transaction to run every item in, or null for the method to begin one of its own, which it commits after the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is open.</param>
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
-        /// <returns>A task that completes when the query has run for every item.</returns>
         /// <exception cref="T:SqlSource.CollectionItemException">The database raised an error for an item.  Its <c>InnerException</c> is the database's exception and its <c>ItemIndex</c> is the item's position, counted from 0.</exception>
-        internal static async global::System.Threading.Tasks.Task Rename(
+        internal static void Rename(
             this global::System.Data.Common.DbConnection connection,
             global::System.Collections.Generic.IEnumerable<global::App.RenameParams> parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
-            int? commandTimeout = null,
-            global::System.Threading.CancellationToken cancellationToken = default)
+            int? commandTimeout = null)
         {
             global::System.ArgumentNullException.ThrowIfNull(connection);
             global::System.ArgumentNullException.ThrowIfNull(parameters);
@@ -227,13 +224,13 @@ namespace App
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                connection.Open();
             }
 
             try
             {
                 var ownTransaction = ownsTransaction
-                    ? await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+                    ? connection.BeginTransaction()
                     : null;
                 try
                 {
@@ -243,7 +240,7 @@ namespace App
                     {
                         var first = itemIndex;
                         var batch = connection.CreateBatch();
-                        await using var batchScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(batch, false);
+                        using var batchScope = batch;
                         batch.Transaction = ownTransaction ?? transaction;
                         if (commandTimeout.HasValue)
                         {
@@ -285,7 +282,7 @@ namespace App
 
                         try
                         {
-                            await batch.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                            batch.ExecuteNonQuery();
                         }
                         catch (global::System.Data.Common.DbException error) when (
                             error is not global::SqlSource.CollectionItemException
@@ -325,7 +322,7 @@ namespace App
 
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        ownTransaction.Commit();
                     }
                 }
                 catch
@@ -334,7 +331,7 @@ namespace App
                     {
                         try
                         {
-                            await ownTransaction.RollbackAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false);
+                            ownTransaction.Rollback();
                         }
                         catch
                         {
@@ -348,7 +345,7 @@ namespace App
                 {
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.DisposeAsync().ConfigureAwait(false);
+                        ownTransaction.Dispose();
                     }
                 }
             }
@@ -356,7 +353,7 @@ namespace App
             {
                 if (wasClosed)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    connection.Close();
                 }
             }
         }
@@ -431,15 +428,13 @@ namespace App
         /// <param name="parameters">The items to run the query for, in order.</param>
         /// <param name="transaction">The transaction to run every item in, or null for the method to begin one of its own, which it commits after the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is open.</param>
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The number of rows the query affected, summed over the items.</returns>
         /// <exception cref="T:SqlSource.CollectionItemException">The database raised an error for an item.  Its <c>InnerException</c> is the database's exception and its <c>ItemIndex</c> is the item's position, counted from 0.</exception>
-        internal static async global::System.Threading.Tasks.Task<int> CountUsers(
+        internal static int CountUsers(
             this global::System.Data.Common.DbConnection connection,
             global::System.Collections.Generic.IEnumerable<global::App.CountUsersParams> parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
-            int? commandTimeout = null,
-            global::System.Threading.CancellationToken cancellationToken = default)
+            int? commandTimeout = null)
         {
             global::System.ArgumentNullException.ThrowIfNull(connection);
             global::System.ArgumentNullException.ThrowIfNull(parameters);
@@ -454,13 +449,13 @@ namespace App
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                connection.Open();
             }
 
             try
             {
                 var ownTransaction = ownsTransaction
-                    ? await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+                    ? connection.BeginTransaction()
                     : null;
                 try
                 {
@@ -471,7 +466,7 @@ namespace App
                     {
                         var first = itemIndex;
                         var batch = connection.CreateBatch();
-                        await using var batchScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(batch, false);
+                        using var batchScope = batch;
                         batch.Transaction = ownTransaction ?? transaction;
                         if (commandTimeout.HasValue)
                         {
@@ -506,7 +501,7 @@ namespace App
 
                         try
                         {
-                            await batch.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                            batch.ExecuteNonQuery();
                             for (var result = 0; result < itemIndex - first; result++)
                             {
                                 affected += global::System.Math.Max(batch.BatchCommands[result].RecordsAffected, 0);
@@ -550,7 +545,7 @@ namespace App
 
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        ownTransaction.Commit();
                     }
 
                     return affected;
@@ -561,7 +556,7 @@ namespace App
                     {
                         try
                         {
-                            await ownTransaction.RollbackAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false);
+                            ownTransaction.Rollback();
                         }
                         catch
                         {
@@ -575,7 +570,7 @@ namespace App
                 {
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.DisposeAsync().ConfigureAwait(false);
+                        ownTransaction.Dispose();
                     }
                 }
             }
@@ -583,7 +578,7 @@ namespace App
             {
                 if (wasClosed)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    connection.Close();
                 }
             }
         }
@@ -672,16 +667,14 @@ namespace App
         /// <param name="parameters">The items to run the query for, in order.</param>
         /// <param name="transaction">The transaction to run every item in, or null for the method to begin one of its own, which it commits after the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is open.</param>
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The row of each item, in the order of the items.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">An item returned no rows, or more than one.  Its <c>ItemIndex</c> is the item's position, counted from 0.</exception>
         /// <exception cref="T:SqlSource.CollectionItemException">The database raised an error for an item.  Its <c>InnerException</c> is the database's exception and its <c>ItemIndex</c> is the item's position, counted from 0.</exception>
-        internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(
+        internal static global::App.GetUserDto[] GetUser(
             this global::System.Data.Common.DbConnection connection,
             global::System.Collections.Generic.IEnumerable<global::App.GetUserParams> parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
-            int? commandTimeout = null,
-            global::System.Threading.CancellationToken cancellationToken = default)
+            int? commandTimeout = null)
         {
             global::System.ArgumentNullException.ThrowIfNull(connection);
             global::System.ArgumentNullException.ThrowIfNull(parameters);
@@ -696,13 +689,13 @@ namespace App
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                connection.Open();
             }
 
             try
             {
                 var ownTransaction = ownsTransaction
-                    ? await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+                    ? connection.BeginTransaction()
                     : null;
                 try
                 {
@@ -713,7 +706,7 @@ namespace App
                     {
                         var first = itemIndex;
                         var batch = connection.CreateBatch();
-                        await using var batchScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(batch, false);
+                        using var batchScope = batch;
                         batch.Transaction = ownTransaction ?? transaction;
                         if (commandTimeout.HasValue)
                         {
@@ -748,22 +741,22 @@ namespace App
 
                         try
                         {
-                            var reader = await batch.ExecuteReaderAsync(global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                            await using var readerScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                            var reader = batch.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                            using var readerScope = reader;
                             for (var result = 0; result < itemIndex - first; result++)
                             {
                                 if (result > 0)
                                 {
-                                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                                    reader.NextResult();
                                 }
 
-                                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                if (!reader.Read())
                                 {
                                     throw new global::SqlSource.UnexpectedRowCountException("GetUser", false, first + result);
                                 }
 
                                 rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(0), reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
-                                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                if (reader.Read())
                                 {
                                     throw new global::SqlSource.UnexpectedRowCountException("GetUser", true, first + result);
                                 }
@@ -807,7 +800,7 @@ namespace App
 
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        ownTransaction.Commit();
                     }
 
                     return rows.ToArray();
@@ -818,7 +811,7 @@ namespace App
                     {
                         try
                         {
-                            await ownTransaction.RollbackAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false);
+                            ownTransaction.Rollback();
                         }
                         catch
                         {
@@ -832,7 +825,7 @@ namespace App
                 {
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.DisposeAsync().ConfigureAwait(false);
+                        ownTransaction.Dispose();
                     }
                 }
             }
@@ -840,7 +833,7 @@ namespace App
             {
                 if (wasClosed)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    connection.Close();
                 }
             }
         }
@@ -929,16 +922,14 @@ namespace App
         /// <param name="parameters">The items to run the query for, in order.</param>
         /// <param name="transaction">The transaction to run every item in, or null for the method to begin one of its own, which it commits after the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is open.</param>
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The row of each item that returned one, in the order of the items.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">An item returned more than one row.  Its <c>ItemIndex</c> is the item's position, counted from 0.</exception>
         /// <exception cref="T:SqlSource.CollectionItemException">The database raised an error for an item.  Its <c>InnerException</c> is the database's exception and its <c>ItemIndex</c> is the item's position, counted from 0.</exception>
-        internal static async global::System.Threading.Tasks.Task<global::App.FindUserDto[]> FindUser(
+        internal static global::App.FindUserDto[] FindUser(
             this global::System.Data.Common.DbConnection connection,
             global::System.Collections.Generic.IEnumerable<global::App.FindUserParams> parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
-            int? commandTimeout = null,
-            global::System.Threading.CancellationToken cancellationToken = default)
+            int? commandTimeout = null)
         {
             global::System.ArgumentNullException.ThrowIfNull(connection);
             global::System.ArgumentNullException.ThrowIfNull(parameters);
@@ -953,13 +944,13 @@ namespace App
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                connection.Open();
             }
 
             try
             {
                 var ownTransaction = ownsTransaction
-                    ? await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+                    ? connection.BeginTransaction()
                     : null;
                 try
                 {
@@ -970,7 +961,7 @@ namespace App
                     {
                         var first = itemIndex;
                         var batch = connection.CreateBatch();
-                        await using var batchScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(batch, false);
+                        using var batchScope = batch;
                         batch.Transaction = ownTransaction ?? transaction;
                         if (commandTimeout.HasValue)
                         {
@@ -1005,19 +996,19 @@ namespace App
 
                         try
                         {
-                            var reader = await batch.ExecuteReaderAsync(global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                            await using var readerScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                            var reader = batch.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                            using var readerScope = reader;
                             for (var result = 0; result < itemIndex - first; result++)
                             {
                                 if (result > 0)
                                 {
-                                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                                    reader.NextResult();
                                 }
 
-                                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                if (reader.Read())
                                 {
                                     rows.Add(new global::App.FindUserDto(reader.GetFieldValue<int>(0), reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
-                                    if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                    if (reader.Read())
                                     {
                                         throw new global::SqlSource.UnexpectedRowCountException("FindUser", true, first + result);
                                     }
@@ -1062,7 +1053,7 @@ namespace App
 
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        ownTransaction.Commit();
                     }
 
                     return rows.ToArray();
@@ -1073,7 +1064,7 @@ namespace App
                     {
                         try
                         {
-                            await ownTransaction.RollbackAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false);
+                            ownTransaction.Rollback();
                         }
                         catch
                         {
@@ -1087,7 +1078,7 @@ namespace App
                 {
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.DisposeAsync().ConfigureAwait(false);
+                        ownTransaction.Dispose();
                     }
                 }
             }
@@ -1095,7 +1086,7 @@ namespace App
             {
                 if (wasClosed)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    connection.Close();
                 }
             }
         }
@@ -1178,15 +1169,13 @@ namespace App
         /// <param name="parameters">The items to run the query for, in order.</param>
         /// <param name="transaction">The transaction to run every item in, or null for the method to begin one of its own, which it commits after the last item and rolls back when anything throws, unless a <c>System.Transactions</c> transaction is open.</param>
         /// <param name="commandTimeout">The command's timeout in seconds, or null for the driver's.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows of every item, in the order of the items.</returns>
         /// <exception cref="T:SqlSource.CollectionItemException">The database raised an error for an item.  Its <c>InnerException</c> is the database's exception and its <c>ItemIndex</c> is the item's position, counted from 0.</exception>
-        internal static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ListUsers(
+        internal static global::App.ListUsersDto[] ListUsers(
             this global::System.Data.Common.DbConnection connection,
             global::System.Collections.Generic.IEnumerable<global::App.ListUsersParams> parameters,
             global::System.Data.Common.DbTransaction? transaction = null,
-            int? commandTimeout = null,
-            global::System.Threading.CancellationToken cancellationToken = default)
+            int? commandTimeout = null)
         {
             global::System.ArgumentNullException.ThrowIfNull(connection);
             global::System.ArgumentNullException.ThrowIfNull(parameters);
@@ -1201,13 +1190,13 @@ namespace App
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                connection.Open();
             }
 
             try
             {
                 var ownTransaction = ownsTransaction
-                    ? await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+                    ? connection.BeginTransaction()
                     : null;
                 try
                 {
@@ -1218,7 +1207,7 @@ namespace App
                     {
                         var first = itemIndex;
                         var batch = connection.CreateBatch();
-                        await using var batchScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(batch, false);
+                        using var batchScope = batch;
                         batch.Transaction = ownTransaction ?? transaction;
                         if (commandTimeout.HasValue)
                         {
@@ -1253,16 +1242,16 @@ namespace App
 
                         try
                         {
-                            var reader = await batch.ExecuteReaderAsync(global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                            await using var readerScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                            var reader = batch.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                            using var readerScope = reader;
                             for (var result = 0; result < itemIndex - first; result++)
                             {
                                 if (result > 0)
                                 {
-                                    await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
+                                    reader.NextResult();
                                 }
 
-                                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                while (reader.Read())
                                 {
                                     rows.Add(new global::App.ListUsersDto(reader.GetFieldValue<int>(0), reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
                                 }
@@ -1306,7 +1295,7 @@ namespace App
 
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        ownTransaction.Commit();
                     }
 
                     return rows.ToArray();
@@ -1317,7 +1306,7 @@ namespace App
                     {
                         try
                         {
-                            await ownTransaction.RollbackAsync(global::System.Threading.CancellationToken.None).ConfigureAwait(false);
+                            ownTransaction.Rollback();
                         }
                         catch
                         {
@@ -1331,7 +1320,7 @@ namespace App
                 {
                     if (ownTransaction is not null)
                     {
-                        await ownTransaction.DisposeAsync().ConfigureAwait(false);
+                        ownTransaction.Dispose();
                     }
                 }
             }
@@ -1339,7 +1328,7 @@ namespace App
             {
                 if (wasClosed)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    connection.Close();
                 }
             }
         }

@@ -65,7 +65,7 @@ internal static partial class QueryMethodCorpus
         new("repository-connection-string-sync", engine => RepositoryOfConnectionString(engine, MethodTypeSync)),
         new("repository-connection-string-both", engine => RepositoryOfConnectionString(engine, MethodTypeBoth)),
         new("collection-method-sync", engine => CollectionMethod(engine, MethodTypeSync)),
-        new("collection-method-both", engine => CollectionMethod(engine, MethodTypeBoth)),
+        new("collection-method-both", engine => CollectionMethod(engine, MethodTypeBoth, withStream: true)),
     ];
 
     public static IReadOnlyList<(string Name, CorpusEngine Engine, CorpusScenario Scenario)> Cases { get; } =
@@ -167,48 +167,61 @@ internal static partial class QueryMethodCorpus
     }
 
     // A query of each shape with the collection method on, under the settings given: none, a row count, one row, one
-    // row or none, and many rows, each with the id parameter that a collection method needs.
-    private static GeneratorRun CollectionMethod(CorpusEngine engine, string settings)
+    // row or none, and many rows, each with the id parameter that a collection method needs, and with withStream a
+    // stream, whose collection method reads an array, which under method-type=both has a synchronous one.
+    private static GeneratorRun CollectionMethod(CorpusEngine engine, string settings, bool withStream = false)
     {
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            """
-            -- name: Rename -> none
-            -- generator: collection-method
-            UPDATE users SET name = @name WHERE id = @id;
-            -- name: CountUsers -> rowcount
-            -- generator: collection-method
-            DELETE FROM users WHERE id = @id;
-            -- name: GetUser -> one
-            -- generator: collection-method
-            SELECT id, name FROM users WHERE id = @id;
-            -- name: FindUser -> one-optional
-            -- generator: collection-method
-            SELECT id, name FROM users WHERE id = @id;
-            -- name: ListUsers
+        const string Stream = """
+            -- name: StreamUsers
+            -- collection-type: IAsyncEnumerable
             -- generator: collection-method
             SELECT id, name FROM users WHERE id > @id;
 
-            """
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            (withStream ? Stream : "")
+                + """
+                -- name: Rename -> none
+                -- generator: collection-method
+                UPDATE users SET name = @name WHERE id = @id;
+                -- name: CountUsers -> rowcount
+                -- generator: collection-method
+                DELETE FROM users WHERE id = @id;
+                -- name: GetUser -> one
+                -- generator: collection-method
+                SELECT id, name FROM users WHERE id = @id;
+                -- name: FindUser -> one-optional
+                -- generator: collection-method
+                SELECT id, name FROM users WHERE id = @id;
+                -- name: ListUsers
+                -- generator: collection-method
+                SELECT id, name FROM users WHERE id > @id;
+
+                """
         );
         var id = IdParameter(engine);
         var columns = IdAndName(engine);
+        SidecarEntry[] streamEntries = withStream ? [engine.Entry(file, "StreamUsers", [id], columns)] : [];
         return engine.Run(
             [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
             [
                 file,
                 Sidecars.Of(
                     file,
-                    engine.Entry(
-                        file,
-                        "Rename",
-                        [CorpusEngine.Parameter("name", engine.Text, nullable: true), id],
-                        null
-                    ),
-                    engine.Entry(file, "CountUsers", [id], null),
-                    engine.Entry(file, "GetUser", [id], columns),
-                    engine.Entry(file, "FindUser", [id], columns),
-                    engine.Entry(file, "ListUsers", [id], columns)
+                    [
+                        .. streamEntries,
+                        engine.Entry(
+                            file,
+                            "Rename",
+                            [CorpusEngine.Parameter("name", engine.Text, nullable: true), id],
+                            null
+                        ),
+                        engine.Entry(file, "CountUsers", [id], null),
+                        engine.Entry(file, "GetUser", [id], columns),
+                        engine.Entry(file, "FindUser", [id], columns),
+                        engine.Entry(file, "ListUsers", [id], columns),
+                    ]
                 ),
             ],
             settings: settings
