@@ -56,6 +56,58 @@
         }
       ]
     },
+    "StreamAccountsBoth": {
+      "hash": "c0d5c535ddb03266e988c2922c96ff706707ffe803b00f8bd3de2d0cf839c13c",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "StreamAccountsNamedFrom": {
       "hash": "880dd1443215624d209a1f68793ef0cda660490c3034a5e3319c9b1bf69451e0",
       "toolVersion": "0.1.0",

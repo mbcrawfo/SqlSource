@@ -1,21 +1,48 @@
 -- The queries of the settings of query methods, claimed by MethodQueries: each result shape, what rowcount counts, a
 -- token, and the method's suffix, run on the seed's accounts and notes; and one that waits on a lock before its last
--- row, for a cancellation during the read.
+-- row, for a cancellation during the read.  A copy named with Sync after its original is the original under
+-- method-type=sync, which gives it a synchronous method in place of the asynchronous one, and GetAccountInRangeBoth is
+-- GetAccountInRange under both, which gives it the two.
 
 -- name: TouchAccount
 -- summary: Updates an account without changing it, as rowcount by default, since it returns no rows.
+UPDATE accounts SET name = name WHERE id = @accountId;
+
+-- name: TouchAccountSync
+-- summary: TouchAccount, by a synchronous method.
+-- generator: method-type=sync
 UPDATE accounts SET name = name WHERE id = @accountId;
 
 -- name: TouchAccountQuietly -> none
 -- summary: The same update, with nothing returned.
 UPDATE accounts SET name = name WHERE id = @accountId;
 
+-- name: TouchAccountQuietlySync -> none
+-- summary: TouchAccountQuietly, by a synchronous method.
+-- generator: method-type=sync
+UPDATE accounts SET name = name WHERE id = @accountId;
+
 -- name: GetAccountInRange -> one
 -- summary: The one account whose id is in a range.
 SELECT id, name FROM accounts WHERE id BETWEEN @fromId AND @toId ORDER BY id;
 
+-- name: GetAccountInRangeSync -> one
+-- summary: GetAccountInRange, by a synchronous method.
+-- generator: method-type=sync
+SELECT id, name FROM accounts WHERE id BETWEEN @fromId AND @toId ORDER BY id;
+
+-- name: GetAccountInRangeBoth -> one
+-- summary: GetAccountInRange, by a synchronous method and an asynchronous one, which is named with Async after it.
+-- generator: method-type=both
+SELECT id, name FROM accounts WHERE id BETWEEN @fromId AND @toId ORDER BY id;
+
 -- name: FindAccountInRange -> one-optional
 -- summary: The account whose id is in a range, if there is one.
+SELECT id, name FROM accounts WHERE id BETWEEN @fromId AND @toId ORDER BY id;
+
+-- name: FindAccountInRangeSync -> one-optional
+-- summary: FindAccountInRange, by a synchronous method.
+-- generator: method-type=sync
 SELECT id, name FROM accounts WHERE id BETWEEN @fromId AND @toId ORDER BY id;
 
 -- name: CountNotesOf -> one
@@ -26,6 +53,12 @@ SELECT count(*) AS note_count FROM notes WHERE account_id = @accountId;
 -- name: ListAccountsWhere
 -- summary: The accounts that a filter keeps, whose sample filters by a parameter that another filter may leave out.
 -- param: @accountId integer
+SELECT id, name FROM accounts WHERE {{filter:id = @accountId}} ORDER BY id;
+
+-- name: ListAccountsWhereSync
+-- summary: ListAccountsWhere, by a synchronous method, which takes the token as the asynchronous one does.
+-- param: @accountId integer
+-- generator: method-type=sync
 SELECT id, name FROM accounts WHERE {{filter:id = @accountId}} ORDER BY id;
 
 -- name: AddNote -> rowcount
@@ -64,6 +97,15 @@ UNION ALL
 -- ListThenRaise under one, whose second read, to see that there is no second row, meets the error.
 -- column: id not null
 -- output-model: CollectedAccount
+(SELECT id, name FROM accounts WHERE id = 1)
+UNION ALL
+(SELECT id / 0, name FROM accounts WHERE id = 1);
+
+-- name: GetThenRaiseSync -> one
+-- summary: GetThenRaise, by a synchronous method.
+-- column: id not null
+-- output-model: CollectedAccount
+-- generator: method-type=sync
 (SELECT id, name FROM accounts WHERE id = 1)
 UNION ALL
 (SELECT id / 0, name FROM accounts WHERE id = 1);

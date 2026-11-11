@@ -94,6 +94,96 @@
         }
       ]
     },
+    "ListAccountsByIdsSync": {
+      "hash": "5ef2c4ee73f0b3fc36778345027e28e0b209b1a23bf1d3dcf1110d94faa6a7ab",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "ids",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "status",
+          "type": {
+            "name": "public.account_status",
+            "kind": "enum",
+            "schema": "public",
+            "internalName": "account_status",
+            "labels": [
+              "active",
+              "suspended",
+              "closed"
+            ]
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "status"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "ListAccountsExcept": {
       "hash": "82425ce6f50bfe77806a10d2b0958c8e295bf30ac784d800eb29b5a51b7527b0",
       "toolVersion": "0.1.0",

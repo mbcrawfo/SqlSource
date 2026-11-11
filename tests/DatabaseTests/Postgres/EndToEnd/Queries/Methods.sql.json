@@ -27,6 +27,29 @@
         }
       ]
     },
+    "TouchAccountSync": {
+      "hash": "eefe32bebc4410f4a81f27d2daa73eaace1185b886fedeec9e5d35721c7598f3",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "none",
+      "parameters": [
+        {
+          "name": "accountId",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ]
+    },
     "TouchAccountQuietly": {
       "hash": "eefe32bebc4410f4a81f27d2daa73eaace1185b886fedeec9e5d35721c7598f3",
       "toolVersion": "0.1.0",
@@ -50,7 +73,188 @@
         }
       ]
     },
+    "TouchAccountQuietlySync": {
+      "hash": "eefe32bebc4410f4a81f27d2daa73eaace1185b886fedeec9e5d35721c7598f3",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "none",
+      "parameters": [
+        {
+          "name": "accountId",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ]
+    },
     "GetAccountInRange": {
+      "hash": "ffd42cf1f32260d520cd2a40e751e5c10f28e937a1ca4812de3dd3c11cf84869",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "fromId",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "toId",
+          "ordinal": 1,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "GetAccountInRangeSync": {
+      "hash": "ffd42cf1f32260d520cd2a40e751e5c10f28e937a1ca4812de3dd3c11cf84869",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "fromId",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "toId",
+          "ordinal": 1,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "GetAccountInRangeBoth": {
       "hash": "ffd42cf1f32260d520cd2a40e751e5c10f28e937a1ca4812de3dd3c11cf84869",
       "toolVersion": "0.1.0",
       "database": "app",
@@ -208,6 +412,85 @@
         }
       ]
     },
+    "FindAccountInRangeSync": {
+      "hash": "ffd42cf1f32260d520cd2a40e751e5c10f28e937a1ca4812de3dd3c11cf84869",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "fromId",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "toId",
+          "ordinal": 1,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "CountNotesOf": {
       "hash": "05675685c789219c2cf87a8570df1e15c6ab0591519a7424f6207aba6d498f32",
       "toolVersion": "0.1.0",
@@ -252,6 +535,72 @@
       ]
     },
     "ListAccountsWhere": {
+      "hash": "a952b842162be5a26c46eb99471f5ecd80627408b2015026b230d174e29eb7c1",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "accountId",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "declared"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "ListAccountsWhereSync": {
       "hash": "a952b842162be5a26c46eb99471f5ecd80627408b2015026b230d174e29eb7c1",
       "toolVersion": "0.1.0",
       "database": "app",
@@ -577,6 +926,50 @@
       ]
     },
     "GetThenRaise": {
+      "hash": "d786be5234d6595e627f0b5d9ca461ed40d60315d2f275859bd03717d2e444db",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "nullableSource": "no-origin",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "set-operation",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
+    "GetThenRaiseSync": {
       "hash": "d786be5234d6595e627f0b5d9ca461ed40d60315d2f275859bd03717d2e444db",
       "toolVersion": "0.1.0",
       "database": "app",

@@ -37,6 +37,17 @@ LEFT JOIN notes AS n ON n.account_id = a.id
 WHERE a.id = @id
 GROUP BY a.id;
 
+-- name: GetAccountNoteCountSync -> one
+-- summary: GetAccountNoteCount, by a synchronous method, which sends and reads through the converters.
+-- param: @id -> AccountId
+-- column: note_count -> NoteCount
+-- generator: method-type=sync
+SELECT a.id, count(n.id) AS note_count
+FROM accounts AS a
+LEFT JOIN notes AS n ON n.account_id = a.id
+WHERE a.id = @id
+GROUP BY a.id;
+
 -- name: ListDisplayNames
 -- summary: The name of each account with each word capitalized.
 -- column: display_name not null
