@@ -35,6 +35,17 @@ LEFT JOIN dbo.notes AS n ON n.account_id = a.id
 WHERE a.id = @id
 GROUP BY a.id;
 
+-- name: GetAccountNoteCountSync -> one
+-- summary: GetAccountNoteCount, by a synchronous method, which sends and reads through the converters.
+-- param: @id -> AccountId
+-- column: note_count -> NoteCount
+-- generator: method-type=sync
+SELECT a.id, COUNT(n.id) AS note_count
+FROM dbo.accounts AS a
+LEFT JOIN dbo.notes AS n ON n.account_id = a.id
+WHERE a.id = @id
+GROUP BY a.id;
+
 -- name: ListAccountMonths
 -- summary: The last day of the month each account opened in.
 -- SQL Server treats EOMONTH as possibly null, and the tool cannot show otherwise, so the column would be nullable
