@@ -66,7 +66,9 @@ internal static class ExecutionCapabilityWriter
     /// Appends the catch of a chunk's database error that names none of the batch's commands, after the catch of one
     /// that names one: the failed item is that of the first command whose statement type Npgsql has not set, as it
     /// sets it when a command completes, and an error after every command completed, which no item raised, is thrown
-    /// as it is.  <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" /> turns it on.
+    /// as it is.  A batch whose commands are not Npgsql's, which a connection that wraps Npgsql's makes, has no
+    /// statement type to read, so its error is thrown as it is too; a chunk holds at least one command, all made by
+    /// one batch, so the first tells.  <see cref="ExecutionCapabilities.FindsFailedItemByCompletion" /> turns it on.
     /// </summary>
     public static void AppendFailedCommandSearch(in QueryMethodContext context, string indent)
     {
@@ -79,7 +81,9 @@ internal static class ExecutionCapabilityWriter
             .Append(indent)
             .Append("catch (global::Npgsql.PostgresException ")
             .Append(batch.Error)
-            .Append(")\n")
+            .Append(") when (")
+            .Append(commands)
+            .Append("[0] is global::Npgsql.NpgsqlBatchCommand)\n")
             .Append(indent)
             .Append("{\n")
             .Append(body)

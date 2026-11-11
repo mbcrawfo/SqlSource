@@ -426,8 +426,9 @@ public sealed class BatchMethodWriterTests
 
     // On PostgreSQL a database error that names no command of the batch, as Npgsql 10's names none unless the
     // connection string asks it to, is the item of the first command that did not complete, whose statement type
-    // Npgsql has not set; an error after every command completed is thrown as it is.  It follows the catch of a named
-    // command, for every shape, a rowcount's that runs without a reader included.
+    // Npgsql has not set; an error after every command completed is thrown as it is, and so is one of a batch whose
+    // commands are not Npgsql's, as a connection that wraps Npgsql's makes.  It follows the catch of a named command,
+    // for every shape, a rowcount's that runs without a reader included.
     [Theory]
     [InlineData(nameof(ResultShape.Many))]
     [InlineData(nameof(ResultShape.RowCount))]
@@ -438,7 +439,8 @@ public sealed class BatchMethodWriterTests
         text.ShouldContain(
             "                    );\n"
                 + "                }\n"
-                + "                catch (global::Npgsql.PostgresException error)\n"
+                + "                catch (global::Npgsql.PostgresException error) when ("
+                + "batch.BatchCommands[0] is global::Npgsql.NpgsqlBatchCommand)\n"
                 + "                {\n"
                 + "                    var failed = 0;\n"
                 + "                    while (\n"
@@ -460,7 +462,7 @@ public sealed class BatchMethodWriterTests
                 + "\"GetUser\", first + failed, error);\n"
                 + "                }\n"
         );
-        IndexOf(text, "catch (global::Npgsql.PostgresException error)")
+        IndexOf(text, "catch (global::Npgsql.PostgresException error) when (")
             .ShouldBeGreaterThan(IndexOf(text, "catch (global::System.Data.Common.DbException error) when ("));
     }
 
