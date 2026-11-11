@@ -25,9 +25,9 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // at an item, in the second chunk, at a null item, at an item with no row, under XACT_ABORT ON, at a cancellation, and
 // by InsertConvertedNote at a conversion that ends the batch; off by InsertNoteNoTransaction at an item, which keeps
 // the items before and after it, in the second of three chunks, at a null item and under XACT_ABORT ON, and by
-// InsertConvertedNoteNoTransaction at a conversion that ends the batch; each isolation
-// level by its copy in the second chunk; and the caller's transaction at an item, with XACT_ABORT off and on, and with
-// a later conversion that rolls it back after an item's error and after an exception of the method's own.
+// InsertConvertedNoteNoTransaction at a conversion that ends the batch; each isolation level by its copy in the second
+// chunk; and the caller's transaction at an item, with XACT_ABORT off and on, and with a later conversion that rolls it
+// back after an item's error and after an exception of the method's own.
 [Collection(UsesSqlServer.Name)]
 public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
 {

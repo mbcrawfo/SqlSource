@@ -32,6 +32,7 @@ public sealed class VariantCopyTests
     [InlineData("Lists.sql", "ListAccountsByIds", "StreamAccountsByIds")]
     [InlineData("Lists.sql", "ListAccountsByIds", "ListAccountsByIdsNoPadding")]
     [InlineData("Batches.sql", "InsertNote", "InsertNoteNoTransaction")]
+    [InlineData("Batches.sql", "InsertConvertedNote", "InsertConvertedNoteNoTransaction")]
     [InlineData("Batches.sql", "InsertNote", "InsertNoteInRepository")]
     [InlineData("Batches.sql", "InsertNoteRowCount", "InsertNoteQuietly")]
     [InlineData("Batches.sql", "FindAccountThenEmpty", "GetAccountThenEmpty")]
