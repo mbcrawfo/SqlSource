@@ -1,4 +1,6 @@
 -- The queries of the accounts, claimed by AccountQueries and by Reporting.AccountReports, which each get their models.
+-- A copy named with Unpooled or Sync after its original is the original under array-pool=off or method-type=sync, or
+-- both, for the allocation tests of tests/DatabaseTests/QueryMethodAllocation, which link this file.
 
 -- name: GetAccount
 -- summary: One account, its columns in another order than the table's.
@@ -15,6 +17,20 @@ ORDER BY id;
 -- name: ListAccountsUnpooled
 -- summary: ListAccounts again, without the array pool.
 -- generator: array-pool=off
+SELECT *
+FROM accounts
+ORDER BY id;
+
+-- name: ListAccountsSync
+-- summary: ListAccounts, by a synchronous method.
+-- generator: method-type=sync
+SELECT *
+FROM accounts
+ORDER BY id;
+
+-- name: ListAccountsUnpooledSync
+-- summary: ListAccountsUnpooled, by a synchronous method.
+-- generator: array-pool=off method-type=sync
 SELECT *
 FROM accounts
 ORDER BY id;
@@ -48,6 +64,24 @@ SELECT id, name
 FROM accounts
 WHERE id = @accountId;
 
+-- name: GetAccountNameSync
+-- summary: GetAccountName, by a synchronous method.
+-- output-model: AccountName
+-- generator: method-type=sync
+-- input-model: GetAccountNameArgs
+SELECT id, name
+FROM accounts
+WHERE id = @accountId;
+
+-- name: GetAccountNameUnpooledSync
+-- summary: GetAccountNameUnpooled, by a synchronous method.
+-- output-model: AccountName
+-- generator: array-pool=off method-type=sync
+-- input-model: GetAccountNameArgs
+SELECT id, name
+FROM accounts
+WHERE id = @accountId;
+
 -- name: FindAccountName
 -- summary: The name of an account, by its email.
 -- output-model: AccountName
@@ -67,6 +101,28 @@ ORDER BY id;
 -- summary: ListClosedBefore again, without the array pool.
 -- param: @closedBefore timestamptz null
 -- generator: array-pool=off
+-- input-model: ListClosedBeforeArgs
+-- output-model: ListClosedBeforeDto
+SELECT id, name, closed_at
+FROM accounts
+WHERE @closedBefore IS NULL OR closed_at < @closedBefore
+ORDER BY id;
+
+-- name: ListClosedBeforeSync
+-- summary: ListClosedBefore, by a synchronous method.
+-- param: @closedBefore timestamptz null
+-- generator: method-type=sync
+-- input-model: ListClosedBeforeArgs
+-- output-model: ListClosedBeforeDto
+SELECT id, name, closed_at
+FROM accounts
+WHERE @closedBefore IS NULL OR closed_at < @closedBefore
+ORDER BY id;
+
+-- name: ListClosedBeforeUnpooledSync
+-- summary: ListClosedBeforeUnpooled, by a synchronous method.
+-- param: @closedBefore timestamptz null
+-- generator: array-pool=off method-type=sync
 -- input-model: ListClosedBeforeArgs
 -- output-model: ListClosedBeforeDto
 SELECT id, name, closed_at

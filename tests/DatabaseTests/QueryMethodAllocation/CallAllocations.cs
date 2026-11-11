@@ -31,6 +31,11 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation;
 // runner in CI, where the calls that bear it alternate, so that the pairs that differ by it outnumber those that do
 // not, and the commonest difference became the collector's bytes and failed the tests at random.  So a measure skips
 // under coverage, or any other profiler, and the nightly jobs that run the allocation tests run them without it.
+//
+// A synchronous method makes its calls, the driver's reads among them, on the thread that calls it, so a call of one is
+// measured by GC.GetAllocatedBytesForCurrentThread, which counts that thread alone, and no other thread's work falls
+// in it.  The driver still takes one of its paths on each call, so the two are compared by the commonest difference of
+// a pair as well, and a measure skips under coverage too, since the margins were measured without it.
 internal static class CallAllocations
 {
     // The variables a coverage collector or a profiler sets in the process it measures: CODE_COVERAGE_SESSION_NAME of
@@ -81,6 +86,50 @@ internal static class CallAllocations
                 }
 
                 var bytes = GC.GetTotalAllocatedBytes(precise: true) - before;
+                (isGenerated ? generatedCalls : byHandCalls)[pair] = bytes;
+            }
+        }
+
+        return CallPairs.Of(generatedCalls, byHandCalls);
+    }
+
+    // The same measure of two synchronous methods, each call counted on the thread that makes it.
+    public static CallPairs Measure<TGenerated, TByHand>(
+        Func<TGenerated> generated,
+        Func<TByHand> byHand,
+        int warmUpCalls,
+        int pairs
+    )
+    {
+        Assert.SkipWhen(
+            IsMeasuredByAnother,
+            "Coverage or a profiler allocates in the process on some calls and not others, which this measure counts."
+        );
+
+        for (var call = 0; call < warmUpCalls; call++)
+        {
+            _ = generated();
+            _ = byHand();
+        }
+
+        var generatedCalls = new long[pairs];
+        var byHandCalls = new long[pairs];
+        for (var pair = 0; pair < pairs; pair++)
+        {
+            for (var turn = 0; turn < 2; turn++)
+            {
+                var isGenerated = (pair + turn) % 2 == 0;
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                if (isGenerated)
+                {
+                    _ = generated();
+                }
+                else
+                {
+                    _ = byHand();
+                }
+
+                var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
                 (isGenerated ? generatedCalls : byHandCalls)[pair] = bytes;
             }
         }

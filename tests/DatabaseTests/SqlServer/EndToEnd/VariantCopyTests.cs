@@ -15,6 +15,17 @@ public sealed class VariantCopyTests
 {
     [Theory]
     [InlineData("Shapes.sql", "SearchAccounts", "SearchAccountsUnpooled")]
+    [InlineData("Shapes.sql", "SearchAccounts", "SearchAccountsSync")]
+    [InlineData("Shapes.sql", "SearchAccountsUnpooled", "SearchAccountsUnpooledSync")]
+    [InlineData("RowBuffers.sql", "NumbersAsArray", "NumbersAsArraySync")]
+    [InlineData("RowBuffers.sql", "NumbersAsList", "NumbersAsListSync")]
+    [InlineData("RowBuffers.sql", "NumbersAsIList", "NumbersAsIListSync")]
+    [InlineData("RowBuffers.sql", "NumbersAsICollection", "NumbersAsICollectionSync")]
+    [InlineData("RowBuffers.sql", "NumbersAsImmutableArray", "NumbersAsImmutableArraySync")]
+    [InlineData("RowBuffers.sql", "NumbersNoPoolAsList", "NumbersNoPoolAsListSync")]
+    [InlineData("RowBuffers.sql", "NumbersNoPoolAsIList", "NumbersNoPoolAsIListSync")]
+    [InlineData("RowBuffers.sql", "NumbersNoPoolAsICollection", "NumbersNoPoolAsICollectionSync")]
+    [InlineData("RowBuffers.sql", "NumbersNoPoolAsImmutableArray", "NumbersNoPoolAsImmutableArraySync")]
     [InlineData("AllTypes.sql", "ListAllTypes", "ListAllTypesForDapper")]
     [InlineData("AllTypes.sql", "InsertAllTypes", "InsertAllTypesForDapper")]
     [InlineData("NewTypes.sql", "ListNewTypes", "ListNewTypesForDapper")]
@@ -59,4 +70,11 @@ public sealed class VariantCopyTests
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteDefaultLevelInRepository")]
     public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy) =>
         VariantCopies.ShouldShareHash(RepositoryPaths.EndToEndQueries, file, original, copy);
+
+    // The copies of NodaTime/Queries/, whose folder turns NodaTime on.
+    [Theory]
+    [InlineData("NodaTime.sql", "InsertNodaValues", "InsertNodaValuesSync")]
+    [InlineData("NodaTime.sql", "GetNodaValues", "GetNodaValuesSync")]
+    public void Copy_CommittedEntryUnderNodaTime_HasTheHashOfItsOriginal(string file, string original, string copy) =>
+        VariantCopies.ShouldShareHash(RepositoryPaths.EndToEndNodaTimeQueries, file, original, copy);
 }
