@@ -102,6 +102,35 @@ public sealed class SynchronousMethodTests(PostgresDatabases postgres)
         connection.State.ShouldBe(ConnectionState.Open);
     }
 
+    // Npgsql's limit, which the method neither hides nor works around: a multiplexing data source refuses a synchronous
+    // command outside a transaction, and runs one inside a transaction that the caller began on the connection.
+    [Fact]
+    public void GetAccountInRangeSync_MultiplexingDataSourceAndNoTransaction_ThrowsNotSupported()
+    {
+        using var source = EndToEndSources.AppMultiplexing(postgres);
+        using var connection = source.CreateConnection();
+
+        var exception = Should.Throw<NotSupportedException>(() =>
+            connection.GetAccountInRangeSync(new GetAccountInRangeSyncArgs(2, 2))
+        );
+
+        exception.Message.ShouldBe("Synchronous command execution is not supported when multiplexing is on");
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    [Fact]
+    public void GetAccountInRangeSync_MultiplexingDataSourceAndATransaction_ReadsTheRow()
+    {
+        using var source = EndToEndSources.AppMultiplexing(postgres);
+        using var connection = source.OpenConnection();
+        using var transaction = connection.BeginTransaction();
+
+        var account = connection.GetAccountInRangeSync(new GetAccountInRangeSyncArgs(2, 2), transaction);
+
+        account.ShouldBe(new GetAccountInRangeSyncDto(2, "bob"));
+        transaction.Rollback();
+    }
+
     [Fact]
     public void GetAccountInRangeSync_NoRowOnAClosedConnection_ThrowsUnexpectedRowCountAndIsClosedAgain()
     {
