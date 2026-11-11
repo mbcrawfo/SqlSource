@@ -54,7 +54,7 @@ internal static partial class QueryMethodCorpus
     // The engine's Int read as App.UserId and its Text as App.Email, in parameters and columns that can be null and
     // that cannot, in a many, a one, a one-optional and a stream query; and ListLegacy, whose query reads its Int as
     // App.LegacyId, so that the methods' file disables the warning of an obsolete member.
-    private static GeneratorRun Converters(CorpusEngine engine)
+    private static GeneratorRun Converters(CorpusEngine engine, string? settings)
     {
         const string Select =
             "SELECT id, manager_id, email, backup_email FROM users\n"
@@ -103,7 +103,8 @@ internal static partial class QueryMethodCorpus
                     engine.Entry(file, "StreamUsers", parameters, columns),
                     engine.Entry(file, "ListLegacy", [], [CorpusEngine.Column("id", engine.Int)])
                 ),
-            ]
+            ],
+            settings: settings
         );
     }
 }

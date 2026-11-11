@@ -22,21 +22,28 @@ internal static partial class QueryMethodCorpus
     private const string ArrayPoolOff = /*lang=json,strict*/
         """{"generatorParameters": ["array-pool=off"]}""";
 
+    // The settings of the -sync and -both scenarios, over the project's settings file: which methods a query gets.
+    private const string MethodTypeSync = /*lang=json,strict*/
+        """{"generatorParameters": ["method-type=sync"]}""";
+
+    private const string MethodTypeBoth = /*lang=json,strict*/
+        """{"generatorParameters": ["method-type=both"]}""";
+
     // The scenarios that every engine runs.  Cases reads it, so both stay in this part, where their order is kept.
     public static IReadOnlyList<CorpusScenario> Shared { get; } =
     [
         new("shapes", engine => Shapes(engine, properties: null)),
         new("collections", engine => Collections(engine, settings: null)),
         new("collections-no-pool", engine => Collections(engine, ArrayPoolOff)),
-        new("tokens", Tokens),
+        new("tokens", engine => Tokens(engine, settings: null)),
         new("placement", Placement),
-        new("converters", Converters),
+        new("converters", engine => Converters(engine, settings: null)),
         new("nodatime", NodaTime),
         new("json", Json),
         new("diagnostics", Diagnostics),
-        new("lists", Lists),
+        new("lists", engine => Lists(engine, settings: null)),
         new("lists-no-padding", ListsWithoutPadding),
-        new("repository-connection-string", RepositoryOfConnectionString),
+        new("repository-connection-string", engine => RepositoryOfConnectionString(engine, settings: null)),
         new("repository-data-source", RepositoryOfDataSource),
         new("repository-factory", RepositoryOfFactory),
         new("repository-borrowed", RepositoryOfBorrowed),
@@ -48,6 +55,17 @@ internal static partial class QueryMethodCorpus
                     new Dictionary<string, string?>(StringComparer.Ordinal) { [PublicExceptions.PropertyName] = "true" }
                 )
         ),
+        new("shapes-sync", engine => Shapes(engine, properties: null, MethodTypeSync)),
+        new("shapes-both", engine => Shapes(engine, properties: null, MethodTypeBoth)),
+        new("collections-sync", engine => Collections(engine, MethodTypeSync)),
+        new("collections-both", engine => Collections(engine, MethodTypeBoth)),
+        new("tokens-sync", engine => Tokens(engine, MethodTypeSync)),
+        new("lists-sync", engine => Lists(engine, MethodTypeSync)),
+        new("converters-sync", engine => Converters(engine, MethodTypeSync)),
+        new("repository-connection-string-sync", engine => RepositoryOfConnectionString(engine, MethodTypeSync)),
+        new("repository-connection-string-both", engine => RepositoryOfConnectionString(engine, MethodTypeBoth)),
+        new("collection-method-sync", engine => CollectionMethod(engine, MethodTypeSync)),
+        new("collection-method-both", engine => CollectionMethod(engine, MethodTypeBoth)),
     ];
 
     public static IReadOnlyList<(string Name, CorpusEngine Engine, CorpusScenario Scenario)> Cases { get; } =
@@ -91,7 +109,11 @@ internal static partial class QueryMethodCorpus
     // without parameters, and many rows in the default collection.  An entry lists its parameters in the order the SQL
     // has them, as the tool writes it.  The properties are what MSBuild tells the generator: public-exceptions runs
     // these queries with the exceptions public.
-    private static GeneratorRun Shapes(CorpusEngine engine, IReadOnlyDictionary<string, string?>? properties)
+    private static GeneratorRun Shapes(
+        CorpusEngine engine,
+        IReadOnlyDictionary<string, string?>? properties,
+        string? settings = null
+    )
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -139,7 +161,57 @@ internal static partial class QueryMethodCorpus
                     engine.Entry(file, "ListAll", none, columns)
                 ),
             ],
-            properties: properties
+            properties: properties,
+            settings: settings
+        );
+    }
+
+    // A query of each shape with the collection method on, under the settings given: none, a row count, one row, one
+    // row or none, and many rows, each with the id parameter that a collection method needs.
+    private static GeneratorRun CollectionMethod(CorpusEngine engine, string settings)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            """
+            -- name: Rename -> none
+            -- generator: collection-method
+            UPDATE users SET name = @name WHERE id = @id;
+            -- name: CountUsers -> rowcount
+            -- generator: collection-method
+            DELETE FROM users WHERE id = @id;
+            -- name: GetUser -> one
+            -- generator: collection-method
+            SELECT id, name FROM users WHERE id = @id;
+            -- name: FindUser -> one-optional
+            -- generator: collection-method
+            SELECT id, name FROM users WHERE id = @id;
+            -- name: ListUsers
+            -- generator: collection-method
+            SELECT id, name FROM users WHERE id > @id;
+
+            """
+        );
+        var id = IdParameter(engine);
+        var columns = IdAndName(engine);
+        return engine.Run(
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
+            [
+                file,
+                Sidecars.Of(
+                    file,
+                    engine.Entry(
+                        file,
+                        "Rename",
+                        [CorpusEngine.Parameter("name", engine.Text, nullable: true), id],
+                        null
+                    ),
+                    engine.Entry(file, "CountUsers", [id], null),
+                    engine.Entry(file, "GetUser", [id], columns),
+                    engine.Entry(file, "FindUser", [id], columns),
+                    engine.Entry(file, "ListUsers", [id], columns)
+                ),
+            ],
+            settings: settings
         );
     }
 

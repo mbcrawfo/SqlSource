@@ -72,8 +72,8 @@ internal static partial class QueryMethodCorpus
         }
         """;
 
-    private static GeneratorRun RepositoryOfConnectionString(CorpusEngine engine) =>
-        Repository(engine, ConnectionStringSource);
+    private static GeneratorRun RepositoryOfConnectionString(CorpusEngine engine, string? settings) =>
+        Repository(engine, ConnectionStringSource, settings);
 
     private static GeneratorRun RepositoryOfDataSource(CorpusEngine engine) => Repository(engine, DataSourceSource);
 
@@ -82,7 +82,7 @@ internal static partial class QueryMethodCorpus
     private static GeneratorRun RepositoryOfBorrowed(CorpusEngine engine) => Repository(engine, BorrowedSource);
 
     // The repository's queries, at Repository: one row or none, many rows and a stream of them.
-    private static GeneratorRun Repository(CorpusEngine engine, string source)
+    private static GeneratorRun Repository(CorpusEngine engine, string source, string? settings = null)
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -110,7 +110,8 @@ internal static partial class QueryMethodCorpus
                     engine.Entry(file, "StreamUsers", [], columns)
                 ),
             ],
-            output: OutputKind.Repository
+            output: OutputKind.Repository,
+            settings: settings
         );
     }
 }
