@@ -25,7 +25,8 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
     // received every row but those of the last, unfilled buffer when the last row waits, on 14 as on 18.
     private const int RowsBeforeTheWait = 10_000;
 
-    // The advisory lock that ListThenWait's last row waits for.  No other test takes an advisory lock.
+    // The advisory lock that ListThenWait's last row waits for.  No other test takes it; BatchQueryTests takes one of
+    // its own.
     private const long LastRowLock = 112;
 
     // The account whose row the timeout test holds, as SQL Server's twin holds bob's.
@@ -248,8 +249,9 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
             }
         );
 
-    // Cancels once ListThenWait waits on the holder's lock before its last row, or once the wait for it fails.
-    private static async Task CancelOnceWaitingAsync(
+    // Cancels once a query waits on the holder's lock, as ListThenWait does before its last row, or once the wait for
+    // it fails.  BatchQueryTests cancels a collection method so too.
+    internal static async Task CancelOnceWaitingAsync(
         NpgsqlDataSource watch,
         int holder,
         CancellationTokenSource cancel,
@@ -260,7 +262,7 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
         {
             await Eventually.TrueAsync(
                 async () => await IsBlockedByAsync(watch, holder, token),
-                "the query never waited on the lock before its last row"
+                "the query never waited on the holder's lock"
             );
         }
         finally
@@ -320,7 +322,7 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
         "CA2100:Review SQL queries for security vulnerabilities",
         Justification = "The SQL is the test's own constants."
     )]
-    private static async Task<NpgsqlTransaction> HoldAsync(
+    internal static async Task<NpgsqlTransaction> HoldAsync(
         NpgsqlConnection holder,
         string statement,
         long argument,
@@ -343,7 +345,7 @@ public sealed class RunTimeTests(PostgresDatabases postgres)
     }
 
     // Whether a backend waits on a lock that the holder's backend holds: ListThenWait's, which reaches the lock only
-    // after the rows before its last.
+    // after the rows before its last, or a collection method's item.
     private static async Task<bool> IsBlockedByAsync(NpgsqlDataSource watch, int holder, CancellationToken token)
     {
         await using var command = watch.CreateCommand(

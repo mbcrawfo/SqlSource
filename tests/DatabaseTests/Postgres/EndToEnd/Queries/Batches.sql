@@ -20,6 +20,12 @@ RETURNING id, account_id, body;
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
 
+-- name: InsertNoteQuietly -> none
+-- summary: InsertNoteRowCount again, under none, which returns nothing.
+-- input-model: NoteToAdd
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId;
+
 -- name: FindNotes
 -- summary: The notes of the account that an id names.
 -- output-model: BatchNote
@@ -35,6 +41,25 @@ SELECT id, account_id, body FROM notes WHERE id = @id;
 -- summary: and the isolation level of the transaction it ran in.
 -- generator: transaction=serializable
 -- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, current_setting('transaction_isolation') AS isolation;
+
+-- name: InsertNoteReadCommitted -> one
+-- summary: InsertNoteSerializable again, under transaction=read-committed.
+-- generator: transaction=read-committed
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, current_setting('transaction_isolation') AS isolation;
+
+-- name: InsertNoteRepeatableRead -> one
+-- summary: InsertNoteSerializable again, under transaction=repeatable-read.
+-- generator: transaction=repeatable-read
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
 RETURNING id, current_setting('transaction_isolation') AS isolation;
@@ -56,4 +81,16 @@ RETURNING id, account_id, body;
 -- output-model: BatchNote
 INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, account_id, body;
+
+-- name: InsertNoteAfterLock -> one
+-- summary: Adds a note as InsertNote does once it holds a shared advisory lock that a key names, for a cancellation
+-- summary: while an item waits for a lock that another connection holds.
+-- As in ListThenWait of Methods.sql, the lock is taken in a LEFT JOIN LATERAL that the row's account reaches.
+-- output-model: BatchNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, a.id, 'call', @body, now()
+FROM accounts AS a
+LEFT JOIN LATERAL (SELECT pg_advisory_xact_lock_shared(@lockKey) WHERE a.id = @accountId) AS w ON true
+WHERE a.id = @accountId
 RETURNING id, account_id, body;

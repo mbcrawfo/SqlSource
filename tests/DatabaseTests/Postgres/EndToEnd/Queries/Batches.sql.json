@@ -164,6 +164,55 @@
         }
       ]
     },
+    "InsertNoteQuietly": {
+      "hash": "2a9468e328b7ac3c624266c8b9721a20003466dbd37be667ebe4c710bfda7fba",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "none",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "body",
+          "ordinal": 1,
+          "type": {
+            "name": "text",
+            "bindName": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "accountId",
+          "ordinal": 2,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ]
+    },
     "FindNotes": {
       "hash": "cb1fdf45309b1697b87bfb1a413a6782337904911826d9b9186056f4aca62ffa",
       "toolVersion": "0.1.0",
@@ -422,6 +471,182 @@
         }
       ]
     },
+    "InsertNoteReadCommitted": {
+      "hash": "8d4c9d84665352219f1cb53f0e18292927c5791a307e69c30698dccc89f9a1fc",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "body",
+          "ordinal": 1,
+          "type": {
+            "name": "text",
+            "bindName": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "accountId",
+          "ordinal": 2,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "isolation",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "nullableSource": "no-origin",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
+    "InsertNoteRepeatableRead": {
+      "hash": "8d4c9d84665352219f1cb53f0e18292927c5791a307e69c30698dccc89f9a1fc",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "body",
+          "ordinal": 1,
+          "type": {
+            "name": "text",
+            "bindName": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "accountId",
+          "ordinal": 2,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "isolation",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "nullableSource": "no-origin",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
     "InsertNoteNoTransaction": {
       "hash": "3b4ac56803aff95212c89e4802054879d2a3ca25157a35c79b311eb1d25af303",
       "toolVersion": "0.1.0",
@@ -573,6 +798,130 @@
         {
           "name": "accountId",
           "ordinal": 2,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "InsertNoteAfterLock": {
+      "hash": "8c66758bc176172f7c77a386592b2af6295ab56ef50a4a4117f42dbc1211d34a",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "body",
+          "ordinal": 1,
+          "type": {
+            "name": "text",
+            "bindName": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "lockKey",
+          "ordinal": 2,
+          "type": {
+            "name": "bigint",
+            "bindName": "bigint",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int8"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "accountId",
+          "ordinal": 3,
           "type": {
             "name": "integer",
             "bindName": "integer",
