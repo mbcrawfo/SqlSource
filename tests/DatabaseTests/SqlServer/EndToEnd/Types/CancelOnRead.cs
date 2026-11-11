@@ -2,8 +2,8 @@ using System.Threading;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd.Types;
 
-// The C# type that ListAccountIdsCancellingOnRead of Queries/Methods.sql reads its int as, by its type override, so
-// that RunTimeArgumentTests can cancel a token between two rows: the generated method gives each row's int to
+// The C# type that ListAccountIdsCancellingOnRead of Queries/Cancellation.sql reads its int as, by its type override,
+// so that RunTimeArgumentTests can cancel a token between two rows: the generated method gives each row's int to
 // FromDatabase, which cancels Source, and the ReadAsync of the next row sees the token cancelled.  Source is held for
 // each async flow: the generated method runs in the flow of the test that set it, and a test run beside it sees its
 // own, or none.

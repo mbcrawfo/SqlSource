@@ -338,11 +338,3 @@ USING (SELECT id FROM dbo.accounts WHERE id <= @lastId) AS s
 ON a.id = s.id
 WHEN MATCHED THEN UPDATE SET status = @status
 OUTPUT $action AS change, INSERTED.id;
-
--- name: ListAccountIdsCancellingOnRead
--- summary: The ids of the accounts, each read as a CancelOnRead, whose converter cancels the token of its test, so
--- that the read of the second row sees it cancelled.
--- type-override: int = SqlSource.DatabaseTests.SqlServer.EndToEnd.Types.CancelOnRead
-SELECT id
-FROM dbo.accounts
-ORDER BY id;

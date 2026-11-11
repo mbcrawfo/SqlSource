@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -22,6 +23,8 @@ public sealed class SynchronousMethodTests(PostgresDatabases postgres)
 {
     // The account whose row the timeout test holds, as RunTimeTests holds it.
     private const int LockedAccountId = 2;
+
+    private const BindingFlags Statics = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
 
     [Fact]
     public void TouchAccountSync_OneRowInATransaction_Returns1()
@@ -315,9 +318,14 @@ public sealed class SynchronousMethodTests(PostgresDatabases postgres)
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
+    // The methods are internal, the project's default visibility, so the lookup takes the non-public ones too, and
+    // finds the asynchronous method that it does not find a synchronous twin beside.
     [Fact]
-    public void StreamAccountsBoth_UnderBoth_HasNoSynchronousMethod() =>
-        typeof(StreamingQueriesExtensions).GetMethod("StreamAccountsBoth").ShouldBeNull();
+    public void StreamAccountsBoth_UnderBoth_HasNoSynchronousMethod()
+    {
+        typeof(StreamingQueriesExtensions).GetMethod("StreamAccountsBoth", Statics).ShouldBeNull();
+        _ = typeof(StreamingQueriesExtensions).GetMethod("StreamAccountsBothAsync", Statics).ShouldNotBeNull();
+    }
 
     [Fact]
     public async Task StreamAccountsBothAsync_EveryAccount_YieldsEveryRow()
