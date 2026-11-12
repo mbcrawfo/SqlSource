@@ -957,7 +957,7 @@ See: [The interface](generator.md#repository-interface), [repository interfaces]
 
 **Connection parameter is hidden by a method argument**
 
-The primary-constructor parameter that gives a database its connection is named `cancellationToken`, which every repository method takes as an argument, or `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.  Inside a method the argument hides the parameter, so the method could not reach its connection.
+The primary-constructor parameter that gives a database its connection is named `cancellationToken`, which every asynchronous repository method takes as an argument, and which is refused whatever the queries' `method-type`, or `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.  Inside a method the argument hides the parameter, so the method could not reach its connection.
 
 ```csharp
 [SqlSourceGenerate]
@@ -3703,4 +3703,4 @@ Mark a second member `[SqlSourceConnection]` beside it that returns no task: a c
 
 Under `method-type=both` the query keeps its asynchronous method, and its asynchronous [collection method](generator.md#collection-methods) when it has one, on the type and in its interface; only the synchronous ones are not generated until it is fixed.  Under `sync` the query gets no method.  A query under `method-type=async` is not reported.
 
-See: [Synchronous methods](generator.md#synchronous-methods)
+See: [Synchronous repository methods](generator.md#synchronous-repository-methods)

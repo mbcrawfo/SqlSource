@@ -354,7 +354,19 @@ GetUserNameDto? user = await connection.GetUserNameAsync(new GetUserNameParams(i
 
 `-- generator: method-type=both` gives `GetUserName` a synchronous method, `GetUserName`, which returns the row or null and takes no cancellation token, beside its asynchronous method, `GetUserNameAsync`.  `method-type=sync` gives it the synchronous method alone.  A query with [`collection-method`](generator.md#collection-methods) gets its collection method the same way, synchronous, asynchronous or both.  Write it in the file header, or in `generatorParameters` of the folder's `sqlsource.json`, for every query it reaches.  On PostgreSQL, the data source it runs on has no `Multiplexing=true`.
 
-Rules: [synchronous methods](generator.md#synchronous-methods), [generator parameters](settings.md#setting-generator-parameters).
+```csharp
+// The same query at the default output, repository, without -- output: methods
+public int Run(int id)
+{
+    GetUserNameDto? user = users.GetUserName(new GetUserNameParams(id));
+    Console.WriteLine(user?.Name ?? "no such user");
+    return user is null ? 1 : 0;
+}
+```
+
+A repository gets the same methods, and its interface a member for each, so `users` can be the interface.  Each gets its connection from the repository: a repository whose only connection is a method that returns a task marks a second one that returns none, as [the next recipe](#connection-from-a-provider) does.
+
+Rules: [synchronous methods](generator.md#synchronous-methods), [synchronous repository methods](generator.md#synchronous-repository-methods), [generator parameters](settings.md#setting-generator-parameters).
 
 <a id="connection-from-a-provider"></a>
 
@@ -378,6 +390,8 @@ public partial class UserRepository(IConnectionStrings connectionStrings)
 public interface IConnectionFactory
 {
     Task<DbConnection> OpenAsync(CancellationToken cancellationToken);
+
+    DbConnection Open();
 }
 
 [SqlSourceGenerate]
@@ -386,10 +400,14 @@ public partial class OrderRepository(IConnectionFactory connections)
     [SqlSourceConnection]
     private Task<DbConnection> OpenAsync(CancellationToken cancellationToken) =>
         connections.OpenAsync(cancellationToken);
+
+    // For the synchronous methods of method-type=sync or both
+    [SqlSourceConnection]
+    private DbConnection Open() => connections.Open();
 }
 ```
 
-A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [known issues](generator.md#known-issues) says.  `OrderRepository`'s method is a factory: each repository method calls it, opens the connection it returns when it is closed, and disposes it.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
+A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [known issues](generator.md#known-issues) says.  `OrderRepository`'s methods are factories: each repository method calls one, opens the connection it returns when it is closed, and disposes it, an asynchronous method `OpenAsync` and a [synchronous one](generator.md#synchronous-repository-methods) `Open`.  A type whose queries are all asynchronous needs only `OpenAsync`.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
 
 Rules: [the connection](generator.md#repository-connection).
 
