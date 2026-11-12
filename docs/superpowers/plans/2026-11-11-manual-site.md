@@ -396,4 +396,5 @@ Run `./pre-commit-validation.sh` (expect it to pass), then commit `ci: publish t
 - [ ] **Step 4:** Offer the pull request.  Its description lists the owner's steps:
   - before merging, set Pages' source to "GitHub Actions" and add tag `v*` to `github-pages`
   - after merging, run `gh workflow run docs.yml --ref main` and open `https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc024`
+  - optionally, set the repository's website field to the site
   - say plainly that `SqlSource 0.1.0-beta.1`'s help links and readme links break, as accepted
