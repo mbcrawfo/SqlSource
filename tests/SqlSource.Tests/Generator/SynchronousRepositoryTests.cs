@@ -452,6 +452,35 @@ public sealed class SynchronousRepositoryTests
         run.Sources[MethodsFile].ShouldNotContain("Finalize");
     }
 
+    // A Finalize that the type has already takes the name, which is one SQLSRC274 for the form and not a second for its
+    // signature.  A destructor is the type's finalizer, which may or may not take the name; either way it is reported
+    // once.
+    [Theory]
+    [InlineData("method-type=sync", "public void Finalize(int x) { }")]
+    [InlineData("method-type=both", "public void Finalize(int x) { }")]
+    [InlineData("method-type=sync", "~Sample() { }")]
+    [InlineData("method-type=both", "~Sample() { }")]
+    public void Run_SynchronousRepositoryMethodNamedAFinalizeTheTypeHas_ReportsSqlsrc274Once(
+        string parameters,
+        string member
+    )
+    {
+        var source = SampleOf(
+            "public partial class Sample(string connectionString)\n    {\n        " + member + "\n    }"
+        );
+        var file = UsersFile("-- generator: " + parameters + "\n-- name: Finalize\nSELECT id FROM users;\n");
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "Finalize", [], [Column("id")])], source);
+
+        var problems = run.Problems();
+        problems.Count.ShouldBe(1);
+        problems[0].ShouldStartWith("SQLSRC274 ");
+        StepOutputs
+            .Single<TypeMethods>(run, TrackingNames.TypeMethods)
+            .Diagnostics.Count(diagnostic => diagnostic.Descriptor.Id == "SQLSRC274")
+            .ShouldBe(1);
+    }
+
     // The asynchronous method takes the token, and a method that takes a parameter has another signature, so neither is
     // object.Finalize.
     [Theory]

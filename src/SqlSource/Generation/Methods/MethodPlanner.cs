@@ -428,6 +428,7 @@ internal static class MethodPlanner
         var forms = FormsOf(query, settings, shape, models.Input is not null, connection, problems, out var lostForm);
         problems.AddRange(FindTokenProblems(query, forms));
         var host = HostOf(placement);
+        var taken = new HashSet<MethodForm>();
         foreach (var form in forms)
         {
             var reason =
@@ -436,6 +437,7 @@ internal static class MethodPlanner
                 ?? FindTakenByInterface(input.Type.Type.Type, interfaceName, form.Source, host, form.Name);
             if (reason is not null)
             {
+                _ = taken.Add(form);
                 problems.Add(
                     DiagnosticInfo.Create(
                         SqlDiagnostics.MethodNameTaken,
@@ -468,7 +470,7 @@ internal static class MethodPlanner
         // checked here, with every form's real argument list.  A query whose input was not read has its own problem.
         if (hasInput)
         {
-            problems.AddRange(FindFinalizeProblems(query, forms, methodInput, host));
+            problems.AddRange(FindFinalizeProblems(query, forms, taken, methodInput, host));
         }
 
         // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
@@ -1173,11 +1175,13 @@ internal static class MethodPlanner
     }
 
     // SQLSRC274 for each form of the query that is a method named Finalize with no argument, on the type or in a nested
-    // class, which the compiler takes for the type's finalizer (CS0465).  Only a synchronous repository method can be
+    // class, which the compiler takes for the type's finalizer (CS0465), except a form that something took the name of
+    // already, which has its one SQLSRC274.  Only a synchronous repository method can be
     // one: every other method has the connection or the cancellation token as an argument.
     private static List<DiagnosticInfo> FindFinalizeProblems(
         SqlQuery query,
         List<MethodForm> forms,
+        HashSet<MethodForm> taken,
         MethodInput? input,
         MethodHost host
     )
@@ -1193,6 +1197,7 @@ internal static class MethodPlanner
         {
             if (
                 form.HasQueryMethod
+                && !taken.Contains(form)
                 && string.Equals(form.Name, FinalizeName, StringComparison.Ordinal)
                 && !new MethodArguments(input, tokens, streams: false, form.Source is null, synchrony: form.Synchrony)
                     .GetEnumerator()
