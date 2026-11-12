@@ -56,6 +56,23 @@ public sealed class SynchronousBatchTests(SqlServerDatabases sqlServer)
         new(3, 2, "Closed the account on site."),
     ];
 
+    // The repository's synchronous collection method begins its own transaction and commits it before it returns, as
+    // the asynchronous one does: a transaction that it disposed uncommitted would have rolled the rows back.  The
+    // borrowed connection is open, with the temporary table, so the method leaves it open.
+    [Fact]
+    public void Repository_InsertNoteSync_CommitsItsOwnTransaction()
+    {
+        using var connection = OpenWithTemporaryNotes(EndToEndSources.App(sqlServer));
+        var items = Items(3);
+
+        var rows = new BatchQueries(connection).InsertNoteInRepositorySync(items, Notes);
+
+        rows.ShouldBe(RowsOf(items));
+        connection.State.ShouldBe(ConnectionState.Open);
+        CountNotes(connection, null).ShouldBe(3);
+        ShouldBeInNoTransaction(connection);
+    }
+
     [Fact]
     public void InsertNoteSync_OneItem_ReturnsItsRow()
     {

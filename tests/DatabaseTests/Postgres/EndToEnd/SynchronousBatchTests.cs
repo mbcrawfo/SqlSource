@@ -45,6 +45,42 @@ public sealed class SynchronousBatchTests(PostgresDatabases postgres)
         new(3, 2, "Closed the account on site."),
     ];
 
+    // The repository's synchronous collection method begins its own transaction and commits it before it returns, as
+    // the asynchronous one does: a transaction that it disposed uncommitted would have rolled the rows back.  The
+    // borrowed connection is open, with the temporary table, so the method leaves it open.
+    [Fact]
+    public void Repository_InsertNoteSync_CommitsItsOwnTransaction()
+    {
+        using var source = EndToEndSources.App(postgres);
+        using var connection = OpenWithTemporaryNotes(source);
+        var items = Notes(3);
+
+        var rows = new BatchQueries(connection).InsertNoteInRepositorySync(items);
+
+        rows.ShouldBe(RowsOf(items));
+        connection.State.ShouldBe(ConnectionState.Open);
+        CountNotes(connection).ShouldBe(3);
+        ShouldBeInNoTransaction(connection);
+    }
+
+    // On a multiplexing data source the repository's method runs on a borrowed closed connection with no transaction
+    // of the caller's, since Npgsql runs a synchronous command inside a transaction and the method begins its own.
+    // The item's account does not exist, so the insert writes nothing and returns no row, which shows that it ran, and
+    // the method closes the connection again as it throws.
+    [Fact]
+    public void Repository_InsertNoteSyncMultiplexingBorrowedClosedConnection_RunsInItsOwnTransaction()
+    {
+        using var source = EndToEndSources.AppMultiplexing(postgres);
+        using var connection = source.CreateConnection();
+
+        var thrown = Should.Throw<UnexpectedRowCountException>(() =>
+            new BatchQueries(connection).InsertNoteInRepositorySync([new NoteToAdd(FirstId, "Lost.", 99)])
+        );
+
+        thrown.ItemIndex.ShouldBe(0);
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
     [Fact]
     public void InsertNoteSync_OneItem_ReturnsItsRow()
     {

@@ -41,6 +41,7 @@ public sealed class VariantCopyTests
     [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNameNested")]
     [InlineData("Batches.sql", "InsertNote", "InsertNoteNoTransaction")]
     [InlineData("Batches.sql", "InsertNote", "InsertNoteInRepository")]
+    [InlineData("Batches.sql", "InsertNoteInRepository", "InsertNoteInRepositorySync")]
     [InlineData("Batches.sql", "InsertNoteRowCount", "InsertNoteQuietly")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteReadCommitted")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteRepeatableRead")]

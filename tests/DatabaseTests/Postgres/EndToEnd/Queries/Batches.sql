@@ -173,6 +173,16 @@ INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VAL
 SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
 RETURNING id, account_id, body;
 
+-- name: InsertNoteInRepositorySync -> one
+-- summary: InsertNoteInRepository, by a synchronous collection method of BatchQueries.
+-- output: repository
+-- generator: method-type=sync
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE
+SELECT @id, id, 'call', @body, now() FROM accounts WHERE id = @accountId
+RETURNING id, account_id, body;
+
 -- name: InsertNoteAfterLock -> one
 -- summary: Adds a note as InsertNote does once it holds a shared advisory lock that a key names, for a cancellation
 -- summary: while an item waits for a lock that another connection holds.
