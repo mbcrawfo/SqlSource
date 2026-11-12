@@ -380,6 +380,57 @@ public sealed class SynchronousRepositoryTests
         run.Problems().ShouldBe(problem is null ? [] : [problem]);
     }
 
+    // A source that both forms share is checked once, so that its token is a problem once and not for each form.
+    [Fact]
+    public void Run_MethodTypeBothTokenNamedAsTheSharedSource_ReportsSqlsrc275Once()
+    {
+        var source = SampleOf("public partial class Sample(NpgsqlDataSource dataSource);");
+        var file = UsersFile(
+            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{dataSource:users}}\n"
+                + "SELECT id FROM {{dataSource}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC275 /app/Repo/Users.sql(2,10)-(2,17): The token 'dataSource' of the query 'GetFrom' has the "
+                    + "name of the primary-constructor parameter 'dataSource', which gives the repository methods of "
+                    + "'App.Sample' their connection.  Rename the token.",
+            ]);
+        // The run's report lists a problem once whatever the planner found, so the planner's own list says it too.
+        StepOutputs
+            .Single<TypeMethods>(run, TrackingNames.TypeMethods)
+            .Diagnostics.Count(diagnostic => diagnostic.Descriptor.Id == "SQLSRC275")
+            .ShouldBe(1);
+    }
+
+    // A pair's synchronous factory, an instance member, hides no type, and its asynchronous one, a static member, is
+    // reached through the type, which a token of the type's name would hide: the second form is checked too.
+    [Fact]
+    public void Run_MethodTypeBothTokenNamedAsTheTypeOfTheAsynchronousFactory_ReportsSqlsrc275()
+    {
+        var source = SampleOf(
+            "public partial class Sample\n    {\n"
+                + "        [SqlSourceConnection]\n"
+                + "        private static Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) =>\n"
+                + "            Task.FromResult(new NpgsqlConnection());\n\n"
+                + "        [SqlSourceConnection]\n"
+                + "        private NpgsqlConnection Open() => new NpgsqlConnection();\n    }"
+        );
+        var file = UsersFile(
+            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{Sample:users}}\n"
+                + "SELECT id FROM {{Sample}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], source);
+
+        var problems = run.Problems();
+        problems.Count.ShouldBe(1);
+        problems[0].ShouldStartWith("SQLSRC275 ");
+        problems[0].ShouldContain("'Sample'");
+    }
+
     // Every method's cancellation token would hide the parameter, whatever the method-type.
     [Fact]
     public void Run_MethodTypeSyncSourceParameterNamedCancellationToken_ReportsSqlsrc036()
