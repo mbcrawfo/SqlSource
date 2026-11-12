@@ -13,8 +13,8 @@ using Xunit;
 namespace SqlSource.DatabaseTests.SqlServer.SyncAsync;
 
 // The runner's SQL Server: the connections the end-to-end tests run their queries on, by name, a copy of a seeded
-// database for a scenario that writes, error numbers and what became of a caller's transaction.  It disposes the shared
-// sources it made.
+// database for a scenario that writes, error numbers, what became of a caller's transaction and the text of a NodaTime
+// value or a geometry.  It disposes the shared sources it made.
 internal sealed class SqlServerEngine(SqlServerDatabases databases) : IEngine, IAsyncDisposable
 {
     // The number of the last copy made in this process, so that each copy has a name of its own.
@@ -94,6 +94,8 @@ internal sealed class SqlServerEngine(SqlServerDatabases databases) : IEngine, I
         command.Transaction = transaction;
         return (string)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
     }
+
+    public string? Render(object value) => LibraryRendering.Of(value);
 
     public async ValueTask DisposeAsync()
     {

@@ -14,13 +14,14 @@ using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 namespace SqlSource.DatabaseTests.TestHarness.SyncAsync;
 
 // A value as text that does not depend on the culture or the run, so that what the two methods of a pair return can be
-// compared as strings.  It uses nothing but the framework: a type of a library the harness does not reference, such as
-// a NodaTime value or a NetTopologySuite geometry, is rendered by its own ToString.
+// compared as strings.  It uses nothing but the framework: a value of a library the harness does not reference, such as
+// a NodaTime value or a NetTopologySuite geometry, whose own ToString drops part of it, is rendered by library, the
+// engine's IEngine.Render, which is asked first at every depth.
 internal static partial class Rendering
 {
     private const int MaxDepth = 8;
 
-    public static string Of(object? value) => Of(value, 0);
+    public static string Of(object? value, Func<object, string?>? library = null) => Of(value, library, 0);
 
     // The message with every GUID replaced by "<guid>", since a driver puts its connection's id in it.
     public static string Masked(string message) => GuidPattern().Replace(message, "<guid>");
@@ -28,8 +29,13 @@ internal static partial class Rendering
     [GeneratedRegex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")]
     private static partial Regex GuidPattern();
 
-    private static string Of(object? value, int depth)
+    private static string Of(object? value, Func<object, string?>? library, int depth)
     {
+        if (value is not null && library?.Invoke(value) is { } own)
+        {
+            return own;
+        }
+
         var simple = SimpleOf(value);
         if (simple is not null)
         {
@@ -39,7 +45,7 @@ internal static partial class Rendering
         var type = value!.GetType();
         if (ItemsOfMemory(value, type) is { } memory)
         {
-            return "[" + string.Join(", ", memory.Cast<object?>().Select(item => Of(item, depth + 1))) + "]";
+            return "[" + string.Join(", ", memory.Cast<object?>().Select(item => Of(item, library, depth + 1))) + "]";
         }
 
         if (HasOwnToString(type))
@@ -55,12 +61,12 @@ internal static partial class Rendering
         return value switch
         {
             ITuple tuple => "("
-                + string.Join(", ", Enumerable.Range(0, tuple.Length).Select(i => Of(tuple[i], depth + 1)))
+                + string.Join(", ", Enumerable.Range(0, tuple.Length).Select(i => Of(tuple[i], library, depth + 1)))
                 + ")",
             IEnumerable items => "["
-                + string.Join(", ", items.Cast<object?>().Select(item => Of(item, depth + 1)))
+                + string.Join(", ", items.Cast<object?>().Select(item => Of(item, library, depth + 1)))
                 + "]",
-            _ => ObjectOf(value, type, depth),
+            _ => ObjectOf(value, type, library, depth),
         };
     }
 
@@ -120,7 +126,7 @@ internal static partial class Rendering
         || type.GetProperty("EqualityContract", BindingFlags.NonPublic | BindingFlags.Instance) is not null
         || toString.GetCustomAttribute<CompilerGeneratedAttribute>() is not null;
 
-    private static string ObjectOf(object value, Type type, int depth)
+    private static string ObjectOf(object value, Type type, Func<object, string?>? library, int depth)
     {
         var properties = ModelReflection
             .PropertiesOf(type)
@@ -132,7 +138,7 @@ internal static partial class Rendering
             _ = text.Append(i == 0 ? " " : ", ")
                 .Append(properties[i].Name)
                 .Append(" = ")
-                .Append(Of(properties[i].GetValue(value), depth + 1));
+                .Append(Of(properties[i].GetValue(value), library, depth + 1));
         }
 
         return text.Append(" }").ToString();

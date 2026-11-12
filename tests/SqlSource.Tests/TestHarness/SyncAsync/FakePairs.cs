@@ -77,7 +77,8 @@ internal static class FakePairs
 }
 
 // Hand-written pairs of the connection they are given, for the tests of the runner: one runs a command naming whether
-// it was given a transaction, and one throws naming the connection's database.
+// it was given a transaction, one throws naming the connection's database, and one throws an exception of an item whose
+// index differs between the two methods.
 internal static class FakeConnectionPairs
 {
     public static void Run(DbConnection connection, FakePairs.Args parameters, DbTransaction? transaction = null)
@@ -106,6 +107,15 @@ internal static class FakeConnectionPairs
         CancellationToken cancellationToken = default
     ) => Task.FromException(new InvalidOperationException($"Failed in {connection.Database}."));
 
+    public static void FailAt(DbConnection connection, FakePairs.Args parameters) =>
+        throw new ItemException(parameters.Id + 1);
+
+    public static Task FailAtAsync(
+        DbConnection connection,
+        FakePairs.Args parameters,
+        CancellationToken cancellationToken = default
+    ) => Task.FromException(new ItemException(parameters.Id));
+
     private static DbCommand CommandOf(DbConnection connection, DbTransaction? transaction)
     {
         var command = connection.CreateCommand();
@@ -121,4 +131,13 @@ internal static class FakeConnectionPairs
         command.Transaction = transaction;
         return command;
     }
+}
+
+// An exception of a collection method's item, which names the item by its ItemIndex as the generated methods' do.  Only
+// the fakes throw it, with an item, so it has none of the usual constructors and stays internal.
+#pragma warning disable CA1032, S3871
+internal sealed class ItemException(int itemIndex) : Exception("An item failed.")
+#pragma warning restore CA1032, S3871
+{
+    public int ItemIndex { get; } = itemIndex;
 }

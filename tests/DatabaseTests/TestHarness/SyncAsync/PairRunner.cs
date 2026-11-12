@@ -159,7 +159,7 @@ internal static class PairRunner
                 : null;
             var given = scenario.Setup.PassTransaction ? transaction : null;
             var value = await pair.InvokeAsync(method, instance, connection, given, scenario).ConfigureAwait(false);
-            result = IsVoid(method) ? "<void>" : Rendering.Of(value);
+            result = IsVoid(method) ? "<void>" : Rendering.Of(value, engine.Render);
         }
 #pragma warning disable CA1031 // Any exception the method throws is the outcome that is compared.
         catch (Exception exception)
@@ -185,7 +185,7 @@ internal static class PairRunner
         var tables = new List<string>();
         foreach (var select in scenario.Setup.Tables ?? [])
         {
-            tables.Add(await TableAsync(source, connection, transaction, select).ConfigureAwait(false));
+            tables.Add(await TableAsync(engine, source, connection, transaction, select).ConfigureAwait(false));
         }
 
         return new Outcome(result, failure, connectionState, transactionState, tables);
@@ -217,6 +217,7 @@ internal static class PairRunner
 
     // The call's connection and transaction when they still work, else a new connection of the source.
     private static async Task<string> TableAsync(
+        IEngine engine,
         DbDataSource source,
         DbConnection connection,
         DbTransaction? transaction,
@@ -227,7 +228,7 @@ internal static class PairRunner
         {
             try
             {
-                return await ReadTableAsync(connection, transaction, select).ConfigureAwait(false);
+                return await ReadTableAsync(engine, connection, transaction, select).ConfigureAwait(false);
             }
             catch (DbException)
             {
@@ -238,7 +239,7 @@ internal static class PairRunner
         var other = await source.OpenConnectionAsync().ConfigureAwait(false);
         await using (other.ConfigureAwait(false))
         {
-            return await ReadTableAsync(other, null, select).ConfigureAwait(false);
+            return await ReadTableAsync(engine, other, null, select).ConfigureAwait(false);
         }
     }
 
@@ -256,8 +257,13 @@ internal static class PairRunner
         return command;
     }
 
-    // The columns' names, then each row, with the values as Rendering writes them.
-    private static async Task<string> ReadTableAsync(DbConnection connection, DbTransaction? transaction, string select)
+    // The columns' names, then each row, with the values as Rendering writes them through the engine's Render.
+    private static async Task<string> ReadTableAsync(
+        IEngine engine,
+        DbConnection connection,
+        DbTransaction? transaction,
+        string select
+    )
     {
         await using var command = CommandOf(connection, transaction, select);
         var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
@@ -273,7 +279,9 @@ internal static class PairRunner
                             " | ",
                             Enumerable
                                 .Range(0, reader.FieldCount)
-                                .Select(i => Rendering.Of(reader.IsDBNull(i) ? null : reader.GetValue(i)))
+                                .Select(i =>
+                                    Rendering.Of(reader.IsDBNull(i) ? null : reader.GetValue(i), engine.Render)
+                                )
                         )
                     );
             }

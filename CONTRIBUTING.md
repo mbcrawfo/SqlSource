@@ -129,7 +129,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, and the allocation tests on each engine's default image, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, and the allocation tests and the comparison of each synchronous method with its asynchronous twin on each engine's default image, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>

@@ -16,11 +16,13 @@
 - **A scenario that writes sets `Writes` and names the tables it touches in `Tables`**, so that each run restores its own copy of the seed; one that only reads sets neither, since a restore costs about half a second.
 - **A scenario whose SQL before the call changes a setting of the session, such as `SET XACT_ABORT ON`, runs on the source `unpooled`**, so that the pool hands the setting to no other scenario.
 - **An insert of `Queries/Batches.sql` is given `SqlServerDatabases.BatchNotes` by its token `notes`**, never a temporary table, which a closed connection drops before the runner reads it.
+- **Every test that needs the server is in `UsesSqlServer`**; `KnownDifferencesTests` and `LibraryRenderingTests` need none and stay outside it, so that they run without Docker.
+- **A NodaTime value or a geometry whose own `ToString` drops part of it is written by `LibraryRendering`, with a row in `LibraryRenderingTests`, and both stay the same as the other `SyncAsync` project's**, since the harness references neither library and a test project compiles no file of another.
 
 ## Known differences
 
 - **`KnownDifferences.cs` holds a driver's limit alone, with its reason and a note of its effect in `site/sqlserver.md`**, and a row in the readme's table.
-- **Never add one that changes what a caller's `catch` sees or what is left in the database**: that is a difference of the generated methods, to fix or to take to the owner first.
+- **One that changes what a caller's `catch` sees or what is left in the database is added only once the owner has ruled it the driver's limit**, and never to hide a difference that the generated methods could avoid.
 
 ## Project
 

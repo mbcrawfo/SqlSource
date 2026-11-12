@@ -10,12 +10,18 @@ using SqlSource.DatabaseTests.TestHarness.SyncAsync;
 namespace SqlSource.Tests.TestHarness.SyncAsync;
 
 // A database without a server, for the tests of PairRunner: every command returns one row of one column, and the text
-// of each is written to Commands, as are "BEGIN" and "ROLLBACK" for a transaction.  Its data source is DbDataSource's
+// of each is written to Commands, as are "BEGIN" and "ROLLBACK" for a transaction, and to Executions with the
+// connection and the transaction it ran on.  Its data source is DbDataSource's
 // own, whose commands refuse a connection, as Npgsql's do.  It overrides none of the asynchronous members, which call
 // the synchronous ones, so that it declares no pair that MethodPairs.Find would find.
 internal sealed class FakeDatabase : IEngine
 {
     public List<string> Commands { get; } = [];
+
+    public List<Execution> Executions { get; } = [];
+
+    // What Render gives, which renders nothing itself unless a test sets it.
+    public Func<object, string?> Renderer { get; set; } = static _ => null;
 
     private int _copies;
 
@@ -31,6 +37,11 @@ internal sealed class FakeDatabase : IEngine
 
     public Task<string> TransactionStateAsync(DbConnection connection, DbTransaction transaction) =>
         Task.FromResult("active");
+
+    public string? Render(object value) => Renderer(value);
+
+    // A command's text, with the connection and the transaction it ran on.
+    public sealed record Execution(string Text, DbConnection Connection, DbTransaction? Transaction);
 
     private sealed class Source(FakeDatabase database, string name) : DbDataSource
     {
@@ -121,7 +132,7 @@ internal sealed class FakeDatabase : IEngine
 
         public override int ExecuteNonQuery()
         {
-            database.Commands.Add(CommandText);
+            Record();
             return 0;
         }
 
@@ -134,9 +145,15 @@ internal sealed class FakeDatabase : IEngine
 
         protected override DbParameter CreateDbParameter() => throw new NotSupportedException();
 
-        protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+        private void Record()
         {
             database.Commands.Add(CommandText);
+            database.Executions.Add(new Execution(CommandText, DbConnection!, DbTransaction));
+        }
+
+        protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+        {
+            Record();
             using var table = new DataTable { Locale = CultureInfo.InvariantCulture };
             _ = table.Columns.Add("n", typeof(int));
             _ = table.Rows.Add(1);

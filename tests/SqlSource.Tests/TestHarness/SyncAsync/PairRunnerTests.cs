@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -109,4 +111,114 @@ public sealed class PairRunnerTests
 
         verdict.Agreement.ShouldBe(Agreement.Same);
     }
+
+    // Each method of the pair runs once: a runner that ran the asynchronous method twice would find the two the same.
+    [Fact]
+    public async Task RunAsync_PairThatDiffers_IsDifferent()
+    {
+        var database = new FakeDatabase();
+        var pair = PairOf(typeof(FakePairs.Queries), "Fail");
+        var scenario = new Scenario(
+            "Queries.Fail: each method its own message",
+            typeof(FakePairs.Queries),
+            "Fail",
+            MethodKind.Query,
+            ScenarioTag.Other,
+            new Setup(),
+            new FakePairs.Args(1)
+        );
+
+        var verdict = await PairRunner.RunAsync(database, pair, scenario, []);
+
+        verdict.Agreement.ShouldBe(Agreement.Different);
+        verdict.Report.ShouldContain("async failure");
+        verdict.Report.ShouldContain("sync failure");
+    }
+
+    // The item an exception names is compared, so a synchronous method that fails at another item differs.
+    [Fact]
+    public async Task RunAsync_ExceptionWithItemIndex_RecordsIt()
+    {
+        var database = new FakeDatabase();
+        var pair = PairOf(typeof(FakeConnectionPairs), "FailAt");
+        var scenario = new Scenario(
+            "FakeConnectionPairs.FailAt: each method its own item",
+            typeof(FakeConnectionPairs),
+            "FailAt",
+            MethodKind.Query,
+            ScenarioTag.LaterChunkFailure,
+            new Setup(),
+            new FakePairs.Args(2)
+        );
+
+        var verdict = await PairRunner.RunAsync(database, pair, scenario, []);
+
+        verdict.Agreement.ShouldBe(Agreement.Different);
+        verdict.Report.ShouldContain("item 2)");
+        verdict.Report.ShouldContain("item 3)");
+    }
+
+    // What the call left in its transaction is read in that transaction, before the runner rolls it back.
+    [Fact]
+    public async Task RunAsync_Tables_ReadOnTheCallsConnectionInItsTransaction()
+    {
+        var database = new FakeDatabase();
+        var pair = PairOf(typeof(FakeConnectionPairs), "Run");
+        var scenario = new Scenario(
+            "FakeConnectionPairs.Run: in a transaction, with a table",
+            typeof(FakeConnectionPairs),
+            "Run",
+            MethodKind.Query,
+            ScenarioTag.Ordinary,
+            new Setup(Transaction: CallerTransaction.Begun, Tables: ["SELECT n"]),
+            new FakePairs.Args(1)
+        );
+
+        _ = await PairRunner.RunAsync(database, pair, scenario, []);
+
+        database
+            .Executions.Select(static execution => execution.Text)
+            .ShouldBe(["given", "SELECT n", "given", "SELECT n"]);
+        foreach (var (call, table) in new[] { (0, 1), (2, 3) })
+        {
+            _ = database.Executions[call].Transaction.ShouldNotBeNull();
+            database.Executions[table].Connection.ShouldBeSameAs(database.Executions[call].Connection);
+            database.Executions[table].Transaction.ShouldBeSameAs(database.Executions[call].Transaction);
+        }
+    }
+
+    // The returned value and each table's values are written through the engine's Render, which renders the values of
+    // the libraries the harness does not reference.
+    [Fact]
+    public async Task RunAsync_ResultAndTables_RenderedThroughTheEngine()
+    {
+        var rendered = new List<object>();
+        var database = new FakeDatabase
+        {
+            Renderer = value =>
+            {
+                rendered.Add(value);
+                return null;
+            },
+        };
+        var pair = PairOf(typeof(FakePairs.Queries), "Get");
+        var scenario = new Scenario(
+            "Queries.Get: with a table",
+            typeof(FakePairs.Queries),
+            "Get",
+            MethodKind.Query,
+            ScenarioTag.Ordinary,
+            new Setup(Tables: ["SELECT n"]),
+            new FakePairs.Args(41)
+        );
+
+        _ = await PairRunner.RunAsync(database, pair, scenario, []);
+
+        rendered.ShouldBe([42, 1, 42, 1]);
+    }
+
+    private static MethodPair PairOf(Type host, string method) =>
+        MethodPairs
+            .Find(typeof(PairRunnerTests).Assembly)
+            .Single(pair => pair.Host == host && pair.Method == method && pair.Kind == MethodKind.Query);
 }

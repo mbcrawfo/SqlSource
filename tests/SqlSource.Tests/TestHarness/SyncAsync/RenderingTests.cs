@@ -18,6 +18,26 @@ public sealed class RenderingTests
         public override string ToString() => "own";
     }
 
+    // A value whose own ToString drops what it holds, as a NodaTime value's drops its sub-second digits.
+    private sealed class Lossy(int value)
+    {
+        public int Value => value;
+
+        public override string ToString() => "lossy";
+    }
+
+    private sealed record Holder(Lossy Top, int Count);
+
+    // An engine's Render, which is never given null.
+    private static string? Library(object value) =>
+        value switch
+        {
+            null => throw new ArgumentNullException(nameof(value)),
+            Lossy lossy => "lossy " + lossy.Value.ToString(CultureInfo.InvariantCulture),
+            int number => "int " + number.ToString(CultureInfo.InvariantCulture),
+            _ => null,
+        };
+
     [Fact]
     public void Of_Null_IsNull() => Rendering.Of(null).ShouldBe("null");
 
@@ -68,6 +88,18 @@ public sealed class RenderingTests
 
     [Fact]
     public void Of_TypeWithItsOwnToString_UsesIt() => Rendering.Of(new Own()).ShouldBe("own");
+
+    // The library is asked before anything else, the framework's types too, in every place a value can hold another.
+    [Fact]
+    public void Of_ValueTheLibraryRenders_UsesItFirstAtEveryDepth()
+    {
+        Rendering.Of(new Lossy(1), Library).ShouldBe("lossy 1");
+        Rendering.Of(new Holder(new Lossy(2), 3), Library).ShouldBe("Holder { Top = lossy 2, Count = int 3 }");
+        Rendering.Of(new List<Lossy> { new(4) }, Library).ShouldBe("[lossy 4]");
+        Rendering.Of((new Lossy(5), 6), Library).ShouldBe("(lossy 5, int 6)");
+        Rendering.Of(new ReadOnlyMemory<int>([7]), Library).ShouldBe("[int 7]");
+        Rendering.Of(null, Library).ShouldBe("null");
+    }
 
     [Fact]
     public void Of_StringAndBytes_AreQuotedAndHex()

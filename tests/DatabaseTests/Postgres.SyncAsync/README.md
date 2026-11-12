@@ -5,7 +5,7 @@ This project runs each synchronous query method of PostgreSQL's end-to-end proje
 ## When a test fails
 
 1. Read the failure.  A failed row of the theory `RunAsync_Scenario_SyncMatchesAsync` names its scenario, then one line for each field of the outcome that differs, the asynchronous method's value first, `Result: async = ...; sync = ...`:
-   - `Result`, the returned value as text, rows in order, `<void>` for none and `<none>` when the call threw;
+   - `Result`, the returned value as text, rows in order, `<void>` for none and `<none>` when the call threw, with a NodaTime value or a geometry written by `LibraryRendering`, every sub-second digit, a date's era and calendar, and a geometry's SRID and every ordinate, which their own `ToString` drops;
    - `Failure`, the exception's type, its inner exception's type, its SQL state, its `ItemIndex` and its message;
    - `ConnectionState`, the connection's state after the call;
    - `TransactionState`, what became of the caller's transaction: `none` without one, `active`, `aborted` when an error left it unusable, or `completed`;
@@ -17,7 +17,7 @@ A skipped row is a scenario whose two outcomes differed only by a known differen
 
 ## Running
 
-The project needs Docker running, and it starts one container of the PostGIS image built on PostgreSQL's default image, which it builds on the first run.  The variable that names another image is ignored.
+The project needs Docker running, but for `KnownDifferencesTests` and `LibraryRenderingTests`, which need no server, and it starts one container of the PostGIS image built on PostgreSQL's default image, which it builds on the first run.  The variable that names another image is ignored.
 
 ```bash
 dotnet test --project tests/DatabaseTests/Postgres.SyncAsync -p:RunSyncAsync=true
@@ -27,6 +27,12 @@ One scenario, by its name, the theory's row:
 
 ```bash
 dotnet test --project tests/DatabaseTests/Postgres.SyncAsync -p:RunSyncAsync=true --filter-display-name '*"CubeQueriesExtensions.EchoCube: open")'
+```
+
+The tests that need no server, without Docker:
+
+```bash
+dotnet test --project tests/DatabaseTests/Postgres.SyncAsync -p:RunSyncAsync=true --filter-class '*KnownDifferencesTests' --filter-class '*LibraryRenderingTests'
 ```
 
 Without `-p:RunSyncAsync=true`, `dotnet test` finds no test project here.  That is how `dotnet test --solution SqlSource.slnx`, `pre-commit-validation.sh` and `.github/workflows/build.yml` leave the project out, so that only the nightly job runs it.  It still builds with the solution.
@@ -65,7 +71,7 @@ Before two messages are compared, every GUID in them is masked as `<guid>`, and 
 
 ## The known differences
 
-`KnownDifferences.cs` lists the differences that are Npgsql's limits, each a rewrite of the pair of outcomes that is applied only when the two differ.  A scenario that the rewrites make equal is skipped with each one's name and reason; one that still differs fails, showing the rewritten pair.
+`KnownDifferences.cs` lists the differences that are Npgsql's limits, each a rewrite of the pair of outcomes that is applied only when the two differ.  A scenario that the rewrites make equal is skipped with each one's name and reason; one that still differs fails, showing the rewritten pair.  `KnownDifferencesTests` checks each condition of a rewrite on outcomes it writes itself.
 
 | Name | Reason | Manual |
 |----|----|----|

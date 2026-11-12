@@ -20,4 +20,8 @@ internal interface IEngine
 
     // The engine's text for what became of the transaction, read after the call.
     Task<string> TransactionStateAsync(DbConnection connection, DbTransaction transaction);
+
+    // The text of a value of a library the harness does not reference, with all it holds, or null for a value that
+    // Rendering writes itself.
+    string? Render(object value);
 }

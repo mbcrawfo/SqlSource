@@ -13,8 +13,8 @@ using Xunit;
 namespace SqlSource.DatabaseTests.Postgres.SyncAsync;
 
 // The runner's PostgreSQL: the data sources the end-to-end tests run their queries on, by name, a copy of a seeded
-// database for a scenario that writes, SQL states and what became of a caller's transaction.  It disposes the shared
-// sources it made.
+// database for a scenario that writes, SQL states, what became of a caller's transaction and the text of a NodaTime
+// value or a geometry.  It disposes the shared sources it made.
 internal sealed class PostgresEngine(PostgresDatabases databases) : IEngine, IAsyncDisposable
 {
     // The SQL state of a statement in a transaction that an error aborted.
@@ -80,6 +80,8 @@ internal sealed class PostgresEngine(PostgresDatabases databases) : IEngine, IAs
             return "aborted";
         }
     }
+
+    public string? Render(object value) => LibraryRendering.Of(value);
 
     public async ValueTask DisposeAsync()
     {

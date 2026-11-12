@@ -14,12 +14,14 @@
 - **Every generated pair has its scenarios in `Scenarios/<File>Scenarios.cs`, listed in `Scenarios/AllScenarios.cs`**, and a collection method an `Empty`, a `ChunkBoundary` and a `LaterChunkFailure` one: `Find_GeneratedPairs_EachHasItsScenarios` fails otherwise, and only the nightly runs it.
 - **A scenario holds no expected value**: the asynchronous method's outcome is what the synchronous one's is compared with, and the end-to-end tests assert values.
 - **A scenario that writes sets `Writes` and names the tables it touches in `Tables`**, so that each run gets its own copy of the seed; one that only reads sets neither, since a copy costs a database.
-- **Every test is in `UsesPostgis`**, since the one PostGIS container holds `app`, `billing` and `gis`.
+- **Every test that needs the server is in `UsesPostgis`**, since the one PostGIS container holds `app`, `billing` and `gis`; `KnownDifferencesTests` and `LibraryRenderingTests` need none and stay outside it, so that they run without Docker.
+- **A NodaTime value or a geometry whose own `ToString` drops part of it is written by `LibraryRendering`, with a row in `LibraryRenderingTests`, and both stay the same as the other `SyncAsync` project's**, since the harness references neither library and a test project compiles no file of another.
 
 ## Known differences
 
 - **`KnownDifferences.cs` holds a driver's limit alone, with its reason and a note of its effect in `site/postgresql.md`**, and a row in the readme's table.
-- **Never add one that changes what a caller's `catch` sees or what is left in the database**: that is a difference of the generated methods, to fix or to take to the owner first.
+- **One that changes what a caller's `catch` sees or what is left in the database is added only once the owner has ruled it the driver's limit**, as `NpgsqlMultiplexingRefusesSyncIo` is, and never to hide a difference that the generated methods could avoid.
+- **Every condition of a rewrite has a row in `KnownDifferencesTests` that fails without it**, since a rewrite that matches too much hides a difference.
 
 ## Project
 
