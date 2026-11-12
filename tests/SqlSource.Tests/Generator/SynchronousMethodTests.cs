@@ -14,8 +14,8 @@ namespace SqlSource.Tests.Generator;
 
 // The methods that method-type gives a query: a synchronous method named as the query under sync, beside the
 // asynchronous one, which always ends in Async, under both, their names' clashes, and SQLSRC298 for a stream under
-// sync.  A collection method follows method-type as the query's method does.  In this part a repository's methods
-// stay asynchronous.  Each run is under postgres on Npgsql 10.
+// sync.  A collection method follows method-type as the query's method does.  SynchronousRepositoryTests holds a
+// repository's.  Each run is under postgres on Npgsql 10.
 public sealed class SynchronousMethodTests
 {
     private const string GetUserText = "-- name: GetUser -> one\nSELECT id FROM users WHERE id = @id;\n";
@@ -333,64 +333,6 @@ public sealed class SynchronousMethodTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         CountOf(methods, "internal static void GetUser(\n").ShouldBe(2);
         methods.ShouldNotContain("<returns>");
-    }
-
-    // In this part a repository's collection method stays asynchronous, as its method does.
-    [Fact]
-    public void Run_MethodTypeSyncRepositoryCollectionMethod_StaysAsynchronous()
-    {
-        var file = UsersFile("-- generator: method-type=sync collection-method\n" + GetUserText);
-
-        var run = RepositoryRuns.Run(file, [Entry(file, "GetUser", [Parameter("id")], [Column("id")])]);
-
-        run.ShouldBeClean();
-        var planned = MethodsOf(run);
-        planned.Select(method => method.Name).ShouldBe(["GetUser", "GetUser"]);
-        planned.ShouldAllBe(method => method.Synchrony == MethodSynchrony.Asynchronous);
-        _ = planned[1].Batch.ShouldNotBeNull();
-    }
-
-    // In this part a repository's method stays asynchronous, named under sync as under async.
-    [Theory]
-    [InlineData("method-type=sync", "GetUser")]
-    [InlineData("method-type=sync async-method-suffix", "GetUserAsync")]
-    public void Run_MethodTypeSyncRepository_WritesTheAsynchronousMethod(string parameters, string name)
-    {
-        var file = UsersFile("-- generator: " + parameters + "\n" + GetUserText);
-
-        var run = RepositoryRuns.Run(file, [Entry(file, "GetUser", [Parameter("id")], [Column("id")])]);
-
-        run.ShouldBeClean();
-        var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain(
-            "        public async global::System.Threading.Tasks.Task<global::App.GetUserDto> " + name + "(\n"
-        );
-        methods.ShouldContain("        global::System.Threading.Tasks.Task<global::App.GetUserDto> " + name + "(\n");
-        var method = MethodsOf(run).ShouldHaveSingleItem();
-        method.Name.ShouldBe(name);
-        method.Synchrony.ShouldBe(MethodSynchrony.Asynchronous);
-    }
-
-    // Under both a repository's query gets its asynchronous method alone, named with Async, on the type and in its
-    // interface.
-    [Fact]
-    public void Run_MethodTypeBothRepository_WritesOnlyTheAsynchronousMethodNamedAsync()
-    {
-        var file = UsersFile("-- generator: method-type=both\n" + GetUserText);
-
-        var run = RepositoryRuns.Run(file, [Entry(file, "GetUser", [Parameter("id")], [Column("id")])]);
-
-        run.ShouldBeClean();
-        var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain(
-            "        public async global::System.Threading.Tasks.Task<global::App.GetUserDto> GetUserAsync(\n"
-        );
-        methods.ShouldContain("        global::System.Threading.Tasks.Task<global::App.GetUserDto> GetUserAsync(\n");
-        CountOf(methods, " GetUserAsync(\n").ShouldBe(2);
-        methods.ShouldNotContain(" GetUser(\n");
-        var method = MethodsOf(run).ShouldHaveSingleItem();
-        method.Name.ShouldBe("GetUserAsync");
-        method.Synchrony.ShouldBe(MethodSynchrony.Asynchronous);
     }
 
     [Fact]

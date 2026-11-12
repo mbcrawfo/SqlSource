@@ -1401,6 +1401,23 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the query, {1} the database, {2} the type in full, and {3} the member.  Reported at the query's name, by
+    // MethodPlanner, for a repository query that would have a synchronous method, under method-type=sync or both,
+    // whose database's one source is a factory that returns a task.  The query loses its synchronous methods alone, so
+    // under sync it gets none.
+    public static readonly DiagnosticDescriptor SynchronousMethodHasNoConnection = new(
+        id: "SQLSRC299",
+        title: "Synchronous method has no connection",
+        messageFormat: "The query '{0}' would have a synchronous method, but the one connection of its database '{1}' "
+            + "in '{2}', '{3}', returns a task, which a synchronous method cannot call.  Mark a member that returns no "
+            + "task [SqlSourceConnection] beside it, or give the query method-type=async.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc299",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -1510,7 +1527,8 @@ internal static class SqlDiagnostics
             JsonOptInNotApplicable,
             ShortNameFindsAPackagesType,
             UnsupportedTransactionIsolation,
-            StreamNeedsAsyncMethod
+            StreamNeedsAsyncMethod,
+            SynchronousMethodHasNoConnection
         );
 
     /// <summary>

@@ -306,6 +306,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | Id | Title |
 |----|----|
 | [SQLSRC298](#sqlsrc298) | A stream has no synchronous method |
+| [SQLSRC299](#sqlsrc299) | Synchronous method has no connection |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything, and [SQLSRC024](#sqlsrc024) to [SQLSRC027](#sqlsrc027), about a build that runs the `sqlsource` tool before it compiles, at the project file.  [SQLSRC028](#sqlsrc028) to [SQLSRC037](#sqlsrc037) are about a type that claims a query whose output is `repository`, at its `[SqlSourceGenerate]` or at the member they name, and never about a type whose queries are all of other outputs.  Each of [SQLSRC028](#sqlsrc028) to [SQLSRC034](#sqlsrc034) but the warning [SQLSRC031](#sqlsrc031), and [SQLSRC036](#sqlsrc036), leaves the repository queries of the databases it is about without a method until it is fixed; their models are still generated.  [SQLSRC035](#sqlsrc035) and [SQLSRC037](#sqlsrc037) cost the type only its interface.  Ids from 101 to 127 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, 271 and 285 to 296 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`, or when `replay` gave another answer than the bundle's.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120 and [SQLSRC126](#sqlsrc126), under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121), [SQLSRC122](#sqlsrc122) to [SQLSRC125](#sqlsrc125), which depend on the type that claims the file, and [SQLSRC127](#sqlsrc127), which depends on the query's output.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.  In a build that runs the tool, the tool leaves out each error that the build reports too, so that the build lists it once, but not [SQLSRC019](#sqlsrc019) for `database`, which the build never reports: the build lists the tool's error.
 
@@ -340,6 +341,8 @@ The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about convert
 `SQLSRC297` is reported by the build, at the name of a query whose output is `methods` or `repository`, once for the query.  Unlike the ids above, it costs the query only its collection method, not its method.
 
 `SQLSRC298` is reported by the build, at the name of a query whose output is `methods` or `repository`, once for the query, as `SQLSRC272` is.  The query gets no method and no collection method until it is fixed; its models are still generated.
+
+`SQLSRC299` is reported by the build, at the name of a query whose output is `repository`, once for the query, whatever other errors it has.  It costs the query only its synchronous method and synchronous collection method: under `method-type=both` it keeps its asynchronous ones, and under `sync` it gets none until it is fixed.  Its models are still generated.
 
 ## SQLSRC001
 
@@ -3676,3 +3679,28 @@ A query whose output is `methods` or `repository` streams its rows, with the [co
 Write `-- generator: method-type=async` in the query, or `method-type=both`, under which it keeps its stream, named with `Async` after the query's name, and gets no synchronous method, but for a synchronous [collection method](generator.md#collection-methods) when it has one.  Or give it a collection type that is read whole, such as `List`, which a synchronous method can return.  The query gets no method, and no [collection method](generator.md#collection-methods) either, until it is fixed; its models are still generated.  A query of another shape is not reported, whatever its collection type.
 
 See: [Collection type](settings.md#setting-collection-type)
+
+## SQLSRC299
+
+**Synchronous method has no connection**
+
+A query whose output is `repository` would have a [synchronous method](generator.md#synchronous-methods), under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `sync` or `both`, but the one member that gives its database's connection is a method that returns a `Task` or `ValueTask` of a connection, which a synchronous method cannot call.  The message names the query, the database, the type and the member.
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository
+{
+    [SqlSourceConnection]
+    private Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) => ...;
+}
+```
+
+```console
+/work/App/Queries/Users.sql(2,10): error SQLSRC299: The query 'GetUser' would have a synchronous method, but the one connection of its database 'postgres' in 'App.UserRepository', 'OpenAsync', returns a task, which a synchronous method cannot call.  Mark a member that returns no task [SqlSourceConnection] beside it, or give the query method-type=async.
+```
+
+Mark a second member `[SqlSourceConnection]` beside it that returns no task: a connection string, a data source, a connection, or a method that returns a connection.  The synchronous methods then get their connection from it, and the asynchronous methods keep the one that returns a task.  Or write `-- generator: method-type=async` in the query, which then has no synchronous method.
+
+Under `method-type=both` the query keeps its asynchronous method, and its asynchronous [collection method](generator.md#collection-methods) when it has one, on the type and in its interface; only the synchronous ones are not generated until it is fixed.  Under `sync` the query gets no method.  A query under `method-type=async` is not reported.
+
+See: [Synchronous methods](generator.md#synchronous-methods)

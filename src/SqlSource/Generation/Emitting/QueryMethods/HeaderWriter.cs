@@ -142,7 +142,7 @@ internal static class HeaderWriter
             _ = context.Spelling.AppendReturnType(builder, RowsWriter.GetResultType(in context)).Append(' ');
         }
 
-        _ = builder.Append(context.Method.Name).Append("(\n");
+        _ = builder.Append(context.Method.Name);
         context.Arguments.AppendDeclaration(builder, indent, context.Host);
     }
 
@@ -161,7 +161,7 @@ internal static class HeaderWriter
             _ = context.Spelling.AppendInterfaceReturnType(builder, RowsWriter.GetResultType(in context)).Append(' ');
         }
 
-        _ = builder.Append(context.Method.Name).Append("(\n");
+        _ = builder.Append(context.Method.Name);
         context.Arguments.AppendInterfaceDeclaration(builder, indent);
     }
 
@@ -247,8 +247,7 @@ internal static class HeaderWriter
             .Append(AsyncCallSpelling.IteratorModifiersOf(captures))
             .Append(RowsWriter.GetResultType(in context))
             .Append(' ')
-            .Append(locals.Iterator)
-            .Append("(\n");
+            .Append(locals.Iterator);
         arguments.AppendIteratorDeclaration(builder, indent);
         _ = builder.Append(indent).Append("{\n");
     }

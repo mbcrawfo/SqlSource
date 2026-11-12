@@ -30,8 +30,10 @@ namespace SqlSource.Generation.Methods;
 /// <c>SQLSRC282</c> from the libraries that the type's queries use.  A type with a query whose output is
 /// <see cref="OutputKind.Repository" /> gets the problems of its connection, <c>SQLSRC028</c> to <c>SQLSRC034</c>, from
 /// <see cref="ConnectionResolver" />, and such a query gets an instance method on the type only when its database has a
-/// connection.  Such a type gets its interface unless it is off, <c>SQLSRC037</c> reports that its name is no
-/// identifier, or <c>SQLSRC035</c> that it is taken.
+/// connection, each method from the source of its synchrony: a synchronous one has none when the database's one
+/// source returns a task, which is <c>SQLSRC299</c> and costs the query that method alone.  Such a type gets its
+/// interface unless it is off, <c>SQLSRC037</c> reports that its name is no identifier, or <c>SQLSRC035</c> that it is
+/// taken.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -259,11 +261,11 @@ internal static class MethodPlanner
             engines |= engine.ToMethodEngines();
             // A repository query's connection is its database's, or none when the resolution failed it, whose problem
             // the type has reported above.
-            var source =
+            var connection =
                 usable.Settings.Output == OutputKind.Repository
-                    ? SourceOf(resolution, DatabaseOf(typeQueries, usable, file))
+                    ? ConnectionOf(resolution, DatabaseOf(typeQueries, usable, file))
                     : null;
-            var context = new QueryContext(input, key, file, engine, usable, source, interfaceName);
+            var context = new QueryContext(input, key, file, engine, usable, connection, interfaceName);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
             var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
             if (Plan(context, written, queries, target, served.Of(target), ref usedLibraries) is { } plan)
@@ -319,9 +321,9 @@ internal static class MethodPlanner
             SqlDialectName.Canonical(file.Dialect)
         );
 
-    // The source of the database's asynchronous methods, by DatabaseName.Comparer, or null when the resolution failed
-    // it, or there is none, for a type whose shape the step did not find.
-    private static ConnectionSource? SourceOf(ConnectionResolution? resolution, string database)
+    // The connection of the database, by DatabaseName.Comparer, or null when the resolution failed it, or there is
+    // none, for a type whose shape the step did not find.
+    private static ResolvedConnection? ConnectionOf(ConnectionResolution? resolution, string database)
     {
         if (
             resolution is null
@@ -331,9 +333,7 @@ internal static class MethodPlanner
             return null;
         }
 
-        return resolution
-            .Sources.FirstOrDefault(resolved => DatabaseName.Comparer.Equals(resolved.Database, database))
-            ?.Asynchronous;
+        return resolution.Sources.FirstOrDefault(resolved => DatabaseName.Comparer.Equals(resolved.Database, database));
     }
 
     // The names of the members the type's file writes for the queries that have no method: each one's constant
@@ -371,7 +371,9 @@ internal static class MethodPlanner
 
     // The plan of one query whose output has a method, or null when it gets nothing and reports nothing here.  Every
     // problem of its SQL, of SQLSRC123, SQLSRC272, SQLSRC275, SQLSRC298, SQLSRC274 and of its converters that the query
-    // has is reported, and any one leaves it no method.  Each name of its methods, by its method-type, is checked.  Its
+    // has is reported, and any one leaves it no method.  SQLSRC299 is reported beside them, and leaves it only the
+    // methods of its other form, or none when it has no other.  Each name of its methods, by its method-type, is
+    // checked, with the source of its form.  Its
     // conversions see the converters of the type's slice that serve its target.  The libraries it uses are added to the
     // type's, and one older than its floor leaves it no method, beside its problems, which stay true once the library
     // is updated.  A repository query without a connection gets no method either, beside its problems.
@@ -384,7 +386,7 @@ internal static class MethodPlanner
         ref HashSet<LibraryUse>? usedLibraries
     )
     {
-        var (input, _, file, engine, usable, source, interfaceName) = context;
+        var (input, _, file, engine, usable, connection, interfaceName) = context;
         var (_, queryIndex, query, settings, placement) = usable;
         // A query without models has its own error already, reported by its file.  Its SQL's own errors need no
         // models, so it gets them before it is described.
@@ -421,19 +423,25 @@ internal static class MethodPlanner
             );
         }
 
-        problems.AddRange(FindTokenProblems(query, source));
-        var forms = FormsOf(query, settings, shape, models.Input is not null, problems);
+        var forms = FormsOf(query, settings, shape, models.Input is not null, connection, problems, out var lostForm);
+        problems.AddRange(FindTokenProblems(query, forms));
         var host = HostOf(placement);
-        foreach (var name in forms.Select(static form => form.Name))
+        foreach (var form in forms)
         {
             var reason =
-                FindTakenReason(input, name, host, written, queries.Placement.NestedClasses)
-                ?? FindTakenBySource(source, name)
-                ?? FindTakenByInterface(input.Type.Type.Type, interfaceName, source, host, name);
+                FindTakenReason(input, form.Name, host, written, queries.Placement.NestedClasses)
+                ?? FindTakenBySource(form.Source, form.Name)
+                ?? FindTakenByInterface(input.Type.Type.Type, interfaceName, form.Source, host, form.Name);
             if (reason is not null)
             {
                 problems.Add(
-                    DiagnosticInfo.Create(SqlDiagnostics.MethodNameTaken, query.NameLocation, query.Name, name, reason)
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.MethodNameTaken,
+                        query.NameLocation,
+                        query.Name,
+                        form.Name,
+                        reason
+                    )
                 );
             }
         }
@@ -457,8 +465,11 @@ internal static class MethodPlanner
         // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
         var isBelowTheFloor = AddUsedLibraries(input, engine, models, methodInput, methodOutput, ref usedLibraries);
         // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
-        var hasNoConnection = settings.Output == OutputKind.Repository && source is null;
-        if (problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor || hasNoConnection)
+        // SQLSRC299, which cost it a form, is the one problem that leaves it the others, and it has none left only
+        // when that form was its only one.
+        var hasNoConnection = settings.Output == OutputKind.Repository && connection is null;
+        var stops = problems.Count > (lostForm ? 1 : 0) || forms.Count == 0;
+        if (stops || !hasInput || !hasOutput || isBelowTheFloor || hasNoConnection)
         {
             return new Planned(problems, query.Name, query.NameLocation, [], false, []);
         }
@@ -481,7 +492,7 @@ internal static class MethodPlanner
         )
         {
             Host = host,
-            Source = source,
+            Source = first.Source,
             Synchrony = first.Synchrony,
         };
         return new Planned(
@@ -499,16 +510,20 @@ internal static class MethodPlanner
     // with Async.  Each form has its collection method too, when the query has one.  A stream has no synchronous
     // method: under both it keeps its asynchronous one, and its synchronous form is its collection method's alone,
     // which reads an array and needs no stream, when it takes items; under sync it gets SQLSRC298 and none, so that it
-    // takes no name.  In this part a repository's methods are asynchronous under any.
+    // takes no name.  A repository query's form has the source of its synchrony, and its synchronous form, when its
+    // database's one source returns a task, is lost with SQLSRC299, which lostForm says.
     private static List<MethodForm> FormsOf(
         SqlQuery query,
         QuerySettings settings,
         ResultShape shape,
         bool takesItems,
-        List<DiagnosticInfo> problems
+        ResolvedConnection? connection,
+        List<DiagnosticInfo> problems,
+        out bool lostForm
     )
     {
         var forms = new List<MethodForm>(2);
+        lostForm = false;
         var streams = shape == ResultShape.Many && settings.CollectionType == CollectionKind.IAsyncEnumerable;
         if (streams && settings.MethodType == MethodType.Sync)
         {
@@ -518,7 +533,31 @@ internal static class MethodPlanner
 
         if (MethodNames.HasSynchronous(settings) && (!streams || (settings.CollectionMethod && takesItems)))
         {
-            forms.Add(new MethodForm(MethodSynchrony.Synchronous, query.Name, HasQueryMethod: !streams));
+            if (connection is not null && connection.SourceFor(MethodSynchrony.Synchronous) is null)
+            {
+                problems.Add(
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.SynchronousMethodHasNoConnection,
+                        query.NameLocation,
+                        query.Name,
+                        connection.Database,
+                        connection.Asynchronous.TypeName,
+                        connection.Asynchronous.MemberName
+                    )
+                );
+                lostForm = true;
+            }
+            else
+            {
+                forms.Add(
+                    new MethodForm(
+                        MethodSynchrony.Synchronous,
+                        query.Name,
+                        HasQueryMethod: !streams,
+                        connection?.SourceFor(MethodSynchrony.Synchronous)
+                    )
+                );
+            }
         }
 
         if (MethodNames.HasAsynchronous(settings))
@@ -527,7 +566,8 @@ internal static class MethodPlanner
                 new MethodForm(
                     MethodSynchrony.Asynchronous,
                     MethodNames.AsyncNameOf(query.Name, settings),
-                    HasQueryMethod: true
+                    HasQueryMethod: true,
+                    connection?.SourceFor(MethodSynchrony.Asynchronous)
                 )
             );
         }
@@ -551,7 +591,7 @@ internal static class MethodPlanner
     }
 
     // The query's methods: one of each form that has a query method, the first of which is the method, and after them
-    // a collection method of each form, in the same order, when the query has one.
+    // a collection method of each form, in the same order, when the query has one, each with its form's source.
     private static ImmutableArray<QueryMethod> MethodsOf(
         QueryMethod method,
         List<MethodForm> forms,
@@ -565,7 +605,16 @@ internal static class MethodPlanner
         {
             if (form.HasQueryMethod)
             {
-                methods.Add(methods.Count == 0 ? method : method with { Name = form.Name, Synchrony = form.Synchrony });
+                methods.Add(
+                    methods.Count == 0
+                        ? method
+                        : method with
+                        {
+                            Name = form.Name,
+                            Synchrony = form.Synchrony,
+                            Source = form.Source,
+                        }
+                );
             }
         }
 
@@ -573,7 +622,7 @@ internal static class MethodPlanner
         {
             foreach (var form in forms)
             {
-                methods.Add(collection with { Name = form.Name, Synchrony = form.Synchrony });
+                methods.Add(collection with { Name = form.Name, Synchrony = form.Synchrony, Source = form.Source });
             }
         }
 
@@ -872,31 +921,56 @@ internal static class MethodPlanner
     }
 
     // SQLSRC275 for each token named as an argument that every method can have, as MethodArguments.IsReserved says, or,
-    // for a repository's method, as the name its source's access starts with, which the token's argument would hide.
-    private static List<DiagnosticInfo> FindTokenProblems(SqlQuery query, ConnectionSource? source)
+    // for a repository's method, as the name the access of a source of its forms starts with, which the token's
+    // argument would hide: once for each source that it hides.
+    private static List<DiagnosticInfo> FindTokenProblems(SqlQuery query, List<MethodForm> forms)
     {
         var problems = new List<DiagnosticInfo>();
         foreach (var name in query.Tokens.Select(static token => token.Name))
         {
-            var reason = MethodArguments.IsReserved(name)
-                ? "an argument that a query method can have: connection, parameters, transaction, commandTimeout or "
-                    + "cancellationToken"
-                : HiddenSourceReason(source, name);
-            if (reason is not null)
+            if (MethodArguments.IsReserved(name))
             {
                 problems.Add(
-                    DiagnosticInfo.Create(
-                        SqlDiagnostics.TokenNamedAsAnArgument,
-                        query.NameLocation,
+                    TokenProblem(
+                        query,
                         name,
-                        query.Name,
-                        reason
+                        "an argument that a query method can have: connection, parameters, transaction, "
+                            + "commandTimeout or cancellationToken"
                     )
                 );
+                continue;
+            }
+
+            for (var index = 0; index < forms.Count; index++)
+            {
+                var source = forms[index].Source;
+                if (!IsFirstOfItsSource(forms, index) || HiddenSourceReason(source, name) is not { } reason)
+                {
+                    continue;
+                }
+
+                problems.Add(TokenProblem(query, name, reason));
             }
         }
 
         return problems;
+    }
+
+    private static DiagnosticInfo TokenProblem(SqlQuery query, string name, string reason) =>
+        DiagnosticInfo.Create(SqlDiagnostics.TokenNamedAsAnArgument, query.NameLocation, name, query.Name, reason);
+
+    // Whether no form before the one of the index has its source, so that a source two forms share is checked once.
+    private static bool IsFirstOfItsSource(List<MethodForm> forms, int index)
+    {
+        for (var before = 0; before < index; before++)
+        {
+            if (Equals(forms[before].Source, forms[index].Source))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // What a token of the name would hide of the source, as SQLSRC275 says it: the primary-constructor parameter, or
@@ -1349,7 +1423,7 @@ internal static class MethodPlanner
         ParsedSqlFile File,
         DatabaseEngine Engine,
         UsableQuery Query,
-        ConnectionSource? Source,
+        ResolvedConnection? Connection,
         string? InterfaceName
     );
 
@@ -1434,9 +1508,15 @@ internal static class MethodPlanner
         }
     }
 
-    // One form of a query's methods: whether it is synchronous, its name, and whether it has a query method, which only
-    // a stream's synchronous form, whose collection method is its only method, has not.
-    private readonly record struct MethodForm(MethodSynchrony Synchrony, string Name, bool HasQueryMethod);
+    // One form of a query's methods: whether it is synchronous, its name, whether it has a query method, which only a
+    // stream's synchronous form, whose collection method is its only method, has not, and for a repository's query the
+    // source its methods get their connection from.
+    private readonly record struct MethodForm(
+        MethodSynchrony Synchrony,
+        string Name,
+        bool HasQueryMethod,
+        ConnectionSource? Source
+    );
 
     // One query's problems and its methods, none when it cannot have one, with whether its driver allows them and the
     // ids of the warnings they give.

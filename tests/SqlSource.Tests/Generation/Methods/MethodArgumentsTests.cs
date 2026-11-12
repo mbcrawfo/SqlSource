@@ -181,7 +181,8 @@ public sealed class MethodArgumentsTests
         builder
             .ToString()
             .ShouldBe(
-                "        this global::System.Data.Common.DbConnection connection,\n"
+                "(\n"
+                    + "        this global::System.Data.Common.DbConnection connection,\n"
                     + "        global::App.P parameters,\n"
                     + "        string orderBy,\n"
                     + "        string @await,\n"
@@ -206,7 +207,20 @@ public sealed class MethodArgumentsTests
 
         builder
             .ToString()
-            .ShouldBe("        global::App.P parameters,\n        string orderBy,\n        string @await);\n");
+            .ShouldBe("(\n        global::App.P parameters,\n        string orderBy,\n        string @await);\n");
+    }
+
+    // A synchronous repository's method of no input and no token has no argument, so its parentheses are empty.
+    [Fact]
+    public void AppendInterfaceDeclaration_NoArgument_IsEmptyParentheses()
+    {
+        var builder = new StringBuilder();
+        var arguments = new MethodArguments(null, [], false, false, synchrony: MethodSynchrony.Synchronous);
+
+        arguments.AppendInterfaceDeclaration(builder, "    ");
+        arguments.AppendDeclaration(builder, "    ", default);
+
+        builder.ToString().ShouldBe("();\n()\n");
     }
 
     [Fact]
@@ -234,7 +248,7 @@ public sealed class MethodArgumentsTests
         builder
             .ToString()
             .ShouldBe(
-                "        "
+                "(\n        "
                     + receiverPrefix
                     + "global::System.Data.Common.DbConnection connection,\n"
                     + "        global::App.P parameters,\n"
@@ -256,7 +270,8 @@ public sealed class MethodArgumentsTests
         builder
             .ToString()
             .ShouldBe(
-                "        global::System.Data.Common.DbConnection connection,\n"
+                "(\n"
+                    + "        global::System.Data.Common.DbConnection connection,\n"
                     + "        global::App.P parameters,\n"
                     + "        string orderBy,\n"
                     + "        string @await,\n"

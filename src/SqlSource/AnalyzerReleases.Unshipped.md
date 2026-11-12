@@ -165,3 +165,4 @@ SQLSRC295 | SqlSource | Error | Bundle is not a raw bundle
 SQLSRC296 | SqlSource | Error | Raw bundle is not reproduced by this version
 SQLSRC297 | SqlSource | Error | Transaction isolation level is not the database's
 SQLSRC298 | SqlSource | Error | A stream has no synchronous method
+SQLSRC299 | SqlSource | Error | Synchronous method has no connection

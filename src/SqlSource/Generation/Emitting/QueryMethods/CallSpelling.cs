@@ -4,10 +4,11 @@ using SqlSource.Generation.Methods;
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
-/// Spells what makes a query's method asynchronous or synchronous: a call of the driver, its token, an awaited
-/// expression, a disposal scope and the type the method returns.  No phase file spells them itself; each asks the
-/// method's <see cref="QueryMethodContext.Spelling" />, which <see cref="For" /> chooses by the method's
-/// <see cref="QueryMethod.Synchrony" />.  See "Adding a kind of method" in the generator's architecture page.
+/// Spells what makes a query's method asynchronous or synchronous: a call of the driver, its token, the token given to
+/// a connection source, an awaited expression, a disposal scope and the type the method returns.  No phase file spells
+/// them itself; each asks the method's <see cref="QueryMethodContext.Spelling" />, which <see cref="For" /> chooses by
+/// the method's <see cref="QueryMethod.Synchrony" />.  See "Adding a kind of method" in the generator's architecture
+/// page.
 /// </summary>
 internal abstract class CallSpelling
 {
@@ -39,6 +40,12 @@ internal abstract class CallSpelling
     /// that takes no token.
     /// </summary>
     public abstract StringBuilder AppendToken(StringBuilder builder, string token, bool afterArgument);
+
+    /// <summary>
+    /// Appends the argument of a repository's connection source that takes a cancellation token: the method's token, or
+    /// <c>default</c> for a method that takes none.
+    /// </summary>
+    public abstract StringBuilder AppendSourceToken(StringBuilder builder, string token);
 
     /// <summary>
     /// Appends the <c>)</c> that closes a call's arguments, and for an awaited one what configures its await.

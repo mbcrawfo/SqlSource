@@ -82,27 +82,25 @@ namespace App
         /// </code>
         /// </remarks>
         /// <param name="parameters">The query's parameters.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The row, or null when there is none.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
-        public async global::System.Threading.Tasks.Task<global::App.FindUserDto?> FindUser(
-            global::App.FindUserParams parameters,
-            global::System.Threading.CancellationToken cancellationToken = default)
+        public global::App.FindUserDto? FindUser(
+            global::App.FindUserParams parameters)
         {
             global::System.ArgumentNullException.ThrowIfNull(parameters);
             const string sql = "SELECT id, name FROM users WHERE id = @id;";
             var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
-            await using var connectionScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);
+            using var connectionScope = connection;
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                connection.Open();
             }
 
             try
             {
                 var command = connection.CreateCommand();
-                await using var commandScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                using var commandScope = command;
                 command.CommandText = sql;
 
                 {
@@ -113,11 +111,11 @@ namespace App
                     command.Parameters.Add(parameter);
                 }
 
-                var reader = await command.ExecuteReaderAsync(global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                await using var readerScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
-                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                var reader = command.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                using var readerScope = reader;
+                if (!reader.Read())
                 {
-                    while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                    while (reader.NextResult())
                     {
                     }
 
@@ -125,12 +123,12 @@ namespace App
                 }
 
                 var row = new global::App.FindUserDto(reader.GetFieldValue<int>(0), reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1));
-                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                if (reader.Read())
                 {
                     throw new global::SqlSource.UnexpectedRowCountException("FindUser", true);
                 }
 
-                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                while (reader.NextResult())
                 {
                 }
 
@@ -140,7 +138,7 @@ namespace App
             {
                 if (wasClosed)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    connection.Close();
                 }
             }
         }
@@ -154,26 +152,24 @@ namespace App
         /// </code>
         /// </remarks>
         /// <param name="parameters">The query's parameters.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        public async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ListUsers(
-            global::App.ListUsersParams parameters,
-            global::System.Threading.CancellationToken cancellationToken = default)
+        public global::App.ListUsersDto[] ListUsers(
+            global::App.ListUsersParams parameters)
         {
             global::System.ArgumentNullException.ThrowIfNull(parameters);
             const string sql = "SELECT id, name FROM users WHERE id > @id;";
             var connection = new global::Microsoft.Data.SqlClient.SqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
-            await using var connectionScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);
+            using var connectionScope = connection;
             var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
             if (wasClosed)
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                connection.Open();
             }
 
             try
             {
                 var command = connection.CreateCommand();
-                await using var commandScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                using var commandScope = command;
                 command.CommandText = sql;
 
                 {
@@ -184,15 +180,15 @@ namespace App
                     command.Parameters.Add(parameter);
                 }
 
-                var reader = await command.ExecuteReaderAsync(global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                await using var readerScope = global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                var reader = command.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                using var readerScope = reader;
                 var rows = new global::SqlSource.SqlSourceRowBuffer<global::App.ListUsersDto>();
-                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                while (reader.Read())
                 {
                     rows.Add(new global::App.ListUsersDto(reader.GetFieldValue<int>(0), reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
                 }
 
-                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                while (reader.NextResult())
                 {
                 }
 
@@ -202,7 +198,7 @@ namespace App
             {
                 if (wasClosed)
                 {
-                    await connection.CloseAsync().ConfigureAwait(false);
+                    connection.Close();
                 }
             }
         }
@@ -222,12 +218,10 @@ namespace App
         /// </code>
         /// </remarks>
         /// <param name="parameters">The query's parameters.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The row, or null when there is none.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
-        global::System.Threading.Tasks.Task<global::App.FindUserDto?> FindUser(
-            global::App.FindUserParams parameters,
-            global::System.Threading.CancellationToken cancellationToken = default);
+        global::App.FindUserDto? FindUser(
+            global::App.FindUserParams parameters);
 
         /// <summary>
         /// The <c>ListUsers</c> query from <c>Users.sql</c>.
@@ -238,11 +232,9 @@ namespace App
         /// </code>
         /// </remarks>
         /// <param name="parameters">The query's parameters.</param>
-        /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The rows the query returned.</returns>
-        global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ListUsers(
-            global::App.ListUsersParams parameters,
-            global::System.Threading.CancellationToken cancellationToken = default);
+        global::App.ListUsersDto[] ListUsers(
+            global::App.ListUsersParams parameters);
     }
 }
 

@@ -157,6 +157,33 @@ public sealed class TypePlacementTests
         placement.Usable.ShouldBe([false]);
     }
 
+    // Under both a repository query has a synchronous method named as it, which a nested class of that name cannot
+    // hold, as a methods query's cannot.
+    [Fact]
+    public void Of_RepositoryQueryUnderBothInANestedClassNamedLikeItsSynchronousMethod_ReportsSqlsrc009()
+    {
+        var query = Query("Users", OutputKind.Repository, MemberLocation.NestedClass, nestedClass: "Users");
+        query = query with
+        {
+            Markers = query.Markers with
+            {
+                Parameters = query.Markers.Parameters.With(GeneratorParameters.MethodType, (int)MethodType.Both),
+            },
+        };
+
+        var (placement, diagnostics) = Analyse(TestModels.Type(), Files(File("Users.sql", query)));
+
+        diagnostics.ShouldContain(
+            DiagnosticInfo.Create(
+                SqlDiagnostics.QueryNamedLikeContainingType,
+                At("Users.sql", 0),
+                "UserRepository",
+                "Users"
+            )
+        );
+        placement.Usable.ShouldBe([false]);
+    }
+
     // The method planner judges a method's name on the type.
     [Fact]
     public void Of_MethodOnTheTypeNamedLikeIt_IsNoErrorHere()
