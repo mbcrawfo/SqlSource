@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The nightly comparison of each synchronous query method with its asynchronous twin on SQL Server: the end-to-end
+        project's queries under method-type=both, run side by side.  A test project only under RunSyncAsync=true, which
+        only the nightly job passes, as QueryMethodAllocation is.
+        The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
+        ones are imported here and at the end of this file.
+    -->
+    <Import Project="../../../src/SqlSource/build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+        <!-- SQLSRC240 stays a warning: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
+        <!--
+            False keeps the solution's test run and a project run without RunSyncAsync=true from treating this as a
+            test project, while xunit still generates its entry point, so that `dotnet build SqlSource.slnx` and
+            format.sh cover it.  The nightly job sets the property.
+        -->
+        <IsTestingPlatformApplication Condition="'$(RunSyncAsync)' != 'true'">false</IsTestingPlatformApplication>
+        <!--
+            Where the end-to-end project's queries, sidecars and settings files are copied to, below this project's
+            settings file, which gives every query method-type=both: a .sql file takes the settings files of the folder
+            it is in, so a linked one would keep the end-to-end project's.  The claims name this path.
+        -->
+        <SyncAsyncMirror>$(MSBuildProjectDirectory)/obj/Mirror/</SyncAsyncMirror>
+        <!-- The end-to-end project's fixture project and the scripts of its databases, which are not its queries. -->
+        <SyncAsyncNotMirrored>../SqlServer/EndToEnd/ErrorPaths/**;../SqlServer/EndToEnd/app/**</SyncAsyncNotMirrored>
+        <SyncAsyncNotMirrored>$(SyncAsyncNotMirrored);../SqlServer/EndToEnd/billing/**</SyncAsyncNotMirrored>
+    </PropertyGroup>
+    <ItemGroup>
+        <SyncAsyncMirrored Include="../SqlServer/sqlsource.json" Into="" />
+        <SyncAsyncMirrored
+            Include="../SqlServer/EndToEnd/**/*.sql"
+            Exclude="$(SyncAsyncNotMirrored)"
+            Into="EndToEnd/"
+        />
+        <SyncAsyncMirrored
+            Include="../SqlServer/EndToEnd/**/*.sql.json"
+            Exclude="$(SyncAsyncNotMirrored)"
+            Into="EndToEnd/"
+        />
+        <SyncAsyncMirrored
+            Include="../SqlServer/EndToEnd/**/sqlsource.json"
+            Exclude="$(SyncAsyncNotMirrored)"
+            Into="EndToEnd/"
+        />
+    </ItemGroup>
+    <!--
+        Copies the mirrored files before the generator's search for settings files, as the manual says a target that
+        adds a .sql file does, and gives them to the compiler.  Unchanged files keep their time, so a build with nothing
+        changed compiles nothing again.
+    -->
+    <Target Name="SyncAsyncMirrorQueries" BeforeTargets="SqlSourceListFiles">
+        <ItemGroup>
+            <_SyncAsyncMirrorCopy
+                Include="@(SyncAsyncMirrored)"
+                Destination="$(SyncAsyncMirror)%(Into)%(RecursiveDir)%(Filename)%(Extension)"
+            />
+        </ItemGroup>
+        <Copy
+            SourceFiles="@(_SyncAsyncMirrorCopy)"
+            DestinationFiles="@(_SyncAsyncMirrorCopy->'%(Destination)')"
+            SkipUnchangedFiles="true"
+        />
+        <ItemGroup>
+            <AdditionalFiles Include="@(_SyncAsyncMirrorCopy->'%(Destination)')" />
+        </ItemGroup>
+    </Target>
+    <ItemGroup>
+        <PackageReference Include="GitHubActionsTestLogger" />
+        <PackageReference Include="Microsoft.Data.SqlClient" />
+        <PackageReference Include="Microsoft.SqlServer.Types" />
+        <PackageReference Include="NetTopologySuite" />
+        <PackageReference Include="NetTopologySuite.IO.SqlServerBytes" />
+        <PackageReference Include="NodaTime" />
+        <PackageReference Include="Testcontainers.MsSql" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="xunit.v3" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference
+            Include="../../../src/SqlSource/SqlSource.csproj"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="true"
+        />
+        <ProjectReference Include="../TestHarness/TestHarness.csproj" />
+    </ItemGroup>
+    <Import Project="../../../src/SqlSource/build/SqlSource.targets" />
+</Project>

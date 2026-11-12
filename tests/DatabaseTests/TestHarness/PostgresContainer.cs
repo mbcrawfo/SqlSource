@@ -55,6 +55,10 @@ public abstract class PostgresContainer(DbProviderFactory factory, string image)
     // builds its own.  A container whose image this throws for is never started.
     protected virtual Task PrepareImageAsync(CancellationToken token) => Task.CompletedTask;
 
+    // Runs once every database of DatabasesOf is built, on a source of the server's own database, for a subclass that
+    // makes more of them, such as a template of one.  A container whose call of this throws is removed.
+    protected virtual Task BuiltAsync(DbDataSource server, CancellationToken token) => Task.CompletedTask;
+
     // Skips the test on a server before that major, which lacks what the reason names.
     public void SkipBelow(int major, string reason) => EngineImage.SkipBelow(Major, major, reason);
 
@@ -81,6 +85,7 @@ public abstract class PostgresContainer(DbProviderFactory factory, string image)
             var databases = DatabasesOf(Major);
             _database = TestDatabases.DefaultOf(databases, GetType());
             await TestDatabases.BuildAsync(server, EndToEndEngine.Postgres, databases, SourceOf, token);
+            await BuiltAsync(server, token);
         }
         catch
         {
