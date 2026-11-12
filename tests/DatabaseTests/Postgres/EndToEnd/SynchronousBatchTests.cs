@@ -150,6 +150,36 @@ public sealed class SynchronousBatchTests(PostgresDatabases postgres)
         ShouldBeInNoTransaction(connection);
     }
 
+    // Npgsql's limit on a multiplexing data source, which refuses a synchronous command outside a transaction: the
+    // method's own transaction, which it begins under transaction=on, is one.
+    [Fact]
+    public void FindNotesSync_MultiplexingDataSourceAndItsOwnTransaction_ReadsTheRows()
+    {
+        using var source = EndToEndSources.AppMultiplexing(postgres);
+        using var connection = source.CreateConnection();
+
+        var rows = connection.FindNotesSync([new FindNotesSyncArgs(1)]);
+
+        rows.ShouldBe([SeedNotes[0], SeedNotes[1]]);
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // Under transaction=off the method begins none, so a multiplexing data source refuses it as it refuses a query
+    // method outside a transaction.  The item's account does not exist, so the insert would add no row if it ran.
+    [Fact]
+    public void InsertNoteNoTransactionSync_MultiplexingDataSource_ThrowsNotSupported()
+    {
+        using var source = EndToEndSources.AppMultiplexing(postgres);
+        using var connection = source.CreateConnection();
+
+        var exception = Should.Throw<NotSupportedException>(() =>
+            connection.InsertNoteNoTransactionSync([new NoteToAdd(FirstId, "Refused.", 99)])
+        );
+
+        exception.Message.ShouldBe("Synchronous command execution is not supported when multiplexing is on");
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
     [Fact]
     public void FindNotesSync_OneItem_ReturnsItsRows()
     {
