@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -85,8 +86,7 @@ internal static class PairRunner
 
             if (setup.Prepare is not null)
             {
-                await using var prepare = source.CreateCommand(setup.Prepare);
-                prepare.Connection = connection;
+                await using var prepare = CommandOf(connection, null, setup.Prepare);
                 _ = await prepare.ExecuteNonQueryAsync().ConfigureAwait(false);
                 if (!open)
                 {
@@ -204,7 +204,7 @@ internal static class PairRunner
         {
             try
             {
-                return await ReadTableAsync(source, connection, transaction, select).ConfigureAwait(false);
+                return await ReadTableAsync(connection, transaction, select).ConfigureAwait(false);
             }
             catch (DbException)
             {
@@ -215,21 +215,28 @@ internal static class PairRunner
         var other = await source.OpenConnectionAsync().ConfigureAwait(false);
         await using (other.ConfigureAwait(false))
         {
-            return await ReadTableAsync(source, other, null, select).ConfigureAwait(false);
+            return await ReadTableAsync(other, null, select).ConfigureAwait(false);
         }
     }
 
-    // The columns' names, then each row, with the values as Rendering writes them.
-    private static async Task<string> ReadTableAsync(
-        DbDataSource source,
-        DbConnection connection,
-        DbTransaction? transaction,
-        string select
-    )
+    // A command of the connection, since a command of a data source refuses a connection, as Npgsql's does.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The SQL is a scenario's, written in a test."
+    )]
+    private static DbCommand CommandOf(DbConnection connection, DbTransaction? transaction, string sql)
     {
-        await using var command = source.CreateCommand(select);
-        command.Connection = connection;
+        var command = connection.CreateCommand();
+        command.CommandText = sql;
         command.Transaction = transaction;
+        return command;
+    }
+
+    // The columns' names, then each row, with the values as Rendering writes them.
+    private static async Task<string> ReadTableAsync(DbConnection connection, DbTransaction? transaction, string select)
+    {
+        await using var command = CommandOf(connection, transaction, select);
         var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
         await using (reader.ConfigureAwait(false))
         {

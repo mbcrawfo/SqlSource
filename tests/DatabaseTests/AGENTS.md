@@ -5,7 +5,7 @@
 ## Names
 
 - **The folder and the project file carry the short name, and the assembly and the root namespace the prefix**: `Postgres/Postgres.csproj` builds `SqlSource.DatabaseTests.Postgres`, and every namespace in it starts with that.  `Directory.Build.props` of this folder sets both from the project file's name; no project file sets them.
-- **The `project` lines of `tools/test-scopes.txt` are exactly the test projects of this folder; `TestHarness`, a library, and `QueryMethodAllocation`, which the script never runs, have none, and `TestScopes` of `tests/SqlSource.Repository` derives the same assembly name from each**, so a new project here gets its `project` line and its folder's scope lines, and a `RunningProjectTests` copied from a sibling, in the same change ([why](../README.md#reading-the-repository)).
+- **The `project` lines of `tools/test-scopes.txt` are exactly the test projects of this folder; `TestHarness`, a library, and `QueryMethodAllocation` and `Postgres.SyncAsync`, which the script never runs, have none, and `TestScopes` of `tests/SqlSource.Repository` derives the same assembly name from each**, so a new project here gets its `project` line and its folder's scope lines, and a `RunningProjectTests` copied from a sibling, in the same change ([why](../README.md#reading-the-repository)).
 
 ## Containers
 

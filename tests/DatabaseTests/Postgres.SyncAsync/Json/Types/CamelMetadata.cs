@@ -1,0 +1,27 @@
+using System;
+using System.Text.Json;
+
+#pragma warning disable IDE0130 // The end-to-end project's namespace, which the mirrored queries name.
+namespace SqlSource.DatabaseTests.Postgres.EndToEnd.Json.Types;
+
+#pragma warning restore IDE0130
+
+// This project's copy of tests/DatabaseTests/Postgres/EndToEnd/Json/Types/CamelMetadata.cs, in its namespace, since a
+// test project compiles no file of another: the mirrored queries name it.  A change to the original changes this copy.
+//
+// A class of the project that the column types of Queries/Json.sql give camel, a jsonb, with converters of its own
+// between it and a string, which replace the serializer's default options with the web's: its properties are stored in
+// camelCase, orderId and note.
+#pragma warning disable CA1812 // Made by the serializer, until a scenario sends one.
+internal sealed record CamelMetadata(int OrderId, string? Note)
+{
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+
+    [SqlSourceConverter]
+    public static CamelMetadata FromDatabase(string value) =>
+        JsonSerializer.Deserialize<CamelMetadata>(value, Web)
+        ?? throw new InvalidCastException("A CamelMetadata cannot be a JSON null.");
+
+    [SqlSourceConverter]
+    public static string ToDatabase(CamelMetadata metadata) => JsonSerializer.Serialize(metadata, Web);
+}
