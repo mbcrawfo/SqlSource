@@ -72,14 +72,42 @@ internal static partial class QueryMethodCorpus
         }
         """;
 
+    // A pair of factories, one that opens a connection asynchronously and one that opens it at once, which the
+    // asynchronous methods and the synchronous ones each use.
+    private const string PairSource = """
+        using System.Data.Common;
+        using System.Threading;
+        using System.Threading.Tasks;
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate(Source = ".")]
+            public partial class Sample(DbDataSource dataSource)
+            {
+                [SqlSourceConnection]
+                private ValueTask<DbConnection> OpenAsync(CancellationToken cancellationToken) =>
+                    dataSource.OpenConnectionAsync(cancellationToken);
+
+                [SqlSourceConnection]
+                private DbConnection Open(CancellationToken cancellationToken) => dataSource.OpenConnection();
+            }
+        }
+        """;
+
     private static GeneratorRun RepositoryOfConnectionString(CorpusEngine engine, string? settings) =>
         Repository(engine, ConnectionStringSource, settings);
 
-    private static GeneratorRun RepositoryOfDataSource(CorpusEngine engine) => Repository(engine, DataSourceSource);
+    private static GeneratorRun RepositoryOfDataSource(CorpusEngine engine, string? settings) =>
+        Repository(engine, DataSourceSource, settings);
 
     private static GeneratorRun RepositoryOfFactory(CorpusEngine engine) => Repository(engine, FactorySource);
 
-    private static GeneratorRun RepositoryOfBorrowed(CorpusEngine engine) => Repository(engine, BorrowedSource);
+    private static GeneratorRun RepositoryOfBorrowed(CorpusEngine engine, string? settings) =>
+        Repository(engine, BorrowedSource, settings);
+
+    private static GeneratorRun RepositoryOfPair(CorpusEngine engine, string? settings) =>
+        Repository(engine, PairSource, settings);
 
     // The repository's queries, at Repository: one row or none, many rows and a stream of them.
     private static GeneratorRun Repository(CorpusEngine engine, string source, string? settings = null)
