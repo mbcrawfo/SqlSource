@@ -171,4 +171,35 @@ public sealed class UserDocsReadingTests
         UserDocs.RepositoryLinkProblem(target).ShouldBeNull();
         UserDocs.Resolve("README.md", target).ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc024", "site/diagnostics.md", "sqlsrc024")]
+    [InlineData(
+        "https://mbcrawfo.github.io/SqlSource/README.html#what-works-today",
+        "site/README.md",
+        "what-works-today"
+    )]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/README.md", "")]
+    public void Resolve_SiteUrl_IsThePageOfSite(string target, string path, string anchor)
+    {
+        UserDocs.IsSiteLink(target).ShouldBeTrue();
+        UserDocs.Resolve("README.md", target).ShouldBe((path, anchor));
+    }
+
+    // The root is a redirect to README.html that drops the anchor, and the site has no folders and no page that is
+    // not built from a .md file.
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/#what-works-today")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/tool")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/tool.md")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
+    public void SiteLinkProblem_NotAPageOfTheSite_IsReported(string target) =>
+        UserDocs.SiteLinkProblem(target).ShouldNotBeNull();
+
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes")]
+    [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]
+    public void SiteLinkProblem_APageOrAnotherSite_IsNone(string target) =>
+        UserDocs.SiteLinkProblem(target).ShouldBeNull();
 }

@@ -61,11 +61,20 @@ public sealed class UserDocsLinksTests
 
     [Fact]
     public void RelativeLinks_OfTheUserDocs_ReachAFileAndAnchorThatExist() =>
-        Problems((file, target) => UserDocs.IsRepositoryLink(target) ? null : Follow(file, target)).ShouldBeEmpty();
+        Problems(
+                (file, target) =>
+                    UserDocs.IsRepositoryLink(target) || UserDocs.IsSiteLink(target) ? null : Follow(file, target)
+            )
+            .ShouldBeEmpty();
 
     [Fact]
     public void RepositoryUrls_OfTheUserDocs_ReachAFileAndAnchorThatExist() =>
         Problems((file, target) => UserDocs.IsRepositoryLink(target) ? Follow(file, target) : null).ShouldBeEmpty();
+
+    // A link to the site is followed to the page of site/ it is built from.
+    [Fact]
+    public void SiteUrls_OfTheUserDocs_ReachAPageAndAnchorThatExist() =>
+        Problems((file, target) => UserDocs.IsSiteLink(target) ? Follow(file, target) : null).ShouldBeEmpty();
 
     [Fact]
     public void Links_OfThePackedReadmes_AreOnlyAbsolute() =>
@@ -127,6 +136,11 @@ public sealed class UserDocsLinksTests
         if (UserDocs.RepositoryLinkProblem(target) is { } problem)
         {
             return problem;
+        }
+
+        if (UserDocs.SiteLinkProblem(target) is { } siteProblem)
+        {
+            return siteProblem;
         }
 
         if (UserDocs.Resolve(file, target) is not var (path, anchor))

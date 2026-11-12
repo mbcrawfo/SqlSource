@@ -16,6 +16,12 @@ internal static partial class UserDocs
     // Where a link of a packed readme points, since nuget.org shows the readme without the repository around it.
     public const string RepositoryUrl = "https://github.com/mbcrawfo/SqlSource/blob/main/";
 
+    // Where the manual is published, and the folder of the repository it is built from.  A page `<name>.md` of the
+    // folder is `<name>.html` of the site, and the site's root redirects to README.html.
+    public const string SiteUrl = "https://mbcrawfo.github.io/SqlSource/";
+
+    internal const string Site = "site";
+
     private const string Manual = "docs/manual";
 
     // The names of the block elements of CommonMark, whose tags start an HTML block whatever follows them.
@@ -90,6 +96,31 @@ internal static partial class UserDocs
             ? $"use {RepositoryUrl}<path>: only blob/main and tree/main are followed"
             : null;
 
+    // Whether a link goes to the manual's site.
+    public static bool IsSiteLink(string target) => target.StartsWith(SiteUrl, StringComparison.OrdinalIgnoreCase);
+
+    // What is wrong with a link to the site: it must name a page, `<name>.html`, or be the root with no anchor, since
+    // the root's redirect drops the anchor.  Null when the form is right, and for a link to anything else.
+    public static string? SiteLinkProblem(string target)
+    {
+        if (!IsSiteLink(target))
+        {
+            return null;
+        }
+
+        var rest = target[SiteUrl.Length..];
+        var hash = rest.IndexOf('#', StringComparison.Ordinal);
+        var page = hash < 0 ? rest : rest[..hash];
+        if (page.Length == 0)
+        {
+            return hash < 0
+                ? null
+                : $"name the page, {SiteUrl}README.html#<anchor>: the root's redirect drops the anchor";
+        }
+
+        return SitePagePattern().IsMatch(page) ? null : $"use {SiteUrl}<page>.html: the site has no other kind of page";
+    }
+
     private static bool IsMain(Match link) =>
         !link.Groups[1].Value.Equals("raw", StringComparison.OrdinalIgnoreCase) && link.Groups[2].Value == "main";
 
@@ -105,6 +136,19 @@ internal static partial class UserDocs
         {
             var match = RepositoryLinkPattern().Match(path);
             return IsMain(match) ? (match.Groups[3].Value.TrimEnd('/'), anchor) : null;
+        }
+
+        if (IsSiteLink(target))
+        {
+            var page = path[SiteUrl.Length..];
+            if (page.Length == 0)
+            {
+                return ($"{Site}/README.md", anchor);
+            }
+
+            return SitePagePattern().Match(page) is { Success: true } name
+                ? ($"{Site}/{name.Groups[1].Value}.md", anchor)
+                : null;
         }
 
         if (SchemePattern().IsMatch(target))
@@ -331,6 +375,10 @@ internal static partial class UserDocs
         RegexOptions.IgnoreCase
     )]
     private static partial Regex RepositoryLinkPattern();
+
+    // A page of the site: one segment, its name and `.html`.
+    [GeneratedRegex(@"^([^/]+)\.html$")]
+    private static partial Regex SitePagePattern();
 
     [GeneratedRegex(@"\[([^\]]*)\]\([^)]*\)")]
     private static partial Regex LinkPattern();
