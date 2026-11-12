@@ -27,7 +27,7 @@ The nine test projects, the four libraries they share and a stand-in of the tool
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
-- `tests/SqlSource.Repository.Tests` runs the checks of the repository's own files: the user docs, the `AGENTS.md` files, the test scopes and the library that finds the repository and guards what a test project reads of it.
+- `tests/SqlSource.Repository.Tests` runs the checks of the repository's own files: the user docs, the `AGENTS.md` files, the test scopes and the library that finds the repository and guards what a test project reads of it, and the tests of `tools/MutationReport`.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
 - `tests/DatabaseTests/Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models and methods from its own queries and runs every described query through its method, and needs Docker.
 - `tests/DatabaseTests/Postgres.Npgsql8` writes and reads every mapped type, every NodaTime type, NetTopologySuite's and the JSON types and classes through the generated methods, reads the mapped types through Dapper, and breaks out of a streaming method, on Npgsql 8, the oldest supported driver, and needs Docker.
@@ -36,6 +36,8 @@ The nine test projects, the four libraries they share and a stand-in of the tool
 - `tests/DatabaseTests/QueryMethodAllocation` runs the allocation tests of the generated methods of both engines against hand-written ADO.NET, needs Docker, and is run by the nightly alone.
 - `tests/SqlSource.Repository`, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 - `tests/SqlSource.Tool.StandIn` is a stand-in of the `sqlsource` tool, which the tests of the online build in `tests/SqlSource.Tool.Tests` give a real build as its command.
+
+`tools/MutationReport` is a console program that compares the reports of two mutation runs, which `tools/mutation-test.sh` runs; it builds with the solution and is never packed.
 
 `site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
 
