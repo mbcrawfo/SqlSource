@@ -415,6 +415,16 @@ INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
 OUTPUT inserted.id, inserted.account_id, inserted.body
 SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
 
+-- name: InsertNoteInRepositorySync -> one
+-- summary: InsertNoteInRepository, by a synchronous collection method of BatchQueries.
+-- output: repository
+-- generator: method-type=sync
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+
 -- name: InsertNoteSerializableInRepository -> one
 -- summary: InsertNoteSerializable again, at the output repository, as an instance method of BatchQueries that runs on
 -- summary: its borrowed connection and begins its own transaction at the level serializable.

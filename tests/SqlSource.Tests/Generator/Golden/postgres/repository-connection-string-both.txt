@@ -82,6 +82,67 @@ namespace App
         /// </code>
         /// </remarks>
         /// <param name="parameters">The query's parameters.</param>
+        /// <returns>The row, or null when there is none.</returns>
+        /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
+        public global::App.FindUserDto? FindUser(
+            global::App.FindUserParams parameters)
+        {
+            global::System.ArgumentNullException.ThrowIfNull(parameters);
+            const string sql = "SELECT id, name FROM users WHERE id = @id;";
+            var connection = new global::Npgsql.NpgsqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+            using var connectionScope = connection;
+            var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
+            if (wasClosed)
+            {
+                connection.Open();
+            }
+
+            try
+            {
+                var command = connection.CreateCommand();
+                using var commandScope = command;
+                command.CommandText = sql;
+
+                {
+                    var parameter = new global::Npgsql.NpgsqlParameter<int>();
+                    parameter.ParameterName = "id";
+                    parameter.TypedValue = parameters.Id;
+                    command.Parameters.Add(parameter);
+                }
+
+                var reader = command.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                using var readerScope = reader;
+                if (!reader.Read())
+                {
+                    return null;
+                }
+
+                var row = new global::App.FindUserDto(reader.GetFieldValue<int>(0), reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1));
+                if (reader.Read())
+                {
+                    throw new global::SqlSource.UnexpectedRowCountException("FindUser", true);
+                }
+
+                return row;
+            }
+            finally
+            {
+                if (wasClosed)
+                {
+                    connection.Close();
+                }
+            }
+        }
+
+        /// <summary>
+        /// The <c>FindUser</c> query from <c>Users.sql</c>.
+        /// </summary>
+        /// <remarks>
+        /// <code>
+        /// SELECT id, name FROM users WHERE id = @id;
+        /// </code>
+        /// </remarks>
+        /// <param name="parameters">The query's parameters.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The row, or null when there is none.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
@@ -132,6 +193,61 @@ namespace App
                 if (wasClosed)
                 {
                     await connection.CloseAsync().ConfigureAwait(false);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The <c>ListUsers</c> query from <c>Users.sql</c>.
+        /// </summary>
+        /// <remarks>
+        /// <code>
+        /// SELECT id, name FROM users WHERE id &gt; @id;
+        /// </code>
+        /// </remarks>
+        /// <param name="parameters">The query's parameters.</param>
+        /// <returns>The rows the query returned.</returns>
+        public global::App.ListUsersDto[] ListUsers(
+            global::App.ListUsersParams parameters)
+        {
+            global::System.ArgumentNullException.ThrowIfNull(parameters);
+            const string sql = "SELECT id, name FROM users WHERE id > @id;";
+            var connection = new global::Npgsql.NpgsqlConnection(connectionString ?? throw new global::System.InvalidOperationException("The connection source 'connectionString' of 'App.Sample' is null."));
+            using var connectionScope = connection;
+            var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
+            if (wasClosed)
+            {
+                connection.Open();
+            }
+
+            try
+            {
+                var command = connection.CreateCommand();
+                using var commandScope = command;
+                command.CommandText = sql;
+
+                {
+                    var parameter = new global::Npgsql.NpgsqlParameter<int>();
+                    parameter.ParameterName = "id";
+                    parameter.TypedValue = parameters.Id;
+                    command.Parameters.Add(parameter);
+                }
+
+                var reader = command.ExecuteReader(global::System.Data.CommandBehavior.Default);
+                using var readerScope = reader;
+                var rows = new global::SqlSource.SqlSourceRowBuffer<global::App.ListUsersDto>();
+                while (reader.Read())
+                {
+                    rows.Add(new global::App.ListUsersDto(reader.GetFieldValue<int>(0), reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
+                }
+
+                return rows.ToArray();
+            }
+            finally
+            {
+                if (wasClosed)
+                {
+                    connection.Close();
                 }
             }
         }
@@ -258,12 +374,39 @@ namespace App
         /// </code>
         /// </remarks>
         /// <param name="parameters">The query's parameters.</param>
+        /// <returns>The row, or null when there is none.</returns>
+        /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
+        global::App.FindUserDto? FindUser(
+            global::App.FindUserParams parameters);
+
+        /// <summary>
+        /// The <c>FindUser</c> query from <c>Users.sql</c>.
+        /// </summary>
+        /// <remarks>
+        /// <code>
+        /// SELECT id, name FROM users WHERE id = @id;
+        /// </code>
+        /// </remarks>
+        /// <param name="parameters">The query's parameters.</param>
         /// <param name="cancellationToken">Cancels the query.</param>
         /// <returns>The row, or null when there is none.</returns>
         /// <exception cref="T:SqlSource.UnexpectedRowCountException">The query returned more than one row.</exception>
         global::System.Threading.Tasks.Task<global::App.FindUserDto?> FindUserAsync(
             global::App.FindUserParams parameters,
             global::System.Threading.CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The <c>ListUsers</c> query from <c>Users.sql</c>.
+        /// </summary>
+        /// <remarks>
+        /// <code>
+        /// SELECT id, name FROM users WHERE id &gt; @id;
+        /// </code>
+        /// </remarks>
+        /// <param name="parameters">The query's parameters.</param>
+        /// <returns>The rows the query returned.</returns>
+        global::App.ListUsersDto[] ListUsers(
+            global::App.ListUsersParams parameters);
 
         /// <summary>
         /// The <c>ListUsers</c> query from <c>Users.sql</c>.

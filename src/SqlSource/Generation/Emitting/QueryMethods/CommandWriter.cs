@@ -226,7 +226,7 @@ internal static class CommandWriter
     }
 
     // The source's value, or the exception that says it is null: its member, as the method reaches it, read, or called
-    // with the token when it takes one, and awaited when it is an asynchronous factory.
+    // with the token when it takes one, the method's or default, and awaited when it is an asynchronous factory.
     private static void AppendSourceOrThrow(
         StringBuilder builder,
         CallSpelling spelling,
@@ -246,7 +246,7 @@ internal static class CommandWriter
             _ = builder.Append('(');
             if (source.TakesCancellationToken)
             {
-                _ = spelling.AppendToken(builder, MethodArguments.CancellationToken, afterArgument: false);
+                _ = spelling.AppendSourceToken(builder, MethodArguments.CancellationToken);
             }
 
             _ = isAwaited ? spelling.AppendCallEnd(builder) : builder.Append(')');

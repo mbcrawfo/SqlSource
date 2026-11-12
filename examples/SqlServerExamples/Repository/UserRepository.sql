@@ -4,7 +4,11 @@
 
 -- name: GetUser -> one-optional
 -- summary: One user, or null.
--- one-optional: the method returns the row, or null when there is none.
+-- one-optional: the method returns the row, or null when there is none.  The generator parameter method-type=both
+-- gives the query a synchronous method, GetUser, for code that does not await, and its asynchronous method beside it,
+-- GetUserAsync, each a member of IUserRepository too.  The synchronous one takes no cancellation token and gets its
+-- connection from the same connection string, with the driver's synchronous calls.
+-- generator: method-type=both
 SELECT id, name, email
 FROM users
 WHERE id = @userId;

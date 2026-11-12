@@ -3,9 +3,9 @@ using System.Text;
 namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
-/// The spelling of a synchronous method: each call of the driver in its synchronous form, without a token, a
-/// <c>using</c> for each disposal scope, and the result returned as it is, or <c>void</c>.  A synchronous method never
-/// streams, so it has no iterator.
+/// The spelling of a synchronous method: each call of the driver in its synchronous form, without a token,
+/// <c>default</c> for a connection source's token, a <c>using</c> for each disposal scope, and the result returned as
+/// it is, or <c>void</c>.  A synchronous method never streams, so it has no iterator.
 /// </summary>
 internal sealed class SyncCallSpelling : CallSpelling
 {
@@ -20,6 +20,9 @@ internal sealed class SyncCallSpelling : CallSpelling
 
     /// <inheritdoc />
     public override StringBuilder AppendToken(StringBuilder builder, string token, bool afterArgument) => builder;
+
+    /// <inheritdoc />
+    public override StringBuilder AppendSourceToken(StringBuilder builder, string token) => builder.Append("default");
 
     /// <inheritdoc />
     public override StringBuilder AppendCallEnd(StringBuilder builder) => builder.Append(')');

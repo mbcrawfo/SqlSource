@@ -32,7 +32,7 @@ public sealed class ConnectionResolverTests
         resolution.FailedDatabases.ShouldBeEmpty();
         var resolved = resolution.Sources.ShouldHaveSingleItem();
         resolved.Database.ShouldBe("main");
-        resolved.Source.ShouldBe(
+        resolved.Asynchronous.ShouldBe(
             new ConnectionSource(
                 ConnectionSourceKind.ConnectionString,
                 CandidateMember.Field,
@@ -164,7 +164,7 @@ public sealed class ConnectionResolverTests
         );
 
         resolution.Diagnostics.ShouldBeEmpty();
-        resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("this.GetConnectionString");
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe("this.GetConnectionString");
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class ConnectionResolverTests
         resolution.Diagnostics.ShouldBeEmpty();
         resolution.FailedDatabases.ShouldBeEmpty();
         resolution
-            .Sources.Select(resolved => (resolved.Database, resolved.Source.MemberName))
+            .Sources.Select(resolved => (resolved.Database, resolved.Asynchronous.MemberName))
             .ShouldBe([("main", "_main"), ("reports", "_reports")]);
     }
 
@@ -218,7 +218,7 @@ public sealed class ConnectionResolverTests
         diagnostic.Location.ShouldBe(unused.Location);
         diagnostic.Arguments.ShouldBe(["App.UserRepository", "_archive", "archive", "'main'"]);
         resolution.FailedDatabases.ShouldBeEmpty();
-        resolution.Sources.ShouldHaveSingleItem().Source.MemberName.ShouldBe("_main");
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.MemberName.ShouldBe("_main");
     }
 
     [Fact]
@@ -325,7 +325,7 @@ public sealed class ConnectionResolverTests
         var resolution = Resolve([Candidate("parameters", CandidateType.DataSource, CandidateMember.Parameter)], Main);
 
         resolution.Diagnostics.ShouldBeEmpty();
-        resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("parameters");
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe("parameters");
     }
 
     // Every method takes a cancellation token, whatever its query.
@@ -345,7 +345,7 @@ public sealed class ConnectionResolverTests
     public void Resolve_FieldNamedAsAnArgument_IsTheSource() =>
         Resolve([Candidate("parameters", CandidateType.DataSource)], Main)
             .Sources.ShouldHaveSingleItem()
-            .Source.AccessText.ShouldBe("this.parameters");
+            .Asynchronous.AccessText.ShouldBe("this.parameters");
 
     // The resolution says whether the repository is a struct, whose streaming methods read the source first.
     [Fact]
@@ -359,7 +359,7 @@ public sealed class ConnectionResolverTests
             [Main]
         );
 
-        resolution.Sources.ShouldHaveSingleItem().Source.InStruct.ShouldBeTrue();
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.InStruct.ShouldBeTrue();
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public sealed class ConnectionResolverTests
         var resolution = Resolve([Candidate("dataSource", CandidateType.DataSource, declared: declared)], Main);
 
         resolution.Diagnostics.ShouldBeEmpty();
-        resolution.Sources.ShouldHaveSingleItem().Source.Kind.ShouldBe(ConnectionSourceKind.DataSource);
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.Kind.ShouldBe(ConnectionSourceKind.DataSource);
     }
 
     [Fact]
@@ -437,7 +437,7 @@ public sealed class ConnectionResolverTests
 
         var resolution = Resolve([candidate], Main);
 
-        resolution.Sources.ShouldHaveSingleItem().Source.Kind.ShouldBe(Enum.Parse<ConnectionSourceKind>(kind));
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.Kind.ShouldBe(Enum.Parse<ConnectionSourceKind>(kind));
     }
 
     [Fact]
@@ -449,7 +449,7 @@ public sealed class ConnectionResolverTests
             TakesCancellationToken = true,
         };
 
-        var source = Resolve([candidate], Main).Sources.ShouldHaveSingleItem().Source;
+        var source = Resolve([candidate], Main).Sources.ShouldHaveSingleItem().Asynchronous;
 
         source.IsAsync.ShouldBeTrue();
         source.TakesCancellationToken.ShouldBeTrue();
@@ -461,7 +461,7 @@ public sealed class ConnectionResolverTests
     {
         var resolution = Resolve([Candidate("dataSource", CandidateType.DataSource, CandidateMember.Parameter)], Main);
 
-        var source = resolution.Sources.ShouldHaveSingleItem().Source;
+        var source = resolution.Sources.ShouldHaveSingleItem().Asynchronous;
         source.AccessText.ShouldBe("dataSource");
         source.LeadingName.ShouldBe("dataSource");
     }
@@ -472,14 +472,14 @@ public sealed class ConnectionResolverTests
     public void Resolve_InstanceMember_HasNoLeadingName() =>
         Resolve([Candidate("_dataSource", CandidateType.DataSource)], Main)
             .Sources.ShouldHaveSingleItem()
-            .Source.LeadingName.ShouldBeNull();
+            .Asynchronous.LeadingName.ShouldBeNull();
 
     // A method returning a connection string is called, so the source says which kind of member it is.
     [Fact]
     public void Resolve_MethodReturningAConnectionString_IsAMethodSource() =>
         Resolve([Candidate("GetConnectionString", CandidateType.ConnectionString, CandidateMember.Method, true)], Main)
             .Sources.ShouldHaveSingleItem()
-            .Source.Member.ShouldBe(CandidateMember.Method);
+            .Asynchronous.Member.ShouldBe(CandidateMember.Method);
 
     [Fact]
     public void Resolve_KeywordName_IsEscaped()
@@ -489,7 +489,7 @@ public sealed class ConnectionResolverTests
             Main
         );
 
-        var source = resolution.Sources.ShouldHaveSingleItem().Source;
+        var source = resolution.Sources.ShouldHaveSingleItem().Asynchronous;
         source.MemberName.ShouldBe("string");
         source.AccessText.ShouldBe("@string");
     }
@@ -506,7 +506,7 @@ public sealed class ConnectionResolverTests
 
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
-        var source = resolution.Sources.ShouldHaveSingleItem().Source;
+        var source = resolution.Sources.ShouldHaveSingleItem().Asynchronous;
         source.AccessText.ShouldBe("Repo<T>.ConnectionString");
         source.LeadingName.ShouldBeNull();
         source.TypeName.ShouldBe("App.Repo<T>");
@@ -522,7 +522,10 @@ public sealed class ConnectionResolverTests
             IsStatic = true,
         };
 
-        var source = ConnectionResolver.Resolve(type, Shape(candidate), [Main]).Sources.ShouldHaveSingleItem().Source;
+        var source = ConnectionResolver
+            .Resolve(type, Shape(candidate), [Main])
+            .Sources.ShouldHaveSingleItem()
+            .Asynchronous;
 
         source.AccessText.ShouldBe("Repo.ConnectionString");
         source.LeadingName.ShouldBe("Repo");
@@ -540,7 +543,177 @@ public sealed class ConnectionResolverTests
 
         var resolution = ConnectionResolver.Resolve(type, Shape(candidate), [Main]);
 
-        resolution.Sources.ShouldHaveSingleItem().Source.AccessText.ShouldBe("@class<@int>.ConnectionString");
+        resolution.Sources.ShouldHaveSingleItem().Asynchronous.AccessText.ShouldBe("@class<@int>.ConnectionString");
+    }
+
+    // A source that returns no task serves both kinds of method.
+    [Fact]
+    public void Resolve_OneSourceThatReturnsNoTask_IsTheSourceOfBothKindsOfMethod()
+    {
+        var resolved = Resolve([Candidate("dataSource", CandidateType.DataSource)], Main)
+            .Sources.ShouldHaveSingleItem();
+
+        resolved.Asynchronous.MemberName.ShouldBe("dataSource");
+        resolved.Synchronous.ShouldBe(resolved.Asynchronous);
+    }
+
+    // A factory that returns a task serves asynchronous methods alone.
+    [Fact]
+    public void Resolve_OneFactoryThatReturnsATask_HasNoSynchronousSource()
+    {
+        var resolution = Resolve([AsyncFactory("OpenAsync")], Main);
+
+        resolution.Diagnostics.ShouldBeEmpty();
+        var resolved = resolution.Sources.ShouldHaveSingleItem();
+        resolved.Asynchronous.MemberName.ShouldBe("OpenAsync");
+        resolved.Synchronous.ShouldBeNull();
+    }
+
+    // The asynchronous methods take the one that returns a task, whichever is declared first.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Resolve_PairOfFactories_GivesEachKindOfMethodItsOwn(bool asyncFirst)
+    {
+        var asynchronous = AsyncFactory("OpenAsync");
+        var synchronous = Candidate("Open", CandidateType.Factory, CandidateMember.Method, isMarked: true);
+
+        var resolution = Resolve(asyncFirst ? [asynchronous, synchronous] : [synchronous, asynchronous], Main);
+
+        resolution.Diagnostics.ShouldBeEmpty();
+        resolution.FailedDatabases.ShouldBeEmpty();
+        var resolved = resolution.Sources.ShouldHaveSingleItem();
+        resolved.Database.ShouldBe("main");
+        resolved.Asynchronous.MemberName.ShouldBe("OpenAsync");
+        resolved.Asynchronous.IsAsync.ShouldBeTrue();
+        resolved.Synchronous.ShouldNotBeNull().MemberName.ShouldBe("Open");
+        resolved.Synchronous.IsAsync.ShouldBeFalse();
+    }
+
+    // Any source that returns no task pairs with a factory that returns one.  The cases name the enums' members,
+    // which are internal.
+    [Theory]
+    [InlineData("DataSource", "Field", "DataSource")]
+    [InlineData("ConnectionString", "Property", "ConnectionString")]
+    [InlineData("Connection", "Field", "Borrowed")]
+    public void Resolve_PairOfAFactoryAndAnotherSource_GivesEachKindOfMethodItsOwn(
+        string type,
+        string member,
+        string kind
+    )
+    {
+        var other = Candidate("source", Enum.Parse<CandidateType>(type), Enum.Parse<CandidateMember>(member), true);
+
+        var resolution = Resolve([other, AsyncFactory("OpenAsync")], Main);
+
+        resolution.Diagnostics.ShouldBeEmpty();
+        var resolved = resolution.Sources.ShouldHaveSingleItem();
+        resolved.Asynchronous.MemberName.ShouldBe("OpenAsync");
+        resolved.Synchronous.ShouldNotBeNull().Kind.ShouldBe(Enum.Parse<ConnectionSourceKind>(kind));
+    }
+
+    [Fact]
+    public void Resolve_TwoFactoriesThatReturnATask_ReportsSqlsrc029()
+    {
+        var resolution = Resolve([AsyncFactory("OpenAsync"), AsyncFactory("ConnectAsync")], Main);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.RepositoryHasManyConnections);
+        diagnostic.Arguments[2].ShouldBe("'OpenAsync', 'ConnectAsync'");
+        resolution.FailedDatabases.ShouldBe(["main"]);
+        resolution.Sources.ShouldBeEmpty();
+    }
+
+    // A pair is two members: a third is one too many, whichever of them returns a task.
+    [Fact]
+    public void Resolve_ThreeMarkedOfWhichOneReturnsATask_ReportsSqlsrc029()
+    {
+        var resolution = Resolve(
+            [
+                AsyncFactory("OpenAsync"),
+                Candidate("_dataSource", CandidateType.DataSource, isMarked: true),
+                Candidate("Open", CandidateType.Factory, CandidateMember.Method, isMarked: true),
+            ],
+            Main
+        );
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.RepositoryHasManyConnections);
+        diagnostic.Arguments[2].ShouldBe("'OpenAsync', '_dataSource', 'Open'");
+        resolution.FailedDatabases.ShouldBe(["main"]);
+        resolution.Sources.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_PairForOneDatabaseBesideAnotherDatabasesOneSource_ResolvesEach()
+    {
+        var resolution = Resolve(
+            [
+                AsyncFactory("OpenReportsAsync", "reports"),
+                Candidate("_main", CandidateType.DataSource, isMarked: true, database: "main"),
+                Candidate("OpenReports", CandidateType.Factory, CandidateMember.Method, true, "Reports"),
+            ],
+            Main,
+            Reports
+        );
+
+        resolution.Diagnostics.ShouldBeEmpty();
+        resolution.FailedDatabases.ShouldBeEmpty();
+        resolution
+            .Sources.Select(resolved =>
+                (resolved.Database, resolved.Asynchronous.MemberName, Synchronous: resolved.Synchronous?.MemberName)
+            )
+            .ShouldBe([("main", "_main", "_main"), ("reports", "OpenReportsAsync", "OpenReports")]);
+    }
+
+    // A problem of either member of a pair fails the database, and each is checked as a source alone would be.
+    [Fact]
+    public void Resolve_PairWithASourceOfAnotherEngine_ReportsSqlsrc033AndFailsTheDatabase()
+    {
+        var other = Candidate(
+            "_dataSource",
+            CandidateType.DataSource,
+            isMarked: true,
+            declared: "Npgsql.NpgsqlDataSource"
+        );
+
+        var resolution = Resolve([AsyncFactory("OpenAsync"), other], Sales);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.ConnectionOfAnotherEngine);
+        diagnostic.Location.ShouldBe(other.Location);
+        resolution.FailedDatabases.ShouldBe(["sales"]);
+        resolution.Sources.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_PairWithAHiddenParameter_ReportsSqlsrc036AndFailsTheDatabase()
+    {
+        var hidden = Candidate("cancellationToken", CandidateType.DataSource, CandidateMember.Parameter, true);
+
+        var resolution = Resolve([hidden, AsyncFactory("OpenAsync")], Main);
+
+        var diagnostic = resolution.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.ConnectionParameterHidden);
+        diagnostic.Location.ShouldBe(hidden.Location);
+        resolution.FailedDatabases.ShouldBe(["main"]);
+        resolution.Sources.ShouldBeEmpty();
+    }
+
+    // Each member's problem is reported, not only the first.
+    [Fact]
+    public void Resolve_PairWhoseMembersBothHaveAProblem_ReportsEach()
+    {
+        var asynchronous = AsyncFactory("OpenAsync") with { DeclaredTypeName = "Npgsql.NpgsqlConnection" };
+        var hidden = Candidate("cancellationToken", CandidateType.DataSource, CandidateMember.Parameter, true);
+
+        var resolution = Resolve([asynchronous, hidden], Sales);
+
+        resolution
+            .Diagnostics.Select(diagnostic => diagnostic.Descriptor)
+            .ShouldBe([SqlDiagnostics.ConnectionOfAnotherEngine, SqlDiagnostics.ConnectionParameterHidden]);
+        resolution.FailedDatabases.ShouldBe(["sales"]);
+        resolution.Sources.ShouldBeEmpty();
     }
 
     private static ConnectionResolution Resolve(ConnectionCandidate[] candidates, params NeededDatabase[] needed) =>
@@ -572,6 +745,13 @@ public sealed class ConnectionResolverTests
             declared ?? DeclaredOf(type),
             new LocationInfo(TestModels.SourceFile, new TextSpan(100 + name.Length, name.Length), default)
         );
+
+    // A marked factory that returns a task of a connection, for the database when the test names one.
+    private static ConnectionCandidate AsyncFactory(string name, string? database = null) =>
+        Candidate(name, CandidateType.Factory, CandidateMember.Method, isMarked: true, database: database) with
+        {
+            IsAsync = true,
+        };
 
     private static string DeclaredOf(CandidateType type) =>
         type switch

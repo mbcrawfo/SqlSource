@@ -20,6 +20,6 @@ See [query methods](../../../../../docs/architecture/generator.md#query-methods)
 
 - **A new kind of method follows [adding a kind of method](../../../../../docs/architecture/generator.md#adding-a-kind-of-method).**
 - **A new axis is a value on the plan, `QueryMethod` or `TypeMethods`, that a phase reads from `QueryMethodContext`, never a `bool` threaded through helpers.**
-- **A call of the driver, its token, `await`, a disposal scope and the type a method returns are spelled only by `CallSpelling.cs` and its two implementations, `AsyncCallSpelling.cs` and `SyncCallSpelling.cs`**, through `context.Spelling`; the iterator's modifiers are `AsyncCallSpelling.IteratorModifiersOf`'s, since a synchronous method never streams.
+- **A call of the driver, its token, the token given to a connection source, `await`, a disposal scope and the type a method returns are spelled only by `CallSpelling.cs` and its two implementations, `AsyncCallSpelling.cs` and `SyncCallSpelling.cs`**, through `context.Spelling`; the iterator's modifiers are `AsyncCallSpelling.IteratorModifiersOf`'s, since a synchronous method never streams.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

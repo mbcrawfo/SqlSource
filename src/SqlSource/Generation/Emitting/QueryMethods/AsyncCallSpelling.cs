@@ -37,6 +37,9 @@ internal sealed class AsyncCallSpelling : CallSpelling
         (afterArgument ? builder.Append(", ") : builder).Append(token);
 
     /// <inheritdoc />
+    public override StringBuilder AppendSourceToken(StringBuilder builder, string token) => builder.Append(token);
+
+    /// <inheritdoc />
     public override StringBuilder AppendCallEnd(StringBuilder builder) => builder.Append(").ConfigureAwait(false)");
 
     /// <inheritdoc />

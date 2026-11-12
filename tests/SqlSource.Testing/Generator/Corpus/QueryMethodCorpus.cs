@@ -44,9 +44,9 @@ internal static partial class QueryMethodCorpus
         new("lists", engine => Lists(engine, settings: null)),
         new("lists-no-padding", ListsWithoutPadding),
         new("repository-connection-string", engine => RepositoryOfConnectionString(engine, settings: null)),
-        new("repository-data-source", RepositoryOfDataSource),
+        new("repository-data-source", engine => RepositoryOfDataSource(engine, settings: null)),
         new("repository-factory", RepositoryOfFactory),
-        new("repository-borrowed", RepositoryOfBorrowed),
+        new("repository-borrowed", engine => RepositoryOfBorrowed(engine, settings: null)),
         new(
             "public-exceptions",
             engine =>
@@ -64,6 +64,9 @@ internal static partial class QueryMethodCorpus
         new("converters-sync", engine => Converters(engine, MethodTypeSync)),
         new("repository-connection-string-sync", engine => RepositoryOfConnectionString(engine, MethodTypeSync)),
         new("repository-connection-string-both", engine => RepositoryOfConnectionString(engine, MethodTypeBoth)),
+        new("repository-data-source-sync", engine => RepositoryOfDataSource(engine, MethodTypeSync)),
+        new("repository-borrowed-sync", engine => RepositoryOfBorrowed(engine, MethodTypeSync)),
+        new("repository-pair-both", engine => RepositoryOfPair(engine, MethodTypeBoth)),
         new("collection-method-sync", engine => CollectionMethod(engine, MethodTypeSync)),
         new("collection-method-both", engine => CollectionMethod(engine, MethodTypeBoth, withStream: true)),
     ];

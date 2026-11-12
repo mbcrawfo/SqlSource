@@ -32,6 +32,9 @@ public sealed class RepositoryMethodWriterTests
         "    await using var connectionScope = "
         + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(connection, false);\n";
 
+    // The scope that disposes a synchronous repository method's own connection.
+    private const string SyncConnectionScope = "    using var connectionScope = connection;\n";
+
     // The null source's exception, as a repository method of GetUserRepository writes it for its member.
     private const string NullSource =
         "throw new global::System.InvalidOperationException("
@@ -215,6 +218,82 @@ public sealed class RepositoryMethodWriterTests
                     + string.Format(CultureInfo.InvariantCulture, statement, NullSource)
                     + "    var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;\n"
             );
+    }
+
+    // A synchronous method gets its connection by each kind's synchronous form, gives a factory default for its token,
+    // and disposes the connection it made with a using.
+    [Theory]
+    [InlineData(
+        nameof(ConnectionSourceKind.ConnectionString),
+        nameof(CandidateMember.Field),
+        false,
+        "var connection = new global::Npgsql.NpgsqlConnection(this._dataSource ?? {0});\n" + SyncConnectionScope
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.ConnectionString),
+        nameof(CandidateMember.Method),
+        true,
+        "var connection = new global::Npgsql.NpgsqlConnection(this._dataSource(default) ?? {0});\n"
+            + SyncConnectionScope
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.DataSource),
+        nameof(CandidateMember.Field),
+        false,
+        "var connection = (this._dataSource ?? {0}).OpenConnection();\n" + SyncConnectionScope
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Factory),
+        nameof(CandidateMember.Method),
+        false,
+        "var connection = this._dataSource() ?? {0};\n" + SyncConnectionScope
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Factory),
+        nameof(CandidateMember.Method),
+        true,
+        "var connection = this._dataSource(default) ?? {0};\n" + SyncConnectionScope
+    )]
+    [InlineData(
+        nameof(ConnectionSourceKind.Borrowed),
+        nameof(CandidateMember.Property),
+        false,
+        "var connection = this._dataSource ?? {0};\n"
+    )]
+    public void Append_SynchronousRepositoryKind_AcquiresSynchronously(
+        string kindName,
+        string memberName,
+        bool takesCancellationToken,
+        string statement
+    )
+    {
+        var source = TestModels.Source(
+            Enum.Parse<ConnectionSourceKind>(kindName),
+            Enum.Parse<CandidateMember>(memberName),
+            takesCancellationToken: takesCancellationToken
+        );
+
+        WriteAsPlanned(Repository with { Source = source, Synchrony = MethodSynchrony.Synchronous })
+            .ShouldContain(
+                "    const string sql = \"SELECT id, name FROM users WHERE id = @id\";\n"
+                    + "    "
+                    + string.Format(CultureInfo.InvariantCulture, statement, NullSource)
+                    + "    var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;\n"
+                    + "    if (wasClosed)\n    {\n        connection.Open();\n    }\n"
+            );
+    }
+
+    // A synchronous method of no input and no token declares no argument, on the type and in the interface.
+    [Fact]
+    public void Append_SynchronousRepositoryWithoutArguments_DeclaresEmptyParentheses()
+    {
+        var method = Repository with { Input = null, Synchrony = MethodSynchrony.Synchronous };
+        var builder = new StringBuilder();
+
+        QueryMethodWriter.AppendInterfaceMember(builder, string.Empty, method);
+
+        WriteAsPlanned(method).ShouldContain(" GetUser()\n{\n");
+        builder.ToString().ShouldEndWith(" GetUser();\n");
     }
 
     // A connection string is the engine's driver's connection.

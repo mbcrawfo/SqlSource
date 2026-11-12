@@ -66,7 +66,7 @@ The setting that says what SqlSource produces for a query: its SQL alone, its SQ
 
 #### Query method
 
-What a described query whose [output](#output) is `repository` or `methods` becomes: an asynchronous method that sends the query's parameters, runs it and reads its rows into its models, or under `methods` a [synchronous one](generator.md#synchronous-methods) instead or beside it.  Under `repository` it is an instance method of a [repository](#repository), which gets its own connection; under `methods` it takes the connection, and opens it when it is closed.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
+What a described query whose [output](#output) is `repository` or `methods` becomes: an asynchronous method that sends the query's parameters, runs it and reads its rows into its models, or, under the generator parameter `method-type`, a [synchronous one](generator.md#synchronous-methods) instead or beside it.  Under `repository` it is an instance method of a [repository](#repository), which gets its own connection; under `methods` it takes the connection, and opens it when it is closed.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
 
 <a id="repository"></a>
 

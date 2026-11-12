@@ -26,23 +26,16 @@ internal static class MethodNames
             : string.Empty;
 
     /// <summary>
-    /// Whether the query's output can give it a synchronous method, its shape aside: at <c>methods</c>, under
-    /// <c>sync</c> or <c>both</c>.  A repository's methods stay asynchronous in this release.
+    /// Whether the query's output can give it a synchronous method, its shape aside: at <c>methods</c> or
+    /// <c>repository</c>, under <c>sync</c> or <c>both</c>.
     /// </summary>
     public static bool HasSynchronous(QuerySettings settings) =>
-        settings.Output == OutputKind.Methods && settings.MethodType != MethodType.Async;
+        settings.Output.HasMethod() && settings.MethodType != MethodType.Async;
 
     /// <summary>
-    /// Whether the query's output can give it an asynchronous method, its shape aside: at <c>methods</c>, under
-    /// <c>async</c> or <c>both</c>, and at <c>repository</c> under any, since a repository's methods stay asynchronous
-    /// in this release.
+    /// Whether the query's output can give it an asynchronous method, its shape aside: at <c>methods</c> or
+    /// <c>repository</c>, under <c>async</c> or <c>both</c>.
     /// </summary>
     public static bool HasAsynchronous(QuerySettings settings) =>
-        settings.Output switch
-        {
-            OutputKind.Methods => settings.MethodType != MethodType.Sync,
-            OutputKind.Repository => true,
-            OutputKind.Sql or OutputKind.Models => false,
-            _ => throw UnexpectedEnumValueException.Of(settings.Output),
-        };
+        settings.Output.HasMethod() && settings.MethodType != MethodType.Sync;
 }

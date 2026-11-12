@@ -201,8 +201,8 @@ internal readonly struct MethodArguments(
     public Enumerator GetEnumerator() => new(this);
 
     /// <summary>
-    /// Appends the method's arguments, each on its own line at <paramref name="indent" /> and one level more, and
-    /// the parenthesis that closes them.
+    /// Appends the method's arguments in parentheses, each on its own line at <paramref name="indent" /> and one level
+    /// more, or <c>()</c> when it has none.
     /// </summary>
     /// <param name="builder">The source being built.</param>
     /// <param name="indent">The whitespace that starts the method's line.</param>
@@ -246,17 +246,15 @@ internal readonly struct MethodArguments(
         }
     }
 
-    // Each argument on its own line, a comma after each but the last, and the end after the last, whatever its role.
+    // The opening parenthesis, each argument on its own line, a comma after each but the last, and the end after the
+    // last, whatever its role, or right after the parenthesis when there is none.
     private void Append(StringBuilder builder, string indent, bool isExtension, bool isIterator, string end)
     {
+        _ = builder.Append('(');
         var first = true;
         foreach (var argument in this)
         {
-            if (!first)
-            {
-                _ = builder.Append(",\n");
-            }
-
+            _ = builder.Append(first ? "\n" : ",\n");
             first = false;
             _ = builder.Append(indent).Append(GeneratedText.Indent);
             if (isExtension && argument.Role == ArgumentRole.Receiver)

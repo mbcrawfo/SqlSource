@@ -7,11 +7,11 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // setting, for a test that needs the two apart: the allocation tests of tests/DatabaseTests/QueryMethodAllocation send
 // both through one hand-written SQL, the Dapper tests run the constants of the ForDapper copies, such as
 // ListAllTypesForDapper, which are at the output models, since a methods query has a method and no constant, and
-// SynchronousMethodTests and SynchronousBatchTests run the synchronous methods of the copies under method-type, such as
-// GetAccountInRangeSync and InsertNoteSync.  A query's hash is of its SQL, its declared parameters and its tokens'
-// defaults, and the project does not build while an entry's hash is not its query's, so the committed entries of the
-// two have one hash as long as the two queries have one SQL and one declaration of their parameters.  No server is
-// needed.
+// SynchronousMethodTests, SynchronousBatchTests and SynchronousRepositoryTests run the synchronous methods of the
+// copies under method-type, such as GetAccountInRangeSync, InsertNoteSync and GetNoteSync.  A query's hash is of its
+// SQL, its declared parameters and its tokens' defaults, and the project does not build while an entry's hash is not
+// its query's, so the committed entries of the two have one hash as long as the two queries have one SQL and one
+// declaration of their parameters.  No server is needed.
 public sealed class VariantCopyTests
 {
     [Theory]
@@ -41,6 +41,7 @@ public sealed class VariantCopyTests
     [InlineData("Locations.sql", "GetLocatedName", "GetLocatedNameNested")]
     [InlineData("Batches.sql", "InsertNote", "InsertNoteNoTransaction")]
     [InlineData("Batches.sql", "InsertNote", "InsertNoteInRepository")]
+    [InlineData("Batches.sql", "InsertNoteInRepository", "InsertNoteInRepositorySync")]
     [InlineData("Batches.sql", "InsertNoteRowCount", "InsertNoteQuietly")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteReadCommitted")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteRepeatableRead")]
@@ -67,6 +68,10 @@ public sealed class VariantCopyTests
     [InlineData("Methods.sql", "GetThenRaise", "GetThenRaiseSync")]
     [InlineData("Notes.sql", "GetAccountNoteCount", "GetAccountNoteCountSync")]
     [InlineData("Streaming.sql", "StreamAccounts", "StreamAccountsBoth")]
+    [InlineData("Repository.sql", "GetNote", "GetNoteSync")]
+    [InlineData("Repository.sql", "GetNote", "GetNoteBoth")]
+    [InlineData("Repository.sql", "ListNotes", "ListNotesSync")]
+    [InlineData("Repository.sql", "TouchNote", "TouchNoteSync")]
     public void Copy_CommittedEntry_HasTheHashOfItsOriginal(string file, string original, string copy) =>
         VariantCopies.ShouldShareHash(RepositoryPaths.EndToEndQueries, file, original, copy);
 }

@@ -107,6 +107,315 @@
         }
       ]
     },
+    "GetNoteSync": {
+      "hash": "f471aceba82f7e9707316b0fea83e1f5d2dd7198bbc07f226cb76b0fc6bf0fdd",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "nvarchar(max)",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "remind_at",
+          "type": {
+            "name": "time(0)",
+            "maxLength": 3,
+            "precision": 8,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "remind_at"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "GetNoteBoth": {
+      "hash": "f471aceba82f7e9707316b0fea83e1f5d2dd7198bbc07f226cb76b0fc6bf0fdd",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "nvarchar(max)",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "remind_at",
+          "type": {
+            "name": "time(0)",
+            "maxLength": 3,
+            "precision": 8,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "remind_at"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindNoteOfAccountSync": {
+      "hash": "3b7ccb9c4cf39bdfa90d5240f0163bbcadad092aa863f036631fb05966917d82",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "accountId",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "nvarchar(max)",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "remind_at",
+          "type": {
+            "name": "time(0)",
+            "maxLength": 3,
+            "precision": 8,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "remind_at"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "ListNotes": {
       "hash": "dd6672d2653eccfdb40f2f66ed57f6863abda67d5b56aca975f9a260bce79d76",
       "toolVersion": "0.1.0",
@@ -197,7 +506,119 @@
         }
       ]
     },
+    "ListNotesSync": {
+      "hash": "dd6672d2653eccfdb40f2f66ed57f6863abda67d5b56aca975f9a260bce79d76",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "nvarchar(max)",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "remind_at",
+          "type": {
+            "name": "time(0)",
+            "maxLength": 3,
+            "precision": 8,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "remind_at"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "TouchNote": {
+      "hash": "65697c6af3b48aa4756b4624f436f0a521dbe90840a721ace12ffa1082b9ae25",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "none",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ]
+    },
+    "TouchNoteSync": {
       "hash": "65697c6af3b48aa4756b4624f436f0a521dbe90840a721ace12ffa1082b9ae25",
       "toolVersion": "0.1.0",
       "database": "app",
