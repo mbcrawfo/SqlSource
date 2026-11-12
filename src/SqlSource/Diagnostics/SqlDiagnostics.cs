@@ -325,7 +325,8 @@ internal static class SqlDiagnostics
         id: "SQLSRC029",
         title: "Repository has more than one connection",
         messageFormat: "'{0}' has more than one connection for the database '{1}': {2}.  Mark only the one to use "
-            + "[SqlSourceConnection].",
+            + "[SqlSourceConnection], or two of which only one returns a task: the asynchronous methods use that one, "
+            + "and the synchronous methods the other.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

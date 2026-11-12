@@ -771,7 +771,7 @@ See: [The connection](generator.md#repository-connection)
 
 **Repository has more than one connection**
 
-The type has more than one member that could give its repository queries their connection for one database: two members that the build finds by their name or type, or two marked `[SqlSourceConnection]` for the same database.
+The type has more than one member that could give its repository queries their connection for one database: two members that the build finds by their name or type, two marked `[SqlSourceConnection]` for the same database that both return a `Task` or `ValueTask`, or both do not, or three or more marked for it.
 
 ```csharp
 [SqlSourceGenerate]
@@ -783,12 +783,26 @@ public partial class UserRepository
 ```
 
 ```console
-/work/App/UserRepository.cs(1,2): error SQLSRC029: 'App.UserRepository' has more than one connection for the database 'postgres': '_connectionString', '_dataSource'.  Mark only the one to use [SqlSourceConnection].
+/work/App/UserRepository.cs(1,2): error SQLSRC029: 'App.UserRepository' has more than one connection for the database 'postgres': '_connectionString', '_dataSource'.  Mark only the one to use [SqlSourceConnection], or two of which only one returns a task: the asynchronous methods use that one, and the synchronous methods the other.
 ```
 
 The error is at the type's `[SqlSourceGenerate]` and lists the members, and the repository queries of that database get no method.  A primary-constructor parameter is found by its name or type only when no field or property of the type or of a base type is, so a parameter that the type stores in a field of its own gives one connection, the field.
 
 Mark the one to use `[SqlSourceConnection]`, which leaves the others alone; when several are marked, leave one marked for the database, or set each one's `Database` to the database it connects to.
+
+A database may keep two marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection: its asynchronous methods get their connection from that one, and its synchronous methods from the other, which can be a connection string, a data source, a connection or a method that returns a connection.
+
+```csharp
+[SqlSourceGenerate]
+public partial class UserRepository
+{
+    [SqlSourceConnection]
+    private Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken) => ...;
+
+    [SqlSourceConnection]
+    private NpgsqlConnection Open() => ...;
+}
+```
 
 See: [The connection](generator.md#repository-connection)
 

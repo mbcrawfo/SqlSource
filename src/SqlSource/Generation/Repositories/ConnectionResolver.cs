@@ -11,8 +11,9 @@ namespace SqlSource.Generation.Repositories;
 
 /// <summary>
 /// Decides which member gives a repository's methods their connection for each database its repository queries use,
-/// from the candidates of its <see cref="RepositoryShape" />, with <c>SQLSRC028</c> to <c>SQLSRC034</c> for what it
-/// cannot decide.  Every problem but <c>SQLSRC031</c> leaves the databases it is about without a connection.
+/// one member or a pair of which one returns a task, from the candidates of its <see cref="RepositoryShape" />, with
+/// <c>SQLSRC028</c> to <c>SQLSRC034</c> for what it cannot decide.  Every problem but <c>SQLSRC031</c> leaves the
+/// databases it is about without a connection.
 /// </summary>
 internal static class ConnectionResolver
 {
@@ -20,7 +21,8 @@ internal static class ConnectionResolver
     /// The connection of each database the type needs.  A static type gets <c>SQLSRC034</c> and none.  When a member is
     /// marked, each database takes the member marked for it, or the one marked without a <c>Database</c> when the type
     /// needs one database; otherwise the type must need one database, and the one candidate of the conventions is its
-    /// connection.  Nothing is reported for a type that needs none.
+    /// connection.  A database may take two marked members when only one of them returns a task: its asynchronous
+    /// methods take that one, and its synchronous methods the other.  Nothing is reported for a type that needs none.
     /// </summary>
     /// <param name="type">The repository.</param>
     /// <param name="shape">Its candidates, which the reader has filtered.</param>
@@ -74,6 +76,9 @@ internal static class ConnectionResolver
                     break;
                 case 1:
                     resolving.Take(database, members[0]);
+                    break;
+                case 2 when members[0].IsAsync != members[1].IsAsync:
+                    resolving.Take(database, members[0], members[1]);
                     break;
                 default:
                     resolving.Report(
@@ -317,9 +322,40 @@ internal static class ConnectionResolver
 
         public void FailAll() => FailEach(Needed.Select(static database => database.Name));
 
-        // The member is the database's connection, unless it is a parameter that an argument of the methods hides, or
-        // its type is a driver's of another engine.
+        // The member is the database's connection, of its synchronous methods too unless it returns a task, when it can
+        // be one.
         public void Take(NeededDatabase database, ConnectionCandidate candidate)
+        {
+            if (!IsUsable(database, candidate))
+            {
+                Fail(database.Name);
+                return;
+            }
+
+            var source = SourceOf(candidate);
+            _sources.Add(new ResolvedConnection(database.Name, source, source.IsAsync ? null : source));
+        }
+
+        // The pair, of which one returns a task, are the database's connections, that one of its asynchronous methods
+        // and the other of its synchronous ones, when both can be one.  Each is checked, so that each one's problem is
+        // reported, and a problem of either fails the database.
+        public void Take(NeededDatabase database, ConnectionCandidate first, ConnectionCandidate second)
+        {
+            var firstIsUsable = IsUsable(database, first);
+            var secondIsUsable = IsUsable(database, second);
+            if (!firstIsUsable || !secondIsUsable)
+            {
+                Fail(database.Name);
+                return;
+            }
+
+            var (asynchronous, synchronous) = first.IsAsync ? (first, second) : (second, first);
+            _sources.Add(new ResolvedConnection(database.Name, SourceOf(asynchronous), SourceOf(synchronous)));
+        }
+
+        // Whether the member can be the database's connection, with its problem when it cannot: a parameter that an
+        // argument of the methods hides, or a type of a driver of another engine.
+        private bool IsUsable(NeededDatabase database, ConnectionCandidate candidate)
         {
             if (candidate.Member == CandidateMember.Parameter && IsAnArgumentsName(candidate.Name, database))
             {
@@ -332,8 +368,7 @@ internal static class ConnectionResolver
                         database.Name
                     )
                 );
-                Fail(database.Name);
-                return;
+                return false;
             }
 
             if (DriverEngineOf(candidate.DeclaredTypeName) is { } other && other != database.Engine)
@@ -350,11 +385,10 @@ internal static class ConnectionResolver
                         database.Engine.DriverName()
                     )
                 );
-                Fail(database.Name);
-                return;
+                return false;
             }
 
-            _sources.Add(new ResolvedConnection(database.Name, SourceOf(candidate)));
+            return true;
         }
 
         // The resolution, its databases in the order they are needed.

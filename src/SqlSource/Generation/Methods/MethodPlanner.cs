@@ -319,8 +319,8 @@ internal static class MethodPlanner
             SqlDialectName.Canonical(file.Dialect)
         );
 
-    // The connection of the database, by DatabaseName.Comparer, or null when the resolution failed it, or there is
-    // none, for a type whose shape the step did not find.
+    // The source of the database's asynchronous methods, by DatabaseName.Comparer, or null when the resolution failed
+    // it, or there is none, for a type whose shape the step did not find.
     private static ConnectionSource? SourceOf(ConnectionResolution? resolution, string database)
     {
         if (
@@ -333,7 +333,7 @@ internal static class MethodPlanner
 
         return resolution
             .Sources.FirstOrDefault(resolved => DatabaseName.Comparer.Equals(resolved.Database, database))
-            ?.Source;
+            ?.Asynchronous;
     }
 
     // The names of the members the type's file writes for the queries that have no method: each one's constant
