@@ -46,6 +46,10 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
 
     private const int ConversionFailed = 245;
 
+    // The runs of a test of the pooled session before it fails: it runs again when the pool hands back another
+    // session.
+    private const int PooledSessionAttempts = 3;
+
     // The seed's three notes, as BatchNote reads them.
     private static readonly BatchNote[] SeedNotes =
     [
@@ -572,6 +576,10 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
     // same session at the same level.  The pool drops a session's temporary tables when it hands the session out
     // again, and a snapshot transaction cannot write a global one in tempdb, so the notes are a table of app of the
     // test's own, which it drops; the container ends with the run, so a table a failed run leaves does not outlive it.
+    // A session can end while it waits in the pool, and the pool then opens another in its place, at read committed,
+    // which SQL Server often gives the same ServerProcessId.  So the test knows the session by the connection's
+    // ClientConnectionId, which is the physical connection's, and runs again on a new pool when the pool hands back
+    // another, since the method's promise is of the session it ran on.
     [Theory]
     [InlineData("read uncommitted", "repeatable read")]
     [InlineData("read committed", "repeatable read")]
@@ -587,33 +595,42 @@ public sealed class BatchQueryTests(SqlServerDatabases sqlServer)
     )
     {
         var token = TestContext.Current.CancellationToken;
-        var unique = Guid.NewGuid().ToString("N");
-        var notes = "dbo.isolation_notes_" + unique;
-        await using var owner = await OpenWithNotesAsync(EndToEndSources.AppUnpooled(sqlServer), notes, token);
-        try
+        for (var attempt = 1; attempt <= PooledSessionAttempts; attempt++)
         {
-            await using var connection = new SqlConnection(
-                new SqlConnectionStringBuilder(EndToEndSources.AppConnectionString(sqlServer))
+            var unique = Guid.NewGuid().ToString("N");
+            var notes = "dbo.isolation_notes_" + unique;
+            await using var owner = await OpenWithNotesAsync(EndToEndSources.AppUnpooled(sqlServer), notes, token);
+            try
+            {
+                await using var connection = new SqlConnection(
+                    new SqlConnectionStringBuilder(EndToEndSources.AppConnectionString(sqlServer))
+                    {
+                        ApplicationName = "isolation " + unique,
+                    }.ConnectionString
+                );
+                await connection.OpenAsync(token);
+                var session = connection.ClientConnectionId;
+                await SetSessionLevelAsync(connection, before, token);
+                await connection.CloseAsync();
+
+                var rows = await InsertAtLevelAsync(connection, level, Items(2), token, notes);
+
+                connection.State.ShouldBe(ConnectionState.Closed);
+                rows.ShouldAllBe(row => row.Kind == LevelNumber(level).ToString(CultureInfo.InvariantCulture));
+                await connection.OpenAsync(token);
+                if (connection.ClientConnectionId != session && attempt < PooledSessionAttempts)
                 {
-                    ApplicationName = "isolation " + unique,
-                }.ConnectionString
-            );
-            await connection.OpenAsync(token);
-            var session = connection.ServerProcessId;
-            await SetSessionLevelAsync(connection, before, token);
-            await connection.CloseAsync();
+                    continue;
+                }
 
-            var rows = await InsertAtLevelAsync(connection, level, Items(2), token, notes);
-
-            connection.State.ShouldBe(ConnectionState.Closed);
-            rows.ShouldAllBe(row => row.Kind == LevelNumber(level).ToString(CultureInfo.InvariantCulture));
-            await connection.OpenAsync(token);
-            connection.ServerProcessId.ShouldBe(session);
-            (await SessionLevelAsync(connection, null, token)).ShouldBe(LevelNumber(before));
-        }
-        finally
-        {
-            await DropAsync(owner, notes, token);
+                connection.ClientConnectionId.ShouldBe(session, "The pool replaced the session on every attempt.");
+                (await SessionLevelAsync(connection, null, token)).ShouldBe(LevelNumber(before));
+                return;
+            }
+            finally
+            {
+                await DropAsync(owner, notes, token);
+            }
         }
     }
 

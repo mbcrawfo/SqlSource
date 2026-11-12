@@ -14,6 +14,9 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 [Collection(UsesSqlServer.Name)]
 public sealed class RowCountTests(SqlServerDatabases sqlServer)
 {
+    // The runs of the test of the pooled session, as in BatchQueryTests.
+    private const int PooledSessionAttempts = 3;
+
     [Fact]
     public async Task AddTwoNotes_InsertWithOutput_CountsItsRows()
     {
@@ -58,58 +61,72 @@ public sealed class RowCountTests(SqlServerDatabases sqlServer)
 
     // SET NOCOUNT ON in a query with no parameters, which SqlClient sends as a batch, is the session's: the count of
     // every later command on the open connection is -1 too.  The connection string names a pool of this test alone, so
-    // that the second connection is given the session of the first, as its @@SPID shows, which SqlClient resets with
-    // sp_reset_connection when it hands it out again: that turns NOCOUNT off, and the count is back.
+    // that the second connection is given the session of the first, known by its ClientConnectionId, which SqlClient
+    // resets with sp_reset_connection when it hands it out again: that turns NOCOUNT off, and the count is back.  A
+    // session can end while it waits in the pool, and the pool then opens another in its place, which SQL Server often
+    // gives the same @@SPID and whose NOCOUNT is off too, so the test runs again on a new pool when the pool hands back
+    // another, since a count of 1 on another session shows nothing of the reset.
     [Fact]
     public async Task TouchAccountsQuietly_NoCountInABatch_IsMinusOneUntilThePoolResetsTheSession()
     {
         var token = TestContext.Current.CancellationToken;
-        var pool = new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase))
+        for (var attempt = 1; attempt <= PooledSessionAttempts; attempt++)
         {
-            ApplicationName = nameof(TouchAccountsQuietly_NoCountInABatch_IsMinusOneUntilThePoolResetsTheSession),
-        }.ConnectionString;
-        short session;
+            var pool = new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase))
+            {
+                ApplicationName = $"{nameof(RowCountTests)}-{Guid.NewGuid():N}",
+            }.ConnectionString;
+            Guid session;
 
-        await using (var connection = new SqlConnection(pool))
-        {
+            await using (var connection = new SqlConnection(pool))
+            {
+                await EndToEndSources.RolledBackAsync(
+                    connection,
+                    async transaction =>
+                    {
+                        var quiet = await connection.TouchAccountsQuietly(
+                            transaction: transaction,
+                            cancellationToken: token
+                        );
+                        var after = await connection.TouchAccount(
+                            new TouchAccountArgs(1),
+                            transaction: transaction,
+                            cancellationToken: token
+                        );
+
+                        quiet.ShouldBe(-1);
+                        after.ShouldBe(-1);
+                    },
+                    token
+                );
+                session = connection.ClientConnectionId;
+            }
+
+            await using var reset = new SqlConnection(pool);
+            var handedBack = Guid.Empty;
+            var count = 0;
             await EndToEndSources.RolledBackAsync(
-                connection,
+                reset,
                 async transaction =>
                 {
-                    var quiet = await connection.TouchAccountsQuietly(
-                        transaction: transaction,
-                        cancellationToken: token
-                    );
-                    var after = await connection.TouchAccount(
+                    handedBack = reset.ClientConnectionId;
+                    count = await reset.TouchAccount(
                         new TouchAccountArgs(1),
                         transaction: transaction,
                         cancellationToken: token
                     );
-
-                    quiet.ShouldBe(-1);
-                    after.ShouldBe(-1);
                 },
                 token
             );
-            session = await connection.ExecuteScalarAsync<short>("SELECT @@SPID");
-        }
-
-        await using var reset = new SqlConnection(pool);
-        await EndToEndSources.RolledBackAsync(
-            reset,
-            async transaction =>
+            if (handedBack != session && attempt < PooledSessionAttempts)
             {
-                var count = await reset.TouchAccount(
-                    new TouchAccountArgs(1),
-                    transaction: transaction,
-                    cancellationToken: token
-                );
+                continue;
+            }
 
-                (await reset.ExecuteScalarAsync<short>("SELECT @@SPID", transaction: transaction)).ShouldBe(session);
-                count.ShouldBe(1);
-            },
-            token
-        );
+            handedBack.ShouldBe(session, "The pool replaced the session on every attempt.");
+            count.ShouldBe(1);
+            return;
+        }
     }
 
     // A query with parameters runs in sp_executesql, and a SET inside it ends with it: the count of its own command is
