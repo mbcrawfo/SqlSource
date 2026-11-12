@@ -14,8 +14,8 @@ namespace SqlSource.Tests.Generator;
 
 // The methods that method-type gives a query: a synchronous method named as the query under sync, beside the
 // asynchronous one, which always ends in Async, under both, their names' clashes, and SQLSRC298 for a stream under
-// sync.  In this part a collection method and a repository's method stay asynchronous.  Each run is under postgres on
-// Npgsql 10.
+// sync.  A collection method follows method-type as the query's method does.  In this part a repository's methods
+// stay asynchronous.  Each run is under postgres on Npgsql 10.
 public sealed class SynchronousMethodTests
 {
     private const string GetUserText = "-- name: GetUser -> one\nSELECT id FROM users WHERE id = @id;\n";
@@ -42,6 +42,13 @@ public sealed class SynchronousMethodTests
         SidecarEntry[] entries = [Entry(file, "ListUsers", [Parameter("id")], [Column("id")])];
         return isRepository ? RepositoryRuns.Run(file, entries) : MethodRuns.Run(file, entries);
     }
+
+    // A type App.Sample that claims the folder and has a static member of the name.
+    private static string SampleWithMember(string name) =>
+        "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate(Source = \".\")]\n"
+        + "    public partial class Sample\n    {\n        public static int "
+        + name
+        + " => 0;\n    }\n}\n";
 
     private static QueryMethod[] MethodsOf(GeneratorRun run) =>
         [.. StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods).Methods];
@@ -157,9 +164,10 @@ public sealed class SynchronousMethodTests
     }
 
     // Under both a stream gets its asynchronous method alone, named with Async, and its collection method, which
-    // returns an array, of the same name.
+    // returns an array, of each synchrony: the synchronous one has the query's name, though no method of the query has
+    // it.
     [Fact]
-    public void Run_MethodTypeBothStream_WritesOnlyTheAsynchronousStreamNamedAsync()
+    public void Run_MethodTypeBothStream_WritesTheAsynchronousStreamAndBothCollectionMethods()
     {
         var run = RunStream("-- generator: method-type=both collection-method\n" + StreamText);
 
@@ -168,48 +176,178 @@ public sealed class SynchronousMethodTests
         methods.ShouldContain(
             "global::System.Collections.Generic.IAsyncEnumerable<global::App.ListUsersDto> ListUsersAsync(\n"
         );
-        methods.ShouldNotContain(" ListUsers(\n");
+        methods.ShouldContain("internal static global::App.ListUsersDto[] ListUsers(\n");
+        methods.ShouldContain(
+            "internal static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ListUsersAsync(\n"
+        );
         var planned = MethodsOf(run);
-        planned.Select(method => method.Name).ShouldBe(["ListUsersAsync", "ListUsersAsync"]);
-        planned.ShouldAllBe(method => method.Synchrony == MethodSynchrony.Asynchronous);
+        planned.Select(method => method.Name).ShouldBe(["ListUsersAsync", "ListUsers", "ListUsersAsync"]);
+        planned
+            .Select(method => method.Synchrony)
+            .ShouldBe([MethodSynchrony.Asynchronous, MethodSynchrony.Synchronous, MethodSynchrony.Asynchronous]);
         planned[0].Streams.ShouldBeTrue();
-        planned[1].Collection.ShouldBe(CollectionKind.Array);
+        planned[0].Batch.ShouldBeNull();
+        planned.Skip(1).ShouldAllBe(method => method.Batch != null && method.Collection == CollectionKind.Array);
     }
 
-    // In this part a collection method stays asynchronous, and under sync takes the synchronous method's name, as an
-    // overload by its items.
+    // Without collection-method a stream has no collection method, so under both it has no synchronous name to check
+    // either, though it takes items.
     [Fact]
-    public void Run_MethodTypeSyncCollectionMethod_WritesTheSynchronousMethodAndAnAsyncCollectionMethodOfOneName()
+    public void Run_MethodTypeBothStreamWithoutCollectionMethodAndAMemberOfItsName_WritesTheStream()
+    {
+        var file = UsersFile("-- generator: method-type=both\n-- member-location: class\n\n" + StreamText);
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "ListUsers", [Parameter("id")], [Column("id")])],
+            SampleWithMember("ListUsers")
+        );
+
+        run.ShouldBeClean();
+        MethodsOf(run).Select(method => method.Name).ShouldBe(["ListUsersAsync"]);
+    }
+
+    // The synchronous collection method of a stream FooAsync has the name of Foo's asynchronous method, and no method
+    // of its own query has that name, so it clashes with Foo's: SQLSRC274 at both, and neither gets a method.
+    [Fact]
+    public void Run_MethodTypeBothStreamCollectionMethodAndAnotherQueryOfItsName_ReportsSQLSRC274()
+    {
+        var file = UsersFile(
+            "-- generator: method-type=both collection-method\n\n-- name: Foo\nSELECT id FROM users WHERE id = @id;\n"
+                + "-- name: FooAsync\n-- collection-type: IAsyncEnumerable\nSELECT id FROM users WHERE id > @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(file, "Foo", [Parameter("id")], [Column("id")]),
+                Entry(file, "FooAsync", [Parameter("id")], [Column("id")]),
+            ]
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(3,10)-(3,13): The method of the query 'Foo' cannot be named "
+                    + "'FooAsync', because the method of the query 'FooAsync' has that name too.  Rename the query.",
+                "SQLSRC274 /app/Repo/Users.sql(5,10)-(5,18): The method of the query 'FooAsync' cannot be named "
+                    + "'FooAsync', because the method of the query 'Foo' has that name too.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // A stream without parameters has no collection method, so under both it has no synchronous name to check either.
+    [Fact]
+    public void Run_MethodTypeBothStreamWithoutItemsAndAMemberOfItsName_WritesTheStream()
+    {
+        var file = UsersFile(
+            "-- generator: method-type=both collection-method\n-- member-location: class\n\n"
+                + "-- collection-type: IAsyncEnumerable\n-- name: ListUsers\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "ListUsers", [], [Column("id")])], SampleWithMember("ListUsers"));
+
+        run.ShouldBeClean();
+        MethodsOf(run).Select(method => method.Name).ShouldBe(["ListUsersAsync"]);
+    }
+
+    // The synchronous collection method of a stream under both takes the query's name, so a member of that name is
+    // SQLSRC274, and the query gets none of its methods.
+    [Fact]
+    public void Run_MethodTypeBothStreamAndAMemberOfTheQuerysName_ReportsSQLSRC274()
+    {
+        var file = UsersFile(
+            "-- generator: method-type=both collection-method\n-- member-location: class\n\n" + StreamText
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "ListUsers", [Parameter("id")], [Column("id")])],
+            SampleWithMember("ListUsers")
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(5,10)-(5,19): The method of the query 'ListUsers' cannot be named "
+                    + "'ListUsers', because 'App.Sample' has a member of that name.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // Under sync the collection method is synchronous, the synchronous method's overload by its items.
+    [Fact]
+    public void Run_MethodTypeSyncCollectionMethod_WritesASynchronousCollectionMethod()
     {
         var run = RunGetUser("-- generator: method-type=sync collection-method\n" + GetUserText);
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(SyncGetUser);
-        methods.ShouldContain("global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n");
+        methods.ShouldContain("internal static global::App.GetUserDto[] GetUser(\n");
+        methods.ShouldContain("global::System.Collections.Generic.IEnumerable<global::App.GetUserParams> parameters,");
+        methods.ShouldNotContain("Task");
+        methods.ShouldNotContain("cancellationToken");
         methods.ShouldNotContain("GetUserAsync");
         var planned = MethodsOf(run);
         planned.Select(method => method.Name).ShouldBe(["GetUser", "GetUser"]);
-        planned
-            .Select(method => method.Synchrony)
-            .ShouldBe([MethodSynchrony.Synchronous, MethodSynchrony.Asynchronous]);
+        planned.ShouldAllBe(method => method.Synchrony == MethodSynchrony.Synchronous);
         planned[0].Batch.ShouldBeNull();
         _ = planned[1].Batch.ShouldNotBeNull();
     }
 
-    // Under both the collection method is the asynchronous method's overload, named with Async.
+    // Under both the query gets its two methods, then its two collection methods, each named as the method of its
+    // synchrony.
     [Fact]
-    public void Run_MethodTypeBothCollectionMethod_WritesTheCollectionMethodNamedAsync()
+    public void Run_MethodTypeBothCollectionMethod_WritesBothCollectionMethods()
     {
         var run = RunGetUser("-- generator: method-type=both collection-method\n" + GetUserText);
 
         run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("internal static global::App.GetUserDto[] GetUser(\n");
+        methods.ShouldContain(
+            "internal static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUserAsync(\n"
+        );
         var planned = MethodsOf(run);
-        planned.Select(method => method.Name).ShouldBe(["GetUser", "GetUserAsync", "GetUserAsync"]);
+        planned.Select(method => method.Name).ShouldBe(["GetUser", "GetUserAsync", "GetUser", "GetUserAsync"]);
         planned
             .Select(method => method.Synchrony)
-            .ShouldBe([MethodSynchrony.Synchronous, MethodSynchrony.Asynchronous, MethodSynchrony.Asynchronous]);
-        _ = planned[2].Batch.ShouldNotBeNull();
+            .ShouldBe([
+                MethodSynchrony.Synchronous,
+                MethodSynchrony.Asynchronous,
+                MethodSynchrony.Synchronous,
+                MethodSynchrony.Asynchronous,
+            ]);
+        planned.Select(method => method.Batch is null).ShouldBe([true, true, false, false]);
+    }
+
+    // A synchronous collection method of none returns void, and documents no return.
+    [Fact]
+    public void Run_MethodTypeSyncNoneCollectionMethod_ReturnsVoidAndDocumentsNoReturn()
+    {
+        var run = RunGetUser(
+            "-- generator: method-type=sync collection-method\n-- name: GetUser -> none\n"
+                + "UPDATE users SET id = @id WHERE id = @id;\n"
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        CountOf(methods, "internal static void GetUser(\n").ShouldBe(2);
+        methods.ShouldNotContain("<returns>");
+    }
+
+    // In this part a repository's collection method stays asynchronous, as its method does.
+    [Fact]
+    public void Run_MethodTypeSyncRepositoryCollectionMethod_StaysAsynchronous()
+    {
+        var file = UsersFile("-- generator: method-type=sync collection-method\n" + GetUserText);
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetUser", [Parameter("id")], [Column("id")])]);
+
+        run.ShouldBeClean();
+        var planned = MethodsOf(run);
+        planned.Select(method => method.Name).ShouldBe(["GetUser", "GetUser"]);
+        planned.ShouldAllBe(method => method.Synchrony == MethodSynchrony.Asynchronous);
+        _ = planned[1].Batch.ShouldNotBeNull();
     }
 
     // In this part a repository's method stays asynchronous, named under sync as under async.

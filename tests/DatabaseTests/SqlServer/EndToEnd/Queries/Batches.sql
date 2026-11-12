@@ -5,11 +5,31 @@
 -- of its own connection without the identity of dbo.notes, so that the rows land there, a method that commits leaves
 -- the seed as it was, and a rollback leaves the table.  Each insert writes the id it is given, so that a test can
 -- repeat one, and reads its account from dbo.accounts, so that an item of an account that does not exist adds no row
--- and returns none.
+-- and returns none.  A copy named with Sync after its original is the original under method-type=sync, which gives it
+-- a synchronous collection method in place of the asynchronous one, and one named with Both is under method-type=both,
+-- which gives it the two.
 -- generator: collection-method
 
 -- name: InsertNote -> one
 -- summary: Adds a note with the id it is given to the account that an id names, and returns it.
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+
+-- name: InsertNoteSync -> one
+-- summary: InsertNote, by a synchronous collection method.
+-- generator: method-type=sync
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+
+-- name: InsertNoteBoth -> one
+-- summary: InsertNote, by a synchronous collection method and an asynchronous one, which is named with Async after it.
+-- generator: method-type=both
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
@@ -22,8 +42,22 @@ SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accou
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
 SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
 
+-- name: InsertNoteRowCountSync -> rowcount
+-- summary: InsertNoteRowCount, by a synchronous collection method.
+-- generator: method-type=sync
+-- input-model: NoteToAdd
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+
 -- name: InsertNoteQuietly -> none
 -- summary: InsertNoteRowCount again, under none, which returns nothing.
+-- input-model: NoteToAdd
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+
+-- name: InsertNoteQuietlySync -> none
+-- summary: InsertNoteQuietly, by a synchronous collection method.
+-- generator: method-type=sync
 -- input-model: NoteToAdd
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
 SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
@@ -53,13 +87,51 @@ SELECT
 FROM dbo.accounts
 WHERE id = @accountId;
 
+-- name: InsertConvertedNoteSync -> one
+-- summary: InsertConvertedNote, by a synchronous collection method.
+-- generator: method-type=sync
+-- The LIKE and SUBSTRING type @body as nvarchar(4000), and the insert as nvarchar(max), so the marker gives the type.
+-- param: @body nvarchar(max) not null
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT
+    @id,
+    id,
+    CASE WHEN @body LIKE N'int:%' THEN CONVERT(varchar(10), CAST(SUBSTRING(@body, 5, 10) AS int)) ELSE 'call' END,
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
 -- name: FindNotes
 -- summary: The notes of the account that an id names.
 -- output-model: BatchNote
 SELECT id, account_id, body FROM dbo.notes WHERE account_id = @accountId ORDER BY id;
 
+-- name: FindNotesSync
+-- summary: FindNotes, by a synchronous collection method.
+-- generator: method-type=sync
+-- output-model: BatchNote
+SELECT id, account_id, body FROM dbo.notes WHERE account_id = @accountId ORDER BY id;
+
+-- name: FindNotesStreamBoth
+-- summary: FindNotes as a stream under method-type=both, which gives a stream its asynchronous method alone, named
+-- summary: with Async after it, and a synchronous collection method and an asynchronous one, which return arrays.
+-- generator: method-type=both
+-- collection-type: IAsyncEnumerable
+-- output-model: BatchNote
+SELECT id, account_id, body FROM dbo.notes WHERE account_id = @accountId ORDER BY id;
+
 -- name: FindNote -> one-optional
 -- summary: The note that an id names, if there is one.
+-- output-model: BatchNote
+SELECT id, account_id, body FROM dbo.notes WHERE id = @id;
+
+-- name: FindNoteSync -> one-optional
+-- summary: FindNote, by a synchronous collection method.
+-- generator: method-type=sync
 -- output-model: BatchNote
 SELECT id, account_id, body FROM dbo.notes WHERE id = @id;
 
@@ -75,9 +147,21 @@ SELECT 2 AS other, 3 AS third;
 IF @id > 0
     SELECT id FROM dbo.accounts WHERE id = @id;
 
+-- name: FindAccountWhenPositiveSync
+-- summary: FindAccountWhenPositive, by a synchronous collection method.
+-- generator: method-type=sync
+IF @id > 0
+    SELECT id FROM dbo.accounts WHERE id = @id;
+
 -- name: FindAccountThenEmpty
 -- summary: The account that an id names, and then an empty result set of the same one column, which a collection method
 -- summary: reads as the next item's, and refuses only when the batch has a result set left after the last item's.
+SELECT id FROM dbo.accounts WHERE id = @id;
+SELECT id FROM dbo.accounts WHERE id = 0;
+
+-- name: FindAccountThenEmptySync
+-- summary: FindAccountThenEmpty, by a synchronous collection method.
+-- generator: method-type=sync
 SELECT id FROM dbo.accounts WHERE id = @id;
 SELECT id FROM dbo.accounts WHERE id = 0;
 
@@ -86,9 +170,21 @@ SELECT id FROM dbo.accounts WHERE id = 0;
 SELECT id FROM dbo.accounts WHERE id = @id;
 SELECT id FROM dbo.accounts WHERE id = 0;
 
+-- name: GetAccountThenEmptySync -> one
+-- summary: GetAccountThenEmpty, by a synchronous collection method.
+-- generator: method-type=sync
+SELECT id FROM dbo.accounts WHERE id = @id;
+SELECT id FROM dbo.accounts WHERE id = 0;
+
 -- name: FindAccountThenText
 -- summary: The account that an id names, and then a result set of one column of text, which a collection method reads
 -- summary: as the next item's, and fails to read as an id.
+SELECT id FROM dbo.accounts WHERE id = @id;
+SELECT N'other' AS other;
+
+-- name: FindAccountThenTextSync
+-- summary: FindAccountThenText, by a synchronous collection method.
+-- generator: method-type=sync
 SELECT id FROM dbo.accounts WHERE id = @id;
 SELECT N'other' AS other;
 
@@ -102,10 +198,36 @@ OUTPUT inserted.id, inserted.account_id, inserted.body
 SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
 SELECT 2 AS other;
 
+-- name: InsertNoteThenOtherSync -> one
+-- summary: InsertNoteThenOther, by a synchronous collection method.
+-- generator: method-type=sync
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+SELECT 2 AS other;
+
 -- name: InsertNoteSerializable -> one
 -- summary: Adds a note as InsertNote does, in a transaction of its own at the level serializable, and returns its id
 -- summary: and, as its kind, the isolation level of the transaction it ran in, as sys.dm_exec_sessions numbers it.
 -- generator: transaction=serializable
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
+-- name: InsertNoteSerializableSync -> one
+-- summary: InsertNoteSerializable, by a synchronous collection method.
+-- generator: transaction=serializable method-type=sync
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
@@ -135,9 +257,41 @@ SELECT
 FROM dbo.accounts
 WHERE id = @accountId;
 
+-- name: InsertNoteReadUncommittedSync -> one
+-- summary: InsertNoteReadUncommitted, by a synchronous collection method.
+-- generator: transaction=read-uncommitted method-type=sync
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
 -- name: InsertNoteReadCommitted -> one
 -- summary: InsertNoteSerializable again, under transaction=read-committed.
 -- generator: transaction=read-committed
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
+-- name: InsertNoteReadCommittedSync -> one
+-- summary: InsertNoteReadCommitted, by a synchronous collection method.
+-- generator: transaction=read-committed method-type=sync
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
@@ -167,6 +321,22 @@ SELECT
 FROM dbo.accounts
 WHERE id = @accountId;
 
+-- name: InsertNoteRepeatableReadSync -> one
+-- summary: InsertNoteRepeatableRead, by a synchronous collection method.
+-- generator: transaction=repeatable-read method-type=sync
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
 -- name: InsertNoteSnapshot -> one
 -- summary: InsertNoteSerializable again, under transaction=snapshot, which the schema of app allows.
 -- generator: transaction=snapshot
@@ -183,9 +353,34 @@ SELECT
 FROM dbo.accounts
 WHERE id = @accountId;
 
+-- name: InsertNoteSnapshotSync -> one
+-- summary: InsertNoteSnapshot, by a synchronous collection method.
+-- generator: transaction=snapshot method-type=sync
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
 -- name: InsertNoteNoTransaction -> one
 -- summary: InsertNote again, under transaction=off, so that each item commits on its own.
 -- generator: transaction=off
+-- input-model: NoteToAdd
+-- output-model: BatchNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.account_id, inserted.body
+SELECT @id, id, 'call', @body, SYSDATETIME() FROM dbo.accounts WHERE id = @accountId;
+
+-- name: InsertNoteNoTransactionSync -> one
+-- summary: InsertNoteNoTransaction, by a synchronous collection method.
+-- generator: transaction=off method-type=sync
 -- input-model: NoteToAdd
 -- output-model: BatchNote
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
@@ -241,6 +436,22 @@ WHERE id = @accountId;
 -- name: InsertNoteDefaultLevel -> one
 -- summary: InsertNoteSerializable again, under transaction=on, whose transaction begins at read committed.
 -- generator: transaction=on
+-- input-model: NoteToAdd
+-- output-model: IsolatedNote
+INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)
+OUTPUT inserted.id, inserted.kind
+SELECT
+    @id,
+    id,
+    (SELECT CONVERT(varchar(10), transaction_isolation_level) FROM sys.dm_exec_sessions WHERE session_id = @@SPID),
+    @body,
+    SYSDATETIME()
+FROM dbo.accounts
+WHERE id = @accountId;
+
+-- name: InsertNoteDefaultLevelSync -> one
+-- summary: InsertNoteDefaultLevel, by a synchronous collection method.
+-- generator: transaction=on method-type=sync
 -- input-model: NoteToAdd
 -- output-model: IsolatedNote
 INSERT INTO {{notes:dbo.notes}} (id, account_id, kind, body, written_at)

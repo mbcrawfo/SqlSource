@@ -7,10 +7,11 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // setting, for a test that needs the two apart: the allocation tests of tests/DatabaseTests/QueryMethodAllocation send
 // both through one hand-written SQL, the Dapper tests run the constants of the ForDapper copies, such as
 // ListAllTypesForDapper, which are at the output models, since a methods query has a method and no constant, and
-// SynchronousMethodTests runs the synchronous methods of the copies under method-type, such as
-// GetAccountInRangeSync.  A query's hash is of its SQL, its declared parameters and its tokens' defaults, and the
-// project does not build while an entry's hash is not its query's, so the committed entries of the two have one hash
-// as long as the two queries have one SQL and one declaration of their parameters.  No server is needed.
+// SynchronousMethodTests and SynchronousBatchTests run the synchronous methods of the copies under method-type, such as
+// GetAccountInRangeSync and InsertNoteSync.  A query's hash is of its SQL, its declared parameters and its tokens'
+// defaults, and the project does not build while an entry's hash is not its query's, so the committed entries of the
+// two have one hash as long as the two queries have one SQL and one declaration of their parameters.  No server is
+// needed.
 public sealed class VariantCopyTests
 {
     [Theory]
@@ -43,6 +44,17 @@ public sealed class VariantCopyTests
     [InlineData("Batches.sql", "InsertNoteRowCount", "InsertNoteQuietly")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteReadCommitted")]
     [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteRepeatableRead")]
+    [InlineData("Batches.sql", "InsertNote", "InsertNoteSync")]
+    [InlineData("Batches.sql", "InsertNote", "InsertNoteBoth")]
+    [InlineData("Batches.sql", "InsertNoteRowCount", "InsertNoteRowCountSync")]
+    [InlineData("Batches.sql", "InsertNoteQuietly", "InsertNoteQuietlySync")]
+    [InlineData("Batches.sql", "FindNotes", "FindNotesSync")]
+    [InlineData("Batches.sql", "FindNotes", "FindNotesStreamBoth")]
+    [InlineData("Batches.sql", "FindNote", "FindNoteSync")]
+    [InlineData("Batches.sql", "InsertNoteSerializable", "InsertNoteSerializableSync")]
+    [InlineData("Batches.sql", "InsertNoteReadCommitted", "InsertNoteReadCommittedSync")]
+    [InlineData("Batches.sql", "InsertNoteRepeatableRead", "InsertNoteRepeatableReadSync")]
+    [InlineData("Batches.sql", "InsertNoteNoTransaction", "InsertNoteNoTransactionSync")]
     [InlineData("Lists.sql", "ListAccountsByIds", "StreamAccountsByIds")]
     [InlineData("Lists.sql", "ListAccountsByIds", "ListAccountsByIdsNoPadding")]
     [InlineData("Lists.sql", "ListAccountsByIds", "ListAccountsByIdsSync")]
