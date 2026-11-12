@@ -101,10 +101,12 @@ internal sealed class PostgresEngine(PostgresDatabases databases) : IEngine, IAs
             _ => throw new ArgumentException($"No data source is named '{source}'.", nameof(source)),
         };
 
-    // A data source set up as EndToEndSources of the end-to-end project sets up the one of that name.
+    // A data source set up as EndToEndSources of the end-to-end project sets up the one of that name.  Its connection
+    // string keeps the password, so that a scenario can make a ConnectionStringRepository of the source's.
     private NpgsqlDataSource Build(string source, string database)
     {
         var builder = new NpgsqlDataSourceBuilder(databases.ConnectionStringOf(database));
+        builder.ConnectionStringBuilder.PersistSecurityInfo = true;
         switch (source)
         {
             case "default":

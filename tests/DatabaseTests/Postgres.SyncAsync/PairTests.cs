@@ -9,7 +9,7 @@ using Xunit;
 namespace SqlSource.DatabaseTests.Postgres.SyncAsync;
 
 // Each scenario's synchronous method beside its asynchronous twin, and the check that every pair has its scenarios.
-[Collection(UsesPostgres.Name)]
+[Collection(UsesPostgis.Name)]
 public sealed class PairTests(PostgresDatabases databases)
 {
     private static readonly IReadOnlyList<MethodPair> Pairs = MethodPairs.Find(typeof(PairTests).Assembly);

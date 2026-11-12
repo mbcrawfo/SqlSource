@@ -12,7 +12,6 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd.Json.Types;
 // A class of the project that the column types of Queries/Json.sql give camel, a jsonb, with converters of its own
 // between it and a string, which replace the serializer's default options with the web's: its properties are stored in
 // camelCase, orderId and note.
-#pragma warning disable CA1812 // Made by the serializer, until a scenario sends one.
 internal sealed record CamelMetadata(int OrderId, string? Note)
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);

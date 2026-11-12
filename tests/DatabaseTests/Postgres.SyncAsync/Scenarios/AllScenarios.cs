@@ -21,6 +21,13 @@ internal static class AllScenarios
         .. ConstantsScenarios.All,
         .. RowBuffersScenarios.All,
         .. StreamingScenarios.All,
+        .. BatchesScenarios.All,
+        .. RepositoryScenarios.All,
+        .. AllTypesScenarios.All,
+        .. InvoicesScenarios.All,
+        .. NodaTimeScenarios.All,
+        .. NetTopologySuiteScenarios.All,
+        .. JsonScenarios.All,
     ];
 
     public static Scenario Named(string name) =>

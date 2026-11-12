@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using SqlSource.DatabaseTests.TestHarness.SyncAsync;
 
 namespace SqlSource.DatabaseTests.Postgres.SyncAsync.Scenarios;
@@ -25,6 +26,28 @@ internal static class Calls
         object? parameters = null,
         IReadOnlyDictionary<string, string>? tokens = null
     ) => new($"{host.Name}.{method}: {what}", host, method, MethodKind.Query, tag, setup, parameters, tokens);
+
+    // A call of the collection method, "<Host>.<Method>, collection: <what>", which a query's method of the same name
+    // overloads.
+    public static Scenario OfCollection(
+        Type host,
+        string method,
+        ScenarioTag tag,
+        string what,
+        Setup setup,
+        object items,
+        Func<DbConnection, DbDataSource, object>? instance = null
+    ) =>
+        new(
+            $"{host.Name}.{method}, collection: {what}",
+            host,
+            method,
+            MethodKind.Collection,
+            tag,
+            setup,
+            items,
+            Instance: instance
+        );
 
     // An Ordinary call on an open connection and the same call on a closed one.
     public static IEnumerable<Scenario> OpenAndClosed(
