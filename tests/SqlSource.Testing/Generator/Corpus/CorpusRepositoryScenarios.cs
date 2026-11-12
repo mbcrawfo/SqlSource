@@ -107,18 +107,24 @@ internal static partial class QueryMethodCorpus
         Repository(engine, BorrowedSource, settings);
 
     private static GeneratorRun RepositoryOfPair(CorpusEngine engine, string? settings) =>
-        Repository(engine, PairSource, settings);
+        Repository(engine, PairSource, settings, collectionMethod: true);
 
-    // The repository's queries, at Repository: one row or none, many rows and a stream of them.
-    private static GeneratorRun Repository(CorpusEngine engine, string source, string? settings = null)
+    // The repository's queries, at Repository: one row or none, many rows and a stream of them.  The many rows have a
+    // collection method when collectionMethod says so, so that a pair's factories are each used by it too.
+    private static GeneratorRun Repository(
+        CorpusEngine engine,
+        string source,
+        string? settings = null,
+        bool collectionMethod = false
+    )
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            """
+            $"""
             -- name: FindUser -> one-optional
             SELECT id, name FROM users WHERE id = @id;
             -- name: ListUsers
-            SELECT id, name FROM users WHERE id > @id;
+            {(collectionMethod ? "-- generator: collection-method\n" : "")}SELECT id, name FROM users WHERE id > @id;
             -- name: StreamUsers
             -- collection-type: IAsyncEnumerable
             SELECT id, name FROM users;

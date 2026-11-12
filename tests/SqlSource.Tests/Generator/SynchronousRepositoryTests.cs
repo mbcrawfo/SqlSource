@@ -196,6 +196,22 @@ public sealed class SynchronousRepositoryTests
         planned.Select(method => method.Source!.MemberName).ShouldBe(["Open", "OpenAsync"]);
     }
 
+    // A pair's collection methods each take their own form's factory, as the methods do: the collection method is a
+    // copy of the query's, and each copy has the source of its form.
+    [Fact]
+    public void Run_MethodTypeBothCollectionMethodWithAPair_GivesEachCollectionMethodItsOwnFactory()
+    {
+        var run = RunGetUser("method-type=both collection-method", PairOfFactories);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodsFile];
+        CountOf(methods, "this.OpenAsync(cancellationToken)").ShouldBe(2);
+        CountOf(methods, "this.Open(default)").ShouldBe(2);
+        methods.ShouldNotContain("this.Open(cancellationToken)");
+        methods.ShouldNotContain("this.OpenAsync(default)");
+        MethodsOf(run).Select(method => method.Source!.MemberName).ShouldBe(["Open", "OpenAsync", "Open", "OpenAsync"]);
+    }
+
     // The synchronous factory of a pair that no synchronous method uses is no problem.
     [Fact]
     public void Run_MethodTypeAsyncWithAPair_UsesTheAsynchronousFactoryAlone()
