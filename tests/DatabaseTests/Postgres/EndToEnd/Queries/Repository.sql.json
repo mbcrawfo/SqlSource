@@ -114,6 +114,336 @@
         }
       ]
     },
+    "GetNoteSync": {
+      "hash": "66700a5967c4534c9d5cb029bd128cda9173d721e9f62b4e8cbb2430a68c0934",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "ref",
+          "type": {
+            "name": "public.note_ref",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "note_ref",
+            "base": {
+              "name": "bigint",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "int8"
+            }
+          },
+          "nullable": true,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "ref"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "GetNoteBoth": {
+      "hash": "66700a5967c4534c9d5cb029bd128cda9173d721e9f62b4e8cbb2430a68c0934",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "ref",
+          "type": {
+            "name": "public.note_ref",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "note_ref",
+            "base": {
+              "name": "bigint",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "int8"
+            }
+          },
+          "nullable": true,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "ref"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindNoteOfAccountSync": {
+      "hash": "35adcd593badd689ea70aa4de50a036e137446cafb3695203282b6bfae9a3d86",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "accountId",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "ref",
+          "type": {
+            "name": "public.note_ref",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "note_ref",
+            "base": {
+              "name": "bigint",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "int8"
+            }
+          },
+          "nullable": true,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "ref"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "ListNotes": {
       "hash": "440cbfbbe31f91ff0f94e648b776fa00d229101b389972e3353c3d32aea5166c",
       "toolVersion": "0.1.0",
@@ -210,7 +540,126 @@
         }
       ]
     },
+    "ListNotesSync": {
+      "hash": "440cbfbbe31f91ff0f94e648b776fa00d229101b389972e3353c3d32aea5166c",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "ref",
+          "type": {
+            "name": "public.note_ref",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "note_ref",
+            "base": {
+              "name": "bigint",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "int8"
+            }
+          },
+          "nullable": true,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "ref"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "TouchNote": {
+      "hash": "bd34d10b2ca37066d2cce1e820426879d0bef05407456ceff3ab9e66b27da987",
+      "toolVersion": "0.1.0",
+      "database": "app",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "none",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ]
+    },
+    "TouchNoteSync": {
       "hash": "bd34d10b2ca37066d2cce1e820426879d0bef05407456ceff3ab9e66b27da987",
       "toolVersion": "0.1.0",
       "database": "app",
