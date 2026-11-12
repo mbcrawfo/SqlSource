@@ -22,8 +22,6 @@ internal static partial class UserDocs
 
     internal const string Site = "site";
 
-    private const string Manual = Site;
-
     // The names of the block elements of CommonMark, whose tags start an HTML block whatever follows them.
     private const string BlockTags =
         "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl"
@@ -33,18 +31,19 @@ internal static partial class UserDocs
 
     private static readonly ConcurrentDictionary<string, Document> Documents = new(StringComparer.Ordinal);
 
-    // The repository-relative paths, with '/', of the user documents.  A page of site/ is one for the user,
-    // except AGENTS.md, which is guidance for an agent.
-    public static IReadOnlyList<string> Files { get; } =
+    // The pages of the manual, as repository-relative paths with '/': every .md file of site/ but AGENTS.md, which is
+    // guidance for an agent, and index.md, which only sends the site's root to README.html.  docfx publishes these.
+    public static IReadOnlyList<string> SitePages { get; } =
     [
-        "README.md",
-        "src/SqlSource.Tool/README.md",
         .. Directory
-            .EnumerateFiles(RepositoryRoot.Path(Manual), "*.md")
-            .Select(path => $"{Manual}/{Path.GetFileName(path)}")
-            .Where(path => path != $"{Manual}/AGENTS.md")
+            .EnumerateFiles(RepositoryRoot.Path(Site), "*.md")
+            .Select(path => $"{Site}/{Path.GetFileName(path)}")
+            .Where(path => Path.GetFileName(path) is not ("AGENTS.md" or "index.md"))
             .Order(StringComparer.Ordinal),
     ];
+
+    // The repository-relative paths, with '/', of the user documents: the two readmes and the pages of the manual.
+    public static IReadOnlyList<string> Files { get; } = ["README.md", "src/SqlSource.Tool/README.md", .. SitePages];
 
     // What GitHub makes of a heading's text: the anchor a link to it names.
     public static string Slug(string heading)

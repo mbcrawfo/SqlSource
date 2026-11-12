@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that pulls the test images, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -12,6 +12,10 @@ Each linter script runs its tool from a pinned Docker image, so they need Docker
 | `tools/shellcheck.sh` | Shell scripts, with ShellCheck |
 | `tools/shfmt.sh --check` | Shell script formatting; without `--check` it rewrites the files |
 | `tools/actionlint.sh` | GitHub Actions workflows |
+
+## The site
+
+`tools/build-site.sh` builds the manual, `site/`, into `artifacts/site` with docfx, the local tool of `dotnet-tools.json`, so it needs `dotnet tool restore` first.  Any docfx warning fails it: a link to a page or an anchor that is not there.  It also fails when the output holds a page built from an `AGENTS.md` or a `CLAUDE*.md`, which `site/docfx.json` excludes.  The `Site` job of `.github/workflows/build.yml` runs it on every pull request.
 
 ## Package checks
 

@@ -37,7 +37,8 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 - Add one in the PR that opens its item; remove it in the PR that closes it, found by its effect, as it names no id.  A page's first one brings the section and a link from the entry page's "Find a problem that is not an error" row.
 - **`diagnostics.md`.**  A new diagnostic gets a row in the index, a `## SQLSRCnnn` section whose first bold line is its descriptor's title, and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.
 - Keep true the paragraphs giving each area's range of ids.  Never give a heading another anchor: every error's help link is the lower-case id's slug.
-- **A new page** is listed under "The pages" of the entry page, with a "Find what you need" row for each need it answers.
+- **A new page** gets an entry in `toc.yml`, the site's sidebar, in the order of "The pages", and is listed under "The pages" of the entry page, with a "Find what you need" row for each need it answers.
+- **The site.**  docfx publishes every page of this folder but `AGENTS.md`, and `index.md` only redirects the site's root to `README.html`.  `tools/build-site.sh` builds it and fails on any docfx warning.
 - **Tests.**  The tests in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/DiagnosticsDocumentTests.cs` say in comments what fails them.  None checks whether a page is true today and free of internals.
 
 ## When a phase lands
