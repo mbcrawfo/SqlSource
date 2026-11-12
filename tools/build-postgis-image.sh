@@ -79,7 +79,7 @@ id | unchanged)
         echo "$id"
     elif [[ $id != "$built_id" ]]; then
         echo "The tests built the PostGIS image again: $image is $id, where the build step left $built_id." >&2
-        echo "PostgisContainer builds only an image that is missing, so its name and the script's may differ." >&2
+        echo "PostgisContainer must build only a missing image: check WithImageBuildPolicy(PullPolicy.Missing)." >&2
         exit 1
     fi
     exit 0

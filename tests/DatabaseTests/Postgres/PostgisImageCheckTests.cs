@@ -32,6 +32,7 @@ public sealed class PostgisImageCheckTests
 
         unchanged.ExitCode.ShouldBe(1);
         unchanged.Error.ShouldContain("built the PostGIS image again");
+        unchanged.Error.ShouldContain("WithImageBuildPolicy(PullPolicy.Missing)");
     }
 
     [Fact]
