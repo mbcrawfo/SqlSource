@@ -169,8 +169,15 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: tools/pull-test-images.sh
 
-      - name: Test
+      # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
+      # output, and not as errors of the tests, which then find the image and build nothing.
+      - name: Build PostGIS image
+        id: postgis
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: tools/build-postgis-image.sh
+
+      - name: Test
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.postgis.outcome == 'success' }}
         run: >-
           dotnet test --solution "$SOLUTION" --configuration "$CONFIGURATION" --no-build
           --results-directory artifacts/test-results
@@ -226,6 +233,11 @@ jobs:
       # A pull is a step of its own, so that the time it takes shows apart from the time the tests take.
       - name: Pull test image
         run: docker pull --quiet "$POSTGRES_FLOOR_IMAGE"
+
+      # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
+      # output, and not as errors of the tests, which then find the image and build nothing.
+      - name: Build PostGIS image
+        run: tools/build-postgis-image.sh "$POSTGRES_FLOOR_IMAGE"
 
       - name: Test
         env:

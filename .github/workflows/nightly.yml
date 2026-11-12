@@ -132,6 +132,13 @@ jobs:
           IMAGE: ${{ matrix.image }}
         run: docker pull --quiet "$IMAGE"
 
+      # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
+      # output, and not as errors of the tests, which then find the image and build nothing.
+      - name: Build PostGIS image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: tools/build-postgis-image.sh "$IMAGE"
+
       - name: Test
         env:
           SQLSOURCE_TESTS_POSTGRES_IMAGE: ${{ matrix.image }}
@@ -289,6 +296,11 @@ jobs:
       # rule 5 of AGENTS.md lists the places that do.
       - name: Pull test images
         run: tools/pull-test-images.sh
+
+      # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
+      # output, and not as errors of the tests, which then find the image and build nothing.
+      - name: Build PostGIS image
+        run: tools/build-postgis-image.sh
 
       - name: Test
         run: >-
