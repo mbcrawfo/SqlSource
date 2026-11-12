@@ -61,7 +61,8 @@ The owner chose docfx: it fits the existing toolchain, and with a revamp coming,
 
 - `git mv docs/manual site`: the eleven pages, `README.md` and `AGENTS.md` keep their names.
 - `site/docfx.json` and `site/toc.yml` are added.  The sidebar lists the pages in the order of "The pages" in `README.md`.
-- `AGENTS.md` and the docfx files are excluded from the built content; only the user pages are published.
+- Only the user pages are published.  `docfx.json`'s content excludes `**/AGENTS.md` and `**/CLAUDE*.md`, at any depth of `site/`, so a guidance file added later in a subfolder stays off the site too; the docfx files themselves are not content.
+- The site's build step checks its output and fails when it holds a page built from an `AGENTS.md` or `CLAUDE*.md`, so a broken exclude is caught by its effect rather than trusted.
 - Build output goes under `artifacts/`, which `.gitignore` already ignores (the builder picks the exact folder).
 - `dotnet-tools.json` gains `docfx` 2.81.0, the current version, with `rollForward: false` like the others.
 
@@ -102,6 +103,7 @@ Every live reference to `docs/manual` changes, about 65 files.  `git grep docs/m
   - A link into the manual by its old GitHub address (`blob/main/docs/manual/`) fails.
   - A link from a page to a file outside `site/` must be absolute.
   - Other links of the packed readmes still check against `blob/main/` as today.
+- A new test checks that every user page of `site/` has an entry in `toc.yml` and that every entry names a page that exists, since docfx publishes a page left out of `toc.yml` without a warning, live but missing from the sidebar.
 - `DiagnosticsDocumentTests` and the tests that check help links follow the new base.
 - `AgentsFileTests`, `RepositoryRootTests`, `TestScopesTests` and `EditorRecipeTests` follow the new paths.
 
@@ -116,7 +118,7 @@ Every live reference to `docs/manual` changes, about 65 files.  `git grep docs/m
   - The existing jobs are untouched.
   - A failed docs publish leaves the packages and release in place, and is re-run by hand from the tag.
 - **CI checks the site builds.** A docfx build with warnings as errors runs in `build.yml`, in the `Lint` job or a job of its own (builder's call).
-- **`pre-commit-validation.sh` runs the same build** when a path under `site/` or `dotnet-tools.json` changes, and on `--full`.
+- **`pre-commit-validation.sh` runs the same build** when a path under `site/` or `dotnet-tools.json` changes, and on `--full`.  The owner chose this over a CI-only check so that CI and the script keep running the same checks.  The build adds little to `UserDocsLinksTests`, which already checks links and anchors between pages, but it alone catches a heading id that docfx makes differently from GitHub, `toc.yml` drifting from the pages, and a configuration error.
   - It currently treats an unknown file kind as a reason to run everything; `toc.yml` and `docfx.json` must be known kinds.
   - `tools/test-scopes.txt` gets `none site/*` if `docs/*` has an equivalent line, so a manual change does not run the container tests.
 
