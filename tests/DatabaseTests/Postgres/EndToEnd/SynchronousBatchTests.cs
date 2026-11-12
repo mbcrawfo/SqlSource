@@ -180,6 +180,19 @@ public sealed class SynchronousBatchTests(PostgresDatabases postgres)
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
+    // In an ambient transaction the method begins none either, so a multiplexing data source refuses it there too.
+    [Fact]
+    public void FindNotesSync_MultiplexingDataSourceInATransactionScope_ThrowsNotSupported()
+    {
+        using var source = EndToEndSources.AppMultiplexing(postgres);
+        using var connection = source.OpenConnection();
+        using var scope = new TransactionScope();
+
+        var exception = Should.Throw<NotSupportedException>(() => connection.FindNotesSync([new FindNotesSyncArgs(1)]));
+
+        exception.Message.ShouldBe("Synchronous command execution is not supported when multiplexing is on");
+    }
+
     [Fact]
     public void FindNotesSync_OneItem_ReturnsItsRows()
     {

@@ -190,6 +190,51 @@ public sealed class SynchronousMethodTests
         planned.Skip(1).ShouldAllBe(method => method.Batch != null && method.Collection == CollectionKind.Array);
     }
 
+    // Without collection-method a stream has no collection method, so under both it has no synchronous name to check
+    // either, though it takes items.
+    [Fact]
+    public void Run_MethodTypeBothStreamWithoutCollectionMethodAndAMemberOfItsName_WritesTheStream()
+    {
+        var file = UsersFile("-- generator: method-type=both\n-- member-location: class\n\n" + StreamText);
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "ListUsers", [Parameter("id")], [Column("id")])],
+            SampleWithMember("ListUsers")
+        );
+
+        run.ShouldBeClean();
+        MethodsOf(run).Select(method => method.Name).ShouldBe(["ListUsersAsync"]);
+    }
+
+    // The synchronous collection method of a stream FooAsync has the name of Foo's asynchronous method, and no method
+    // of its own query has that name, so it clashes with Foo's: SQLSRC274 at both, and neither gets a method.
+    [Fact]
+    public void Run_MethodTypeBothStreamCollectionMethodAndAnotherQueryOfItsName_ReportsSQLSRC274()
+    {
+        var file = UsersFile(
+            "-- generator: method-type=both collection-method\n\n-- name: Foo\nSELECT id FROM users WHERE id = @id;\n"
+                + "-- name: FooAsync\n-- collection-type: IAsyncEnumerable\nSELECT id FROM users WHERE id > @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(file, "Foo", [Parameter("id")], [Column("id")]),
+                Entry(file, "FooAsync", [Parameter("id")], [Column("id")]),
+            ]
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(3,10)-(3,13): The method of the query 'Foo' cannot be named "
+                    + "'FooAsync', because the method of the query 'FooAsync' has that name too.  Rename the query.",
+                "SQLSRC274 /app/Repo/Users.sql(5,10)-(5,18): The method of the query 'FooAsync' cannot be named "
+                    + "'FooAsync', because the method of the query 'Foo' has that name too.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
     // A stream without parameters has no collection method, so under both it has no synchronous name to check either.
     [Fact]
     public void Run_MethodTypeBothStreamWithoutItemsAndAMemberOfItsName_WritesTheStream()
