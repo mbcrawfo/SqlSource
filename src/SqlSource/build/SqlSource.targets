@@ -122,6 +122,7 @@
         </PropertyGroup>
         <Error
             Code="SQLSRC021"
+            HelpLink="https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc021"
             Text="SqlSource needs the C# compiler of the .NET SDK 9.0.300 or later, or of Visual Studio 2022 17.14 or later, and this build's compiler is Roslyn $(SqlSourceCompilerApiVersion).  Update the .NET SDK or Visual Studio; a project can still target .NET 8."
             Condition="'$(SqlSourceCompilerApiVersion)' != '' and $([MSBuild]::VersionLessThan('$(SqlSourceCompilerApiVersion)', '4.14'))"
         />

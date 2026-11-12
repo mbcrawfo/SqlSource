@@ -193,8 +193,22 @@ public sealed class UserDocsReadingTests
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.md")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
-    public void SiteLinkProblem_NotAPageOfTheSite_IsReported(string target) =>
-        UserDocs.SiteLinkProblem(target).ShouldNotBeNull();
+    [InlineData("https://mbcrawfo.github.io/SqlSource#what-works-today")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource")]
+    [InlineData("http://mbcrawfo.github.io/SqlSource/tool.html")]
+    [InlineData("http://mbcrawfo.github.io/SqlSource/")]
+    [InlineData("HTTPS://MBCRAWFO.GITHUB.IO/SqlSource/tool.html")]
+    public void SiteLinkProblem_NotAPageOfTheSite_IsReported(string target)
+    {
+        UserDocs.IsSiteLink(target).ShouldBeTrue();
+        _ = UserDocs.SiteLinkProblem(target).ShouldNotBeNull();
+    }
+
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSourceX/tool.html")]
+    [InlineData("https://mbcrawfo.github.io/")]
+    [InlineData("https://example.github.io/SqlSource/tool.html")]
+    public void IsSiteLink_AnotherAddress_IsFalse(string target) => UserDocs.IsSiteLink(target).ShouldBeFalse();
 
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/")]

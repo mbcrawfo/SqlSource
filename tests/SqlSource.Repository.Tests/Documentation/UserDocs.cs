@@ -95,8 +95,9 @@ internal static partial class UserDocs
             ? $"use {RepositoryUrl}<path>: only blob/main and tree/main are followed"
             : null;
 
-    // Whether a link goes to the manual's site.
-    public static bool IsSiteLink(string target) => target.StartsWith(SiteUrl, StringComparison.OrdinalIgnoreCase);
+    // Whether a link goes to the manual's site, in any spelling of its address: http or https, any case, with or
+    // without the slash after the repository's name.
+    public static bool IsSiteLink(string target) => SiteLinkPattern().IsMatch(target);
 
     // What is wrong with a link to the site: it must name a page, `<name>.html`, or be the root with no anchor, since
     // the root's redirect drops the anchor.  Null when the form is right, and for a link to anything else.
@@ -105,6 +106,11 @@ internal static partial class UserDocs
         if (!IsSiteLink(target))
         {
             return null;
+        }
+
+        if (!target.StartsWith(SiteUrl, StringComparison.Ordinal))
+        {
+            return $"write the site's address as {SiteUrl}: the root without its slash drops an anchor too";
         }
 
         var rest = target[SiteUrl.Length..];
@@ -139,6 +145,11 @@ internal static partial class UserDocs
 
         if (IsSiteLink(target))
         {
+            if (!target.StartsWith(SiteUrl, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
             var page = path[SiteUrl.Length..];
             if (page.Length == 0)
             {
@@ -374,6 +385,10 @@ internal static partial class UserDocs
         RegexOptions.IgnoreCase
     )]
     private static partial Regex RepositoryLinkPattern();
+
+    // The site's address, in any spelling, and nothing longer: SqlSourceX is another site.
+    [GeneratedRegex(@"^https?://mbcrawfo\.github\.io/SqlSource(?=[/#?]|$)", RegexOptions.IgnoreCase)]
+    private static partial Regex SiteLinkPattern();
 
     // A page of the site: one segment, its name and `.html`.
     [GeneratedRegex(@"^([^/]+)\.html$")]
