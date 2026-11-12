@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Reads the JSON report of a Stryker mutation run and compares two of them, for tools/mutation-test.sh.  A
+        program and not a script, since a report of a whole project is hundreds of megabytes and the repository
+        requires no tool that reads JSON.  It is never packed, and tests/SqlSource.Repository.Tests holds its tests.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+        <AssemblyName>SqlSource.MutationReport</AssemblyName>
+        <RootNamespace>SqlSource.MutationReport</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="SqlSource.Repository.Tests" />
+    </ItemGroup>
+</Project>

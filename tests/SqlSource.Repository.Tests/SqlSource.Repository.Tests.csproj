@@ -16,5 +16,6 @@
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../SqlSource.Repository/SqlSource.Repository.csproj" />
+        <ProjectReference Include="../../tools/MutationReport/MutationReport.csproj" />
     </ItemGroup>
 </Project>

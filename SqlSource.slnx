@@ -25,4 +25,7 @@
     <Project Path="tests/DatabaseTests/SqlServer/SqlServer.csproj" />
     <Project Path="tests/DatabaseTests/TestHarness/TestHarness.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/MutationReport/MutationReport.csproj" />
+  </Folder>
 </Solution>
