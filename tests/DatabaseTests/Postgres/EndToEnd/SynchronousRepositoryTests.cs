@@ -16,8 +16,9 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // the connection the synchronous one gave is disposed after a return and after an exception.  A borrowed connection is
 // closed again after a return and after an UnexpectedRowCountException, and an open one is left open; a null source
 // throws the InvalidOperationException that names it before anything is opened; and a multiplexing data source
-// refuses a synchronous command, as it does one of a method on a connection.  Every test is a plain method, as the
-// analyzers refuse a synchronous call in an asynchronous one that has an asynchronous twin.
+// refuses a synchronous command, as it does one of a method on a connection, except in a transaction that the caller
+// began on a borrowed connection.  Every test is a plain method, as the analyzers refuse a synchronous call in an
+// asynchronous one that has an asynchronous twin.
 [Collection(UsesPostgres.Name)]
 public sealed class SynchronousRepositoryTests(PostgresDatabases postgres)
 {
@@ -267,6 +268,23 @@ public sealed class SynchronousRepositoryTests(PostgresDatabases postgres)
         var exception = Should.Throw<NotSupportedException>(() => repository.GetNoteSync(new GetNoteSyncArgs(1)));
 
         exception.Message.ShouldBe("Synchronous command execution is not supported when multiplexing is on");
+    }
+
+    // The exception to that limit: a borrowed connection on which the caller has begun a transaction runs the method in
+    // it, since Npgsql runs a synchronous command inside a transaction on a multiplexing data source.
+    [Fact]
+    public void GetNoteSync_MultiplexingBorrowedConnectionInATransaction_ReadsTheRow()
+    {
+        using var dataSource = EndToEndSources.AppMultiplexing(postgres);
+        using var connection = dataSource.OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var repository = new BorrowedRepository(connection);
+
+        var note = repository.GetNoteSync(new GetNoteSyncArgs(3));
+
+        note.ShouldBe(Notes[2]);
+        connection.State.ShouldBe(ConnectionState.Open);
+        transaction.Rollback();
     }
 
     // A borrowed connection made for the one row of the theory that needs it, and disposed by its owner, the test.
