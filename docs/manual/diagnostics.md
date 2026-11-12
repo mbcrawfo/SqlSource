@@ -342,7 +342,7 @@ The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about convert
 
 `SQLSRC298` is reported by the build, at the name of a query whose output is `methods` or `repository`, once for the query, as `SQLSRC272` is.  The query gets no method and no collection method until it is fixed; its models are still generated.
 
-`SQLSRC299` is reported by the build, at the name of a query whose output is `repository`, once for the query, whatever other errors it has.  It costs the query only its synchronous method and synchronous collection method: under `method-type=both` it keeps its asynchronous ones, and under `sync` it gets none until it is fixed.  Its models are still generated.
+`SQLSRC299` is reported by the build, at the name of a query whose output is `repository`, once for the query, beside its other errors.  A query that has no entry in its sidecar yet gets only [SQLSRC241](#sqlsrc241), and this error once it is described, as it gets the errors about its method's names and shape.  It costs the query only its synchronous method and synchronous collection method: under `method-type=both` it keeps its asynchronous ones, and under `sync` it gets none until it is fixed.  Its models are still generated.
 
 ## SQLSRC001
 
