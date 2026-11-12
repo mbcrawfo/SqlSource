@@ -5,7 +5,7 @@ using Npgsql;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
 
-// The same code as the sample of docs/manual/recipes.md (#dapper-with-postgresql), in this repository's layout, for a
+// The same code as the sample of site/recipes.md (#dapper-with-postgresql), in this repository's layout, for a
 // parameter that Dapper cannot send: a change to one is a change to the other.  DapperRecipeTests sends it.
 public sealed class TypedParameter(string dataTypeName, object? value) : SqlMapper.ICustomQueryParameter
 {

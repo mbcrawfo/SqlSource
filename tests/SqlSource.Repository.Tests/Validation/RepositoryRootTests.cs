@@ -51,7 +51,7 @@ public sealed class RepositoryRootTests
 
     [Fact]
     public void Check_PathOfNone_ThrowsForAContainerProject() =>
-        Should.Throw<InvalidOperationException>(() => RepositoryRoot.Check(Ms, "docs/manual/README.md", Scopes));
+        Should.Throw<InvalidOperationException>(() => RepositoryRoot.Check(Ms, "docs/guide/README.md", Scopes));
 
     [Fact]
     public void Check_FolderWithAFileOfTheOtherEngine_Throws()
@@ -72,7 +72,7 @@ public sealed class RepositoryRootTests
     [Fact]
     public void Check_UnlistedProject_PassesEverything() =>
         Should.NotThrow(() =>
-            RepositoryRoot.Check("OtherTests", "docs", Scopes, ["docs/manual/README.md", "tests/MsTests/b.sql"])
+            RepositoryRoot.Check("OtherTests", "docs", Scopes, ["docs/guide/README.md", "tests/MsTests/b.sql"])
         );
 
     [Fact]
@@ -98,8 +98,8 @@ public sealed class RepositoryRootTests
     [Fact]
     public void PathFor_UnlistedProject_PassesUnchecked() =>
         RepositoryRoot
-            .PathFor("OtherTests", Scopes, "docs", "manual", "README.md")
-            .ShouldBe(RepositoryRoot.Path("docs", "manual", "README.md"));
+            .PathFor("OtherTests", Scopes, "docs", "guide", "README.md")
+            .ShouldBe(RepositoryRoot.Path("docs", "guide", "README.md"));
 
     // This project's own bin/ and obj/, which its build makes, are put in the other engine, and one of its sources is
     // too: the check never lists the build output, and still lists every other file of the folder.

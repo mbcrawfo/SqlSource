@@ -1,4 +1,4 @@
-# AGENTS.md - docs/manual
+# AGENTS.md - site
 
 Rules for the user documentation, this folder and the two packed readmes, beside root rule 4.
 
@@ -30,7 +30,7 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 - A new setting or marker gets its row and its section, and a marker its row in the marker index of `sql-files.md`.  A new generator parameter goes in each place that the comment on the list in `DiagnosticsDocumentTests` names.
 - **Recipes hold examples, not rules.**  Each is a sample and a link to the rules, so it cannot drift from them.
 - **Anchors.**  A heading of this folder linked from anywhere gets an `<a id>` anchor on the line above, kept when the heading is reworded; "Known issues" gets `<a id="known-issues"></a>`.
-- **Links.**  Pages of this folder link to each other relatively.
+- **Links.**  Pages of this folder link to each other relatively, and to any other file of the repository by `https://github.com/mbcrawfo/SqlSource/blob/main/<path>`: only this folder is published.
 - **SQL samples** are marked by the info strings `UserDocsSamplesTests` reads; never weaken the test.  Put no fence inside a blockquote.
 - **`--prerelease`** goes on every page's install and update commands while only previews are published, as root rule 4 says.
 - **Known issues.**  A page that documents behaviour ends with "Known issues": what a user can plausibly hit from the open items of `docs/tech-debt` and `docs/deferred`, by its effect in the user's words and what to do.  Leave out what a user cannot see, such as a test gap, duplicated code or a cost with no visible effect.
@@ -44,11 +44,11 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 
 Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-generation-epic-design.md`), and every later feature, does in its PR what root rule 4 and this file ask, its Status cells in `settings.md` included, and:
 
-- **Callouts.**  `git grep -n "Coming in a later release" -- README.md src/SqlSource.Tool/README.md docs/manual` lists them.  A callout for a part still to come stays, narrowed to that part.
+- **Callouts.**  `git grep -n "Coming in a later release" -- README.md src/SqlSource.Tool/README.md site` lists them.  A callout for a part still to come stays, narrowed to that part.
 - **Sentences that say it is missing or still to come**, such as "It takes effect when generated query methods arrive", are rewritten.  It finds most, among much noise; also read each page the table names:
 
   ```bash
-  git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md docs/manual
+  git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md site
   ```
 
 - **Recipes** go in `recipes.md` where a task is new.  **The README** changes where the common path does: the introduction's status line, getting started, a scenario, a FAQ answer, the supported environments.

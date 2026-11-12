@@ -9,7 +9,7 @@ namespace SqlSource.Repository.Tests.Documentation;
 // reader at the top of a long page, or on a page that is not found, so each is followed here.
 public sealed class UserDocsLinksTests
 {
-    private const string Manual = "docs/manual/";
+    private const string Manual = UserDocs.Site + "/";
 
     // The two readmes are packed into NuGet packages and shown on nuget.org, away from the repository.
     private static readonly string[] PackedReadmes = ["README.md", "src/SqlSource.Tool/README.md"];
@@ -38,7 +38,7 @@ public sealed class UserDocsLinksTests
     [Fact]
     public void Anchors_HeadingsOfAPage_AreTheirSlugs()
     {
-        var anchors = UserDocs.Anchors("docs/manual/diagnostics.md");
+        var anchors = UserDocs.Anchors("site/diagnostics.md");
 
         anchors.ShouldContain("sqlsrc001");
         anchors.ShouldContain("sqlsrc236");
@@ -51,7 +51,7 @@ public sealed class UserDocsLinksTests
         UserDocs.Files.ShouldNotBeEmpty();
         UserDocs.Links().ShouldNotBeEmpty();
         UserDocs.Links().Select(link => link.File).Distinct().ShouldContain("README.md");
-        UserDocs.Links().Select(link => link.File).Distinct().ShouldContain("docs/manual/diagnostics.md");
+        UserDocs.Links().Select(link => link.File).Distinct().ShouldContain("site/diagnostics.md");
     }
 
     // The tests read inline links and "#" headings.  Another form is not read, and what it names would not be checked.
@@ -82,6 +82,34 @@ public sealed class UserDocsLinksTests
             .Links()
             .Where(link => PackedReadmes.Contains(link.File))
             .Where(link => !link.Target.StartsWith("https://", StringComparison.Ordinal))
+            .Select(link => $"{link.File}:{link.Line}: {link.Target}")
+            .ShouldBeEmpty();
+
+    // A packed readme is read on nuget.org beside a release, so it sends the reader to the site, which shows the
+    // release, and never to the pages on main.
+    [Fact]
+    public void Links_OfThePackedReadmes_ReachTheManualOnlyBySite() =>
+        UserDocs
+            .Links()
+            .Where(link => PackedReadmes.Contains(link.File) && UserDocs.IsRepositoryLink(link.Target))
+            .Where(link =>
+                UserDocs.Resolve(link.File, link.Target) is { } resolved
+                && (resolved.Path + "/").StartsWith(UserDocs.Site + "/", StringComparison.Ordinal)
+            )
+            .Select(link => $"{link.File}:{link.Line}: {link.Target}")
+            .ShouldBeEmpty();
+
+    // The site is built from site/ alone, so a relative link that leaves the folder is broken on the site.
+    [Fact]
+    public void RelativeLinks_OfTheSite_StayInsideIt() =>
+        UserDocs
+            .Links()
+            .Where(link => link.File.StartsWith(UserDocs.Site + "/", StringComparison.Ordinal))
+            .Where(link => !UserDocs.IsRepositoryLink(link.Target) && !UserDocs.IsSiteLink(link.Target))
+            .Where(link =>
+                UserDocs.Resolve(link.File, link.Target) is { } resolved
+                && !resolved.Path.StartsWith(UserDocs.Site + "/", StringComparison.Ordinal)
+            )
             .Select(link => $"{link.File}:{link.Line}: {link.Target}")
             .ShouldBeEmpty();
 

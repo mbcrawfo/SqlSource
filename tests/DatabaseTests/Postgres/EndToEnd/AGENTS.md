@@ -42,7 +42,7 @@
 
 - **A column of `all_types` changes `EndToEnd/app/schema.sql`, `EndToEnd/app/seed.sql` and `tests/DatabaseTests/TestHarness/EndToEnd/AllTypesRows.cs` together**, with its parameter, declared `null`, in `InsertEveryType`, and its parameter in `InsertAllTypes` or its row in `WriteSideLeftOut` of `EndToEnd/AllTypesQueryTests.cs`.
 - **A type added to the map adds its key to `MapWritten` or `MapLeftOut` of `EndToEnd/ModelShapeTests.cs`.**
-- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `docs/manual/recipes.md#dapper-with-postgresql`.**
+- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `site/recipes.md#dapper-with-postgresql`.**
 - **`EndToEnd/DapperRecipeTests.cs` writes each of its columns by the recipe's remedy and proves the rest of that recipe**, and `EndToEnd/Types/TypedParameter.cs` and `EndToEnd/Types/EmailHandler.cs` are the same code as its samples, in this repository's layout: a change to one changes the other.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

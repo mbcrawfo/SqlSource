@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace SqlSource.Repository.Tests.Documentation;
 
-// The documents a user reads: the readme of the repository, the readme of the tool, and the pages of docs/manual/.
+// The documents a user reads: the readme of the repository, the readme of the tool, and the pages of site/.
 // The tests of this folder read them as text: their links, the anchors a link may name, and the fenced blocks.
 internal static partial class UserDocs
 {
@@ -22,7 +22,7 @@ internal static partial class UserDocs
 
     internal const string Site = "site";
 
-    private const string Manual = "docs/manual";
+    private const string Manual = Site;
 
     // The names of the block elements of CommonMark, whose tags start an HTML block whatever follows them.
     private const string BlockTags =
@@ -33,7 +33,7 @@ internal static partial class UserDocs
 
     private static readonly ConcurrentDictionary<string, Document> Documents = new(StringComparer.Ordinal);
 
-    // The repository-relative paths, with '/', of the user documents.  A page of docs/manual/ is one for the user,
+    // The repository-relative paths, with '/', of the user documents.  A page of site/ is one for the user,
     // except AGENTS.md, which is guidance for an agent.
     public static IReadOnlyList<string> Files { get; } =
     [

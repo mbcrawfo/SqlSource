@@ -46,7 +46,7 @@
 
 - **A column of `all_types` changes `EndToEnd/app/schema.sql`, `EndToEnd/app/seed.sql` and `tests/DatabaseTests/TestHarness/EndToEnd/SqlServerAllTypesRows.cs` together**, which holds its expectation and its property in `AllTypesProperties`, with its parameter in `WriteAllTypes`, declared `null`, and in `InsertAllTypes` or its row in `WriteSideLeftOut` of `EndToEnd/AllTypesQueryTests.cs`.
 - **`EndToEnd/ModelShapeTests.cs` and `tests/DatabaseTests/SqlServer.SqlClient61/AllTypesQueryTests.cs` compare the model with `AllTypesProperties`** and keep no list of their own.
-- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `docs/manual/recipes.md#dapper-with-sql-server`.**
+- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `site/recipes.md#dapper-with-sql-server`.**
 - **`EndToEnd/DapperRecipeTests.cs` proves what that part of the recipe says**, and `EndToEnd/Types/TypedParameter.cs`, `EndToEnd/Types/DateOnlyHandler.cs` and `EndToEnd/Types/TimeOnlyHandler.cs` are the same code as its samples, in this repository's layout: a change to one changes the other.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

@@ -9,7 +9,7 @@ namespace SqlServerExamples.Methods;
 // one, which needs nothing on the attribute.  Each query gets its models and a method that runs it, an extension method
 // of the connection in the generated class OrderLineQueriesExtensions, which opens the connection when it is closed,
 // sends the input model's values and reads the rows into the output model.  Each method here passes on the caller's
-// CancellationToken.  See docs/manual/generator.md, "Query methods".
+// CancellationToken.  See site/generator.md, "Query methods".
 [SqlSourceGenerate]
 public sealed partial class OrderLineQueries(DbConnection connection)
 {

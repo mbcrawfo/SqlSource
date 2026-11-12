@@ -27,7 +27,7 @@ public sealed class TestScopesTests
         TestScopes.Parse(Layered).Of(@"a\b\c").ShouldBe(TestScope.Postgres);
 
     [Fact]
-    public void Matches_Star_CrossesSlashes() => TestScopes.Matches("*.md", "docs/manual/x.md").ShouldBeTrue();
+    public void Matches_Star_CrossesSlashes() => TestScopes.Matches("*.md", "site/x.md").ShouldBeTrue();
 
     [Theory]
     [InlineData("a/*", "xa/b", false)]

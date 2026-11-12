@@ -129,12 +129,12 @@ public sealed class UserDocsReadingTests
 
     [Theory]
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md#x", "README.md", "x")]
-    [InlineData("https://github.com/mbcrawfo/SqlSource/tree/main/docs/manual/", "docs/manual", "")]
+    [InlineData("https://github.com/mbcrawfo/SqlSource/tree/main/site/", "site", "")]
     [InlineData("https://GitHub.com/MBCrawfo/sqlsource/blob/main/LICENSE", "LICENSE", "")]
-    [InlineData("../manual/README.md#y", "docs/manual/README.md", "y")]
-    [InlineData("#z", "docs/manual/page.md", "z")]
+    [InlineData("../site/README.md#y", "site/README.md", "y")]
+    [InlineData("#z", "site/page.md", "z")]
     public void Resolve_LinkToThisRepository_GivesItsPathAndAnchor(string target, string path, string anchor) =>
-        UserDocs.Resolve("docs/manual/page.md", target).ShouldBe((path, anchor));
+        UserDocs.Resolve("site/page.md", target).ShouldBe((path, anchor));
 
     [Theory]
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]

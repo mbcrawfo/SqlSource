@@ -46,7 +46,7 @@ public sealed class WatchFailureTests : IAsyncDisposable
         _watch.Errors.ShouldBe(
             $"{Folder} : error SQLSRC287: watching '{Folder}' for changes failed: {InotifyLimit}\n"
                 + "    help: set DOTNET_USE_POLLING_FILE_WATCHER=true to poll for changes instead\n"
-                + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc287\n"
+                + "    see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc287\n"
         );
         _watch.ManifestRuns.ShouldBeGreaterThan(manifestRuns);
         _watch.Watcher.Open.ShouldNotBeEmpty();
@@ -71,7 +71,7 @@ public sealed class WatchFailureTests : IAsyncDisposable
 
         _watch.Errors.ShouldBe(
             $"{Folder} : error SQLSRC287: watching '{Folder}' for changes failed: {message}\n"
-                + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc287\n"
+                + "    see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc287\n"
         );
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
     }

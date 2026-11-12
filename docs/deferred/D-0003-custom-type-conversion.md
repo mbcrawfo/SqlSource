@@ -6,12 +6,12 @@ The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.m
 
 ## Delivered instead
 
-Converters, sub-phase 8.2: a static method marked `[SqlSourceConverter]`, read by [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) and chosen by [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs), converts a type override's C# type to and from the type the base map reads the database type as, for the columns and parameters of the generated query methods.  Its database side is the base map's type exactly, so it serves every database type the base map gives a C# type, and the manual documents it under [converters](../manual/settings.md#converters).
+Converters, sub-phase 8.2: a static method marked `[SqlSourceConverter]`, read by [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) and chosen by [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs), converts a type override's C# type to and from the type the base map reads the database type as, for the columns and parameters of the generated query methods.  Its database side is the base map's type exactly, so it serves every database type the base map gives a C# type, and the manual documents it under [converters](../../site/settings.md#converters).
 
 The database types the base map gives none have nothing to convert from:
 
-- **A parameter** of a composite type, a table's row type, `regclass` and the other types of the system catalogs that Npgsql does not load, or a type whose schema or name holds a `.`, is still [`SQLSRC232`](../manual/diagnostics.md#sqlsrc232), raised by [`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) when the tool describes the query.  The workaround is a `text` parameter with a cast in the SQL, and the tool never rewrites a user's SQL to make a parameter bindable.  [Sub-phase 8.3](../superpowers/specs/2026-10-24-query-generation-phase-8-3-postgresql-binding-design.md)'s binding of each parameter by its `bindName` did not change this: such a parameter is refused before the sidecar is written, so it has no `bindName` to bind by.
-- **A column** of such a type, mapped by the type override to a type that has converters, is [`SQLSRC279`](../manual/diagnostics.md#sqlsrc279) at its query, in the form that says the database type has no C# type to convert from.  Mapped to a type with no converter, it is read with `GetFieldValue<T>` of the override's type, which works when the application's data source maps the type, as with `MapComposite<T>()`.
+- **A parameter** of a composite type, a table's row type, `regclass` and the other types of the system catalogs that Npgsql does not load, or a type whose schema or name holds a `.`, is still [`SQLSRC232`](../../site/diagnostics.md#sqlsrc232), raised by [`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) when the tool describes the query.  The workaround is a `text` parameter with a cast in the SQL, and the tool never rewrites a user's SQL to make a parameter bindable.  [Sub-phase 8.3](../superpowers/specs/2026-10-24-query-generation-phase-8-3-postgresql-binding-design.md)'s binding of each parameter by its `bindName` did not change this: such a parameter is refused before the sidecar is written, so it has no `bindName` to bind by.
+- **A column** of such a type, mapped by the type override to a type that has converters, is [`SQLSRC279`](../../site/diagnostics.md#sqlsrc279) at its query, in the form that says the database type has no C# type to convert from.  Mapped to a type with no converter, it is read with `GetFieldValue<T>` of the override's type, which works when the application's data source maps the type, as with `MapComposite<T>()`.
 
 ## Why deferred
 
@@ -23,7 +23,7 @@ A way for a query method to send a parameter of a type that the base map reads a
 
 - **What is sent**: the override's type, trusting the data source's `MapComposite<T>()` as the methods trust `MapEnum<T>()` for a column, with the parameter's `DataTypeName` from the sidecar; or a converter to a type the driver binds, `string` for one, with the cast to the database type that the SQL needs.
 - **The tool's check**: it binds each parameter by its type's name, and refuses these types as `SQLSRC232` before it writes the sidecar.  It must learn which parameters it may describe anyway, and what it binds them by.
-- **The diagnostics and the manual**: `SQLSRC232` and the second form of `SQLSRC279` narrowed to what stays refused, and the types listed in [`docs/manual/diagnostics.md`](../manual/diagnostics.md#sqlsrc232) changed to match.
+- **The diagnostics and the manual**: `SQLSRC232` and the second form of `SQLSRC279` narrowed to what stays refused, and the types listed in [`site/diagnostics.md`](../../site/diagnostics.md#sqlsrc232) changed to match.
 
 ## Trigger
 

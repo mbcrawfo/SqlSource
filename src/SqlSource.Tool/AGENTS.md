@@ -12,7 +12,7 @@ Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 - **It targets `net8.0` with `RollForward` `Major`, and references a current Roslyn by `VersionOverride`.**  Do not raise the target: a user with only the .NET 8 SDK must be able to run it.  `tools/check-tool-install.sh` runs the packed tool on the newest runtime the machine has.
 - **The tool writes English**, and `SatelliteResourceLanguages` keeps other languages out of the package.  A test compares no text that System.CommandLine wrote.
 - **`README.md` here is the package's short page on nuget.org**: what the tool is for, how to install it, its commonest commands, and links to the manual and the repository's `README.md`.  Keep it that short.
-- **The tool's behaviour is documented in `docs/manual/tool.md`**, where a new option, environment variable, exit code or command goes; in `settings.md` beside it for the logical database setting; and in `postgresql.md` and `sqlserver.md`.
+- **The tool's behaviour is documented in `site/tool.md`**, where a new option, environment variable, exit code or command goes; in `settings.md` beside it for the logical database setting; and in `postgresql.md` and `sqlserver.md`.
 
 ## The host
 
@@ -27,7 +27,7 @@ Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 
 - **A result that may fail has one shape where files meet.**  A method that another file calls and that gives one value or one reason returns an `Outcome<TValue, TFailure>` and reports nothing: its caller does, as `PlanSteps.FindUnit` reports what `Projects/RunUnitFinder.cs` found.  `Outcome.cs` says what is no `Outcome`, and how one of a value that must be disposed is made.
 - **Every error goes through `Reporting/Reporter.cs` with a descriptor of `ToolDiagnostics`**, or of `SqlDiagnostics` where the generator reports the same condition.  The descriptors are in the generator's project; `src/SqlSource/Diagnostics/AGENTS.md` lists the four places a new one touches.  A wrong command line is the one exception, below.
-- **The exit code is `0`, `1` or `2`**, as the manual's [exit codes](../../docs/manual/tool.md#exit-codes) say.  `Cli.ExitCodeOf` takes it from the reporter, so a command reports, goes on, and never returns `1`.  `2` is for `SQLSRC219` and for `replay`'s answer that is not the bundle's; a query that cannot be described is "could not check", never `SQLSRC219`.
+- **The exit code is `0`, `1` or `2`**, as the manual's [exit codes](../../site/tool.md#exit-codes) say.  `Cli.ExitCodeOf` takes it from the reporter, so a command reports, goes on, and never returns `1`.  `2` is for `SQLSRC219` and for `replay`'s answer that is not the bundle's; a query that cannot be described is "could not check", never `SQLSRC219`.
 - **Every text the tool prints and did not write goes through `Reporting/OneLine.cs`**, which writes a line break as a space: an argument of a message, a path, a label, the name of an unknown option.
 - **A path in a message is a full path**, or `The path at position <n>` when its token holds `=` or `;` (`UsageValue.NamedAsPath`), but not under `--online`, whose `--manifest`, `--log` and `--env-file` paths the owner ruled no secret.
 - **No error carries a hint to a log.**  A failed `describe` with no log ends with `Cli.RunAgainLine` instead, but not under `--online` or `--watch`.

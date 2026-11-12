@@ -6,7 +6,7 @@
 
 ## Delivered instead
 
-Only a method marked `[SqlSourceConverter]` is a converter: [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) reads the marked methods of the project's source, and [`MappedTypeResolver`](../../src/SqlSource/Generation/Types/MappedTypes/MappedTypeResolver.cs) those of each mapped type of a referenced assembly.  A type with no marked method is given to the driver as it is, which throws `InvalidCastException` for a type the driver does not know.  The manual's known issues of [settings](../manual/settings.md#known-issues) show the two converters a project writes for such a type, each calling the type's own `From` and `Value`.
+Only a method marked `[SqlSourceConverter]` is a converter: [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) reads the marked methods of the project's source, and [`MappedTypeResolver`](../../src/SqlSource/Generation/Types/MappedTypes/MappedTypeResolver.cs) those of each mapped type of a referenced assembly.  A type with no marked method is given to the driver as it is, which throws `InvalidCastException` for a type the driver does not know.  The manual's known issues of [settings](../../site/settings.md#known-issues) show the two converters a project writes for such a type, each calling the type's own `From` and `Value`.
 
 ## Why deferred
 
@@ -17,7 +17,7 @@ The research found that a convention guesses silently: a constructor or a `Value
 - **Discovery**: in `MappedTypeResolver`, for a mapped type with no marked converter, its members of the convention, as a `Converter` of a new `ConverterOrigin`, for the project's own types as well as a reference's.
 - **The rule**: both halves required, read and write, and their `P` equal to the base map's type, so that a type that only looks like an id is never converted; an opt-in, a key of the settings files or an attribute on the type, and whether it is on by default.
 - **Validation**: whether a validating `From` is used on read, or a member that skips validation as Vogen's own Dapper handler does, and the diagnostics of a convention that matches in part.
-- **The manual**: the convention in [converters](../manual/settings.md#converters), and its known issue removed.
+- **The manual**: the convention in [converters](../../site/settings.md#converters), and its known issue removed.
 
 ## Trigger
 
