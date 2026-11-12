@@ -431,6 +431,67 @@ public sealed class SynchronousRepositoryTests
         problems[0].ShouldContain("'Sample'");
     }
 
+    // A method of no argument named Finalize has the signature of object.Finalize, which the compiler warns about
+    // (CS0465), so a synchronous repository method, whose arguments may be none, cannot have the name; an asynchronous
+    // one takes the token.  Under both the synchronous form is the one that is named so.
+    [Theory]
+    [InlineData("method-type=sync")]
+    [InlineData("method-type=both")]
+    public void Run_SynchronousRepositoryMethodNamedFinalizeWithNoArguments_ReportsSqlsrc274(string parameters)
+    {
+        var file = UsersFile("-- generator: " + parameters + "\n-- name: Finalize\nSELECT id FROM users;\n");
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "Finalize", [], [Column("id")])], RepositoryRuns.Source);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(2,10)-(2,18): The method of the query 'Finalize' cannot be named "
+                    + "'Finalize', because object.Finalize has that signature, and a method of the type with no "
+                    + "argument that is named so is taken for the type's finalizer.  Rename the query.",
+            ]);
+        run.Sources[MethodsFile].ShouldNotContain("Finalize");
+    }
+
+    // The asynchronous method takes the token, and a method that takes a parameter has another signature, so neither is
+    // object.Finalize.
+    [Theory]
+    [InlineData("method-type=async", false)]
+    [InlineData("method-type=sync", true)]
+    [InlineData("method-type=both", true)]
+    public void Run_RepositoryMethodNamedFinalizeWithAnotherSignature_IsClean(string parameters, bool takesParameter)
+    {
+        var file = UsersFile(
+            "-- generator: "
+                + parameters
+                + "\n-- name: Finalize\nSELECT id FROM users"
+                + (takesParameter ? " WHERE id = @id" : "")
+                + ";\n"
+        );
+        var entry = takesParameter
+            ? Entry(file, "Finalize", [Parameter("id")], [Column("id")])
+            : Entry(file, "Finalize", [], [Column("id")]);
+
+        var run = RepositoryRuns.Run(file, [entry], RepositoryRuns.Source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain(" Finalize");
+    }
+
+    // Only Finalize has the signature of an object's method that the compiler warns about, so the names of the others
+    // with no argument are no problem.
+    [Theory]
+    [InlineData("ToString")]
+    [InlineData("GetHashCode")]
+    public void Run_SynchronousRepositoryMethodNamedAsAnotherMethodOfObject_IsClean(string name)
+    {
+        var file = UsersFile("-- generator: method-type=sync\n-- name: " + name + "\nSELECT id FROM users;\n");
+
+        var run = RepositoryRuns.Run(file, [Entry(file, name, [], [Column("id")])], RepositoryRuns.Source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain(" " + name + "()\n");
+    }
+
     // Every method's cancellation token would hide the parameter, whatever the method-type.
     [Fact]
     public void Run_MethodTypeSyncSourceParameterNamedCancellationToken_ReportsSqlsrc036()

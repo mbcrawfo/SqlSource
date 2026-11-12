@@ -39,6 +39,8 @@ internal static class MethodPlanner
 {
     private const string ExtensionsSuffix = "Extensions";
 
+    private const string FinalizeName = "Finalize";
+
     /// <summary>
     /// The methods of the type: one for each query of a file it can use whose output is
     /// <see cref="OutputKind.Methods" />, or <see cref="OutputKind.Repository" /> when its database has a connection,
@@ -462,6 +464,13 @@ internal static class MethodPlanner
         );
         var hasInput = TryReadInput(context, models, reading, out var methodInput);
         var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
+        // The arguments of a form are known only once its input is read, so the one name that depends on them is
+        // checked here, with every form's real argument list.  A query whose input was not read has its own problem.
+        if (hasInput)
+        {
+            problems.AddRange(FindFinalizeProblems(query, forms, methodInput, host));
+        }
+
         // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
         var isBelowTheFloor = AddUsedLibraries(input, engine, models, methodInput, methodOutput, ref usedLibraries);
         // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
@@ -1161,6 +1170,49 @@ internal static class MethodPlanner
     {
         var at = ModelAssignment.IndexOf(assignments, key, path, queryIndex, role);
         return at >= 0 ? assignments[at] : null;
+    }
+
+    // SQLSRC274 for each form of the query that is a method named Finalize with no argument, on the type or in a nested
+    // class, which the compiler takes for the type's finalizer (CS0465).  Only a synchronous repository method can be
+    // one: every other method has the connection or the cancellation token as an argument.
+    private static List<DiagnosticInfo> FindFinalizeProblems(
+        SqlQuery query,
+        List<MethodForm> forms,
+        MethodInput? input,
+        MethodHost host
+    )
+    {
+        var problems = new List<DiagnosticInfo>();
+        if (host.Location == MemberLocation.ExtensionClass)
+        {
+            return problems;
+        }
+
+        var tokens = MethodWriter.GetTokens(query.Segments);
+        foreach (var form in forms)
+        {
+            if (
+                form.HasQueryMethod
+                && string.Equals(form.Name, FinalizeName, StringComparison.Ordinal)
+                && !new MethodArguments(input, tokens, streams: false, form.Source is null, synchrony: form.Synchrony)
+                    .GetEnumerator()
+                    .MoveNext()
+            )
+            {
+                problems.Add(
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.MethodNameTaken,
+                        query.NameLocation,
+                        query.Name,
+                        form.Name,
+                        "object.Finalize has that signature, and a method of the type with no argument that is named "
+                            + "so is taken for the type's finalizer"
+                    )
+                );
+            }
+        }
+
+        return problems;
     }
 
     // What takes the name of a method of the type, as SQLSRC274 says it, or null when nothing does: by where the method
