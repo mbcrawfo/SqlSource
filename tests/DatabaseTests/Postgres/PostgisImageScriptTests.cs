@@ -1,11 +1,9 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Repository;
-using SqlSource.Testing;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -65,13 +63,14 @@ public sealed class PostgisImageScriptTests
     }
 
     // The name that the script prints for --name and the arguments given, which builds nothing.
-    private static Task<string> NameAsync(params string[] arguments) =>
-        NameAsync(RepositoryRoot.Path("tools", "build-postgis-image.sh"), RepositoryRoot.WorkingFolder.Path, arguments);
+    private static async Task<string> NameAsync(params string[] arguments) =>
+        Succeeded(await PostgisImageScript.RunAsync(["--name", .. arguments]));
 
-    private static async Task<string> NameAsync(string script, string folder, params string[] arguments)
+    private static async Task<string> NameAsync(string script, string folder) =>
+        Succeeded(await PostgisImageScript.RunCopyAsync(script, folder, "--name"));
+
+    private static string Succeeded(ProgramResult result)
     {
-        var start = new ProcessStartInfo("bash", [script, "--name", .. arguments]) { WorkingDirectory = folder };
-        var result = await Programs.RunAsync(start, Eventually.Patience);
         result.ExitCode.ShouldBe(0, result.Error);
         return result.Output.Trim();
     }

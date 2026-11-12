@@ -170,11 +170,15 @@ jobs:
         run: tools/pull-test-images.sh
 
       # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
-      # output, and not as errors of the tests, which then find the image and build nothing.
+      # output, and not as errors of the tests, which then find the image and build nothing.  It keeps the image's ID
+      # for the check after the tests.
       - name: Build PostGIS image
         id: postgis
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: tools/build-postgis-image.sh
+        run: |
+          tools/build-postgis-image.sh
+          id="$(tools/build-postgis-image.sh --id)"
+          echo "POSTGIS_IMAGE_ID=$id" >> "$GITHUB_ENV"
 
       - name: Test
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.postgis.outcome == 'success' }}
@@ -183,6 +187,11 @@ jobs:
           --results-directory artifacts/test-results
           --coverage --coverage-output-format cobertura
           --report-github --report-github-summary-include-passed false
+
+      # Fails the job when the tests built the PostGIS image again, which would hide a failed build in their errors.
+      - name: Check the tests built no PostGIS image
+        if: ${{ !cancelled() && steps.postgis.outcome == 'success' }}
+        run: tools/build-postgis-image.sh --unchanged "$POSTGIS_IMAGE_ID"
 
       - name: Report coverage
         id: coverage
@@ -235,9 +244,14 @@ jobs:
         run: docker pull --quiet "$POSTGRES_FLOOR_IMAGE"
 
       # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
-      # output, and not as errors of the tests, which then find the image and build nothing.
+      # output, and not as errors of the tests, which then find the image and build nothing.  It keeps the image's ID
+      # for the check after the tests.
       - name: Build PostGIS image
-        run: tools/build-postgis-image.sh "$POSTGRES_FLOOR_IMAGE"
+        id: postgis
+        run: |
+          tools/build-postgis-image.sh "$POSTGRES_FLOOR_IMAGE"
+          id="$(tools/build-postgis-image.sh --id "$POSTGRES_FLOOR_IMAGE")"
+          echo "POSTGIS_IMAGE_ID=$id" >> "$GITHUB_ENV"
 
       - name: Test
         env:
@@ -245,6 +259,11 @@ jobs:
         run: >-
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           --report-github --report-github-summary-include-passed false
+
+      # Fails the job when the tests built the PostGIS image again, which would hide a failed build in their errors.
+      - name: Check the tests built no PostGIS image
+        if: ${{ !cancelled() && steps.postgis.outcome == 'success' }}
+        run: tools/build-postgis-image.sh --unchanged "$POSTGIS_IMAGE_ID" "$POSTGRES_FLOOR_IMAGE"
 
   # The same for tests/DatabaseTests/SqlServer, which the build job ran on the default image, on the oldest SQL Server
   # that is supported: see tests/DatabaseTests/SqlServer/README.md.
