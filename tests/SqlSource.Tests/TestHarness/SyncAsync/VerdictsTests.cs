@@ -76,4 +76,48 @@ public sealed class VerdictsTests
         verdict.Agreement.ShouldBe(Agreement.Different);
         verdict.Applied.ShouldBeEmpty();
     }
+
+    // An outcome with every field set, which each row of the theory changes in one field alone.
+    private static readonly Outcome Full = new(
+        "result-a",
+        new Failure("type-a", "inner-a", "code-a", 1, "message-a"),
+        "state-a",
+        "transaction-a",
+        ["table-a"]
+    );
+
+    private static Outcome Changed(string field) =>
+        field switch
+        {
+            "Result" => Full with { Result = "result-b" },
+            "ConnectionState" => Full with { ConnectionState = "state-b" },
+            "TransactionState" => Full with { TransactionState = "transaction-b" },
+            "Tables" => Full with { Tables = ["table-b"] },
+            "Type" => Full with { Failure = Full.Failure! with { Type = "type-b" } },
+            "InnerType" => Full with { Failure = Full.Failure! with { InnerType = "inner-b" } },
+            "Code" => Full with { Failure = Full.Failure! with { Code = "code-b" } },
+            "ItemIndex" => Full with { Failure = Full.Failure! with { ItemIndex = 2 } },
+            "Message" => Full with { Failure = Full.Failure! with { Message = "message-b" } },
+            _ => throw new ArgumentException($"No field '{field}'.", nameof(field)),
+        };
+
+    // Each field is compared, and the report shows both of its values.
+    [Theory]
+    [InlineData("Result", "result-a", "result-b")]
+    [InlineData("ConnectionState", "state-a", "state-b")]
+    [InlineData("TransactionState", "transaction-a", "transaction-b")]
+    [InlineData("Tables", "table-a", "table-b")]
+    [InlineData("Type", "type-a", "type-b")]
+    [InlineData("InnerType", "inner-a", "inner-b")]
+    [InlineData("Code", "code-a", "code-b")]
+    [InlineData("ItemIndex", "item 1)", "item 2)")]
+    [InlineData("Message", "message-a", "message-b")]
+    public void Of_OutcomesDifferingInOneField_IsDifferent(string field, string asyncText, string syncText)
+    {
+        var verdict = Verdicts.Of(Any, Full, Changed(field), []);
+
+        verdict.Agreement.ShouldBe(Agreement.Different);
+        verdict.Report.ShouldContain(asyncText);
+        verdict.Report.ShouldContain(syncText);
+    }
 }

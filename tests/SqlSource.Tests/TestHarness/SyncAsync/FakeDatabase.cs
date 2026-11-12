@@ -9,11 +9,11 @@ using SqlSource.DatabaseTests.TestHarness.SyncAsync;
 
 namespace SqlSource.Tests.TestHarness.SyncAsync;
 
-// A database without a server, for the tests of PairRunner: every command returns one row of one column, and the text
-// of each is written to Commands, as are "BEGIN" and "ROLLBACK" for a transaction, and to Executions with the
-// connection and the transaction it ran on.  Its data source is DbDataSource's
-// own, whose commands refuse a connection, as Npgsql's do.  It overrides none of the asynchronous members, which call
-// the synchronous ones, so that it declares no pair that MethodPairs.Find would find.
+// A database without a server, for the tests of PairRunner: every command returns one row of one column, TableValue of
+// the read's number, and the text of each is written to Commands, as are "BEGIN" and "ROLLBACK" for a transaction, and
+// to Executions with the connection and the transaction it ran on.  Its data source is DbDataSource's own, whose
+// commands refuse a connection, as Npgsql's do.  It overrides none of the asynchronous members, which call the
+// synchronous ones, so that it declares no pair that MethodPairs.Find would find.
 internal sealed class FakeDatabase : IEngine
 {
     public List<string> Commands { get; } = [];
@@ -23,7 +23,17 @@ internal sealed class FakeDatabase : IEngine
     // What Render gives, which renders nothing itself unless a test sets it.
     public Func<object, string?> Renderer { get; set; } = static _ => null;
 
+    // The value of a read's one row, by the read's number from 0, the same for every read unless a test sets it.
+    public Func<int, int> TableValue { get; set; } = static _ => 1;
+
+    // What TransactionStateAsync gives, by the call's number from 0, "active" for every call unless a test sets it.
+    public Func<int, string> TransactionState { get; set; } = static _ => "active";
+
     private int _copies;
+
+    private int _reads;
+
+    private int _transactionStates;
 
     public DbDataSource SourceOf(string source, string? database) => new Source(this, database ?? "fake");
 
@@ -33,10 +43,10 @@ internal sealed class FakeDatabase : IEngine
 
     public Task DropDatabaseAsync(string database) => Task.CompletedTask;
 
-    public string? CodeOf(DbException exception) => null;
+    public string? CodeOf(DbException exception) => exception.SqlState;
 
     public Task<string> TransactionStateAsync(DbConnection connection, DbTransaction transaction) =>
-        Task.FromResult("active");
+        Task.FromResult(TransactionState(_transactionStates++));
 
     public string? Render(object value) => Renderer(value);
 
@@ -156,7 +166,7 @@ internal sealed class FakeDatabase : IEngine
             Record();
             using var table = new DataTable { Locale = CultureInfo.InvariantCulture };
             _ = table.Columns.Add("n", typeof(int));
-            _ = table.Rows.Add(1);
+            _ = table.Rows.Add(database.TableValue(database._reads++));
             return table.CreateDataReader();
         }
     }

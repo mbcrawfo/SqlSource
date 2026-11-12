@@ -17,7 +17,7 @@
 - **A scenario whose SQL before the call changes a setting of the session, such as `SET XACT_ABORT ON`, runs on the source `unpooled`**, so that the pool hands the setting to no other scenario.
 - **An insert of `Queries/Batches.sql` is given `SqlServerDatabases.BatchNotes` by its token `notes`**, never a temporary table, which a closed connection drops before the runner reads it.
 - **Every test that needs the server is in `UsesSqlServer`**; `KnownDifferencesTests` and `LibraryRenderingTests` need none and stay outside it, so that they run without Docker.
-- **A NodaTime value or a geometry whose own `ToString` drops part of it is written by `LibraryRendering`, with a row in `LibraryRenderingTests`, and both stay the same as the other `SyncAsync` project's**, since the harness references neither library and a test project compiles no file of another.
+- **A value of a library whose own `ToString` drops part of it, as a `SqlGeography`'s drops its SRID, is written by `LibraryRendering`, with a row in `LibraryRenderingTests`, and the NodaTime and NetTopologySuite rows stay the same as the other `SyncAsync` project's**, since the harness references neither library and a test project compiles no file of another.
 
 ## Known differences
 

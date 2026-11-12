@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using NetTopologySuite.Geometries;
 using NodaTime;
+using NpgsqlTypes;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness.SyncAsync;
 using Xunit;
@@ -70,6 +71,63 @@ public sealed class LibraryRenderingTests
         LibraryRendering
             .Of(Moment.InUtc())
             .ShouldNotBe(LibraryRendering.Of(Moment.InZoneStrictly(DateTimeZoneProviders.Tzdb["Europe/London"])));
+
+    private static readonly DateTime Midnight = new(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    // Two ranges alike but for one part: a bound's value, which the range's own ToString writes by the bound's, or
+    // its emptiness, inclusivity or infinity.
+    private static (object, object) RangesOf(string kind) =>
+        kind switch
+        {
+            "Instant" => (
+                new NpgsqlRange<Instant>(Instant.FromUnixTimeTicks(0), Instant.FromUnixTimeTicks(10_000_000)),
+                new NpgsqlRange<Instant>(Instant.FromUnixTimeTicks(1_234_567), Instant.FromUnixTimeTicks(10_000_000))
+            ),
+            "LocalDateTime" => (
+                new NpgsqlRange<LocalDateTime>(Moment, Moment.PlusHours(1)),
+                new NpgsqlRange<LocalDateTime>(Moment.PlusTicks(1_234_567), Moment.PlusHours(1))
+            ),
+            "DateTime" => (
+                new NpgsqlRange<DateTime>(Midnight, true, false, default, false, true),
+                new NpgsqlRange<DateTime>(Midnight.AddMilliseconds(500), true, false, default, false, true)
+            ),
+            "DateTime kind" => (
+                new NpgsqlRange<DateTime>(Midnight, true, false, default, false, true),
+                new NpgsqlRange<DateTime>(
+                    DateTime.SpecifyKind(Midnight, DateTimeKind.Unspecified),
+                    true,
+                    false,
+                    default,
+                    false,
+                    true
+                )
+            ),
+            "empty" => (NpgsqlRange<int>.Empty, new NpgsqlRange<int>(0, true, false, 0, true, false)),
+            "infinite" => (
+                new NpgsqlRange<int>(0, true, true, 5, false, false),
+                new NpgsqlRange<int>(0, true, false, 5, false, false)
+            ),
+            "inclusive" => (new NpgsqlRange<int>(0, true, 5, false), new NpgsqlRange<int>(0, false, 5, false)),
+            _ => throw new ArgumentException($"No pair of kind '{kind}'.", nameof(kind)),
+        };
+
+    // A range is rendered by its parts, its bounds through the engine's Render, so a bound that lost its sub-second
+    // digits or its Kind renders apart, where the range's own ToString, which writes each bound by its own, does not.
+    [Theory]
+    [InlineData("Instant", true)]
+    [InlineData("LocalDateTime", true)]
+    [InlineData("DateTime", true)]
+    [InlineData("DateTime kind", true)]
+    [InlineData("empty", false)]
+    [InlineData("infinite", false)]
+    [InlineData("inclusive", false)]
+    public void RenderingOf_RangesAlikeButForOnePart_RenderApart(string kind, bool ownTextAlike)
+    {
+        var (left, right) = RangesOf(kind);
+
+        (left.ToString() == right.ToString()).ShouldBe(ownTextAlike);
+        Rendering.Of(left, LibraryRendering.Of).ShouldNotBe(Rendering.Of(right, LibraryRendering.Of));
+    }
 
     [Fact]
     public void Of_ValueOfNoLibrary_IsNull() => LibraryRendering.Of(Moment.TimeOfDay.ToTimeOnly()).ShouldBeNull();

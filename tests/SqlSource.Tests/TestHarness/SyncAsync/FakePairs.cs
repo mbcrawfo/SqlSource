@@ -77,8 +77,8 @@ internal static class FakePairs
 }
 
 // Hand-written pairs of the connection they are given, for the tests of the runner: one runs a command naming whether
-// it was given a transaction, one throws naming the connection's database, and one throws an exception of an item whose
-// index differs between the two methods.
+// it was given a transaction, one throws naming the connection's database, and each of the others has two methods that
+// differ in one part of what they do alone.
 internal static class FakeConnectionPairs
 {
     public static void Run(DbConnection connection, FakePairs.Args parameters, DbTransaction? transaction = null)
@@ -116,6 +116,43 @@ internal static class FakeConnectionPairs
         CancellationToken cancellationToken = default
     ) => Task.FromException(new ItemException(parameters.Id));
 
+    public static int Answer(DbConnection connection, FakePairs.Args parameters) => parameters.Id;
+
+    public static Task<int> AnswerAsync(
+        DbConnection connection,
+        FakePairs.Args parameters,
+        CancellationToken cancellationToken = default
+    ) => Task.FromResult(parameters.Id + 1);
+
+    public static void Close(DbConnection connection, FakePairs.Args parameters) => connection.Close();
+
+    public static Task CloseAsync(
+        DbConnection connection,
+        FakePairs.Args parameters,
+        CancellationToken cancellationToken = default
+    ) => Task.CompletedTask;
+
+    public static void FailWithCode(DbConnection connection, FakePairs.Args parameters) =>
+        throw new CodedException("23505");
+
+    public static Task FailWithCodeAsync(
+        DbConnection connection,
+        FakePairs.Args parameters,
+        CancellationToken cancellationToken = default
+    ) => Task.FromException(new CodedException("23503"));
+
+    public static void FailWithInner(DbConnection connection, FakePairs.Args parameters) =>
+        throw new InvalidOperationException("Failed.", new FormatException("Inner."));
+
+    public static Task FailWithInnerAsync(
+        DbConnection connection,
+        FakePairs.Args parameters,
+        CancellationToken cancellationToken = default
+    ) =>
+        Task.FromException(
+            new InvalidOperationException("Failed.", new ArgumentException("Inner.", nameof(parameters)))
+        );
+
     private static DbCommand CommandOf(DbConnection connection, DbTransaction? transaction)
     {
         var command = connection.CreateCommand();
@@ -140,4 +177,12 @@ internal sealed class ItemException(int itemIndex) : Exception("An item failed."
 #pragma warning restore CA1032, S3871
 {
     public int ItemIndex { get; } = itemIndex;
+}
+
+// A database's error with its code, which FakeDatabase.CodeOf reads as an engine reads its SqlState or Number.
+#pragma warning disable CA1032, S3871
+internal sealed class CodedException(string code) : DbException("A row failed.")
+#pragma warning restore CA1032, S3871
+{
+    public override string SqlState => code;
 }

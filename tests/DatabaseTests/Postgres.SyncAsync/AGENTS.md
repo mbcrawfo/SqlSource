@@ -15,7 +15,7 @@
 - **A scenario holds no expected value**: the asynchronous method's outcome is what the synchronous one's is compared with, and the end-to-end tests assert values.
 - **A scenario that writes sets `Writes` and names the tables it touches in `Tables`**, so that each run gets its own copy of the seed; one that only reads sets neither, since a copy costs a database.
 - **Every test that needs the server is in `UsesPostgis`**, since the one PostGIS container holds `app`, `billing` and `gis`; `KnownDifferencesTests` and `LibraryRenderingTests` need none and stay outside it, so that they run without Docker.
-- **A NodaTime value or a geometry whose own `ToString` drops part of it is written by `LibraryRendering`, with a row in `LibraryRenderingTests`, and both stay the same as the other `SyncAsync` project's**, since the harness references neither library and a test project compiles no file of another.
+- **A value of a library whose own `ToString` drops part of it is written by `LibraryRendering`, with a row in `LibraryRenderingTests`, and the NodaTime and NetTopologySuite rows stay the same as the other `SyncAsync` project's**, since the harness references neither library and a test project compiles no file of another.  A generic value, such as an `NpgsqlRange<T>`, needs none: `Rendering` writes it by its properties.
 
 ## Known differences
 

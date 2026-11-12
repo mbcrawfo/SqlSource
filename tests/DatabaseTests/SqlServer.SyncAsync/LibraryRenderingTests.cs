@@ -1,5 +1,7 @@
 using System;
+using System.Data.SqlTypes;
 using System.Threading.Tasks;
+using Microsoft.SqlServer.Types;
 using NetTopologySuite.Geometries;
 using NodaTime;
 using Shouldly;
@@ -41,6 +43,14 @@ public sealed class LibraryRenderingTests
                 Wgs84.CreatePoint(new Coordinate(1, 2)),
                 new GeometryFactory(new PrecisionModel(), 3857).CreatePoint(new Coordinate(1, 2))
             ),
+            "SqlGeography SRID" => (
+                SqlGeography.STGeomFromText(new SqlChars("POINT (1 2 3 4)"), 4326),
+                SqlGeography.STGeomFromText(new SqlChars("POINT (1 2 3 4)"), 4269)
+            ),
+            "SqlGeometry SRID" => (
+                SqlGeometry.STGeomFromText(new SqlChars("POINT (1 2 3 4)"), 0),
+                SqlGeometry.STGeomFromText(new SqlChars("POINT (1 2 3 4)"), 3857)
+            ),
             _ => throw new ArgumentException($"No pair of kind '{kind}'.", nameof(kind)),
         };
 
@@ -56,6 +66,8 @@ public sealed class LibraryRenderingTests
     [InlineData("ZonedDateTime")]
     [InlineData("Geometry M")]
     [InlineData("Geometry SRID")]
+    [InlineData("SqlGeography SRID")]
+    [InlineData("SqlGeometry SRID")]
     public void Of_ValuesTheirOwnTextMakesAlike_RenderApart(string kind)
     {
         var (left, right) = PairOf(kind);

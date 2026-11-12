@@ -5,7 +5,7 @@ This project runs each synchronous query method of SQL Server's end-to-end proje
 ## When a test fails
 
 1. Read the failure.  A failed row of the theory `RunAsync_Scenario_SyncMatchesAsync` names its scenario, then one line for each field of the outcome that differs, the asynchronous method's value first, `Result: async = ...; sync = ...`:
-   - `Result`, the returned value as text, rows in order, `<void>` for none and `<none>` when the call threw, with a NodaTime value or a geometry written by `LibraryRendering`, every sub-second digit, a date's era and calendar, and a geometry's SRID and every ordinate, which their own `ToString` drops;
+   - `Result`, the returned value as text, rows in order, `<void>` for none and `<none>` when the call threw, with a NodaTime value or a geometry written by `LibraryRendering`, every sub-second digit, a date's era and calendar, and a geometry's SRID and every ordinate, a `SqlGeography`'s or a `SqlGeometry`'s SRID too, which their own `ToString` drops;
    - `Failure`, the exception's type, its inner exception's type, the number of the `SqlException` in it or under it, its `ItemIndex` and its message;
    - `ConnectionState`, the connection's state after the call;
    - `TransactionState`, what became of the caller's transaction: `none` without one, `completed` when the call or the server ended it, else `xact_state=<n> trancount=<n>`, as the server reports it in the transaction;

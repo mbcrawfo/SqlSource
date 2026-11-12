@@ -217,6 +217,56 @@ public sealed class PairRunnerTests
         rendered.ShouldBe([42, 1, 42, 1]);
     }
 
+    // A pair whose two methods differ in one part of what they do alone, with the database set up for it: the runner
+    // must record that part and Verdicts compare it.
+    private static (FakeDatabase Database, string Method, Setup Setup) DifferingIn(string part) =>
+        part switch
+        {
+            "Result" => (new FakeDatabase(), "Answer", new Setup()),
+            "ConnectionState" => (new FakeDatabase(), "Close", new Setup()),
+            "Tables" => (
+                new FakeDatabase { TableValue = static read => read + 1 },
+                "Run",
+                new Setup(Tables: ["SELECT n"])
+            ),
+            "TransactionState" => (
+                new FakeDatabase { TransactionState = static call => call == 0 ? "active" : "aborted" },
+                "Run",
+                new Setup(Transaction: CallerTransaction.Begun)
+            ),
+            "Code" => (new FakeDatabase(), "FailWithCode", new Setup()),
+            "InnerType" => (new FakeDatabase(), "FailWithInner", new Setup()),
+            _ => throw new ArgumentException($"No pair differs in '{part}'.", nameof(part)),
+        };
+
+    [Theory]
+    [InlineData("Result", "Result: async = 2", "; sync = 1")]
+    [InlineData("ConnectionState", "ConnectionState: async = Open", "; sync = Closed")]
+    [InlineData("Tables", "Tables[0]: async = n\n1", "; sync = n\n2")]
+    [InlineData("TransactionState", "TransactionState: async = active", "; sync = aborted")]
+    [InlineData("Code", "code 23503", "code 23505")]
+    [InlineData("InnerType", "inner System.ArgumentException", "inner System.FormatException")]
+    public async Task RunAsync_PairThatDiffersInOnePart_IsDifferent(string part, string asyncText, string syncText)
+    {
+        var (database, method, setup) = DifferingIn(part);
+        var pair = PairOf(typeof(FakeConnectionPairs), method);
+        var scenario = new Scenario(
+            $"FakeConnectionPairs.{method}: differs in {part}",
+            typeof(FakeConnectionPairs),
+            method,
+            MethodKind.Query,
+            ScenarioTag.Other,
+            setup,
+            new FakePairs.Args(1)
+        );
+
+        var verdict = await PairRunner.RunAsync(database, pair, scenario, []);
+
+        verdict.Agreement.ShouldBe(Agreement.Different);
+        verdict.Report.ShouldContain(asyncText);
+        verdict.Report.ShouldContain(syncText);
+    }
+
     private static MethodPair PairOf(Type host, string method) =>
         MethodPairs
             .Find(typeof(PairRunnerTests).Assembly)

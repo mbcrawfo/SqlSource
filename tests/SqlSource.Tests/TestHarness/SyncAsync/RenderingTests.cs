@@ -28,6 +28,35 @@ public sealed class RenderingTests
 
     private sealed record Holder(Lossy Top, int Count);
 
+    // A generic value that writes itself by its value's own ToString, as Npgsql's NpgsqlRange<T> does.
+    private readonly struct Wrapper<T>(T value, bool open)
+    {
+        public T Value => value;
+
+        public bool Open => open;
+
+        public override string ToString() => Open ? "[" + Value : "(" + Value;
+    }
+
+    private static readonly DateTime Moment = new(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+
+    // Two values of a framework type alike but for their last tick, or for what else Rendering keeps.
+    private static (object, object) PairOf(string kind) =>
+        kind switch
+        {
+            "DateTime" => (Moment, Moment.AddTicks(1)),
+            "DateTime kind" => (Moment, DateTime.SpecifyKind(Moment, DateTimeKind.Unspecified)),
+            "DateTimeOffset" => (new DateTimeOffset(Moment), new DateTimeOffset(Moment.AddTicks(1))),
+            "DateTimeOffset offset" => (
+                new DateTimeOffset(Moment),
+                new DateTimeOffset(Moment).ToOffset(TimeSpan.FromHours(2))
+            ),
+            "DateOnly" => (DateOnly.FromDateTime(Moment), DateOnly.FromDateTime(Moment).AddDays(1)),
+            "TimeOnly" => (TimeOnly.FromDateTime(Moment), TimeOnly.FromDateTime(Moment.AddTicks(1))),
+            "TimeSpan" => (Moment.TimeOfDay, Moment.TimeOfDay.Add(TimeSpan.FromTicks(1))),
+            _ => throw new ArgumentException($"No pair of kind '{kind}'.", nameof(kind)),
+        };
+
     // An engine's Render, which is never given null.
     private static string? Library(object value) =>
         value switch
@@ -78,6 +107,34 @@ public sealed class RenderingTests
         Rendering
             .Of(new DateTime(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc))
             .ShouldBe("2024-01-02T03:04:05.0000000Z (Utc)");
+
+    [Theory]
+    [InlineData("DateTime")]
+    [InlineData("DateTime kind")]
+    [InlineData("DateTimeOffset")]
+    [InlineData("DateTimeOffset offset")]
+    [InlineData("DateOnly")]
+    [InlineData("TimeOnly")]
+    [InlineData("TimeSpan")]
+    public void Of_FrameworkValuesATickApart_RenderApart(string kind)
+    {
+        var (left, right) = PairOf(kind);
+
+        Rendering.Of(left).ShouldNotBe(Rendering.Of(right));
+    }
+
+    // A generic value's own ToString writes its contents by theirs, so it is rendered by its properties, each through
+    // the library, which keeps a DateTime's Kind and every digit that ToString drops.
+    [Fact]
+    public void Of_GenericTypeWithItsOwnToString_RendersItsProperties()
+    {
+        Rendering
+            .Of(new Wrapper<Lossy>(new Lossy(1), true), Library)
+            .ShouldBe("Wrapper<Lossy> { Value = lossy 1, Open = true }");
+        Rendering
+            .Of(new Wrapper<DateTime>(Moment, false))
+            .ShouldBe("Wrapper<DateTime> { Value = 2024-01-02T03:04:05.0000000Z (Utc), Open = false }");
+    }
 
     [Fact]
     public void Of_Memory_RendersItsItems()

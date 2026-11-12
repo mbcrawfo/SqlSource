@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -107,7 +106,10 @@ internal static partial class Rendering
             : null;
 
     // A type that writes itself: ToString is declared by a type other than object and ValueType, and is not the one the
-    // compiler writes for a record.
+    // compiler writes for a record.  A generic type, such as Npgsql's NpgsqlRange<T>, a tuple or a KeyValuePair, never
+    // does, since its ToString writes its type arguments' values by their own ToString, which drops what Rendering and
+    // the engine's Render keep, such as a DateTime's Kind or an Instant's sub-second digits: it is rendered by its
+    // items or its properties.
     private static bool HasOwnToString(Type type)
     {
         var method = type.GetMethod(nameof(ToString), BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
@@ -116,9 +118,7 @@ internal static partial class Rendering
             return false;
         }
 
-        return !IsCompilerGenerated(type, method)
-            && !typeof(ITuple).IsAssignableFrom(type)
-            && !(type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>));
+        return !IsCompilerGenerated(type, method) && !type.IsGenericType;
     }
 
     private static bool IsCompilerGenerated(Type type, MethodInfo toString) =>

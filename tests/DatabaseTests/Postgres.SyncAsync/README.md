@@ -5,7 +5,7 @@ This project runs each synchronous query method of PostgreSQL's end-to-end proje
 ## When a test fails
 
 1. Read the failure.  A failed row of the theory `RunAsync_Scenario_SyncMatchesAsync` names its scenario, then one line for each field of the outcome that differs, the asynchronous method's value first, `Result: async = ...; sync = ...`:
-   - `Result`, the returned value as text, rows in order, `<void>` for none and `<none>` when the call threw, with a NodaTime value or a geometry written by `LibraryRendering`, every sub-second digit, a date's era and calendar, and a geometry's SRID and every ordinate, which their own `ToString` drops;
+   - `Result`, the returned value as text, rows in order, `<void>` for none and `<none>` when the call threw, with a NodaTime value or a geometry written by `LibraryRendering`, every sub-second digit, a date's era and calendar, and a geometry's SRID and every ordinate, which their own `ToString` drops, and a range by its bounds, each written so, its inclusivity, its infinity and its emptiness;
    - `Failure`, the exception's type, its inner exception's type, its SQL state, its `ItemIndex` and its message;
    - `ConnectionState`, the connection's state after the call;
    - `TransactionState`, what became of the caller's transaction: `none` without one, `active`, `aborted` when an error left it unusable, or `completed`;
