@@ -73,7 +73,7 @@ internal static partial class ReportReader
         return new Mutant(first with { Ordinal = ordinal }, StatusOf(status, file));
     }
 
-    private static MutantStatus StatusOf(string status, string file) =>
+    internal static MutantStatus StatusOf(string status, string file) =>
         status switch
         {
             "Killed" => MutantStatus.Killed,
@@ -89,7 +89,7 @@ internal static partial class ReportReader
 
     // The path of a file from the project root, with '/'.  Both are compared as text, whatever the system that reads
     // them, so that a report made on Windows reads the same anywhere.
-    private static string FromRoot(string root, string path)
+    internal static string FromRoot(string root, string path)
     {
         var folder = root.Replace('\\', '/').TrimEnd('/') + "/";
         var file = path.Replace('\\', '/');
@@ -102,9 +102,9 @@ internal static partial class ReportReader
 
     private sealed record MutantJson(string? MutatorName, string? Replacement, LocationJson? Location, string? Status);
 
-    private sealed record LocationJson(PositionJson? Start, PositionJson? End);
+    internal sealed record LocationJson(PositionJson? Start, PositionJson? End);
 
-    private sealed record PositionJson(int Line, int Column);
+    internal sealed record PositionJson(int Line, int Column);
 
     [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     [JsonSerializable(typeof(ReportJson))]
