@@ -23,7 +23,7 @@ The two projects that ship are:
 - `src/SqlSource` is the source generator, and the package `SqlSource`.  [`docs/architecture/generator.md`](docs/architecture/generator.md) explains how it works.
 - `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.  [`docs/architecture/tool.md`](docs/architecture/tool.md) explains how it works.
 
-The nine test projects, the four libraries they share and a stand-in of the tool, which [`tests/README.md`](tests/README.md) describes:
+The eleven test projects, the four libraries they share and a stand-in of the tool, which [`tests/README.md`](tests/README.md) describes:
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
@@ -34,6 +34,8 @@ The nine test projects, the four libraries they share and a stand-in of the tool
 - `tests/DatabaseTests/SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries, runs each query through its method, writes and reads every mapped type through the methods, and reads rows through Dapper for the manual's recipe, and needs Docker.
 - `tests/DatabaseTests/SqlServer.SqlClient61` reads every mapped type through Dapper, writes and reads it, every NodaTime type, NetTopologySuite's and the JSON types and classes through the generated methods, and breaks out of a streaming method, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
 - `tests/DatabaseTests/QueryMethodAllocation` runs the allocation tests of the generated methods of both engines against hand-written ADO.NET, needs Docker, and is run by the nightly alone.
+- `tests/DatabaseTests/Postgres.SyncAsync` runs each synchronous query method of the PostgreSQL end-to-end project beside its asynchronous twin and compares what the two do, needs Docker, and is run by the nightly alone.
+- `tests/DatabaseTests/SqlServer.SyncAsync` does the same for SQL Server's end-to-end project, needs Docker, and is run by the nightly alone.
 - `tests/SqlSource.Repository`, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 - `tests/SqlSource.Tool.StandIn` is a stand-in of the `sqlsource` tool, which the tests of the online build in `tests/SqlSource.Tool.Tests` give a real build as its command.
 
@@ -52,7 +54,7 @@ dotnet build SqlSource.slnx
 dotnet test --solution SqlSource.slnx
 ```
 
-This runs every test project, the two PostgreSQL projects on the default PostgreSQL image and the two SQL Server projects on the default SQL Server image.  The first run of the PostgreSQL projects on a PostgreSQL image also builds [their PostGIS image](tests/DatabaseTests/Postgres/README.md#the-postgis-image) on it, which takes a minute or two and needs to reach PostgreSQL's package sources, `apt.postgresql.org` and `apt-archive.postgresql.org`.  CI also runs `tests/DatabaseTests/Postgres` on PostgreSQL 14, the oldest supported:
+This runs every test project but the three that the nightly alone runs, the two PostgreSQL projects on the default PostgreSQL image and the two SQL Server projects on the default SQL Server image.  The first run of the PostgreSQL projects on a PostgreSQL image also builds [their PostGIS image](tests/DatabaseTests/Postgres/README.md#the-postgis-image) on it, which takes a minute or two and needs to reach PostgreSQL's package sources, `apt.postgresql.org` and `apt-archive.postgresql.org`.  CI also runs `tests/DatabaseTests/Postgres` on PostgreSQL 14, the oldest supported:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/DatabaseTests/Postgres
@@ -81,7 +83,7 @@ dotnet test --solution SqlSource.slnx --results-directory artifacts/test-results
 dotnet reportgenerator '-reports:artifacts/test-results/*.cobertura.xml' -targetdir:artifacts/coverage -reporttypes:Html '-assemblyfilters:+SqlSource;+SqlSource.Tool'
 ```
 
-Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.  The allocation tests of `tests/DatabaseTests/QueryMethodAllocation` skip under coverage and run only in the nightly; its readme has the command.
+Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.  The allocation tests of `tests/DatabaseTests/QueryMethodAllocation` skip under coverage and run only in the nightly; its readme has the command.  The comparisons of `tests/DatabaseTests/Postgres.SyncAsync` and `tests/DatabaseTests/SqlServer.SyncAsync` run only in the nightly too, and their readmes have the commands.
 
 A change to what the generator writes updates the golden corpus, as [`tests/README.md`](tests/README.md#the-golden-corpus-of-query-methods) says.
 
@@ -127,7 +129,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, and the allocation tests on each engine's default image, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, and the allocation tests and the comparison of each synchronous method with its asynchronous twin on each engine's default image, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>

@@ -24,6 +24,7 @@
 - **A test of what the pool keeps of a session knows the session by `ClientConnectionId`, never `ServerProcessId` or `@@SPID`, and runs again on a new pool when the pool hands back another**, as `EndToEnd/BatchQueryTests.cs` does, since a session can end in the pool and the one the pool opens in its place often gets its number.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
 - **A change to `EndToEnd/ListQueryTests.cs` changes its copy in `tests/DatabaseTests/SqlServer.SqlClient61` too**, which runs the same lists on SqlClient 6.1.
+- **A query added here that has a pair under `method-type=both`, neither a stream nor a `<Query>Sync` copy, gets its scenarios in `tests/DatabaseTests/SqlServer.SyncAsync` in the same change**, or that project's coverage test fails at night.
 - **`RowBufferQueryTests` is the eight generated methods and their twins handed to `RowBufferReads`** of `tests/DatabaseTests/TestHarness`, which holds the body, so a check of what every collection type returns goes there.
 
 ## NodaTime
