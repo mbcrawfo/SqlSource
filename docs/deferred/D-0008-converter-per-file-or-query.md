@@ -6,7 +6,7 @@
 
 ## Delivered instead
 
-A converter is an edge between two C# types for the whole project: [`ConverterSet`](../../src/SqlSource/Generation/Converters/ConverterSet.cs) holds one per pair of types and direction, a second in the project's source being `SQLSRC278`, and [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs) chooses by the property's type and the base map's type alone, whatever chose the property's type: a level of the override, a column type or a `-- param:` or `-- column:` marker.  An entry's text after its C# type is still not valid: [`TypeOverrideGrammar`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideGrammar.cs) rejects it.  The manual's known issues of [settings](../manual/settings.md#known-issues) say that a type has one conversion in a project, and that a file or query that needs another gives the database type, or the column, a C# type of its own.
+A converter is an edge between two C# types for the whole project: [`ConverterSet`](../../src/SqlSource/Generation/Converters/ConverterSet.cs) holds one per pair of types and direction, a second in the project's source being `SQLSRC278`, and [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs) chooses by the property's type and the base map's type alone, whatever chose the property's type: a level of the override, a column type or a `-- param:` or `-- column:` marker.  An entry's text after its C# type is still not valid: [`TypeOverrideGrammar`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideGrammar.cs) rejects it.  The manual's known issues of [settings](../../site/settings.md#known-issues) say that a type has one conversion in a project, and that a file or query that needs another gives the database type, or the column, a C# type of its own.
 
 ## Why deferred
 
@@ -17,7 +17,7 @@ The research judged a converter per file a rare need, and naming one in the entr
 - **The grammar**: in a settings file, a member of `typeOverrides` or `columnTypes` whose value is an object, `{"type": "MyApp.Email", "converter": "MyApp.EmailConverter"}`, which needs no suffix; in a marker, a suffix after the C# type of the entry, with a character that the value allows, `|` for one, since `:` is taken by `global::` and `,` and `<>` by type arguments; `SQLSRC019` and `SQLSRC111` for a converter that is not valid.
 - **The levels**: `TypeOverride` gains the converter type, merged by the override's precedence, and `SQLSRC112` compares it.
 - **Resolution and use**: the converter type resolved as a mapped type is, its static methods read by `ConverterReader` and checked as `SQLSRC277`, and its edges used before the project's and the mapped type's for the properties that entry types, which `PropertyType` or the slice of `MethodsInput` must then carry.
-- **The manual**: the suffix in [type overrides](../manual/settings.md#setting-type-overrides) and [converters](../manual/settings.md#converters), and the known issue removed.
+- **The manual**: the suffix in [type overrides](../../site/settings.md#setting-type-overrides) and [converters](../../site/settings.md#converters), and the known issue removed.
 
 ## Trigger
 

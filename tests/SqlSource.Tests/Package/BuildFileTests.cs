@@ -186,14 +186,15 @@ public sealed partial class BuildFileTests
     }
 
     // The build stops on a compiler before Roslyn 4.14, in which the generator cannot load, with SQLSRC021.  The
-    // generator cannot report it, so the target does, and its text is the descriptor's message: a change to one is
-    // made to both.
+    // generator cannot report it, so the target does, and its text and help link are the descriptor's: a change to one
+    // is made to both.
     [Fact]
-    public void Targets_CompilerCheck_ErrorIsTheDescriptorsCodeAndMessage()
+    public void Targets_CompilerCheck_ErrorIsTheDescriptorsCodeMessageAndHelpLink()
     {
         var error = Target(CompilerCheckTarget).Elements("Error").ShouldHaveSingleItem();
 
         error.Attribute("Code").ShouldNotBeNull().Value.ShouldBe(SqlDiagnostics.CompilerTooOld.Id);
+        error.Attribute("HelpLink").ShouldNotBeNull().Value.ShouldBe(SqlDiagnostics.CompilerTooOld.HelpLinkUri);
         error
             .Attribute("Text")
             .ShouldNotBeNull()

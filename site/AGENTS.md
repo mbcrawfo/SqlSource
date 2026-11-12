@@ -1,4 +1,4 @@
-# AGENTS.md - docs/manual
+# AGENTS.md - site
 
 Rules for the user documentation, this folder and the two packed readmes, beside root rule 4.
 
@@ -30,25 +30,26 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 - A new setting or marker gets its row and its section, and a marker its row in the marker index of `sql-files.md`.  A new generator parameter goes in each place that the comment on the list in `DiagnosticsDocumentTests` names.
 - **Recipes hold examples, not rules.**  Each is a sample and a link to the rules, so it cannot drift from them.
 - **Anchors.**  A heading of this folder linked from anywhere gets an `<a id>` anchor on the line above, kept when the heading is reworded; "Known issues" gets `<a id="known-issues"></a>`.
-- **Links.**  Pages of this folder link to each other relatively.
+- **Links.**  Pages of this folder link to each other relatively, and to any other file of the repository by `https://github.com/mbcrawfo/SqlSource/blob/main/<path>`: only this folder is published.
 - **SQL samples** are marked by the info strings `UserDocsSamplesTests` reads; never weaken the test.  Put no fence inside a blockquote.
 - **`--prerelease`** goes on every page's install and update commands while only previews are published, as root rule 4 says.
 - **Known issues.**  A page that documents behaviour ends with "Known issues": what a user can plausibly hit from the open items of `docs/tech-debt` and `docs/deferred`, by its effect in the user's words and what to do.  Leave out what a user cannot see, such as a test gap, duplicated code or a cost with no visible effect.
 - Add one in the PR that opens its item; remove it in the PR that closes it, found by its effect, as it names no id.  A page's first one brings the section and a link from the entry page's "Find a problem that is not an error" row.
 - **`diagnostics.md`.**  A new diagnostic gets a row in the index, a `## SQLSRCnnn` section whose first bold line is its descriptor's title, and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.
 - Keep true the paragraphs giving each area's range of ids.  Never give a heading another anchor: every error's help link is the lower-case id's slug.
-- **A new page** is listed under "The pages" of the entry page, with a "Find what you need" row for each need it answers.
+- **A new page** gets an entry in `toc.yml`, the site's sidebar, in the order of "The pages", and is listed under "The pages" of the entry page, with a "Find what you need" row for each need it answers.
+- **The site.**  docfx publishes every page of this folder but `AGENTS.md`, and `index.md` only redirects the site's root to `README.html`.  `tools/build-site.sh` builds it and fails on any docfx warning.
 - **Tests.**  The tests in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/DiagnosticsDocumentTests.cs` say in comments what fails them.  None checks whether a page is true today and free of internals.
 
 ## When a phase lands
 
 Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-generation-epic-design.md`), and every later feature, does in its PR what root rule 4 and this file ask, its Status cells in `settings.md` included, and:
 
-- **Callouts.**  `git grep -n "Coming in a later release" -- README.md src/SqlSource.Tool/README.md docs/manual` lists them.  A callout for a part still to come stays, narrowed to that part.
+- **Callouts.**  `git grep -n "Coming in a later release" -- README.md src/SqlSource.Tool/README.md site` lists them.  A callout for a part still to come stays, narrowed to that part.
 - **Sentences that say it is missing or still to come**, such as "It takes effect when generated query methods arrive", are rewritten.  It finds most, among much noise; also read each page the table names:
 
   ```bash
-  git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md docs/manual
+  git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md site
   ```
 
 - **Recipes** go in `recipes.md` where a task is new.  **The README** changes where the common path does: the introduction's status line, getting started, a scenario, a FAQ answer, the supported environments.

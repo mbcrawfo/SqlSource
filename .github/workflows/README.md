@@ -7,8 +7,9 @@ The GitHub Actions workflows of the repository.  [`CONTRIBUTING.md`](../../CONTR
 | Workflow | Runs on | Does |
 |----|----|----|
 | `ci.yml` | Pull requests to `main` or an `integration/*` branch, pushes to them | Calls `build.yml` and ends with the `ci` job |
-| `build.yml` | Called by `ci.yml` and `publish.yml` | Seven jobs that start at once and need none of the others: `Lint`, the Docker-only checks; two halves of `format.sh --check`, `style` with `csharpier` and `analyzers`; a `Release` build and the tests with coverage, the two PostgreSQL projects and the two SQL Server projects on their default images among them, the tests of `tests/DatabaseTests/Postgres` alone again on PostgreSQL 14, and of `tests/DatabaseTests/SqlServer` alone again on SQL Server 2017, one job each; and `dotnet pack` of the two packages with the three package checks |
-| `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the two packages to nuget.org, and creates a GitHub release for a tag |
+| `build.yml` | Called by `ci.yml` and `publish.yml` | Eight jobs that start at once and need none of the others: `Lint`, the Docker-only checks; `Site`, the docfx build of the manual by `tools/build-site.sh`; two halves of `format.sh --check`, `style` with `csharpier` and `analyzers`; a `Release` build and the tests with coverage, the two PostgreSQL projects and the two SQL Server projects on their default images among them, the tests of `tests/DatabaseTests/Postgres` alone again on PostgreSQL 14, and of `tests/DatabaseTests/SqlServer` alone again on SQL Server 2017, one job each; and `dotnet pack` of the two packages with the three package checks |
+| `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the two packages to nuget.org, and for a tag creates a GitHub release and calls `docs.yml` |
+| `docs.yml` | Manual runs, called by `publish.yml` for a tag | Builds the manual, `site/`, with `tools/build-site.sh` and deploys it to GitHub Pages, at `https://mbcrawfo.github.io/SqlSource/` |
 | `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
 | `nightly.yml` | Every night, manual runs, pull requests that change the file | Restores, builds in `Release` and runs the tests of every project but `tests/DatabaseTests/Postgres`, `tests/DatabaseTests/Postgres.Npgsql8`, `tests/DatabaseTests/SqlServer`, `tests/DatabaseTests/SqlServer.SqlClient61` and `tests/DatabaseTests/QueryMethodAllocation` on `windows-latest` and `macos-latest`; and on `ubuntu-latest`, the tests of `tests/DatabaseTests/Postgres` on PostgreSQL 15, 16 and 17 and of `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022, one job each, and the allocation tests of `tests/DatabaseTests/QueryMethodAllocation` on each engine's default image, `allocation-postgres` and `allocation-sqlserver`, alone and without coverage |
 
@@ -26,7 +27,7 @@ This leaves a limitation of the reporter, which has no option to shorten or cap 
 
 The `ci` job succeeds only when every other job in `ci.yml` succeeded or was skipped.  It is the one status check to require in the `main` ruleset.
 
-`coverage-comment.yml` always runs the version on `main`, never the one a pull request changes.  A change to it takes effect, and can first be tried, after it is merged.  A manual run of `publish.yml` on a branch runs the file but skips every job, because its `build` job runs only for a tag or `main`.
+`coverage-comment.yml` always runs the version on `main`, never the one a pull request changes.  A change to it takes effect, and can first be tried, after it is merged.  A manual run of `publish.yml` on a branch runs the file but skips every job, because its `build` job runs only for a tag or `main`.  A manual run of `docs.yml` builds the branch it is started on, but the `github-pages` environment deploys from `main` and `v*` tags alone, so from any other branch it fails at the deploy.
 
 ## Nightly
 

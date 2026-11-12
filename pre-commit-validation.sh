@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs the validations that the uncommitted change could break: formatting, linting, build, tests and the three
-# package checks.  A step or a pair of container test projects is skipped when nothing in the change reaches them.
+# Runs the validations that the uncommitted change could break: formatting, linting, the manual's site, build, tests
+# and the three package checks.  A step or a pair of container test projects is skipped when nothing in the change
+# reaches them.
 # --full runs everything, as a clean tree, a change to this script and a changed path of no known kind do.
 # Rewrites nothing.  Every step runs even when an earlier one fails, except that the tests and the package checks are
 # skipped when the build fails, and the package checks when the pack fails.
@@ -43,7 +44,7 @@ is_known_kind() {
     known=true
     case "$1" in
     *.cs | *.csproj | *.props | *.targets | *.slnx | *.md | *.sql | *.json | *.sh | *.txt) return ;;
-    .github/workflows/*.yml | .github/workflows/*.yaml | examples/*/docker-compose.yml) return ;;
+    .github/workflows/*.yml | .github/workflows/*.yaml | examples/*/docker-compose.yml | site/*.yml) return ;;
     esac
     case "${1##*/}" in
     .editorconfig | .gitignore | .worktreeinclude) return ;;
@@ -177,6 +178,7 @@ format_files=()
 no_format='no .cs file changed'
 shell_trigger=''
 workflow_trigger=''
+site_trigger=''
 postgres_trigger=''
 sqlserver_trigger=''
 packages_trigger=''
@@ -194,6 +196,10 @@ for path in ${changes[@]+"${changes[@]}"}; do
     if [[ "$path" == *.sh || "${path##*/}" == .editorconfig ]]; then first shell_trigger; fi
     # actionlint reads the workflows, and its script is how it runs.
     if [[ "$path" == .github/workflows/* || "$path" == tools/actionlint.sh ]]; then first workflow_trigger; fi
+    # docfx builds site/ alone, with the version that dotnet-tools.json pins, through its script.
+    if [[ "$path" == site/* || "$path" == dotnet-tools.json || "$path" == tools/build-site.sh ]]; then
+        first site_trigger
+    fi
     if [[ "$scope" == postgres || "$scope" == both ]]; then first postgres_trigger; fi
     if [[ "$scope" == sqlserver || "$scope" == both ]]; then first sqlserver_trigger; fi
     if [[ "$packages" == true ]]; then first packages_trigger; fi
@@ -239,6 +245,7 @@ decide always always ''
 decide format "$format_trigger" "$no_format"
 decide shell "$shell_trigger" 'no .sh file or .editorconfig changed'
 decide workflow "$workflow_trigger" 'no workflow or tools/actionlint.sh changed'
+decide site "$site_trigger" 'nothing under site/ changed'
 decide postgres "$postgres_trigger" "$no_scope"
 decide sqlserver "$sqlserver_trigger" "$no_scope"
 decide packages "$packages_trigger" 'no change reaches the packages'
@@ -363,6 +370,7 @@ step 'editorconfig-checker' always tools/editorconfig-checker.sh || true
 step 'shellcheck' shell tools/shellcheck.sh || true
 step 'shfmt' shell tools/shfmt.sh --check || true
 step 'actionlint' workflow tools/actionlint.sh || true
+step 'site' site tools/build-site.sh || true
 if step 'build' always dotnet build "$SOLUTION"; then
     step 'test' always dotnet test --solution "$test_solution" --no-build || true
     if [[ "$plan" == true ]]; then

@@ -5,7 +5,7 @@ namespace SqlServerExamples.Methods;
 // The id of an order, which the project's column types give order_lines.order_id, and markers of OrderLineQueries.sql a
 // parameter and a computed column, each by its short name.  The driver reads an int column as a C# int and knows
 // nothing of OrderId, so the generated method reads the int and passes it to FromDatabase, and sends an OrderId
-// parameter as the int that ToDatabase returns.  See docs/manual/settings.md, "Converters".
+// parameter as the int that ToDatabase returns.  See site/settings.md, "Converters".
 public readonly record struct OrderId(int Value)
 {
     [SqlSourceConverter]

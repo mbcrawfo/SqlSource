@@ -63,7 +63,7 @@ public sealed class ToolDiagnosticsTests
         {
             // The anchor of a heading is its text in lower case, and an id is "SQLSRC" followed by digits.
             descriptor.HelpLinkUri.ShouldBe(
-                "https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc" + descriptor.Id[6..]
+                "https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc" + descriptor.Id[6..]
             );
         }
     }

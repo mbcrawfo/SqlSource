@@ -8,6 +8,6 @@ namespace PostgresExamples.Repository;
 // which opens a connection of the data source, runs the query and disposes the connection, so the caller passes no
 // connection.  The data source is found by its type, NpgsqlDataSource, which derives from DbDataSource.  The class also
 // gets the interface IUserRepository, of those methods, for code that takes a repository, as UserGreeter does.  See
-// docs/manual/settings.md#setting-output.
+// site/settings.md#setting-output.
 [SqlSourceGenerate]
 public sealed partial class UserRepository(NpgsqlDataSource dataSource);

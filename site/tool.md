@@ -165,7 +165,7 @@ To keep the sidecars current:
 
 The build tells you when a sidecar is not current.  A query without an entry is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since its entry was written is [SQLSRC244](diagnostics.md#sqlsrc244).  An entry that names no query that must be described is the warning [SQLSRC245](diagnostics.md#sqlsrc245), and a sidecar, or an entry of one, that another version of the tool wrote the warning [SQLSRC240](diagnostics.md#sqlsrc240).  Each of the first three goes away when you run `describe` and commit what it writes.  SQLSRC240 goes away once the tool and the `SqlSource` package have one version and `describe` has run with that tool.  A sidecar with a merge conflict in it is [SQLSRC237](diagnostics.md#sqlsrc237).
 
-The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), for the curious.  Nothing in this manual depends on it.
+The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.json`](https://github.com/mbcrawfo/SqlSource/blob/main/schemas/sidecar-v1.schema.json), for the curious.  Nothing in this manual depends on it.
 
 <a id="sidecars-in-git"></a>
 
@@ -215,7 +215,7 @@ SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password
 
 ```console
 $ dotnet build -tl:off
-/work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': relation "user" does not exist; query: GetUser, database postgres, postgres 18.6, Npgsql 10.0.3; step: describe parameters; server: 42P01: relation "user" does not exist; server: at character 15; see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc225 [/work/App/App.csproj]
+/work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': relation "user" does not exist; query: GetUser, database postgres, postgres 18.6, Npgsql 10.0.3; step: describe parameters; server: 42P01: relation "user" does not exist; server: at character 15; see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc225 [/work/App/App.csproj]
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'methods' needs one.  Run 'sqlsource describe'. [/work/App/App.csproj]
 ```
 
@@ -339,7 +339,7 @@ $ dotnet restore
 $ SQLSOURCE_CONNECTION_BILLING="$BILLING_CONNECTION" dotnet sqlsource describe --check
 /work/App/Queries/Users.sql(3,10): error SQLSRC219: The sidecar is out of date for 'GetUser': the query has changed since it was described
     help: run 'dotnet sqlsource describe' and commit the sidecars
-    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc219
+    see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc219
 billing (postgres): 15 same, 1 differ, 0 failed
 ```
 
@@ -412,7 +412,7 @@ Before it writes the bundle, `diagnose` checks that every word in it is a new na
 $ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip
 /work/report.zip : error SQLSRC293: The bundle cannot be made safe to post: a word is not one of the new names, at query.sql, found ssn_hash
     help: make a raw bundle with --no-obfuscate and keep it, then open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it
-    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc293
+    see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc293
 ```
 
 `diagnose` writes nothing rather than a bundle it cannot make safe: one that would still hold a text of yours ([SQLSRC293](diagnostics.md#sqlsrc293)), or whose renamed copy no longer gives your query's answer ([SQLSRC294](diagnostics.md#sqlsrc294)).  The line names what it found, which is yours, such as a name of your schema: do not paste it into an issue.

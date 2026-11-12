@@ -5,7 +5,7 @@ namespace PostgresExamples.Methods;
 // A price, the type that OrderLineQueries.sql gives its numeric columns with a type override.  The driver reads a
 // numeric column as a C# decimal and knows nothing of Price, so the generated method reads the decimal and passes it to
 // FromDatabase, and a Price parameter would be sent as the decimal that ToDatabase returns.  See
-// docs/manual/settings.md, "Converters".
+// site/settings.md, "Converters".
 public readonly record struct Price(decimal Amount)
 {
     [SqlSourceConverter]

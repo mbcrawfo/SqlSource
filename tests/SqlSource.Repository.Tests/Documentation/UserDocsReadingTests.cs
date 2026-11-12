@@ -129,12 +129,12 @@ public sealed class UserDocsReadingTests
 
     [Theory]
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md#x", "README.md", "x")]
-    [InlineData("https://github.com/mbcrawfo/SqlSource/tree/main/docs/manual/", "docs/manual", "")]
+    [InlineData("https://github.com/mbcrawfo/SqlSource/tree/main/site/", "site", "")]
     [InlineData("https://GitHub.com/MBCrawfo/sqlsource/blob/main/LICENSE", "LICENSE", "")]
-    [InlineData("../manual/README.md#y", "docs/manual/README.md", "y")]
-    [InlineData("#z", "docs/manual/page.md", "z")]
+    [InlineData("../site/README.md#y", "site/README.md", "y")]
+    [InlineData("#z", "site/page.md", "z")]
     public void Resolve_LinkToThisRepository_GivesItsPathAndAnchor(string target, string path, string anchor) =>
-        UserDocs.Resolve("docs/manual/page.md", target).ShouldBe((path, anchor));
+        UserDocs.Resolve("site/page.md", target).ShouldBe((path, anchor));
 
     [Theory]
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]
@@ -171,4 +171,49 @@ public sealed class UserDocsReadingTests
         UserDocs.RepositoryLinkProblem(target).ShouldBeNull();
         UserDocs.Resolve("README.md", target).ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc024", "site/diagnostics.md", "sqlsrc024")]
+    [InlineData(
+        "https://mbcrawfo.github.io/SqlSource/README.html#what-works-today",
+        "site/README.md",
+        "what-works-today"
+    )]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/README.md", "")]
+    public void Resolve_SiteUrl_IsThePageOfSite(string target, string path, string anchor)
+    {
+        UserDocs.IsSiteLink(target).ShouldBeTrue();
+        UserDocs.Resolve("README.md", target).ShouldBe((path, anchor));
+    }
+
+    // The root is a redirect to README.html that drops the anchor, and the site has no folders and no page that is
+    // not built from a .md file.
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/#what-works-today")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/tool")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/tool.md")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource#what-works-today")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource")]
+    [InlineData("http://mbcrawfo.github.io/SqlSource/tool.html")]
+    [InlineData("http://mbcrawfo.github.io/SqlSource/")]
+    [InlineData("HTTPS://MBCRAWFO.GITHUB.IO/SqlSource/tool.html")]
+    public void SiteLinkProblem_NotAPageOfTheSite_IsReported(string target)
+    {
+        UserDocs.IsSiteLink(target).ShouldBeTrue();
+        _ = UserDocs.SiteLinkProblem(target).ShouldNotBeNull();
+    }
+
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSourceX/tool.html")]
+    [InlineData("https://mbcrawfo.github.io/")]
+    [InlineData("https://example.github.io/SqlSource/tool.html")]
+    public void IsSiteLink_AnotherAddress_IsFalse(string target) => UserDocs.IsSiteLink(target).ShouldBeFalse();
+
+    [Theory]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes")]
+    [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]
+    public void SiteLinkProblem_APageOrAnotherSite_IsNone(string target) =>
+        UserDocs.SiteLinkProblem(target).ShouldBeNull();
 }
