@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SqlSource.DatabaseTests.TestHarness.SyncAsync;
 
 namespace SqlSource.DatabaseTests.SqlServer.SyncAsync;
@@ -10,7 +11,8 @@ internal static class KnownDifferences
 {
     // site/generator.md, "Give the method the transaction": SqlClient refuses a command on a connection with a pending
     // transaction that the command was not given, from both methods, and names the call that refused it, so the
-    // asynchronous method's message says BeginExecuteReader where the synchronous one's says ExecuteReader.
+    // asynchronous method's message says BeginExecuteReader where the synchronous one's says ExecuteReader, or
+    // ExecuteScalar, since SqlClient runs ExecuteScalarAsync through BeginExecuteReader.
     public static KnownDifference SqlClientPendingTransactionMessage { get; } =
         new(
             nameof(SqlClientPendingTransactionMessage),
@@ -19,12 +21,13 @@ internal static class KnownDifferences
                 + "the connection assigned to the command is in a pending local transaction ...\") before anything is "
                 + "sent (site/generator.md, \"Give the method the transaction\"): the message names the call that "
                 + "refused it, BeginExecuteReader or BeginExecuteNonQuery from the asynchronous method, and "
-                + "ExecuteReader or ExecuteNonQuery from the synchronous one.",
+                + "ExecuteReader, ExecuteScalar or ExecuteNonQuery from the synchronous one, since SqlClient runs "
+                + "ExecuteScalarAsync through BeginExecuteReader.",
             static (_, asyncRun, syncRun) =>
                 asyncRun.Failure is { Type: InvalidOperation } asyncFailure
                 && syncRun.Failure is { Type: InvalidOperation } syncFailure
                 && asyncFailure.Message != syncFailure.Message
-                && SyncWordsOf(asyncFailure.Message) == syncFailure.Message
+                && SyncWordsOf(asyncFailure.Message).Contains(syncFailure.Message)
                     ? (asyncRun, syncRun with { Failure = syncFailure with { Message = asyncFailure.Message } })
                     : (asyncRun, syncRun)
         );
@@ -33,9 +36,13 @@ internal static class KnownDifferences
 
     private const string InvalidOperation = "System.InvalidOperationException";
 
-    // The asynchronous message with the synchronous calls' names in place of the asynchronous ones'.
-    private static string SyncWordsOf(string message) =>
-        message
-            .Replace("BeginExecuteReader", "ExecuteReader", StringComparison.Ordinal)
-            .Replace("BeginExecuteNonQuery", "ExecuteNonQuery", StringComparison.Ordinal);
+    // The asynchronous message with the names of the synchronous calls that SqlClient runs it as in place of the
+    // asynchronous one's: BeginExecuteReader is ExecuteReader's and ExecuteScalar's.
+    private static string[] SyncWordsOf(string message) =>
+        [
+            message
+                .Replace("BeginExecuteReader", "ExecuteReader", StringComparison.Ordinal)
+                .Replace("BeginExecuteNonQuery", "ExecuteNonQuery", StringComparison.Ordinal),
+            message.Replace("BeginExecuteReader", "ExecuteScalar", StringComparison.Ordinal),
+        ];
 }

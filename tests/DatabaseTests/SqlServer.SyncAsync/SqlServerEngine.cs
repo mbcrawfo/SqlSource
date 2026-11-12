@@ -64,8 +64,20 @@ internal sealed class SqlServerEngine(SqlServerDatabases databases) : IEngine, I
         );
     }
 
-    public string? CodeOf(DbException exception) =>
-        exception is SqlException sql ? sql.Number.ToString(CultureInfo.InvariantCulture) : null;
+    // The number of the SqlException in the exception or under it: a CollectionItemException is a DbException that
+    // holds the driver's inside, and passes on what DbException has, which a SQL Server error number is not.
+    public string? CodeOf(DbException exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SqlException sql)
+            {
+                return sql.Number.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        return null;
+    }
 
     // "completed" when the call committed the transaction or the server rolled it back, else the transaction's state as
     // the server sees it in it: XACT_STATE() is 1 for one that can commit and -1 for one that an error doomed, and

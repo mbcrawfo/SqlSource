@@ -25,6 +25,13 @@ internal static class AllScenarios
         .. ExternalRefsScenarios.All,
         .. NewTypesScenarios.All,
         .. WritesScenarios.All,
+        .. BatchesScenarios.All,
+        .. RepositoryScenarios.All,
+        .. AllTypesScenarios.All,
+        .. InvoicesScenarios.All,
+        .. NodaTimeScenarios.All,
+        .. NetTopologySuiteScenarios.All,
+        .. JsonScenarios.All,
     ];
 
     public static Scenario Named(string name) =>
