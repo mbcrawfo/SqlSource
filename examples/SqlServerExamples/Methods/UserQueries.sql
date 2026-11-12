@@ -62,3 +62,15 @@ ORDER BY {{orderBy:name}};
 SELECT name
 FROM users
 WHERE id = @id;
+
+-- name: RenameUser -> rowcount
+-- summary: Renames one user.
+-- rowcount: the method returns the count of rows updated.  The generator parameter method-type=sync gives the query a
+-- synchronous method, RenameUser, in place of its asynchronous one, and collection-method gives it a synchronous
+-- collection method too, an overload of RenameUser that takes a collection of RenameUserParams, renames every user in
+-- one transaction of its own and returns the count of rows updated.  Neither takes a cancellation token.  The query
+-- returns no result set, which a collection method on SQL Server allows.
+-- generator: collection-method method-type=sync
+UPDATE users
+SET name = @name
+WHERE id = @userId;

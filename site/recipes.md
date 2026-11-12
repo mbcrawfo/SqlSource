@@ -352,7 +352,7 @@ public int Run(int id)
 GetUserNameDto? user = await connection.GetUserNameAsync(new GetUserNameParams(id), cancellationToken: cancellationToken);
 ```
 
-`-- generator: method-type=both` gives `GetUserName` a synchronous method, `GetUserName`, which returns the row or null and takes no cancellation token, beside its asynchronous method, `GetUserNameAsync`.  `method-type=sync` gives it the synchronous method alone.  Write it in the file header, or in `generatorParameters` of the folder's `sqlsource.json`, for every query it reaches.  On PostgreSQL, the data source it runs on has no `Multiplexing=true`.
+`-- generator: method-type=both` gives `GetUserName` a synchronous method, `GetUserName`, which returns the row or null and takes no cancellation token, beside its asynchronous method, `GetUserNameAsync`.  `method-type=sync` gives it the synchronous method alone.  A query with [`collection-method`](generator.md#collection-methods) gets its collection method the same way, synchronous, asynchronous or both.  Write it in the file header, or in `generatorParameters` of the folder's `sqlsource.json`, for every query it reaches.  On PostgreSQL, the data source it runs on has no `Multiplexing=true`.
 
 Rules: [synchronous methods](generator.md#synchronous-methods), [generator parameters](settings.md#setting-generator-parameters).
 

@@ -88,4 +88,10 @@ public sealed partial class UserQueries(DbConnection connection)
                 .GetUserNameAsync(new GetUserNameParams(id), cancellationToken: cancellationToken)
                 .ConfigureAwait(false)
         )?.Name;
+
+    // The query's -- generator: collection-method method-type=sync gives RenameUser a synchronous collection method,
+    // which renames every user in one transaction of its own, on this thread, sending up to 1,000 in each round trip,
+    // and returns the count of rows updated.  It takes no CancellationToken, and a user the database refuses throws
+    // CollectionItemException, whose ItemIndex is its position, after the transaction has been rolled back.
+    public int RenameUsers(IEnumerable<RenameUserParams> renames) => connection.RenameUser(renames);
 }

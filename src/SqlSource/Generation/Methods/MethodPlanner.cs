@@ -422,7 +422,7 @@ internal static class MethodPlanner
         }
 
         problems.AddRange(FindTokenProblems(query, source));
-        var forms = FormsOf(query, settings, shape, problems);
+        var forms = FormsOf(query, settings, shape, models.Input is not null, problems);
         var host = HostOf(placement);
         foreach (var name in forms.Select(static form => form.Name))
         {
@@ -463,8 +463,9 @@ internal static class MethodPlanner
             return new Planned(problems, query.Name, query.NameLocation, [], false, []);
         }
 
+        var first = FirstMethodForm(forms);
         var method = new QueryMethod(
-            forms[0].Name,
+            first.Name,
             query.Name,
             TypeEmitter.GetSummaryXml(query, file.FileName),
             shape,
@@ -481,7 +482,7 @@ internal static class MethodPlanner
         {
             Host = host,
             Source = source,
-            Synchrony = forms[0].Synchrony,
+            Synchrony = first.Synchrony,
         };
         return new Planned(
             problems,
@@ -495,12 +496,15 @@ internal static class MethodPlanner
 
     // The forms of the query's methods, in their order, by its method-type and MethodNames: under sync a synchronous
     // method named as the query, under async an asynchronous one, and under both the two, the asynchronous one named
-    // with Async.  A stream has no synchronous method: under both it keeps its asynchronous one, and under sync it gets
-    // SQLSRC298 and none, so that it takes no name.  In this part a repository's method is asynchronous under any.
+    // with Async.  Each form has its collection method too, when the query has one.  A stream has no synchronous
+    // method: under both it keeps its asynchronous one, and its synchronous form is its collection method's alone,
+    // which reads an array and needs no stream, when it takes items; under sync it gets SQLSRC298 and none, so that it
+    // takes no name.  In this part a repository's methods are asynchronous under any.
     private static List<MethodForm> FormsOf(
         SqlQuery query,
         QuerySettings settings,
         ResultShape shape,
+        bool takesItems,
         List<DiagnosticInfo> problems
     )
     {
@@ -512,20 +516,42 @@ internal static class MethodPlanner
             return forms;
         }
 
-        if (!streams && MethodNames.HasSynchronous(settings))
+        if (MethodNames.HasSynchronous(settings) && (!streams || (settings.CollectionMethod && takesItems)))
         {
-            forms.Add(new MethodForm(MethodSynchrony.Synchronous, query.Name));
+            forms.Add(new MethodForm(MethodSynchrony.Synchronous, query.Name, HasQueryMethod: !streams));
         }
 
         if (MethodNames.HasAsynchronous(settings))
         {
-            forms.Add(new MethodForm(MethodSynchrony.Asynchronous, MethodNames.AsyncNameOf(query.Name, settings)));
+            forms.Add(
+                new MethodForm(
+                    MethodSynchrony.Asynchronous,
+                    MethodNames.AsyncNameOf(query.Name, settings),
+                    HasQueryMethod: true
+                )
+            );
         }
 
         return forms;
     }
 
-    // The query's methods, one of each form, the first of which is the method, and after them its collection method.
+    // The first form that has a query method, which every query with a form has: a form of its collection method alone
+    // is a stream's synchronous one, beside its asynchronous stream.
+    private static MethodForm FirstMethodForm(List<MethodForm> forms)
+    {
+        foreach (var form in forms)
+        {
+            if (form.HasQueryMethod)
+            {
+                return form;
+            }
+        }
+
+        throw new InvalidOperationException("A query's forms have no query method.");
+    }
+
+    // The query's methods: one of each form that has a query method, the first of which is the method, and after them
+    // a collection method of each form, in the same order, when the query has one.
     private static ImmutableArray<QueryMethod> MethodsOf(
         QueryMethod method,
         List<MethodForm> forms,
@@ -534,29 +560,33 @@ internal static class MethodPlanner
         List<DiagnosticInfo> problems
     )
     {
-        var methods = ImmutableArray.CreateBuilder<QueryMethod>(forms.Count + 1);
-        methods.Add(method);
-        for (var index = 1; index < forms.Count; index++)
+        var methods = ImmutableArray.CreateBuilder<QueryMethod>(forms.Count * 2);
+        foreach (var form in forms)
         {
-            methods.Add(method with { Name = forms[index].Name, Synchrony = forms[index].Synchrony });
+            if (form.HasQueryMethod)
+            {
+                methods.Add(methods.Count == 0 ? method : method with { Name = form.Name, Synchrony = form.Synchrony });
+            }
         }
 
-        if (CollectionMethodOf(methods[methods.Count - 1], plainSegments, settings, problems) is { } collection)
+        if (CollectionMethodOf(method, plainSegments, settings, problems) is { } collection)
         {
-            methods.Add(collection);
+            foreach (var form in forms)
+            {
+                methods.Add(collection with { Name = form.Name, Synchrony = form.Synchrony });
+            }
         }
 
         return methods.ToImmutable();
     }
 
-    // The collection method of the query, which follows its last method, when the query asks for one and takes
-    // parameters, which are the items, or null.  It has that method's name by design, so it is not checked against the
-    // names again, and it reads its rows into an array where the query method streams them.  In this part it is
-    // asynchronous, also beside a synchronous method, whose overload it is by its items.  An isolation level that the
-    // query's database does not have costs the query only this method, and is reported as a problem that does not
-    // stop the query's own.  Npgsql refuses a batch command whose text ends in a line comment after its final
-    // semicolon, which keep-comments can leave, so a PostgreSQL collection method sends the query's SQL without
-    // comments, plainSegments.
+    // The collection method of the query, without its form's name and synchrony, when the query asks for one and takes
+    // parameters, which are the items, or null.  Each has the name of a method of its query of the same synchrony, or,
+    // for a stream's synchronous one, the name that method would have, which the query's names are checked with.  It
+    // reads its rows into an array where the query method streams them.  An isolation level that the query's database
+    // does not have costs the query only these methods, and is reported as a problem that does not stop the query's
+    // own.  Npgsql refuses a batch command whose text ends in a line comment after its final semicolon, which
+    // keep-comments can leave, so a PostgreSQL collection method sends the query's SQL without comments, plainSegments.
     private static QueryMethod? CollectionMethodOf(
         QueryMethod method,
         EquatableArray<SqlSegment> plainSegments,
@@ -589,7 +619,6 @@ internal static class MethodPlanner
 
         return method with
         {
-            Synchrony = MethodSynchrony.Asynchronous,
             Batch = new BatchCall(transaction),
             Collection =
                 method.Collection == CollectionKind.IAsyncEnumerable ? CollectionKind.Array : method.Collection,
@@ -1197,9 +1226,9 @@ internal static class MethodPlanner
             for (var index = 0; index < plan.Methods.Length; index++)
             {
                 var method = plan.Methods[index];
-                // A collection method shares the name of the method it follows by design, which is no clash of the
-                // query with itself, and clashes where that method does.
-                if (method.Batch is not null)
+                // A collection method that shares the name of a method of its query by design, which is no clash of the
+                // query with itself, clashes where that method does.  A stream's synchronous one shares none.
+                if (SharesAMethodsName(plan, method))
                 {
                     continue;
                 }
@@ -1220,7 +1249,7 @@ internal static class MethodPlanner
             var clashes = false;
             foreach (var method in plan.Methods)
             {
-                if (method.Batch is null && byName[KeyOf(method)] is { Count: > 1 } queries)
+                if (!SharesAMethodsName(plan, method) && byName[KeyOf(method)] is { Count: > 1 } queries)
                 {
                     var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
                     diagnostics.Add(
@@ -1252,6 +1281,26 @@ internal static class MethodPlanner
                 warningIds.UnionWith(plan.WarningIds);
             }
         }
+    }
+
+    // Whether the method is a collection method with the name and class of a method of its query that is not one.
+    private static bool SharesAMethodsName(Planned plan, QueryMethod method)
+    {
+        if (method.Batch is null)
+        {
+            return false;
+        }
+
+        // An index, not Any, which would allocate a closure for each method.
+        for (var index = 0; index < plan.Methods.Length; index++)
+        {
+            if (plan.Methods[index].Batch is null && KeyOf(plan.Methods[index]) == KeyOf(method))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // The class that holds the method, and its name.
@@ -1385,11 +1434,12 @@ internal static class MethodPlanner
         }
     }
 
-    // One query's problems and its methods, one today or none when it cannot have one, with whether its driver allows
-    // them and the ids of the warnings they give.
-    // One method of a query, before its collection method: whether it is synchronous, and its name.
-    private readonly record struct MethodForm(MethodSynchrony Synchrony, string Name);
+    // One form of a query's methods: whether it is synchronous, its name, and whether it has a query method, which only
+    // a stream's synchronous form, whose collection method is its only method, has not.
+    private readonly record struct MethodForm(MethodSynchrony Synchrony, string Name, bool HasQueryMethod);
 
+    // One query's problems and its methods, none when it cannot have one, with whether its driver allows them and the
+    // ids of the warnings they give.
     private sealed record Planned(
         List<DiagnosticInfo> Problems,
         string QueryName,

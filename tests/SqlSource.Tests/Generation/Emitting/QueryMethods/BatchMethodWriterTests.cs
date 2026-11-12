@@ -18,6 +18,8 @@ namespace SqlSource.Tests.Generation.Emitting.QueryMethods;
 // its own unless the caller has one.  CollectionMethodTests of tests/SqlSource.Tests/Generator/ compile it.
 public sealed class BatchMethodWriterTests
 {
+    private const MethodSynchrony Synchronous = MethodSynchrony.Synchronous;
+
     // GetUser, a record of two columns in a list, as its collection method is planned.
     private static readonly QueryMethod Batch = QueryMethodWriterTests.GetUser with
     {
@@ -912,6 +914,91 @@ public sealed class BatchMethodWriterTests
         text.ShouldNotContain("TransactionRolledBackException");
         text.ShouldNotContain("raisedLater");
         CountOf(text, "catch (global::System.Data.Common.DbException error) when (").ShouldBe(1);
+    }
+
+    // A synchronous collection method of each shape returns what the asynchronous one's task holds, or nothing, takes
+    // no token and makes each call of the driver synchronously: it begins, commits, rolls back and disposes its own
+    // transaction, and runs each chunk, with no await.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many), "global::System.Collections.Generic.List<global::App.GetUserDto>", true)]
+    [InlineData(nameof(ResultShape.One), "global::System.Collections.Generic.List<global::App.GetUserDto>", true)]
+    [InlineData(
+        nameof(ResultShape.OneOptional),
+        "global::System.Collections.Generic.List<global::App.GetUserDto>",
+        true
+    )]
+    [InlineData(nameof(ResultShape.RowCount), "int", false)]
+    [InlineData(nameof(ResultShape.None), "void", false)]
+    public void Append_SynchronousEachShape_RunsEachChunkWithoutAwaiting(
+        string shapeName,
+        string returns,
+        bool readsRows
+    )
+    {
+        var text = Write(WithShape(System.Enum.Parse<ResultShape>(shapeName)) with { Synchrony = Synchronous });
+
+        text.ShouldContain("public static " + returns + " GetUser(\n");
+        text.ShouldContain("        connection.Open();\n");
+        text.ShouldContain("            ? connection.BeginTransaction()\n");
+        text.ShouldContain("                ownTransaction.Commit();\n");
+        text.ShouldContain("                    ownTransaction.Rollback();\n");
+        text.ShouldContain("                ownTransaction.Dispose();\n");
+        text.ShouldContain("            connection.Close();\n");
+        text.ShouldContain("using var batchScope = batch;\n");
+        text.ShouldContain(readsRows ? "batch.ExecuteReader(" : "batch.ExecuteNonQuery()");
+        text.Contains("<returns>", System.StringComparison.Ordinal).ShouldBe(returns != "void");
+        ShouldNotAwait(text);
+    }
+
+    [Fact]
+    public void Append_SynchronousIsolationLevel_BeginsTheTransactionAtIt() =>
+        Write(Batch with { Batch = new BatchCall(TransactionMode.Serializable), Synchrony = Synchronous })
+            .ShouldContain("? connection.BeginTransaction(global::System.Data.IsolationLevel.Serializable)\n");
+
+    // On SQL Server a synchronous method reads the session's level and sets it back as the asynchronous one does, with
+    // the synchronous calls.
+    [Fact]
+    public void Append_SynchronousSqlServerOwnTransaction_RestoresTheSessionsLevelWithoutAwaiting()
+    {
+        var text = Write(
+            Batch with
+            {
+                Engine = DatabaseEngine.SqlServer,
+                Batch = new BatchCall(TransactionMode.Serializable),
+                Synchrony = Synchronous,
+            }
+        );
+
+        text.ShouldContain("            using var isolationScope = isolationCommand;\n");
+        text.ShouldContain("                isolationCommand.ExecuteScalar(),\n");
+        text.ShouldContain("                isolationCommand.ExecuteNonQuery();\n");
+        IndexOf(text, "isolationCommand.ExecuteScalar()").ShouldBeLessThan(IndexOf(text, "BeginTransaction("));
+        IndexOf(text, "ownTransaction.Dispose()").ShouldBeLessThan(IndexOf(text, "if (isolationLevel != 0)"));
+        IndexOf(text, "if (isolationLevel != 0)").ShouldBeLessThan(IndexOf(text, "connection.Close()"));
+        ShouldNotAwait(text);
+    }
+
+    // A synchronous SQL Server method checks each result set, refuses a completed transaction and reports a rollback
+    // as the asynchronous one does.
+    [Fact]
+    public void Append_SynchronousSqlServerReadingRows_ChecksAsTheAsynchronousMethodDoes()
+    {
+        var text = Write(Batch with { Engine = DatabaseEngine.SqlServer, Synchrony = Synchronous });
+
+        text.ShouldContain("TransactionRolledBackException");
+        text.ShouldContain("reader.NextResult()");
+        text.ShouldContain("reader.Dispose();\n");
+        ShouldNotAwait(text);
+    }
+
+    private static void ShouldNotAwait(string text)
+    {
+        text.ShouldNotContain("async");
+        text.ShouldNotContain("await");
+        text.ShouldNotContain("Task");
+        text.ShouldNotContain("ConfigureAwait");
+        text.ShouldNotContain("cancellationToken");
+        text.ShouldNotContain("CancellationToken");
     }
 
     private static QueryMethod Repository(QueryMethod method) =>

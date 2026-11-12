@@ -9,9 +9,10 @@ namespace SqlSource.DatabaseTests.Postgres.Npgsql8;
 // The collection methods on Npgsql 8, which names the command of a database error in a batch, BatchCommand, where
 // Npgsql 10 names none unless the connection string asks it to: the end-to-end project proves the methods on Npgsql 10,
 // where the method finds the failed item by the commands that completed, and this class holds that it takes the item
-// that Npgsql 8 names, with a reader and without one, and from the repository's copy.  Each test makes a temporary
-// table notes on its own connection, which the queries' notes names, so that the method's own transaction leaves the
-// seed as it was.
+// that Npgsql 8 names, with a reader and without one, from the repository's copy, and from the synchronous collection
+// methods of the copies under method-type=sync, which run the batch through Npgsql 8's synchronous calls.  Each test
+// makes a temporary table notes on its own connection, which the queries' notes names, so that the method's own
+// transaction leaves the seed as it was.
 [Collection(UsesApp.Name)]
 public sealed class BatchQueryTests(AppContainer app)
 {
@@ -69,6 +70,36 @@ public sealed class BatchQueryTests(AppContainer app)
         (await CountNotesAsync(connection, token)).ShouldBe(0);
     }
 
+    // The duplicate key at item 2, from the synchronous collection method of InsertNote's copy.
+    [Fact]
+    public void InsertNoteSync_DuplicateKeyAtItemTwo_ThrowsCollectionItemExceptionAtTwo()
+    {
+        using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        using var connection = OpenWithTemporaryNotes(source);
+        NoteToAdd[] items = [new(101, "First.", 1), new(102, "Second.", 2), new(101, "Again.", 3)];
+
+        var thrown = Should.Throw<CollectionItemException>(() => connection.InsertNoteSync(items));
+
+        thrown.ItemIndex.ShouldBe(2);
+        thrown.InnerException.ShouldBeOfType<PostgresException>().SqlState.ShouldBe("23505");
+        CountNotes(connection).ShouldBe(0);
+    }
+
+    // The same failure, from the synchronous collection method that runs its batch without a reader.
+    [Fact]
+    public void InsertNoteRowCountSync_DuplicateKeyAtItemTwo_ThrowsCollectionItemExceptionAtTwo()
+    {
+        using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        using var connection = OpenWithTemporaryNotes(source);
+        NoteToAdd[] items = [new(101, "First.", 1), new(102, "Second.", 2), new(101, "Again.", 3)];
+
+        var thrown = Should.Throw<CollectionItemException>(() => connection.InsertNoteRowCountSync(items));
+
+        thrown.ItemIndex.ShouldBe(2);
+        thrown.InnerException.ShouldBeOfType<PostgresException>().SqlState.ShouldBe("23505");
+        CountNotes(connection).ShouldBe(0);
+    }
+
     // A connection of the source with a temporary table notes, empty, with the columns, defaults, keys and identity of
     // the seed's, which the queries' notes names until the connection closes.
     private static async Task<NpgsqlConnection> OpenWithTemporaryNotesAsync(
@@ -89,5 +120,22 @@ public sealed class BatchQueryTests(AppContainer app)
     {
         await using var count = new NpgsqlCommand("SELECT count(*) FROM notes", connection);
         return (long)(await count.ExecuteScalarAsync(token))!;
+    }
+
+    private static NpgsqlConnection OpenWithTemporaryNotes(NpgsqlDataSource source)
+    {
+        var connection = source.OpenConnection();
+        using var create = new NpgsqlCommand(
+            "CREATE TEMPORARY TABLE notes (LIKE public.notes INCLUDING ALL)",
+            connection
+        );
+        _ = create.ExecuteNonQuery();
+        return connection;
+    }
+
+    private static long CountNotes(NpgsqlConnection connection)
+    {
+        using var count = new NpgsqlCommand("SELECT count(*) FROM notes", connection);
+        return (long)count.ExecuteScalar()!;
     }
 }

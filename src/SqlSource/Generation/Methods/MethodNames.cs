@@ -6,7 +6,8 @@ namespace SqlSource.Generation.Methods;
 /// The names of a query's methods, by its <c>method-type</c>, for the planner and for the placement's check of a
 /// nested class's name, so that the two agree.  A synchronous method has the query's name.  An asynchronous one has it
 /// with <c>Async</c> after it under <c>async-method-suffix</c>, and always under <c>method-type=both</c>, so that the
-/// two never differ only by an argument with a default.  A collection method has the name of the method it follows.
+/// two never differ only by an argument with a default.  A collection method has the name of its query's method of
+/// the same synchrony.
 /// </summary>
 internal static class MethodNames
 {
@@ -34,7 +35,7 @@ internal static class MethodNames
     /// <summary>
     /// Whether the query's output can give it an asynchronous method, its shape aside: at <c>methods</c>, under
     /// <c>async</c> or <c>both</c>, and at <c>repository</c> under any, since a repository's methods stay asynchronous
-    /// in this release.  A collection method under <c>sync</c>, asynchronous too, has the synchronous method's name.
+    /// in this release.
     /// </summary>
     public static bool HasAsynchronous(QuerySettings settings) =>
         settings.Output switch

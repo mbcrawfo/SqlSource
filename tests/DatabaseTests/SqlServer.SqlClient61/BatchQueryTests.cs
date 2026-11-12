@@ -8,14 +8,22 @@ namespace SqlSource.DatabaseTests.SqlServer.SqlClient61;
 
 // The collection methods on SqlClient 6.1, the oldest driver that is supported, which names the command of a database
 // error in a batch, BatchCommand: the end-to-end project proves the methods on SqlClient 7, and this class holds that
-// the method takes the item that SqlClient 6.1 names, with a reader and without one, and from the repository's copy.
-// Each test makes a temporary table #notes on its own connection, which the inserts' token names, so that the method's
-// own transaction leaves the seed as it was.
+// the method takes the item that SqlClient 6.1 names, with a reader and without one, from the repository's copy, and
+// from the synchronous collection methods of the copies under method-type=sync, which run the batch through SqlClient
+// 6.1's synchronous calls.  Each test makes a temporary table #notes on its own connection, which the inserts' token
+// names, so that the method's own transaction leaves the seed as it was.
 [Collection(UsesApp.Name)]
 public sealed class BatchQueryTests(AppContainer app)
 {
     // The temporary table that the inserts write into, by their token.
     private const string Notes = "#notes";
+
+    // The table #notes, empty, with the columns of dbo.notes that the inserts write and no identity.
+    private const string CreateNotes =
+        "CREATE TABLE "
+        + Notes
+        + " (id int PRIMARY KEY, account_id int NOT NULL, kind varchar(10) NOT NULL, "
+        + "body nvarchar(max) NOT NULL, written_at datetime2(3) NOT NULL)";
 
     // The error number of a duplicate key.
     private const int DuplicateKey = 2627;
@@ -76,19 +84,39 @@ public sealed class BatchQueryTests(AppContainer app)
         (await CountNotesAsync(connection, token)).ShouldBe(0);
     }
 
+    // The duplicate key at item 2, from the synchronous collection method of InsertNote's copy.
+    [Fact]
+    public void InsertNoteSync_DuplicateKeyAtItemTwo_ThrowsCollectionItemExceptionAtTwo()
+    {
+        using var connection = OpenWithTemporaryNotes();
+
+        var thrown = Should.Throw<CollectionItemException>(() => connection.InsertNoteSync(Items, Notes));
+
+        thrown.ItemIndex.ShouldBe(2);
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(DuplicateKey);
+        CountNotes(connection).ShouldBe(0);
+    }
+
+    // The same failure, from the synchronous collection method that runs its batch without a reader.
+    [Fact]
+    public void InsertNoteRowCountSync_DuplicateKeyAtItemTwo_ThrowsCollectionItemExceptionAtTwo()
+    {
+        using var connection = OpenWithTemporaryNotes();
+
+        var thrown = Should.Throw<CollectionItemException>(() => connection.InsertNoteRowCountSync(Items, Notes));
+
+        thrown.ItemIndex.ShouldBe(2);
+        thrown.InnerException.ShouldBeOfType<SqlException>().Number.ShouldBe(DuplicateKey);
+        CountNotes(connection).ShouldBe(0);
+    }
+
     // A connection of "app" with the temporary table #notes, empty, with the columns of dbo.notes that the inserts
     // write and no identity, which ends with the session.
     private async Task<SqlConnection> OpenWithTemporaryNotesAsync(CancellationToken token)
     {
         var connection = new SqlConnection(app.ConnectionString);
         await connection.OpenAsync(token);
-        await using var create = new SqlCommand(
-            "CREATE TABLE "
-                + Notes
-                + " (id int PRIMARY KEY, account_id int NOT NULL, kind varchar(10) NOT NULL, "
-                + "body nvarchar(max) NOT NULL, written_at datetime2(3) NOT NULL)",
-            connection
-        );
+        await using var create = new SqlCommand(CreateNotes, connection);
         _ = await create.ExecuteNonQueryAsync(token);
         return connection;
     }
@@ -97,5 +125,20 @@ public sealed class BatchQueryTests(AppContainer app)
     {
         await using var count = new SqlCommand("SELECT COUNT(*) FROM " + Notes, connection);
         return (int)await count.ExecuteScalarAsync(token);
+    }
+
+    private SqlConnection OpenWithTemporaryNotes()
+    {
+        var connection = new SqlConnection(app.ConnectionString);
+        connection.Open();
+        using var create = new SqlCommand(CreateNotes, connection);
+        _ = create.ExecuteNonQuery();
+        return connection;
+    }
+
+    private static int CountNotes(SqlConnection connection)
+    {
+        using var count = new SqlCommand("SELECT COUNT(*) FROM " + Notes, connection);
+        return (int)count.ExecuteScalar();
     }
 }

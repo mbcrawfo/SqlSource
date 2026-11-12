@@ -461,6 +461,42 @@
           "computed": false
         }
       ]
+    },
+    "RenameUser": {
+      "hash": "cbe62f25443f4c417baef9e6ae215ed48d2322c3f55d38cd9f2e46770d153a48",
+      "toolVersion": "0.1.0",
+      "database": "postgres",
+      "engine": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "none",
+      "parameters": [
+        {
+          "name": "name",
+          "ordinal": 0,
+          "type": {
+            "name": "text",
+            "bindName": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "userId",
+          "ordinal": 1,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ]
     }
   }
 }

@@ -3659,6 +3659,6 @@ A query whose output is `methods` or `repository` streams its rows, with the [co
 /work/App/Queries/Users.sql(3,10): error SQLSRC298: The query 'ListUsers' streams its rows as an IAsyncEnumerable, which has no synchronous method; give it method-type=async or method-type=both
 ```
 
-Write `-- generator: method-type=async` in the query, or `method-type=both`, under which it keeps its stream, named with `Async` after the query's name, and gets no synchronous method.  Or give it a collection type that is read whole, such as `List`, which a synchronous method can return.  The query gets no method, and no [collection method](generator.md#collection-methods) either, until it is fixed; its models are still generated.  A query of another shape is not reported, whatever its collection type.
+Write `-- generator: method-type=async` in the query, or `method-type=both`, under which it keeps its stream, named with `Async` after the query's name, and gets no synchronous method, but for a synchronous [collection method](generator.md#collection-methods) when it has one.  Or give it a collection type that is read whole, such as `List`, which a synchronous method can return.  The query gets no method, and no [collection method](generator.md#collection-methods) either, until it is fixed; its models are still generated.  A query of another shape is not reported, whatever its collection type.
 
 See: [Collection type](settings.md#setting-collection-type)
