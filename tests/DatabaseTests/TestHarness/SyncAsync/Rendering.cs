@@ -37,6 +37,11 @@ internal static partial class Rendering
         }
 
         var type = value!.GetType();
+        if (ItemsOfMemory(value, type) is { } memory)
+        {
+            return "[" + string.Join(", ", memory.Cast<object?>().Select(item => Of(item, depth + 1))) + "]";
+        }
+
         if (HasOwnToString(type))
         {
             return value.ToString() ?? "null";
@@ -83,6 +88,17 @@ internal static partial class Rendering
             IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
             _ => null,
         };
+
+    // The items of a Memory<T> or a ReadOnlyMemory<T>, such as the one a SqlClient vector holds, whose own ToString
+    // names only its type and length; null for any other value.
+    private static Array? ItemsOfMemory(object value, Type type) =>
+        type.IsGenericType
+        && (
+            type.GetGenericTypeDefinition() == typeof(Memory<>)
+            || type.GetGenericTypeDefinition() == typeof(ReadOnlyMemory<>)
+        )
+            ? (Array?)type.GetMethod("ToArray", Type.EmptyTypes)?.Invoke(value, null)
+            : null;
 
     // A type that writes itself: ToString is declared by a type other than object and ValueType, and is not the one the
     // compiler writes for a record.

@@ -1,0 +1,12 @@
+#pragma warning disable IDE0130 // The end-to-end project's namespace, which the mirrored queries name.
+namespace SqlSource.DatabaseTests.SqlServer.EndToEnd.Json.Types;
+
+#pragma warning restore IDE0130
+
+// This project's copy of tests/DatabaseTests/SqlServer/EndToEnd/Json/Types/Tag.cs, in its namespace, since a test
+// project compiles no file of another: the mirrored queries name it.  A change to the original changes this copy.
+//
+// The element of the List<Tag> that the header of Queries/Json.sql gives tags, an nvarchar, by the opt-in: the
+// serializer reads and sends the list whole, as one JSON array.
+#pragma warning disable CA1812 // Made by the serializer, until a scenario sends one.
+internal sealed record Tag(string Name);

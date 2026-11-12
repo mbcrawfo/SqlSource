@@ -37,6 +37,7 @@ sqlserver tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/*
 # projects the script runs.
 none tests/DatabaseTests/Postgres.SyncAsync/*
 none tests/DatabaseTests/QueryMethodAllocation/*
+none tests/DatabaseTests/SqlServer.SyncAsync/*
 none docs/*
 none site/*
 none examples/*

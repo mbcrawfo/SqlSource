@@ -15,12 +15,16 @@ namespace SqlSource.DatabaseTests.TestHarness.SyncAsync;
 // own copy of the database, and compares what they did.
 internal static class PairRunner
 {
+    // What a fresh database's name is masked as in a message.
+    private const string FreshDatabase = "<fresh database>";
+
     // For each of Async then Sync: a fresh database when Setup.Writes; a connection from SourceOf, opened when
-    // Setup.Connection is Open (also when Transaction is Begun); Prepare run; a transaction begun when Begun; the call;
+    // Setup.Connection is Open (also with a caller's transaction); Prepare run; a transaction begun when Begun, and
+    // rolled back too when Completed; the call, given the transaction unless Setup.PassTransaction is false;
     // ConnectionState and TransactionState read; each Setup.Tables SELECT run on the call's connection in its
-    // transaction when both still work, else on a new connection; the transaction rolled back and everything
-    // disposed, then the fresh database dropped.  ItemIndex is read from the exception's "ItemIndex" property when
-    // it has one.  Returns Verdicts.Of(...).
+    // transaction when both still work, else on a new connection; the transaction rolled back and everything disposed,
+    // then the fresh database dropped.  ItemIndex is read from the exception's "ItemIndex" property when it has one,
+    // and the fresh database's name is masked in the message.  Returns Verdicts.Of(...).
     public static async Task<PairVerdict> RunAsync(
         IEngine engine,
         MethodPair pair,
@@ -47,7 +51,8 @@ internal static class PairRunner
             var source = engine.SourceOf(setup.Source, database);
             try
             {
-                return await RunOnAsync(engine, pair, method, scenario, source).ConfigureAwait(false);
+                var outcome = await RunOnAsync(engine, pair, method, scenario, source).ConfigureAwait(false);
+                return database is null ? outcome : WithoutTheName(outcome, database);
             }
             finally
             {
@@ -66,6 +71,19 @@ internal static class PairRunner
         }
     }
 
+    // The outcome with the fresh database's name in its failure's message masked, since each run has a copy of its own
+    // and a server may name it, as SQL Server's error of a constraint does.
+    private static Outcome WithoutTheName(Outcome outcome, string database) =>
+        outcome.Failure is { } failure
+            ? outcome with
+            {
+                Failure = failure with
+                {
+                    Message = failure.Message.Replace(database, FreshDatabase, StringComparison.Ordinal),
+                },
+            }
+            : outcome;
+
     private static async Task<Outcome> RunOnAsync(
         IEngine engine,
         MethodPair pair,
@@ -78,7 +96,7 @@ internal static class PairRunner
         var connection = source.CreateConnection();
         await using (connection.ConfigureAwait(false))
         {
-            var open = setup.Connection == ConnectionStart.Open || setup.Transaction == CallerTransaction.Begun;
+            var open = setup.Connection == ConnectionStart.Open || setup.Transaction != CallerTransaction.None;
             if (open || setup.Prepare is not null)
             {
                 await connection.OpenAsync().ConfigureAwait(false);
@@ -95,9 +113,14 @@ internal static class PairRunner
             }
 
             var transaction =
-                setup.Transaction == CallerTransaction.Begun
-                    ? await connection.BeginTransactionAsync().ConfigureAwait(false)
-                    : null;
+                setup.Transaction == CallerTransaction.None
+                    ? null
+                    : await connection.BeginTransactionAsync().ConfigureAwait(false);
+            if (setup.Transaction == CallerTransaction.Completed)
+            {
+                await transaction!.RollbackAsync().ConfigureAwait(false);
+            }
+
             try
             {
                 return await CallAsync(engine, pair, method, scenario, source, connection, transaction)
@@ -134,8 +157,8 @@ internal static class PairRunner
                     ?? throw new InvalidOperationException($"{scenario.Name}: a repository method needs an Instance.")
                 )(connection, source)
                 : null;
-            var value = await pair.InvokeAsync(method, instance, connection, transaction, scenario)
-                .ConfigureAwait(false);
+            var given = scenario.Setup.PassTransaction ? transaction : null;
+            var value = await pair.InvokeAsync(method, instance, connection, given, scenario).ConfigureAwait(false);
             result = IsVoid(method) ? "<void>" : Rendering.Of(value);
         }
 #pragma warning disable CA1031 // Any exception the method throws is the outcome that is compared.

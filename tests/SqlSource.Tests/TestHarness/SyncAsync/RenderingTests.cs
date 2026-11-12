@@ -60,6 +60,13 @@ public sealed class RenderingTests
             .ShouldBe("2024-01-02T03:04:05.0000000Z (Utc)");
 
     [Fact]
+    public void Of_Memory_RendersItsItems()
+    {
+        Rendering.Of(new ReadOnlyMemory<float>([1.5f, -2.25f])).ShouldBe("[1.5, -2.25]");
+        Rendering.Of(new Memory<int>([3])).ShouldBe("[3]");
+    }
+
+    [Fact]
     public void Of_TypeWithItsOwnToString_UsesIt() => Rendering.Of(new Own()).ShouldBe("own");
 
     [Fact]

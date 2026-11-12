@@ -18,11 +18,14 @@ internal enum ConnectionStart
     Open,
 }
 
-// Whether the caller begins a transaction on the connection before the call.
+// Whether the caller begins a transaction on the connection before the call, and whether it has ended by then.
 internal enum CallerTransaction
 {
     None,
     Begun,
+
+    // Begun and rolled back before the call, which is given a transaction that has completed.
+    Completed,
 }
 
 // What a scenario shows of its method; a collection method must have the last three of Empty, ChunkBoundary and
@@ -50,7 +53,10 @@ internal sealed record Setup(
     // SELECTs whose rows the outcome records, each with its ORDER BY.
     IReadOnlyList<string>? Tables = null,
     // SQL run on the connection before the call.
-    string? Prepare = null
+    string? Prepare = null,
+    // Whether the call is given the caller's transaction: false gives it null while the transaction stays begun on the
+    // connection, as a caller who forgets to pass it does.
+    bool PassTransaction = true
 );
 
 // One call of a method pair, with what surrounds it.

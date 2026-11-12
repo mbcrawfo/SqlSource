@@ -75,3 +75,50 @@ internal static class FakePairs
             Task.FromResult(answer);
     }
 }
+
+// Hand-written pairs of the connection they are given, for the tests of the runner: one runs a command naming whether
+// it was given a transaction, and one throws naming the connection's database.
+internal static class FakeConnectionPairs
+{
+    public static void Run(DbConnection connection, FakePairs.Args parameters, DbTransaction? transaction = null)
+    {
+        using var command = CommandOf(connection, transaction);
+        _ = command.ExecuteNonQuery();
+    }
+
+    public static async Task RunAsync(
+        DbConnection connection,
+        FakePairs.Args parameters,
+        DbTransaction? transaction = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        await using var command = CommandOf(connection, transaction);
+        _ = await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public static void FailIn(DbConnection connection, FakePairs.Args parameters) =>
+        throw new InvalidOperationException($"Failed in {connection.Database}.");
+
+    public static Task FailInAsync(
+        DbConnection connection,
+        FakePairs.Args parameters,
+        CancellationToken cancellationToken = default
+    ) => Task.FromException(new InvalidOperationException($"Failed in {connection.Database}."));
+
+    private static DbCommand CommandOf(DbConnection connection, DbTransaction? transaction)
+    {
+        var command = connection.CreateCommand();
+        if (transaction is null)
+        {
+            command.CommandText = "not given";
+        }
+        else
+        {
+            command.CommandText = "given";
+        }
+
+        command.Transaction = transaction;
+        return command;
+    }
+}
