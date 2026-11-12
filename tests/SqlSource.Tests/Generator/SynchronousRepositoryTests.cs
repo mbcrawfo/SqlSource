@@ -306,6 +306,23 @@ public sealed class SynchronousRepositoryTests
         run.Problems().Select(problem => problem[..9]).ShouldBe(["SQLSRC275", "SQLSRC299"]);
     }
 
+    // SQLSRC299 excuses no other error: under both the query that has one beside it keeps no method, not even the
+    // asynchronous one that its form alone would have kept.
+    [Fact]
+    public void Run_MethodTypeBothWithOnlyAnAsyncFactoryAndAnotherProblem_LeavesTheQueryNoMethod()
+    {
+        var file = UsersFile(
+            "-- generator: method-type=both\n-- name: GetFrom\n-- token: {{connection:users}}\n"
+                + "SELECT id FROM {{connection}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "GetFrom", [], [Column("id")])], AsyncFactoryOnly);
+
+        run.Problems().Select(problem => problem[..9]).ShouldBe(["SQLSRC275", "SQLSRC299"]);
+        MethodsOf(run).ShouldBeEmpty();
+        run.Sources[MethodsFile].ShouldNotContain("GetFrom");
+    }
+
     // The synchronous form's source is a base type's member of the query's name, which the method would hide; the
     // asynchronous form's is another member, so under async the query is no problem.
     [Theory]
@@ -504,6 +521,24 @@ public sealed class SynchronousRepositoryTests
 
         run.ShouldBeClean();
         run.Sources[MethodsFile].ShouldContain(" Finalize");
+    }
+
+    // A token is an argument, so a Finalize whose only argument is one has another signature than object.Finalize.
+    [Theory]
+    [InlineData("method-type=sync")]
+    [InlineData("method-type=both")]
+    public void Run_SynchronousRepositoryMethodNamedFinalizeWithATokenAlone_IsClean(string parameters)
+    {
+        var file = UsersFile(
+            "-- generator: "
+                + parameters
+                + "\n-- name: Finalize\n-- token: {{table:users}}\nSELECT id FROM {{table}};\n"
+        );
+
+        var run = RepositoryRuns.Run(file, [Entry(file, "Finalize", [], [Column("id")])], RepositoryRuns.Source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodsFile].ShouldContain(" Finalize(\n");
     }
 
     // Only Finalize has the signature of an object's method that the compiler warns about, so the names of the others
