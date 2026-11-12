@@ -23,6 +23,7 @@
 - **A test that changes a setting of the session, such as `SET XACT_ABORT ON`, takes a connection that is not pooled from `EndToEndSources.AppUnpooled`**, as `EndToEnd/UnpooledTransaction.cs` does, so that no other test gets the session; a test of what the pool keeps of a session takes a pool of its own by a unique `ApplicationName`.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
 - **A change to `EndToEnd/ListQueryTests.cs` changes its copy in `tests/DatabaseTests/SqlServer.SqlClient61` too**, which runs the same lists on SqlClient 6.1.
+- **A query added here that has a pair under `method-type=both`, neither a stream nor a `<Query>Sync` copy, gets its scenarios in `tests/DatabaseTests/SqlServer.SyncAsync` in the same change**, or that project's coverage test fails at night.
 - **`RowBufferQueryTests` is the eight generated methods and their twins handed to `RowBufferReads`** of `tests/DatabaseTests/TestHarness`, which holds the body, so a check of what every collection type returns goes there.
 
 ## NodaTime

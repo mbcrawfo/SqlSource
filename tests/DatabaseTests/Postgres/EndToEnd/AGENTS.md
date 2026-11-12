@@ -20,6 +20,7 @@
 - **A test that must show that a commit succeeds commits only into a temporary table of its own connection**, as the transaction test of `EndToEnd/StreamingQueryTests.cs` does, since a rollback cannot show that the transaction was not aborted.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
 - **A change to `EndToEnd/ListQueryTests.cs` changes its copy in `tests/DatabaseTests/Postgres.Npgsql8` too**, which runs the same lists on Npgsql 8.
+- **A query added here that has a pair under `method-type=both`, neither a stream nor a `<Query>Sync` copy, gets its scenarios in `tests/DatabaseTests/Postgres.SyncAsync` in the same change**, or that project's coverage test fails at night.
 - **`RowBufferQueryTests` is the eight generated methods and their twins handed to `RowBufferReads`** of `tests/DatabaseTests/TestHarness`, which holds the body, so a check of what every collection type returns goes there.
 
 ## NodaTime

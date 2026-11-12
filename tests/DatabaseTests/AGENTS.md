@@ -14,6 +14,7 @@
 - **The PostGIS image is built from the pinned postgres image with PostGIS at `PostgisContainer.Package`, never from a `postgis/postgis` tag**, which names no minor (root `AGENTS.md` rule 5).
 - **A change here is run on both of the engine's images before it is pushed**, since `pre-commit-validation.sh` runs the default image alone ([the commands](README.md#running)).
 - **The allocation tests of the generated methods are in `QueryMethodAllocation` and run only in the nightly's `allocation-postgres` and `allocation-sqlserver` jobs**, never in `dotnet test --solution`, `pre-commit-validation.sh` or `build.yml`: its `.csproj` is a test project only under `RunQueryMethodAllocation=true` ([why](QueryMethodAllocation/README.md)).
+- **The comparisons of each synchronous method with its asynchronous twin are in `Postgres.SyncAsync` and `SqlServer.SyncAsync` and run only in the nightly's `sync-async-postgres` and `sync-async-sqlserver` jobs**, never in `dotnet test --solution`, `pre-commit-validation.sh` or `build.yml`: each `.csproj` is a test project only under `RunSyncAsync=true` ([why](Postgres.SyncAsync/README.md#running)).
 
 ## References
 
@@ -21,5 +22,6 @@
 - **`TestHarness` references `src/SqlSource`, `tests/SqlSource.Repository` and `tests/SqlSource.Testing` alone**, with no driver, no Dapper and nothing of the tool, so every project here, the driver-floor ones included, references it; a helper that needs a driver stays in the project.
 - **`Postgres` and `SqlServer` reference `tests/SqlSource.Tool.Testing` too**, for the describer, fixture and realistic-corpus helpers, and are the two projects the tool's fixtures and corpora are recorded through.
 - **`QueryMethodAllocation` references `src/SqlSource`, `TestHarness`, the current Npgsql and Microsoft.Data.SqlClient, and NodaTime**, and nothing of the tool, and links its queries from the two describer projects.
+- **`Postgres.SyncAsync` and `SqlServer.SyncAsync` reference `src/SqlSource`, `TestHarness` and their engine's current driver**, and nothing of the tool, and copy their engine's end-to-end queries into `obj/Mirror/` ([why](Postgres.SyncAsync/README.md#the-queries)).
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.
