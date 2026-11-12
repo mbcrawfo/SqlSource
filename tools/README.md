@@ -15,7 +15,7 @@ Each linter script runs its tool from a pinned Docker image, so they need Docker
 
 ## The site
 
-`tools/build-site.sh` builds the manual, `site/`, into `artifacts/site` with docfx, the local tool of `dotnet-tools.json`, so it needs `dotnet tool restore` first.  Any docfx warning fails it: a link to a page or an anchor that is not there.  It also fails when the output holds a page built from an `AGENTS.md` or a `CLAUDE*.md`, which `site/docfx.json` excludes.  The `Site` job of `.github/workflows/build.yml` runs it on every pull request.
+`tools/build-site.sh` builds the manual, `site/`, into `artifacts/site` with docfx, the local tool of `dotnet-tools.json`, so it needs `dotnet tool restore` first.  Any docfx warning fails it: a link to a page or an anchor that is not there.  It also fails when the output holds a page built from an `AGENTS.md` or a `CLAUDE*.md`, which `site/docfx.json` excludes.  The `Site` job of `.github/workflows/build.yml` runs it on every pull request, and `.github/workflows/docs.yml` before it publishes the site.
 
 ## Package checks
 
