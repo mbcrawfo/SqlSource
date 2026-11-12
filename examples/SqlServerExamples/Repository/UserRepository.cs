@@ -9,6 +9,6 @@ namespace SqlServerExamples.Repository;
 // method-type=both, does the same with the driver's synchronous calls.  The connection string is found by its name,
 // connectionString, and type, string, since SqlClient has no data source.  The class also gets the interface
 // IUserRepository, of those methods, for code that takes a repository, as UserGreeter does.  See
-// docs/manual/settings.md#setting-output.
+// site/settings.md#setting-output.
 [SqlSourceGenerate]
 public sealed partial class UserRepository(string connectionString);

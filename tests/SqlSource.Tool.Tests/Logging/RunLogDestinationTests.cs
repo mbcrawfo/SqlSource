@@ -221,7 +221,7 @@ public sealed class RunLogDestinationTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldBe(
             $"{log} : error SQLSRC218: '{log}' could not be written: No space left on device; "
-                + "see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc218\n"
+                + "see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc218\n"
         );
     }
 

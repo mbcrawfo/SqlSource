@@ -1,6 +1,6 @@
 # Architecture
 
-These pages explain how SqlSource's code works and how its parts hand work to each other, for a developer who needs to understand a component before changing it.  What a user writes and sees is in [the manual](../manual/README.md), and the rules for editing a folder's code are in the `AGENTS.md` beside it.
+These pages explain how SqlSource's code works and how its parts hand work to each other, for a developer who needs to understand a component before changing it.  What a user writes and sees is in [the manual](../../site/README.md), and the rules for editing a folder's code are in the `AGENTS.md` beside it.
 
 ## Components
 
@@ -43,7 +43,7 @@ The tool plans a run with the generator's path resolver, readers of settings fil
 
 ## Glossary
 
-Each page uses these terms in the sense given here.  The words a user meets are defined in [the manual's glossary](../manual/concepts.md#glossary).
+Each page uses these terms in the sense given here.  The words a user meets are defined in [the manual's glossary](../../site/concepts.md#glossary).
 
 ### Bundle
 

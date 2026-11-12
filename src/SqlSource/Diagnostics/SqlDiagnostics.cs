@@ -11,13 +11,13 @@ namespace SqlSource.Diagnostics;
 /// </summary>
 /// <remarks>
 /// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and
-/// <c>docs/manual/diagnostics.md</c>.
+/// <c>site/diagnostics.md</c>.
 /// </remarks>
 internal static class SqlDiagnostics
 {
     internal const string Category = "SqlSource";
 
-    internal const string HelpLinkBase = "https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#";
+    internal const string HelpLinkBase = "https://mbcrawfo.github.io/SqlSource/diagnostics.html#";
 
     public static readonly DiagnosticDescriptor TypeNotPartial = new(
         id: "SQLSRC001",

@@ -1,6 +1,6 @@
 # SqlSource manual
 
-This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSource to turn it into code: how to write a `.sql` file, which settings change what is generated, how to describe your queries with the `sqlsource` tool, and what each error means.  If you have not used SqlSource yet, start with the [repository README](../../README.md); this manual is the reference behind it.  Words such as *marker*, *token* and *sidecar* are defined in [concepts](concepts.md#glossary).
+This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSource to turn it into code: how to write a `.sql` file, which settings change what is generated, how to describe your queries with the `sqlsource` tool, and what each error means.  If you have not used SqlSource yet, start with the [repository README](https://github.com/mbcrawfo/SqlSource/blob/main/README.md); this manual is the reference behind it.  Words such as *marker*, *token* and *sidecar* are defined in [concepts](concepts.md#glossary).
 
 ## Find what you need
 
@@ -52,7 +52,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Read and send JSON as System.Text.Json's types, or as a class of my own | JSON on [PostgreSQL](postgresql.md#json) and [SQL Server](sqlserver.md#json), [a class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in), or the [recipe](recipes.md#class-in-a-json-column) |
 | Give one column or one parameter a C# type of its own, such as an id's | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker), or the [recipe](recipes.md#strongly-typed-id) |
 | Read and send a type of my own, such as an id or an `Email`, in the query methods | [Converters](settings.md#converters), or the [recipe](recipes.md#strongly-typed-id) |
-| See a whole project that uses SqlSource, with its database | [The PostgreSQL example](../../examples/PostgresExamples/README.md), [the SQL Server example](../../examples/SqlServerExamples/README.md) |
+| See a whole project that uses SqlSource, with its database | [The PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md), [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
 | Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues), [PostgreSQL](postgresql.md#known-issues) and [SQL Server](sqlserver.md#known-issues) |
 

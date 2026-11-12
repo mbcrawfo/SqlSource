@@ -16,7 +16,7 @@ Low.  It takes a project that is not of the SDK, or one that drops the package's
 
 ## Proposed fix
 
-None is known that runs last in a project that is not of the SDK.  Such a target hooks `SqlSourceListFiles`, which the search depends on, so that it runs first wherever it is declared; the comment of `SqlSourceFindSettingsFiles` says so, and the known issues of [`docs/manual/settings.md`](../manual/settings.md#known-issues) say so with a sample target.
+None is known that runs last in a project that is not of the SDK.  Such a target hooks `SqlSourceListFiles`, which the search depends on, so that it runs first wherever it is declared; the comment of `SqlSourceFindSettingsFiles` says so, and the known issues of [`site/settings.md`](../../site/settings.md#known-issues) say so with a sample target.
 
 ## Trigger
 

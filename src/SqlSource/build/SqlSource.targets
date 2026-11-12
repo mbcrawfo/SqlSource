@@ -122,6 +122,7 @@
         </PropertyGroup>
         <Error
             Code="SQLSRC021"
+            HelpLink="https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc021"
             Text="SqlSource needs the C# compiler of the .NET SDK 9.0.300 or later, or of Visual Studio 2022 17.14 or later, and this build's compiler is Roslyn $(SqlSourceCompilerApiVersion).  Update the .NET SDK or Visual Studio; a project can still target .NET 8."
             Condition="'$(SqlSourceCompilerApiVersion)' != '' and $([MSBuild]::VersionLessThan('$(SqlSourceCompilerApiVersion)', '4.14'))"
         />
@@ -502,7 +503,7 @@
             Code="SQLSRC024"
             File="$(MSBuildProjectFullPath)"
             Text="SqlSourceOnline is '$(SqlSourceOnlineValue)', which is not auto, true or false.  Set it to one of the three, or leave it empty for auto."
-            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc024"
+            HelpLink="https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc024"
             Condition="!$(SqlSourceOnlineValue.Equals('auto')) and !$(SqlSourceOnlineValue.Equals('true')) and !$(SqlSourceOnlineValue.Equals('false'))"
         />
         <MSBuild
@@ -748,21 +749,21 @@
             Code="SQLSRC026"
             File="$(MSBuildProjectFullPath)"
             Text="The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning."
-            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc026"
+            HelpLink="https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc026"
             Condition="'$(SqlSourceToolStarted)' != 'true' and $(SqlSourceOnlineValue.Equals('auto'))"
         />
         <Error
             Code="SQLSRC025"
             File="$(MSBuildProjectFullPath)"
             Text="The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars."
-            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc025"
+            HelpLink="https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc025"
             Condition="'$(SqlSourceToolStarted)' != 'true' and $(SqlSourceOnlineValue.Equals('true'))"
         />
         <Error
             Code="SQLSRC027"
             File="$(MSBuildProjectFullPath)"
             Text="The sqlsource tool exited with the code $(SqlSourceToolExitCode) and reported no error, so the sidecars may not be current.  $(SqlSourceToolUpdateAdvice)It printed first: '$(SqlSourceToolFirstLine)'."
-            HelpLink="https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc027"
+            HelpLink="https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc027"
             Condition="'$(SqlSourceToolStarted)' == 'true' and '$(SqlSourceToolExitCode)' != '0' and '$(SqlSourceToolReportedError)' != 'true'"
         />
     </Target>

@@ -22,7 +22,7 @@ Low.  It takes a target that adds `.sql` files while the build runs.  The failur
 
 ## Proposed fix
 
-A target that adds a `.sql` file hooks `SqlSourceListFiles`, which runs it before the manifest is written as well as before the search for settings files; the comment at the top of `build/SqlSource.targets` says the same for a build.  The known issues of [`docs/manual/settings.md`](../manual/settings.md#known-issues) say so, and those of `docs/manual/tool.md` point there.  The online build of a project with one framework does not have the limit, and that of a project with several keeps it, as the problem says; the same line fixes it there.
+A target that adds a `.sql` file hooks `SqlSourceListFiles`, which runs it before the manifest is written as well as before the search for settings files; the comment at the top of `build/SqlSource.targets` says the same for a build.  The known issues of [`site/settings.md`](../../site/settings.md#known-issues) say so, and those of `site/tool.md` point there.  The online build of a project with one framework does not have the limit, and that of a project with several keeps it, as the problem says; the same line fixes it there.
 
 ## Trigger
 

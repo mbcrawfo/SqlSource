@@ -10,7 +10,7 @@ This repository holds SqlSource, a C# source generator that turns the `.sql` fil
 | [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, the PostgreSQL that `tests/DatabaseTests/Postgres` and `tests/DatabaseTests/Postgres.Npgsql8` run against, and the SQL Server that `tests/DatabaseTests/SqlServer` and `tests/DatabaseTests/SqlServer.SqlClient61` run against |
 | `unzip` | Any | `tools/check-package.sh` lists the contents of the packages with it.  Present on macOS and most Linux distributions. |
 
-CSharpier and ReportGenerator are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
+CSharpier, ReportGenerator and docfx are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
 
 ```bash
 dotnet tool restore
@@ -36,6 +36,12 @@ The nine test projects, the four libraries they share and a stand-in of the tool
 - `tests/DatabaseTests/QueryMethodAllocation` runs the allocation tests of the generated methods of both engines against hand-written ADO.NET, needs Docker, and is run by the nightly alone.
 - `tests/SqlSource.Repository`, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 - `tests/SqlSource.Tool.StandIn` is a stand-in of the `sqlsource` tool, which the tests of the online build in `tests/SqlSource.Tool.Tests` give a real build as its command.
+
+`site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
+
+```bash
+dotnet docfx site/docfx.json --serve
+```
 
 `examples/PostgresExamples` shows a user SqlSource with PostgreSQL and Dapper, and `examples/SqlServerExamples` with SQL Server and Dapper; they build with the solution and hold no tests.
 
@@ -100,12 +106,12 @@ Run the checks before committing, and all of them before pushing:
 ./pre-commit-validation.sh --full
 ```
 
-It verifies formatting, runs the [linters](tools/README.md#linters), builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed, failed and was skipped.
+It verifies formatting, runs the [linters](tools/README.md#linters), builds the manual's site, builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed, failed and was skipped.
 
 A plain run checks only what the uncommitted change (staged, unstaged and untracked) can affect:
 
 - Formatting is limited to the changed `.cs` files, and skipped when none changed; a change to `format.sh` or to a file that configures the formatters checks everything.
-- editorconfig-checker always runs.  shellcheck and shfmt run when a shell script or `.editorconfig` changed, actionlint when a workflow or `tools/actionlint.sh` changed, and the three package checks when a change can alter what is packed or how the packages are checked.
+- editorconfig-checker always runs.  shellcheck and shfmt run when a shell script or `.editorconfig` changed, actionlint when a workflow or `tools/actionlint.sh` changed, the site's build when a file under `site/`, `dotnet-tools.json` or `tools/build-site.sh` changed, and the three package checks when a change can alter what is packed or how the packages are checked.
 - The build and the tests that need no container always run.  A pair of container test projects, PostgreSQL's or SQL Server's, runs only when the change can reach it.  [`tools/test-scopes.txt`](tools/README.md#test-scopes) decides which pair a path can reach.
 - A clean tree, a change to `pre-commit-validation.sh`, a path of a kind the script does not know and a failing `git` command each make the run full.
 

@@ -7,11 +7,11 @@ namespace SqlSource.Diagnostics;
 /// The errors of the <c>sqlsource</c> tool that are not the generator's own; the tool reports some of
 /// <see cref="SqlDiagnostics" /> too.  The generator reports two of these, where the tool reports them:
 /// <see cref="OutputNeedsDescribableDialect" /> and <see cref="TokenHasNoDefault" />.  The others are here only so
-/// that the release tracking and the tests of <c>docs/manual/diagnostics.md</c> cover them with the generator's own.
+/// that the release tracking and the tests of <c>site/diagnostics.md</c> cover them with the generator's own.
 /// </summary>
 /// <remarks>
 /// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and
-/// <c>docs/manual/diagnostics.md</c>.
+/// <c>site/diagnostics.md</c>.
 /// </remarks>
 internal static class ToolDiagnostics
 {

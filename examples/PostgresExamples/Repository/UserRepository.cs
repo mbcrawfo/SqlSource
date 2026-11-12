@@ -9,6 +9,6 @@ namespace PostgresExamples.Repository;
 // and disposes the connection, so the caller passes no connection.  The synchronous GetUser, of method-type=both, opens
 // its connection of the same data source with OpenConnection.  The data source is found by its type, NpgsqlDataSource,
 // which derives from DbDataSource.  The class also gets the interface IUserRepository, of those methods, for code that
-// takes a repository, as UserGreeter does.  See docs/manual/settings.md#setting-output.
+// takes a repository, as UserGreeter does.  See site/settings.md#setting-output.
 [SqlSourceGenerate]
 public sealed partial class UserRepository(NpgsqlDataSource dataSource);

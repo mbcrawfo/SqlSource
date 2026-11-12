@@ -53,7 +53,7 @@ The sample's `Directory.Build.targets` has `SpikeProbe`, with no condition, whic
 
 ### The VS Code task
 
-This check runs [the recipe](../manual/recipes.md#start-the-watcher-with-your-editor) as a user gets it, in a project of your own and not in the sample, which has no VS Code task: the stand-in task it once held ran a stand-in of the watcher, served no other check, and would leave the recipe itself unchecked.  The project references the `SqlSource` package, has the tool in its tool manifest at the package's version, restored, and a `.env` file with a connection to a database that its queries describe against.  Run `dotnet sqlsource describe` in its folder and see it report no error.
+This check runs [the recipe](../../site/recipes.md#start-the-watcher-with-your-editor) as a user gets it, in a project of your own and not in the sample, which has no VS Code task: the stand-in task it once held ran a stand-in of the watcher, served no other check, and would leave the recipe itself unchecked.  The project references the `SqlSource` package, has the tool in its tool manifest at the package's version, restored, and a `.env` file with a connection to a database that its queries describe against.  Run `dotnet sqlsource describe` in its folder and see it report no error.
 
 1. Copy the `jsonc` block of the recipe, unchanged, into `.vscode/tasks.json` of the folder that holds the solution or the project.
 2. Open that folder in VS Code.  Record whether it asks to trust the folder and to allow automatic tasks, with the questions' exact words, and allow.
@@ -256,4 +256,4 @@ echo "sample written to $(pwd); open it in the IDE, or run: dotnet build"
 
 ## Trigger
 
-When Visual Studio, VS Code, or Rider on another system, is at hand to run the procedure, or when a user reports that a recipe of [starting the watcher with your editor](../manual/recipes.md#start-the-watcher-with-your-editor), or [what your editor shows](../manual/tool.md#what-your-editor-shows), does not do what the manual says.  The manual's page on the tool says, as a known issue, that Visual Studio and VS Code were not checked; the change that closes this item removes it.
+When Visual Studio, VS Code, or Rider on another system, is at hand to run the procedure, or when a user reports that a recipe of [starting the watcher with your editor](../../site/recipes.md#start-the-watcher-with-your-editor), or [what your editor shows](../../site/tool.md#what-your-editor-shows), does not do what the manual says.  The manual's page on the tool says, as a known issue, that Visual Studio and VS Code were not checked; the change that closes this item removes it.

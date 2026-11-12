@@ -61,6 +61,31 @@ jobs:
         if: ${{ !cancelled() }}
         run: tools/actionlint.sh
 
+  # The manual's site, built by docfx with warnings as errors, so that a link docfx cannot follow fails here and not
+  # when the site is published.  It restores the tools alone, so its cache is keyed on dotnet-tools.json alone.
+  site:
+    name: Site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: dotnet-tools.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Build the site
+        run: tools/build-site.sh
+
   # format.sh --check is split in two, because dotnet format style and dotnet format analyzers each compile the
   # solution and together are the slowest check.  CSharpier, which takes seconds, goes with the faster of the two.
   format-style:
@@ -111,7 +136,7 @@ jobs:
   build:
     name: Build, test and report coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

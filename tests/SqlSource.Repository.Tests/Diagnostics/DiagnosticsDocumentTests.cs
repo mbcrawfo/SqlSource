@@ -12,7 +12,7 @@ using Xunit;
 
 namespace SqlSource.Repository.Tests.Diagnostics;
 
-// docs/manual/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that
+// site/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that
 // is added, removed or renamed fails them until the document says the same.
 public sealed class DiagnosticsDocumentTests
 {
@@ -24,7 +24,7 @@ public sealed class DiagnosticsDocumentTests
         .. SqlDiagnostics.All.Concat(ToolDiagnostics.All).OrderBy(descriptor => descriptor.Id, StringComparer.Ordinal),
     ];
 
-    private static readonly string[] Lines = File.ReadAllLines(RepositoryRoot.Path("docs", "manual", "diagnostics.md"));
+    private static readonly string[] Lines = File.ReadAllLines(RepositoryRoot.Path("site", "diagnostics.md"));
 
     [Fact]
     public void Document_Sections_AreTheDescriptorsInOrder() =>
@@ -56,7 +56,7 @@ public sealed class DiagnosticsDocumentTests
 
     // The section of SQLSRC109 tells a user what the generator parameters are.  A generator parameter that is added is
     // added to this list and to the section together; each name here must be in the section and known to the parser.
-    // It also goes in docs/manual/settings.md, in the Values cell of the Generator parameters row and in the table of
+    // It also goes in site/settings.md, in the Values cell of the Generator parameters row and in the table of
     // parameters under #setting-generator-parameters, which no test checks.
     [Fact]
     public void Document_UnknownGeneratorParameterSection_ListsEveryGeneratorParameter()

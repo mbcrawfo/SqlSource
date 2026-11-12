@@ -9,14 +9,18 @@ using System.Text.RegularExpressions;
 
 namespace SqlSource.Repository.Tests.Documentation;
 
-// The documents a user reads: the readme of the repository, the readme of the tool, and the pages of docs/manual/.
+// The documents a user reads: the readme of the repository, the readme of the tool, and the pages of site/.
 // The tests of this folder read them as text: their links, the anchors a link may name, and the fenced blocks.
 internal static partial class UserDocs
 {
     // Where a link of a packed readme points, since nuget.org shows the readme without the repository around it.
     public const string RepositoryUrl = "https://github.com/mbcrawfo/SqlSource/blob/main/";
 
-    private const string Manual = "docs/manual";
+    // Where the manual is published, and the folder of the repository it is built from.  A page `<name>.md` of the
+    // folder is `<name>.html` of the site, and the site's root redirects to README.html.
+    public const string SiteUrl = "https://mbcrawfo.github.io/SqlSource/";
+
+    internal const string Site = "site";
 
     // The names of the block elements of CommonMark, whose tags start an HTML block whatever follows them.
     private const string BlockTags =
@@ -27,18 +31,19 @@ internal static partial class UserDocs
 
     private static readonly ConcurrentDictionary<string, Document> Documents = new(StringComparer.Ordinal);
 
-    // The repository-relative paths, with '/', of the user documents.  A page of docs/manual/ is one for the user,
-    // except AGENTS.md, which is guidance for an agent.
-    public static IReadOnlyList<string> Files { get; } =
+    // The pages of the manual, as repository-relative paths with '/': every .md file of site/ but AGENTS.md, which is
+    // guidance for an agent, and index.md, which only sends the site's root to README.html.  docfx publishes these.
+    public static IReadOnlyList<string> SitePages { get; } =
     [
-        "README.md",
-        "src/SqlSource.Tool/README.md",
         .. Directory
-            .EnumerateFiles(RepositoryRoot.Path(Manual), "*.md")
-            .Select(path => $"{Manual}/{Path.GetFileName(path)}")
-            .Where(path => path != $"{Manual}/AGENTS.md")
+            .EnumerateFiles(RepositoryRoot.Path(Site), "*.md")
+            .Select(path => $"{Site}/{Path.GetFileName(path)}")
+            .Where(path => Path.GetFileName(path) is not ("AGENTS.md" or "index.md"))
             .Order(StringComparer.Ordinal),
     ];
+
+    // The repository-relative paths, with '/', of the user documents: the two readmes and the pages of the manual.
+    public static IReadOnlyList<string> Files { get; } = ["README.md", "src/SqlSource.Tool/README.md", .. SitePages];
 
     // What GitHub makes of a heading's text: the anchor a link to it names.
     public static string Slug(string heading)
@@ -90,6 +95,37 @@ internal static partial class UserDocs
             ? $"use {RepositoryUrl}<path>: only blob/main and tree/main are followed"
             : null;
 
+    // Whether a link goes to the manual's site, in any spelling of its address: http or https, any case, with or
+    // without the slash after the repository's name.
+    public static bool IsSiteLink(string target) => SiteLinkPattern().IsMatch(target);
+
+    // What is wrong with a link to the site: it must name a page, `<name>.html`, or be the root with no anchor, since
+    // the root's redirect drops the anchor.  Null when the form is right, and for a link to anything else.
+    public static string? SiteLinkProblem(string target)
+    {
+        if (!IsSiteLink(target))
+        {
+            return null;
+        }
+
+        if (!target.StartsWith(SiteUrl, StringComparison.Ordinal))
+        {
+            return $"write the site's address as {SiteUrl}: the root without its slash drops an anchor too";
+        }
+
+        var rest = target[SiteUrl.Length..];
+        var hash = rest.IndexOf('#', StringComparison.Ordinal);
+        var page = hash < 0 ? rest : rest[..hash];
+        if (page.Length == 0)
+        {
+            return hash < 0
+                ? null
+                : $"name the page, {SiteUrl}README.html#<anchor>: the root's redirect drops the anchor";
+        }
+
+        return SitePagePattern().IsMatch(page) ? null : $"use {SiteUrl}<page>.html: the site has no other kind of page";
+    }
+
     private static bool IsMain(Match link) =>
         !link.Groups[1].Value.Equals("raw", StringComparison.OrdinalIgnoreCase) && link.Groups[2].Value == "main";
 
@@ -105,6 +141,24 @@ internal static partial class UserDocs
         {
             var match = RepositoryLinkPattern().Match(path);
             return IsMain(match) ? (match.Groups[3].Value.TrimEnd('/'), anchor) : null;
+        }
+
+        if (IsSiteLink(target))
+        {
+            if (!target.StartsWith(SiteUrl, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var page = path[SiteUrl.Length..];
+            if (page.Length == 0)
+            {
+                return ($"{Site}/README.md", anchor);
+            }
+
+            return SitePagePattern().Match(page) is { Success: true } name
+                ? ($"{Site}/{name.Groups[1].Value}.md", anchor)
+                : null;
         }
 
         if (SchemePattern().IsMatch(target))
@@ -331,6 +385,14 @@ internal static partial class UserDocs
         RegexOptions.IgnoreCase
     )]
     private static partial Regex RepositoryLinkPattern();
+
+    // The site's address, in any spelling, and nothing longer: SqlSourceX is another site.
+    [GeneratedRegex(@"^https?://mbcrawfo\.github\.io/SqlSource(?=[/#?]|$)", RegexOptions.IgnoreCase)]
+    private static partial Regex SiteLinkPattern();
+
+    // A page of the site: one segment, its name and `.html`.
+    [GeneratedRegex(@"^([^/]+)\.html$")]
+    private static partial Regex SitePagePattern();
 
     [GeneratedRegex(@"\[([^\]]*)\]\([^)]*\)")]
     private static partial Regex LinkPattern();

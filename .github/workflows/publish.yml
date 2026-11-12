@@ -1,4 +1,5 @@
 # Publishes to nuget.org through trusted publishing: a release from a v* tag, or a beta from a manual run on main.
+# After a tag's release, docs.yml publishes the manual's site from the tag; a beta does not publish it.
 # The file name and the nuget environment are part of the nuget.org policy.  Do not rename either.
 # The publish job keeps `environment: nuget`, and the NuGet/login and push steps stay in this file, not in a
 # reusable workflow.
@@ -92,3 +93,13 @@ jobs:
           REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: gh release create "$TAG" packages/*.nupkg --repo "$REPO" --title "$TAG" --generate-notes --verify-tag
+
+  docs:
+    name: Publish the site
+    needs: release
+    if: ${{ github.ref_type == 'tag' }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml

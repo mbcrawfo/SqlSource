@@ -14,7 +14,7 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// What the Dapper recipe of docs/manual/recipes.md (#dapper-with-sql-server) says for SQL Server beyond the generated
+// What the Dapper recipe of site/recipes.md (#dapper-with-sql-server) says for SQL Server beyond the generated
 // queries, on the connection that the recipe sets up: the type each C# parameter is sent as; a DateTime for a
 // datetime2, written or compared, goes as a TypedParameter, the recipe's sample copied in Types/, or with its DbType
 // in DynamicParameters over the generated input model; a SqlVector<float>, which Dapper refuses, goes as a
