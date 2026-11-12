@@ -443,6 +443,40 @@
           "computed": false
         }
       ]
+    },
+    "RenameUser": {
+      "hash": "cea1f07b44f66d0a8c9049ab5c714c8abc61c6773fe005c4f45e4eaa8ebe9fd4",
+      "toolVersion": "0.1.0",
+      "database": "mssql",
+      "engine": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "none",
+      "parameters": [
+        {
+          "name": "name",
+          "ordinal": 0,
+          "type": {
+            "name": "nvarchar(100)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "userId",
+          "ordinal": 1,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ]
     }
   }
 }
