@@ -1,0 +1,77 @@
+using System;
+using System.Collections.Generic;
+using System.Data.Common;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+// The parameters a fake does not read give it the signature of the method the generator writes.
+#pragma warning disable IDE0060
+
+namespace SqlSource.Tests.TestHarness.SyncAsync;
+
+// Hand-written method pairs shaped like the generator's, for the tests that find and call them by reflection.
+internal static class FakePairs
+{
+    public sealed record Args(int Id);
+
+    public static class Queries
+    {
+        public static int Get(
+            DbConnection connection,
+            Args parameters,
+            DbTransaction? transaction = null,
+            int? commandTimeout = null
+        ) => parameters.Id + 1;
+
+        public static int Get(
+            DbConnection connection,
+            IEnumerable<Args> parameters,
+            DbTransaction? transaction = null,
+            int? commandTimeout = null
+        ) => parameters.Count();
+
+        public static Task<int> GetAsync(
+            DbConnection connection,
+            Args parameters,
+            DbTransaction? transaction = null,
+            int? commandTimeout = null,
+            CancellationToken cancellationToken = default
+        ) => Task.FromResult(parameters.Id + 1);
+
+        public static Task<int> GetAsync(
+            DbConnection connection,
+            IEnumerable<Args> parameters,
+            DbTransaction? transaction = null,
+            int? commandTimeout = null,
+            CancellationToken cancellationToken = default
+        ) => Task.FromResult(parameters.Count());
+
+        public static void Fail(DbConnection connection, Args parameters) =>
+            throw new InvalidOperationException("sync failure");
+
+        public static async Task FailAsync(
+            DbConnection connection,
+            Args parameters,
+            CancellationToken cancellationToken
+        )
+        {
+            await Task.Yield();
+            throw new InvalidOperationException("async failure");
+        }
+
+        // Has no asynchronous twin.
+        public static void Orphan(DbConnection connection, Args parameters)
+        {
+            // Method intentionally left empty.
+        }
+    }
+
+    public sealed class Repository(int answer)
+    {
+        public int Count(DbConnection connection, Args parameters) => answer;
+
+        public Task<int> CountAsync(DbConnection connection, Args parameters, CancellationToken cancellationToken) =>
+            Task.FromResult(answer);
+    }
+}
