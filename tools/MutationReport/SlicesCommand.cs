@@ -94,14 +94,13 @@ internal static partial class SlicesCommand
             // what it holds outside them by itself.
             var all = FilesOf(whole, name, excluded);
             var projects = ProjectsBelow(whole, name, excluded);
+            var byProject = all.ToLookup(file => ProjectOf(file, projects) ?? name, StringComparer.Ordinal);
             foreach (var project in projects)
             {
-                slices.AddRange(TestSlices.Cut(project, [.. all.Where(file => IsIn(file, project))], limit));
+                slices.AddRange(TestSlices.Cut(project, [.. byProject[project]], limit));
             }
 
-            slices.AddRange(
-                TestSlices.Cut(name, [.. all.Where(file => !projects.Exists(project => IsIn(file, project)))], limit)
-            );
+            slices.AddRange(TestSlices.Cut(name, [.. byProject[name]], limit));
         }
 
         _ = Directory.CreateDirectory(outputFolder);
@@ -127,8 +126,12 @@ internal static partial class SlicesCommand
         return 0;
     }
 
-    private static bool IsIn(SliceFile file, string folder) =>
-        file.Path.StartsWith(folder + "/", StringComparison.Ordinal);
+    // The project a file is of: the nearest folder above it that is one, so that a file of a project inside
+    // another is of the inner one alone.  Null for a file outside every project.
+    private static string? ProjectOf(SliceFile file, List<string> projects) =>
+        projects
+            .Where(project => file.Path.StartsWith(project + "/", StringComparison.Ordinal))
+            .MaxBy(project => project.Length);
 
     // The folders below a folder that hold a project file, in order, but those of a build's output and those under
     // an excluded path.  A folder that is itself in a project has none below it, and is cut as one folder.

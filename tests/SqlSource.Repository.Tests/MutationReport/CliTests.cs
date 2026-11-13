@@ -179,6 +179,27 @@ public sealed class CliTests
             ReadLines(slices, "D-1.txt").ShouldBe(["tests/D/Loose/LooseTests.cs", "tests/D/Shared.cs"]);
         });
 
+    // A file is of the nearest project above it, and in that project's slices alone.
+    [Fact]
+    public async Task RunAsync_SlicesOfAProjectInsideAnother_PutsEachFileInOneSlice() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/D/A/A.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/A/ATests.cs", 10);
+            WriteLines(folder, "tests/D/A/Inner/Inner.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/A/Inner/InnerTests.cs", 10);
+            WriteLines(folder, "tests/D/B/B.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/B/BTests.cs", 10);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, output, _) = await RunAsync("slices", folder, slices, "tests/D");
+
+            code.ShouldBe(0);
+            output.ShouldBe(Lines("3 slices of 3 files and 30 lines"));
+            ReadLines(slices, "index.txt").ShouldBe(["D.A-1 10 1", "D.A.Inner-1 10 1", "D.B-1 10 1"]);
+            ReadLines(slices, "D.A-1.txt").ShouldBe(["tests/D/A/ATests.cs"]);
+        });
+
     [Fact]
     public async Task RunAsync_SlicesOfAFolderInsideAProject_CutsItAsOneFolder() =>
         await InFolderAsync(async folder =>
