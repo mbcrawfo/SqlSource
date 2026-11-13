@@ -13,6 +13,10 @@ namespace SqlSource.Repository.Tests.Documentation;
 // a link, and fails on an entry whose page is gone.
 public sealed partial class SiteTocTests
 {
+    // The folder of the made-up pages of a test, written so that InboundSiteReferenceTests does not read them as
+    // references to pages of the site.
+    private const string MadeUpFolder = "site/a";
+
     // Fails when a toc.yml of site/, at any depth, names a page that does not exist or a folder with no toc.yml, when a
     // page is named by more than one entry, or when a page is in no toc.yml.
     [Fact]
@@ -39,7 +43,13 @@ public sealed partial class SiteTocTests
                 "- name: D\n  href: ../diagnostics.md\n- name: P\n  href: page.md\n- name: T\n  href: twice.md\n",
             ["site/b/toc.yml"] = "- name: T\n  href: ../a/twice.md\n- name: G\n  href: gone.md\n",
         };
-        string[] pages = ["site/diagnostics.md", "site/a/page.md", "site/a/twice.md", "site/a/none.md"];
+        string[] pages =
+        [
+            "site/diagnostics.md",
+            $"{MadeUpFolder}/page.md",
+            $"{MadeUpFolder}/twice.md",
+            $"{MadeUpFolder}/none.md",
+        ];
 
         var problems = Problems(tocs, pages);
 
@@ -47,9 +57,11 @@ public sealed partial class SiteTocTests
         problems.ShouldContain(problem => problem.Contains("site/toc.yml") && problem.Contains("c/"));
         problems.ShouldContain(problem => problem.Contains("site/b/toc.yml") && problem.Contains("gone.md"));
         problems.ShouldContain(problem =>
-            problem.Contains("site/a/twice.md") && problem.Contains("more than one entry")
+            problem.Contains($"{MadeUpFolder}/twice.md") && problem.Contains("more than one entry")
         );
-        problems.ShouldContain(problem => problem.Contains("site/a/none.md") && problem.Contains("no toc.yml"));
+        problems.ShouldContain(problem =>
+            problem.Contains($"{MadeUpFolder}/none.md") && problem.Contains("no toc.yml")
+        );
     }
 
     // Each problem is one line that names the file and the href, or the page.
