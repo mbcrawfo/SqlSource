@@ -15,7 +15,7 @@
    - **The two packed readmes have rules of their own.**
      - nuget.org shows them with HTML turned off, so they hold no raw HTML and no `<a id>` line: their headings are linked by GitHub's slug, and renaming one means updating every link to it, which the link test in `tests/SqlSource.Repository.Tests/Documentation/` catches.
      - They link the manual by its site, `https://mbcrawfo.github.io/SqlSource/<page>.html#<anchor>`, which shows the release a reader installed, never by its pages on GitHub; a link with an anchor names the page, since the site's root drops it.
-     - Install and update commands are written for a stable release: no `--prerelease`, and no sentence about previews.  The NuGet badge is `nuget/vpre` until the first stable release (`docs/publishing.md`).
+     - Install and update commands are written for a stable release: no `--prerelease`, and no sentence about previews.  The NuGet badge is `nuget/vpre` until step 3 of `docs/publishing.md` changes it at the first stable release.
      - A `sql` sample's info string names its dialect (`sql postgres`), or says `fragment` or `error`, since a test parses it.
      - Never name the describer, a plan or `EXPLAIN`, a field of the sidecar, or a tech-debt or deferred id.
    - `site/` is the manual, published as the site `https://mbcrawfo.github.io/SqlSource/`, and is for the user with a specific need: one part of a project configured differently, a complex query, a database's limits, a build error to look up.  Each topic has one page; the entry page, `site/README.md`, routes a reader by need.
