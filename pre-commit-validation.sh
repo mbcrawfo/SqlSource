@@ -45,6 +45,7 @@ is_known_kind() {
     case "$1" in
     *.cs | *.csproj | *.props | *.targets | *.slnx | *.md | *.sql | *.json | *.sh | *.txt) return ;;
     .github/workflows/*.yml | .github/workflows/*.yaml | examples/*/docker-compose.yml | site/*.yml) return ;;
+    docs/superpowers/specs/2026-11-12-docs-overhaul/*.tsv) return ;;
     esac
     case "${1##*/}" in
     .editorconfig | .gitignore | .worktreeinclude) return ;;

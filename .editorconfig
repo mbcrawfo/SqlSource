@@ -45,6 +45,11 @@ max_line_length = off
 max_line_length = off
 end_of_line = lf
 
+# The inventory, the ledger and the checker's phase table of the docs overhaul epic, whose rows are as long as their
+# text and notes.  The epic's last phase removes them, and this section.
+[docs/superpowers/specs/2026-11-12-docs-overhaul/**.tsv]
+max_line_length = off
+
 # The fixtures of a describer, as the tool writes them: a line of a capture is as long as its SQL.
 [tests/SqlSource.Tool.Tests/Fixtures/Describers/**]
 max_line_length = off
