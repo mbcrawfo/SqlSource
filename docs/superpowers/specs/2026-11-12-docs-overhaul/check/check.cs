@@ -1116,11 +1116,13 @@ internal static partial class Check
     // The row that judges each unit left over, and why the unit fails the command.  The units of one text are judged
     // together, since a row that names one of them by its id names them all: in the order of the ledger, each row
     // that lets a unit be left over covers as many of them as it names, and only the rest are judged by the first
-    // row that does not.  Rows of the units come before those of their parts.  So the verdict does not depend on
-    // the order of the rows.
+    // row that does not.  A unit that list 1 found at its row's to is placed, and its row covers no other unit for
+    // it.  Rows of the units come before those of their parts.  So the verdict does not depend on the order of the
+    // rows.
     private static Dictionary<OldUnit, (LedgerRow? Row, string? Failure)> Verdicts(
         PhaseState phase,
-        IEnumerable<OldUnit> leftOver
+        IEnumerable<OldUnit> leftOver,
+        HashSet<(string Row, string Name)> placedNames
     )
     {
         var verdicts = new Dictionary<OldUnit, (LedgerRow? Row, string? Failure)>();
@@ -1132,7 +1134,7 @@ internal static partial class Check
             var index = 0;
             foreach (var row in rows.Where(row => FailureOf(row) is null))
             {
-                for (var covers = Covers(row, units); covers > 0 && index < units.Count; covers--)
+                for (var covers = Covers(row, units, placedNames); covers > 0 && index < units.Count; covers--)
                 {
                     verdicts[units[index++]] = (row, null);
                 }
@@ -1146,7 +1148,7 @@ internal static partial class Check
             }
             else if (rows.Count > 0)
             {
-                rest = (null, "each row that names its text covers another unit left over");
+                rest = (null, "each row that names its text placed its own unit or covers another unit left over");
             }
 
             for (; index < units.Count; index++)
@@ -1159,9 +1161,11 @@ internal static partial class Check
     }
 
     // How many units of one text a row covers: the units of the inventory that it names and that have the text, or
-    // the units it names by their place at the base.
-    private static int Covers(LedgerRow row, List<OldUnit> units) =>
-        units[0].Ids.Count > 0 ? units[0].Ids.Count(row.Ids.Contains) : units.Count(row.Names);
+    // the units it names by their place at the base, less those that list 1 found at its to.
+    private static int Covers(LedgerRow row, List<OldUnit> units, HashSet<(string Row, string Name)> placedNames) =>
+        units[0].Ids.Count > 0
+            ? units[0].Ids.Count(id => row.Ids.Contains(id) && !placedNames.Contains((row.Ref, id)))
+            : units.Count(unit => row.Names(unit) && !placedNames.Contains((row.Ref, $"@{unit.Unit.Id}")));
 
     // Why a row does not let its unit be left over, or null when it does.
     private static string? FailureOf(LedgerRow row) =>
@@ -1187,10 +1191,11 @@ internal static partial class Check
     {
         var phase = LoadPhase(root, number);
         var placed = new Dictionary<(string File, string Text), int>();
-        var misplaced = NotAtPlace(phase, placed);
+        var placedNames = new HashSet<(string Row, string Name)>();
+        var misplaced = NotAtPlace(phase, placed, placedNames);
         misplaced.AddRange(PartsNotAtBase(phase));
         var leftOver = LeftOver(phase);
-        var verdicts = Verdicts(phase, leftOver);
+        var verdicts = Verdicts(phase, leftOver, placedNames);
         var added = Added(phase, placed).GroupBy(unit => unit.File, StringComparer.Ordinal).ToList();
         var failingFiles = added.Count(file => PlaceOfNewText(phase, file.Key) is null);
         var gone = AnchorsGone(phase);
@@ -1244,7 +1249,13 @@ internal static partial class Check
 
     // List 1: each row that places text, and what of it is not at its place.  Each unit found whole is counted in
     // placed, by file and text.
-    private static List<string> NotAtPlace(PhaseState phase, Dictionary<(string File, string Text), int> placed)
+    // A unit that list 1 finds at its row's to is counted in placed by its text and file, and in placedNames by its
+    // row and its name.
+    private static List<string> NotAtPlace(
+        PhaseState phase,
+        Dictionary<(string File, string Text), int> placed,
+        HashSet<(string Row, string Name)> placedNames
+    )
     {
         var entries = new List<string>();
         foreach (var row in phase.Rows.Where(Places))
@@ -1266,7 +1277,7 @@ internal static partial class Check
             }
             else if (!row.IsFact && !row.IsPosition)
             {
-                entries.AddRange(UnitsNotAt(phase, row, units, placed));
+                entries.AddRange(UnitsNotAt(phase, row, units, placed, placedNames));
             }
         }
 
@@ -1315,7 +1326,8 @@ internal static partial class Check
         PhaseState phase,
         LedgerRow row,
         List<Unit> units,
-        Dictionary<(string File, string Text), int> placed
+        Dictionary<(string File, string Text), int> placed,
+        HashSet<(string Row, string Name)> placedNames
     )
     {
         var named = Named(phase, row);
@@ -1330,6 +1342,7 @@ internal static partial class Check
             if (units.Find(unit => unit.Hash == hash) is { } found)
             {
                 placed[(found.File, found.Text)] = placed.GetValueOrDefault((found.File, found.Text)) + 1;
+                _ = placedNames.Add((row.Ref, name));
             }
             else
             {
@@ -1854,6 +1867,7 @@ internal static partial class Check
         ("11: one copy of a text that stands twice removed with no row: move fails and names it", RepeatedRowCase),
         ("12: a move-split part whose words carry a changed numeral: move fails and names the part", PartChangedCase),
         ("13: two copies of a text, named by a move and a removed-status row: each row covers one", CountedRowsCase),
+        ("14: a restated-from or merge-pair row whose copy stands at its to covers no other copy", PlacedRowCase),
     ];
 
     // A case that throws fails, with the exception's message.
@@ -2321,6 +2335,39 @@ internal static partial class Check
             {
                 return $"with both {repeated} left over, {moves} are judged by the move and move exits with {code}:\n"
                     + text;
+            }
+        }
+
+        return null;
+    }
+
+    // Two copies of one text: a restated-from row with a to, or a merge-pair row, each with a note, names the copy
+    // that stays at its to word for word, and the other copy is cut with no row.  The placed copy's row covers no
+    // other copy, so move fails, and passes once a removed-status row names the cut one.
+    private static string? PlacedRowCase(string scratch)
+    {
+        var (repeated, units, ids) = RepeatedText(scratch);
+        RemoveUnits(scratch, units.Take(1));
+        string[] placing =
+        [
+            $"{ids[1]}\trestated-from\t{units[1].File}\t{units[1].File}#owner\t-\tthe rewrite of the page cuts it",
+            $"{ids[1]}\tmerge-pair\t{units[1].File}\tMP-01\t-\tplaced beside its pair",
+        ];
+        var removed = $"{ids[0]}\tremoved-status\t-\t-\t-\tstatus: the selftest cuts one copy";
+        foreach (var row in placing)
+        {
+            WriteLedger(scratch, 1, [row]);
+            var (code, text) = RunCommand(scratch, "move", "01");
+            if (code != 1 || !ListOf(text, 2).Contains(repeated, StringComparison.Ordinal))
+            {
+                return $"with one {repeated} cut and only the row of the placed copy, move exits with {code}:\n{text}";
+            }
+
+            WriteLedger(scratch, 1, [row, removed]);
+            (code, text) = RunCommand(scratch, "move", "01");
+            if (code != 0)
+            {
+                return $"with a removed-status row for the cut {repeated}, move exits with {code}:\n{text}";
             }
         }
 
