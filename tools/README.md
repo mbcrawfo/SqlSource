@@ -121,12 +121,12 @@ None of these is a check, and a person runs them.  `pre-commit-validation.sh` an
 `tools/mutation-test.sh` runs a mutation test of one of the two source projects with [Stryker.NET](https://stryker-mutator.io/docs/stryker-net/introduction/), the local tool `dotnet-stryker`: Stryker changes the project's code one small place at a time, each change a mutant, and runs the tests that reach it, so that a mutant no test fails on shows what the tests do not check.  It is no check: a person runs it on a folder of a project, which takes minutes, and neither `pre-commit-validation.sh` nor `build.yml` runs it.
 
 ```bash
-tools/mutation-test.sh generator --tests 'FullyQualifiedName~SqlSource.Tests.Parsing.' '**/Parsing/**/*.cs'
-tools/mutation-test.sh tool --output artifacts/mutation/before --tests 'FullyQualifiedName~SqlSource.Tool.Tests.DotEnv.' '**/DotEnv/*.cs'
+tools/mutation-test.sh generator --tests 'FullyQualifiedName~SqlSource.Tests.Parsing.' 'Parsing/**/*.cs'
+tools/mutation-test.sh tool --output artifacts/mutation/before --tests 'FullyQualifiedName~SqlSource.Tool.Tests.DotEnv.' 'DotEnv/*.cs'
 tools/mutation-test.sh compare artifacts/mutation/before/reports/mutation-report.json artifacts/mutation/after/reports/mutation-report.json
 ```
 
-`generator` is `src/SqlSource`, tested by `tests/SqlSource.Tests`, and `tool` is `src/SqlSource.Tool`, tested by `tests/SqlSource.Tool.Tests`.  Each glob names source files from the project's folder and is quoted, so that the shell does not expand it; with none every file is tested.  `--tests` is Stryker's `--test-case-filter`, which limits the tests that run: a run is given the folder of the source and the tests of that folder, [since a whole project does not fit in a night](#how-long-a-run-takes).  `--output` is the folder of the run, `artifacts/mutation/<generator|tool>` unless it is given.  The script runs from any folder, exits with Stryker's code, and ends by printing the path of the report, `reports/mutation-report.json` in the output folder, beside `mutation-report.html`, the same report to read in a browser.
+`generator` is `src/SqlSource`, tested by `tests/SqlSource.Tests`, and `tool` is `src/SqlSource.Tool`, tested by `tests/SqlSource.Tool.Tests`.  Each glob names source files from the project's folder and is quoted, so that the shell does not expand it; with none every file is tested.  A folder's glob starts at the folder, `Parsing/**/*.cs`, and never with `**/`: Stryker matches a glob against a file's full path as well, so in a checkout under a folder named `Projects`, `**/Projects/**/*.cs` is every file of the project.  `--tests` is Stryker's `--test-case-filter`, which limits the tests that run: a run is given the folder of the source and the tests of that folder, [since a whole project does not fit in a night](#how-long-a-run-takes).  `--output` is the folder of the run, `artifacts/mutation/<generator|tool>` unless it is given.  The script runs from any folder, exits with Stryker's code, and ends by printing the path of the report, `reports/mutation-report.json` in the output folder, beside `mutation-report.html`, the same report to read in a browser.
 
 Stryker builds and runs in the working tree, so two runs cannot share a checkout: a run holds the folder `artifacts/mutation/.running` as its lock and a second one is refused.  Nothing else that builds, `pre-commit-validation.sh` included, runs in the checkout during a run.
 
@@ -142,14 +142,15 @@ A run is given a folder of the source and the tests of that folder.  Measured on
 
 | Run | Tests | Mutants tested | Killed | Survived | Timeout | Time |
 |----|----|----|----|----|----|----|
-| `generator`, `**/Parsing/**/*.cs`, the tests of `SqlSource.Tests.Parsing` | 2,284 | 2,260 | 1,968 | 209 | 83 | 38 min |
-| `tool`, `**/Planning/**/*.cs`, the tests of `SqlSource.Tool.Tests.Planning` | 204 | 144 | 122 | 21 | 1 | 3 min |
-| `generator`, `**/Parsing/SqlDialectName.cs`, the tests of `Parsing` and `Generator` | 4,368 | 35 | 30 | 3 | 2 | 18 min |
-| `generator`, `**/Generation/Paths/**/*.cs`, the tests of `SqlSource.Tests.Generation.Paths` | 166 | 149 | 132 | 15 | 2 | 3 min |
+| `generator`, `Parsing/**/*.cs`, the tests of `SqlSource.Tests.Parsing` | 2,284 | 2,260 | 1,968 | 209 | 83 | 38 min |
+| `tool`, `Planning/**/*.cs`, the tests of `SqlSource.Tool.Tests.Planning` | 204 | 144 | 122 | 21 | 1 | 3 min |
+| `generator`, `Parsing/SqlDialectName.cs`, the tests of `Parsing` and `Generator` | 4,368 | 35 | 30 | 3 | 2 | 18 min |
+| `generator`, `Generation/Paths/**/*.cs`, the tests of `SqlSource.Tests.Generation.Paths` | 166 | 149 | 132 | 15 | 2 | 3 min |
 | The same files, with the driver tests of `SqlSource.Tests.Generator` added | 2,250 | 149 | 132 | 11 | 6 | 34 min |
 | `generator`, `*.cs`, its root files, with the driver tests and the root files' own | 2,213 | 235 | 208 | 13 | 14 | 67 min |
+| `tool`, `Projects/**/*.cs`, the tests of `SqlSource.Tool.Tests.Projects` | 316 | 228 | 214 | 12 | 2 | 19 min |
 
-The last three rows are of 2026-11-13.  The driver tests, which run the whole generator, cost about 17 seconds for each mutant where a folder's own tests cost about one: on `Generation/Paths` they took eleven times as long, killed one of the fifteen mutants that its own tests leave alive, and had three more reported as timeouts, [which may not be kills](#limits).  So a folder is run with its own tests, and the driver tests with the root files alone.
+The last four rows are of 2026-11-13.  The tests of `Projects`, some of which run MSBuild, cost about five seconds for each mutant.  The driver tests, which run the whole generator, cost about 17 seconds for each mutant where a folder's own tests cost about one: on `Generation/Paths` they took eleven times as long, killed one of the fifteen mutants that its own tests leave alive, and had three more reported as timeouts, [which may not be kills](#limits).  So a folder is run with its own tests, and the driver tests with the root files alone.
 
 A whole project does not fit in a night, so it is not run.  The generator's one whole run, with every test and Stryker's default time allowance, took 11 hours 41 minutes for 10,782 mutants and reported no survivor, [since it reported each as a timeout](#limits); its report was 738 MB, which `compare` reads in two seconds.  Before a single mutant is tested, a run of every generator test takes eleven minutes to build, run the tests once and capture what each reaches, and the script does that twice.
 

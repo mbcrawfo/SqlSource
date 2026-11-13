@@ -90,8 +90,8 @@ public sealed partial class SkillDataTests
             );
 
     // Whether a glob of a scope names a file, the path of which is from its project's folder.  A scope's glob is one
-    // of three forms: "*.cs", the project's own files; "**/<folder>/*.cs", a folder's own files; and
-    // "**/<folder>/**/*.cs", a folder's files at any depth.
+    // of three forms, each written from the project's folder: "*.cs", the project's own files; "<folder>/*.cs", a
+    // folder's own files; and "<folder>/**/*.cs", a folder's files at any depth.
     private static bool Matches(string glob, string path)
     {
         var folder = path.Contains('/', StringComparison.Ordinal) ? path[..path.LastIndexOf('/')] : "";
@@ -100,14 +100,34 @@ public sealed partial class SkillDataTests
             return folder.Length == 0;
         }
 
-        // "**/" is any folders, none among them, so the folder named may be at any depth.
-        glob.ShouldStartWith("**/");
         glob.ShouldEndWith("/*.cs");
-        var named = "/" + glob["**/".Length..^"/*.cs".Length];
+        var named = glob[..^"/*.cs".Length];
         return named.EndsWith("/**", StringComparison.Ordinal)
-            ? $"/{folder}/".Contains(named[..^"**".Length], StringComparison.Ordinal)
-            : $"/{folder}".EndsWith(named, StringComparison.Ordinal);
+            ? $"{folder}/".StartsWith(named[..^"**".Length], StringComparison.Ordinal)
+            : folder == named;
     }
+
+    // Stryker matches a glob against a file's full path as well as its path from the project, so a glob that starts
+    // with "**/" also names every file of the project in a checkout under a folder of the glob's name: under
+    // /Users/me/Projects/, "**/Projects/**/*.cs" is the whole tool.  A glob that starts at a folder of the project
+    // cannot match a full path, which starts with '/' or a drive.
+    [Fact]
+    public void Scopes_EveryGlob_StartsAtAFolderOfTheProjectAndNotAtAnyFolder()
+    {
+        var loose = Scopes()
+            .SelectMany(scope => scope.Mutate.Select(glob => $"{scope.Name}: {glob}"))
+            .Where(glob =>
+            {
+                var written = glob[(glob.IndexOf(": ", StringComparison.Ordinal) + 2)..];
+                return written != "*.cs" && !StartsAtAFolder().IsMatch(written);
+            })
+            .ToList();
+
+        loose.ShouldBeEmpty("These globs do not start at a folder of the project: " + string.Join("; ", loose));
+    }
+
+    [GeneratedRegex(@"^\w+(/\w+)*(/\*\*)?/\*\.cs$")]
+    private static partial Regex StartsAtAFolder();
 
     [Fact]
     public void Scopes_EveryBlock_IsWholeAndNamesFoldersThatExist()

@@ -155,6 +155,49 @@ public sealed class CliTests
             ReadLines(slices, "index.txt").ShouldBe(["P-1 10 1", "Q-1 10 1"]);
         });
 
+    // A folder is cut by its path from the root, however it is written.
+    [Theory]
+    [InlineData("./tests/P")]
+    [InlineData("tests/P/")]
+    [InlineData("tests/Q/../P")]
+    public async Task RunAsync_SlicesOfAFolderWrittenAnotherWay_CutsItAsWrittenPlainly(string written) =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/P/Own.cs", 60);
+            WriteLines(folder, "tests/P/A/ATests.cs", 60);
+            WriteLines(folder, "tests/P/B/BTests.cs", 60);
+            _ = Directory.CreateDirectory(Path.Combine(folder, "tests", "Q"));
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, _, error) = await RunAsync("slices", folder, slices, "--limit", "100", written);
+
+            error.ShouldBeEmpty();
+            code.ShouldBe(0);
+            ReadLines(slices, "index.txt").ShouldBe(["P-1 60 1", "P.A-1 60 1", "P.B-1 60 1"]);
+            ReadLines(slices, "P.A-1.txt").ShouldBe(["tests/P/A/ATests.cs"]);
+        });
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData("tests/..")]
+    [InlineData("..")]
+    [InlineData("tests/../../elsewhere")]
+    public async Task RunAsync_SlicesOfTheRootOrOfAFolderOutsideIt_ExitsTwoNamingIt(string outside) =>
+        await InFolderAsync(async folder =>
+        {
+            var root = Path.Combine(folder, "repo");
+            WriteLines(root, "tests/P/ATests.cs", 10);
+            _ = Directory.CreateDirectory(Path.Combine(folder, "elsewhere"));
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, output, error) = await RunAsync("slices", root, slices, outside);
+
+            code.ShouldBe(2);
+            error.ShouldBe(Lines($"The folder {outside} is not a folder below the repository's root."));
+            output.ShouldBeEmpty();
+            Directory.Exists(slices).ShouldBeFalse();
+        });
+
     [Theory]
     [InlineData("tests/Missing")]
     [InlineData("tests/P", "tests/P/A")]

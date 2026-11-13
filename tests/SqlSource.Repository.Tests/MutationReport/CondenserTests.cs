@@ -252,6 +252,47 @@ public sealed class CondenserTests : IDisposable
         Evidence("P-1.md").ShouldContain("- `ATests.Reads`: 1 row, 0.500 s\n");
     }
 
+    // tests/SqlSource.Tests.RoslynFloor compiles the files of tests/SqlSource.Tests/Generator/ a second time, so its
+    // results name those files too.  A slice's times are its own project's.
+    [Fact]
+    public async Task RunAsync_FileThatASecondProjectCompilesAgain_HasItsOwnProjectsTimesAlone()
+    {
+        WriteSlice("P-1", "tests/P/ATests.cs");
+        WriteTimes(
+            "P",
+            ("tests/P/ATests.cs", "N.ATests", "Reads", "Pass", "0.5"),
+            ("tests/P/BTests.cs", "N.BTests", "Reads", "Pass", "1.5")
+        );
+        WriteTimes(
+            "P.Floor",
+            ("tests/P/ATests.cs", "N.ATests", "Reads", "Pass", "7"),
+            ("tests/P.Floor/FloorTests.cs", "N.FloorTests", "Reads", "Pass", "9")
+        );
+
+        var (code, _, _) = await RunAsync();
+
+        code.ShouldBe(0);
+        var evidence = Evidence("P-1.md");
+        evidence.ShouldContain("- `ATests.Reads`: 1 row, 0.500 s\n");
+        evidence.ShouldContain("- `ATests`: 0.500 s, 25.0% of tests/P (2.0 s)\n");
+    }
+
+    [Fact]
+    public async Task RunAsync_TheoryWithOneRowSkipped_IsNotSkippedAndHasTheTimeOfItsOtherRows()
+    {
+        WriteSlice("P-1", "tests/P/ATests.cs");
+        WriteTimes(
+            "P",
+            ("tests/P/ATests.cs", "N.ATests", "Reads", "Pass", "1.5"),
+            ("tests/P/ATests.cs", "N.ATests", "Reads", "Skip", "0")
+        );
+
+        var (code, _, _) = await RunAsync();
+
+        code.ShouldBe(0);
+        Evidence("P-1.md").ShouldContain("- `ATests.Reads`: 2 rows, 1.5 s\n");
+    }
+
     [Fact]
     public async Task RunAsync_SliceOfAProjectThatWasNotRun_HasNoTimes()
     {

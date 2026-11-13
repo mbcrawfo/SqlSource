@@ -20,9 +20,6 @@ internal static class SliceEvidences
         }
 
         var kills = KillEvidence.Of(measured.Matrix, isBroad).ToLookup(method => method.File, StringComparer.Ordinal);
-        var times = measured
-            .Times.SelectMany(project => project.Value)
-            .ToLookup(test => test.File, StringComparer.Ordinal);
         var reach = Reach.Of(measured.Matrix, sliceOf, measured.Slices.Count);
 
         for (var slice = 0; slice < measured.Slices.Count; slice++)
@@ -33,7 +30,14 @@ internal static class SliceEvidences
                 .Scopes.Where(scope => scope.Matrix.Tests.Any(test => paths.Contains(test.File)))
                 .Select(ScopeOf)
                 .ToList();
+            // The times are those of the slice's own project: another project may compile the same files again, as
+            // tests/SqlSource.Tests.RoslynFloor does those of tests/SqlSource.Tests/Generator/, and its results then
+            // name them too.
             var project = ProjectOf(measured, files[0].Path);
+            var times = (measured.Times.GetValueOrDefault(project) ?? []).ToLookup(
+                test => test.File,
+                StringComparer.Ordinal
+            );
             var ran = files.SelectMany(file => times[file.Path]).ToList();
             yield return new SliceEvidence(
                 name,

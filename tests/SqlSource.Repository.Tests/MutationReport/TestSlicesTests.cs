@@ -44,6 +44,19 @@ public sealed class TestSlicesTests
     }
 
     [Fact]
+    public void Cut_SiblingFoldersThatComeToExactlyTheLimit_AreJoined()
+    {
+        var slices = Cut(100, File("A/1.cs", 40), File("B/1.cs", 60), File("C/1.cs", 10));
+
+        slices
+            .Select(Paths)
+            .ShouldBe([
+                ["A/1.cs", "B/1.cs"],
+                ["C/1.cs"],
+            ]);
+    }
+
+    [Fact]
     public void Cut_FolderOverTheLimit_IsSplitByItsSubFoldersWithItsOwnFilesFirst()
     {
         var slices = Cut(100, File("Z.cs", 60), File("A/1.cs", 70), File("B/1.cs", 80));

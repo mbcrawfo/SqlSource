@@ -28,16 +28,38 @@ internal static partial class SlicesCommand
         TextWriter error
     )
     {
-        var names = folders.Select(folder => folder.Replace('\\', '/').Trim('/')).ToArray();
+        // Each folder as its path from the root, however it was written: "./tests/P", "tests/P/" and "tests/Q/../P"
+        // are tests/P, which is what a slice's files and its name are cut from.
+        var whole = Path.GetFullPath(root);
+        var names = new List<string>();
+        foreach (var folder in folders)
+        {
+            var name = Path.GetRelativePath(whole, Path.GetFullPath(Path.Combine(whole, folder))).Replace('\\', '/');
+            if (
+                name == "."
+                || name == ".."
+                || name.StartsWith("../", StringComparison.Ordinal)
+                || Path.IsPathRooted(name)
+            )
+            {
+                await error
+                    .WriteLineAsync($"The folder {folder} is not a folder below the repository's root.")
+                    .ConfigureAwait(false);
+                return 2;
+            }
+
+            names.Add(name);
+        }
+
         foreach (var name in names)
         {
-            if (!Directory.Exists(Path.Combine(root, name)))
+            if (!Directory.Exists(Path.Combine(whole, name)))
             {
                 await error.WriteLineAsync($"The folder {name} does not exist.").ConfigureAwait(false);
                 return 2;
             }
 
-            if (names.Any(other => name.StartsWith(other + "/", StringComparison.Ordinal)))
+            if (names.Exists(other => name.StartsWith(other + "/", StringComparison.Ordinal)))
             {
                 await error
                     .WriteLineAsync($"The folder {name} is inside another of the folders.")
@@ -66,7 +88,7 @@ internal static partial class SlicesCommand
         var slices = new List<Slice>();
         foreach (var name in names.Distinct(StringComparer.Ordinal))
         {
-            slices.AddRange(TestSlices.Cut(name, FilesOf(root, name, excluded), limit));
+            slices.AddRange(TestSlices.Cut(name, FilesOf(whole, name, excluded), limit));
         }
 
         _ = Directory.CreateDirectory(outputFolder);
