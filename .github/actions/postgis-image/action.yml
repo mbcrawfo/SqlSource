@@ -1,0 +1,81 @@
+# Loads the PostGIS image of the tests from the Actions cache, or builds it with tools/build-postgis-image.sh and saves
+# it to the cache, and keeps its ID as POSTGIS_IMAGE_ID for the step "Check the tests built no PostGIS image".
+# The cache's key is the image's name, which holds the postgres tag, the PostGIS package and the hash of the Dockerfile,
+# so a change to any of them misses the cache and builds.  A build that fails fails this step with Docker's whole
+# output, before any test runs, as the script's own step did.
+# After a load it builds nothing: BuildKit's cache does not hold a loaded image, so a build would run apt again.  A
+# tarball that fails to load is warned of, and the image is built as on a miss.
+# The image is saved as soon as it is built, so a job whose tests then fail still caches it.
+# A key that is hit is never built again, so the nightly jobs pass use-cache: false and build it every night: a
+# Dockerfile that stops building against PostgreSQL's package sources, or a postgres tag pushed again, still fails a run
+# within a day.
+# A job checks out the repository before it uses this action.
+name: PostGIS image
+description: Loads the PostGIS image of the tests from the cache, or builds and caches it.
+
+inputs:
+  postgres-image:
+    description: The postgres image to build on.  Empty for the default image, as the script reads it.
+    required: false
+    default: ''
+  use-cache:
+    description: Whether to load the image from the cache and save it there.  'false' always builds and saves nothing.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Name the image
+      id: name
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.postgres-image }}
+      run: echo "name=$(tools/build-postgis-image.sh --name "$IMAGE")" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the image
+      id: restore
+      if: ${{ inputs.use-cache == 'true' }}
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/postgis-image.tar
+        key: postgis-image-${{ steps.name.outputs.name }}
+
+    - name: Load or build the image
+      id: build
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.postgres-image }}
+        NAME: ${{ steps.name.outputs.name }}
+        CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+        TARBALL: ${{ runner.temp }}/postgis-image.tar
+        USE_CACHE: ${{ inputs.use-cache }}
+      run: |
+        if [[ $CACHE_HIT == true ]]; then
+            if docker load --input "$TARBALL"; then
+                echo "Loaded $NAME from the cache."
+            else
+                echo "::warning::The cached $NAME did not load.  Building it.  A key that is hit is never saved" \
+                    "again, so delete the entry: gh cache delete postgis-image-$NAME"
+            fi
+        fi
+        built=false
+        if ! docker image inspect "$NAME" >/dev/null 2>&1; then
+            tools/build-postgis-image.sh "$IMAGE"
+            if [[ $USE_CACHE == true ]]; then
+                docker save --output "$TARBALL" "$NAME"
+            fi
+            built=true
+        fi
+        echo "built=$built" >> "$GITHUB_OUTPUT"
+        echo "POSTGIS_IMAGE_ID=$(tools/build-postgis-image.sh --id "$IMAGE")" >> "$GITHUB_ENV"
+
+    # A hit's key exists already, and a save under it would fail, so only a build is saved.
+    - name: Save the image
+      if: >-
+        ${{ inputs.use-cache == 'true' && steps.build.outputs.built == 'true'
+        && steps.restore.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/postgis-image.tar
+        key: postgis-image-${{ steps.name.outputs.name }}
