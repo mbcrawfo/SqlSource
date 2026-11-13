@@ -10,7 +10,7 @@ This repository holds SqlSource, a C# source generator that turns the `.sql` fil
 | [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, the PostgreSQL that `tests/DatabaseTests/Postgres` and `tests/DatabaseTests/Postgres.Npgsql8` run against, and the SQL Server that `tests/DatabaseTests/SqlServer` and `tests/DatabaseTests/SqlServer.SqlClient61` run against |
 | `unzip` | Any | `tools/check-package.sh` lists the contents of the packages with it.  Present on macOS and most Linux distributions. |
 
-CSharpier, ReportGenerator and docfx are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
+CSharpier, ReportGenerator, docfx and Stryker.NET are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
 
 ```bash
 dotnet tool restore
@@ -37,7 +37,7 @@ The nine test projects, the four libraries they share and a stand-in of the tool
 - `tests/SqlSource.Repository`, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 - `tests/SqlSource.Tool.StandIn` is a stand-in of the `sqlsource` tool, which the tests of the online build in `tests/SqlSource.Tool.Tests` give a real build as its command.
 
-`tools/MutationReport` is a console program that compares the reports of two mutation runs, which `tools/mutation-test.sh` runs; it builds with the solution and is never packed.
+`tools/MutationReport` is a console program that compares the reports of two mutation runs, which [`tools/mutation-test.sh`](tools/README.md#mutation-testing) runs; it builds with the solution and is never packed.
 
 `site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
 
@@ -84,6 +84,14 @@ dotnet reportgenerator '-reports:artifacts/test-results/*.cobertura.xml' -target
 ```
 
 Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.  The allocation tests of `tests/DatabaseTests/QueryMethodAllocation` skip under coverage and run only in the nightly; its readme has the command.
+
+To see which changes to a folder's code its tests would not notice, run a mutation test of it with the tests of that folder, which takes minutes and is no check:
+
+```bash
+tools/mutation-test.sh generator --tests 'FullyQualifiedName~SqlSource.Tests.Parsing.' '**/Parsing/**/*.cs'
+```
+
+[`tools/README.md`](tools/README.md#mutation-testing) says what the report holds, how two reports are compared and what the results cannot be trusted for.
 
 A change to what the generator writes updates the golden corpus, as [`tests/README.md`](tests/README.md#the-golden-corpus-of-query-methods) says.
 

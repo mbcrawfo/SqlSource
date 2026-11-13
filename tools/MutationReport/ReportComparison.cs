@@ -13,7 +13,9 @@ internal sealed record Comparison(int Detected, IReadOnlyList<Change> Lost, IRea
 }
 
 // Compares two reports of the same source, mutant for mutant.  A mutant that the first run did not detect is left
-// out, whatever the second made of it: the guard is that nothing detected stops being detected.
+// out, whatever the second made of it: the guard is that nothing detected stops being detected.  A mutant that was
+// killed and now runs out of time is not comparable, since Stryker reports a mutant that no test fails on as a
+// timeout when its tests are slow enough.
 internal static class ReportComparison
 {
     public static Comparison Compare(IReadOnlyList<Mutant> before, IReadOnlyList<Mutant> after)
@@ -43,7 +45,7 @@ internal static class ReportComparison
             {
                 lost.Add(new Change(mutant.Key, mutant.Status, status));
             }
-            else if (!IsDetected(status))
+            else if (!IsDetected(status) || (mutant.Status, status) is (MutantStatus.Killed, MutantStatus.Timeout))
             {
                 notComparable.Add(new Change(mutant.Key, mutant.Status, status));
             }

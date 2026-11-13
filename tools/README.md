@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, two recording scripts and the script and program of mutation testing, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -111,3 +111,61 @@ None of these is a check, and a person runs them.  `pre-commit-validation.sh` an
 
 - `tools/record-fixtures.sh [postgres|mssql]` records the cases of one describer's fixtures, or of both when it is given no engine; any other argument is a usage error.  It records on the default image of the engine, or on the image of `SQLSOURCE_TESTS_POSTGRES_IMAGE` or `SQLSOURCE_TESTS_SQLSERVER_IMAGE` when the variable is set.  The procedures are [the PostgreSQL describer's fixtures](../tests/DatabaseTests/Postgres/README.md#the-describers-fixtures) and [the SQL Server describer's](../tests/DatabaseTests/SqlServer/README.md#the-describers-fixtures).
 - `tools/describe-end-to-end.sh` writes every sidecar of both end-to-end projects, of both engines' realistic cases and of both example projects, `examples/PostgresExamples` and `examples/SqlServerExamples`, from nothing, on the default image of each engine alone; [PostgreSQL's end-to-end project](../tests/DatabaseTests/Postgres/README.md#writing-the-sidecars) and [SQL Server's](../tests/DatabaseTests/SqlServer/README.md#writing-the-sidecars) have the procedure.  It runs no test, since a project does not build until its sidecars are current, and has a part for each engine, which starts a container of its own with `docker run` and removes it.  PostgreSQL's applies `Realistic/schema.sql` and `Realistic/seed.sql` of `tests/DatabaseTests/Postgres` to a database `realistic`, and the schemas and seeds of `app` and `billing`, with `psql`.  It also builds the PostGIS image of the tests with `docker build`, from `tests/DatabaseTests/TestHarness/Postgis/Dockerfile` on the default image's tag, with the PostGIS package that `PostgisContainer.Package` of the harness names and under the name that `PostgisContainer` gives it, keeps it, and starts a second container of it for the schema and seed of `gis`, which the end-to-end project's `EndToEnd/NetTopologySuite/` names, and for the examples' schema, which creates the extension `postgis`, on a database `examples`.  SQL Server's starts its image with `--platform linux/amd64`, which an arm64 host runs under emulation, and applies `Realistic/schema.sql` and `Realistic/seed.sql` of `tests/DatabaseTests/SqlServer` to a database `realistic`, then the schemas and seeds of `app` and `billing` of its `EndToEnd/`, with `new-types.sql` after the seed of `app`, for the queries of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/` and `EndToEnd/NetTopologySuite/Queries/`, and the examples' schema to a database `examples`, with the image's `sqlcmd`, given `-I` so that `QUOTED_IDENTIFIER` is on, as SqlClient has it.  Each part then runs the tool from its source with `describe --force`.
+
+## Mutation testing
+
+`tools/mutation-test.sh` runs a mutation test of one of the two source projects with [Stryker.NET](https://stryker-mutator.io/docs/stryker-net/introduction/), the local tool `dotnet-stryker`: Stryker changes the project's code one small place at a time, each change a mutant, and runs the tests that reach it, so that a mutant no test fails on shows what the tests do not check.  It is no check: a person runs it on a folder of a project, which takes minutes, and neither `pre-commit-validation.sh` nor `build.yml` runs it.
+
+```bash
+tools/mutation-test.sh generator --tests 'FullyQualifiedName~SqlSource.Tests.Parsing.' '**/Parsing/**/*.cs'
+tools/mutation-test.sh tool --output artifacts/mutation/before --tests 'FullyQualifiedName~SqlSource.Tool.Tests.DotEnv.' '**/DotEnv/*.cs'
+tools/mutation-test.sh compare artifacts/mutation/before/reports/mutation-report.json artifacts/mutation/after/reports/mutation-report.json
+```
+
+`generator` is `src/SqlSource`, tested by `tests/SqlSource.Tests`, and `tool` is `src/SqlSource.Tool`, tested by `tests/SqlSource.Tool.Tests`.  Each glob names source files from the project's folder and is quoted, so that the shell does not expand it; with none every file is tested.  `--tests` is Stryker's `--test-case-filter`, which limits the tests that run: a run is given the folder of the source and the tests of that folder, [since a whole project does not fit in a night](#how-long-a-run-takes).  `--output` is the folder of the run, `artifacts/mutation/<generator|tool>` unless it is given.  The script runs from any folder, exits with Stryker's code, and ends by printing the path of the report, `reports/mutation-report.json` in the output folder, beside `mutation-report.html`, the same report to read in a browser.
+
+Stryker builds and runs in the working tree, so two runs cannot share a checkout: a run holds the folder `artifacts/mutation/.running` as its lock and a second one is refused.  Nothing else that builds, `pre-commit-validation.sh` included, runs in the checkout during a run.
+
+### The two runs of a run
+
+A run of the script is two runs of Stryker.  The first tests nothing: it finds the static mutants, those of a static initialiser or constructor, and writes it to `static/` of the output folder.  The second leaves them out, by the span of each in its file, which `static/exclusions.txt` lists.
+
+This is not an optimisation.  Stryker's runner for the Microsoft Testing Platform tests each mutant in a process that it goes on using for the mutants after it, and a static mutant changes state that the process keeps: the tests that notice that state then fail under the mutants that follow, and Stryker reports those mutants killed, by those tests.  On `Parsing/SqlDialectName.cs`, two mutants that it reported killed pass every test when the change is made by hand, and two identical runs gave 48 and 46 kills.  With the static mutants left out the runs agree with each other, with a run of one worker and with the changes made by hand.  A run whose report still shows a static mutant tested fails, and its report is not to be used.
+
+### How long a run takes
+
+A run is given a folder of the source and the tests of that folder.  Measured on 2026-11-12 on an Apple M3 Max of 14 cores and 36 GB, with Stryker's seven workers, each time the two runs together:
+
+| Run | Tests | Mutants tested | Killed | Survived | Timeout | Time |
+|----|----|----|----|----|----|----|
+| `generator`, `**/Parsing/**/*.cs`, the tests of `SqlSource.Tests.Parsing` | 2,284 | 2,260 | 1,968 | 209 | 83 | 38 min |
+| `tool`, `**/Planning/**/*.cs`, the tests of `SqlSource.Tool.Tests.Planning` | 204 | 144 | 122 | 21 | 1 | 3 min |
+| `generator`, `**/Parsing/SqlDialectName.cs`, the tests of `Parsing` and `Generator` | 4,368 | 35 | 30 | 3 | 2 | 18 min |
+
+A whole project does not fit in a night, so it is not run.  The generator's one whole run, with every test and Stryker's default time allowance, took 11 hours 41 minutes for 10,782 mutants and reported no survivor, [since it reported each as a timeout](#limits); its report was 738 MB, which `compare` reads in two seconds.  Before a single mutant is tested, a run of every generator test takes eleven minutes to build, run the tests once and capture what each reaches, and the script does that twice.
+
+The generator has 19,868 mutants, of which 4,572 do not compile and 1,687 are static; the tool has 15,207, of which 2,759 do not compile and 1,583 are static.
+
+### What a report holds
+
+`reports/mutation-report.json` is in the [mutation-testing report schema](https://github.com/stryker-mutator/mutation-testing-elements/tree/master/packages/report-schema).  For each source file it holds the mutants: where each is, what it changes, its status, `coveredBy`, the tests that reach it, and `killedBy`, the tests that fail on it.  `testFiles` gives each test's file, full name and line by the id those lists use.  A mutant is `Killed` or `Timeout` when a test notices it, `Survived` when the tests that reach it all pass, `NoCoverage` when none reaches it, `CompileError` when it does not compile, and `Ignored` when the run left it out.
+
+### Comparing two reports
+
+`tools/mutation-test.sh compare <before.json> <after.json>` is the guard of a change to the tests: it names every mutant that the first report has as `Killed` or `Timeout` and the second does not, and exits 0 only when there is none.  It prints one line for each, `LOST` for a mutant that now survives or that no test reaches, and `NOT COMPARABLE` for one the second run left out, could not compile or does not hold, then the counts; it exits 1 when a mutant is lost or not comparable and 2 when a report cannot be read.  A mutant that was killed and now times out is not comparable, since [a timeout is not always a kill](#limits); one that timed out in both runs is kept.  The two runs have the same globs and no change to `src/` between them, since a mutant is matched by its file's path from the project folder, its place, what it changes and what it changes it to.  Reports of two checkouts compare.
+
+`tools/MutationReport` is the program behind it, a console project of the solution that is never packed, whose tests are in `tests/SqlSource.Repository.Tests/MutationReport/`.  Its `static <report.json>` prints the exclusions of a report's static mutants and exits 1 when the report's run tested one, which is how the script finds them and checks its second run.
+
+### Limits
+
+- **Stryker's runner for the Microsoft Testing Platform is a preview**, and its other runner cannot run these projects.  The static mutants are the one fault found in it, on one file checked by hand; any state that a process keeps from one mutant to the next would do the same, so a result that decides something is read by a person, and a scope whose two runs disagree is not to be trusted.  Stryker has an open request for a process for each mutant, [stryker-net#3742](https://github.com/stryker-mutator/stryker-net/issues/3742).
+- **The static mutants are never tested.**  They are mostly the texts of diagnostics and the tables of names.
+- **A method with a mutant that does not compile loses all its mutants.**  Stryker removes them together, and the code's `out` and pattern variables make it common.
+- **The rows of a theory share one name.**  Each row has its own id, so a report says how many rows kill a mutant and not which.
+- **Only the tests of the run test its mutants.**  A mutant that only a test outside `--tests` fails on is reported as surviving, and so is a mutant of the generator that only a test of the tool or of a database project fails on, since each source project has one test project.
+- **Stryker makes every mutant of the project on every run**, whatever the globs, and each run of the script pays for the build, the first run of the tests and the capture of what each test reaches twice.
+- **A timeout is not always a kill.**  Stryker gives a mutant's tests the time they took unmutated and an allowance, `additional-timeout`, and reports a mutant whose tests outlast it as `Timeout`, which it counts as detected.  At its default of five seconds, every surviving mutant of a run with slow tests in scope was reported as a timeout, and tests that timed out while Stryker captured what each test reaches were then run against every mutant.  Both `stryker-config.json` files set the allowance to one minute: no test then times out in the capture, and a folder with its own tests gives what it gives at ten minutes, but for one mutant of 2,260, in a sixth of the time, since each mutant that truly hangs holds a worker for the whole allowance.  With the generator's driver tests in scope, two of five known survivors were still reported as timeouts at one minute and none at ten, so a run with slow tests in scope raises the allowance in the file for that run, and a `Timeout` in a report is read before it is believed.
+
+### Where the configuration is
+
+Stryker refuses the repository root: it finds `SqlSource.slnx` there, takes the run as a run of the solution and then rejects a named test project.  So each source project has its `stryker-config.json` beside it, where Stryker looks, with the runner, its one test project and the reports to write, and a bare `dotnet stryker` in that folder works, though it tests the static mutants and writes to `StrykerOutput/` there.  Stryker finds the project it mutates among the test project's own references, which is why `tests/SqlSource.Tool.Tests` references `src/SqlSource.Tool` itself.

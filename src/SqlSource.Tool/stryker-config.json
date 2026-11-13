@@ -4,6 +4,7 @@
     "test-projects": ["../../tests/SqlSource.Tool.Tests/SqlSource.Tool.Tests.csproj"],
     "test-runner": "mtp",
     "coverage-analysis": "perTest",
-    "reporters": ["json", "html", "progress"]
+    "reporters": ["json", "html", "progress"],
+    "additional-timeout": 60000
   }
 }

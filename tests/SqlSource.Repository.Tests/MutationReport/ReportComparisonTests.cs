@@ -17,8 +17,8 @@ public sealed class ReportComparisonTests
 
     [Theory]
     [InlineData(nameof(MutantStatus.Killed), nameof(MutantStatus.Killed))]
-    [InlineData(nameof(MutantStatus.Killed), nameof(MutantStatus.Timeout))]
     [InlineData(nameof(MutantStatus.Timeout), nameof(MutantStatus.Killed))]
+    [InlineData(nameof(MutantStatus.Timeout), nameof(MutantStatus.Timeout))]
     public void Compare_DetectedBeforeAndAfter_Holds(string before, string after)
     {
         var comparison = ReportComparison.Compare([At(1, Status(before))], [At(1, Status(after))]);
@@ -47,6 +47,18 @@ public sealed class ReportComparisonTests
 
         comparison.Lost.ShouldBeEmpty();
         comparison.NotComparable.ShouldBe([new Change(At(1, Status(after)).Key, MutantStatus.Killed, Status(after))]);
+    }
+
+    // A mutant whose tests now run out of time may be one that no test fails on any more, with slow tests.
+    [Fact]
+    public void Compare_KilledBeforeAndTimeoutAfter_IsNotComparable()
+    {
+        var comparison = ReportComparison.Compare([At(1, MutantStatus.Killed)], [At(1, MutantStatus.Timeout)]);
+
+        comparison.Lost.ShouldBeEmpty();
+        comparison.NotComparable.ShouldBe([
+            new Change(At(1, MutantStatus.Killed).Key, MutantStatus.Killed, MutantStatus.Timeout),
+        ]);
     }
 
     [Fact]

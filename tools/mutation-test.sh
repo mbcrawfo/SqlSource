@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs a mutation test of one of the two source projects with Stryker, or compares the reports of two runs.  It is no
-# check: a whole run takes hours, a person runs it, and neither pre-commit-validation.sh nor build.yml does.
+# check: a person runs it on a folder of a project with that folder's tests, which takes minutes, where a whole
+# project takes more than a night, and neither pre-commit-validation.sh nor build.yml runs it.
 # Stryker refuses the repository root, where it finds the solution, so a run starts in the folder of the project it
 # mutates, with the stryker-config.json there.  It builds in the working tree, so one run at a time holds the lock,
 # the folder artifacts/mutation/.running.

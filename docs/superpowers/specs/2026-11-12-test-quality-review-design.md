@@ -70,6 +70,34 @@ A spike on this branch, 2026-11-12, with `dotnet-stryker` 5.1.0 added to `dotnet
   and goes on.
 - **A run leaves nothing behind** in the working tree when `--output` points outside it.
 
+Found while building part 1, after this design was approved:
+
+- **A run that tests a static mutant reports kills that are not real.**  The `mtp` runner tests each mutant in a
+  process it goes on using, and the state a static mutant leaves fails tests under the mutants after it.  Two
+  mutants reported killed pass every test when the change is made by hand, and two identical runs gave 48 and 46
+  kills.  With the static mutants left out, by their spans, runs agree with each other, with a run of one worker and
+  with the hand check.  So `tools/mutation-test.sh` runs Stryker twice, first to find the static mutants and then
+  without them, and fails a run whose report shows one tested; `tools/README.md` has the detail.
+- **The static mutants are a second blind area**: 1,687 of the generator's 19,868 mutants and 1,583 of the tool's
+  15,207, mostly the texts of diagnostics and tables of names.  The evidence of part 2 marks them as it marks the
+  methods Stryker cannot compile.
+- **The kill matrix is to be distrusted where it decides something.**  The static mutants are the one fault found,
+  on one file; any state a process keeps between mutants would do the same.  A verifier of part 2 treats a kill that
+  it cannot explain from the test's inputs as a doubt about the tool, and a scope whose two runs disagree is not
+  evidence.
+- **A whole project does not fit in a night, and its result was unusable.**  The generator's whole run took 11
+  hours 41 minutes and reported no survivor: at Stryker's default allowance of five seconds, a surviving mutant
+  with slow tests in scope is reported as a timeout, and tests that time out during the capture of coverage are
+  run against every mutant.  An allowance of ten minutes cures both on a scope, and one minute, now in both
+  configuration files, gives the same result for a folder with its own tests in a sixth of the time: the parser
+  folder takes 38 minutes.  With the generator's driver tests in scope a survivor can still come back as a timeout
+  at one minute, so a `Timeout` is read before it is believed, and `compare` does not take a mutant that was
+  killed and now times out as kept.
+- **The owner decided on folder scopes** (2026-11-12): no whole-project runs.  Stage 1 of the skill measures a
+  source folder at a time against chosen test folders, one scope after another in one checkout, and a slice's
+  evidence says which tests its scope ran, since a kill by a test outside the scope is not seen.  The ceiling on a
+  full run and the two whole runs of part 1 no longer apply.
+
 ## Constraints
 
 - `global.json` sets the test runner to Microsoft.Testing.Platform and the tests are xUnit v3 4.0.1, so Stryker runs
@@ -146,7 +174,8 @@ folders; with none it reviews everything.
 ### Stages
 
 1. **Measure.**  No agents.  Started first and run in the background, one after another in one checkout:
-   - `tools/mutation-test.sh generator` and `tools/mutation-test.sh tool`, whole;
+   - `tools/mutation-test.sh` on one scope after another, each a source folder with the test folders chosen for
+     it, and never a whole project (see "What was tried");
    - one run of every test project with coverage and with each test's duration, the database projects on their
      default images.  Each project writes its own Cobertura file, as `CONTRIBUTING.md` shows, which is what tells
      the lines only the database projects reach.  `tests/DatabaseTests/QueryMethodAllocation` is not run: it is a
