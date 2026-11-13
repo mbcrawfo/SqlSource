@@ -39,7 +39,7 @@ The eleven test projects, the four libraries they share and a stand-in of the to
 - `tests/SqlSource.Repository`, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 - `tests/SqlSource.Tool.StandIn` is a stand-in of the `sqlsource` tool, which the tests of the online build in `tests/SqlSource.Tool.Tests` give a real build as its command.
 
-`tools/MutationReport` is a console program that compares the reports of two mutation runs, which [`tools/mutation-test.sh`](tools/README.md#mutation-testing) runs; it builds with the solution and is never packed.
+`tools/MutationReport` is a console program that compares the reports of two mutation runs, which [`tools/mutation-test.sh`](tools/README.md#mutation-testing) runs, and prepares [the evidence of a test review](tools/README.md#the-test-reviews-commands); it builds with the solution and is never packed.
 
 `site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
 

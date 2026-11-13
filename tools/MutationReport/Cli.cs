@@ -27,6 +27,8 @@ internal static class Cli
                 return await CondenseAsync(root, run, null, output, error).ConfigureAwait(false);
             case ["condense", var root, var run, "--broad-from", var broad]:
                 return await CondenseAsync(root, run, broad, output, error).ConfigureAwait(false);
+            case ["kills", var report, var test]:
+                return await KillsAsync(report, test, output, error).ConfigureAwait(false);
             default:
                 foreach (var line in Usage)
                 {
@@ -43,7 +45,28 @@ internal static class Cli
         "       static <report.json>",
         "       slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] <folder> ...",
         "       condense <repository root> <run folder> [--broad-from <file>]",
+        "       kills <report.json> <test name>",
     ];
+
+    private static async Task<int> KillsAsync(string path, string test, TextWriter output, TextWriter error)
+    {
+        KillMatrix matrix;
+        try
+        {
+            var stream = File.OpenRead(path);
+            await using (stream.ConfigureAwait(false))
+            {
+                matrix = await KillMatrixReader.ReadAsync(stream, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        catch (Exception exception) when (IsUnreadable(exception))
+        {
+            await error.WriteLineAsync($"Cannot read {path}: {exception.Message}").ConfigureAwait(false);
+            return 2;
+        }
+
+        return await KillsCommand.RunAsync(matrix, test, output, error).ConfigureAwait(false);
+    }
 
     private static async Task<int> CondenseAsync(
         string root,

@@ -62,6 +62,8 @@ public sealed class CliTests
     [InlineData("slices", "root", "out", "tests", "--exclude-from")]
     [InlineData("slices", "root", "out", "--unknown", "tests")]
     [InlineData("condense", "root")]
+    [InlineData("kills", "report.json")]
+    [InlineData("kills", "report.json", "N.A.One", "N.A.Two")]
     [InlineData("condense", "root", "run", "--broad-from")]
     [InlineData("condense", "root", "run", "--narrow-from", "file")]
     public async Task RunAsync_OtherArguments_ExitsTwoWithTheUsage(params string[] arguments)
@@ -75,7 +77,8 @@ public sealed class CliTests
                 "       static <report.json>",
                 "       slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] "
                     + "<folder> ...",
-                "       condense <repository root> <run folder> [--broad-from <file>]"
+                "       condense <repository root> <run folder> [--broad-from <file>]",
+                "       kills <report.json> <test name>"
             )
         );
         output.ShouldBeEmpty();
@@ -274,6 +277,126 @@ public sealed class CliTests
             code.ShouldBe(2);
             error.ShouldStartWith($"Cannot read {other}: ");
             output.ShouldBeEmpty();
+        });
+
+    // A report of three tests, the two rows of N.ATests.Reads and N.BTests.Reads, and of one file's mutants.
+    private static string WriteKills(string folder, params ReportMutant[] mutants)
+    {
+        var path = Path.Combine(folder, "report.json");
+        Reports.Write(
+            path,
+            "/repo/src/SqlSource",
+            [new ReportFile("/repo/src/SqlSource/Parsing/A.cs", "class A { }", mutants)],
+            [
+                new ReportTestFile("/repo/tests/P/ATests.cs", ("a1", "N.ATests.Reads"), ("a2", "N.ATests.Reads")),
+                new ReportTestFile("/repo/tests/P/BTests.cs", ("b1", "N.BTests.Reads"), ("c1", "M.BTests.Reads")),
+            ]
+        );
+        return path;
+    }
+
+    private static ReportMutant Killed(int line, params string[] killers) =>
+        new(line, 1, line, 5, "Killed", CoveredBy: killers, KilledBy: killers);
+
+    [Fact]
+    public async Task RunAsync_KillsOfAMethod_ListsEachKillWithItsOtherKillers() =>
+        await InFolderAsync(async folder =>
+        {
+            var report = WriteKills(
+                folder,
+                Killed(9, "a2", "b1", "c1"),
+                Killed(3, "a1", "a2"),
+                Killed(5, "b1"),
+                new ReportMutant(7, 1, 7, 5, "Survived", CoveredBy: ["a1"], KilledBy: [])
+            );
+
+            var (code, output, error) = await RunAsync("kills", report, "N.ATests.Reads");
+
+            error.ShouldBeEmpty();
+            code.ShouldBe(0);
+            output.ShouldBe(
+                Lines(
+                    "src/SqlSource/Parsing/A.cs:3:1 Boolean mutation -> `true`",
+                    "    killed by it alone",
+                    "src/SqlSource/Parsing/A.cs:9:1 Boolean mutation -> `true`",
+                    "    also killed by 2 methods: M.BTests.Reads, N.BTests.Reads",
+                    "N.ATests.Reads: 2 rows, 2 kills, 1 alone, 0 timeouts under it"
+                )
+            );
+        });
+
+    [Fact]
+    public async Task RunAsync_KillsOfAMethodWithTimeouts_ListsThem() =>
+        await InFolderAsync(async folder =>
+        {
+            var report = WriteKills(
+                folder,
+                new ReportMutant(4, 1, 4, 5, "Timeout", CoveredBy: ["b1", "a1"], KilledBy: []),
+                new ReportMutant(6, 1, 6, 5, "Timeout", CoveredBy: ["a1"], KilledBy: [])
+            );
+
+            var (code, output, _) = await RunAsync("kills", report, "N.BTests.Reads");
+
+            code.ShouldBe(0);
+            output.ShouldBe(
+                Lines(
+                    "TIMEOUT src/SqlSource/Parsing/A.cs:4:1 Boolean mutation -> `true`",
+                    "N.BTests.Reads: 1 rows, 0 kills, 0 alone, 1 timeouts under it"
+                )
+            );
+        });
+
+    [Fact]
+    public async Task RunAsync_KillsOfTheEndOfAName_FindsTheOneMethodThatEndsInIt() =>
+        await InFolderAsync(async folder =>
+        {
+            var report = WriteKills(folder, Killed(3, "a1"));
+
+            var (code, output, _) = await RunAsync("kills", report, "ATests.Reads");
+
+            code.ShouldBe(0);
+            output.ShouldEndWith(Lines("N.ATests.Reads: 2 rows, 1 kills, 1 alone, 0 timeouts under it"));
+        });
+
+    [Fact]
+    public async Task RunAsync_KillsOfAnEndThatSeveralMethodsShare_ExitsOneNamingThem() =>
+        await InFolderAsync(async folder =>
+        {
+            var report = WriteKills(folder, Killed(3, "a1"));
+
+            var (code, output, error) = await RunAsync("kills", report, "BTests.Reads");
+
+            code.ShouldBe(1);
+            error.ShouldBe(Lines("Several tests end in 'BTests.Reads': M.BTests.Reads, N.BTests.Reads"));
+            output.ShouldBeEmpty();
+        });
+
+    [Fact]
+    public async Task RunAsync_KillsOfANameTheReportLacks_ExitsOne() =>
+        await InFolderAsync(async folder =>
+        {
+            var report = WriteKills(folder, Killed(3, "a1"));
+
+            var (code, output, error) = await RunAsync("kills", report, "N.ATests.Read");
+
+            code.ShouldBe(1);
+            error.ShouldBe(
+                Lines("The report holds no test named 'N.ATests.Read': a scope's report holds its own tests.")
+            );
+            output.ShouldBeEmpty();
+        });
+
+    [Fact]
+    public async Task RunAsync_KillsOfAFileThatIsNoReport_ExitsTwoAndNamesTheFile() =>
+        await InFolderAsync(async folder =>
+        {
+            var other = Path.Combine(folder, "other.json");
+            await File.WriteAllTextAsync(other, "[]", TestContext.Current.CancellationToken);
+
+            var (code, _, error) = await RunAsync("kills", other, "N.ATests.Reads");
+
+            code.ShouldBe(2);
+            error.ShouldStartWith($"Cannot read {other}: ");
         });
 
     private static async Task<(int Code, string Output, string Error)> RunAsync(params string[] arguments)

@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, two recording scripts and the script and program of mutation testing, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, two recording scripts and the script and program of mutation testing and of the test review, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -159,6 +159,35 @@ The generator has 19,868 mutants, of which 4,572 do not compile and 1,687 are st
 `tools/mutation-test.sh compare <before.json> <after.json>` is the guard of a change to the tests: it names every mutant that the first report has as `Killed` or `Timeout` and the second does not, and exits 0 only when there is none.  It prints one line for each, `LOST` for a mutant that now survives or that no test reaches, and `NOT COMPARABLE` for one the second run left out, could not compile or does not hold, then the counts; it exits 1 when a mutant is lost or not comparable and 2 when a report cannot be read.  A mutant that was killed and now times out is not comparable, since [a timeout is not always a kill](#limits); one that timed out in both runs is kept.  The two runs have the same globs and no change to `src/` between them, since a mutant is matched by its file's path from the project folder, its place, what it changes and what it changes it to.  Reports of two checkouts compare.
 
 `tools/MutationReport` is the program behind it, a console project of the solution that is never packed, whose tests are in `tests/SqlSource.Repository.Tests/MutationReport/`.  Its `static <report.json>` prints the exclusions of a report's static mutants and exits 1 when the report's run tested one, which is how the script finds them and checks its second run.
+
+### The test review's commands
+
+`tools/MutationReport` has three more commands, which the skill in `.claude/skills/reviewing-test-quality/` runs to prepare what its reviewers read.  None of them runs a test or a mutation run: they read what a run of the skill measured into its run folder, `artifacts/test-review/<run>/`.
+
+```bash
+dotnet run --project tools/MutationReport -- slices . artifacts/test-review/<run>/slices --exclude-from <file> tests/SqlSource.Tests
+dotnet run --project tools/MutationReport -- condense . artifacts/test-review/<run> --broad-from <file>
+dotnet tools/MutationReport/bin/Debug/net10.0/SqlSource.MutationReport.dll kills <report.json> SqlLexerTests.Read_Quote_Ends
+```
+
+`slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] <folder> ...` cuts the `.cs` files of the folders into slices of at most 5,000 lines, or the limit given, so that every file is in exactly one slice and none is split.  It leaves out `bin/`, `obj/` and the paths the exclusion file lists, one to a line with `#` starting a comment, and cuts each folder by itself, so no slice holds files of two.  A slice follows folders: a folder that fits is one block, a larger one is its own files and then its sub-folders, each cut the same way, and neighbouring blocks of one folder are joined while they fit.  The files of one partial class stay together.  It writes `<name>.txt` for each slice, its files one to a line, and `index.txt`, a line `<name> <lines> <files>` for each, and refuses an output folder that holds anything, since a second cut would leave the first one's slices beside its own.  A slice is named for the deepest folder that holds all its files, as `SqlSource.Tests.Parsing-2`.
+
+`condense <repository root> <run folder> [--broad-from <file>]` writes `evidence/<slice>.md` for each slice of the run folder, from what the folder holds:
+
+| Path in the run folder | Holds |
+|----|----|
+| `slices/` | The slices, as `slices` writes them |
+| `mutation/<scope>/reports/mutation-report.json` | The report of each mutation scope, and a file `failed` beside `reports/` when the scope's run failed |
+| `tests/<project>/results.xunit.xml` | A test project's tests with their times, as `--report-xunit-xml` writes them; `<project>` is its folder from `tests/` |
+| `tests/<project>/coverage.cobertura.xml` | The same run's line coverage |
+
+An evidence file lists the slice's files, the mutation scopes that ran its tests, and each test method with its rows, its time, the mutants it kills, how many of those no other test kills, and the smallest set found of other tests that kill all it kills.  It then lists the mutants that survive under the slice's tests, the mutants whose tests ran out of time, the lines of the source its tests reach that no test covers or that no run can test, and each class's share of its project's time.  The rows of a theory are one method, since a report tells them apart only by id.  A broad test, one whose full name starts with a line of the file `--broad-from` names, is never another test's cover and never the other killer that stops a kill being a test's alone.  A slice that no scope ran says so, and does not say that its tests kill nothing.
+
+It also writes `evidence/gaps.md`, the mutants of each source file by what became of them, and `evidence/database-only-lines.md`, the source lines that only the projects under `tests/DatabaseTests/` reach.  It exits 2, naming the scope, for a scope that failed, a report that cannot be read or one whose run tested a static mutant, and when two scopes tested one mutant, whose kills would be counted twice.
+
+`kills <report.json> <test name>` prints each mutant that a test method kills in one scope's report, with the other methods that kill it, and the mutants under it whose tests ran out of time.  The name is a method's full name, or its end, as `SqlLexerTests.Read_Quote_Ends`.  It exits 1 when the report holds no such test.
+
+An agent runs the built program, the third form above, and never `dotnet run`: two builds of one project at once fail, and nothing builds in a checkout during a mutation run.
 
 ### Limits
 
