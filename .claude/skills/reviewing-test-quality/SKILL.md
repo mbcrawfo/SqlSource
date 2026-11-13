@@ -35,10 +35,10 @@ S=.claude/skills/reviewing-test-quality
    ```
 
    `$R/slices/index.txt` has a line for each slice.  A folder that holds several test projects is cut project by project, so no slice is of two.  `slices` refuses a folder that holds anything, so a second cut names a new run folder.
-5. **Say the cost to the owner.**  One reviewer and one verifier for each slice, up to three mirror agents and a writer: everything is 59 slices on 2026-11-12.  In the pilot a reviewer of a slice of 4,300 lines took 12 to 18 minutes and about 400,000 tokens, and its verifier about 270,000.  The scopes run one after another, each about a second for each mutant it tests, the count above it in `scopes.txt`, and about five minutes besides, but a scope whose tests are slow: `tool-projects`, whose tests run MSBuild, took 19 minutes for 241 mutants, and the two root scopes, whose driver and command tests cost about 17 seconds a mutant, far more: `generator-root` took 67 minutes; [tools/README.md](../../../tools/README.md#how-long-a-run-takes) has the measured runs.  The test projects take what `./pre-commit-validation.sh --full` takes for its tests, and the two `SyncAsync` projects besides.  A run of more than ten slices, or of more than an hour of measurements, **waits for the owner's yes**.  If the measurements will not fit in a night, ask the owner which scopes to leave out; a scope left out is named in the epic.
-6. **Start `$R/run-notes.md`**, which the writer is given: the date, the commit the run reads (`git rev-parse HEAD`), the folders of the run, the slices, and then, as the run goes, each scope's time and counts from `measure.log` and `evidence/gaps.md`, each scope left out or failed, each test project that failed, each coverage gap by its path, and each correction to a list of the skill.
+5. **Say the cost to the owner.**  One reviewer and one verifier for each slice, up to three mirror agents and a writer: everything is 59 slices on 2026-11-12.  In the pilot a reviewer of a slice of 4,300 lines took 12 to 18 minutes and about 400,000 tokens, and its verifier about 270,000.  The scopes run one after another, each about a second for each mutant it tests, the count above it in `scopes.txt`, and about five minutes besides, but a scope whose tests are slow: `tool-projects`, whose tests run MSBuild, took 19 minutes for 241 mutants, and the two root scopes, whose driver and command tests cost about 17 seconds a mutant, far more: `generator-root` took 67 minutes; [tools/README.md](../../../tools/README.md#how-long-a-run-takes) has the measured runs.  The test projects take what `./pre-commit-validation.sh --full` takes for its tests, and the two `SyncAsync` projects besides.  Say the limit on agents running with the cost, since it sets how long stages 3 and 4 take: at five, the 59 reviewers of a whole run are twelve rounds of a reviewer's time, about three hours, and the verifiers share their places.  A run of more than ten slices, or of more than an hour of measurements, **waits for the owner's yes**.  If the measurements will not fit in a night, ask the owner which scopes to leave out; a scope left out is named in the epic.
+6. **Start `$R/run-notes.md`**, which the writer is given: the date, the commit the run reads (`git rev-parse HEAD`), the folders of the run, the slices, the limit on agents running, and then, as the run goes, each scope's time and counts from `measure.log` and `evidence/gaps.md`, each scope left out or failed, each test project that failed, each coverage gap by its path, and each correction to a list of the skill.
 
-**Agents.**  These instructions are the opt-in that the `Workflow` tool asks for.  Without that tool, dispatch agents in batches of about ten.  Every agent is general-purpose, on the lead's model.  [briefs.md](briefs.md) has the briefs: an agent's prompt is the path of `$R/brief.md`, the text of its own section of `briefs.md`, pasted, and the paths that section says it is given.
+**Agents.**  These instructions are the opt-in that the `Workflow` tool asks for.  **At most five agents run at a time**, unless the person who starts the run gives another number, in the invocation or when the cost is stated; the lead uses that number and writes it in `run-notes.md`.  The limit holds for every agent of every stage, the reviewers, the reviewers of files not read, the verifiers, the mirror agents and their verifiers and the writer, whether a `Workflow` script sends them or the Agent tool does.  It is a limit on agents running, not a batch: when one ends, the next one waiting starts, so a `Workflow` script keeps a pool of that many and never sends every slice in one `parallel`.  Every agent is general-purpose, on the lead's model.  [briefs.md](briefs.md) has the briefs: an agent's prompt is the path of `$R/brief.md`, the text of its own section of `briefs.md`, pasted, and the paths that section says it is given.
 
 ## Stage 1: measure
 
@@ -66,15 +66,15 @@ It writes `$R/evidence/<slice>.md` for each slice, `gaps.md` and `database-only-
 ## Stages 3 and 4: review and verify
 
 1. Write `$R/brief.md` once: the repository root, `R` in full, the previous appendix's path or that there is none, and then "Every agent" and "The shared brief" of `briefs.md`, whole.
-2. One reviewer for each slice, all at once, with "The reviewer" and its slice's name.
+2. One reviewer for each slice, with "The reviewer" and its slice's name, each started when a place under the limit is free.
 3. When a reviewer returns, compare what it read with its slice:
 
    ```bash
    comm -23 <(sort "$R/slices/<slice>.txt") <(sort "$R/findings/<slice>.read.txt")
    ```
 
-   The files this prints go to one more reviewer, with "The reviewer" and those files as its list, who writes the `-rest` files that section names.  A file that one does not read in full either is a coverage gap, noted by its path.
-4. As soon as a slice's files are all read, one fresh verifier for it, with "The verifier".  A slice with no findings needs none.
+   The files this prints go to one more reviewer, with "The reviewer" and those files as its list, who writes the `-rest` files that section names and takes the next free place, before any reviewer still waiting.  A file that one does not read in full either is a coverage gap, noted by its path.
+4. As soon as a slice's files are all read, one fresh verifier for it, with "The verifier", which takes the next free place, before any reviewer still waiting, so that the slices already started finish first.  A slice with no findings needs none.
 
 ## Stage 5: measure again, where asked
 
@@ -128,6 +128,7 @@ The pull request holds the outline, the phase specs, the appendix and the tech-d
 - Dropping a test, or rows of one, that is the record of something.  In the pilot a reviewer and a verifier both agreed to drop rows of the `Lex_KnownLimit` tests, which a comment above them calls deliberate and `docs/tech-debt/TD-0004` names as the pins of the lexer's known limits; only the writer's search of the documents found it.
 - Running anything that builds during a mutation run, or `dotnet run` from two agents at once: agents run the built program, `dotnet $D`.
 - Giving the repository root as `.` to an agent: an agent is given paths in full.
+- Sending every reviewer at once, or in batches that wait for their slowest agent.  At most the limit run, five unless the person who started the run gave another number, and each agent that ends frees its place for the next.
 - Letting the agent that found a finding verify it.
 - Printing several files with one `cat`: past about 30 KB the output is cut to a preview, and the reviewer then reports a file it did not read.
 - In `zsh`, a glob without its quotes fails with "no matches found", and an unquoted variable is not split into words: run these commands through `bash`.
