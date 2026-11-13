@@ -323,7 +323,9 @@ public sealed class UserDocsReadingTests
                 File.WriteAllText(path, "");
             }
 
-            UserDocs.PagesUnder(root).ShouldBe(["site/a/b/c.md", "site/reference/databases/index.md", "site/top.md"]);
+            UserDocs
+                .PagesUnder(Path.Combine(root, "site"))
+                .ShouldBe(["site/a/b/c.md", "site/reference/databases/index.md", "site/top.md"]);
         }
         finally
         {
