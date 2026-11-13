@@ -8,9 +8,9 @@
 #   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries, EndToEnd/NodaTime/Queries,
 #   EndToEnd/NetTopologySuite/Queries and EndToEnd/Json/Queries, against the databases "realistic", "app" and
 #   "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/, and
-#   "gis", made from those of EndToEnd/gis/ in a second container, of the PostGIS image that the harness's
-#   PostgisContainer builds from tests/DatabaseTests/TestHarness/Postgis/Dockerfile on the same postgres image.  That
-#   image is kept, as the tests keep it.
+#   "gis", made from those of EndToEnd/gis/ in a second container, of the PostGIS image of the tests, which
+#   tools/build-postgis-image.sh builds on the same postgres image under the name the harness's PostgisContainer looks
+#   for.  That image is kept, and the tests then use it.
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
 #   schema.sql on the PostGIS container, since the schema creates the extension postgis, and runs after a change to a
 #   query or to the schema of the examples too.
@@ -28,8 +28,6 @@
 set -euo pipefail
 
 IMAGES='tests/DatabaseTests/TestHarness/DefaultImages.cs'
-POSTGIS_CONTAINER='tests/DatabaseTests/TestHarness/PostgisContainer.cs'
-POSTGIS_DOCKERFILE='tests/DatabaseTests/TestHarness/Postgis'
 
 POSTGRES_PROJECT='tests/DatabaseTests/Postgres'
 POSTGRES_END_TO_END="$POSTGRES_PROJECT/EndToEnd"
@@ -87,17 +85,6 @@ default_image() {
     echo "$image"
 }
 
-# The package of PostGIS that the harness's PostgisContainer installs, read from its line, and not repeated here.
-postgis_package() {
-    local package
-    package="$(sed -n 's/.*const string Package = "\(.*\)";.*/\1/p' "$POSTGIS_CONTAINER")"
-    if [[ -z "$package" ]]; then
-        echo "$POSTGIS_CONTAINER has no line that declares Package as a string." >&2
-        exit 1
-    fi
-    echo "$package"
-}
-
 # Starts a container of a PostgreSQL image, sets the variable named by the second argument to it, so that the trap
 # removes it, and waits until the server answers.
 start_postgres() {
@@ -139,7 +126,7 @@ create_postgres_database() {
 }
 
 describe_postgres() {
-    local image tag package postgis_image port postgis_port database folder connection connections=()
+    local image postgis_image port postgis_port database folder connection connections=()
     image="$(default_image Postgres)"
 
     start_postgres "$image" postgres_container
@@ -156,15 +143,9 @@ describe_postgres() {
         connections+=(--connection "$database=$connection")
     done
 
-    # The PostGIS image, built as PostgisContainer builds it, by the same arguments and under the same name, so that a
-    # build of either reuses the other's.
-    tag="${image##*:}"
-    package="$(postgis_package)"
-    postgis_image="sqlsource-postgis:$tag-${package%%+*}"
-    printf 'Building %s ... ' "$postgis_image"
-    docker build --quiet --build-arg "PG=$tag" --build-arg "POSTGIS=$package" -t "$postgis_image" \
-        "$POSTGIS_DOCKERFILE" >/dev/null
-    echo 'done'
+    # The PostGIS image, under the name that PostgisContainer looks for, so that the tests use it.
+    postgis_image="$(tools/build-postgis-image.sh --name "$image")"
+    tools/build-postgis-image.sh "$image"
 
     start_postgres "$postgis_image" postgis_container
     postgis_port="$(postgres_port "$postgis_container")"

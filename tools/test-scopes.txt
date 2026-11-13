@@ -24,6 +24,7 @@ postgres tests/DatabaseTests/TestHarness/Postgis/*
 postgres tests/SqlSource.Tool.Tests/Bundles/Renaming/Postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/*
+postgres tools/build-postgis-image.sh
 
 sqlserver src/SqlSource.Tool/Bundles/Renaming/SqlServer/*
 sqlserver src/SqlSource.Tool/Describing/SqlServer/*

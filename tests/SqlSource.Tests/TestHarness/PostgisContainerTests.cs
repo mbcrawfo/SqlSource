@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
@@ -19,10 +20,30 @@ public sealed class PostgisContainerTests : IDisposable
     public void Dispose() => File.Delete(_lock);
 
     [Theory]
-    [InlineData("postgres:18.6", "sqlsource-postgis:18.6-3.6.4")]
-    [InlineData("postgres:14.24", "sqlsource-postgis:14.24-3.6.4")]
-    public void ImageOf_PostgresImage_NamesItsTagAndPostgisVersion(string postgres, string image) =>
-        PostgisContainer.ImageOf(postgres).ShouldBe(image);
+    [InlineData("postgres:18.6", @"^sqlsource-postgis:18\.6-3\.6\.4-[0-9a-f]{12}$")]
+    [InlineData("postgres:14.24", @"^sqlsource-postgis:14\.24-3\.6\.4-[0-9a-f]{12}$")]
+    public void ImageOf_PostgresImage_NamesItsTagPostgisVersionAndDockerfileHash(string postgres, string pattern) =>
+        PostgisContainer.ImageOf(postgres).ShouldMatch(pattern);
+
+    [Fact]
+    public void ImageOf_PostgresImage_EndsWithTheDockerfilesHash() =>
+        PostgisContainer
+            .ImageOf("postgres:18.6")
+            .ShouldEndWith(
+                "-"
+                    + PostgisContainer.DockerfileHash(
+                        File.ReadAllBytes(
+                            RepositoryRoot.Path("tests", "DatabaseTests", "TestHarness", "Postgis", "Dockerfile")
+                        )
+                    )
+            );
+
+    // A checkout on Windows may give the Dockerfile CRLF line endings, which must name the same image.
+    [Theory]
+    [InlineData("a\nb")]
+    [InlineData("a\r\nb")]
+    public void DockerfileHash_LineEndings_AreIgnored(string text) =>
+        PostgisContainer.DockerfileHash(Encoding.UTF8.GetBytes(text)).ShouldBe("7e18f737311b");
 
     [Fact]
     public void Dockerfile_DefaultPackage_IsThePackage() =>

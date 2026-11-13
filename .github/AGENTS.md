@@ -19,7 +19,7 @@
 
 ## Workflows
 
-- **The check steps in `workflows/build.yml` mirror `pre-commit-validation.sh`.**  A check added to or removed from one is added to or removed from the other in the same commit.  The step `Pull test images` of the `build` job and the jobs `Test on PostgreSQL 14` and `Test on SQL Server 2017` are the ones the script has no counterpart for.
+- **The check steps in `workflows/build.yml` mirror `pre-commit-validation.sh`.**  A check added to or removed from one is added to or removed from the other in the same commit.  The steps `Pull test images`, `Build PostGIS image` and `Check the tests built no PostGIS image` of the `build` job and the jobs `Test on PostgreSQL 14` and `Test on SQL Server 2017` are the ones the script has no counterpart for.
 - CI runs every check on every change; the skips of a plain script run are local, so a trigger added to the script is no change to the workflow.
 - A check that needs only Docker goes in the `lint` job.  One that needs the .NET SDK goes in the job whose build it shares, or in a job of its own when it would make that job the slowest.
 - **No job of `workflows/build.yml` `needs` another**, so the `packages` artifact can exist in a run whose lint or tests failed: anything that consumes it must `needs` the whole `build.yml` call, as `publish.yml` does, never a single job inside it.
