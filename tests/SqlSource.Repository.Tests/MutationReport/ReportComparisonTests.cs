@@ -84,12 +84,31 @@ public sealed class ReportComparisonTests
         ReportComparison.Compare([], [At(1, MutantStatus.Survived)]).Holds.ShouldBeTrue();
 
     [Fact]
-    public void Compare_SeveralLost_AreOrderedByPosition() =>
+    public void Compare_SeveralLost_AreOrderedByFileLineColumnAndOrdinal()
+    {
+        // Each mutant is out of place by one of the four parts of the order, and by that part alone.
+        MutantKey[] ordered =
+        [
+            new("A.cs", 9, 1, 9, 5, "m", "r", 0),
+            new("B.cs", 1, 2, 1, 5, "m", "r", 0),
+            new("B.cs", 1, 9, 1, 12, "m", "r", 0),
+            new("B.cs", 1, 9, 1, 12, "m", "r", 1),
+            new("B.cs", 4, 1, 4, 5, "m", "r", 0),
+        ];
+        int[] shuffled = [4, 3, 2, 1, 0];
+
+        var comparison = ReportComparison.Compare(
+            [.. shuffled.Select(index => new Mutant(ordered[index], MutantStatus.Killed))],
+            [.. shuffled.Select(index => new Mutant(ordered[index], MutantStatus.Survived))]
+        );
+
+        comparison.Lost.Select(change => change.Key).ShouldBe(ordered);
+    }
+
+    [Fact]
+    public void Compare_SeveralNotComparable_AreOrderedAsTheLostAre() =>
         ReportComparison
-            .Compare(
-                [At(9, MutantStatus.Killed), At(2, MutantStatus.Killed)],
-                [At(9, MutantStatus.Survived), At(2, MutantStatus.Survived)]
-            )
-            .Lost.Select(change => change.Key.StartLine)
+            .Compare([At(9, MutantStatus.Killed), At(2, MutantStatus.Killed)], [])
+            .NotComparable.Select(change => change.Key.StartLine)
             .ShouldBe([2, 9]);
 }
