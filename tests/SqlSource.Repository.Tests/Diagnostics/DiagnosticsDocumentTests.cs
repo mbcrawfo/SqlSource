@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Diagnostics;
@@ -15,7 +16,7 @@ namespace SqlSource.Repository.Tests.Diagnostics;
 
 // site/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that
 // is added, removed or renamed fails them until the document says the same.
-public sealed class DiagnosticsDocumentTests
+public sealed partial class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
     private const string ReportedByTheBuild = "Reported by: the build.";
@@ -100,6 +101,27 @@ public sealed class DiagnosticsDocumentTests
         );
     }
 
+    // The table of areas in site/errors.md links each id from one row, and the rows of all the areas together are in
+    // id order.  Fails when a descriptor is added and no row links it, when an id is linked twice or no longer exists,
+    // or when an id is linked from a row out of order: a new id above the last goes in the last row, or a new row.
+    [Fact]
+    public void ErrorsPage_AreaTable_LinksEveryDiagnosticOnceInIdOrder()
+    {
+        var lines = File.ReadAllLines(RepositoryRoot.Path("site", "errors.md"));
+        var start = Array.IndexOf(lines, "<a id=\"errors-by-area\"></a>");
+        start.ShouldBeGreaterThanOrEqualTo(0);
+
+        var links = lines
+            .Skip(start + 1)
+            .SkipWhile(line => !line.StartsWith('#'))
+            .Skip(1)
+            .TakeWhile(line => !line.StartsWith('#'))
+            .Where(line => line.StartsWith('|'))
+            .SelectMany(line => SectionLink().Matches(line).Select(match => match.Groups[1].Value));
+
+        links.ShouldBe(Descriptors.Select(descriptor => "sqlsrc" + descriptor.Id[6..]));
+    }
+
     // The section of SQLSRC109 tells a user what the generator parameters are.  A generator parameter that is added is
     // added to this list and to the section together; each name here must be in the section and known to the parser.
     // It also goes in site/settings.md, in the Values cell of the Generator parameters row and in the table of
@@ -137,6 +159,9 @@ public sealed class DiagnosticsDocumentTests
             errors.ShouldNotContain(error => error.Kind == SqlParseErrorKind.UnknownGeneratorParameter, parameter);
         }
     }
+
+    [GeneratedRegex(@"diagnostics\.md#(sqlsrc\d+)")]
+    private static partial Regex SectionLink();
 
     // The lines of a section after its title that are not blank.
     private static IEnumerable<string> LinesAfterTitle(List<string> body) =>
