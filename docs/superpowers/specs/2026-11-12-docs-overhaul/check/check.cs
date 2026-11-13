@@ -1140,7 +1140,9 @@ internal static partial class Check
                 }
             }
 
-            var unfit = rows.Find(row => FailureOf(row) is not null);
+            // A row that does not fit judges the rest only when a unit it names was not placed: a move whose copy
+            // stands at its to is not to blame for another copy.
+            var unfit = rows.Find(row => FailureOf(row) is not null && Covers(row, units, placedNames) > 0);
             (LedgerRow? Row, string? Failure) rest = (null, "no row names it");
             if (unfit is not null)
             {
@@ -1871,7 +1873,7 @@ internal static partial class Check
         ("11: one copy of a text that stands twice removed with no row: move fails and names it", RepeatedRowCase),
         ("12: a move-split part whose words carry a changed numeral: move fails and names the part", PartChangedCase),
         ("13: two copies of a text, named by a move and a removed-status row: each row covers one", CountedRowsCase),
-        ("14: a restated-from or merge-pair row whose copy stands at its to covers no other copy", PlacedRowCase),
+        ("14: a restated-from, merge-pair or move row whose copy stands at its to covers no other copy", PlacedRowCase),
         ("15: the same, with rows that name the copies by their place, @<file>:<line>", PlacedPlaceRowCase),
     ];
 
@@ -2346,9 +2348,10 @@ internal static partial class Check
         return null;
     }
 
-    // Two copies of one text: a restated-from row with a to, or a merge-pair row, each with a note, names the copy
-    // that stays at its to word for word, and the other copy is cut with no row.  The placed copy's row covers no
-    // other copy, so move fails, and passes once a removed-status row names the cut one.
+    // Two copies of one text: a restated-from row with a to, a merge-pair row, each with a note, or a plain move row
+    // names the copy that stays at its to word for word, and the other copy is cut with no row.  The placed copy's
+    // row covers no other copy and is not blamed for it, so move fails saying so, and passes once a removed-status
+    // row names the cut one.
     private static string? PlacedRowCase(string scratch)
     {
         var (repeated, units, ids) = RepeatedText(scratch);
@@ -2357,6 +2360,7 @@ internal static partial class Check
         [
             $"{ids[1]}\trestated-from\t{units[1].File}\t{units[1].File}#owner\t-\tthe rewrite of the page cuts it",
             $"{ids[1]}\tmerge-pair\t{units[1].File}\tMP-01\t-\tplaced beside its pair",
+            $"{ids[1]}\tmove\t{units[1].File}\t-\t-\t-",
         ];
         var removed = $"{ids[0]}\tremoved-status\t-\t-\t-\tstatus: the selftest cuts one copy";
         foreach (var row in placing)
@@ -2384,9 +2388,9 @@ internal static partial class Check
     }
 
     // Two copies of a paragraph that the selftest writes twice into the base, so that the inventory has no id for it
-    // and a row names each copy by its place, @<file>:<line>.  A restated-from or merge-pair row names the copy that
-    // stays at its to, and the other copy is cut with no row: move fails, and passes once a removed-status row names
-    // the cut copy.
+    // and a row names each copy by its place, @<file>:<line>.  A restated-from, merge-pair or move row names the copy
+    // that stays at its to, and the other copy is cut with no row: move fails, and passes once a removed-status row
+    // names the cut copy.
     private static string? PlacedPlaceRowCase(string scratch)
     {
         const string Twice = "A paragraph that the selftest writes twice, which no page of the baseline holds.";
@@ -2405,6 +2409,7 @@ internal static partial class Check
         [
             $"@{units[1].Id}\trestated-from\t{Readme}\t{Readme}#owner\t-\tthe rewrite of the page cuts it",
             $"@{units[1].Id}\tmerge-pair\t{Readme}\tMP-01\t-\tplaced beside its pair",
+            $"@{units[1].Id}\tmove\t{Readme}\t-\t-\t-",
         ];
         var removed = $"@{units[0].Id}\tremoved-status\t-\t-\t-\tstatus: the selftest cuts one copy";
         foreach (var row in placing)

@@ -227,6 +227,14 @@ public sealed partial class InboundSiteReferenceTests
         Problem("docs/README.md", "../site/diagnostics.md#sqlsrc001").ShouldBeNull();
     }
 
+    // Fails when a GitHub URL of another ref than `main`, in any case, is not reported as the wrong ref, but as a page
+    // that the site does not publish.
+    [Theory]
+    [InlineData("https://github.com/mbcrawfo/SqlSource/blob/Main/site/tool.md")]
+    [InlineData("https://github.com/mbcrawfo/SqlSource/tree/MAIN/site/tool.md#exit-codes")]
+    public void Problem_OfAGitHubUrlOfAnotherRef_SaysToUseMain(string reference) =>
+        Problem("README.md", reference).ShouldNotBeNull().ShouldContain("blob/main");
+
     // Fails when the walk reads a file that git ignores or a binary file, or skips a tracked text file.
     [Fact]
     public void Walk_OfAFolder_SkipsWhatGitIgnores()
@@ -320,6 +328,12 @@ public sealed partial class InboundSiteReferenceTests
             || reference.StartsWith("./", StringComparison.Ordinal);
         if (reference.StartsWith(GitHubSite, StringComparison.OrdinalIgnoreCase))
         {
+            // Another ref than `main`, in any case, is the wrong form of a link to the repository, as for a user doc.
+            if (UserDocs.RepositoryLinkProblem(reference) is { } wrongRef)
+            {
+                return wrongRef;
+            }
+
             // `blob/main/` or `tree/main/`, then the path from the root.
             reference = reference[
                 (
