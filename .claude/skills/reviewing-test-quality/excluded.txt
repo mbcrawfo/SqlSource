@@ -1,0 +1,14 @@
+# What no slice of the test review holds, one path to a line.
+
+# The libraries of the tests and the stand-in of the tool, which hold no tests and are read as context.
+tests/SqlSource.Repository
+tests/SqlSource.Testing
+tests/SqlSource.Tool.Testing
+tests/SqlSource.Tool.StandIn
+tests/DatabaseTests/TestHarness
+
+# Test data: the examples of the sidecar tests and the fixture projects, which are no tests.
+tests/SqlSource.Tests/Snapshot/Examples
+tests/SqlSource.Tool.Tests/Fixtures/Projects
+tests/DatabaseTests/Postgres/EndToEnd/ErrorPaths
+tests/DatabaseTests/SqlServer/EndToEnd/ErrorPaths

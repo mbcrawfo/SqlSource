@@ -84,6 +84,28 @@ public sealed class CondenserTests : IDisposable
         gaps.ShouldContain("| src/SqlSource/A.cs | 4 | 2 | 1 | 1 | 0 | 1 | 1 |\n");
     }
 
+    // The reports name their files in full, so a root given from the working folder, as ".", is made whole first.
+    [Fact]
+    public async Task RunAsync_RootGivenFromTheWorkingFolder_FindsTheTimesOfItsTests()
+    {
+        WriteTwoSlicesAndTheirScope();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var code = await Condenser.RunAsync(
+            Path.GetRelativePath(Directory.GetCurrentDirectory(), _root),
+            Run,
+            [],
+            output,
+            error,
+            TestContext.Current.CancellationToken
+        );
+
+        error.ToString().ShouldBeEmpty();
+        code.ShouldBe(0);
+        Evidence("P-1.md").ShouldContain("- `ATests.Reads`: 1 row, 0.500 s; kills 2");
+    }
+
     [Fact]
     public async Task RunAsync_BroadTest_IsNoOthersCover()
     {

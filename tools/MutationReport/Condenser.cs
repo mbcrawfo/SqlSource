@@ -37,10 +37,12 @@ internal static class Condenser
         CancellationToken cancellation
     )
     {
+        // The reports name their files in full, so a root given from the working folder is made whole to match them.
+        var root = Path.GetFullPath(repositoryRoot);
         Measurements measured;
         try
         {
-            measured = await Measurements.ReadAsync(repositoryRoot, runFolder, cancellation).ConfigureAwait(false);
+            measured = await Measurements.ReadAsync(root, runFolder, cancellation).ConfigureAwait(false);
         }
         catch (InvalidDataException exception)
         {
