@@ -22,14 +22,16 @@
     </ItemGroup>
     <ItemGroup>
         <!--
-            The five test projects of this folder; SqlSource.Tests, whose TestHarness/ tests the harness's own types;
+            The seven test projects of this folder; SqlSource.Tests, whose TestHarness/ tests the harness's own types;
             and SqlSource.Tool.Testing and SqlSource.Tool.Tests, which read EngineImage or ModelReflection.
         -->
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres.Npgsql8" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres.SyncAsync" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.QueryMethodAllocation" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer.SqlClient61" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer.SyncAsync" />
         <InternalsVisibleTo Include="SqlSource.Tests" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />

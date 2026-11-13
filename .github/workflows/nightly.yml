@@ -5,7 +5,7 @@
 # are Linux images, which these runners cannot start, and build.yml has all three.
 # build.yml tests each engine's floor and default image, and test-postgres and test-sqlserver here every supported major
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
-# The two allocation jobs run the default images only.
+# The two allocation jobs and the two sync-async jobs run the default images only.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
 # Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
 # 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the Test
@@ -41,7 +41,9 @@ jobs:
   test:
     name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # A green run takes 15 to 17 minutes on either system, and a cache miss or a slow runner adds minutes: 20 cancelled
+    # a Windows run whose every test had passed.
+    timeout-minutes: 30
     strategy:
       # One system's failure says nothing of the other.
       fail-fast: false
@@ -74,8 +76,9 @@ jobs:
 
       # Each project but tests/DatabaseTests/Postgres, tests/DatabaseTests/Postgres.Npgsql8,
       # tests/DatabaseTests/SqlServer and tests/DatabaseTests/SqlServer.SqlClient61, whose containers these runners
-      # cannot start, and tests/DatabaseTests/QueryMethodAllocation, which the allocation jobs below run.  Every
-      # project runs even when an earlier one failed.
+      # cannot start, tests/DatabaseTests/QueryMethodAllocation, which the allocation jobs below run, and
+      # tests/DatabaseTests/Postgres.SyncAsync and tests/DatabaseTests/SqlServer.SyncAsync, which the sync-async jobs
+      # below run.  Every project runs even when an earlier one failed.
       - name: Test
         run: |
           status=0
@@ -129,12 +132,31 @@ jobs:
           IMAGE: ${{ matrix.image }}
         run: docker pull --quiet "$IMAGE"
 
+      # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
+      # output, and not as errors of the tests, which then find the image and build nothing.  It keeps the image's ID
+      # for the check after the tests.
+      - name: Build PostGIS image
+        id: postgis
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          tools/build-postgis-image.sh "$IMAGE"
+          id="$(tools/build-postgis-image.sh --id "$IMAGE")"
+          echo "POSTGIS_IMAGE_ID=$id" >> "$GITHUB_ENV"
+
       - name: Test
         env:
           SQLSOURCE_TESTS_POSTGRES_IMAGE: ${{ matrix.image }}
         run: >-
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           --report-github --report-github-summary-include-passed false
+
+      # Fails the job when the tests built the PostGIS image again, which would hide a failed build in their errors.
+      - name: Check the tests built no PostGIS image
+        if: ${{ !cancelled() && steps.postgis.outcome == 'success' }}
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: tools/build-postgis-image.sh --unchanged "$POSTGIS_IMAGE_ID" "$IMAGE"
 
   # The same for tests/DatabaseTests/SqlServer, which build.yml runs on SQL Server 2017, the floor, and 2025, the
   # default.  Each image here has its row of SqlServerContainer.ImageBuilds.  The steps are those of build.yml's
@@ -255,4 +277,91 @@ jobs:
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           -p:RunQueryMethodAllocation=true
           --filter-namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer
+          --report-github --report-github-summary-include-passed false
+
+  # Runs the comparisons of tests/DatabaseTests/Postgres.SyncAsync, each synchronous query method beside its
+  # asynchronous twin, on PostgreSQL's default image, without coverage.  A red job means a synchronous method may
+  # behave otherwise than its twin: tests/DatabaseTests/Postgres.SyncAsync/README.md says how to read it.
+  sync-async-postgres:
+    name: Sync and async methods on PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROJECT: tests/DatabaseTests/Postgres.SyncAsync
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: tests/DatabaseTests/Postgres.SyncAsync/packages.lock.json
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
+
+      # tools/pull-test-images.sh pulls the default image of both engines, so that no workflow names a default image:
+      # rule 5 of AGENTS.md lists the places that do.
+      - name: Pull test images
+        run: tools/pull-test-images.sh
+
+      # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
+      # output, and not as errors of the tests, which then find the image and build nothing.  It keeps the image's ID
+      # for the check after the tests.
+      - name: Build PostGIS image
+        id: postgis
+        run: |
+          tools/build-postgis-image.sh
+          id="$(tools/build-postgis-image.sh --id)"
+          echo "POSTGIS_IMAGE_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Test
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          -p:RunSyncAsync=true
+          --report-github --report-github-summary-include-passed false
+
+      # Fails the job when the tests built the PostGIS image again, which would hide a failed build in their errors.
+      - name: Check the tests built no PostGIS image
+        if: ${{ !cancelled() && steps.postgis.outcome == 'success' }}
+        run: tools/build-postgis-image.sh --unchanged "$POSTGIS_IMAGE_ID"
+
+  # Runs the comparisons of tests/DatabaseTests/SqlServer.SyncAsync, each synchronous query method beside its
+  # asynchronous twin, on SQL Server's default image, without coverage.  A red job means a synchronous method may
+  # behave otherwise than its twin: tests/DatabaseTests/SqlServer.SyncAsync/README.md says how to read it.
+  sync-async-sqlserver:
+    name: Sync and async methods on SQL Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PROJECT: tests/DatabaseTests/SqlServer.SyncAsync
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: tests/DatabaseTests/SqlServer.SyncAsync/packages.lock.json
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
+
+      # tools/pull-test-images.sh pulls the default image of both engines, so that no workflow names a default image:
+      # rule 5 of AGENTS.md lists the places that do.
+      - name: Pull test images
+        run: tools/pull-test-images.sh
+
+      - name: Test
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          -p:RunSyncAsync=true
           --report-github --report-github-summary-include-passed false

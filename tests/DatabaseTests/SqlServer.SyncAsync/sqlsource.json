@@ -1,0 +1,6 @@
+{
+  // Every query copied from the end-to-end project into obj/Mirror/ gets its synchronous method and its asynchronous
+  // one, which the tests run side by side.  A query's own marker still wins, so a copy under method-type=sync keeps
+  // its synchronous method alone.
+  "generatorParameters": ["method-type=both"],
+}

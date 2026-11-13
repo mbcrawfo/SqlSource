@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Testcontainers.MsSql;
 using Xunit;
@@ -63,6 +64,10 @@ public abstract class SqlServerContainer(DbProviderFactory factory, string image
         return await TestDatabases.ScalarAsync(source, sql, TestContext.Current.CancellationToken);
     }
 
+    // Runs once every database of DatabasesOf is built, on a source of the server's database "master", for a subclass
+    // that makes more of them, such as a backup of one.  A container whose call of this throws is removed.
+    protected virtual Task BuiltAsync(DbDataSource server, CancellationToken token) => Task.CompletedTask;
+
     // Skips the test on a server before that major, which lacks what the reason names.
     public void SkipBelow(int major, string reason) => EngineImage.SkipBelow(Major, major, reason);
 
@@ -88,6 +93,7 @@ public abstract class SqlServerContainer(DbProviderFactory factory, string image
             var databases = DatabasesOf(Major);
             _database = TestDatabases.DefaultOf(databases, GetType());
             await TestDatabases.BuildAsync(server, EndToEndEngine.SqlServer, databases, SourceOf, token);
+            await BuiltAsync(server, token);
         }
         catch
         {

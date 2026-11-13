@@ -24,6 +24,7 @@ postgres tests/DatabaseTests/TestHarness/Postgis/*
 postgres tests/SqlSource.Tool.Tests/Bundles/Renaming/Postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/*
+postgres tools/build-postgis-image.sh
 
 sqlserver src/SqlSource.Tool/Bundles/Renaming/SqlServer/*
 sqlserver src/SqlSource.Tool/Describing/SqlServer/*
@@ -33,8 +34,11 @@ sqlserver tests/SqlSource.Tool.Tests/Bundles/Renaming/SqlServer/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/*
 
-# The nightly alone runs the allocation project, and `project` lines are for the projects the script runs.
+# The nightly alone runs the allocation project and the sync/async comparison, and `project` lines are for the
+# projects the script runs.
+none tests/DatabaseTests/Postgres.SyncAsync/*
 none tests/DatabaseTests/QueryMethodAllocation/*
+none tests/DatabaseTests/SqlServer.SyncAsync/*
 none docs/*
 none site/*
 none examples/*
