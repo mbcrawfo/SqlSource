@@ -200,6 +200,41 @@ public sealed class CliTests
             ReadLines(slices, "D.A-1.txt").ShouldBe(["tests/D/A/ATests.cs"]);
         });
 
+    // Every folder of projects.txt is a project, so this is the cut of a whole run.
+    [Fact]
+    public async Task RunAsync_SlicesOfAFolderThatIsAProject_PutsEachFileInOneSlice() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/D/A/A.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/A/ATests.cs", 10);
+            WriteLines(folder, "tests/D/A/Sub/MoreTests.cs", 10);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, output, _) = await RunAsync("slices", folder, slices, "tests/D/A");
+
+            code.ShouldBe(0);
+            output.ShouldBe(Lines("1 slices of 2 files and 20 lines"));
+            ReadLines(slices, "index.txt").ShouldBe(["D.A-1 20 2"]);
+        });
+
+    // A folder beside a project whose name starts with the project's is not in it.
+    [Fact]
+    public async Task RunAsync_SlicesOfAFolderBesideAProjectOfALikeName_KeepsItOutOfTheProject() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/D/A/A.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/A/ATests.cs", 10);
+            WriteLines(folder, "tests/D/AB/LooseTests.cs", 10);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, _, _) = await RunAsync("slices", folder, slices, "tests/D");
+
+            code.ShouldBe(0);
+            ReadLines(slices, "index.txt").ShouldBe(["D.A-1 10 1", "D.AB-1 10 1"]);
+            ReadLines(slices, "D.A-1.txt").ShouldBe(["tests/D/A/ATests.cs"]);
+            ReadLines(slices, "D.AB-1.txt").ShouldBe(["tests/D/AB/LooseTests.cs"]);
+        });
+
     [Fact]
     public async Task RunAsync_SlicesOfAFolderInsideAProject_CutsItAsOneFolder() =>
         await InFolderAsync(async folder =>
