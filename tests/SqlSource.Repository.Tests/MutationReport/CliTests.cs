@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.MutationReport;
@@ -50,17 +51,135 @@ public sealed class CliTests
     [InlineData("compare")]
     [InlineData("compare", "one.json")]
     [InlineData("compare", "one.json", "two.json", "three.json")]
-    [InlineData("condense", "one.json", "two.json")]
+    [InlineData("condemn", "one.json", "two.json")]
     [InlineData("static")]
     [InlineData("static", "one.json", "two.json")]
+    [InlineData("slices", "root")]
+    [InlineData("slices", "root", "out")]
+    [InlineData("slices", "root", "out", "--limit", "0", "tests")]
+    [InlineData("slices", "root", "out", "--limit", "many", "tests")]
+    [InlineData("slices", "root", "out", "tests", "--limit")]
+    [InlineData("slices", "root", "out", "tests", "--exclude-from")]
+    [InlineData("slices", "root", "out", "--unknown", "tests")]
     public async Task RunAsync_OtherArguments_ExitsTwoWithTheUsage(params string[] arguments)
     {
         var (code, output, error) = await RunAsync(arguments);
 
         code.ShouldBe(2);
-        error.ShouldBe(Lines("Usage: compare <before.json> <after.json>", "       static <report.json>"));
+        error.ShouldBe(
+            Lines(
+                "Usage: compare <before.json> <after.json>",
+                "       static <report.json>",
+                "       slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] <folder> ..."
+            )
+        );
         output.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task RunAsync_Slices_WritesAFileForEachSliceAndTheIndex() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/P/A/ATests.cs", 60);
+            WriteLines(folder, "tests/P/B/BTests.cs", 30);
+            WriteLines(folder, "tests/P/B/CTests.cs", 50);
+            WriteLines(folder, "tests/P/B/notes.md", 500);
+            WriteLines(folder, "tests/P/B/bin/Built.cs", 500);
+            WriteLines(folder, "tests/P/B/obj/Built.cs", 500);
+            WriteLines(folder, "tests/P/Data/Example.cs", 500);
+            WriteLines(folder, "tests/Q/QTests.cs", 500);
+            var exclusions = Path.Combine(folder, "excluded.txt");
+            await File.WriteAllLinesAsync(
+                exclusions,
+                ["# test data", "", "tests/P/Data  # holds no test"],
+                TestContext.Current.CancellationToken
+            );
+            var slices = Path.Combine(folder, "run", "slices");
+
+            var (code, output, error) = await RunAsync(
+                "slices",
+                folder,
+                slices,
+                "--limit",
+                "100",
+                "--exclude-from",
+                exclusions,
+                "tests/P/"
+            );
+
+            error.ShouldBeEmpty();
+            code.ShouldBe(0);
+            output.ShouldBe(Lines("2 slices of 3 files and 140 lines"));
+            ReadLines(slices, "index.txt").ShouldBe(["P.A-1 60 1", "P.B-1 80 2"]);
+            ReadLines(slices, "P.A-1.txt").ShouldBe(["tests/P/A/ATests.cs"]);
+            ReadLines(slices, "P.B-1.txt").ShouldBe(["tests/P/B/BTests.cs", "tests/P/B/CTests.cs"]);
+            Directory.GetFiles(slices).Length.ShouldBe(3);
+        });
+
+    [Fact]
+    public async Task RunAsync_SlicesOfFilesOfOnePartialClass_KeepsThemTogether() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/P/A.cs", 60);
+            WriteLines(folder, "tests/P/B.cs", 30, "public sealed partial class BTests");
+            WriteLines(folder, "tests/P/C.cs", 10, "    public partial class BTests");
+            WriteLines(folder, "tests/P/D.cs", 30, "public sealed partial class BTests");
+            WriteLines(folder, "tests/P/E.cs", 20);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, _, _) = await RunAsync("slices", folder, slices, "--limit", "100", "tests/P");
+
+            code.ShouldBe(0);
+            ReadLines(slices, "P-2.txt").ShouldBe(["tests/P/B.cs", "tests/P/C.cs", "tests/P/D.cs", "tests/P/E.cs"]);
+        });
+
+    [Fact]
+    public async Task RunAsync_SlicesOfTwoFolders_CutsEachByItselfAndNumbersThemTogether() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/P/A.cs", 10);
+            WriteLines(folder, "tests/Q/B.cs", 10);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, _, _) = await RunAsync("slices", folder, slices, "tests/P", "tests/Q");
+
+            code.ShouldBe(0);
+            ReadLines(slices, "index.txt").ShouldBe(["P-1 10 1", "Q-1 10 1"]);
+        });
+
+    [Theory]
+    [InlineData("tests/Missing")]
+    [InlineData("tests/P", "tests/P/A")]
+    public async Task RunAsync_SlicesOfAFolderThatDoesNotExistOrIsInsideAnother_ExitsTwoNamingIt(
+        params string[] folders
+    ) =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/P/A/ATests.cs", 10);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, output, error) = await RunAsync(["slices", folder, slices, .. folders]);
+
+            code.ShouldBe(2);
+            error.ShouldContain(folders[^1]);
+            output.ShouldBeEmpty();
+            Directory.Exists(slices).ShouldBeFalse();
+        });
+
+    // A cut over an earlier one would leave the earlier one's slices beside its own.
+    [Fact]
+    public async Task RunAsync_SlicesIntoAFolderThatHoldsFiles_ExitsTwoAndWritesNothing() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/P/ATests.cs", 10);
+            WriteLines(folder, "slices/Old-1.txt", 1);
+
+            var (code, _, error) = await RunAsync("slices", folder, Path.Combine(folder, "slices"), "tests/P");
+
+            code.ShouldBe(2);
+            error.ShouldContain("is not empty");
+            Directory.GetFiles(Path.Combine(folder, "slices")).Length.ShouldBe(1);
+        });
 
     [Fact]
     public async Task RunAsync_ReportThatDoesNotExist_ExitsTwoAndNamesTheFile() =>
@@ -170,6 +289,16 @@ public sealed class CliTests
         );
         return path;
     }
+
+    // A file of a number of lines, the first of them the one given.
+    private static void WriteLines(string folder, string path, int lines, string first = "// a line")
+    {
+        var file = Path.Combine(folder, path);
+        _ = Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllLines(file, [first, .. Enumerable.Repeat("// a line", lines - 1)]);
+    }
+
+    private static string[] ReadLines(string folder, string name) => File.ReadAllLines(Path.Combine(folder, name));
 
     private static string Lines(params string[] lines) => string.Join(Environment.NewLine, lines) + Environment.NewLine;
 
