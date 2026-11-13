@@ -49,28 +49,30 @@ internal static partial class ReportReader
 
     private static Mutant Read(string file, MutantJson mutant, Dictionary<MutantKey, int> seen)
     {
-        if (
-            mutant.MutatorName is not { } mutator
-            || mutant.Location is not { Start: { } start, End: { } end }
-            || mutant.Status is not { } status
-        )
+        var key = KeyOf(file, mutant.MutatorName, mutant.Replacement, mutant.Location, seen);
+        return mutant.Status is { } status
+            ? new Mutant(key, StatusOf(status, file))
+            : throw new InvalidDataException($"A mutant of {file} has no mutatorName, location or status.");
+    }
+
+    // The key of a mutant, numbered among those of its file that seen has met with the same other fields.
+    internal static MutantKey KeyOf(
+        string file,
+        string? mutator,
+        string? replacement,
+        LocationJson? location,
+        Dictionary<MutantKey, int> seen
+    )
+    {
+        if (mutator is null || location is not { Start: { } start, End: { } end })
         {
             throw new InvalidDataException($"A mutant of {file} has no mutatorName, location or status.");
         }
 
-        var first = new MutantKey(
-            file,
-            start.Line,
-            start.Column,
-            end.Line,
-            end.Column,
-            mutator,
-            mutant.Replacement ?? "",
-            0
-        );
+        var first = new MutantKey(file, start.Line, start.Column, end.Line, end.Column, mutator, replacement ?? "", 0);
         var ordinal = seen.GetValueOrDefault(first);
         seen[first] = ordinal + 1;
-        return new Mutant(first with { Ordinal = ordinal }, StatusOf(status, file));
+        return first with { Ordinal = ordinal };
     }
 
     internal static MutantStatus StatusOf(string status, string file) =>
