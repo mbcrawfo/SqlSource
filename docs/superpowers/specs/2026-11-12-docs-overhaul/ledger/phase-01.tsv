@@ -1,6 +1,6 @@
 # base 65a6e0a20724fdb0c2464c1afb8fea7295f67b48
 unit	disposition	to	arg	words	note
-README.md:7	removed-status	-	-	-	What it says is generated is stated in site/generator.md 1-32, describing in site/tool.md 1-14 and README.md 7, and describing on save in site/tool.md#describe-on-save
+README.md:7	removed-status	-	-	-	What it says is generated is stated in site/generator.md 1-32, describing in site/tool.md 1-14 and README.md 7, and describing on save in README.md 126 and site/tool.md#describe-on-save
 README.md:9	move-split	-	-	-	A clause that says what describing is goes in after its first two words, since README.md:7 that defined it goes
 README.md:9/1	move	README.md	-	**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries	-
 README.md:9/2	move	README.md	-	works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see database support.  So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as Just want to keep your SQL out of code files? shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see only generating models.	-

@@ -22,14 +22,17 @@ public sealed class StatusLanguageTests
         "early development",
     ];
 
-    public static TheoryData<string> PhraseData => [.. Phrases];
-
     [Fact]
     public void UserDocs_HoldNoPhraseOfStatus() =>
         UserDocs.Files.SelectMany(file => Hits(file, File.ReadAllLines(RepositoryRoot.Path(file)))).ShouldBeEmpty();
 
+    // The rows are written out, not taken from Phrases, so that a phrase taken off the list fails here.
     [Theory]
-    [MemberData(nameof(PhraseData))]
+    [InlineData("Coming in a later release")]
+    [InlineData("works today")]
+    [InlineData("work today")]
+    [InlineData("no effect yet")]
+    [InlineData("early development")]
     public void Hits_FindEachPhrase_InAnyCase(string phrase)
     {
         Hits("page.md", [$"A sentence: {phrase}."]).ShouldContain($"page.md:1: {phrase}");
