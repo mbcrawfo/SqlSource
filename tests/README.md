@@ -10,7 +10,7 @@ The test projects:
 |----|----|----|----|
 | `tests/SqlSource.Tests` | A current version | No | Every test of the generator |
 | `tests/SqlSource.Tests.RoslynFloor` | 4.14.0, the oldest supported | No | The generator driver tests: the files of `tests/SqlSource.Tests/Generator/`, compiled a second time |
-| `tests/SqlSource.Repository.Tests` | A current version | No | The checks of the repository's own files: the links, anchors and SQL samples of the user docs, the sections of `site/diagnostics.md`, the limits of every `AGENTS.md`, the root `sqlsource.json`, the VS Code recipe of `site/recipes.md`, `tools/test-scopes.txt`, how the test projects reference and include each other, the hand-written row buffer of `tests/DatabaseTests/QueryMethodAllocation` and the plan keys that the PostgreSQL describer's `PlanNode.cs` spells, and the tests of `tests/SqlSource.Repository` |
+| `tests/SqlSource.Repository.Tests` | A current version | No | The checks of the repository's own files: the links, anchors and SQL samples of the user docs, the sections of `site/diagnostics.md`, the limits of every `AGENTS.md`, the root `sqlsource.json`, the VS Code recipe of `site/recipes.md`, `tools/test-scopes.txt`, how the test projects reference and include each other, the hand-written row buffer of `tests/DatabaseTests/QueryMethodAllocation` and the plan keys that the PostgreSQL describer's `PlanNode.cs` spells, and the tests of `tests/SqlSource.Repository` and of `tools/MutationReport`, the program that compares two mutation reports |
 | `tests/SqlSource.Tool.Tests` | A current version | No | The tests of the tool, which run the whole command in process with their own output, working directory and environment |
 
 The seven projects that run against a real server are in [`tests/DatabaseTests/`](DatabaseTests/README.md), whose readme has their table.
@@ -81,6 +81,7 @@ graph TD
     Repository["tests/SqlSource.Repository"]
     RepositoryTests["tests/SqlSource.Repository.Tests"]
     StandIn["tests/SqlSource.Tool.StandIn"]
+    MutationReport["tools/MutationReport"]
     Harness["tests/DatabaseTests/TestHarness"]
     ToolTesting["tests/SqlSource.Tool.Testing"]
 
@@ -92,6 +93,7 @@ graph TD
     Floor --> Testing
     Floor -.->|compiles Generator/ again| Tests
     ToolTests --> Generator
+    ToolTests --> Tool
     ToolTests --> Testing
     ToolTests --> Repository
     ToolTests --> Harness
@@ -132,13 +134,14 @@ graph TD
     RepositoryTests --> Generator
     RepositoryTests --> Tool
     RepositoryTests --> Repository
+    RepositoryTests --> MutationReport
 ```
 
 What each test project takes from the libraries:
 
-- `tests/SqlSource.Repository.Tests` references `tests/SqlSource.Repository`, whose tests it holds, and nothing of the other libraries.  It references `src/SqlSource` and `src/SqlSource.Tool`, which grant it `InternalsVisibleTo`, for what its checks hold a file to: the descriptors, the parser and the settings file reader of the generator, and the watch's markers, the error format and `PlanKeys` of the tool.  Its `RowBufferByHandTests` reads `RowBufferByHand.cs` of `tests/DatabaseTests/QueryMethodAllocation` as text.
+- `tests/SqlSource.Repository.Tests` references `tests/SqlSource.Repository`, whose tests it holds, and nothing of the other libraries.  It references `src/SqlSource` and `src/SqlSource.Tool`, which grant it `InternalsVisibleTo`, for what its checks hold a file to: the descriptors, the parser and the settings file reader of the generator, and the watch's markers, the error format and `PlanKeys` of the tool.  Its `RowBufferByHandTests` reads `RowBufferByHand.cs` of `tests/DatabaseTests/QueryMethodAllocation` as text.  It references `tools/MutationReport`, which is no part of what ships and has no test project of its own, for the tests of that program in `MutationReport/`.
 - `tests/SqlSource.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, `TestSidecars`, `DiagnosticMessages`, `CultureScope` and `Eventually`, and `tests/SqlSource.Repository` for `RepositoryRoot`, and `tests/SqlSource.Tests.RoslynFloor` references it for the harness.  It references `tests/DatabaseTests/TestHarness` for the tests of the harness in `TestHarness/`, which need no Docker.
-- `tests/SqlSource.Tool.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, which `GeneratorParityTests` runs with the tool over the same sources, and for `SqlTexts`, `TestSidecars`, `DiagnosticMessages` and `Eventually`, references `tests/SqlSource.Repository` for `RepositoryRoot`, references `tests/DatabaseTests/TestHarness` for `EngineImage`, references `tests/SqlSource.Tool.Testing` for the helpers it shares with `tests/DatabaseTests/Postgres` and `tests/DatabaseTests/SqlServer`, and references `tests/SqlSource.Tool.StandIn` for its build output alone.
+- `tests/SqlSource.Tool.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, which `GeneratorParityTests` runs with the tool over the same sources, and for `SqlTexts`, `TestSidecars`, `DiagnosticMessages` and `Eventually`, references `tests/SqlSource.Repository` for `RepositoryRoot`, references `tests/DatabaseTests/TestHarness` for `EngineImage`, references `tests/SqlSource.Tool.Testing` for the helpers it shares with `tests/DatabaseTests/Postgres` and `tests/DatabaseTests/SqlServer`, and references `tests/SqlSource.Tool.StandIn` for its build output alone.  It references `src/SqlSource.Tool` itself, though `tests/SqlSource.Tool.Testing` brings it, because Stryker looks for the project it mutates among a test project's own references.
 - `tests/SqlSource.Tool.Testing` references `tests/SqlSource.Repository` for `RepositoryRoot` and `RepositoryWorkingFolder`, `tests/SqlSource.Testing` for `Eventually` and `DiagnosticMessages`, and for `GeneratorHarness` and `Sidecars` of the generator's harness, which `RealisticGeneration` of its `Realistic/` runs the generator through, and `tests/DatabaseTests/TestHarness` for `EngineImage` and `ModelReflection`, which its `Realistic/` reads.
 - `tests/DatabaseTests/Postgres` references `tests/SqlSource.Repository` for `RepositoryRoot`, `tests/SqlSource.Testing` for `TestSidecars` and `Eventually`, `tests/DatabaseTests/TestHarness` for `DefaultImages`, `EngineImage`, `DescriberFixtures`, `PostgresContainer` and `PostgisContainer`, which its two fixtures subclass, `EndToEndFiles` and `EndToEndEngine`, `AllTypesRows`, `ModelReflection`, `CommittedEntries`, `RowBufferReads`, `ListArguments`, `JsonElements`, `CountingSequence` and `VariantCopies`, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs`, `FixtureProjects`, `FixtureCaseRuns`, `ToolProcess`, `ErrorPaths`, `DiagnoseCommands`, `Describers` and `DescribeRequests`, which open its sessions and build its requests, `HookedExchange` and `Failures`, which its session tests act and read through, and the shared parts of its realistic corpus in `Realistic/`.
 - `tests/DatabaseTests/Postgres.Npgsql8` references `tests/SqlSource.Repository` for `RepositoryRoot` and `tests/DatabaseTests/TestHarness` for `DefaultImages`, `EngineImage`, `PostgresContainer` and `PostgisContainer`, which its two fixtures subclass, `EndToEndFiles` and `EndToEndEngine`, `AllTypesRows`, `ModelReflection`, `ListArguments`, `JsonElements` and `CountingSequence`, and nothing that brings Npgsql 10.

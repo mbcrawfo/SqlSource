@@ -1,0 +1,10 @@
+{
+  "stryker-config": {
+    "project": "SqlSource.csproj",
+    "test-projects": ["../../tests/SqlSource.Tests/SqlSource.Tests.csproj"],
+    "test-runner": "mtp",
+    "coverage-analysis": "perTest",
+    "reporters": ["json", "html", "progress"],
+    "additional-timeout": 60000
+  }
+}
