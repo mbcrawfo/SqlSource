@@ -1,0 +1,16 @@
+# The test projects of the test review, one folder to a line.  measure.sh runs each, with coverage and each test's
+# time, but one marked not-run, and a run of the skill cuts each into slices.
+tests/SqlSource.Tests
+tests/SqlSource.Tests.RoslynFloor
+tests/SqlSource.Repository.Tests
+tests/SqlSource.Tool.Tests
+tests/DatabaseTests/Postgres
+tests/DatabaseTests/Postgres.Npgsql8
+tests/DatabaseTests/Postgres.SyncAsync
+tests/DatabaseTests/SqlServer
+tests/DatabaseTests/SqlServer.SqlClient61
+tests/DatabaseTests/SqlServer.SyncAsync
+
+# Its tests skip under coverage, and it is a test project only under RunQueryMethodAllocation=true, so it is reviewed
+# by reading.
+tests/DatabaseTests/QueryMethodAllocation not-run

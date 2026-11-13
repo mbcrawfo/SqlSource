@@ -66,6 +66,10 @@
 
 A periodic review of the code's folder growth, comments and duplicated patterns follows the skill in `.claude/skills/reviewing-maintainability/`, which says what is fixed in the review's pull request and what is recorded in `docs/tech-debt`.
 
+## Reviewing test quality
+
+A review of whether each test earns its place follows the skill in `.claude/skills/reviewing-test-quality/`, which only a person starts and which ends in a cleanup epic, never in a change to a test.
+
 ## AGENTS.md guidelines
 
 1. Always use AGENTS.md files for AI guidance.

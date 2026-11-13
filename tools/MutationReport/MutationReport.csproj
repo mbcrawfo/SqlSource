@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        Reads the JSON report of a Stryker mutation run and compares two of them, for tools/mutation-test.sh.  A
-        program and not a script, since a report of a whole project is hundreds of megabytes and the repository
-        requires no tool that reads JSON.  It is never packed, and tests/SqlSource.Repository.Tests holds its tests.
+        Reads the JSON report of a Stryker mutation run and compares two of them, for tools/mutation-test.sh, and
+        prepares the evidence of a test review, for .claude/skills/reviewing-test-quality: the slices, each slice's
+        evidence and what one test kills.  A program and not a script, since a report is tens to hundreds of
+        megabytes and the repository requires no tool that reads JSON.  It is never packed, and
+        tests/SqlSource.Repository.Tests holds its tests.
     -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
