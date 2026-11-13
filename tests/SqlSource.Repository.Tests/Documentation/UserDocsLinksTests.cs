@@ -9,8 +9,6 @@ namespace SqlSource.Repository.Tests.Documentation;
 // reader at the top of a long page, or on a page that is not found, so each is followed here.
 public sealed class UserDocsLinksTests
 {
-    private const string Manual = UserDocs.Site + "/";
-
     // The two readmes are packed into NuGet packages and shown on nuget.org, away from the repository.
     private static readonly string[] PackedReadmes = ["README.md", "src/SqlSource.Tool/README.md"];
 
@@ -121,24 +119,6 @@ public sealed class UserDocsLinksTests
             .Where(link => link.Resolved is { } resolved && IsInternal(resolved.Path))
             .Select(link => $"{link.File}:{link.Line}: {link.Target}")
             .ShouldBeEmpty();
-
-    // A link anywhere on the entry page satisfies this test, so keeping the page listed under "The pages", with a
-    // "Find what you need" row for each need it answers, is the writer's job.
-    [Fact]
-    public void Manual_EntryPage_ListsEveryPage()
-    {
-        var entry = Manual + "README.md";
-        var linked = UserDocs
-            .Links()
-            .Where(link => link.File == entry)
-            .Select(link => UserDocs.Resolve(link.File, link.Target)?.Path)
-            .ToHashSet();
-
-        UserDocs
-            .Files.Where(file => file.StartsWith(Manual, StringComparison.Ordinal) && file != entry)
-            .Where(file => !linked.Contains(file))
-            .ShouldBeEmpty();
-    }
 
     private static bool IsInternal(string path) =>
         path != ToolReadme

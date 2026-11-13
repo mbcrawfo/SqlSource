@@ -14,6 +14,60 @@ public sealed class UserDocsReadingTests
             .Read(["# Title", "## Same", "## Same", "## Same"])
             .AnchorSet.ShouldBe(["title", "same", "same-1", "same-2"], ignoreOrder: true);
 
+    [Fact]
+    public void Anchors_TabGroup_GiveNoAnchorAndNoLink()
+    {
+        var document = UserDocs.Read([
+            "# Title",
+            "# [PostgreSQL](#tab/postgres)",
+            "Text.",
+            "",
+            "# [SQL Server](#tab/mssql)",
+            "Text.",
+            "",
+            "---",
+        ]);
+
+        document.AnchorSet.ShouldBe(["title"]);
+        document.LinkList.ShouldBeEmpty();
+        document.Unsupported.ShouldBeEmpty();
+        document.TabList.ShouldBe([(2, "postgres"), (5, "mssql")]);
+    }
+
+    [Fact]
+    public void Anchors_TabHeadingWithAPathId_IsATab()
+    {
+        var document = UserDocs.Read(["# [Linux](#tab/linux/x64)"]);
+
+        document.AnchorSet.ShouldBeEmpty();
+        document.TabList.ShouldBe([(1, "linux/x64")]);
+    }
+
+    [Fact]
+    public void Anchors_TabHeading_IsNotCountedForASuffix() =>
+        UserDocs.Read(["# [Same](#tab/a)", "# Same"]).AnchorSet.ShouldBe(["same"]);
+
+    [Fact]
+    public void FrontMatter_IsNotRead()
+    {
+        var document = UserDocs.Read(["---", "title: Start", "[a](b.md)", "---", "# Title", "[c](d.md)"]);
+
+        document.AnchorSet.ShouldBe(["title"]);
+        document.LinkList.ShouldBe([(6, "d.md")]);
+        document.Unsupported.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void FrontMatter_WithNoClosingLine_IsText() =>
+        UserDocs.Read(["---", "[a](b.md)"]).LinkList.ShouldBe([(2, "b.md")]);
+
+    [Fact]
+    public void Unsupported_RuleUnderAParagraphOfATab_IsReported() =>
+        UserDocs
+            .Read(["# [PostgreSQL](#tab/postgres)", "Text.", "---"])
+            .Unsupported.Select(form => form.Line)
+            .ShouldBe([3]);
+
     [Theory]
     [InlineData("""<a id="one"></a>""", "one")]
     [InlineData("<a id='one'></a>", "one")]
@@ -180,19 +234,30 @@ public sealed class UserDocsReadingTests
         "what-works-today"
     )]
     [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/README.md", "")]
+    [InlineData(
+        "https://mbcrawfo.github.io/SqlSource/reference/cli.html#exit-codes",
+        "site/reference/cli.md",
+        "exit-codes"
+    )]
+    [InlineData(
+        "https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/types.html",
+        "site/reference/databases/postgresql/types.md",
+        ""
+    )]
     public void Resolve_SiteUrl_IsThePageOfSite(string target, string path, string anchor)
     {
         UserDocs.IsSiteLink(target).ShouldBeTrue();
         UserDocs.Resolve("README.md", target).ShouldBe((path, anchor));
     }
 
-    // The root is a redirect to README.html that drops the anchor, and the site has no folders and no page that is
-    // not built from a .md file.
+    // The root is a redirect to README.html that drops the anchor, and the site has no page that is not built from a
+    // .md file.
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/#what-works-today")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.md")]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/reference/")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/reference/cli")]
     [InlineData("https://mbcrawfo.github.io/SqlSource#what-works-today")]
     [InlineData("https://mbcrawfo.github.io/SqlSource")]
     [InlineData("http://mbcrawfo.github.io/SqlSource/tool.html")]
@@ -213,6 +278,7 @@ public sealed class UserDocsReadingTests
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]
     public void SiteLinkProblem_APageOrAnotherSite_IsNone(string target) =>
         UserDocs.SiteLinkProblem(target).ShouldBeNull();

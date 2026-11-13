@@ -16,8 +16,8 @@ internal static partial class UserDocs
     // Where a link of a packed readme points, since nuget.org shows the readme without the repository around it.
     public const string RepositoryUrl = "https://github.com/mbcrawfo/SqlSource/blob/main/";
 
-    // Where the manual is published, and the folder of the repository it is built from.  A page `<name>.md` of the
-    // folder is `<name>.html` of the site, and the site's root redirects to README.html.
+    // Where the manual is published, and the folder of the repository it is built from.  A page `<path>.md` of the
+    // folder, at any depth, is `<path>.html` of the site, and the site's root redirects to README.html.
     public const string SiteUrl = "https://mbcrawfo.github.io/SqlSource/";
 
     internal const string Site = "site";
@@ -31,14 +31,19 @@ internal static partial class UserDocs
 
     private static readonly ConcurrentDictionary<string, Document> Documents = new(StringComparer.Ordinal);
 
-    // The pages of the manual, as repository-relative paths with '/': every .md file of site/ but AGENTS.md, which is
-    // guidance for an agent, and index.md, which only sends the site's root to README.html.  docfx publishes these.
+    // The pages of the manual, as repository-relative paths with '/': every .md file of site/, in its folders, but the
+    // AGENTS.md and CLAUDE*.md files, which are guidance for an agent, and site/index.md, which only sends the site's
+    // root to README.html.  docfx publishes these.
     public static IReadOnlyList<string> SitePages { get; } =
     [
         .. Directory
-            .EnumerateFiles(RepositoryRoot.Path(Site), "*.md")
-            .Select(path => $"{Site}/{Path.GetFileName(path)}")
-            .Where(path => Path.GetFileName(path) is not ("AGENTS.md" or "index.md"))
+            .EnumerateFiles(RepositoryRoot.Path(Site), "*.md", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(RepositoryRoot.Path(), path).Replace('\\', '/'))
+            .Where(path =>
+                path != $"{Site}/index.md"
+                && Path.GetFileName(path) is not "AGENTS.md"
+                && !Path.GetFileName(path).StartsWith("CLAUDE", StringComparison.Ordinal)
+            )
             .Order(StringComparer.Ordinal),
     ];
 
@@ -99,7 +104,7 @@ internal static partial class UserDocs
     // without the slash after the repository's name.
     public static bool IsSiteLink(string target) => SiteLinkPattern().IsMatch(target);
 
-    // What is wrong with a link to the site: it must name a page, `<name>.html`, or be the root with no anchor, since
+    // What is wrong with a link to the site: it must name a page, `<path>.html`, or be the root with no anchor, since
     // the root's redirect drops the anchor.  Null when the form is right, and for a link to anything else.
     public static string? SiteLinkProblem(string target)
     {
@@ -123,7 +128,9 @@ internal static partial class UserDocs
                 : $"name the page, {SiteUrl}README.html#<anchor>: the root's redirect drops the anchor";
         }
 
-        return SitePagePattern().IsMatch(page) ? null : $"use {SiteUrl}<page>.html: the site has no other kind of page";
+        return SitePagePattern().IsMatch(page)
+            ? null
+            : $"use {SiteUrl}<page>.html or {SiteUrl}<folder>/<page>.html: the site has no other kind of page";
     }
 
     private static bool IsMain(Match link) =>
@@ -195,10 +202,22 @@ internal static partial class UserDocs
         var links = new List<(int Line, string Target)>();
         var blocks = new List<(int Line, string Info, string Text)>();
         var unsupported = new List<(int Line, string Message)>();
+        var tabs = new List<(int Line, string Id)>();
+
+        // Front matter, between a first line of '---' and the next one, is for docfx: it is not Markdown to read.
+        var start = 0;
+        if (lines.Length > 0 && lines[0] == "---")
+        {
+            var close = Array.IndexOf(lines, "---", 1);
+            if (close > 0)
+            {
+                start = close + 1;
+            }
+        }
 
         Fence? fence = null;
         var content = new List<string>();
-        for (var index = 0; index < lines.Length; index++)
+        for (var index = start; index < lines.Length; index++)
         {
             var line = lines[index];
             var number = index + 1;
@@ -233,6 +252,16 @@ internal static partial class UserDocs
 
             // What is inside inline code is not Markdown: it makes no link and no anchor.
             var text = CodeSpanPattern().Replace(line, " ");
+
+            // A tab of docfx is a heading whose whole text links to `#tab/<id>`: no anchor and no link.
+            if (
+                HeadingPattern().Match(line) is { Success: true } tabHeading
+                && TabPattern().Match(tabHeading.Groups[1].Value) is { Success: true } tab
+            )
+            {
+                tabs.Add((number, tab.Groups[1].Value));
+                continue;
+            }
 
             if (HeadingPattern().Match(line) is { Success: true } heading)
             {
@@ -275,7 +304,7 @@ internal static partial class UserDocs
             blocks.Add((unclosed.Line, unclosed.Info, string.Join('\n', content)));
         }
 
-        return new Document(anchors, links, blocks, unsupported);
+        return new Document(anchors, links, blocks, unsupported, tabs);
     }
 
     // A backtick fence's info string has no backtick: otherwise the line is a code span.
@@ -329,7 +358,8 @@ internal static partial class UserDocs
         ISet<string> AnchorSet,
         IReadOnlyList<(int Line, string Target)> LinkList,
         IReadOnlyList<(int Line, string Info, string Text)> BlockList,
-        IReadOnlyList<(int Line, string Message)> Unsupported
+        IReadOnlyList<(int Line, string Message)> Unsupported,
+        IReadOnlyList<(int Line, string Id)> TabList
     );
 
     // The start of a fenced block: three or more backticks or tildes, then the info string.
@@ -390,9 +420,13 @@ internal static partial class UserDocs
     [GeneratedRegex(@"^https?://mbcrawfo\.github\.io/SqlSource(?=[/#?]|$)", RegexOptions.IgnoreCase)]
     private static partial Regex SiteLinkPattern();
 
-    // A page of the site: one segment, its name and `.html`.
-    [GeneratedRegex(@"^([^/]+)\.html$")]
+    // A page of the site: its path, in folders or not, and `.html`.
+    [GeneratedRegex(@"^((?:[^/]+/)*[^/]+)\.html$")]
     private static partial Regex SitePagePattern();
+
+    // The text of a tab heading: a link whose target is `#tab/<id>`, the id with its slashes.
+    [GeneratedRegex(@"^\[[^\]]*\]\(#tab/([^)\s]+)\)$")]
+    private static partial Regex TabPattern();
 
     [GeneratedRegex(@"\[([^\]]*)\]\([^)]*\)")]
     private static partial Regex LinkPattern();
