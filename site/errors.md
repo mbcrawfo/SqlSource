@@ -55,7 +55,7 @@ Two more have no file and line, and the project can get more than one of each:
 
 ## What an error costs
 
-Most errors cost part of what SqlSource generates, until you fix them.  What it costs depends on what the error is about.
+Most errors cost part of what SqlSource generates, until you fix them.  What an error costs depends on what it is about.
 
 - **How a `.sql` file is written.**  An error from [SQLSRC101](diagnostics.md#sqlsrc101) to [SQLSRC120](diagnostics.md#sqlsrc120), or [SQLSRC126](diagnostics.md#sqlsrc126), costs the file all its members and models.  The other files of the type keep theirs.  The section of [SQLSRC120](diagnostics.md#sqlsrc120) says when it costs only a type that keeps comments.
 - **Where a query's members go.**  An error from [SQLSRC122](diagnostics.md#sqlsrc122) to [SQLSRC125](diagnostics.md#sqlsrc125) costs the file its members and models for the type that the error is reported for.  Another type that claims the file keeps them.  The section of [SQLSRC123](diagnostics.md#sqlsrc123) says when it costs one method alone.
