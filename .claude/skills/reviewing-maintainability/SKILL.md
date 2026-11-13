@@ -7,7 +7,7 @@ description: Use when asked for a maintainability review, cleanup, tidy-up or ho
 
 ## Overview
 
-A review of the code in `src/` and `tests/`: its comments, its folder structure and its duplicated patterns.  The comment sweeps read every file, so the review is done as parallel read-only sweeps by subagents, each with one question, and every finding is checked and applied by a fresh agent that did not find it.  Comments and structure are fixed in the review's own pull request; a pattern that needs a refactor is recorded in `docs/tech-debt` and not fixed.  The AGENTS.md files, `docs/architecture/` and the readmes are not reviewed here.  The review edits them only to follow code it moves, and adds an AGENTS.md to a folder whose traps none covers.
+A review of the code in `src/` and `tests/`: its comments, its folder structure and its duplicated patterns.  The comment sweeps read every file, so the review is done as parallel read-only sweeps by subagents, each with one question, and every finding is checked and applied by a fresh agent that did not find it.  Comments and structure are fixed in the review's own pull request; a pattern that needs a refactor is recorded in `docs/tech-debt` and not fixed.  Whether a test earns its place is the review of `.claude/skills/reviewing-test-quality/`.  The AGENTS.md files, `docs/architecture/` and the readmes are not reviewed here.  The review edits them only to follow code it moves, and adds an AGENTS.md to a folder whose traps none covers.
 
 **Reading is the test.**  A grep for `phase`, `later` or `TODO` finds the comments that announce their age and misses the ones that are simply wrong.  Each sweep reads its files in full.
 
