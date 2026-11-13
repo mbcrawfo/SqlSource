@@ -10,12 +10,14 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
+using SqlSource.Repository.Tests.Documentation;
 using Xunit;
 
 namespace SqlSource.Repository.Tests.Diagnostics;
 
-// site/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that
-// is added, removed or renamed fails them until the document says the same.
+// site/diagnostics.md is the list of diagnostics a user reads, under its title and one paragraph, and the table of
+// areas of site/errors.md lists each by its area.  These tests keep both complete: a descriptor that is added,
+// removed or renamed fails them until both say the same, and its section says what reports it.
 public sealed partial class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
@@ -34,6 +36,27 @@ public sealed partial class DiagnosticsDocumentTests
     [Fact]
     public void Document_Sections_AreTheDescriptorsInOrder() =>
         Sections().Select(section => section.Id).ShouldBe(Descriptors.Select(descriptor => descriptor.Id));
+
+    // Every help link opens a section of this page at the site's root, and only the title and one paragraph stand above
+    // the first section: an index, a range of ids or a note there fails it.
+    [Fact]
+    public void Document_Head_IsTheTitleAndOneParagraph()
+    {
+        File.Exists(RepositoryRoot.Path("site", "diagnostics.md")).ShouldBeTrue();
+        var head = Lines
+            .TakeWhile(line => !line.StartsWith(HeadingPrefix, StringComparison.Ordinal))
+            .Where(line => line.Length > 0)
+            .ToList();
+
+        head.Count.ShouldBe(2);
+        head[0].ShouldBe("# Diagnostics");
+        head[1].ShouldNotMatch(@"^(#|\||[-*+] |\d+\. )");
+    }
+
+    // The help link of every diagnostic is this base and the lower-case id, which is the slug of its section's heading.
+    [Fact]
+    public void HelpLink_IsTheSitesDiagnosticsPage() =>
+        SqlDiagnostics.HelpLinkBase.ShouldBe(UserDocs.SiteUrl + "diagnostics.html#");
 
     [Fact]
     public void Document_EachSection_StartsWithItsDescriptorsTitle()
@@ -86,19 +109,6 @@ public sealed partial class DiagnosticsDocumentTests
                 body.ShouldNotContain(line => line.StartsWith("Database:", StringComparison.Ordinal), id);
             }
         }
-    }
-
-    // The index is a table per area, and the rows of all the tables together must be in id order: a new id above the
-    // last one goes in the last table, or in a new table after it, never back in an earlier area's table.
-    [Fact]
-    public void Document_Table_ListsEveryDescriptorWithItsTitleAndAnchor()
-    {
-        var rows = Lines.Where(line => line.StartsWith("| [SQLSRC", StringComparison.Ordinal));
-
-        rows.ShouldBe(
-            // The anchor of a heading is its text in lower case, and an id is "SQLSRC" followed by digits.
-            Descriptors.Select(descriptor => $"| [{descriptor.Id}](#sqlsrc{descriptor.Id[6..]}) | {descriptor.Title} |")
-        );
     }
 
     // The table of areas in site/errors.md links each id from one row, and the rows of all the areas together are in

@@ -165,6 +165,8 @@ To keep the sidecars current:
 
 The build tells you when a sidecar is not current.  A query without an entry is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since its entry was written is [SQLSRC244](diagnostics.md#sqlsrc244).  An entry that names no query that must be described is the warning [SQLSRC245](diagnostics.md#sqlsrc245), and a sidecar, or an entry of one, that another version of the tool wrote the warning [SQLSRC240](diagnostics.md#sqlsrc240).  Each of the first three goes away when you run `describe` and commit what it writes.  SQLSRC240 goes away once the tool and the `SqlSource` package have one version and `describe` has run with that tool.  A sidecar with a merge conflict in it is [SQLSRC237](diagnostics.md#sqlsrc237).
 
+A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 120 or [SQLSRC126](diagnostics.md#sqlsrc126), it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](diagnostics.md#sqlsrc237) to [SQLSRC240](diagnostics.md#sqlsrc240), and reports no entry of it as one that names no query.
+
 The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.json`](https://github.com/mbcrawfo/SqlSource/blob/main/schemas/sidecar-v1.schema.json), for the curious.  Nothing in this manual depends on it.
 
 <a id="sidecars-in-git"></a>
