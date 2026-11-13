@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Builds the PostGIS image of the tests, from tests/DatabaseTests/TestHarness/Postgis/Dockerfile on a postgres image,
 # under the name that PostgisContainer of the harness looks for, which PostgisImageScriptTests of
-# tests/DatabaseTests/Postgres keeps equal.  It is a step and no check: each CI job that runs a PostGIS test runs it
-# before the tests, so that a failed build fails a step of its own with Docker's whole output, and the tests then find
-# the image and build nothing.  tools/describe-end-to-end.sh builds the image through it too.
+# tests/DatabaseTests/Postgres keeps equal.  It is no check: each CI job that runs a PostGIS test calls it through
+# .github/actions/postgis-image before the tests, which loads the image from the Actions cache, or builds it with this
+# script so that a failed build fails a step of its own with Docker's whole output, and the tests then find the image
+# and build nothing.  tools/describe-end-to-end.sh builds the image through it too.
 # It builds the image of the postgres image given, or of the default image, which it reads from
 # tests/DatabaseTests/TestHarness/DefaultImages.cs by the line that declares it.  The PostGIS package is read from the
 # line of PostgisContainer.cs that declares Package.  It always builds, through Docker's cache.
