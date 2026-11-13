@@ -35,8 +35,8 @@ S=.claude/skills/reviewing-test-quality
    ```
 
    `$R/slices/index.txt` has a line for each slice.  `slices` refuses a folder that holds anything, so a second cut names a new run folder.
-5. **Say the cost to the owner.**  One reviewer and one verifier for each slice, up to three mirror agents and a writer: everything is 59 slices on 2026-11-12.  The scopes run one after another, each about a second for each mutant it tests, the count above it in `scopes.txt`, and about five minutes besides; [tools/README.md](../../../tools/README.md#how-long-a-run-takes) has the measured runs.  The test projects take what `./pre-commit-validation.sh --full` takes for its tests, and the two `SyncAsync` projects besides.  A run of more than ten slices, or of more than an hour of measurements, **waits for the owner's yes**.  If the measurements will not fit in a night, ask the owner which scopes to leave out; a scope left out is named in the epic.
-6. **Start `$R/run-notes.md`**, which the writer is given: the date, the folders of the run, the slices, and then, as the run goes, each scope's time and counts from `measure.log` and `evidence/gaps.md`, each scope left out or failed, each test project that failed, each coverage gap by its path, and each correction to a list of the skill.
+5. **Say the cost to the owner.**  One reviewer and one verifier for each slice, up to three mirror agents and a writer: everything is 59 slices on 2026-11-12.  In the pilot a reviewer of a slice of 4,300 lines took 12 to 18 minutes and about 400,000 tokens, and its verifier about 270,000.  The scopes run one after another, each about a second for each mutant it tests, the count above it in `scopes.txt`, and about five minutes besides, but the two root scopes, whose driver and command tests cost about 17 seconds a mutant: `generator-root` took 67 minutes; [tools/README.md](../../../tools/README.md#how-long-a-run-takes) has the measured runs.  The test projects take what `./pre-commit-validation.sh --full` takes for its tests, and the two `SyncAsync` projects besides.  A run of more than ten slices, or of more than an hour of measurements, **waits for the owner's yes**.  If the measurements will not fit in a night, ask the owner which scopes to leave out; a scope left out is named in the epic.
+6. **Start `$R/run-notes.md`**, which the writer is given: the date, the commit the run reads (`git rev-parse HEAD`), the folders of the run, the slices, and then, as the run goes, each scope's time and counts from `measure.log` and `evidence/gaps.md`, each scope left out or failed, each test project that failed, each coverage gap by its path, and each correction to a list of the skill.
 
 **Agents.**  These instructions are the opt-in that the `Workflow` tool asks for.  Without that tool, dispatch agents in batches of about ten.  Every agent is general-purpose, on the lead's model.  [briefs.md](briefs.md) has the briefs: an agent's prompt is the path of `$R/brief.md`, the text of its own section of `briefs.md`, pasted, and the paths that section says it is given.
 
@@ -92,6 +92,7 @@ A candidate is left out by `!=` and its full name, which the summary line of `ki
 
 - Nothing `LOST` confirms every candidate.
 - For each mutant `LOST`, run `dotnet $D kills` in the scope's first report for each candidate: a candidate that killed it, or had it as a timeout under it, is refuted.  The others are confirmed.
+- A mutant `LOST` that no candidate killed or reached is a kill that did not repeat, [which happens](../../../tools/README.md#limits): name it in `run-notes.md`, by file, place and mutator, and hold nothing against a candidate for it.  In the pilot two of 2,052 were.
 - `NOT COMPARABLE` is read by the lead: a mutant that was killed and now times out is a doubt, and the candidates that reached it stay unsettled.
 
 Add a line to each such finding's entry in its verdict file: `- measured: confirmed | refuted | unsettled`, with `compare`'s line for it or `nothing lost`.  The writer takes **measured: confirmed** as confirmed and the other two as they are.
@@ -108,6 +109,7 @@ One writer, with "The writer".  Then check what it wrote, yourself:
 - no two phases touch one file, and each phase keeps to one folder and, where it could, one kind of action;
 - every mutation guard is its scope's command of `scopes.txt`, with two output folders and the `compare` of them;
 - every test named as cover exists, and no cover is a broad test or a test of the other engine;
+- no test that a phase deletes, or whose rows a phase drops, is the cover of another finding: a cover is often in another slice, whose reviewer could not see this one's findings;
 - the counts of the outline, the specs and the appendix agree.
 
 ## Finishing
@@ -120,9 +122,10 @@ The pull request holds the outline, the phase specs, the appendix and the tech-d
 - Taking a `Timeout` for a kill.  A report names no test for it, and at a short allowance a surviving mutant is reported as one.
 - Taking a survivor for a fault of a test whose name promises nothing about it.  It is a gap that belongs to no test, counted in the appendix.
 - Taking a broad test, or a test of the other engine, as cover.
-- Taking two tests that cover each other as two tests to delete.
+- Taking two tests that cover each other as two tests to delete, or deleting in one slice the test that a finding of another slice names as its cover.
 - Proposing to delete a database test, a test of `tests/SqlSource.Repository.Tests` or a test of a test library without a cover that a verifier read.
 - Reporting what an `AGENTS.md` says is deliberate: the second compile of `Generator/`, the driver floors, the engine twins, the allocation budgets, the golden corpus.
+- Dropping a test, or rows of one, that is the record of something.  In the pilot a reviewer and a verifier both agreed to drop rows of the `Lex_KnownLimit` tests, which a comment above them calls deliberate and `docs/tech-debt/TD-0004` names as the pins of the lexer's known limits; only the writer's search of the documents found it.
 - Running anything that builds during a mutation run, or `dotnet run` from two agents at once: agents run the built program, `dotnet $D`.
 - Giving the repository root as `.` to an agent: an agent is given paths in full.
 - Letting the agent that found a finding verify it.

@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 namespace SqlSource.MutationReport;
 
 // The kills command: what one test method kills in one scope's report, mutant by mutant, with the other methods that
-// kill each.  A verifier of the test review reads it before believing that a test is redundant, since a slice's
-// evidence gives only the counts.  A broad test is listed among the other killers like any other: the reader knows
-// which they are.
+// kill each, and the mutants it reaches that ran out of time or that no test fails on.  A verifier of the test
+// review reads it before believing that a test is redundant, since a slice's evidence gives only the counts.  A broad
+// test is listed among the other killers like any other: the reader knows which they are.
 internal static class KillsCommand
 {
     private const int MostKillers = 10;
@@ -41,7 +41,7 @@ internal static class KillsCommand
         }
 
         var rows = Enumerable.Range(0, matrix.Tests.Count).Where(test => matrix.Tests[test].Name == name).ToHashSet();
-        var (kills, alone, timeouts) = (0, 0, 0);
+        var (kills, alone, timeouts, survivors) = (0, 0, 0, 0);
         foreach (var mutant in matrix.Mutants.Order(KillEvidence.ByPlace))
         {
             var place = $"{EvidenceWriter.Place(mutant)} -> `{EvidenceWriter.Replacement(mutant.Key.Replacement)}`";
@@ -49,6 +49,11 @@ internal static class KillsCommand
             {
                 timeouts++;
                 await output.WriteLineAsync($"TIMEOUT {place}").ConfigureAwait(false);
+            }
+            else if (mutant.Status == MutantStatus.Survived && mutant.CoveredBy.Any(rows.Contains))
+            {
+                survivors++;
+                await output.WriteLineAsync($"SURVIVED {place}").ConfigureAwait(false);
             }
 
             if (mutant.Status != MutantStatus.Killed || !mutant.KilledBy.Any(rows.Contains))
@@ -81,7 +86,7 @@ internal static class KillsCommand
         await output
             .WriteLineAsync(
                 $"{name}: {Number(rows.Count)} rows, {Number(kills)} kills, {Number(alone)} alone, "
-                    + $"{Number(timeouts)} timeouts under it"
+                    + $"{Number(timeouts)} timeouts under it, {Number(survivors)} survivors under it"
             )
             .ConfigureAwait(false);
         return 0;

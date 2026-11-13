@@ -83,6 +83,7 @@ The actions:
 - The one test of each project that starts the built tool as a process, and the builds of `OnlineBuildTests`.
 - The tests of `tests/SqlSource.Repository.Tests`, which have no source under mutation: judge them by reading, under the named-cover rule.
 - What the `AGENTS.md` files of `tests/` require of every test: its stated output, its waits through `Eventually`, its clock, its names.
+- A test that is the record of something: a known limit, a regression, a decision.  A comment in its file says so, or an `AGENTS.md`, a readme or an item of `docs/tech-debt/` or `docs/deferred/` names it.  It is not redundant on its kills, and its rows are not dropped because another test reads the same text.  Before a **delete** or a **fold**, search those documents for the test's name and its class's (`grep -rn` over the `AGENTS.md` files, the readmes, `CONTRIBUTING.md`, `docs/architecture/`, `docs/tech-debt/` and `docs/deferred/`), read the comment above the test and its group, and say in the finding's evidence what both gave.
 
 **Gaps that belong to no test** are not findings: a mutant no test covers, or one that survives under tests that promise nothing about it.  The review prunes and repairs tests and proposes no new one, but the unit test a **demote** needs.
 
@@ -108,9 +109,10 @@ A fresh agent, never one that wrote a finding it checks.  Given: the slice's nam
 For each **delete**, **fold** and **demote**, try to refute it:
 
 1. Read the test and every test named as its cover.  Do they prove the same behaviour, on the same inputs that matter, on the same engine?
-2. Run `dotnet tools/MutationReport/bin/Debug/net10.0/SqlSource.MutationReport.dll kills <report.json> <Class.Method>` for the test, in the report of each scope that ran it.  For each mutant the test kills, would you expect that test to notice that change, from its inputs?  A kill you cannot explain is a doubt about the tool, not a fact about the test.  A test that no scope ran has no kills to read: skip this step, and hold it to the named-cover rule.
+2. Run `dotnet tools/MutationReport/bin/Debug/net10.0/SqlSource.MutationReport.dll kills <report.json> <Class.Method>` for the test, in the report of each scope that ran it.  For each mutant the test kills, would you expect that test to notice that change, from its inputs?  A kill you cannot explain is a doubt about the tool, not a fact about the test.  Its lines `TIMEOUT` and `SURVIVED` are the mutants the test reaches that ran out of time or that nothing fails on: a timeout under the test that is not also under a named cover is a reason for **needs measurement**.  A test that no scope ran has no kills to read: skip this step, and hold it to the named-cover rule.
 3. Look for what mutation cannot see, as the shared brief lists it: is the test the only guard of a wording, a budget, a wait, an engine's behaviour, or of blind code?
-4. For a database test, a test of `tests/SqlSource.Repository.Tests` or a test of a test library: is the named cover one you read and confirm?
+4. Make the search of the documents yourself, as the shared brief says under "A test that is the record of something", and read the comment above the test and above its group.  A test, or a row, that a comment or a document names as the record of a limit, a regression or a decision is **refuted** as a delete or a fold, unless the cover is named as that record too.
+5. For a database test, a test of `tests/SqlSource.Repository.Tests` or a test of a test library: is the named cover one you read and confirm?
 
 Read each **strengthen**, **loosen** and **keep** finding against its test too: it is **confirmed** when it reads the test rightly and **refuted** when it does not.
 
@@ -148,25 +150,35 @@ A difference between the sides that the engines explain is not a finding.  Acros
 
 Given: `findings/`, `verdicts/` and `mirrors/`, whole; `evidence/gaps.md`; `run-notes.md` of the run folder, the lead's record of the run, its scopes, its failures and its coverage gaps; and today's date.  Read `docs/superpowers/AGENTS.md` and `docs/tech-debt/AGENTS.md` first.  The writer is the one agent that writes in the repository, and only the files named here.
 
+**A cover stays.**  Before cutting phases, list every test that a confirmed **delete**, **fold** or **demote** names as cover.  A finding that would delete one of them, or drop the rows that make it a cover, is withdrawn: it goes to the appendix as a **keep**, with the finding that leans on it as the reason.  Where two findings lean on each other, the one whose test asserts more stays a test.
+
 Only confirmed findings go into a phase: a verdict of **confirmed**, or of **needs measurement** with a line `measured: confirmed` below it.  A finding left at **needs measurement**, or `measured: unsettled`, goes to the appendix as unsettled, and one `measured: refuted` as refuted.
 
 **The phases** are cut by these rules:
 
 - one test folder, or part of one, and one kind of action where the findings allow;
 - about 1,500 changed lines at most, except a phase that only deletes;
-- no two phases touch one file;
-- deletions with measured backing first, since they shrink what every later phase reads; then folds; then strengthening and loosening; the database projects last.
+- no two phases touch one file, which comes before the rule of one kind: the files that hold findings of several kinds, and the files a fold ties to them, are a phase of mixed kinds;
+- deletions with measured backing first, since they shrink what every later phase reads; then folds; then strengthening and loosening; the database projects last.  A phase of mixed kinds takes the place of the last kind it holds.
+
+The rules give no least size: say in your report when they cut phases that together change fewer than a few hundred lines, and leave them cut.
 
 **The files**, with `<date>` today's:
 
-- `docs/superpowers/specs/<date>-test-cleanup-epic-design.md`, the outline, which is kept current until the epic closes: what the run was (its date, its folders, its scopes with their counts, what it could not see); how a phase is done; and the phases in order, a row each with its number, its scope, its count of findings by action, its kind of guard and its state, `not started`.
+- `docs/superpowers/specs/<date>-test-cleanup-epic-design.md`, the outline, which is kept current until the epic closes: what the run was (its date, its folders, its scopes with their counts, what it could not see); how a phase is done; and the phases in order, a row each with its number, its scope, its count of findings by action, its kind of guard and its state: `not started`, then `in progress` and `done` as its pull request goes.  The row's scope is the part of the test folder the phase touches.  The outline names the commit the run read, from `run-notes.md`: a line number of a finding is of that commit, and a phase finds each test by its name.
 - `docs/superpowers/specs/<date>-test-cleanup-phase-<NN>-<slug>-design.md`, one for each phase:
   - the files it touches;
   - the findings it applies, each with its id, its test, its action, its evidence, its cover and the verifier's reason;
-  - **the guard**.  For tests under a mutation scope: the `tools/mutation-test.sh` command of the scope, from `.claude/skills/reviewing-test-quality/scopes.txt`, to run before the change and after it with two `--output` folders; `tools/mutation-test.sh compare <before> <after>`, which must list nothing `LOST` and nothing `NOT COMPARABLE`; and the line coverage of the touched source folders, by the commands of `CONTRIBUTING.md`, which must not fall.  For tests that mutation cannot guard: the list of each removed test beside its named cover, and the project's run time before and after on one machine;
-  - the documents that name a test it removes or renames, found by a search for the test's and the class's name in the `AGENTS.md` files, the readmes, `docs/tech-debt/` and `docs/deferred/`, which the phase updates;
+  - **the guard**.  For tests under a mutation scope:
+    - the `tools/mutation-test.sh` command of the scope, from `.claude/skills/reviewing-test-quality/scopes.txt`, to run before the change and after it with two `--output` folders.  Phases of one scope done one after another may take one's "after" report as the next one's "before";
+    - `tools/mutation-test.sh compare <before> <after>`, which must list nothing `LOST` and nothing `NOT COMPARABLE`.  The one exception is a mutant that no test the phase removed or changed killed, or had as a timeout under it, in the "before" report, as `kills` shows for each such test: it is a kill that did not repeat, and the phase's pull request names it;
+    - for a **strengthen**, each survivor the finding names is `Killed` in the "after" report;
+    - the line coverage of the touched source files, which must not fall: the test project's own run with `--coverage`, as `CONTRIBUTING.md` shows it for the solution, before and after, and the files' figures in the report of `dotnet reportgenerator`.
+
+    For tests that mutation cannot guard, and besides the above for each finding that is blind or whose test reaches no tested mutant: the list of each removed test or row beside its named cover, and the project's run time before and after on one machine;
+  - the documents that name a test it removes, renames or takes rows from, found by a search for the test's and the class's name in the `AGENTS.md` files, the readmes, `CONTRIBUTING.md`, `docs/architecture/`, `docs/tech-debt/` and `docs/deferred/`, which the phase updates.  The plans and specs of `docs/superpowers/` are records of their date and stay as they are;
   - what it leaves out, and why.
-- `docs/superpowers/specs/<date>-test-cleanup-findings.md`, the appendix, the memory between runs: the counts by slice, action and verdict; every finding refuted, with its reason; every **keep**; every finding left unsettled; every coverage gap and failed scope, exactly; and the gaps that belong to no test, counted by source file from `evidence/gaps.md`.
+- `docs/superpowers/specs/<date>-test-cleanup-findings.md`, the appendix, the memory between runs: the counts by slice, action and verdict; every finding refuted, with its reason; every **keep**; every finding left unsettled; every coverage gap and failed scope, exactly; the tests that stay because a finding names them as cover, each with the findings that lean on it; and the gaps that belong to no test, counted by source file: the survivors and uncovered mutants of `evidence/gaps.md`, less those a **strengthen** names.
 - One item in `docs/tech-debt/` for each source project all of whose scopes were run, for the code its tests do not check: it links the appendix and names the files with the most surviving and uncovered mutants.  When an earlier run's item exists, it is updated and none is added.  A run of only some of a project's scopes writes and changes no item, and the appendix says so.  The format, the id and the row in `docs/tech-debt/README.md` are as `docs/tech-debt/AGENTS.md` says.
 
 Return the phases with their counts, and anything the rules could not place.

@@ -318,9 +318,10 @@ public sealed class CliTests
                 Lines(
                     "src/SqlSource/Parsing/A.cs:3:1 Boolean mutation -> `true`",
                     "    killed by it alone",
+                    "SURVIVED src/SqlSource/Parsing/A.cs:7:1 Boolean mutation -> `true`",
                     "src/SqlSource/Parsing/A.cs:9:1 Boolean mutation -> `true`",
                     "    also killed by 2 methods: M.BTests.Reads, N.BTests.Reads",
-                    "N.ATests.Reads: 2 rows, 2 kills, 1 alone, 0 timeouts under it"
+                    "N.ATests.Reads: 2 rows, 2 kills, 1 alone, 0 timeouts under it, 1 survivors under it"
                 )
             );
         });
@@ -341,7 +342,32 @@ public sealed class CliTests
             output.ShouldBe(
                 Lines(
                     "TIMEOUT src/SqlSource/Parsing/A.cs:4:1 Boolean mutation -> `true`",
-                    "N.BTests.Reads: 1 rows, 0 kills, 0 alone, 1 timeouts under it"
+                    "N.BTests.Reads: 1 rows, 0 kills, 0 alone, 1 timeouts under it, 0 survivors under it"
+                )
+            );
+        });
+
+    // A verifier of a finding that would strengthen a test reads which mutants survive under it.
+    [Fact]
+    public async Task RunAsync_KillsOfAMethodWithSurvivorsUnderIt_ListsThem() =>
+        await InFolderAsync(async folder =>
+        {
+            var report = WriteKills(
+                folder,
+                new ReportMutant(4, 1, 4, 5, "Survived", CoveredBy: ["a1", "b1"], KilledBy: []),
+                new ReportMutant(6, 1, 6, 5, "Survived", CoveredBy: ["b1"], KilledBy: []),
+                Killed(8, "a2")
+            );
+
+            var (code, output, _) = await RunAsync("kills", report, "N.ATests.Reads");
+
+            code.ShouldBe(0);
+            output.ShouldBe(
+                Lines(
+                    "SURVIVED src/SqlSource/Parsing/A.cs:4:1 Boolean mutation -> `true`",
+                    "src/SqlSource/Parsing/A.cs:8:1 Boolean mutation -> `true`",
+                    "    killed by it alone",
+                    "N.ATests.Reads: 2 rows, 1 kills, 1 alone, 0 timeouts under it, 1 survivors under it"
                 )
             );
         });
@@ -355,7 +381,9 @@ public sealed class CliTests
             var (code, output, _) = await RunAsync("kills", report, "ATests.Reads");
 
             code.ShouldBe(0);
-            output.ShouldEndWith(Lines("N.ATests.Reads: 2 rows, 1 kills, 1 alone, 0 timeouts under it"));
+            output.ShouldEndWith(
+                Lines("N.ATests.Reads: 2 rows, 1 kills, 1 alone, 0 timeouts under it, 0 survivors under it")
+            );
         });
 
     [Fact]

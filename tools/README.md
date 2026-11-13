@@ -145,6 +145,11 @@ A run is given a folder of the source and the tests of that folder.  Measured on
 | `generator`, `**/Parsing/**/*.cs`, the tests of `SqlSource.Tests.Parsing` | 2,284 | 2,260 | 1,968 | 209 | 83 | 38 min |
 | `tool`, `**/Planning/**/*.cs`, the tests of `SqlSource.Tool.Tests.Planning` | 204 | 144 | 122 | 21 | 1 | 3 min |
 | `generator`, `**/Parsing/SqlDialectName.cs`, the tests of `Parsing` and `Generator` | 4,368 | 35 | 30 | 3 | 2 | 18 min |
+| `generator`, `**/Generation/Paths/**/*.cs`, the tests of `SqlSource.Tests.Generation.Paths` | 166 | 149 | 132 | 15 | 2 | 3 min |
+| The same files, with the driver tests of `SqlSource.Tests.Generator` added | 2,250 | 149 | 132 | 11 | 6 | 34 min |
+| `generator`, `*.cs`, its root files, with the driver tests and the root files' own | 2,213 | 235 | 208 | 13 | 14 | 67 min |
+
+The last three rows are of 2026-11-13.  The driver tests, which run the whole generator, cost about 17 seconds for each mutant where a folder's own tests cost about one: on `Generation/Paths` they took eleven times as long, killed one of the fifteen mutants that its own tests leave alive, and had three more reported as timeouts, [which may not be kills](#limits).  So a folder is run with its own tests, and the driver tests with the root files alone.
 
 A whole project does not fit in a night, so it is not run.  The generator's one whole run, with every test and Stryker's default time allowance, took 11 hours 41 minutes for 10,782 mutants and reported no survivor, [since it reported each as a timeout](#limits); its report was 738 MB, which `compare` reads in two seconds.  Before a single mutant is tested, a run of every generator test takes eleven minutes to build, run the tests once and capture what each reaches, and the script does that twice.
 
@@ -185,13 +190,14 @@ An evidence file lists the slice's files, the mutation scopes that ran its tests
 
 It also writes `evidence/gaps.md`, the mutants of each source file by what became of them, and `evidence/database-only-lines.md`, the source lines that only the projects under `tests/DatabaseTests/` reach.  It exits 2, naming the scope, for a scope that failed, a report that cannot be read or one whose run tested a static mutant, and when two scopes tested one mutant, whose kills would be counted twice.
 
-`kills <report.json> <test name>` prints each mutant that a test method kills in one scope's report, with the other methods that kill it, and the mutants under it whose tests ran out of time.  The name is a method's full name, or its end, as `SqlLexerTests.Read_Quote_Ends`.  It exits 1 when the report holds no such test.
+`kills <report.json> <test name>` prints each mutant that a test method kills in one scope's report, with the other methods that kill it, and the mutants under it whose tests ran out of time (`TIMEOUT`) or that no test fails on (`SURVIVED`).  The name is a method's full name, or its end, as `SqlLexerTests.Read_Quote_Ends`.  It exits 1 when the report holds no such test.
 
 An agent runs the built program, the third form above, and never `dotnet run`: two builds of one project at once fail, and nothing builds in a checkout during a mutation run.
 
 ### Limits
 
 - **Stryker's runner for the Microsoft Testing Platform is a preview**, and its other runner cannot run these projects.  The static mutants are the one fault found in it, on one file checked by hand; any state that a process keeps from one mutant to the next would do the same, so a result that decides something is read by a person, and a scope whose two runs disagree is not to be trusted.  Stryker has an open request for a process for each mutant, [stryker-net#3742](https://github.com/stryker-mutator/stryker-net/issues/3742).
+- **Two runs of one scope do not agree to the last mutant.**  Of the 2,275 mutants of `Parsing/`, three runs on one tree differed in five to seven that one run reports `Killed` and another `Timeout`, and in two that one run reports `Killed`, by one test alone, and two report `Survived`: both read memory that an `ArrayPool` hands back, so what the test sees depends on what the process did before.  A kill by one test alone of a mutant that leaves memory unfilled, or reads past what was filled, may not repeat.
 - **The static mutants are never tested.**  They are mostly the texts of diagnostics and the tables of names.
 - **A method with a mutant that does not compile loses all its mutants.**  Stryker removes them together, and the code's `out` and pattern variables make it common.
 - **The rows of a theory share one name.**  Each row has its own id, so a report says how many rows kill a mutant and not which.
