@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -7,21 +8,114 @@ using Xunit;
 
 namespace SqlSource.Repository.Tests.Documentation;
 
-// The sidebar of the manual's site is site/toc.yml.  docfx publishes a page that it leaves out, with no warning and no
-// way to reach the page but a link, and fails on an entry whose page is gone.
+// The sidebar of the manual's site is site/toc.yml, and a folder of pages has a toc.yml of its own that the entry for
+// the folder leads to.  docfx publishes a page that no toc.yml lists, with no warning and no way to reach the page but
+// a link, and fails on an entry whose page is gone.
 public sealed partial class SiteTocTests
 {
+    // Fails when a toc.yml of site/, at any depth, names a page that does not exist or a folder with no toc.yml, when a
+    // page is named by more than one entry, or when a page is in no toc.yml.
     [Fact]
     public void Toc_ListsEveryPageOnce_AndNothingElse()
     {
-        var hrefs = File.ReadAllLines(RepositoryRoot.Path(UserDocs.Site, "toc.yml"))
-            .Select(line => HrefPattern().Match(line))
-            .Where(match => match.Success)
-            .Select(match => $"{UserDocs.Site}/{match.Groups[1].Value}")
-            .ToList();
+        var tocs = Directory
+            .EnumerateFiles(RepositoryRoot.Path(UserDocs.Site), "toc.yml", SearchOption.AllDirectories)
+            .ToDictionary(
+                path => Path.GetRelativePath(RepositoryRoot.Path(), path).Replace('\\', '/'),
+                File.ReadAllText,
+                StringComparer.Ordinal
+            );
 
-        hrefs.ShouldBeUnique();
-        hrefs.Order(StringComparer.Ordinal).ShouldBe(UserDocs.SitePages.Order(StringComparer.Ordinal));
+        Problems(tocs, UserDocs.SitePages).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Problems_OfANestedSet_AreFound()
+    {
+        var tocs = new Dictionary<string, string>
+        {
+            ["site/toc.yml"] = "- name: A\n  href: a/\n- name: B\n  href: b/toc.yml\n- name: C\n  href: c/\n",
+            ["site/a/toc.yml"] =
+                "- name: D\n  href: ../diagnostics.md\n- name: P\n  href: page.md\n- name: T\n  href: twice.md\n",
+            ["site/b/toc.yml"] = "- name: T\n  href: ../a/twice.md\n- name: G\n  href: gone.md\n",
+        };
+        string[] pages = ["site/diagnostics.md", "site/a/page.md", "site/a/twice.md", "site/a/none.md"];
+
+        var problems = Problems(tocs, pages);
+
+        problems.Count.ShouldBe(4);
+        problems.ShouldContain(problem => problem.Contains("site/toc.yml") && problem.Contains("c/"));
+        problems.ShouldContain(problem => problem.Contains("site/b/toc.yml") && problem.Contains("gone.md"));
+        problems.ShouldContain(problem =>
+            problem.Contains("site/a/twice.md") && problem.Contains("more than one entry")
+        );
+        problems.ShouldContain(problem => problem.Contains("site/a/none.md") && problem.Contains("no toc.yml"));
+    }
+
+    // Each problem is one line that names the file and the href, or the page.
+    internal static IReadOnlyList<string> Problems(
+        IReadOnlyDictionary<string, string> tocs,
+        IReadOnlyList<string> pages
+    )
+    {
+        var problems = new List<string>();
+        var named = new List<string>();
+        foreach (var (toc, text) in tocs.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            var folder = toc.Contains('/', StringComparison.Ordinal) ? toc[..toc.LastIndexOf('/')] : "";
+            foreach (var match in text.Split('\n').Select(line => HrefPattern().Match(line)).Where(m => m.Success))
+            {
+                var href = match.Groups[1].Value;
+                var target = Resolve(folder, href);
+                if (href.EndsWith('/') || target.EndsWith("/toc.yml", StringComparison.Ordinal))
+                {
+                    var childToc = href.EndsWith('/') ? $"{target}toc.yml" : target;
+                    if (!tocs.ContainsKey(childToc))
+                    {
+                        problems.Add($"{toc}: '{href}' names a folder with no toc.yml ({childToc})");
+                    }
+                }
+                else if (!pages.Contains(target, StringComparer.Ordinal))
+                {
+                    problems.Add($"{toc}: '{href}' names no page ({target})");
+                }
+                else
+                {
+                    named.Add(target);
+                }
+            }
+        }
+
+        problems.AddRange(
+            named
+                .GroupBy(page => page, StringComparer.Ordinal)
+                .Where(group => group.Count() > 1)
+                .Select(group => $"{group.Key} is named by more than one entry")
+        );
+        problems.AddRange(pages.Except(named, StringComparer.Ordinal).Select(page => $"{page} is in no toc.yml"));
+        return problems;
+    }
+
+    // The path of an href that is read from the folder of its toc.yml, with its '..' and '.' segments resolved.
+    private static string Resolve(string folder, string href)
+    {
+        var segments = new List<string>(folder.Split('/', StringSplitOptions.RemoveEmptyEntries));
+        foreach (var segment in href.Split('/'))
+        {
+            if (segment == "..")
+            {
+                if (segments.Count > 0)
+                {
+                    segments.RemoveAt(segments.Count - 1);
+                }
+            }
+            else if (segment is not ("." or ""))
+            {
+                segments.Add(segment);
+            }
+        }
+
+        return string.Join('/', segments) + (href.EndsWith('/') ? "/" : "");
     }
 
     [GeneratedRegex(@"^\s*-?\s*href:\s*(\S+)\s*$")]
