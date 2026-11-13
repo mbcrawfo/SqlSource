@@ -26,7 +26,7 @@ S=.claude/skills/reviewing-test-quality
 
 1. **The run.**  The argument is a list of test folders; with none, the run is every folder of [projects.txt](projects.txt), the one marked `not-run` too.  `R` is under `artifacts/`, which git ignores; everything measured and every agent's file goes there.
 2. **The previous review** is the newest `docs/superpowers/specs/*-test-cleanup-findings.md`, if there is one.  Every agent is given it: what it settled is not raised again.
-3. **The scopes and projects.**  A scope of [scopes.txt](scopes.txt) is needed when one of its `folders` holds, or is held by, a folder of the run.  A project of `projects.txt` is needed when it holds a folder of the run, or is one.  Docker runs for the projects under `tests/DatabaseTests/`.
+3. **The scopes and projects.**  A scope of [scopes.txt](scopes.txt) is needed when one of its `folders` holds, or is held by, a folder of the run.  A project of `projects.txt` is needed when it holds, or is held by, a folder of the run: a run of `tests/DatabaseTests` needs the seven projects in it.  Docker runs for the projects under `tests/DatabaseTests/`.
 4. **Cut the slices**, which takes seconds and is the count of the run's reviewers:
 
    ```bash
@@ -34,7 +34,7 @@ S=.claude/skills/reviewing-test-quality
    dotnet $D slices . "$R/slices" --exclude-from $S/excluded.txt <the folders of the run>
    ```
 
-   `$R/slices/index.txt` has a line for each slice.  `slices` refuses a folder that holds anything, so a second cut names a new run folder.
+   `$R/slices/index.txt` has a line for each slice.  A folder that holds several test projects is cut project by project, so no slice is of two.  `slices` refuses a folder that holds anything, so a second cut names a new run folder.
 5. **Say the cost to the owner.**  One reviewer and one verifier for each slice, up to three mirror agents and a writer: everything is 59 slices on 2026-11-12.  In the pilot a reviewer of a slice of 4,300 lines took 12 to 18 minutes and about 400,000 tokens, and its verifier about 270,000.  The scopes run one after another, each about a second for each mutant it tests, the count above it in `scopes.txt`, and about five minutes besides, but a scope whose tests are slow: `tool-projects`, whose tests run MSBuild, took 19 minutes for 241 mutants, and the two root scopes, whose driver and command tests cost about 17 seconds a mutant, far more: `generator-root` took 67 minutes; [tools/README.md](../../../tools/README.md#how-long-a-run-takes) has the measured runs.  The test projects take what `./pre-commit-validation.sh --full` takes for its tests, and the two `SyncAsync` projects besides.  A run of more than ten slices, or of more than an hour of measurements, **waits for the owner's yes**.  If the measurements will not fit in a night, ask the owner which scopes to leave out; a scope left out is named in the epic.
 6. **Start `$R/run-notes.md`**, which the writer is given: the date, the commit the run reads (`git rev-parse HEAD`), the folders of the run, the slices, and then, as the run goes, each scope's time and counts from `measure.log` and `evidence/gaps.md`, each scope left out or failed, each test project that failed, each coverage gap by its path, and each correction to a list of the skill.
 
@@ -48,7 +48,7 @@ No agents.  One command, in the background, and wait for it to end; `;` and not 
 $S/measure.sh "$R" mutation <the scopes needed>; $S/measure.sh "$R" tests <the projects needed, but the one marked not-run>
 ```
 
-With no name after `mutation` or `tests`, every scope or every project that is run is meant.  A run that needs no scope leaves the first half out.
+With no name after `mutation` or `tests`, every scope or every project that is run is meant, so a run of some folders names its scopes and its projects.  A run that needs no scope leaves the first half out.
 
 - Stryker builds in the working tree, so **nothing else that builds runs in the checkout until the command has ended**: no `dotnet run`, no test, no `pre-commit-validation.sh`.
 - `tests/DatabaseTests/QueryMethodAllocation` is sliced and reviewed by reading and is never run: its tests skip under coverage.

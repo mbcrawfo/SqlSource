@@ -84,6 +84,56 @@ public sealed class CondenserTests : IDisposable
         gaps.ShouldContain("| src/SqlSource/A.cs | 4 | 2 | 1 | 1 | 0 | 1 | 1 |\n");
     }
 
+    [Fact]
+    public async Task RunAsync_Gaps_ListTheFilesWithMostSurvivorsAndUnreachedMutantsFirst()
+    {
+        WriteSlice("P-1", "tests/P/ATests.cs");
+        WriteScope(
+            "one",
+            new ReportFile(Source + "/Few.cs", Lines6, At(1, "Survived", ["t1"], []), At(2, "Killed", ["t1"], ["t1"])),
+            new ReportFile(Source + "/Unreached.cs", Lines6, At(1, "NoCoverage", [], []), At(2, "NoCoverage", [], [])),
+            new ReportFile(
+                Source + "/Most.cs",
+                Lines6,
+                At(1, "Survived", ["t1"], []),
+                At(2, "Survived", ["t1"], []),
+                At(3, "NoCoverage", [], [])
+            ),
+            new ReportFile(Source + "/Clean.cs", Lines6, At(1, "Killed", ["t1"], ["t1"]))
+        );
+
+        var (code, _, _) = await RunAsync();
+
+        code.ShouldBe(0);
+        Evidence("gaps.md")
+            .Split('\n')
+            .Where(line => line.StartsWith("| src/", StringComparison.Ordinal))
+            .Select(line => line.Split('|')[1].Trim())
+            .ShouldBe([
+                "src/SqlSource/Most.cs",
+                "src/SqlSource/Unreached.cs",
+                "src/SqlSource/Few.cs",
+                "src/SqlSource/Clean.cs",
+            ]);
+    }
+
+    [Fact]
+    public async Task RunAsync_ScopeThatMutatesAFolderAndFoldersInIt_NamesTheOutermostAlone()
+    {
+        WriteSlice("P-1", "tests/P/ATests.cs");
+        WriteScope(
+            "one",
+            new ReportFile(Source + "/A.cs", Lines6, At(1, "Killed", ["t1"], ["t1"])),
+            new ReportFile(Source + "/Sub/B.cs", Lines6, At(1, "Killed", ["t1"], ["t1"])),
+            new ReportFile(Source + "/Sub/Deep/C.cs", Lines6, At(1, "Killed", ["t1"], ["t1"]))
+        );
+
+        var (code, _, _) = await RunAsync();
+
+        code.ShouldBe(0);
+        Evidence("P-1.md").ShouldContain("- one: ran 2 tests of tests/P; tested 3 mutants of src/SqlSource.\n");
+    }
+
     // The reports name their files in full, so a root given from the working folder, as ".", is made whole first.
     [Fact]
     public async Task RunAsync_RootGivenFromTheWorkingFolder_FindsTheTimesOfItsTests()

@@ -10,7 +10,8 @@ namespace SqlSource.MutationReport;
 
 // The slices command: cuts the .cs files of some test folders into the slices of a test review, and writes each
 // slice's files, one to a line, to <name>.txt of the output folder, and a line "<name> <lines> <files>" for each to
-// its index.txt.  Each folder is cut by itself, so no slice holds files of two.
+// its index.txt.  Each folder is cut by itself, and each test project in it by itself, so no slice holds files of two
+// folders or of two projects.
 internal static partial class SlicesCommand
 {
     // A partial class that a file declares itself, and not one in the text of a test's input, which is indented.
@@ -88,7 +89,19 @@ internal static partial class SlicesCommand
         var slices = new List<Slice>();
         foreach (var name in names.Distinct(StringComparer.Ordinal))
         {
-            slices.AddRange(TestSlices.Cut(name, FilesOf(whole, name, excluded), limit));
+            // A slice is of one test project, since a class's share of its project's time and a slice's times are
+            // read from one project's results: a folder that holds several projects is cut project by project, and
+            // what it holds outside them by itself.
+            var all = FilesOf(whole, name, excluded);
+            var projects = ProjectsBelow(whole, name, excluded);
+            foreach (var project in projects)
+            {
+                slices.AddRange(TestSlices.Cut(project, [.. all.Where(file => IsIn(file, project))], limit));
+            }
+
+            slices.AddRange(
+                TestSlices.Cut(name, [.. all.Where(file => !projects.Exists(project => IsIn(file, project)))], limit)
+            );
         }
 
         _ = Directory.CreateDirectory(outputFolder);
@@ -114,6 +127,30 @@ internal static partial class SlicesCommand
         return 0;
     }
 
+    private static bool IsIn(SliceFile file, string folder) =>
+        file.Path.StartsWith(folder + "/", StringComparison.Ordinal);
+
+    // The folders below a folder that hold a project file, in order, but those of a build's output and those under
+    // an excluded path.  A folder that is itself in a project has none below it, and is cut as one folder.
+    private static List<string> ProjectsBelow(string root, string folder, string[] excluded) =>
+        [
+            .. Directory
+                .EnumerateFiles(Path.Combine(root, folder), "*.csproj", SearchOption.AllDirectories)
+                .Select(file => Path.GetRelativePath(root, Path.GetDirectoryName(file)!).Replace('\\', '/'))
+                .Where(project => project != folder && !IsLeftOut($"{project}/{ProjectFile}", excluded))
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal),
+        ];
+
+    // Any file of a folder, for asking whether the folder is left out.
+    private const string ProjectFile = "project";
+
+    // Whether a file is of a build's output or under an excluded path.
+    private static bool IsLeftOut(string path, string[] excluded) =>
+        path.Contains("/bin/", StringComparison.Ordinal)
+        || path.Contains("/obj/", StringComparison.Ordinal)
+        || excluded.Any(prefix => path.StartsWith(prefix + "/", StringComparison.Ordinal));
+
     // The .cs files under a folder, but those of a build's output and those under an excluded path.
     private static List<SliceFile> FilesOf(string root, string folder, string[] excluded)
     {
@@ -121,11 +158,7 @@ internal static partial class SlicesCommand
         foreach (var file in Directory.EnumerateFiles(Path.Combine(root, folder), "*.cs", SearchOption.AllDirectories))
         {
             var path = Path.GetRelativePath(root, file).Replace('\\', '/');
-            if (
-                path.Contains("/bin/", StringComparison.Ordinal)
-                || path.Contains("/obj/", StringComparison.Ordinal)
-                || excluded.Any(prefix => path.StartsWith(prefix + "/", StringComparison.Ordinal))
-            )
+            if (IsLeftOut(path, excluded))
             {
                 continue;
             }

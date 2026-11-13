@@ -45,11 +45,6 @@ internal static class TestSlices
             return [];
         }
 
-        if (files.Sum(file => file.Lines) <= limit)
-        {
-            return [files];
-        }
-
         // The blocks that may still be joined with the next: the parts of the folder's own files and each
         // sub-folder that fits.  A sub-folder that is cut ends them, and its slices are its own.
         var cut = new List<List<SliceFile>>();

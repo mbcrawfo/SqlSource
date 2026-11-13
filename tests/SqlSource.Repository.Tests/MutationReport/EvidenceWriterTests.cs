@@ -283,6 +283,32 @@ public sealed class EvidenceWriterTests
     }
 
     [Fact]
+    public void Write_ListsAtTheirLimits_AreWholeWithNoCount()
+    {
+        var cover = Enumerable.Range(1, 8).Select(index => $"N.T.Cover{index}").ToArray();
+        var evidence = Slice(
+            new EvidenceFile(
+                Tests,
+                10,
+                [
+                    new EvidenceMethod("T.Covered", 1, 1, false, Kills(20, cover: cover)),
+                    new EvidenceMethod("T.Alone", 1, 1, false, Kills(20, alone: 10)),
+                ]
+            )
+        ) with
+        {
+            Survivors = [new EvidenceSurvivor(Mutant(1), ["N.T.A", "N.T.B", "N.T.C"])],
+        };
+
+        var text = Write(evidence);
+
+        text.ShouldContain("`T.Cover7`, `T.Cover8`\n");
+        text.ShouldContain("SqlLexer.cs:129:17 Equality mutation\n");
+        text.ShouldContain("covered by 3 methods here: `T.A`, `T.B`, `T.C`\n");
+        text.ShouldNotContain(" more");
+    }
+
+    [Fact]
     public void Write_DatabaseSlice_NamesTheLinesFile()
     {
         var evidence = Slice(new EvidenceFile("tests/DatabaseTests/Postgres/ATests.cs", 10, [])) with

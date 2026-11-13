@@ -99,7 +99,7 @@ public sealed class CliTests
             var exclusions = Path.Combine(folder, "excluded.txt");
             await File.WriteAllLinesAsync(
                 exclusions,
-                ["# test data", "", "tests/P/Data  # holds no test"],
+                ["# test data", "", "tests/P/Data/  # holds no test"],
                 TestContext.Current.CancellationToken
             );
             var slices = Path.Combine(folder, "run", "slices");
@@ -153,6 +153,45 @@ public sealed class CliTests
 
             code.ShouldBe(0);
             ReadLines(slices, "index.txt").ShouldBe(["P-1 10 1", "Q-1 10 1"]);
+        });
+
+    // A class's share of its project's time, and a slice's evidence, are of one project: a folder of several
+    // projects is cut project by project, however small they are.
+    [Fact]
+    public async Task RunAsync_SlicesOfAFolderOfSeveralProjects_PutsNoTwoProjectsInOneSlice() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/D/A/A.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/A/ATests.cs", 10);
+            WriteLines(folder, "tests/D/A/Sub/MoreTests.cs", 10);
+            WriteLines(folder, "tests/D/B/B.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/B/BTests.cs", 10);
+            WriteLines(folder, "tests/D/Shared.cs", 10);
+            WriteLines(folder, "tests/D/Loose/LooseTests.cs", 10);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, _, error) = await RunAsync("slices", folder, slices, "tests/D");
+
+            error.ShouldBeEmpty();
+            code.ShouldBe(0);
+            ReadLines(slices, "index.txt").ShouldBe(["D.A-1 20 2", "D.B-1 10 1", "D-1 20 2"]);
+            ReadLines(slices, "D.A-1.txt").ShouldBe(["tests/D/A/ATests.cs", "tests/D/A/Sub/MoreTests.cs"]);
+            ReadLines(slices, "D-1.txt").ShouldBe(["tests/D/Loose/LooseTests.cs", "tests/D/Shared.cs"]);
+        });
+
+    [Fact]
+    public async Task RunAsync_SlicesOfAFolderInsideAProject_CutsItAsOneFolder() =>
+        await InFolderAsync(async folder =>
+        {
+            WriteLines(folder, "tests/D/A/A.csproj", 1, "<Project />");
+            WriteLines(folder, "tests/D/A/X/XTests.cs", 10);
+            WriteLines(folder, "tests/D/A/X/Y/YTests.cs", 10);
+            var slices = Path.Combine(folder, "slices");
+
+            var (code, _, _) = await RunAsync("slices", folder, slices, "tests/D/A/X");
+
+            code.ShouldBe(0);
+            ReadLines(slices, "index.txt").ShouldBe(["D.A.X-1 20 2"]);
         });
 
     // A folder is cut by its path from the root, however it is written.

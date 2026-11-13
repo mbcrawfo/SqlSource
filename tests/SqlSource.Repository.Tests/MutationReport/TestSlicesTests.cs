@@ -57,6 +57,42 @@ public sealed class TestSlicesTests
     }
 
     [Fact]
+    public void Cut_FolderThatComesToExactlyTheLimit_IsOneSlice() =>
+        Cut(100, File("A.cs", 40), File("Sub/1.cs", 60))
+            .Select(Paths)
+            .ShouldBe([
+                ["A.cs", "Sub/1.cs"],
+            ]);
+
+    [Fact]
+    public void Cut_SubFolderThatComesToExactlyTheLimit_IsOneBlock()
+    {
+        var slices = Cut(100, File("A.cs", 90), File("Sub/X/1.cs", 50), File("Sub/Y/1.cs", 50));
+
+        slices
+            .Select(Paths)
+            .ShouldBe([
+                ["A.cs"],
+                ["Sub/X/1.cs", "Sub/Y/1.cs"],
+            ]);
+        slices[1].Name.ShouldBe("P.Sub-1");
+    }
+
+    // A sub-folder at the limit is still a block that joins, which only a neighbour of no lines can show.
+    [Fact]
+    public void Cut_SubFolderAtExactlyTheLimit_StillJoinsANeighbourOfNoLines()
+    {
+        var slices = Cut(100, File("A.cs", 90), File("Sub/1.cs", 100), File("Tub/Empty.cs", 0));
+
+        slices
+            .Select(Paths)
+            .ShouldBe([
+                ["A.cs"],
+                ["Sub/1.cs", "Tub/Empty.cs"],
+            ]);
+    }
+
+    [Fact]
     public void Cut_FolderOverTheLimit_IsSplitByItsSubFoldersWithItsOwnFilesFirst()
     {
         var slices = Cut(100, File("Z.cs", 60), File("A/1.cs", 70), File("B/1.cs", 80));
