@@ -688,6 +688,8 @@ See: [Settings files](settings.md#settings-files)
 
 Reported by: the build.
 
+The error comes before the build compiles anything.
+
 The build's C# compiler is older than the one SqlSource needs, which is the compiler of the .NET SDK 9.0.300 and later, and of Visual Studio 2022 17.14 and later.  The message names the version of the compiler the build found.  The build stops, and no query gets a method: a compiler that old cannot run SqlSource at all.
 
 Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later.  A project can still target .NET 8: the SDK builds it, and what it runs on is the framework it targets.  A `global.json` that pins an older SDK keeps the build on the old compiler, so change the version it pins.
@@ -730,6 +732,8 @@ See: [Projects that share internals](generator.md#projects-that-share-internals)
 
 Reported by: the build.
 
+The error is at the project file.
+
 The project sets the MSBuild property `SqlSourceOnline` to a value that is not `auto`, `true` or `false`.  The case of the value and the white space around it do not matter, so ` True ` is `true`, and an empty value is `auto`.  The message names the value, without the white space around it.  The build stops before it compiles anything.
 
 ```console
@@ -745,6 +749,8 @@ See: [Running the tool in the build](settings.md#online-build)
 **Build cannot run the tool**
 
 Reported by: the build.
+
+The error is at the project file.
 
 `SqlSourceOnline` is `true`, so a build that is not in CI runs `dotnet sqlsource describe` on the project before it compiles, and it could not start the tool: no tool manifest in the project's folder or a folder above it names `SqlSource.Tool`, or the tool it names was never restored on this machine.  The build stops.
 
@@ -762,6 +768,8 @@ See: [Running in the build](tool.md#running-in-the-build)
 
 Reported by: the build.
 
+The warning is at the project file.  A project can also list `SQLSRC026` in the MSBuild property `MSBuildWarningsAsMessages`, which turns the warning into a message.
+
 `SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](settings.md#setting-env-file) names, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
 ```console
@@ -778,6 +786,8 @@ See: [Running in the build](tool.md#running-in-the-build)
 
 Reported by: the build.
 
+The error is at the project file.
+
 The build ran `dotnet sqlsource describe` on the project before it compiled, and the tool ended with an exit code other than 0 without reporting an error of its own, so the build cannot tell whether the sidecars are current, and stops.  The message names the exit code and the first line the tool printed.  The usual cause is a tool older than the `SqlSource` package, which does not know an option the build gives it and prints a line such as `sqlsource: unknown option at position 2`; the message then says to update the tool.
 
 ```console
@@ -793,6 +803,8 @@ See: [Running in the build](tool.md#running-in-the-build)
 **Repository has no connection**
 
 Reported by: the build.
+
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
 A query whose output is `repository` gets an instance method of the type that claims it, and the method takes its connection from a member of the type: a `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`, or one of a type that derives from `DbDataSource`, or the member you mark `[SqlSourceConnection]`.  The type has none of these for a database that its repository queries use.
 
@@ -823,6 +835,8 @@ See: [The connection](generator.md#repository-connection)
 **Repository has more than one connection**
 
 Reported by: the build.
+
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
 The type has more than one member that could give its repository queries their connection for one database: two members that the build finds by their name or type, two marked `[SqlSourceConnection]` for the same database that both return a `Task` or `ValueTask`, or both do not, or three or more marked for it.
 
@@ -865,6 +879,8 @@ See: [The connection](generator.md#repository-connection)
 
 Reported by: the build.
 
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
+
 A member is marked `[SqlSourceConnection]` without a `Database`, and the type's repository queries use more than one database, so it cannot tell which one the member connects to.
 
 ```csharp
@@ -889,6 +905,8 @@ See: [The connection](generator.md#repository-connection)
 **Connection's database is not used**
 
 Reported by: the build.
+
+A type gets this warning only when it claims a query whose output is `repository`.
 
 A member is marked `[SqlSourceConnection]` for a database that no repository query of the type uses: its `Database` is misspelt, or the queries of that database have another output, or are gone.
 
@@ -926,6 +944,8 @@ See: [The connection](generator.md#repository-connection)
 
 Reported by: the build.
 
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
+
 A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  A connection comes from a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`, or from a method that is not generic, takes nothing or one `CancellationToken`, and returns a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of one.
 
 ```csharp
@@ -951,6 +971,8 @@ See: [The connection](generator.md#repository-connection)
 
 Reported by: the build.
 
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
+
 The member that gives a database its connection is of a type of the other engine's driver: an Npgsql type, such as `NpgsqlDataSource`, for a SQL Server database, or a Microsoft.Data.SqlClient type, such as `SqlConnection`, for a PostgreSQL one.
 
 ```csharp
@@ -971,6 +993,8 @@ See: [The connection](generator.md#repository-connection)
 **Repository is static**
 
 Reported by: the build.
+
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
 A query whose output is `repository` gets an instance method, and the type that claims it is `static`, so it has no instance.
 
@@ -1020,6 +1044,8 @@ See: [The interface](generator.md#repository-interface), [repository interfaces]
 **Connection parameter is hidden by a method argument**
 
 Reported by: the build.
+
+A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
 The primary-constructor parameter that gives a database its connection is named `cancellationToken`, which every asynchronous repository method takes as an argument, and which is refused whatever the queries' `method-type`, or `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.  Inside a method the argument hides the parameter, so the method could not reach its connection.
 
@@ -2782,6 +2808,8 @@ See: [Sidecar files](tool.md#sidecar-files)
 
 Reported by: the build.
 
+If the file's dialect cannot be described, or a token has no default, the query gets [SQLSRC209](#sqlsrc209) or [SQLSRC210](#sqlsrc210) instead of this error.
+
 The query's output is `models`, `methods` or `repository`, which needs a description of the query in its file's sidecar, and the sidecar has none: the file has no sidecar, or its sidecar has no entry of the query's name.  A query that was added or renamed since the tool last ran is the usual cause.  Names are compared as C# compares them, so `getuser` is not `GetUser`.  The message names the query and its output.
 
 ```console
@@ -2860,6 +2888,8 @@ See: [Sidecar files](tool.md#sidecar-files)
 
 Reported by: the build.
 
+A query gets this error only while its entry in the sidecar is current.  The error is at the query's name, once for the query: for its first column or parameter that has no C# type.  Parameters come before columns.
+
 A column or a parameter of the query has a database type that Npgsql, or Microsoft.Data.SqlClient for a query of the `mssql` dialect, cannot read as a C# value, so SqlSource can give it no C# type.  The message names the column or parameter, its type, and what to do.
 
 ```console
@@ -2929,6 +2959,8 @@ See: [Which version of Npgsql](postgresql.md#which-npgsql)
 
 Reported by: the build.
 
+A query of the `postgres` dialect gets this error only while its entry in the sidecar is current.  The error is at the query's name, once for the query: for its first column or parameter that has no C# type.  Parameters come before columns.
+
 The project does not reference Npgsql, and a column or a parameter of the query has a type whose C# type depends on it.  It is either a type that Npgsql reads as a type of its own `NpgsqlTypes` namespace, such as `point`, `tsvector` or `int4range`, or a type that Npgsql 8 and 9 read as one C# type and Npgsql 10 as another: `date`, `time`, `cidr`, `daterange` and `datemultirange`, and an array or a domain of one of them.  Without a reference, SqlSource cannot tell which Npgsql the application runs on.  The message names the column or parameter and its type.
 
 ```console
@@ -2944,6 +2976,8 @@ See: [Which version of Npgsql](postgresql.md#which-npgsql)
 **Mapped type is not found**
 
 Reported by: the build.
+
+The error is at the name of each query that has a column or a parameter the type is chosen for.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.
 
 A C# type that you chose cannot be found.  It is a type that the [type override](settings.md#setting-type-overrides) gives a database type, that the [column types](settings.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
 
@@ -2961,6 +2995,8 @@ See: [Type overrides](settings.md#setting-type-overrides), [column types](settin
 **Mapped type is not accessible**
 
 Reported by: the build.
+
+If the project cannot use the type, each query with a column or a parameter of that type gets the error at its name.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.  For a type that is not public in a public model, the error is at the name of each query of the model.
 
 A C# type that you chose, by the type override, the column types or a marker, cannot be used by the project: the type, or one of its type arguments, is `internal` in another assembly, or is a `private` or `protected` type nested in another, in the project itself or another assembly.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250)'s does.
 
@@ -2986,6 +3022,8 @@ See: [Type overrides](settings.md#setting-type-overrides), [column types](settin
 
 Reported by: the build.
 
+The error is at the name of each query that has a column or a parameter the type is chosen for.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.
+
 A C# type that you chose, by the type override, the column types or a marker, is one that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, as is a type argument that is an interface with a `static abstract` member, such as `System.Numerics.INumber<int>`, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  So is a type when it, a type it is nested in or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`, since no code can use it without an error; and so is one marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`, since a model could not turn off the warning, or the error of `[Experimental]`, that its use gives.  `[Experimental]` on the assembly or module that declares the type counts as on the type.  So is a generic type with a type argument that breaks a constraint of its type parameter, as `System.Collections.Generic.List<System.Nullable<string>>`, whose `System.Nullable<T>` takes only a value type, or `MyApp.Box<string>` where `Box<T>` requires `where T : struct`.  A type argument written with a `?` breaks a constraint that forbids null: `notnull`, `class` without a `?`, or a base type or interface written without a `?`, as `System.Collections.Generic.Dictionary<string?, int>` does, whose key is `notnull`.  A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted, and its model compiles without a warning.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250)'s does.
 
 ```console
@@ -3001,6 +3039,8 @@ See: [Type overrides](settings.md#setting-type-overrides), [column types](settin
 **Column has no name**
 
 Reported by: the build.
+
+The error is at the query's name.  If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
 
 A column of the query has no name, so its property in the output model would have none.  PostgreSQL names a column `?column?` when the query gives it no alias and it is no column of a table or call of a function: an expression such as `price * quantity`, or a literal.  On SQL Server such a column is [SQLSRC266](#sqlsrc266), which the tool reports when it describes the query.  The message gives the column's position, from 1, and the query.
 
@@ -3030,6 +3070,8 @@ See: [Property names](generator.md#property-names)
 
 Reported by: the build.
 
+The error is at the query's name.  If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
+
 The PascalCase of a column's or a parameter's name, which names its property, is not a C# identifier: it is empty, as for a name of underscores alone, it starts with a digit, as `_1st` gives `1st`, or it holds a character that an identifier cannot, as `unit-price` does.  The message names the column or parameter and the property name it gives.
 
 ```console
@@ -3058,6 +3100,8 @@ See: [Property names](generator.md#property-names)
 
 Reported by: the build.
 
+The error is at the query's name.  If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
+
 Two columns, or two parameters, of the query give their model one property name, ignoring case: the same column selected from two tables, as `SELECT u.id, o.id`, or two spellings of a name, as `user_id` beside `userId`.  Names are compared ignoring case, since Dapper matches a column to a property ignoring case, and would fill both properties from one column.  The message names both, with their positions from 1, and the property name.
 
 ```console
@@ -3085,6 +3129,8 @@ See: [Property names](generator.md#property-names)
 **Property name is taken**
 
 Reported by: the build.
+
+For a name that a record or `object` has, the error is at the query's name.  If several types claim the query's file, the query still gets it only once, and gets no models until it is fixed.  For a property named as its model, the error is at the name of each query of the model.  The model is not generated until it is fixed.
 
 A column or a parameter gives a property name that a record or `object` already has a member of: `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` or `Clone`.  A column named `equals` or `to_string` is one.  So is a property name that is the name of its model, which C# does not allow a member to have: a column `total` of a query whose `-- output-model:` marker names its model `Total`.  The message names the column or parameter and the property name.
 
@@ -3153,6 +3199,8 @@ See: [Shared models](generator.md#shared-models)
 
 Reported by: the build.
 
+The error is at the name of each query that would have the model.
+
 A model's full name is one that a generated type cannot have, because the code would not compile or would be warned on:
 
 - a type of the project has the full name, the type that carries `[SqlSourceGenerate]` among them;
@@ -3190,6 +3238,8 @@ See: [Names that cannot be used](generator.md#unusable-model-names)
 
 Reported by: the build.
 
+If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
+
 The query has an `-- output-model:` marker, which names the type of its rows, and its statement returns none, as an `INSERT`, `UPDATE` or `DELETE` without `RETURNING` does, or on SQL Server one without `OUTPUT`, or whose `OUTPUT` goes `INTO` a table.  The error is at the marker.
 
 ```console
@@ -3211,6 +3261,8 @@ See: [Which queries get models](generator.md#which-models)
 **Column marker names no usable column**
 
 Reported by: the build.
+
+If several types claim the query's file, the query still gets this error only once.  The query gets no models until it is fixed.
 
 A `-- column:` marker, which sets the nullability or the C# type of one column of its query's result, cannot be used.  Either it names no column of the result, its name compared ignoring case, or the query returns no rows; or it says `null` or `not null` of a column whose alias already ends in `!` or `?`, which says the column's nullability too.  A marker that gives only a C# type may name such a column.  The error is at the marker, and the message says which it is.
 
@@ -3465,6 +3517,8 @@ See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
 Reported by: the build.
 
+A query gets this error only while its entry in the sidecar is current.  It is for the query's first column or parameter that has no C# type, and parameters come before columns.
+
 The project does not reference Microsoft.Data.SqlClient, and a column or a parameter of a query of the `mssql` dialect has a type whose C# type is one of Microsoft.Data.SqlClient's own: `vector`, which it reads as `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without a reference, the project cannot name that type.  The message names the column or parameter and its type.
 
 ```console
@@ -3480,6 +3534,8 @@ See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 **Type needs a newer Microsoft.Data.SqlClient**
 
 Reported by: the build.
+
+A query gets this error only while its entry in the sidecar is current.  It is for the query's first column or parameter that has no C# type, and parameters come before columns.
 
 The project references a version of Microsoft.Data.SqlClient older than 6.1, and a column or a parameter of a query of the `mssql` dialect has a type whose C# type that version does not have: `vector`, which Microsoft.Data.SqlClient reads as `Microsoft.Data.SqlTypes.SqlVector<float>`, first in 6.1.  The message names the column or parameter, its type, the version its C# type needs and the version the project references.
 
@@ -3517,6 +3573,8 @@ See: [Describing again](tool.md#describing-again)
 
 Reported by: the build.
 
+The error is at the query's name.  If several types claim the query's file, the query still gets it only once.  The query also gets each other error about its method, and gets no method until all are fixed.  Its models are still generated.
+
 A query's name marker gives it the shape `one`, `one-optional` or `many`, and its entry in the sidecar says that its statement returns no rows, as an `UPDATE` without `RETURNING` or `OUTPUT` does.  Those shapes read rows, so the query's method cannot be generated.  The message names the query and its shape.
 
 ```console
@@ -3549,6 +3607,8 @@ See: [Query methods](generator.md#query-methods)
 
 Reported by: the build.
 
+If several types claim the query's file, the query gets this error once.  A cause that belongs to one type, such as a member of that type, is the exception: each type that has it reports it.  If two types of one namespace claim the file, each gives the query a method of one signature.  The query then gets one error for each type, each naming the other.  The query also gets each other error about its method, and gets no method until all are fixed.
+
 The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  Under the generator parameter [`method-type`](settings.md#setting-generator-parameters) a synchronous method has the query's name alone, and under `both` an asynchronous method always has `Async` after it, whatever `async-method-suffix` says, so that it never has the name of the synchronous method beside it.  Each name of a query's methods is checked, and the message names the one that is taken; a query with one taken gets none of its methods, but for a clash with a method of another type in an extension class, the last case below, which leaves out its methods of that name alone.  It is taken when it is:
 
 - under the [member location](generator.md#locations) `extension-class`, the default of the output `methods`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
@@ -3575,6 +3635,8 @@ See: [Query methods](generator.md#query-methods)
 **Token is named as an argument of the method**
 
 Reported by: the build.
+
+If several types claim the query's file, the query gets this error once for each such token.  A token that hides a repository's connection is the exception: each type whose connection it hides reports it.  The query also gets each other error about its method, and gets no method until all are fixed.
 
 A token of a query whose output is `methods` or `repository` has the name of one of the arguments a query method can have: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  A token is an argument of the method too, so it cannot take one of these names, even in a query without parameters, whose method has no `parameters`, and the method is not generated.  The message names the token, the query and what has the name.
 
@@ -3620,6 +3682,8 @@ See: [Query methods](generator.md#query-methods)
 
 Reported by: the build.
 
+A method of the project's own code gets this error whether or not a query uses it.  The output of the project, its types and its files do not change this.  A query that gets the error for a converter of a referenced assembly keeps its models.
+
 A method marked `[SqlSourceConverter]` must be a converter: a `static` method of one argument, declared in a type, that returns the argument converted to another type, as `public static Email FromDatabase(string value)` does.  The method is not one, and the message names it and the first of these that is wrong with it:
 
 - `it is a local function`: the method is declared inside another method.  Only a method declared in a type is a converter, and the attribute on a lambda is ignored.
@@ -3651,6 +3715,8 @@ See: [Converters](settings.md#converters)
 **Two converters convert between the same types**
 
 Reported by: the build.
+
+A method of the project's own code gets this error whether or not a query uses it.  The output of the project, its types and its files do not change this.  A query that gets the error for a converter of a referenced assembly keeps its models.
 
 Two methods of the project marked `[SqlSourceConverter]` take the same type and return the same type, so either could convert between the two.  The message names both methods and the two types.
 
@@ -3742,6 +3808,8 @@ See: [Library types](settings.md#setting-library-types)
 
 Reported by: the build.
 
+The query gets this error once for each column and parameter whose C# type has the word `json` where the opt-in does not apply.
+
 A column type, a `-- column:` marker or a `-- param:` marker gives a column or a parameter of a query whose output is `methods` or `repository` a C# type with the word `json` before it, `"json": true` in a settings file or `-> json OrderMetadata` in a marker, and the opt-in cannot read and send that column or parameter as JSON.  The opt-in says that a column of a string type, such as `text` or `nvarchar(max)`, holds JSON, so that your own class is read and sent through System.Text.Json's serializer, as a `json` or `jsonb` column of it is.  It does not apply to a column or parameter of any other database type, such as `int` or `text[]`, or with a C# type that is not a class of your own: a type of System.Text.Json, such as `JsonElement`, or a type that the database's driver reads, such as `string` or `long`.  On an array of a JSON type, such as `jsonb[]`, each element is read and sent on its own, so the opt-in takes an array of your class, `OrderMetadata[]`, and not an array of a type of System.Text.Json or of a type the driver reads, such as `JsonElement[]` or `string[]`; the message then names the element.  The message names the column or parameter, its C# type, the place that chose it, as [SQLSRC250](#sqlsrc250) does, and the reason.
 
 ```console
@@ -3757,6 +3825,8 @@ See: [The JSON opt-in](settings.md#json-opt-in), [a class in a JSON column](sett
 **Short name finds a type that only a package brings**
 
 Reported by: the build.
+
+The warning is at the query's name, under the output `models`, `methods` or `repository`.  A query gets it once for each column and parameter whose C# type has such a short name.
 
 A C# type that you chose, by the type override, the column types or a `-- param:` or `-- column:` marker, is a short name, of one part, or has one in its type arguments, and the one type of that name that the project can see is of an assembly that the project has only through a package that it does not reference itself, one that another package, or a project that it references, brings.  That may not be the type you meant.  A package can bring a type of a common name, such as `AccountId`, that has nothing to do with yours, and an update of the package can stop bringing it, or bring another of the name.  The type is used all the same.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250) does, then the short name, the full name of the type it finds and that type's assembly.
 
@@ -4011,6 +4081,8 @@ See: [When a bundle cannot be made safe](tool.md#raw-bundle), [Checking a bundle
 
 Reported by: the build.
 
+The error is at the query's name, once for the query.
+
 A query that turns on the `collection-method` generator parameter, and has parameters, sets the `transaction` generator parameter to an isolation level that its database does not have.  PostgreSQL has no `read-uncommitted` and no `snapshot`, so a query of the `postgres` dialect cannot ask for either; SQL Server has all five levels.  The message names the query, the level and the database.
 
 ```console
@@ -4027,6 +4099,8 @@ See: [A collection method's transactions](generator.md#collection-transactions)
 
 Reported by: the build.
 
+The error is at the query's name, once for the query.
+
 A query whose output is `methods` or `repository` streams its rows, with the [collection type](settings.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`, and the generator parameter [`method-type`](settings.md#setting-generator-parameters) is `sync`.  A stream reads each row as the caller asks for it, which only an asynchronous method can do, so there is no synchronous one.  The message names the query.
 
 ```console
@@ -4042,6 +4116,8 @@ See: [Collection type](settings.md#setting-collection-type)
 **Synchronous method has no connection**
 
 Reported by: the build.
+
+The error is at the query's name, once for the query, beside its other errors.  A query that has no entry in its sidecar yet gets [SQLSRC241](#sqlsrc241), not this error.  It gets this error once it is described, as it gets the other errors about its method.  Its models are still generated.
 
 A query whose output is `repository` would have a [synchronous method](generator.md#synchronous-methods), under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `sync` or `both`, but the one member that gives its database's connection is a method that returns a `Task` or `ValueTask` of a connection, which a synchronous method cannot call.  The message names the query, the database, the type and the member.
 
