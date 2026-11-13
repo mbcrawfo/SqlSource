@@ -38,6 +38,25 @@ public sealed partial class InboundSiteReferenceTests
         ".sql",
     ];
 
+    // The folders of what a build, a test run, a benchmark or a mutation run writes, as `.gitignore` leaves them out,
+    // in any case, beside those of RepositoryFolders.Skipped and every `TestResult*`.  A report there, such as
+    // Stryker's, copies the sources of the tests with their references.  A folder that `.gitignore` gains, which a run
+    // can fill with text, is added here too.
+    private static readonly HashSet<string> OutputFolders =
+    [
+        with(StringComparer.OrdinalIgnoreCase),
+        "artifacts",
+        "StrykerOutput",
+        "coverage",
+        "BenchmarkDotNet.Artifacts",
+        "publish",
+        "Log",
+        "Logs",
+        "Out",
+        "Debug",
+        "Release",
+    ];
+
     private static readonly string[] WholeFileExceptions =
     [
         "tests/SqlSource.Repository.Tests/Documentation/UserDocsReadingTests.cs",
@@ -212,6 +231,17 @@ public sealed partial class InboundSiteReferenceTests
                     "CLAUDE.local.md",
                     "docs/i.png",
                     ".vscode/x.json",
+                    "src/StrykerOutput/r/reports/mutation-report.json",
+                    "coverage/c.json",
+                    "BenchmarkDotNet.Artifacts/results/b.md",
+                    "src/publish/p.json",
+                    "log/l.txt",
+                    "Logs/l.txt",
+                    "src/out/o.cs",
+                    "src/Debug/d.cs",
+                    "src/release/r.cs",
+                    "testresults-1/t.txt",
+                    "TestResult/t.txt",
                 }
             )
             {
@@ -372,7 +402,8 @@ public sealed partial class InboundSiteReferenceTests
             var name = Path.GetFileName(child);
             if (
                 RepositoryFolders.Skipped.Contains(name)
-                || name == "artifacts"
+                || OutputFolders.Contains(name)
+                || name.StartsWith("TestResult", StringComparison.OrdinalIgnoreCase)
                 || (name.StartsWith('.') && name != ".github")
             )
             {
