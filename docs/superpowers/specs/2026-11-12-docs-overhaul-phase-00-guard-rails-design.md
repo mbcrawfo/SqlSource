@@ -287,6 +287,7 @@ Leave `tests/AGENTS.md` alone: its line 48 stays true, and the file is 6 bytes u
 - [ ] `dotnet test --project tests/SqlSource.Repository.Tests` passes.
 - [ ] `git grep -n Manual_EntryPage_ListsEveryPage -- tests` prints nothing.
 - [ ] A dry run, not committed: add `site/sub/probe.md` (front matter, a tab group, a link to `../diagnostics.md#sqlsrc001`), `site/sub/toc.yml` that lists it, and an entry `href: sub/` in `site/toc.yml`.  The tests and `tools/build-site.sh` pass.  Then each of these fails one test, by name: the entry of `probe.md` taken out of its `toc.yml` (`SiteTocTests`); a comment `// site/sub/probe.md#nope` in a `.cs` file (`InboundSiteReferenceTests`); `[x](../diagnostics.md#sqlsrc999)` in the page (`UserDocsLinksTests`).  The pull request's description says what each run printed.
+- [ ] A second dry run, not committed: write `site/nope.md#x` into a new file `.superpowers/probe.md` and into `CLAUDE.local.md`, both of which git ignores.  `InboundSiteReferenceTests` still passes.  Write the same words into a new file `docs/probe.md`: it fails and names that file.  Then take all three out.
 - [ ] `check.sh inventory`, then `git status --porcelain docs/superpowers/specs/2026-11-12-docs-overhaul` prints nothing.  The first line of `inventory.tsv` names the baseline.
 - [ ] `check.sh coverage` and `check.sh move 00` exit with 0.  `check.sh selftest` prints a pass for each of its ten cases.
 - [ ] `check.sh origin site/settings.md` gives every unit an id, and none is `new`, on a tree where the page equals the baseline.
