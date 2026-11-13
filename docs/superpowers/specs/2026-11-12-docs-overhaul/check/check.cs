@@ -1145,6 +1145,7 @@ internal static partial class Check
         var phase = LoadPhase(root, number);
         var placed = new Dictionary<(string File, string Text), int>();
         var misplaced = NotAtPlace(phase, placed);
+        misplaced.AddRange(PartsNotAtBase(phase));
         var leftOver = LeftOver(phase);
         var added = Added(phase, placed).GroupBy(unit => unit.File, StringComparer.Ordinal).ToList();
         var failingFiles = added.Count(file => PlaceOfNewText(phase, file.Key) is null);
@@ -1238,6 +1239,22 @@ internal static partial class Check
             "corrected" => row.Row.To != "-" || row.Row.Words != "-",
             _ => false,
         };
+
+    // A part's words, but *, must stand inside the text of each unit it names at the base, as the baseline has them,
+    // compared as the words of a to are.  A fact or a position is by its place alone.
+    private static List<string> PartsNotAtBase(PhaseState phase) =>
+        [
+            .. phase
+                .Rows.Where(row => row.IsPart && !row.IsFact && !row.IsPosition && row.Row.Words is not ("*" or "-"))
+                .SelectMany(row =>
+                    phase
+                        .OldUnits.Where(row.Names)
+                        .Where(old => Find(old.Unit.Text, row.Row.Words) < 0)
+                        .Select(old =>
+                            $"{row.Describe()}\n    its words are not in {old.Unit.Id} at the base: {Display(old.Unit)}"
+                        )
+                ),
+        ];
 
     // A part's or a correction's words must stand inside one unit at its to.  A fact or a position is looked for by
     // its place alone, and * or - is no words.
@@ -1787,6 +1804,7 @@ internal static partial class Check
         ("9: a move that mends 'above' passes with a position note and fails without", PositionCase),
         ("10: a move-split with no part may name a heading, not a paragraph", MoveSplitCase),
         ("11: one of the repeated rows | Id | Title | removed: move fails and names it", RepeatedRowCase),
+        ("12: a move-split part whose words carry a changed numeral: move fails and names the part", PartChangedCase),
     ];
 
     // A case that throws fails, with the exception's message.
@@ -2022,6 +2040,43 @@ internal static partial class Check
         var (code, text) = RunCommand(scratch, "move", "01");
         return code != 0 || !ListOf(text, 2).Contains(leftOut.TrimEnd('.'), StringComparison.Ordinal)
             ? $"with {unit.Id} split and '{leftOut}' left out, move exits with {code}:\n{text}"
+            : null;
+    }
+
+    private static char Other(char digit) => digit == '9' ? '8' : '9';
+
+    private static string? PartChangedCase(string scratch)
+    {
+        var docs = Read(scratch, null);
+        var unit = UniqueParagraph(docs, 2);
+        var breaks = SentenceBreakPattern().Matches(unit.Text);
+        var first = unit.Text[..breaks[0].Index];
+        var second = unit.Text[(breaks[1].Index + breaks[1].Length)..];
+        var changed = string.Concat(
+            first.Select(character => char.IsAsciiDigit(character) ? Other(character) : character)
+        );
+        if (changed == first)
+        {
+            changed += " 9";
+        }
+
+        var lines = LinesOf(scratch, unit.File);
+        lines[unit.Line - 1] = changed;
+        lines.InsertRange(unit.Line, ["", second]);
+        WriteLines(scratch, unit.File, lines);
+        var name = NameOf(scratch, unit);
+        WriteLedger(
+            scratch,
+            1,
+            [
+                $"{name}\tmove-split\t-\t-\t-\tsplit: the selftest changes a numeral",
+                $"{name}/1\tmove\t{unit.File}\t-\t{changed}\t-",
+                $"{name}/2\tmove\t{unit.File}\t-\t{second}\t-",
+            ]
+        );
+        var (code, text) = RunCommand(scratch, "move", "01");
+        return code != 1 || !ListOf(text, 1).Contains($"{name}/1", StringComparison.Ordinal)
+            ? $"with a changed numeral in the words of {name}/1, move exits with {code}:\n{text}"
             : null;
     }
 

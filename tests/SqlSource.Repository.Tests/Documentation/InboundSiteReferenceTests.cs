@@ -9,11 +9,13 @@ using Xunit;
 namespace SqlSource.Repository.Tests.Documentation;
 
 // Every reference to a page of the site from outside the user documents: a path `site/<path>.md`, with or without an
-// anchor, and a URL of the published site.  It fails on a reference that names no page, or an anchor that is not on
-// the page, in any text file that git tracks but `docs/superpowers/` (whose files record intent and are not kept
-// current) and the user documents (`UserDocsLinksTests` follows those).  A reference that names nothing is a broken
-// reference: mend it.  Never add an exception to pass.  The exceptions are these four and no other:
-//   - UserDocsReadingTests.cs and this file, whole: their test data is wrong on purpose.
+// anchor, and after `../` read from the folder of its file, and a URL of the published site.  It fails on a reference
+// that names no page, or an anchor that is not on the page, in any text file that git tracks but `docs/superpowers/`
+// (whose files record intent and are not kept current) and the user documents (`UserDocsLinksTests` follows those).
+// A reference that names nothing is a broken reference: mend it.  Never add an exception to pass.
+// The exceptions are these four and no other:
+//   - UserDocsReadingTests.cs, whole: its test data is wrong on purpose.
+//   - This file, whole: its test data is wrong on purpose.
 //   - TestScopesTests.cs, `site/x.md`: a made-up path for a pattern test.
 //   - ToolDiagnosticsTests.cs and Expected.cs, `diagnostics.html#sqlsrc`: the start of a help link that the code ends
 //     with the digits of an id.
@@ -73,12 +75,12 @@ public sealed partial class InboundSiteReferenceTests
     public void References_OfTheRepository_NameAPageAndAnchor() =>
         Found
             .Where(found => !ReferenceExceptions.Contains((found.File, found.Reference)))
-            .Select(found => (found.File, found.Line, found.Reference, Problem: Problem(found.Reference)))
+            .Select(found => (found.File, found.Line, found.Reference, Problem: Problem(found.File, found.Reference)))
             .Where(found => found.Problem is not null)
             .Select(found => $"{found.File}:{found.Line}: {found.Reference}: {found.Problem}")
             .ShouldBeEmpty();
 
-    // Fails when the scan finds no reference to `site/diagnostics.md`, in either form, or when an exception no longer
+    // Fails when the scan finds no reference to `site/diagnostics.md`, in each form, or when an exception no longer
     // matches a string of its file: a scan that finds nothing would pass, and an exception must not outlive its string.
     [Fact]
     public void References_OfTheRepository_AreFound()
@@ -99,9 +101,10 @@ public sealed partial class InboundSiteReferenceTests
         }
     }
 
+    // Fails when a form of reference is read wrongly, or one of its `../` is dropped.
     [Theory]
     [InlineData("`site/tool.md`", "site/tool.md")]
-    [InlineData("[x](../../site/tool.md#exit-codes)", "site/tool.md#exit-codes")]
+    [InlineData("[x](../../site/tool.md#exit-codes)", "../../site/tool.md#exit-codes")]
     [InlineData("// see site/sub/probe.md#nope", "site/sub/probe.md#nope")]
     [InlineData(
         "See https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes.",
@@ -118,6 +121,7 @@ public sealed partial class InboundSiteReferenceTests
     public void References_EachForm_IsFound(string line, string expected) =>
         References(line).Select(found => found.Reference).ShouldBe([expected]);
 
+    // Fails when a text that is not a reference to a page of the site is read as one.
     [Theory]
     [InlineData("the manual's recipe")]
     [InlineData("the folder `site/`")]
@@ -134,24 +138,34 @@ public sealed partial class InboundSiteReferenceTests
     {
         var found = References("https://mbcrawfo.github.io/SqlSource/<page>.html").ToList();
         found.Select(reference => reference.Reference).ShouldBe(["https://mbcrawfo.github.io/SqlSource/"]);
-        Problem(found[0].Reference).ShouldBeNull();
+        Problem("README.md", found[0].Reference).ShouldBeNull();
     }
 
+    // Fails when a reference carries the line of another, or a line counted from 0 or split at a CR LF.
     [Fact]
     public void References_OfALine_CarryTheirLineNumbers() =>
         References("one\ntwo `site/tool.md`\r\nthree").Select(found => found.Line).ShouldBe([2]);
 
+    // Fails when a reference that names no page of the site, or no anchor of it, has no problem, or a good one has,
+    // including a `../` path that leaves the repository, misses `site/`, or lands on another page than it names.
     [Theory]
-    [InlineData("site/diagnostics.md#sqlsrc001", true)]
-    [InlineData("site/diagnostics.md#sqlsrc999", false)]
-    [InlineData("site/nope.md", false)]
-    [InlineData("site/diagnostics.md#", true)]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/", true)]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/diagnostics.html#", true)]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc999", false)]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/reference/", false)]
-    public void Problem_OfAReference_IsNullOnlyWhenItNamesAPageAndAnchor(string reference, bool good) =>
-        (Problem(reference) is null).ShouldBe(good);
+    [InlineData("README.md", "site/diagnostics.md#sqlsrc001", true)]
+    [InlineData("README.md", "site/diagnostics.md#sqlsrc999", false)]
+    [InlineData("README.md", "site/nope.md", false)]
+    [InlineData("README.md", "site/diagnostics.md#", true)]
+    [InlineData("docs/architecture/README.md", "../../site/diagnostics.md#sqlsrc001", true)]
+    [InlineData("docs/architecture/README.md", "../site/diagnostics.md", false)]
+    [InlineData("docs/architecture/README.md", "../../../site/diagnostics.md", false)]
+    [InlineData("docs/README.md", "../site/diagnostics.md", true)]
+    [InlineData("docs/README.md", "../../site/diagnostics.md", false)]
+    [InlineData("a/b/c.md", "../../site/nope.md", false)]
+    [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/", true)]
+    [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#", true)]
+    [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc999", false)]
+    [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/reference/", false)]
+    [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/AGENTS.html", false)]
+    public void Problem_OfAReference_IsNullOnlyWhenItNamesAPageAndAnchor(string file, string reference, bool good) =>
+        (Problem(file, reference) is null).ShouldBe(good);
 
     // Fails when the walk reads a file that git ignores or a binary file, or skips a tracked text file.
     [Fact]
@@ -211,16 +225,43 @@ public sealed partial class InboundSiteReferenceTests
         }
     }
 
-    // What is wrong with a reference, or null when it names a page and, if it has one, an anchor that exist.
-    internal static string? Problem(string reference)
+    // What is wrong with a reference in a file, or null when it names a page and, if it has one, an anchor that exist.
+    // A path is read from the root, unless it follows `../`, which makes it a relative link of the file's folder.
+    internal static string? Problem(string file, string reference)
     {
         string path;
         string anchor;
-        if (reference.StartsWith("site/", StringComparison.Ordinal))
+        var relative = reference.StartsWith("../", StringComparison.Ordinal);
+        if (relative || reference.StartsWith("site/", StringComparison.Ordinal))
         {
             var hash = reference.IndexOf('#', StringComparison.Ordinal);
             path = hash < 0 ? reference : reference[..hash];
             anchor = hash < 0 ? "" : reference[(hash + 1)..];
+            if (relative)
+            {
+                var segments = file.Split('/').SkipLast(1).ToList();
+                foreach (var segment in path.Split('/'))
+                {
+                    if (segment != "..")
+                    {
+                        segments.Add(segment);
+                    }
+                    else if (segments.Count > 0)
+                    {
+                        segments.RemoveAt(segments.Count - 1);
+                    }
+                    else
+                    {
+                        return $"{reference} leaves the repository from {file}";
+                    }
+                }
+
+                path = string.Join('/', segments);
+                if (!path.StartsWith("site/", StringComparison.Ordinal))
+                {
+                    return $"{reference} from {file} reaches {path}, which is not under site/";
+                }
+            }
         }
         else
         {
@@ -235,6 +276,10 @@ public sealed partial class InboundSiteReferenceTests
             }
 
             (path, anchor) = resolved;
+            if (!UserDocs.SitePages.Contains(path))
+            {
+                return $"{path} is not a page that the site publishes";
+            }
         }
 
         if (!File.Exists(RepositoryRoot.Path(path.Split('/'))))
@@ -282,9 +327,9 @@ public sealed partial class InboundSiteReferenceTests
     }
 
     // `site/<path>.md` and an optional anchor, with no letter, digit, `_`, `-`, `.` or `/` before `site/`, unless it
-    // follows `../`.
+    // follows `../`, which the reference then holds.
     [GeneratedRegex(
-        @"(?:(?<![A-Za-z0-9_.\-/])|(?<=\.\./))site/[A-Za-z0-9_.\-/]*\.md(?![A-Za-z0-9_])(?:#[A-Za-z0-9_\-]*)?"
+        @"(?:(?:\.\./)+|(?<![A-Za-z0-9_.\-/]))site/[A-Za-z0-9_.\-/]*\.md(?![A-Za-z0-9_])(?:#[A-Za-z0-9_\-]*)?"
     )]
     private static partial Regex PathReference();
 

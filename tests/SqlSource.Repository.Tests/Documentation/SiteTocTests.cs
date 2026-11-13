@@ -18,7 +18,8 @@ public sealed partial class SiteTocTests
     private const string MadeUpFolder = "site/a";
 
     // Fails when a toc.yml of site/, at any depth, names a page that does not exist or a folder with no toc.yml, when a
-    // page is named by more than one entry, or when a page is in no toc.yml.
+    // page is named by more than one entry, when a page is in no toc.yml, or when a toc.yml but the root's is led to by
+    // no entry.
     [Fact]
     public void Toc_ListsEveryPageOnce_AndNothingElse()
     {
@@ -33,6 +34,8 @@ public sealed partial class SiteTocTests
         Problems(tocs, UserDocs.SitePages).ShouldBeEmpty();
     }
 
+    // Fails when a problem of a nested set of toc.yml files, a folder with none, a gone page, a page named twice, a
+    // page listed nowhere or a toc.yml that no entry leads to, goes unreported.
     [Fact]
     public void Problems_OfANestedSet_AreFound()
     {
@@ -42,6 +45,7 @@ public sealed partial class SiteTocTests
             ["site/a/toc.yml"] =
                 "- name: D\n  href: ../diagnostics.md\n- name: P\n  href: page.md\n- name: T\n  href: twice.md\n",
             ["site/b/toc.yml"] = "- name: T\n  href: ../a/twice.md\n- name: G\n  href: gone.md\n",
+            ["site/e/toc.yml"] = "",
         };
         string[] pages =
         [
@@ -53,7 +57,8 @@ public sealed partial class SiteTocTests
 
         var problems = Problems(tocs, pages);
 
-        problems.Count.ShouldBe(4);
+        problems.Count.ShouldBe(5);
+        problems.ShouldContain(problem => problem.Contains("site/e/toc.yml") && problem.Contains("no entry leads"));
         problems.ShouldContain(problem => problem.Contains("site/toc.yml") && problem.Contains("c/"));
         problems.ShouldContain(problem => problem.Contains("site/b/toc.yml") && problem.Contains("gone.md"));
         problems.ShouldContain(problem =>
@@ -72,6 +77,7 @@ public sealed partial class SiteTocTests
     {
         var problems = new List<string>();
         var named = new List<string>();
+        var led = new HashSet<string>(StringComparer.Ordinal) { "site/toc.yml" };
         foreach (var (toc, text) in tocs.OrderBy(entry => entry.Key, StringComparer.Ordinal))
         {
             var folder = toc.Contains('/', StringComparison.Ordinal) ? toc[..toc.LastIndexOf('/')] : "";
@@ -82,6 +88,7 @@ public sealed partial class SiteTocTests
                 if (href.EndsWith('/') || target.EndsWith("/toc.yml", StringComparison.Ordinal))
                 {
                     var childToc = href.EndsWith('/') ? $"{target}toc.yml" : target;
+                    _ = led.Add(childToc);
                     if (!tocs.ContainsKey(childToc))
                     {
                         problems.Add($"{toc}: '{href}' names a folder with no toc.yml ({childToc})");
@@ -98,6 +105,11 @@ public sealed partial class SiteTocTests
             }
         }
 
+        problems.AddRange(
+            tocs.Keys.Where(toc => !led.Contains(toc))
+                .Order(StringComparer.Ordinal)
+                .Select(toc => $"{toc} is a toc.yml that no entry leads to")
+        );
         problems.AddRange(
             named
                 .GroupBy(page => page, StringComparer.Ordinal)
