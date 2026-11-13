@@ -1,0 +1,45 @@
+# base 65a6e0a20724fdb0c2464c1afb8fea7295f67b48
+unit	disposition	to	arg	words	note
+README.md:7	removed-status	-	-	-	What it says is generated is stated in site/generator.md 1-32, describing in site/tool.md 1-14 and README.md 7, and describing on save in README.md 126 and site/tool.md#describe-on-save
+README.md:9	move-split	-	-	-	A clause that says what describing is goes in after its first two words, since README.md:7 that defined it goes
+README.md:9/1	move	README.md	-	**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries	-
+README.md:9/2	move	README.md	-	works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see database support.  So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as Just want to keep your SQL out of code files? shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see only generating models.	-
+-	new	README.md	-	-	The clause of README.md:9 that says what describing is, after Describing queries
+README.md:13	move-split	-	-	-	Sentence 1 goes, sentence 2 stays
+README.md:13/1	removed-status	-	-	Until the first release the packages are previews, so the commands include `--prerelease`.	Status; nothing stands in its place, since the owner had the commands written for the full release (Q1)
+README.md:13/2	move	README.md	-	In the folder of each project that has queries:	-
+src/SqlSource.Tool/README.md:7	move-split	-	-	-	Sentence 1 stays, sentence 2 goes
+src/SqlSource.Tool/README.md:7/1	move	src/SqlSource.Tool/README.md	-	Install it as a local tool, from the root of your repository, at the version of the `SqlSource` package your projects use (skip the first command if the repository already has a tool manifest).	-
+src/SqlSource.Tool/README.md:7/2	removed-status	-	-	Until the first release the package is a preview, so the command includes `--prerelease`:	Status; nothing stands in its place, since the owner had the commands written for the full release (Q1)
+site/tool.md:20	move-split	-	-	-	Sentence 1 stays, sentence 2 goes
+site/tool.md:20/1	move	site/tool.md#install-the-tool	-	Install it as a local tool of your repository, from the folder at its root.	-
+site/tool.md:20/2	removed-status	-	-	Until the first release the package is a preview, so the command includes `--prerelease`:	Status; nothing stands in its place, since the owner had the commands written for the full release (Q1)
+site/README.md:61	removed-status	-	-	-	The heading of What works today; the anchor what-works-today retires
+site/README.md:63	removed-status	-	-	-	The introduction of the table: status alone
+site/README.md:65-100	removed-status	-	-	-	Each row's facts are stated in the section that its third cell links
+site/README.md:101	move-split	-	-	-	The row goes with its table, but for its pointer
+site/README.md:101/1	removed-status	-	-	*	The row but its pointer; its facts are stated in the section its third cell links
+site/README.md:101/2	move	site/settings.md#setting-type-overrides	-	for a PostgreSQL type that cannot be sent as a parameter, see SQLSRC232	-
+site/README.md:102-105	removed-status	-	-	-	Each row's facts are stated in the section that its third cell links
+site/settings.md:36	removed-status	-	-	-	The heading Settings that work today; the table stands under All settings
+site/settings.md:38-40	move-split	-	-	-	The Status column goes; each row keeps its other three cells
+site/settings.md:38-40/1	move	site/settings.md#all-settings	-	*	The cells Setting, Values and Written as
+site/settings.md:38-40/2	removed-status	-	-	*	The Status cell
+site/settings.md:41	move-split	-	-	-	The Status column goes; each row keeps its other three cells
+site/settings.md:41/1	move	site/settings.md#all-settings	-	*	The cells Setting, Values and Written as
+site/settings.md:41/2	corrected	-	C-01	-	for the tool alone is a fact, and false; nothing replaces it here, and phase 7 states the truth at line 153
+site/settings.md:42-58	move-split	-	-	-	The Status column goes; each row keeps its other three cells
+site/settings.md:42-58/1	move	site/settings.md#all-settings	-	*	The cells Setting, Values and Written as
+site/settings.md:42-58/2	removed-status	-	-	*	The Status cell
+README.md:15	corrected	README.md	-	*	Owner (Q1): the commands are written for the full release, with no --prerelease
+README.md:21	corrected	README.md	-	*	Owner (Q1): the commands are written for the full release, with no --prerelease
+src/SqlSource.Tool/README.md:9	corrected	src/SqlSource.Tool/README.md	-	*	Owner (Q1): the commands are written for the full release, with no --prerelease
+site/tool.md:22	corrected	site/tool.md#install-the-tool	-	*	Owner (Q1): the commands are written for the full release, with no --prerelease
+site/tool.md:29	corrected	site/tool.md#install-the-tool	-	update the tool with `dotnet tool update SqlSource.Tool`	Owner (Q1): the commands are written for the full release, with no --prerelease
+site/settings.md:28	corrected	site/settings.md	-	Which of the three a setting accepts is in the table.	Owner (Q2): #all-settings holds one table, so the tables is false
+site/settings.md:82	corrected	site/settings.md	-	A setting has only the places its row of the table lists.**  A key of a settings file that is not in it, nor	Owner (Q2): #all-settings holds one table, so the tables is false, and them becomes it
+site/settings.md:880	corrected	site/settings.md	-	Only the settings whose row in the table lists a settings file	Owner (Q2): #all-settings holds one table, so the tables is false
+site/settings.md:1037	corrected	site/settings.md	-	The keys** are those of the table,	Owner (Q2): #all-settings holds one table, so the tables is false
+site/diagnostics.md:1703	corrected	site/diagnostics.md	-	Add the package with `dotnet add package SqlSource` and restore	Owner (Q1): the commands are written for the full release, with no --prerelease
+site/diagnostics.md:1735	corrected	site/diagnostics.md	-	or the tool with `dotnet tool update SqlSource.Tool`.	Owner (Q1): the commands are written for the full release, with no --prerelease
+site/diagnostics.md:2022	corrected	site/diagnostics.md	-	Update the tool, with `dotnet tool update SqlSource.Tool`, to the version	Owner (Q1): the commands are written for the full release, with no --prerelease

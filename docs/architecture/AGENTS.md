@@ -68,7 +68,7 @@ A part of query generation that is not built yet has a placeholder under `## Not
 
 - Behaviour a user sees goes in `site/`.  Where a page touches it, such as exit codes or which columns can be null, the page links to the manual and explains only how the code produces it.
 - Decisions and their history go in `docs/superpowers/`.
-- What has been delivered is recorded in "What works today" in `site/README.md`.  A page holds no status table.
+- A page holds no status table.  What SqlSource does is stated in `site/`, as fact.
 - The sidecar's shape and the meaning of each key are defined by `schemas/sidecar-v1.schema.json`, and its rules by `sidecar-format.md`.  Link to them; never restate them.
 
 ## Writing a page
