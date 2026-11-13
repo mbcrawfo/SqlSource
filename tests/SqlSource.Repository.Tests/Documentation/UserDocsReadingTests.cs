@@ -237,9 +237,9 @@ public sealed class UserDocsReadingTests
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc024", "site/diagnostics.md", "sqlsrc024")]
     [InlineData(
-        "https://mbcrawfo.github.io/SqlSource/README.html#what-works-today",
+        "https://mbcrawfo.github.io/SqlSource/README.html#find-what-you-need",
         "site/README.md",
-        "what-works-today"
+        "find-what-you-need"
     )]
     [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/README.md", "")]
     [InlineData(
@@ -261,12 +261,12 @@ public sealed class UserDocsReadingTests
     // The root is a redirect to README.html that drops the anchor, and the site has no page that is not built from a
     // .md file.
     [Theory]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/#what-works-today")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/#find-what-you-need")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.md")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/reference/")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/reference/cli")]
-    [InlineData("https://mbcrawfo.github.io/SqlSource#what-works-today")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource#find-what-you-need")]
     [InlineData("https://mbcrawfo.github.io/SqlSource")]
     [InlineData("http://mbcrawfo.github.io/SqlSource/tool.html")]
     [InlineData("http://mbcrawfo.github.io/SqlSource/")]

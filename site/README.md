@@ -56,54 +56,6 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
 | Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues), [PostgreSQL](postgresql.md#known-issues) and [SQL Server](sqlserver.md#known-issues) |
 
-<a id="what-works-today"></a>
-
-## What works today
-
-SqlSource is in early development.  This table is the one list of what works in the current release and what is still to come.  Where a page for a coming feature exists, it marks the feature with a callout that links back here.
-
-| Feature | Status | Where documented |
-|----|----|----|
-| Queries as string constants, for the output `sql` or `models` | Available | [Constants](generator.md#constants) |
-| Methods for queries with tokens | Available | [Token methods](generator.md#token-methods) |
-| Reading `.sql` files by the rules of your database's dialect | Available | [Dialects](dialects.md) |
-| Settings, and an error for a value that is wrong | Available | [Settings](settings.md#all-settings) |
-| Settings files: `sqlsource.json` in a folder, for it and every folder below | Available | [Settings files](settings.md#settings-files) |
-| The `Output` setting | Available | [Output](settings.md#setting-output) |
-| The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `table-models` | Available | [All settings](settings.md#all-settings) |
-| The settings for query methods: collection type, and the generator parameters `async-method-suffix`, `array-pool` and `list-padding` | Available | [All settings](settings.md#all-settings) |
-| Where each query's members go and how visible they are: member location, visibility and nested class, in markers and settings files | Available | [Where the members go](settings.md#setting-member-location) |
-| `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
-| Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
-| Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
-| Connections in a `.env` file, and `--env-file` and `SqlSourceEnvFile` to choose another | Available | [A `.env` file](tool.md#env-file), [the build's `.env` file](settings.md#setting-env-file) |
-| Describing on save with `describe --watch` | Available | [Describe on save](tool.md#describe-on-save) |
-| Starting the watcher with your editor: VS Code, Rider and Visual Studio | Available | [The recipe](recipes.md#start-the-watcher-with-your-editor) |
-| An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
-| Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
-| The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available | [Types](postgresql.md#type-map) |
-| PostgreSQL array parameters accept any `IEnumerable<T>` in query methods | Available | [Array parameters](postgresql.md#array-parameters) |
-| List parameters: `IN @list`, expanded by the query methods on PostgreSQL and SQL Server | Available | [List parameters](parameters-and-tokens.md#list-parameters) |
-| Describing SQL Server queries | Available | [SQL Server](sqlserver.md) |
-| The C# type of each column and parameter of a described SQL Server query, and an error in the build for one that has none | Available | [Types](sqlserver.md#types) |
-| Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models), [SQL Server](sqlserver.md#models) |
-| A column's nullability set by `!` or `?` at the end of its alias, or by a `-- column:` marker, which leaves the column's name alone for Dapper | Available | [Which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker) |
-| Generated query methods, which run a query and read its rows into its models, `UnexpectedRowCountException`, and on SQL Server `TransactionRolledBackException` | Available | [Query methods](generator.md#query-methods) |
-| Repositories, the default output `repository`: an instance method for each query, which gets its own connection from a connection string, a data source, a method of the type or a connection it borrows, found by its name or type or marked `[SqlSourceConnection]`, and a generated interface of the methods | Available | [Repository methods](generator.md#repository-methods), [repository interfaces](settings.md#repository-interfaces) |
-| Methods that take a connection, a transaction and a command timeout, at the output `methods` | Available | [Methods that take a connection](generator.md#methods-that-take-a-connection) |
-| Collection methods: the generator parameter `collection-method`, an overload of a query's method that runs it for each item of a collection of its input models, 1,000 items to a round trip, in a transaction of its own that the generator parameter `transaction` sets, and `CollectionItemException` for a database error at an item, on PostgreSQL and SQL Server | Available | [Collection methods](generator.md#collection-methods), [PostgreSQL](postgresql.md#collection-methods), [SQL Server](sqlserver.md#collection-methods) |
-| Synchronous methods: the generator parameter `method-type`, which gives a query whose output is `methods` or `repository` a synchronous method, and a synchronous collection method under `collection-method`, in place of its asynchronous ones, or beside them, with their members of a repository's interface, on PostgreSQL and SQL Server | Available | [Synchronous methods](generator.md#synchronous-methods), [synchronous repository methods](generator.md#synchronous-repository-methods), [generator parameters](settings.md#setting-generator-parameters) |
-| Streaming rows: a `many` method that returns `IAsyncEnumerable<T>`, by the collection type `IAsyncEnumerable`, and reads each row as the loop asks for it | Available | [Streaming rows](settings.md#streaming-rows) |
-| Each parameter of a query method sent as the database type it was described with | Available | [How a parameter is sent](generator.md#method-parameters), [PostgreSQL](postgresql.md#query-methods), [SQL Server](sqlserver.md#method-parameters) |
-| Converters: methods of your own that convert between a C# type of your choice and one the driver reads and sends, for the query methods | Available | [Converters](settings.md#converters), [the recipe](recipes.md#strongly-typed-id) |
-| Library types: NodaTime's, NetTopologySuite's and System.Text.Json's types in the query methods of PostgreSQL and SQL Server, with `libraryTypes` in a settings file and `-- library-types:` | Available | [NodaTime on PostgreSQL](postgresql.md#nodatime), [NodaTime on SQL Server](sqlserver.md#nodatime), [NetTopologySuite on PostgreSQL](postgresql.md#nettopologysuite), [NetTopologySuite on SQL Server](sqlserver.md#nettopologysuite), JSON on [PostgreSQL](postgresql.md#json) and [SQL Server](sqlserver.md#json), [library types](settings.md#setting-library-types) |
-| A class of your own in a JSON column, read and sent through System.Text.Json's serializer, and the JSON opt-in for a column of a string type that holds JSON | Available | [A class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in) |
-| Custom type mapping: the type override, `typeOverrides` in a settings file and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
-| Column types: a C# type for one column, by the column it is read from, with `columnTypes` in a settings file or a `-- column:` in the file header, or by a `-- column:` inside a query, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
-| C# types written by their short names, `UserId` for `MyApp.UserId`, wherever SqlSource takes a C# type | Available | [Type overrides](settings.md#setting-type-overrides) |
-| Build integration: the tool running in your build before it compiles, when a connection is configured, and `SqlSourceOnline` | Available | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
-| Bug-report bundles: `diagnose`, which makes a bundle of one query with your names renamed, `--no-obfuscate` and `--scrub`, and checking one with `replay` | Available | [Reporting a wrong model](tool.md#report-a-bug), [making a bundle with `diagnose`](tool.md#diagnose), [checking a bundle with `replay`](tool.md#replay) |
-
 ## The pages
 
 - [Concepts](concepts.md): how the pieces fit together, and the terms the manual uses.
