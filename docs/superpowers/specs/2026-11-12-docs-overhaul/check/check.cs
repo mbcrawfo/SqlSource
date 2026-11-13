@@ -1113,23 +1113,66 @@ internal static partial class Check
         return found >= 0 ? found : text.IndexOf(other + plain[1..], StringComparison.Ordinal);
     }
 
-    // The row that names a unit of the base, the one of the unit before those of its parts, and why the unit fails
-    // the command when it is left over.
-    private static (LedgerRow? Row, string? Failure) Verdict(PhaseState phase, OldUnit unit)
+    // The row that judges each unit left over, and why the unit fails the command.  The units of one text are judged
+    // together, since a row that names one of them by its id names them all: in the order of the ledger, each row
+    // that lets a unit be left over covers as many of them as it names, and only the rest are judged by the first
+    // row that does not.  Rows of the units come before those of their parts.  So the verdict does not depend on
+    // the order of the rows.
+    private static Dictionary<OldUnit, (LedgerRow? Row, string? Failure)> Verdicts(
+        PhaseState phase,
+        IEnumerable<OldUnit> leftOver
+    )
     {
-        var naming = phase.Rows.Where(row => row.Names(unit)).ToList();
-        var row = naming.Find(found => !found.IsPart) ?? naming.FirstOrDefault();
-        var failure = row switch
+        var verdicts = new Dictionary<OldUnit, (LedgerRow? Row, string? Failure)>();
+        foreach (var group in leftOver.GroupBy(unit => unit.Unit.Text, StringComparer.Ordinal))
         {
-            null => "no row names it",
+            var units = group.ToList();
+            var naming = phase.Rows.Where(row => units.Any(row.Names)).ToList();
+            var rows = naming.Any(row => !row.IsPart) ? naming.FindAll(row => !row.IsPart) : naming;
+            var index = 0;
+            foreach (var row in rows.Where(row => FailureOf(row) is null))
+            {
+                for (var covers = Covers(row, units); covers > 0 && index < units.Count; covers--)
+                {
+                    verdicts[units[index++]] = (row, null);
+                }
+            }
+
+            var unfit = rows.Find(row => FailureOf(row) is not null);
+            (LedgerRow? Row, string? Failure) rest = (null, "no row names it");
+            if (unfit is not null)
+            {
+                rest = (unfit, FailureOf(unfit));
+            }
+            else if (rows.Count > 0)
+            {
+                rest = (null, "each row that names its text covers another unit left over");
+            }
+
+            for (; index < units.Count; index++)
+            {
+                verdicts[units[index]] = rest;
+            }
+        }
+
+        return verdicts;
+    }
+
+    // How many units of one text a row covers: the units of the inventory that it names and that have the text, or
+    // the units it names by their place at the base.
+    private static int Covers(LedgerRow row, List<OldUnit> units) =>
+        units[0].Ids.Count > 0 ? units[0].Ids.Count(row.Ids.Contains) : units.Count(row.Names);
+
+    // Why a row does not let its unit be left over, or null when it does.
+    private static string? FailureOf(LedgerRow row) =>
+        row switch
+        {
             { Row.Disposition: "move", IsFact: false, IsPosition: false } =>
                 "its row is a move, but it is not at its place word for word: a move whose words changed has fact, "
                     + "or a note that starts with position",
             { Row.Note: "-" } => "its row has no note, which a unit left over needs",
             _ => null,
         };
-        return (row, failure);
-    }
 
     // The words of a unit of the base, or the start of a block.
     private static string Display(Unit unit) => unit.Kind == "block" ? unit.Start : unit.Text;
@@ -1147,6 +1190,7 @@ internal static partial class Check
         var misplaced = NotAtPlace(phase, placed);
         misplaced.AddRange(PartsNotAtBase(phase));
         var leftOver = LeftOver(phase);
+        var verdicts = Verdicts(phase, leftOver);
         var added = Added(phase, placed).GroupBy(unit => unit.File, StringComparer.Ordinal).ToList();
         var failingFiles = added.Count(file => PlaceOfNewText(phase, file.Key) is null);
         var gone = AnchorsGone(phase);
@@ -1155,7 +1199,7 @@ internal static partial class Check
                 + $"{phase.OldUnits.Count} units at the base, {phase.New.Units.Count()} in the working tree."
         );
         WriteList(output, 1, "Not at its place", misplaced);
-        WriteList(output, 2, "Left over", [.. leftOver.Select(unit => LeftOverEntry(phase, unit))]);
+        WriteList(output, 2, "Left over", [.. leftOver.Select(unit => LeftOverEntry(phase, unit, verdicts[unit]))]);
         WriteList(output, 3, "Added", [.. added.Select(file => AddedEntry(phase, file))]);
         WriteList(output, 4, "Anchors gone", gone);
         WriteFacts(output, phase);
@@ -1164,7 +1208,7 @@ internal static partial class Check
             output.WriteLine($"problem: {problem}");
         }
 
-        var failing = leftOver.Count(unit => Verdict(phase, unit).Failure is not null);
+        var failing = leftOver.Count(unit => verdicts[unit].Failure is not null);
         var failures = misplaced.Count + failing + failingFiles + phase.Problems.Count;
         output.WriteLine(
             failures == 0
@@ -1317,7 +1361,7 @@ internal static partial class Check
                                 ? 0
                                 : 1
                         )
-                        .ThenBy(old => Rank(Verdict(phase, old)))
+                        .ThenBy(old => Rank(phase, old))
                         .ThenBy(old => old.Order)
                         .Take(group.Count() - newCounts.GetValueOrDefault(group.Key))
                 )
@@ -1325,19 +1369,23 @@ internal static partial class Check
         ];
     }
 
-    private static int Rank((LedgerRow? Row, string? Failure) verdict) =>
-        verdict switch
+    // 0 when a row that names the unit lets it be left over, 1 when only other rows name it, 2 when none does.
+    private static int Rank(PhaseState phase, OldUnit unit)
+    {
+        var naming = phase.Rows.Where(row => row.Names(unit)).ToList();
+        if (naming.Exists(row => FailureOf(row) is null))
         {
-            (null, _) => 2,
-            (_, null) => 0,
-            _ => 1,
-        };
+            return 0;
+        }
+
+        return naming.Count > 0 ? 1 : 2;
+    }
 
     // A unit left over: its place at the base, its names, its text, its row and what fails it.  A unit with a
     // position note is printed with the unit at its to nearest to it, and a move-split with what no part holds.
-    private static string LeftOverEntry(PhaseState phase, OldUnit unit)
+    private static string LeftOverEntry(PhaseState phase, OldUnit unit, (LedgerRow? Row, string? Failure) verdict)
     {
-        var (row, failure) = Verdict(phase, unit);
+        var (row, failure) = verdict;
         var lines = new List<string>
         {
             $"{unit.Unit.Id}  [{unit.Names}]  {Display(unit.Unit)}",
@@ -1803,8 +1851,9 @@ internal static partial class Check
         ("8: inventory, run a second time, changes no byte", InventoryCase),
         ("9: a move that mends 'above' passes with a position note and fails without", PositionCase),
         ("10: a move-split with no part may name a heading, not a paragraph", MoveSplitCase),
-        ("11: one of the repeated rows | Id | Title | removed: move fails and names it", RepeatedRowCase),
+        ("11: one copy of a text that stands twice removed with no row: move fails and names it", RepeatedRowCase),
         ("12: a move-split part whose words carry a changed numeral: move fails and names the part", PartChangedCase),
+        ("13: two copies of a text, named by a move and a removed-status row: each row covers one", CountedRowsCase),
     ];
 
     // A case that throws fails, with the exception's message.
@@ -2228,21 +2277,87 @@ internal static partial class Check
 
     private static string? RepeatedRowCase(string scratch)
     {
-        const string File = "site/diagnostics.md";
-        const string Repeated = "| Id | Title |";
-        var lines = LinesOf(scratch, File);
-        if (lines.Count(line => line.Trim() == Repeated) < 2)
-        {
-            return $"{File} holds {Repeated} fewer than twice";
-        }
-
-        lines.RemoveAt(lines.FindIndex(line => line.Trim() == Repeated));
-        WriteLines(scratch, File, lines);
+        var (repeated, units, _) = RepeatedText(scratch);
+        RemoveUnits(scratch, units.Take(1));
         WriteLedger(scratch, 1, []);
         var (code, text) = RunCommand(scratch, "move", "01");
-        return code != 1 || !ListOf(text, 2).Contains($"  {Repeated}\n      no row", StringComparison.Ordinal)
-            ? $"with one {Repeated} removed and no row, move exits with {code}:\n{text}"
+        return code != 1 || !ListOf(text, 2).Contains($"  {repeated}\n      no row", StringComparison.Ordinal)
+            ? $"with one {repeated} removed and no row, move exits with {code}:\n{text}"
             : null;
+    }
+
+    // Two copies of one text, named by a move row and a removed-status row.  With one copy left over, move passes
+    // whichever row comes first; with both left over, one is judged by the removed-status row and the other by the
+    // move, whichever row comes first.
+    private static string? CountedRowsCase(string scratch)
+    {
+        const string MoveFails = "fails: its row is a move";
+        var (repeated, units, ids) = RepeatedText(scratch);
+        string[] rows =
+        [
+            $"{ids[0]}\tmove\t{units[1].File}\t-\t-\t-",
+            $"{ids[1]}\tremoved-status\t-\t-\t-\tstatus: the selftest cuts one copy",
+        ];
+        string[][] orders = [rows, [rows[1], rows[0]]];
+        RemoveUnits(scratch, units.Take(1));
+        foreach (var order in orders)
+        {
+            WriteLedger(scratch, 1, order);
+            var (code, text) = RunCommand(scratch, "move", "01");
+            if (code != 0)
+            {
+                return $"with one {repeated} left over and rows in this order, move exits with {code}:\n{text}";
+            }
+        }
+
+        Reset(scratch);
+        RemoveUnits(scratch, units.Take(2));
+        foreach (var order in orders)
+        {
+            WriteLedger(scratch, 1, order);
+            var (code, text) = RunCommand(scratch, "move", "01");
+            var moves = ListOf(text, 2).Split('\n').Count(line => line.Contains(MoveFails, StringComparison.Ordinal));
+            if (code != 1 || moves != 1)
+            {
+                return $"with both {repeated} left over, {moves} are judged by the move and move exits with {code}:\n"
+                    + text;
+            }
+        }
+
+        return null;
+    }
+
+    // A text that stands at least twice in the tree under test, as no heading and no block, with at least two ids of
+    // the inventory: the text, its units in the tree and the ids.
+    private static (string Text, List<Unit> Units, List<string> Ids) RepeatedText(string scratch)
+    {
+        var baseline = LoadInventory(scratch).ToLookup(entry => entry.Hash, StringComparer.Ordinal);
+        foreach (
+            var group in Read(scratch, null)
+                .Units.Where(unit => unit.Kind is not ("heading" or "block"))
+                .GroupBy(unit => unit.Text, StringComparer.Ordinal)
+        )
+        {
+            var units = group.ToList();
+            var ids = baseline[units[0].Hash].Select(entry => entry.Id).ToList();
+            if (units.Count >= 2 && ids.Count >= 2)
+            {
+                return (group.Key, units, ids);
+            }
+        }
+
+        throw new InvalidOperationException("no text stands twice in the tree under test with two ids");
+    }
+
+    // Takes the lines of units out of the tree under test, the last first so that the earlier lines keep their place.
+    private static void RemoveUnits(string scratch, IEnumerable<Unit> units)
+    {
+        foreach (var unit in units.OrderByDescending(unit => unit.Line))
+        {
+            var lines = LinesOf(scratch, unit.File);
+            lines.RemoveRange(unit.Line - 1, unit.Last - unit.Line + 1);
+            WriteLines(scratch, unit.File, lines);
+        }
     }
 
     // A section of the tree under test, moved to MovedPage: its <a id> renamed, its heading made a level 1, and each
