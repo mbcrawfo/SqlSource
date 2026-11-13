@@ -121,8 +121,10 @@ Ten runs of `ci.yml` from 2026-11-12 and 2026-11-13, read from the jobs API and 
 
 - **The PostGIS image is cached.**  Its name already holds everything that makes it what it is: the postgres tag, the
   PostGIS package and a hash of the Dockerfile.  A job that builds it keys an `actions/cache` entry on that name, loads
-  the saved image on a hit, and on a miss builds it as today and saves it.  This applies to the PostgreSQL test job,
-  `test-postgres-floor`, and the jobs of `nightly.yml` that build it.
+  the saved image on a hit, and on a miss builds it as today and saves it.  This applies to the PostgreSQL test job and
+  `test-postgres-floor`.  The jobs of `nightly.yml` that build it use the same action with the cache turned off, since a
+  key that is hit is never built again: they keep a Dockerfile that no longer builds from going unnoticed for longer
+  than a day (a change made in review).
   - A failed build still fails its own step, with Docker's whole output, before any test runs.
   - "Check the tests built no PostGIS image" stays after the tests in every job that has it.
   - A loaded image is not BuildKit's build cache, so `docker build` after a load could rebuild.  The step must not

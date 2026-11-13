@@ -171,6 +171,7 @@ jobs:
         uses: ./.github/actions/postgis-image
         with:
           postgres-image: ${{ matrix.image }}
+          use-cache: false
 
       - name: Test
         env:
@@ -343,6 +344,8 @@ jobs:
       - name: Build PostGIS image
         id: postgis
         uses: ./.github/actions/postgis-image
+        with:
+          use-cache: false
 
       - name: Test
         run: >-

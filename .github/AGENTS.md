@@ -37,7 +37,7 @@
   - Find the pull request from the event, never from the artifact.
   - It is bound to three names: `name: CI` in `workflows/ci.yml`, the `coverage` artifact that `workflows/build.yml` uploads, and `SummaryGithub.md` inside it.  Change one and change the workflow in the same commit.
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
-- **Local actions live in `.github/actions/<name>/action.yml`**, and a job checks out the repository before it uses one.  `postgis-image` is the one way a job gets the PostGIS image; it never builds after a load from the cache, since BuildKit's cache does not hold a loaded image.
+- **Local actions live in `.github/actions/<name>/action.yml`**, and a job checks out the repository before it uses one.  `postgis-image` is the one way a job gets the PostGIS image; it never builds after a load from the cache, since BuildKit's cache does not hold a loaded image, so the jobs of `workflows/nightly.yml` pass `use-cache: false` to build it every night.
 - Fold workflow lines over the 120-character `.editorconfig` limit with `>-` or `\`.
 - Run `tools/actionlint.sh` after any change.  A change to `publish.yml` or `coverage-comment.yml` is never exercised before merge: a manual run of `publish.yml` on a branch skips every job, and a pull request runs the `coverage-comment.yml` on `main`, so actionlint and a careful read are the only checks; say in the pull request that the change is untried.
 

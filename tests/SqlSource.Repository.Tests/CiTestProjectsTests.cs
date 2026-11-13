@@ -37,11 +37,11 @@ public sealed class CiTestProjectsTests
     }
 
     [Fact]
-    public void BuildWorkflow_RunsEveryTestProjectButTheNightlyOnes() =>
+    public void Unrun_EveryProjectButTheNightlyOnesInTheBuildWorkflow_IsEmpty() =>
         Unrun(TestProjects().Except(NightlyOnly), BuildYml).ShouldBeEmpty();
 
     [Fact]
-    public void NightlyOnlyProjects_AreRunByNightlyAlone()
+    public void Unrun_NightlyOnlyProjects_AreAllUnrunByBuildAndNoneByNightly()
     {
         Unrun(NightlyOnly, BuildYml).ShouldBe(NightlyOnly);
         Unrun(NightlyOnly, NightlyYml).ShouldBeEmpty();

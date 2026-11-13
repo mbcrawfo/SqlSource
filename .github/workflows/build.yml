@@ -203,7 +203,7 @@ jobs:
       # default image of each engine.  It runs after the build, not beside it: in the background during the build it
       # saved no time, because it slowed the build by about as long as it took.
       - name: Pull test images
-        if: ${{ matrix.docker && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.docker && steps.build.outcome == 'success' }}
         run: tools/pull-test-images.sh
 
       # The PostGIS image is loaded from the cache or built in a step of its own, so that a failed build fails the job
@@ -211,11 +211,13 @@ jobs:
       # It keeps the image's ID for the check after the tests.
       - name: Build PostGIS image
         id: postgis
-        if: ${{ matrix.postgis && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.postgis && steps.build.outcome == 'success' }}
         uses: ./.github/actions/postgis-image
 
-      # Every project runs even when an earlier one failed, so that one run reports every problem.
+      # Every project runs even when an earlier one failed, so that one run reports every problem.  A failed pull does
+      # not stop it, since the tests pull what they lack; a failed PostGIS step does, since they would build it again.
       - name: Test
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.postgis.outcome != 'failure' }}
         run: |
           read -ra projects <<<"$PROJECTS"
           status=0
@@ -424,15 +426,15 @@ jobs:
         if: ${{ !cancelled() && steps.pack.outcome == 'success' }}
         run: tools/check-tool-install.sh artifacts/packages
 
-      # After the checks, so that a project that fails to build hides none of their findings.  The packed projects are
-      # built already, so it builds the rest.
-      - name: Build the solution
-        if: ${{ !cancelled() }}
-        run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION"
-
       - name: Upload packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: packages
           path: artifacts/packages/*.nupkg
           if-no-files-found: error
+
+      # Last, so that a project that fails to build hides none of the package checks and does not stop the upload.  The
+      # packed projects are built already, so it builds the rest.
+      - name: Build the solution
+        if: ${{ !cancelled() }}
+        run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION"
