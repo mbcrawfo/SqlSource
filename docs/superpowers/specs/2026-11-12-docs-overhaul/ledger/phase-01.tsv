@@ -1,0 +1,32 @@
+# base 65a6e0a20724fdb0c2464c1afb8fea7295f67b48
+unit	disposition	to	arg	words	note
+README.md:7	removed-status	-	-	-	What it says is generated is stated in site/generator.md 1-32, and describing in site/tool.md 1-14
+README.md:13	move-split	-	-	-	Sentence 1 goes, sentence 2 stays
+README.md:13/1	removed-status	-	-	Until the first release the packages are previews, so the commands include `--prerelease`.	Status; the neutral sentence stands in its place
+README.md:13/2	move	README.md	-	In the folder of each project that has queries:	-
+src/SqlSource.Tool/README.md:7	move-split	-	-	-	Sentence 1 stays, sentence 2 goes
+src/SqlSource.Tool/README.md:7/1	move	src/SqlSource.Tool/README.md	-	Install it as a local tool, from the root of your repository, at the version of the `SqlSource` package your projects use (skip the first command if the repository already has a tool manifest).	-
+src/SqlSource.Tool/README.md:7/2	removed-status	-	-	Until the first release the package is a preview, so the command includes `--prerelease`:	Status; the neutral sentence stands in its place
+site/tool.md:20	move-split	-	-	-	Sentence 1 stays, sentence 2 goes
+site/tool.md:20/1	move	site/tool.md#install-the-tool	-	Install it as a local tool of your repository, from the folder at its root.	-
+site/tool.md:20/2	removed-status	-	-	Until the first release the package is a preview, so the command includes `--prerelease`:	Status; the neutral sentence stands in its place
+-	new	README.md	-	-	The neutral sentence beside --prerelease
+-	new	src/SqlSource.Tool/README.md	-	-	The neutral sentence beside --prerelease
+-	new	site/tool.md#install-the-tool	-	-	The neutral sentence beside --prerelease
+site/README.md:61	removed-status	-	-	-	The heading of What works today; the anchor what-works-today retires
+site/README.md:63	removed-status	-	-	-	The introduction of the table: status alone
+site/README.md:65-100	removed-status	-	-	-	Each row's facts are stated in the section that its third cell links
+site/README.md:101	move-split	-	-	-	The row goes with its table, but for its pointer
+site/README.md:101/1	removed-status	-	-	*	The row but its pointer; its facts are stated in the section its third cell links
+site/README.md:101/2	move	site/settings.md#setting-type-overrides	-	for a PostgreSQL type that cannot be sent as a parameter, see SQLSRC232	-
+site/README.md:102-105	removed-status	-	-	-	Each row's facts are stated in the section that its third cell links
+site/settings.md:36	removed-status	-	-	-	The heading Settings that work today; the table stands under All settings
+site/settings.md:38-40	move-split	-	-	-	The Status column goes; each row keeps its other three cells
+site/settings.md:38-40/1	move	site/settings.md#all-settings	-	*	The cells Setting, Values and Written as
+site/settings.md:38-40/2	removed-status	-	-	*	The Status cell
+site/settings.md:41	move-split	-	-	-	The Status column goes; each row keeps its other three cells
+site/settings.md:41/1	move	site/settings.md#all-settings	-	*	The cells Setting, Values and Written as
+site/settings.md:41/2	corrected	-	C-01	-	for the tool alone is a fact, and false; nothing replaces it here, and phase 7 states the truth at line 153
+site/settings.md:42-58	move-split	-	-	-	The Status column goes; each row keeps its other three cells
+site/settings.md:42-58/1	move	site/settings.md#all-settings	-	*	The cells Setting, Values and Written as
+site/settings.md:42-58/2	removed-status	-	-	*	The Status cell

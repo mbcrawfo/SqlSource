@@ -17,7 +17,7 @@ This page has two parts: [the workflow](#install-the-tool), from installing the 
 
 ## Install the tool
 
-Install it as a local tool of your repository, from the folder at its root.  Until the first release the package is a preview, so the command includes `--prerelease`:
+Install it as a local tool of your repository, from the folder at its root.  The packages are published as previews, so the commands include `--prerelease`:
 
 ```console
 $ dotnet new tool-manifest
