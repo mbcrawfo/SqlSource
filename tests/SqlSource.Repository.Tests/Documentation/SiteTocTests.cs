@@ -17,8 +17,8 @@ public sealed partial class SiteTocTests
     // references to pages of the site.
     private const string MadeUpFolder = "site/a";
 
-    // Fails when a toc.yml of site/, at any depth, names a page that does not exist or a folder with no toc.yml, when a
-    // page is named by more than one entry, when a page is in no toc.yml, or when a toc.yml but the root's is led to by
+    // Fails when a toc.yml of site/, at any depth, has an entry that names no page of the site or a folder with no
+    // toc.yml, when a page is named by more than one entry, when a page is in no toc.yml, or when a toc.yml but the root's is led to by
     // no entry.
     [Fact]
     public void Toc_ListsEveryPageOnce_AndNothingElse()

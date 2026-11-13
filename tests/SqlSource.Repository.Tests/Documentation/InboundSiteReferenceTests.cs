@@ -105,6 +105,7 @@ public sealed partial class InboundSiteReferenceTests
     [Theory]
     [InlineData("`site/tool.md`", "site/tool.md")]
     [InlineData("[x](../../site/tool.md#exit-codes)", "../../site/tool.md#exit-codes")]
+    [InlineData("[x](site/tool.md#exit-codes)", "./site/tool.md#exit-codes")]
     [InlineData("// see site/sub/probe.md#nope", "site/sub/probe.md#nope")]
     [InlineData(
         "See https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes.",
@@ -158,6 +159,8 @@ public sealed partial class InboundSiteReferenceTests
     [InlineData("docs/architecture/README.md", "../../../site/diagnostics.md", false)]
     [InlineData("docs/README.md", "../site/diagnostics.md", true)]
     [InlineData("docs/README.md", "../../site/diagnostics.md", false)]
+    [InlineData("README.md", "./site/diagnostics.md#sqlsrc001", true)]
+    [InlineData("docs/architecture/README.md", "./site/diagnostics.md", false)]
     [InlineData("a/b/c.md", "../../site/nope.md", false)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/", true)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#", true)]
@@ -211,7 +214,15 @@ public sealed partial class InboundSiteReferenceTests
         {
             var found = PathReference()
                 .Matches(lines[index])
-                .Select(match => (match.Index, Reference: match.Value))
+                .Select(match =>
+                    (
+                        match.Index,
+                        Reference: match.Value.StartsWith("site/", StringComparison.Ordinal)
+                        && lines[index][..match.Index].EndsWith("](", StringComparison.Ordinal)
+                            ? "./" + match.Value
+                            : match.Value
+                    )
+                )
                 .Concat(
                     UrlReference()
                         .Matches(lines[index])
@@ -226,12 +237,15 @@ public sealed partial class InboundSiteReferenceTests
     }
 
     // What is wrong with a reference in a file, or null when it names a page and, if it has one, an anchor that exist.
-    // A path is read from the root, unless it follows `../`, which makes it a relative link of the file's folder.
+    // A path is read from the root, unless it follows `../` or is the target of a Markdown link, which References gives
+    // as `./site/...`: either makes it a relative link of the file's folder.
     internal static string? Problem(string file, string reference)
     {
         string path;
         string anchor;
-        var relative = reference.StartsWith("../", StringComparison.Ordinal);
+        var relative =
+            reference.StartsWith("../", StringComparison.Ordinal)
+            || reference.StartsWith("./", StringComparison.Ordinal);
         if (relative || reference.StartsWith("site/", StringComparison.Ordinal))
         {
             var hash = reference.IndexOf('#', StringComparison.Ordinal);
@@ -242,6 +256,11 @@ public sealed partial class InboundSiteReferenceTests
                 var segments = file.Split('/').SkipLast(1).ToList();
                 foreach (var segment in path.Split('/'))
                 {
+                    if (segment == ".")
+                    {
+                        continue;
+                    }
+
                     if (segment != "..")
                     {
                         segments.Add(segment);

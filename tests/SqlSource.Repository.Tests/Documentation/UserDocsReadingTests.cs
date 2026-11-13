@@ -14,6 +14,7 @@ public sealed class UserDocsReadingTests
             .Read(["# Title", "## Same", "## Same", "## Same"])
             .AnchorSet.ShouldBe(["title", "same", "same-1", "same-2"], ignoreOrder: true);
 
+    // Fails when a docfx tab heading gives an anchor or a link, or is not kept as a tab.
     [Fact]
     public void Anchors_TabGroup_GiveNoAnchorAndNoLink()
     {
@@ -34,6 +35,7 @@ public sealed class UserDocsReadingTests
         document.TabList.ShouldBe([(2, "postgres"), (5, "mssql")]);
     }
 
+    // Fails when a tab id with a slash, as docfx allows, is not read as a tab.
     [Fact]
     public void Anchors_TabHeadingWithAPathId_IsATab()
     {
@@ -43,10 +45,12 @@ public sealed class UserDocsReadingTests
         document.TabList.ShouldBe([(1, "linux/x64")]);
     }
 
+    // Fails when a tab heading makes the next heading of the same words take a suffix.
     [Fact]
     public void Anchors_TabHeading_IsNotCountedForASuffix() =>
         UserDocs.Read(["# [Same](#tab/a)", "# Same"]).AnchorSet.ShouldBe(["same"]);
 
+    // Fails when front matter gives a link, or moves the line numbers of what follows it.
     [Fact]
     public void FrontMatter_IsNotRead()
     {
@@ -57,10 +61,12 @@ public sealed class UserDocsReadingTests
         document.Unsupported.ShouldBeEmpty();
     }
 
+    // Fails when a first line of three dashes with no closing line hides the rest of the page.
     [Fact]
     public void FrontMatter_WithNoClosingLine_IsText() =>
         UserDocs.Read(["---", "[a](b.md)"]).LinkList.ShouldBe([(2, "b.md")]);
 
+    // Fails when a rule directly under a paragraph of a tab is not reported, though Markdown reads it as a heading.
     [Fact]
     public void Unsupported_RuleUnderAParagraphOfATab_IsReported() =>
         UserDocs
