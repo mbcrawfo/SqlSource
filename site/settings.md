@@ -25,7 +25,7 @@ SELECT id, name FROM users;
 internal partial class Reports(NpgsqlDataSource dataSource);
 ```
 
-The first block writes settings as markers in a `.sql` file, the second in a [settings file](#settings-files), `sqlsource.json`, which applies to the `.sql` files of its folder and of every folder below it, the third as a property of the attribute.  Which of the three a setting accepts is in [the tables](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
+The first block writes settings as markers in a `.sql` file, the second in a [settings file](#settings-files), `sqlsource.json`, which applies to the `.sql` files of its folder and of every folder below it, the third as a property of the attribute.  Which of the three a setting accepts is in [the table](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
 
 <a id="all-settings"></a>
 
@@ -77,7 +77,7 @@ The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
 - **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file that is empty or white space.  `Source`, on the attribute, is the exception: see [Source](#setting-source).
-- **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
+- **A setting has only the places its row of [the table](#all-settings) lists.**  A key of a settings file that is not in it, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](#setting-member-location).  Only what follows from the type itself can differ: the namespace of the models, which is the type's own unless the [model namespace](#setting-model-namespace) is set, and the default [visibility](#setting-visibility) of the members of `sql`, `models` and `methods` queries on the type, which follows the type's own accessibility.  A type that needs other settings needs a file of its own.
 
 Three exceptions, stated plainly:
@@ -877,7 +877,7 @@ Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the
 
 The file in `Legacy/` applies to the `.sql` files of its subfolders too, `Legacy/Reports/` among them, unless a settings file nearer to them sets the same setting.  Every setting of a query comes from the settings files of its `.sql` file, whichever type claims it, and never from those of a type's C# file.
 
-Only the settings whose row in [the tables](#all-settings) lists a settings file can be given this way.  To change a setting for one file, write its marker in the file header, which wins over every settings file.
+Only the settings whose row in [the table](#all-settings) lists a settings file can be given this way.  To change a setting for one file, write its marker in the file header, which wins over every settings file.
 
 <a id="included-files"></a>
 
@@ -1034,7 +1034,7 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 
 **What it holds** is one JSON object, whose members are the settings.  It may hold `//` and `/* */` comments, and a comma after the last member of an object or the last element of an array.
 
-- **The keys** are those of [the tables](#all-settings), `root` and `$schema`, matched exactly, case included: `Dialect` is not a key.  A key that is not one is [SQLSRC016](diagnostics.md#sqlsrc016), whose section lists them all, and a key written twice is [SQLSRC017](diagnostics.md#sqlsrc017).
+- **The keys** are those of [the table](#all-settings), `root` and `$schema`, matched exactly, case included: `Dialect` is not a key.  A key that is not one is [SQLSRC016](diagnostics.md#sqlsrc016), whose section lists them all, and a key written twice is [SQLSRC017](diagnostics.md#sqlsrc017).
 - **Each value is a JSON string**, except `root`, which is `true` or `false`, `generatorParameters`, an array of strings, `typeOverrides` and `libraryTypes`, each an object whose values are strings, and `columnTypes`, an object whose values are strings, or objects of a `type` and a `json` for [the JSON opt-in](#json-opt-in).  A value of another JSON type, `null` among them, is [SQLSRC018](diagnostics.md#sqlsrc018).
 - **A string is read as JSON writes it.**  The white space around it is ignored, and every character inside it is kept, a `;` or a `#` among them; there is no escape but JSON's own.  A string that is empty or white space sets nothing, and is no error.  To leave a setting to the files above, or to its default, leave its key out.
 - **`$schema`** is for your editor, which then checks the keys and values as you write them and offers them as you type: `https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json`.  SqlSource reads nothing of it.

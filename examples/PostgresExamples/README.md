@@ -23,7 +23,7 @@ In `Sql/`, `Methods/` and `Repository/` each class takes the `.sql` file named f
 [`PostgresExamples.csproj`](PostgresExamples.csproj) takes the generator from this repository, so that it builds with the generator of the same commit and shows what SqlSource does now.  The repository's own build files give it its language version, its analyzers and the versions of its packages.  A project of your own adds the packages instead, here with the versions this example builds with:
 
 ```bash
-dotnet add package SqlSource --prerelease
+dotnet add package SqlSource
 dotnet add package Dapper --version 2.1.89
 dotnet add package Npgsql --version 10.0.3
 dotnet add package Npgsql.NodaTime --version 10.0.3

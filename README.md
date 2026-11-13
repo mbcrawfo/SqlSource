@@ -4,21 +4,21 @@
 
 SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files, and generates the C# that uses it: for a query that your database has described, a type for its parameters, a type for its rows and a method that runs it, and for any other query a constant that holds it.  SQL in a file of its own is cleaner than SQL in a C# string: your editor highlights it, SQL linters and formatters work on it, and it is easy to find when you search for a table or a column.  A query that is renamed or removed is a compile error where it is used, and so is a column that your code reads and the query no longer returns, and your editor shows a query's SQL wherever it is used.  With PostgreSQL or SQL Server, the `sqlsource` tool checks every query against your database's schema, and records what the database says of its parameters and columns, from which the types and the methods are generated.
 
-**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see [database support](https://mbcrawfo.github.io/SqlSource/dialects.html#database-support).  So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models).
+**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries, in which the `sqlsource` tool asks your database about each query's parameters and columns, works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see [database support](https://mbcrawfo.github.io/SqlSource/dialects.html#database-support).  So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models).
 
 ## Installation
 
-The packages are published as previews, so the commands include `--prerelease`.  In the folder of each project that has queries:
+In the folder of each project that has queries:
 
 ```console
-$ dotnet add package SqlSource --prerelease
+$ dotnet add package SqlSource
 ```
 
 Once, at the root of your repository, to install the tool (skip the first command if the repository already has a tool manifest):
 
 ```console
 $ dotnet new tool-manifest
-$ dotnet tool install SqlSource.Tool --prerelease
+$ dotnet tool install SqlSource.Tool
 ```
 
 - **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, and the attributes you mark your types and converters with, their enums and the exception its methods throw, are compiled into your project.
