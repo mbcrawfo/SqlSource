@@ -426,7 +426,7 @@ See: [Running in the build](tool.md#running-in-the-build)
 
 Reported by: the build.
 
-The warning is at the project file.  A project can also list `SQLSRC026` in the MSBuild property `MSBuildWarningsAsMessages`, which turns the warning into a message.
+The warning is at the project file.  A project can list `SQLSRC026` in the MSBuild property `MSBuildWarningsAsMessages`, which turns the warning into a message.
 
 `SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](settings.md#setting-env-file) names, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
@@ -3294,7 +3294,7 @@ See: [Query methods](generator.md#query-methods)
 
 Reported by: the build.
 
-If several types claim the query's file, the query gets this error once for each such token.  A token that hides a repository's connection is the exception: each type whose connection it hides reports it.  The query also gets each other error about its method, and gets no method until all are fixed.
+If several types claim the query's file, the query does not get this error more often.  A token that hides a repository's connection is the exception: each type whose connection it hides reports it.  The query also gets each other error about its method, and gets no method until all are fixed.
 
 A token of a query whose output is `methods` or `repository` has the name of one of the arguments a query method can have: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  A token is an argument of the method too, so it cannot take one of these names, even in a query without parameters, whose method has no `parameters`, and the method is not generated.  The message names the token, the query and what has the name.
 
