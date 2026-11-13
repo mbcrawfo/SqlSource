@@ -13,8 +13,8 @@ The user documents stop speaking of a library in development.  "What works today
 - **Phase 0 is in.**  The tests accept folders, `InboundSiteReferenceTests` follows the references from outside, and the epic folder holds `inventory.tsv`, `ledger/phase-00.tsv` and `check/`.
 - **No page has changed.**  `site/` is twelve flat pages, as at the baseline, but for what feature work added.  Run `git diff 28e20e3c -- README.md src/SqlSource.Tool/README.md site` first: the line numbers below are the baseline's, and a line can have moved.
 - **The status language** is in six places, the `removed-status` rows of the map: `README.md` 7 and 13, `src/SqlSource.Tool/README.md` 7, `site/README.md` 59-105, `site/settings.md` 36 and 38-58, `site/tool.md` 20.
-- **The rules that made it** are in root `AGENTS.md` (lines 10, 12, 18, 22), `site/AGENTS.md` (lines 6, 14, 25-27, 29, 46-55) and `docs/architecture/AGENTS.md` (line 71).
-- **Sizes**, with `wc -c`: `site/AGENTS.md` 7,990 of 8,192 bytes; root `AGENTS.md` 14,925 of 16,384; `docs/architecture/AGENTS.md` 7,128 of 8,192.
+- **The rules that made it** are in root `AGENTS.md` (lines 10, 12, 18, 22), `site/AGENTS.md` (lines 6, 14, 25-27, 29, 46-55), `docs/architecture/AGENTS.md` (line 71) and `src/SqlSource/Settings/AGENTS.md` (lines 16 and 18).
+- **Sizes**, with `wc -c`: `site/AGENTS.md` 7,990 of 8,192 bytes; root `AGENTS.md` 14,925 of 16,384; `docs/architecture/AGENTS.md` 7,128 of 8,192; `src/SqlSource/Settings/AGENTS.md` 7,382 of 8,192.
 - **Four strings of a test** name the anchor that goes: `UserDocsReadingTests.cs` 178, 180, 192 and 196.
 
 ## In scope / Not in scope
@@ -23,7 +23,7 @@ In scope:
 
 - `StatusLanguageTests`, new.
 - Every `removed-status` row of the map, the neutral sentence beside `--prerelease`, and the pointer of `site/README.md` 101.
-- The lines of the three `AGENTS.md` files, of `UserDocsReadingTests.cs`, of `tests/SqlSource.Repository.Tests/Documentation/AGENTS.md`, of `tests/README.md` and of the outline that this phase makes wrong.
+- The lines of the four `AGENTS.md` files, of `UserDocsReadingTests.cs`, of `tests/SqlSource.Repository.Tests/Documentation/AGENTS.md`, of `tests/README.md` and of the outline that this phase makes wrong.
 
 Not in scope:
 
@@ -118,6 +118,8 @@ Each line is replaced by the words given, or goes.  Measure each file again when
 | `site/AGENTS.md` | 48-54 | The bullets "Callouts" and "Sentences that say it is missing or still to come" go, with the fenced `git grep` between them and the blank lines |
 | `site/AGENTS.md` | 55 | The words "the introduction's status line, " go |
 | `docs/architecture/AGENTS.md` | 71 | "- A page holds no status table.  What SqlSource does is stated in `site/`, as fact." |
+| `src/SqlSource/Settings/AGENTS.md` | 16 | The words " and its status" go.  The first sentence ends "a row of its table with every place it can be written, and a section anchored `setting-<name>`." |
+| `src/SqlSource/Settings/AGENTS.md` | 18 | The bullet goes: "A setting accepted before the change that gives it an effect says so in its status, and that change flips it."  A setting has no status after this phase, and `StatusLanguageTests` fails on the words such a cell held |
 
 Root line 19, on `--prerelease` and `nuget/vpre`, stays as it is.  So does step 3 of `docs/publishing.md` (line 28), which already takes "the sentences that explain them" out at the first stable release.  `docs/architecture/AGENTS.md` 65, "Never describe the future as present", is a rule for the architecture pages and stays.
 
@@ -180,7 +182,8 @@ The checker must show:
 - [ ] `git grep -n SQLSRC232 -- site/settings.md` prints one line.
 - [ ] `git diff --stat <base> -- site` names `site/README.md`, `site/settings.md`, `site/tool.md` and `site/AGENTS.md`, and no other file of `site/`.
 - [ ] In `git diff --word-diff <base> -- site/settings.md`, each row of the table differs from the old one only by its last cell: the words removed are "Works today", and in the Database row "Works today, for the tool alone".
-- [ ] `wc -c site/AGENTS.md AGENTS.md docs/architecture/AGENTS.md` is under 8,192, 16,384 and 8,192, and `AgentsFileTests` passes.
+- [ ] `wc -c site/AGENTS.md AGENTS.md docs/architecture/AGENTS.md src/SqlSource/Settings/AGENTS.md` is under 8,192, 16,384, 8,192 and 8,192, and `AgentsFileTests` passes.
+- [ ] `git grep -n -i status -- src/SqlSource/Settings/AGENTS.md` prints nothing.
 - [ ] "check coverage" and "check move 01" show what [The ledger](#the-ledger) says.
 - [ ] `tools/build-site.sh` passes, and so does every test of `tests/SqlSource.Repository.Tests`.
 - [ ] The content reviews, a clean `branch-review:review` and `./pre-commit-validation.sh --full` on the last commit, as the outline's "Reviews" says.

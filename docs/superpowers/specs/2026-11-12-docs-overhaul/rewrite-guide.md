@@ -44,7 +44,7 @@ A rewrite runs beside twelve other rewrites.  These rules keep them apart, and k
 - **The title of a page stays.**  The `# ` line and the sidebar title come from section 1 of the map.
 - **You add no tab group** unless your brief names the place.  A tab holds a sample or a few sentences.  It never holds a heading or an anchor.
 - **Write effects, never internals.**  The rule and its `grep` command are in `site/AGENTS.md`.  Run the command on each page you changed.
-- **State what SqlSource does, as fact.**  No sentence says that a feature is coming, is new, or works "today", "for now" or "currently".  `StatusLanguageTests` holds four exact phrases.  The rule is wider than the test.
+- **State what SqlSource does, as fact.**  No sentence says that a feature is coming, is new, or works "today", "for now" or "currently".  `StatusLanguageTests` holds five exact phrases.  The rule is wider than the test.
 - **Links.**  A page links another page of the site relatively, and an error as `[SQLSRC241](../diagnostics.md#sqlsrc241)`, with the path that fits its folder.
 
 ## 3. The language rule

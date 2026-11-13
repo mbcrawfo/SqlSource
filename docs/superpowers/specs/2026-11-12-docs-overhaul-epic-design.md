@@ -6,7 +6,7 @@ This outline is kept current until the epic closes.  A phase that changes the pl
 
 ## Intent
 
-The manual was written as Markdown files to be read in the repository.  It is now a GitHub Pages site built with docfx, but its shape did not change: twelve flat pages, three of them over 1,000 lines, an entry page that is a 57-row table, and a walkthrough that lives in the repository's README and not on the site.  Much of the text also speaks of a library in development.
+The manual was written as Markdown files to be read in the repository.  It is now a GitHub Pages site built with docfx, but its shape did not change: twelve flat pages, four of them over 1,000 lines, an entry page that is a 49-row table, and a walkthrough that lives in the repository's README and not on the site.  Much of the text also speaks of a library in development.
 
 The owner wants the documentation rethought as a site, for a junior developer who works this library out alone.  That reader must be able to start at the landing page, install the package, run a first query, and then find the answer to each later question by its own words, without reading a 20,000-word page.
 
@@ -42,7 +42,7 @@ The owner wants the documentation rethought as a site, for a junior developer wh
 - Every diagnostic's help link is `https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrcNNN`.  It is compiled into the packages.
 - The two readmes are packed into NuGet packages.  nuget.org shows them with HTML off, so they hold no raw HTML, and every link in them is absolute.
 - Root `AGENTS.md` caps itself at 16 KB and every other `AGENTS.md` at 8 KB, with bullets of at most 80 words.  `site/AGENTS.md` is 7.8 KB today, and `src/SqlSource.Tool/AGENTS.md` is 33 bytes under its limit and names four site pages.
-- 239 references in 72 files outside `site/` name a site page, 51 of them in C# comments.  No test checks them today.
+- 274 references in 78 files outside `site/` name a site page, 51 of them in C# comments.  No test checks them today.
 - Five test files under `tests/DatabaseTests/*/EndToEnd/` mirror samples of `site/recipes.md`, and `EditorRecipeTests` reads the VS Code task from it.
 - No `v*` tag exists.  The only published package is a beta, whose links into the manual already broke when the manual moved to `site/`.
 - Feature work continues on other branches while the epic runs.

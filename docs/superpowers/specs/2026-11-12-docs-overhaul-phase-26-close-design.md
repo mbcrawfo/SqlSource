@@ -79,7 +79,7 @@ For each row, answer three questions, and write the answers in the pull request:
 **The whole site, by search:**
 
 - [ ] The words of the outline that a junior types: "bulk", "mock", "nullable", "timeout", "IN", "enum".  Each is in the title or the first sentence of the page that answers it.
-- [ ] No status language.  `StatusLanguageTests` holds four phrases, and the rule is wider.  Read each hit of this search:
+- [ ] No status language.  `StatusLanguageTests` holds five phrases, and the rule is wider.  Read each hit of this search:
 
 ```bash
 git grep -n -i -E "no effect yet|today|coming|later release|for now|currently|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md site

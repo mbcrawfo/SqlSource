@@ -70,7 +70,7 @@ Write `SiteTocTests` so that its check is a function of the text of the `toc.yml
 
 A new class in `tests/SqlSource.Repository.Tests/Documentation/`.  It fails on a reference to a page of the site, from outside the user documents, that names no page or no anchor.
 
-**What it scans.**  Every text file that git tracks or would track, so not a build output, not `artifacts/site` and not another worktree under `.claude/`.  `git ls-files --cached --others --exclude-standard`, as the scripts in `tools/` list files, gives that set; a walk needs a list of skipped folders that goes stale.  Left out: every path under `docs/superpowers/`, whose files record intent and are not kept current; the user documents, `UserDocs.Files`, whose links `UserDocsLinksTests` follows; and the strings of the table below.
+**What it scans.**  Every text file of the repository, so not a build output, not `artifacts/site` and not another worktree under `.claude/`.  The test walks the tree from `RepositoryRoot.Path()`, as `AgentsFileTests.Find` does, and skips the folders of `AgentsFileTests.SkippedFolders` and `artifacts`.  Move that list to one place that both classes read, so that it is kept once.  The test does not ask git for the files: `tests/AGENTS.md` lets a test start a program only through `Programs.RunAsync`, which is in `tests/SqlSource.Tool.Testing`, and `tests/README.md` (line 139) says that this project references nothing of the other test libraries.  A text file is one of a list of extensions in the test: `.md`, `.cs`, `.yml`, `.yaml`, `.json`, `.props`, `.targets`, `.csproj`, `.sh`, `.txt`, `.sql`, `.editorconfig`.  Left out: every path under `docs/superpowers/`, whose files record intent and are not kept current; the user documents, `UserDocs.Files`, whose links `UserDocsLinksTests` follows; and the strings of the table below.
 
 **The forms it reads**, anywhere in a line:
 
@@ -133,7 +133,9 @@ A change to `pre-commit-validation.sh` makes the run full, and a change to `.edi
 | `words` | The count of `wc -w` over the unit |
 | `hash` | The first 12 hex digits of the SHA-256 of the normalised text, in UTF-8 |
 | `phase` | The first phase that gives the unit a disposition, from the table below |
-| `start` | The first 60 characters of the normalised text, for a reader |
+| `start` | The first 60 characters of the first line of the normalised text, for a reader.  For a fenced block that is its opening fence and info string |
+
+**No cell holds a tab or a line break**, in `inventory.tsv` or in a ledger file, so that one row is one line.  A tab inside a cell's text is written as one space.  A cell stops at the first line break of its text: `start` does, and so does the `words` of a ledger row, whose part is then given as `*` with its lines in the note when it runs over more than one line.
 
 **A line range** of the map or of a ledger row, such as `33-58`, is every unit whose first line is from 33 to 58.  A range can start or end on a line that is no unit.
 
@@ -309,7 +311,7 @@ No text of a user document changes, so both content reviewers read the instrumen
 ## Traps
 
 - **`index.md` by name.**  Excluding every file named `index.md` hides the three `index.md` pages of `reference/databases/` later.  Exclude `site/index.md` by its path.
-- **A walk of the tree** finds `artifacts/site`, `bin`, `obj` and the worktrees under `.claude/`, each full of references.  Ask git for the files.
+- **A walk of the tree** finds `artifacts/site`, `bin`, `obj` and the worktrees under `.claude/`, each full of references.  Skip them by the one shared list, and prove it: the test's count of files with a reference is 78 at the baseline, and a count far above that means a folder that the walk must skip.
 - **A C# file run with `dotnet run`** is under the root `Directory.Build.props` and `Directory.Packages.props`: analyzers at `latest-all`, warnings as errors, lock files.  Prove on the first day that it builds, and that a run leaves no file in the tree.  CSharpier formats every tracked `.cs` file, and shellcheck and shfmt every tracked `.sh` file, the checker's own included.
 - **A cell that is empty** leaves a tab at the end of a line, which editorconfig-checker refuses.  Write `-`.
 - **The baseline in a shallow clone.**  `git show 28e20e3c:<file>` fails where the commit was not fetched.  The checker then exits with 2 and says to fetch `main`; it does not treat the page as empty.
@@ -339,6 +341,6 @@ No text of a user document changes, so both content reviewers read the instrumen
 - **`rewrite` works by section**, as the diagnostics guide needs for four phases in one page, and fails only for a fenced block or a difference with no row.
 - **The worksheet is started by the phase that places the first text**, as the briefs of phases 5 to 8 assume, and not by this phase.
 - **`.tsv` becomes a known kind for the epic folder alone, and the epic's `.tsv` files are free of the 120 columns.**  Without the first, every commit of 26 phases runs the database tests.  Without the second, a ledger row with a note fails the lint.
-- **`InboundSiteReferenceTests` leaves out the user documents**, which `UserDocsLinksTests` already follows, and asks git for the files.
+- **`InboundSiteReferenceTests` leaves out the user documents**, which `UserDocsLinksTests` already follows, and walks the tree with the skipped folders of `AgentsFileTests`, since a test of this project may not start `git`.
 - **The help-link prefix `diagnostics.html#sqlsrc` is a named exception.**  The planning counted two test files that must be left out; the search found these two more.
 - **One bullet in `docs/superpowers/AGENTS.md`** says that the epic folder holds code, since that file says the folder holds designs.
