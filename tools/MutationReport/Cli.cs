@@ -19,10 +19,116 @@ internal static class Cli
                 return await CompareAsync(before, after, output, error).ConfigureAwait(false);
             case ["static", var report]:
                 return await StaticAsync(report, output, error).ConfigureAwait(false);
+            case ["slices", var root, var folder, .. var rest] when SlicesOptions.Read(rest) is { } options:
+                return await SlicesCommand
+                    .RunAsync(root, folder, options.Limit, options.ExclusionFile, options.Folders, output, error)
+                    .ConfigureAwait(false);
+            case ["condense", var root, var run]:
+                return await CondenseAsync(root, run, null, output, error).ConfigureAwait(false);
+            case ["condense", var root, var run, "--broad-from", var broad]:
+                return await CondenseAsync(root, run, broad, output, error).ConfigureAwait(false);
+            case ["kills", var report, var test]:
+                return await KillsAsync(report, test, output, error).ConfigureAwait(false);
             default:
-                await error.WriteLineAsync("Usage: compare <before.json> <after.json>").ConfigureAwait(false);
-                await error.WriteLineAsync("       static <report.json>").ConfigureAwait(false);
+                foreach (var line in Usage)
+                {
+                    await error.WriteLineAsync(line).ConfigureAwait(false);
+                }
+
                 return 2;
+        }
+    }
+
+    private static readonly string[] Usage =
+    [
+        "Usage: compare <before.json> <after.json>",
+        "       static <report.json>",
+        "       slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] <folder> ...",
+        "       condense <repository root> <run folder> [--broad-from <file>]",
+        "       kills <report.json> <test name>",
+    ];
+
+    private static async Task<int> KillsAsync(string path, string test, TextWriter output, TextWriter error)
+    {
+        KillMatrix matrix;
+        try
+        {
+            var stream = File.OpenRead(path);
+            await using (stream.ConfigureAwait(false))
+            {
+                matrix = await KillMatrixReader.ReadAsync(stream, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        catch (Exception exception) when (IsUnreadable(exception))
+        {
+            await error.WriteLineAsync($"Cannot read {path}: {exception.Message}").ConfigureAwait(false);
+            return 2;
+        }
+
+        return await KillsCommand.RunAsync(matrix, test, output, error).ConfigureAwait(false);
+    }
+
+    private static async Task<int> CondenseAsync(
+        string root,
+        string run,
+        string? broadFile,
+        TextWriter output,
+        TextWriter error
+    )
+    {
+        string[] broad;
+        try
+        {
+            broad = broadFile is null ? [] : await ListFile.ReadAsync(broadFile).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (IsUnreadable(exception))
+        {
+            await error.WriteLineAsync($"Cannot read {broadFile}: {exception.Message}").ConfigureAwait(false);
+            return 2;
+        }
+
+        return await Condenser.RunAsync(root, run, broad, output, error, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    // What follows the two folders of the slices command, or null when it is not what the usage says.
+    private sealed record SlicesOptions(int Limit, string? ExclusionFile, IReadOnlyList<string> Folders)
+    {
+        public static SlicesOptions? Read(string[] arguments)
+        {
+            var limit = 5000;
+            string? exclusionFile = null;
+            var folders = new List<string>();
+            var index = 0;
+            while (index < arguments.Length)
+            {
+                var argument = arguments[index++];
+                if (!argument.StartsWith("--", StringComparison.Ordinal))
+                {
+                    folders.Add(argument);
+                    continue;
+                }
+
+                if (index == arguments.Length)
+                {
+                    return null;
+                }
+
+                var value = arguments[index++];
+                if (argument == "--exclude-from")
+                {
+                    exclusionFile = value;
+                }
+                else if (
+                    argument != "--limit"
+                    || !int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out limit)
+                    || limit == 0
+                )
+                {
+                    return null;
+                }
+            }
+
+            return folders.Count == 0 ? null : new SlicesOptions(limit, exclusionFile, folders);
         }
     }
 

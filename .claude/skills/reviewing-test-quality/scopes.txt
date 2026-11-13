@@ -1,0 +1,250 @@
+# The mutation scopes of the test review, which measure.sh runs one after another: each a part of one source project
+# with the tests that mirror it.  No scope mutates a whole project, which does not fit in a night.
+#
+# A block is five lines, and blocks are apart by an empty line:
+#   scope    the scope's name, which is its folder under mutation/ of a run folder
+#   project  generator (src/SqlSource) or tool (src/SqlSource.Tool)
+#   mutate   the globs of the source files, apart by a space, each written from a folder of the project and never
+#            with "**/" before it: Stryker matches a glob against a file's full path too, so "**/Projects/**/*.cs" is
+#            every file of a checkout under a folder named Projects
+#   tests    the filter of the tests, as tools/mutation-test.sh --tests takes it
+#   folders  the test folders that the scope measures, apart by a space
+#
+# Every source file is in exactly one scope, and no test folder is in two.  A scope of a folder's own files runs the
+# tests of that folder alone, without those of its sub-folders, which have scopes of their own.  The root files of a
+# project are run with the tests that drive it whole, the generator's driver tests and the tool's command tests, and
+# with the tests of those files.  tests/SqlSource.Repository.Tests/TestReview/SkillDataTests.cs checks this file.
+#
+# The count above each scope is of the mutants that compile and are not static, on 2026-11-12, from which a run's
+# time is reckoned: about a second each, and about five minutes a scope besides.
+
+# About 302 mutants to test.
+scope generator-root
+project generator
+mutate *.cs
+tests FullyQualifiedName~SqlSource.Tests.Generator.|FullyQualifiedName~SqlSource.Tests.DatabaseNameTests.|FullyQualifiedName~SqlSource.Tests.EquatableArrayTests.|FullyQualifiedName~SqlSource.Tests.PackageVersionTests.|FullyQualifiedName~SqlSource.Tests.SortedSearchTests.|FullyQualifiedName~SqlSource.Tests.SqlIdentifierTests.|FullyQualifiedName~SqlSource.Tests.SqlServerNamesTests.|FullyQualifiedName~SqlSource.Tests.SystemSchemasTests.|FullyQualifiedName~SqlSource.Tests.TextLinesTests.|FullyQualifiedName~SqlSource.Tests.UnexpectedEnumValueExceptionTests.|FullyQualifiedName~SqlSource.Tests.VersionsTests.
+folders tests/SqlSource.Tests/Generator
+
+# About 28 mutants to test.
+scope generator-diagnostics
+project generator
+mutate Diagnostics/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Diagnostics.
+folders tests/SqlSource.Tests/Diagnostics
+
+# About 142 mutants to test.
+scope generator-generation
+project generator
+mutate Generation/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.&FullyQualifiedName!~SqlSource.Tests.Generation.Chains.&FullyQualifiedName!~SqlSource.Tests.Generation.Converters.&FullyQualifiedName!~SqlSource.Tests.Generation.Emitting.&FullyQualifiedName!~SqlSource.Tests.Generation.Exceptions.&FullyQualifiedName!~SqlSource.Tests.Generation.Methods.&FullyQualifiedName!~SqlSource.Tests.Generation.Models.&FullyQualifiedName!~SqlSource.Tests.Generation.Paths.&FullyQualifiedName!~SqlSource.Tests.Generation.Placement.&FullyQualifiedName!~SqlSource.Tests.Generation.Repositories.&FullyQualifiedName!~SqlSource.Tests.Generation.Sidecars.&FullyQualifiedName!~SqlSource.Tests.Generation.Types.
+folders tests/SqlSource.Tests/Generation
+
+# About 183 mutants to test.
+scope generator-generation-chains
+project generator
+mutate Generation/Chains/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Chains.
+folders tests/SqlSource.Tests/Generation/Chains
+
+# About 300 mutants to test.
+scope generator-generation-converters
+project generator
+mutate Generation/Converters/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Converters.
+folders tests/SqlSource.Tests/Generation/Converters
+
+# About 2,818 mutants to test.
+scope generator-generation-emitting
+project generator
+mutate Generation/Emitting/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Emitting.
+folders tests/SqlSource.Tests/Generation/Emitting
+
+# About 117 mutants to test.
+scope generator-generation-exceptions
+project generator
+mutate Generation/Exceptions/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Exceptions.
+folders tests/SqlSource.Tests/Generation/Exceptions
+
+# About 1,123 mutants to test.
+scope generator-generation-methods
+project generator
+mutate Generation/Methods/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Methods.
+folders tests/SqlSource.Tests/Generation/Methods
+
+# About 696 mutants to test.
+scope generator-generation-models
+project generator
+mutate Generation/Models/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Models.
+folders tests/SqlSource.Tests/Generation/Models
+
+# About 177 mutants to test.
+scope generator-generation-paths
+project generator
+mutate Generation/Paths/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Paths.
+folders tests/SqlSource.Tests/Generation/Paths
+
+# About 227 mutants to test.
+scope generator-generation-placement
+project generator
+mutate Generation/Placement/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Placement.
+folders tests/SqlSource.Tests/Generation/Placement
+
+# About 365 mutants to test.
+scope generator-generation-repositories
+project generator
+mutate Generation/Repositories/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Repositories.
+folders tests/SqlSource.Tests/Generation/Repositories
+
+# About 149 mutants to test.
+scope generator-generation-sidecars
+project generator
+mutate Generation/Sidecars/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Sidecars.
+folders tests/SqlSource.Tests/Generation/Sidecars
+
+# About 1,487 mutants to test.
+scope generator-generation-types
+project generator
+mutate Generation/Types/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Generation.Types.
+folders tests/SqlSource.Tests/Generation/Types
+
+# About 2,744 mutants to test.
+scope generator-parsing
+project generator
+mutate Parsing/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Parsing.
+folders tests/SqlSource.Tests/Parsing
+
+# About 1,479 mutants to test.
+scope generator-settings
+project generator
+mutate Settings/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Settings.
+folders tests/SqlSource.Tests/Settings
+
+# About 151 mutants to test.
+scope generator-settings-files
+project generator
+mutate SettingsFiles/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.SettingsFiles.
+folders tests/SqlSource.Tests/SettingsFiles
+
+# About 1,131 mutants to test.
+scope generator-snapshot
+project generator
+mutate Snapshot/**/*.cs
+tests FullyQualifiedName~SqlSource.Tests.Snapshot.
+folders tests/SqlSource.Tests/Snapshot
+
+# About 679 mutants to test.
+scope tool-root
+project tool
+mutate *.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Commands.|FullyQualifiedName~SqlSource.Tool.Tests.OutcomeTests.|FullyQualifiedName~SqlSource.Tool.Tests.ToolHostTests.|FullyQualifiedName~SqlSource.Tool.Tests.UsageValueTests.
+folders tests/SqlSource.Tool.Tests/Commands
+
+# About 533 mutants to test.
+scope tool-bundles
+project tool
+mutate Bundles/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Bundles.&FullyQualifiedName!~SqlSource.Tool.Tests.Bundles.Renaming.
+folders tests/SqlSource.Tool.Tests/Bundles
+
+# About 1,633 mutants to test.
+scope tool-bundles-renaming
+project tool
+mutate Bundles/Renaming/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Bundles.Renaming.
+folders tests/SqlSource.Tool.Tests/Bundles/Renaming
+
+# About 856 mutants to test.
+scope tool-describing
+project tool
+mutate Describing/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Describing.&FullyQualifiedName!~SqlSource.Tool.Tests.Describing.Capture.&FullyQualifiedName!~SqlSource.Tool.Tests.Describing.Describers.&FullyQualifiedName!~SqlSource.Tool.Tests.Describing.Postgres.&FullyQualifiedName!~SqlSource.Tool.Tests.Describing.SqlServer.
+folders tests/SqlSource.Tool.Tests/Describing
+
+# About 116 mutants to test.
+scope tool-describing-capture
+project tool
+mutate Describing/Capture/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Describing.Capture.
+folders tests/SqlSource.Tool.Tests/Describing/Capture
+
+# About 97 mutants to test.
+scope tool-describing-describers
+project tool
+mutate Describing/Describers/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Describing.Describers.
+folders tests/SqlSource.Tool.Tests/Describing/Describers
+
+# About 3,362 mutants to test.
+scope tool-describing-postgres
+project tool
+mutate Describing/Postgres/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Describing.Postgres.
+folders tests/SqlSource.Tool.Tests/Describing/Postgres
+
+# About 1,991 mutants to test.
+scope tool-describing-sqlserver
+project tool
+mutate Describing/SqlServer/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Describing.SqlServer.
+folders tests/SqlSource.Tool.Tests/Describing/SqlServer
+
+# About 178 mutants to test.
+scope tool-dotenv
+project tool
+mutate DotEnv/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.DotEnv.
+folders tests/SqlSource.Tool.Tests/DotEnv
+
+# About 290 mutants to test.
+scope tool-logging
+project tool
+mutate Logging/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Logging.
+folders tests/SqlSource.Tool.Tests/Logging
+
+# About 195 mutants to test.
+scope tool-planning
+project tool
+mutate Planning/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Planning.
+folders tests/SqlSource.Tool.Tests/Planning
+
+# About 32 mutants to test.
+scope tool-processes
+project tool
+mutate Processes/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Processes.
+folders tests/SqlSource.Tool.Tests/Processes
+
+# About 283 mutants to test.
+scope tool-projects
+project tool
+mutate Projects/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Projects.
+folders tests/SqlSource.Tool.Tests/Projects
+
+# About 127 mutants to test.
+scope tool-reporting
+project tool
+mutate Reporting/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Reporting.
+folders tests/SqlSource.Tool.Tests/Reporting
+
+# About 500 mutants to test.
+scope tool-watching
+project tool
+mutate Watching/**/*.cs
+tests FullyQualifiedName~SqlSource.Tool.Tests.Watching.
+folders tests/SqlSource.Tool.Tests/Watching

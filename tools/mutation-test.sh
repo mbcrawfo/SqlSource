@@ -11,7 +11,8 @@
 # real, and the script fails it.  tools/README.md has what a report holds and Stryker's other limits.
 # Usage: mutation-test.sh <generator|tool> [--output <folder>] [--tests <filter>] [<glob> ...]
 #        mutation-test.sh compare <before.json> <after.json>
-# A glob names source files from the project's folder, as '**/Parsing/*.cs', and with none every file is tested.  The
+# A glob names source files from the project's folder, as 'Parsing/*.cs', and with none every file is tested.  It
+# never starts with '**/', which Stryker also matches against a file's full path, and so against the checkout's.  The
 # filter is Stryker's --test-case-filter.  The output folder defaults to artifacts/mutation/<generator|tool>; the
 # report is reports/mutation-report.json in it, and static/ in it holds the first run.
 set -euo pipefail

@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, two recording scripts and the script and program of mutation testing, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that builds the manual's site, a script that pulls the test images, two recording scripts and the script and program of mutation testing and of the test review, none of which is a check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -121,12 +121,12 @@ None of these is a check, and a person runs them.  `pre-commit-validation.sh` an
 `tools/mutation-test.sh` runs a mutation test of one of the two source projects with [Stryker.NET](https://stryker-mutator.io/docs/stryker-net/introduction/), the local tool `dotnet-stryker`: Stryker changes the project's code one small place at a time, each change a mutant, and runs the tests that reach it, so that a mutant no test fails on shows what the tests do not check.  It is no check: a person runs it on a folder of a project, which takes minutes, and neither `pre-commit-validation.sh` nor `build.yml` runs it.
 
 ```bash
-tools/mutation-test.sh generator --tests 'FullyQualifiedName~SqlSource.Tests.Parsing.' '**/Parsing/**/*.cs'
-tools/mutation-test.sh tool --output artifacts/mutation/before --tests 'FullyQualifiedName~SqlSource.Tool.Tests.DotEnv.' '**/DotEnv/*.cs'
+tools/mutation-test.sh generator --tests 'FullyQualifiedName~SqlSource.Tests.Parsing.' 'Parsing/**/*.cs'
+tools/mutation-test.sh tool --output artifacts/mutation/before --tests 'FullyQualifiedName~SqlSource.Tool.Tests.DotEnv.' 'DotEnv/*.cs'
 tools/mutation-test.sh compare artifacts/mutation/before/reports/mutation-report.json artifacts/mutation/after/reports/mutation-report.json
 ```
 
-`generator` is `src/SqlSource`, tested by `tests/SqlSource.Tests`, and `tool` is `src/SqlSource.Tool`, tested by `tests/SqlSource.Tool.Tests`.  Each glob names source files from the project's folder and is quoted, so that the shell does not expand it; with none every file is tested.  `--tests` is Stryker's `--test-case-filter`, which limits the tests that run: a run is given the folder of the source and the tests of that folder, [since a whole project does not fit in a night](#how-long-a-run-takes).  `--output` is the folder of the run, `artifacts/mutation/<generator|tool>` unless it is given.  The script runs from any folder, exits with Stryker's code, and ends by printing the path of the report, `reports/mutation-report.json` in the output folder, beside `mutation-report.html`, the same report to read in a browser.
+`generator` is `src/SqlSource`, tested by `tests/SqlSource.Tests`, and `tool` is `src/SqlSource.Tool`, tested by `tests/SqlSource.Tool.Tests`.  Each glob names source files from the project's folder and is quoted, so that the shell does not expand it; with none every file is tested.  A folder's glob starts at the folder, `Parsing/**/*.cs`, and never with `**/`: Stryker matches a glob against a file's full path as well, so in a checkout under a folder named `Projects`, `**/Projects/**/*.cs` is every file of the project.  `--tests` is Stryker's `--test-case-filter`, which limits the tests that run: a run is given the folder of the source and the tests of that folder, [since a whole project does not fit in a night](#how-long-a-run-takes).  `--output` is the folder of the run, `artifacts/mutation/<generator|tool>` unless it is given.  The script runs from any folder, exits with Stryker's code, and ends by printing the path of the report, `reports/mutation-report.json` in the output folder, beside `mutation-report.html`, the same report to read in a browser.
 
 Stryker builds and runs in the working tree, so two runs cannot share a checkout: a run holds the folder `artifacts/mutation/.running` as its lock and a second one is refused.  Nothing else that builds, `pre-commit-validation.sh` included, runs in the checkout during a run.
 
@@ -142,9 +142,15 @@ A run is given a folder of the source and the tests of that folder.  Measured on
 
 | Run | Tests | Mutants tested | Killed | Survived | Timeout | Time |
 |----|----|----|----|----|----|----|
-| `generator`, `**/Parsing/**/*.cs`, the tests of `SqlSource.Tests.Parsing` | 2,284 | 2,260 | 1,968 | 209 | 83 | 38 min |
-| `tool`, `**/Planning/**/*.cs`, the tests of `SqlSource.Tool.Tests.Planning` | 204 | 144 | 122 | 21 | 1 | 3 min |
-| `generator`, `**/Parsing/SqlDialectName.cs`, the tests of `Parsing` and `Generator` | 4,368 | 35 | 30 | 3 | 2 | 18 min |
+| `generator`, `Parsing/**/*.cs`, the tests of `SqlSource.Tests.Parsing` | 2,284 | 2,260 | 1,968 | 209 | 83 | 38 min |
+| `tool`, `Planning/**/*.cs`, the tests of `SqlSource.Tool.Tests.Planning` | 204 | 144 | 122 | 21 | 1 | 3 min |
+| `generator`, `Parsing/SqlDialectName.cs`, the tests of `Parsing` and `Generator` | 4,368 | 35 | 30 | 3 | 2 | 18 min |
+| `generator`, `Generation/Paths/**/*.cs`, the tests of `SqlSource.Tests.Generation.Paths` | 166 | 149 | 132 | 15 | 2 | 3 min |
+| The same files, with the driver tests of `SqlSource.Tests.Generator` added | 2,250 | 149 | 132 | 11 | 6 | 34 min |
+| `generator`, `*.cs`, its root files, with the driver tests and the root files' own | 2,213 | 235 | 208 | 13 | 14 | 67 min |
+| `tool`, `Projects/**/*.cs`, the tests of `SqlSource.Tool.Tests.Projects` | 316 | 228 | 214 | 12 | 2 | 19 min |
+
+The last four rows are of 2026-11-13.  The tests of `Projects`, some of which run MSBuild, cost about five seconds for each mutant.  The driver tests, which run the whole generator, cost about 17 seconds for each mutant where a folder's own tests cost about one: on `Generation/Paths` they took eleven times as long, killed one of the fifteen mutants that its own tests leave alive, and had three more reported as timeouts, [which may not be kills](#limits).  So a folder is run with its own tests, and the driver tests with the root files alone.
 
 A whole project does not fit in a night, so it is not run.  The generator's one whole run, with every test and Stryker's default time allowance, took 11 hours 41 minutes for 10,782 mutants and reported no survivor, [since it reported each as a timeout](#limits); its report was 738 MB, which `compare` reads in two seconds.  Before a single mutant is tested, a run of every generator test takes eleven minutes to build, run the tests once and capture what each reaches, and the script does that twice.
 
@@ -160,9 +166,39 @@ The generator has 19,868 mutants, of which 4,572 do not compile and 1,687 are st
 
 `tools/MutationReport` is the program behind it, a console project of the solution that is never packed, whose tests are in `tests/SqlSource.Repository.Tests/MutationReport/`.  Its `static <report.json>` prints the exclusions of a report's static mutants and exits 1 when the report's run tested one, which is how the script finds them and checks its second run.
 
+### The test review's commands
+
+`tools/MutationReport` has three more commands, which the skill in `.claude/skills/reviewing-test-quality/` runs to prepare what its reviewers read.  None of them runs a test or a mutation run: they read what a run of the skill measured into its run folder, `artifacts/test-review/<run>/`.
+
+```bash
+dotnet run --project tools/MutationReport -- slices . artifacts/test-review/<run>/slices --exclude-from <file> tests/SqlSource.Tests
+dotnet run --project tools/MutationReport -- condense . artifacts/test-review/<run> --broad-from <file>
+dotnet tools/MutationReport/bin/Debug/net10.0/SqlSource.MutationReport.dll kills <report.json> SqlLexerTests.Read_Quote_Ends
+```
+
+`slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] <folder> ...` cuts the `.cs` files of the folders into slices of at most 5,000 lines, or the limit given, so that every file is in exactly one slice and none is split.  It leaves out `bin/`, `obj/` and the paths the exclusion file lists, one to a line with `#` starting a comment, and cuts each folder by itself, and each test project in it by itself, so no slice holds files of two folders or of two projects.  A slice follows folders: a folder that fits is one block, a larger one is its own files and then its sub-folders, each cut the same way, and neighbouring blocks of one folder are joined while they fit.  The files of one partial class stay together.  It writes `<name>.txt` for each slice, its files one to a line, and `index.txt`, a line `<name> <lines> <files>` for each, and refuses an output folder that holds anything, since a second cut would leave the first one's slices beside its own.  A slice is named for the deepest folder that holds all its files, as `SqlSource.Tests.Parsing-2`.
+
+`condense <repository root> <run folder> [--broad-from <file>]` writes `evidence/<slice>.md` for each slice of the run folder, from what the folder holds:
+
+| Path in the run folder | Holds |
+|----|----|
+| `slices/` | The slices, as `slices` writes them |
+| `mutation/<scope>/reports/mutation-report.json` | The report of each mutation scope, and a file `failed` beside `reports/` when the scope's run failed |
+| `tests/<project>/results.xunit.xml` | A test project's tests with their times, as `--report-xunit-xml` writes them; `<project>` is its folder from `tests/` |
+| `tests/<project>/coverage.cobertura.xml` | The same run's line coverage |
+
+An evidence file lists the slice's files, the mutation scopes that ran its tests, and each test method with its rows, its time, the mutants it kills, how many of those no other test kills, and the smallest set found of other tests that kill all it kills.  It then lists the mutants that survive under the slice's tests, the mutants whose tests ran out of time, the lines of the source its tests reach that no test covers or that no run can test, and each class's share of its project's time.  The rows of a theory are one method, since a report tells them apart only by id.  A broad test, one whose full name starts with a line of the file `--broad-from` names, is never another test's cover and never the other killer that stops a kill being a test's alone.  A slice that no scope ran says so, and does not say that its tests kill nothing.
+
+It also writes `evidence/gaps.md`, the mutants of each source file by what became of them, and `evidence/database-only-lines.md`, the source lines that only the projects under `tests/DatabaseTests/` reach.  It exits 2, naming the scope, for a scope that failed, a report that cannot be read or one whose run tested a static mutant, and when two scopes tested one mutant, whose kills would be counted twice.
+
+`kills <report.json> <test name>` prints each mutant that a test method kills in one scope's report, with the other methods that kill it, and the mutants under it whose tests ran out of time (`TIMEOUT`) or that no test fails on (`SURVIVED`).  The name is a method's full name, or its end, as `SqlLexerTests.Read_Quote_Ends`.  It exits 1 when the report holds no such test.
+
+An agent runs the built program, the third form above, and never `dotnet run`: two builds of one project at once fail, and nothing builds in a checkout during a mutation run.
+
 ### Limits
 
 - **Stryker's runner for the Microsoft Testing Platform is a preview**, and its other runner cannot run these projects.  The static mutants are the one fault found in it, on one file checked by hand; any state that a process keeps from one mutant to the next would do the same, so a result that decides something is read by a person, and a scope whose two runs disagree is not to be trusted.  Stryker has an open request for a process for each mutant, [stryker-net#3742](https://github.com/stryker-mutator/stryker-net/issues/3742).
+- **Two runs of one scope do not agree to the last mutant.**  Of the 2,275 mutants of `Parsing/`, three runs on one tree differed in five to seven that one run reports `Killed` and another `Timeout`, and in two that one run reports `Killed`, by one test alone, and two report `Survived`: both read memory that an `ArrayPool` hands back, so what the test sees depends on what the process did before.  A kill by one test alone of a mutant that leaves memory unfilled, or reads past what was filled, may not repeat.
 - **The static mutants are never tested.**  They are mostly the texts of diagnostics and the tables of names.
 - **A method with a mutant that does not compile loses all its mutants.**  Stryker removes them together, and the code's `out` and pattern variables make it common.
 - **The rows of a theory share one name.**  Each row has its own id, so a report says how many rows kill a mutant and not which.

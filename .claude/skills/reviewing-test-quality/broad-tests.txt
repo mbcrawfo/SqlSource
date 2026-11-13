@@ -1,0 +1,24 @@
+# The broad tests: those that check a whole output at once.  A line is the start of a test's full name, a class with
+# its last '.' or a namespace with its.  A broad test never counts as the cover that makes a focused test redundant,
+# since its failure says that something changed and not which rule broke.  A run may correct this list; say so in
+# its pull request.
+
+# The golden corpus: every file the generator writes for a case, compared with its golden file.
+SqlSource.Tests.Generator.QueryMethodCorpusTests.
+
+# The generator and the tool run over the same sources, and all they find compared.
+SqlSource.Tool.Tests.Planning.GeneratorParityTests.
+
+# Every bundle of Fixtures/Bundles/, replayed and compared with its expected.json.
+SqlSource.Tool.Tests.Fixtures.BundleCasesTests.
+
+# Every recorded fixture of every describer, replayed and compared with its expected.json byte for byte, and
+# described against a server by each engine's project.
+SqlSource.Tool.Tests.Fixtures.DescriberFixtureTests.
+SqlSource.DatabaseTests.Postgres.Describer.FixtureCasesTests.
+SqlSource.DatabaseTests.SqlServer.Describer.FixtureCasesTests.
+
+# The realistic corpora: every case's query generated in process, and described, generated and called on a server.
+SqlSource.Tool.Tests.Realistic.RealisticGenerationTests.
+SqlSource.DatabaseTests.Postgres.Realistic.
+SqlSource.DatabaseTests.SqlServer.Realistic.
