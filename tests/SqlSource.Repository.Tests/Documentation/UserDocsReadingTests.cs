@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Linq;
 using Shouldly;
 using Xunit;
@@ -291,4 +293,82 @@ public sealed class UserDocsReadingTests
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]
     public void SiteLinkProblem_APageOrAnotherSite_IsNone(string target) =>
         UserDocs.SiteLinkProblem(target).ShouldBeNull();
+
+    // Fails when PagesUnder does not recurse, leaves out a nested index.md or a page of a folder, or lists
+    // site/index.md, an AGENTS.md or a CLAUDE*.md.
+    [Fact]
+    public void PagesUnder_AFolder_ListsEveryPageButTheOnesOfAnAgent()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            foreach (
+                var file in new[]
+                {
+                    "site/a/b/c.md",
+                    "site/reference/databases/index.md",
+                    "site/top.md",
+                    "site/index.md",
+                    "site/AGENTS.md",
+                    "site/sub/AGENTS.md",
+                    "site/CLAUDE.local.md",
+                    "site/sub/CLAUDE.md",
+                    "site/sub/image.png",
+                    "docs/outside.md",
+                }
+            )
+            {
+                var path = Path.Combine(root, file);
+                _ = Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, "");
+            }
+
+            UserDocs.PagesUnder(root).ShouldBe(["site/a/b/c.md", "site/reference/databases/index.md", "site/top.md"]);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    // Fails when Exists accepts a path of another case, a path through a file, or rejects the exact one.  On a disk
+    // that ignores case a plain File.Exists finds `site/Tool.md` for `site/tool.md`, as GitHub does not.
+    [Theory]
+    [InlineData("site/Tool.md", true)]
+    [InlineData("site/Tool.md/", true)]
+    [InlineData("site", true)]
+    [InlineData("site/sub", true)]
+    [InlineData("site/sub/Page.md", true)]
+    [InlineData("site/tool.md", false)]
+    [InlineData("site/TOOL.md", false)]
+    [InlineData("Site/Tool.md", false)]
+    [InlineData("SITE", false)]
+    [InlineData("site/Sub/Page.md", false)]
+    [InlineData("site/sub/page.md", false)]
+    [InlineData("site/Tool.md/x", false)]
+    [InlineData("site/missing.md", false)]
+    public void Exists_Path_NeedsItsExactCase(string path, bool exists)
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            _ = Directory.CreateDirectory(Path.Combine(root, "site", "sub"));
+            File.WriteAllText(Path.Combine(root, "site", "Tool.md"), "");
+            File.WriteAllText(Path.Combine(root, "site", "sub", "Page.md"), "");
+
+            UserDocs.Exists(root, path).ShouldBe(exists);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    // Fails when the real repository's Exists is a plain File.Exists: `site/Tool.md` is not a file, `site/tool.md` is.
+    [Fact]
+    public void Exists_OfTheRepository_NeedsTheCaseOfTheFile()
+    {
+        UserDocs.Exists("site/tool.md").ShouldBeTrue();
+        UserDocs.Exists("site/Tool.md").ShouldBeFalse();
+    }
 }

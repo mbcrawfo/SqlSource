@@ -34,18 +34,21 @@ internal static partial class UserDocs
     // The pages of the manual, as repository-relative paths with '/': every .md file of site/, in its folders, but the
     // AGENTS.md and CLAUDE*.md files, which are guidance for an agent, and site/index.md, which only sends the site's
     // root to README.html.  docfx publishes these.
-    public static IReadOnlyList<string> SitePages { get; } =
-    [
-        .. Directory
-            .EnumerateFiles(RepositoryRoot.Path(Site), "*.md", SearchOption.AllDirectories)
-            .Select(path => Path.GetRelativePath(RepositoryRoot.Path(), path).Replace('\\', '/'))
-            .Where(path =>
-                path != $"{Site}/index.md"
-                && Path.GetFileName(path) is not "AGENTS.md"
-                && !Path.GetFileName(path).StartsWith("CLAUDE", StringComparison.Ordinal)
-            )
-            .Order(StringComparer.Ordinal),
-    ];
+    public static IReadOnlyList<string> SitePages { get; } = PagesUnder(RepositoryRoot.Path());
+
+    // The pages of the manual under the folder `repository`, as SitePages lists them for the repository.
+    internal static IReadOnlyList<string> PagesUnder(string repository) =>
+        [
+            .. Directory
+                .EnumerateFiles(Path.Combine(repository, Site), "*.md", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(repository, path).Replace('\\', '/'))
+                .Where(path =>
+                    path != $"{Site}/index.md"
+                    && Path.GetFileName(path) is not "AGENTS.md"
+                    && !Path.GetFileName(path).StartsWith("CLAUDE", StringComparison.Ordinal)
+                )
+                .Order(StringComparer.Ordinal),
+        ];
 
     // The repository-relative paths, with '/', of the user documents: the two readmes and the pages of the manual.
     public static IReadOnlyList<string> Files { get; } = ["README.md", "src/SqlSource.Tool/README.md", .. SitePages];
@@ -184,11 +187,33 @@ internal static partial class UserDocs
         return (Path.GetRelativePath(root, full).Replace('\\', '/').TrimEnd('/'), anchor);
     }
 
-    // Whether a path of the repository, as Resolve gives it, names a file or a folder that is there.
-    public static bool Exists(string path)
+    // Whether a path of the repository, as Resolve gives it, names a file or a folder that is there, with its exact
+    // case: a disk that ignores case finds a page for the name of another case, and GitHub and a Linux build do not.
+    public static bool Exists(string path) => Exists(RepositoryRoot.Path(), path);
+
+    // Whether `path`, with '/', names a file or a folder under the folder `root`, each segment spelt as its entry.
+    internal static bool Exists(string root, string path)
     {
-        var full = RepositoryRoot.Path(path);
-        return File.Exists(full) || Directory.Exists(full);
+        var folder = root;
+        foreach (var segment in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!Directory.Exists(folder))
+            {
+                return false;
+            }
+
+            var entry = Directory
+                .EnumerateFileSystemEntries(folder)
+                .FirstOrDefault(entry => string.Equals(Path.GetFileName(entry), segment, StringComparison.Ordinal));
+            if (entry is null)
+            {
+                return false;
+            }
+
+            folder = entry;
+        }
+
+        return true;
     }
 
     private static Document Load(string file) =>

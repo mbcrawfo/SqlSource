@@ -12,6 +12,8 @@ namespace SqlSource.Repository.Tests.Documentation;
 // anchor, and after `../` read from the folder of its file, and a URL of the published site.  It fails on a reference
 // that names no page, or an anchor that is not on the page, in any text file that git tracks but `docs/superpowers/`
 // (whose files record intent and are not kept current) and the user documents (`UserDocsLinksTests` follows those).
+// It does not read the tracked files of `.claude/`, nor those of any dot folder but `.github`: the brief decided so.
+// A path is compared with its exact case, as GitHub and a Linux build do, though the disk may ignore it.
 // A reference that names nothing is a broken reference: mend it.  Never add an exception to pass.
 // The exceptions are these four and no other:
 //   - UserDocsReadingTests.cs, whole: its test data is wrong on purpose.
@@ -202,6 +204,12 @@ public sealed partial class InboundSiteReferenceTests
     [InlineData("docs/README.md", "https://github.com/mbcrawfo/SqlSource/tree/main/site/diagnostics.md", true)]
     [InlineData("README.md", "https://github.com/mbcrawfo/SqlSource/blob/main/site/diagnostics.md#sqlsrc999", false)]
     [InlineData("README.md", "https://github.com/mbcrawfo/SqlSource/blob/main/site/nope.md", false)]
+    [InlineData("README.md", "site/Tool.md#exit-codes", false)]
+    [InlineData("README.md", "site/Diagnostics.md", false)]
+    [InlineData("docs/README.md", "../site/DIAGNOSTICS.md#sqlsrc001", false)]
+    [InlineData("docs/README.md", "/site/Diagnostics.md", false)]
+    [InlineData("README.md", "https://github.com/mbcrawfo/SqlSource/blob/main/site/Tool.md#exit-codes", false)]
+    [InlineData("README.md", "https://github.com/mbcrawfo/SqlSource/tree/main/Site/diagnostics.md", false)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/", true)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#", true)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc999", false)]
@@ -209,6 +217,15 @@ public sealed partial class InboundSiteReferenceTests
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/AGENTS.html", false)]
     public void Problem_OfAReference_IsNullOnlyWhenItNamesAPageAndAnchor(string file, string reference, bool good) =>
         (Problem(file, reference) is null).ShouldBe(good);
+
+    // Fails when a reference spelt with a wrong case passes: a disk that ignores case finds the file, GitHub does not.
+    // The rows of the test above name the forms and a wrong-cased page of each; this one names the page that exists.
+    [Fact]
+    public void Problem_OfAReferenceWithTheRightCase_IsNull()
+    {
+        Problem("README.md", "site/diagnostics.md#sqlsrc001").ShouldBeNull();
+        Problem("docs/README.md", "../site/diagnostics.md#sqlsrc001").ShouldBeNull();
+    }
 
     // Fails when the walk reads a file that git ignores or a binary file, or skips a tracked text file.
     [Fact]
@@ -372,7 +389,7 @@ public sealed partial class InboundSiteReferenceTests
             }
         }
 
-        if (!File.Exists(RepositoryRoot.Path(path.Split('/'))))
+        if (!UserDocs.Exists(path) || !File.Exists(RepositoryRoot.Path(path.Split('/'))))
         {
             return $"{path} is not a file of the repository";
         }
