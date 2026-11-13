@@ -107,6 +107,16 @@ public sealed partial class InboundSiteReferenceTests
     [InlineData("[x](../../site/tool.md#exit-codes)", "../../site/tool.md#exit-codes")]
     [InlineData("[x](site/tool.md#exit-codes)", "./site/tool.md#exit-codes")]
     [InlineData("// see site/sub/probe.md#nope", "site/sub/probe.md#nope")]
+    [InlineData("[x](./site/tool.md#exit-codes)", "./site/tool.md#exit-codes")]
+    [InlineData("[x](/site/tool.md#exit-codes)", "/site/tool.md#exit-codes")]
+    [InlineData(
+        "[x](https://github.com/mbcrawfo/SqlSource/blob/main/site/tool.md#exit-codes)",
+        "https://github.com/mbcrawfo/SqlSource/blob/main/site/tool.md#exit-codes"
+    )]
+    [InlineData(
+        "See https://github.com/mbcrawfo/SqlSource/tree/main/site/sub/probe.md.",
+        "https://github.com/mbcrawfo/SqlSource/tree/main/site/sub/probe.md"
+    )]
     [InlineData(
         "See https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes.",
         "https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes"
@@ -129,6 +139,9 @@ public sealed partial class InboundSiteReferenceTests
     [InlineData("site/<page>.md")]
     [InlineData("`site/*.md`")]
     [InlineData("tests/site/x.md")]
+    [InlineData("artifacts/site/f.md")]
+    [InlineData("[x](tests/site/x.md)")]
+    [InlineData("[x](../tests/site/x.md)")]
     [InlineData("`tool.md`")]
     [InlineData("mysite/tool.md")]
     public void References_OtherWords_AreNotRead(string line) => References(line).ShouldBeEmpty();
@@ -162,6 +175,14 @@ public sealed partial class InboundSiteReferenceTests
     [InlineData("README.md", "./site/diagnostics.md#sqlsrc001", true)]
     [InlineData("docs/architecture/README.md", "./site/diagnostics.md", false)]
     [InlineData("a/b/c.md", "../../site/nope.md", false)]
+    [InlineData("docs/README.md", "/site/diagnostics.md#sqlsrc001", true)]
+    [InlineData("docs/README.md", "/site/diagnostics.md#sqlsrc999", false)]
+    [InlineData("docs/README.md", "/site/nope.md", false)]
+    [InlineData("docs/README.md", "./site/diagnostics.md", false)]
+    [InlineData("README.md", "https://github.com/mbcrawfo/SqlSource/blob/main/site/diagnostics.md#sqlsrc001", true)]
+    [InlineData("docs/README.md", "https://github.com/mbcrawfo/SqlSource/tree/main/site/diagnostics.md", true)]
+    [InlineData("README.md", "https://github.com/mbcrawfo/SqlSource/blob/main/site/diagnostics.md#sqlsrc999", false)]
+    [InlineData("README.md", "https://github.com/mbcrawfo/SqlSource/blob/main/site/nope.md", false)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/", true)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#", true)]
     [InlineData("README.md", "https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc999", false)]
@@ -190,6 +211,7 @@ public sealed partial class InboundSiteReferenceTests
                     "TestResults/h.txt",
                     "CLAUDE.local.md",
                     "docs/i.png",
+                    ".vscode/x.json",
                 }
             )
             {
@@ -223,6 +245,7 @@ public sealed partial class InboundSiteReferenceTests
                             : match.Value
                     )
                 )
+                .Concat(GitHubReference().Matches(lines[index]).Select(match => (match.Index, Reference: match.Value)))
                 .Concat(
                     UrlReference()
                         .Matches(lines[index])
@@ -238,14 +261,32 @@ public sealed partial class InboundSiteReferenceTests
 
     // What is wrong with a reference in a file, or null when it names a page and, if it has one, an anchor that exist.
     // A path is read from the root, unless it follows `../` or is the target of a Markdown link, which References gives
-    // as `./site/...`: either makes it a relative link of the file's folder.
+    // as `./site/...`: either makes it a relative link of the file's folder.  A path after `/` or in a GitHub URL of
+    // `blob/main/` or `tree/main/` is read from the root.
     internal static string? Problem(string file, string reference)
     {
         string path;
         string anchor;
+        const string GitHubSite = "https://github.com/mbcrawfo/SqlSource/";
         var relative =
             reference.StartsWith("../", StringComparison.Ordinal)
             || reference.StartsWith("./", StringComparison.Ordinal);
+        if (reference.StartsWith(GitHubSite, StringComparison.OrdinalIgnoreCase))
+        {
+            // `blob/main/` or `tree/main/`, then the path from the root.
+            reference = reference[
+                (
+                    GitHubSite.Length
+                    + reference[GitHubSite.Length..].IndexOf("/main/", StringComparison.Ordinal)
+                    + "/main/".Length
+                )..
+            ];
+        }
+        else if (reference.StartsWith("/site/", StringComparison.Ordinal))
+        {
+            reference = reference[1..];
+        }
+
         if (relative || reference.StartsWith("site/", StringComparison.Ordinal))
         {
             var hash = reference.IndexOf('#', StringComparison.Ordinal);
@@ -346,11 +387,20 @@ public sealed partial class InboundSiteReferenceTests
     }
 
     // `site/<path>.md` and an optional anchor, with no letter, digit, `_`, `-`, `.` or `/` before `site/`, unless it
-    // follows `../`, which the reference then holds.
+    // follows `../` or `./`, or is the target of a link that starts with `/`, which the reference then holds.
     [GeneratedRegex(
-        @"(?:(?:\.\./)+|(?<![A-Za-z0-9_.\-/]))site/[A-Za-z0-9_.\-/]*\.md(?![A-Za-z0-9_])(?:#[A-Za-z0-9_\-]*)?"
+        @"(?:(?:\.\./)+|(?<![A-Za-z0-9_.\-/])\./|(?<=\]\()/|(?<![A-Za-z0-9_.\-/]))"
+            + @"site/[A-Za-z0-9_.\-/]*\.md(?![A-Za-z0-9_])(?:#[A-Za-z0-9_\-]*)?"
     )]
     private static partial Regex PathReference();
+
+    // A path under `site/` in a GitHub URL of `blob/main/` or `tree/main/`.
+    [GeneratedRegex(
+        @"https://github\.com/mbcrawfo/SqlSource/(?:blob|tree)/main/"
+            + @"site/[A-Za-z0-9_.\-/]*\.md(?![A-Za-z0-9_])(?:#[A-Za-z0-9_\-]*)?",
+        RegexOptions.IgnoreCase
+    )]
+    private static partial Regex GitHubReference();
 
     // The site's address and every character after it up to a space, a quote, a bracket or an angle bracket.
     [GeneratedRegex(@"https?://mbcrawfo\.github\.io/SqlSource[^\s`""'<>)\]\\]*", RegexOptions.IgnoreCase)]

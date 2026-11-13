@@ -420,8 +420,8 @@ internal static partial class UserDocs
     [GeneratedRegex(@"^https?://mbcrawfo\.github\.io/SqlSource(?=[/#?]|$)", RegexOptions.IgnoreCase)]
     private static partial Regex SiteLinkPattern();
 
-    // A page of the site: its path, in folders or not, and `.html`.
-    [GeneratedRegex(@"^((?:[^/]+/)*[^/]+)\.html$")]
+    // A page of the site: its path, in folders or not, with no `.` or `..` segment, and `.html`.
+    [GeneratedRegex(@"^((?:(?!\.{1,2}/)[^/]+/)*(?!\.{1,2}\.html$)[^/]+)\.html$")]
     private static partial Regex SitePagePattern();
 
     // The text of a tab heading: a link whose target is `#tab/<id>`, the id with its slashes.

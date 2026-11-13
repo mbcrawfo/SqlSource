@@ -269,6 +269,9 @@ public sealed class UserDocsReadingTests
     [InlineData("http://mbcrawfo.github.io/SqlSource/tool.html")]
     [InlineData("http://mbcrawfo.github.io/SqlSource/")]
     [InlineData("HTTPS://MBCRAWFO.GITHUB.IO/SqlSource/tool.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/../README.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/./tool.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/../tool.html")]
     public void SiteLinkProblem_NotAPageOfTheSite_IsReported(string target)
     {
         UserDocs.IsSiteLink(target).ShouldBeTrue();
