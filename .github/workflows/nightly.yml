@@ -6,6 +6,7 @@
 # build.yml tests each engine's floor and default image, and test-postgres and test-sqlserver here every supported major
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
 # The two allocation jobs and the two sync-async jobs run the default images only.
+# roslyn-floor runs the tests of tests/SqlSource.Tests.RoslynFloor on Linux, which build.yml compiles but does not run.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
 # Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
 # 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the Test
@@ -89,6 +90,36 @@ jobs:
                   --report-github --report-github-summary-include-passed false || status=1
           done
           exit "$status"
+
+  # Runs the tests of tests/SqlSource.Tests.RoslynFloor on Linux, the generator's driver tests on the oldest supported
+  # Roslyn.  build.yml compiles the project but leaves its tests to this job and the test job above: they are those
+  # of tests/SqlSource.Tests/Generator/, which build.yml runs on the current Roslyn.
+  roslyn-floor:
+    name: Test on the oldest Roslyn
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PROJECT: tests/SqlSource.Tests.RoslynFloor
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: tests/SqlSource.Tests.RoslynFloor/packages.lock.json
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
+
+      - name: Test
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          --report-github --report-github-summary-include-passed false
 
   # build.yml runs every test of tests/DatabaseTests/Postgres on PostgreSQL 14, the floor, and 18, the default.  This
   # runs them on every supported major between the two, each image pinned as rule 5 of AGENTS.md says.  The steps are

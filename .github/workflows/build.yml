@@ -1,7 +1,8 @@
 # Runs every check, builds, tests, packs and reports coverage.  Called by ci.yml and publish.yml.
 # The check steps mirror pre-commit-validation.sh: a check added to one is added to the other in the same commit.
-# Every job starts at once and none needs another, so that the run takes as long as its slowest job and a failure in
-# one job hides nothing in the others.  A job pays for its own build, which is cheaper than waiting for a shared one.
+# Every job but coverage starts at once and needs no other, so that the run takes as long as its slowest job and a
+# failure in one job hides nothing in the others.  A job pays for its own build, which is cheaper than waiting for a
+# shared one.  The coverage job waits for the test legs alone, whose Cobertura files it merges.
 # The NuGet cache of each job is keyed on the lock files of what it restores, with dotnet-tools.json when it restores
 # the tools.  The first job to finish saves the cache under its key, so two jobs that restore different packages must
 # never share a key, or the cache could hold only the packages of the smaller job.
@@ -133,10 +134,50 @@ jobs:
       - name: Check formatting
         run: ./format.sh --check analyzers
 
-  build:
-    name: Build, test and report coverage
+  # The tests, one leg per test project or group of projects, each on a runner of its own: run together on one runner,
+  # the projects starved each other of its four CPUs.  Each leg builds only its projects, runs them with coverage and
+  # uploads its Cobertura files for the coverage job.  A project of the solution that no leg names runs nowhere in CI,
+  # so CiTestProjectsTests of tests/SqlSource.Repository.Tests fails until a leg names it or it is named there as one
+  # that only nightly.yml runs, as tests/SqlSource.Tests.RoslynFloor is.  Every project still compiles in the package
+  # job's build of the solution.
+  test:
+    name: Test ${{ matrix.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      # One leg's failure says nothing of another.
+      fail-fast: false
+      matrix:
+        include:
+          - name: the generator
+            key: generator
+            projects: tests/SqlSource.Tests
+            lock-files: tests/SqlSource.Tests/packages.lock.json
+          - name: the tool
+            key: tool
+            projects: tests/SqlSource.Tool.Tests
+            lock-files: tests/SqlSource.Tool.Tests/packages.lock.json
+          # The default image of each engine, which tools/pull-test-images.sh reads, so that no workflow names it.
+          - name: on PostgreSQL
+            key: postgres
+            projects: tests/DatabaseTests/Postgres tests/DatabaseTests/Postgres.Npgsql8
+            lock-files: |
+              tests/DatabaseTests/Postgres/packages.lock.json
+              tests/DatabaseTests/Postgres.Npgsql8/packages.lock.json
+            docker: true
+            postgis: true
+          # tests/SqlSource.Repository.Tests, which takes seconds and needs no Docker, rides with the shortest leg.
+          - name: on SQL Server
+            key: sqlserver
+            projects: >-
+              tests/DatabaseTests/SqlServer tests/DatabaseTests/SqlServer.SqlClient61 tests/SqlSource.Repository.Tests
+            lock-files: |
+              tests/DatabaseTests/SqlServer/packages.lock.json
+              tests/DatabaseTests/SqlServer.SqlClient61/packages.lock.json
+              tests/SqlSource.Repository.Tests/packages.lock.json
+            docker: true
+    env:
+      PROJECTS: ${{ matrix.projects }}
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -148,25 +189,21 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            dotnet-tools.json
-
-      - name: Restore tools
-        run: dotnet tool restore
-
-      - name: Restore packages
-        run: dotnet restore "$SOLUTION"
+          cache-dependency-path: ${{ matrix.lock-files }}
 
       - name: Build
         id: build
-        run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
+        run: |
+          read -ra projects <<<"$PROJECTS"
+          for project in "${projects[@]}"; do
+              dotnet build "$project" --configuration "$CONFIGURATION"
+          done
 
       # A pull is a step of its own, so that the time it takes shows apart from the time the tests take.  It pulls the
       # default image of each engine.  It runs after the build, not beside it: in the background during the build it
       # saved no time, because it slowed the build by about as long as it took.
       - name: Pull test images
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ matrix.docker && steps.build.outcome == 'success' }}
         run: tools/pull-test-images.sh
 
       # The PostGIS image is built in a step of its own, so that a failed build fails the job here, with Docker's whole
@@ -174,28 +211,75 @@ jobs:
       # for the check after the tests.
       - name: Build PostGIS image
         id: postgis
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ matrix.postgis && steps.build.outcome == 'success' }}
         run: |
           tools/build-postgis-image.sh
           id="$(tools/build-postgis-image.sh --id)"
           echo "POSTGIS_IMAGE_ID=$id" >> "$GITHUB_ENV"
 
+      # Every project runs even when an earlier one failed, so that one run reports every problem.
       - name: Test
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.postgis.outcome == 'success' }}
-        run: >-
-          dotnet test --solution "$SOLUTION" --configuration "$CONFIGURATION" --no-build
-          --results-directory artifacts/test-results
-          --coverage --coverage-output-format cobertura
-          --report-github --report-github-summary-include-passed false
+        run: |
+          read -ra projects <<<"$PROJECTS"
+          status=0
+          for project in "${projects[@]}"; do
+              dotnet test --project "$project" --configuration "$CONFIGURATION" --no-build \
+                  --results-directory artifacts/test-results \
+                  --coverage --coverage-output-format cobertura \
+                  --report-github --report-github-summary-include-passed false || status=1
+          done
+          exit "$status"
 
       # Fails the job when the tests built the PostGIS image again, which would hide a failed build in their errors.
       - name: Check the tests built no PostGIS image
         if: ${{ !cancelled() && steps.postgis.outcome == 'success' }}
         run: tools/build-postgis-image.sh --unchanged "$POSTGIS_IMAGE_ID"
 
+      # Whatever the tests wrote, even when some failed, as the coverage report of a failed run shows what did pass.
+      - name: Upload Cobertura files
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cobertura-${{ matrix.key }}
+          path: artifacts/test-results/*.cobertura.xml
+          if-no-files-found: warn
+
+  # Merges the Cobertura files of the test legs into the coverage report.  It is the one job of this workflow that
+  # needs another: it consumes the cobertura-* artifacts alone, and no job needs it.  It runs when a leg failed, as the
+  # report did when it was a step of the one test job.  It checks out the sources, which the HTML report shows.  It
+  # restores the tools alone, so its cache is keyed on dotnet-tools.json alone, as the site job's is.
+  coverage:
+    name: Report coverage
+    needs: test
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: dotnet-tools.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Download Cobertura files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cobertura-*
+          merge-multiple: true
+          path: artifacts/test-results
+
       - name: Report coverage
         id: coverage
-        if: ${{ !cancelled() && hashFiles('artifacts/test-results/*.cobertura.xml') != '' }}
+        if: ${{ hashFiles('artifacts/test-results/*.cobertura.xml') != '' }}
         run: |
           dotnet reportgenerator \
               '-reports:artifacts/test-results/*.cobertura.xml' \
@@ -205,15 +289,15 @@ jobs:
           cat artifacts/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage
-        if: ${{ !cancelled() && steps.coverage.outcome == 'success' }}
+        if: ${{ steps.coverage.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage
           path: artifacts/coverage
           if-no-files-found: error
 
-  # The build job ran every test of tests/DatabaseTests/Postgres, the describer's and the end-to-end project's, on
-  # the default image.  This runs them again on the oldest PostgreSQL that is supported: see
+  # The test leg on PostgreSQL runs every test of tests/DatabaseTests/Postgres, the describer's and the end-to-end
+  # project's, on the default image.  This runs them again on the oldest PostgreSQL that is supported: see
   # tests/DatabaseTests/Postgres/README.md.
   test-postgres-floor:
     name: Test on PostgreSQL 14
@@ -265,8 +349,8 @@ jobs:
         if: ${{ !cancelled() && steps.postgis.outcome == 'success' }}
         run: tools/build-postgis-image.sh --unchanged "$POSTGIS_IMAGE_ID" "$POSTGRES_FLOOR_IMAGE"
 
-  # The same for tests/DatabaseTests/SqlServer, which the build job ran on the default image, on the oldest SQL Server
-  # that is supported: see tests/DatabaseTests/SqlServer/README.md.
+  # The same for tests/DatabaseTests/SqlServer, which the test leg on SQL Server runs on the default image, on the
+  # oldest SQL Server that is supported: see tests/DatabaseTests/SqlServer/README.md.
   test-sqlserver-floor:
     name: Test on SQL Server 2017
     runs-on: ubuntu-latest
@@ -304,11 +388,14 @@ jobs:
 
   # Packs the generator and the tool, checks both packages, and uploads them for publish.yml.  The package checks do
   # not wait for the tests: publish.yml needs the whole of this workflow, so a package is never pushed from a run whose
-  # tests failed.
+  # tests failed.  It also builds the whole solution, as pre-commit-validation.sh does, since each test leg builds only
+  # its projects: the examples, whose build checks their sidecars, and the projects whose tests only nightly.yml runs
+  # compile nowhere else in CI.  Its cache is keyed on every lock file, as format-analyzers' is, since it restores the
+  # same packages.
   package:
-    name: Pack and check packages
+    name: Pack, check packages and build the solution
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -320,7 +407,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: src/*/packages.lock.json
+          cache-dependency-path: '**/packages.lock.json'
 
       - name: Pack
         id: pack
@@ -340,6 +427,12 @@ jobs:
       - name: Check tool install
         if: ${{ !cancelled() && steps.pack.outcome == 'success' }}
         run: tools/check-tool-install.sh artifacts/packages
+
+      # After the checks, so that a project that fails to build hides none of their findings.  The packed projects are
+      # built already, so it builds the rest.
+      - name: Build the solution
+        if: ${{ !cancelled() }}
+        run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION"
 
       - name: Upload packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
