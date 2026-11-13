@@ -61,6 +61,9 @@ public sealed class CliTests
     [InlineData("slices", "root", "out", "tests", "--limit")]
     [InlineData("slices", "root", "out", "tests", "--exclude-from")]
     [InlineData("slices", "root", "out", "--unknown", "tests")]
+    [InlineData("condense", "root")]
+    [InlineData("condense", "root", "run", "--broad-from")]
+    [InlineData("condense", "root", "run", "--narrow-from", "file")]
     public async Task RunAsync_OtherArguments_ExitsTwoWithTheUsage(params string[] arguments)
     {
         var (code, output, error) = await RunAsync(arguments);
@@ -70,7 +73,9 @@ public sealed class CliTests
             Lines(
                 "Usage: compare <before.json> <after.json>",
                 "       static <report.json>",
-                "       slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] <folder> ..."
+                "       slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] "
+                    + "<folder> ...",
+                "       condense <repository root> <run folder> [--broad-from <file>]"
             )
         );
         output.ShouldBeEmpty();

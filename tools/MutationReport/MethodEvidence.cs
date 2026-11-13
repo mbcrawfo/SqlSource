@@ -120,7 +120,8 @@ internal static class KillEvidence
         ];
     }
 
-    private static readonly Comparer<MatrixMutant> ByPlace = Comparer<MatrixMutant>.Create(
+    // The order of mutants by project, file and place.
+    internal static readonly Comparer<MatrixMutant> ByPlace = Comparer<MatrixMutant>.Create(
         (left, right) =>
         {
             var order = string.CompareOrdinal(left.Project, right.Project);

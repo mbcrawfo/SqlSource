@@ -23,6 +23,10 @@ internal static class Cli
                 return await SlicesCommand
                     .RunAsync(root, folder, options.Limit, options.ExclusionFile, options.Folders, output, error)
                     .ConfigureAwait(false);
+            case ["condense", var root, var run]:
+                return await CondenseAsync(root, run, null, output, error).ConfigureAwait(false);
+            case ["condense", var root, var run, "--broad-from", var broad]:
+                return await CondenseAsync(root, run, broad, output, error).ConfigureAwait(false);
             default:
                 foreach (var line in Usage)
                 {
@@ -38,7 +42,30 @@ internal static class Cli
         "Usage: compare <before.json> <after.json>",
         "       static <report.json>",
         "       slices <repository root> <output folder> [--limit <lines>] [--exclude-from <file>] <folder> ...",
+        "       condense <repository root> <run folder> [--broad-from <file>]",
     ];
+
+    private static async Task<int> CondenseAsync(
+        string root,
+        string run,
+        string? broadFile,
+        TextWriter output,
+        TextWriter error
+    )
+    {
+        string[] broad;
+        try
+        {
+            broad = broadFile is null ? [] : await ListFile.ReadAsync(broadFile).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (IsUnreadable(exception))
+        {
+            await error.WriteLineAsync($"Cannot read {broadFile}: {exception.Message}").ConfigureAwait(false);
+            return 2;
+        }
+
+        return await Condenser.RunAsync(root, run, broad, output, error, CancellationToken.None).ConfigureAwait(false);
+    }
 
     // What follows the two folders of the slices command, or null when it is not what the usage says.
     private sealed record SlicesOptions(int Limit, string? ExclusionFile, IReadOnlyList<string> Folders)
