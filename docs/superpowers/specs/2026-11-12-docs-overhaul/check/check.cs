@@ -1394,6 +1394,10 @@ internal static partial class Check
         return naming.Count > 0 ? 1 : 2;
     }
 
+    // The line of a unit left over that no row judges: "no row", and why, when rows name its text but none fits.
+    private static string NoRow(string? failure) =>
+        failure is null or "no row names it" ? "    no row" : $"    no row fits: {failure}";
+
     // A unit left over: its place at the base, its names, its text, its row and what fails it.  A unit with a
     // position note is printed with the unit at its to nearest to it, and a move-split with what no part holds.
     private static string LeftOverEntry(PhaseState phase, OldUnit unit, (LedgerRow? Row, string? Failure) verdict)
@@ -1402,7 +1406,7 @@ internal static partial class Check
         var lines = new List<string>
         {
             $"{unit.Unit.Id}  [{unit.Names}]  {Display(unit.Unit)}",
-            row is null ? "    no row" : $"    row {row.Describe()}",
+            row is null ? NoRow(failure) : $"    row {row.Describe()}",
         };
         if (row is not null && failure is not null)
         {
@@ -1868,6 +1872,7 @@ internal static partial class Check
         ("12: a move-split part whose words carry a changed numeral: move fails and names the part", PartChangedCase),
         ("13: two copies of a text, named by a move and a removed-status row: each row covers one", CountedRowsCase),
         ("14: a restated-from or merge-pair row whose copy stands at its to covers no other copy", PlacedRowCase),
+        ("15: the same, with rows that name the copies by their place, @<file>:<line>", PlacedPlaceRowCase),
     ];
 
     // A case that throws fails, with the exception's message.
@@ -2358,7 +2363,11 @@ internal static partial class Check
         {
             WriteLedger(scratch, 1, [row]);
             var (code, text) = RunCommand(scratch, "move", "01");
-            if (code != 1 || !ListOf(text, 2).Contains(repeated, StringComparison.Ordinal))
+            if (
+                code != 1
+                || !ListOf(text, 2).Contains(repeated, StringComparison.Ordinal)
+                || !ListOf(text, 2).Contains("placed its own unit", StringComparison.Ordinal)
+            )
             {
                 return $"with one {repeated} cut and only the row of the placed copy, move exits with {code}:\n{text}";
             }
@@ -2368,6 +2377,50 @@ internal static partial class Check
             if (code != 0)
             {
                 return $"with a removed-status row for the cut {repeated}, move exits with {code}:\n{text}";
+            }
+        }
+
+        return null;
+    }
+
+    // Two copies of a paragraph that the selftest writes twice into the base, so that the inventory has no id for it
+    // and a row names each copy by its place, @<file>:<line>.  A restated-from or merge-pair row names the copy that
+    // stays at its to, and the other copy is cut with no row: move fails, and passes once a removed-status row names
+    // the cut copy.
+    private static string? PlacedPlaceRowCase(string scratch)
+    {
+        const string Twice = "A paragraph that the selftest writes twice, which no page of the baseline holds.";
+        var lines = LinesOf(scratch, Readme);
+        lines.AddRange(["", Twice, "", Twice]);
+        WriteLines(scratch, Readme, lines);
+        CommitScratch(scratch, "the selftest writes a paragraph twice");
+        var units = Read(scratch, null).Units.Where(unit => unit.Text == Twice).ToList();
+        if (units.Count != 2)
+        {
+            return $"{Readme} holds the paragraph {units.Count} times, not twice";
+        }
+
+        RemoveUnits(scratch, units.Take(1));
+        string[] placing =
+        [
+            $"@{units[1].Id}\trestated-from\t{Readme}\t{Readme}#owner\t-\tthe rewrite of the page cuts it",
+            $"@{units[1].Id}\tmerge-pair\t{Readme}\tMP-01\t-\tplaced beside its pair",
+        ];
+        var removed = $"@{units[0].Id}\tremoved-status\t-\t-\t-\tstatus: the selftest cuts one copy";
+        foreach (var row in placing)
+        {
+            WriteLedger(scratch, 1, [row]);
+            var (code, text) = RunCommand(scratch, "move", "01");
+            if (code != 1 || !ListOf(text, 2).Contains("placed its own unit", StringComparison.Ordinal))
+            {
+                return $"with one copy cut and only the @ row of the placed copy, move exits with {code}:\n{text}";
+            }
+
+            WriteLedger(scratch, 1, [row, removed]);
+            (code, text) = RunCommand(scratch, "move", "01");
+            if (code != 0)
+            {
+                return $"with an @ removed-status row for the cut copy, move exits with {code}:\n{text}";
             }
         }
 
