@@ -46,6 +46,8 @@ The owner wants the documentation rethought as a site, for a junior developer wh
 - Five test files under `tests/DatabaseTests/*/EndToEnd/` mirror samples of `site/recipes.md`, and `EditorRecipeTests` reads the VS Code task from it.
 - No `v*` tag exists.  The only published package is a beta, whose links into the manual already broke when the manual moved to `site/`.
 - Feature work continues on other branches while the epic runs.
+- `pre-commit-validation.sh` does not know the kind `.tsv` (`is_known_kind`), so a commit that touches one makes a plain run full.  Phase 0 makes the epic's `.tsv` files a known kind, and phase 26 takes the pattern out.
+- `.editorconfig` holds every file but `.md` to 120 columns, and `tools/editorconfig-checker.sh` checks every tracked file.  Phase 0 frees the epic's `.tsv` files of the limit, and phase 26 takes the section out.
 
 What docfx does, checked in a throwaway site:
 
@@ -225,7 +227,7 @@ Each test reads the code or the file system, and fails only for a real mistake.
 
 | Test | What fails it | Lands in |
 |----|----|----|
-| `InboundSiteReferenceTests` (new) | A reference to `site/<path>.md[#anchor]` or to a site URL, in any tracked text file outside `docs/superpowers`, that names no page or anchor | Phase 0 |
+| `InboundSiteReferenceTests` (new) | A reference to `site/<path>.md[#anchor]` or to a site URL, in any tracked text file, that names no page or anchor.  It leaves out `docs/superpowers`, the user documents, whose links `UserDocsLinksTests` follows, and four named exceptions of test data | Phase 0 |
 | `UserDocs`, `UserDocsReadingTests`, `UserDocsLinksTests` (changed) | They read `site/` in folders, read a tab heading and front matter correctly, and accept `folder/page.html` in a site URL.  `Manual_EntryPage_ListsEveryPage` goes | Phase 0, and phase 3 for the root page |
 | `SiteTocTests` (changed) | A page that is not in exactly one `toc.yml`; an entry that names no page | Phase 0 |
 | `DiagnosticsDocumentTests` (changed) | `diagnostics.md` is not at the root; more than the title and one paragraph stands before `## SQLSRC001`; `SqlDiagnostics.HelpLinkBase` is not the site's address and `diagnostics.html#`.  The test of the index tables goes | Phase 2, and phase 3 for the path of `errors.md` |
