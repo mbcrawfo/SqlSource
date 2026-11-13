@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -17,6 +18,9 @@ namespace SqlSource.Repository.Tests.Diagnostics;
 public sealed class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
+    private const string ReportedByTheBuild = "Reported by: the build.";
+    private const string ReportedByTheTool = "Reported by: the tool.";
+    private const string ReportedByBoth = "Reported by: the build and the tool.";
 
     // The generator's descriptors and the tool's together, in the order of their ids, which is the document's.
     private static readonly ImmutableArray<DiagnosticDescriptor> Descriptors =
@@ -38,6 +42,48 @@ public sealed class DiagnosticsDocumentTests
         foreach (var descriptor in Descriptors)
         {
             sections[descriptor.Id].FirstOrDefault(line => line.Length > 0).ShouldBe($"**{descriptor.Title}**");
+        }
+    }
+
+    // Under its title each section says what reports its error: the build reports the generator's descriptors, the
+    // tool its own, and a "both" line is right for either, since the tool reports some of the generator's and the build
+    // two of the tool's.  Which of the 28 sections say "both" is the reviewer's to check, not this test's.
+    [Fact]
+    public void Document_EachSection_SaysWhoReportsIt()
+    {
+        var sections = Sections().ToDictionary(section => section.Id, section => section.Body);
+        var tools = ToolDiagnostics.All.Select(descriptor => descriptor.Id).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var descriptor in Descriptors)
+        {
+            var line = LinesAfterTitle(sections[descriptor.Id]).FirstOrDefault();
+            string[] allowed = tools.Contains(descriptor.Id)
+                ? [ReportedByTheTool, ReportedByBoth]
+                : [ReportedByTheBuild, ReportedByBoth];
+
+            line.ShouldBeOneOf(allowed, descriptor.Id);
+        }
+    }
+
+    // The errors of describing a query against its database name the database under their "Reported by" line, and no
+    // other section has such a line.  Which database each names is the reviewer's to check, against the files that make
+    // the errors.
+    [Fact]
+    public void Document_DescribingSections_NameTheirDatabase()
+    {
+        string[] lines = ["Database: PostgreSQL.", "Database: SQL Server.", "Database: PostgreSQL and SQL Server."];
+
+        foreach (var (id, body) in Sections())
+        {
+            var number = int.Parse(id[6..], CultureInfo.InvariantCulture);
+            if (number is (>= 224 and <= 236) or (>= 262 and <= 266))
+            {
+                LinesAfterTitle(body).Skip(1).FirstOrDefault().ShouldBeOneOf(lines, id);
+            }
+            else
+            {
+                body.ShouldNotContain(line => line.StartsWith("Database:", StringComparison.Ordinal), id);
+            }
         }
     }
 
@@ -91,6 +137,10 @@ public sealed class DiagnosticsDocumentTests
             errors.ShouldNotContain(error => error.Kind == SqlParseErrorKind.UnknownGeneratorParameter, parameter);
         }
     }
+
+    // The lines of a section after its title that are not blank.
+    private static IEnumerable<string> LinesAfterTitle(List<string> body) =>
+        body.Where(line => line.Length > 0).Skip(1);
 
     private static IEnumerable<(string Id, List<string> Body)> Sections()
     {
