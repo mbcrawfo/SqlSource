@@ -43,6 +43,8 @@
     </ItemGroup>
     <Import Project="../Fixtures.props" />
     <ItemGroup>
+        <!-- Stryker finds the project it mutates among a test project's own references (tools/README.md). -->
+        <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
         <ProjectReference Include="../SqlSource.Repository/SqlSource.Repository.csproj" />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />

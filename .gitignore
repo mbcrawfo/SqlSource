@@ -422,5 +422,8 @@ CLAUDE.local.md
 # Coverage output
 coverage/
 
+# What a `dotnet stryker` without --output writes beside the project it mutates
+StrykerOutput/
+
 # Connections of the sqlsource tool, which hold credentials
 .env
