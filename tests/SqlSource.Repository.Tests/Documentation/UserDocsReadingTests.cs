@@ -193,7 +193,7 @@ public sealed class UserDocsReadingTests
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md#x", "README.md", "x")]
     [InlineData("https://github.com/mbcrawfo/SqlSource/tree/main/site/", "site", "")]
     [InlineData("https://GitHub.com/MBCrawfo/sqlsource/blob/main/LICENSE", "LICENSE", "")]
-    [InlineData("../site/README.md#y", "site/README.md", "y")]
+    [InlineData("../site/index.md#y", "site/index.md", "y")]
     [InlineData("#z", "site/page.md", "z")]
     public void Resolve_LinkToThisRepository_GivesItsPathAndAnchor(string target, string path, string anchor) =>
         UserDocs.Resolve("site/page.md", target).ShouldBe((path, anchor));
@@ -236,12 +236,8 @@ public sealed class UserDocsReadingTests
 
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc024", "site/diagnostics.md", "sqlsrc024")]
-    [InlineData(
-        "https://mbcrawfo.github.io/SqlSource/README.html#find-what-you-need",
-        "site/README.md",
-        "find-what-you-need"
-    )]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/README.md", "")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/#find-what-you-need", "site/index.md", "find-what-you-need")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/index.md", "")]
     [InlineData(
         "https://mbcrawfo.github.io/SqlSource/reference/cli.html#exit-codes",
         "site/reference/cli.md",
@@ -258,10 +254,8 @@ public sealed class UserDocsReadingTests
         UserDocs.Resolve("README.md", target).ShouldBe((path, anchor));
     }
 
-    // The root is a redirect to README.html that drops the anchor, and the site has no page that is not built from a
-    // .md file.
+    // The site has no page that is not built from a .md file, and only one spelling of its address.
     [Theory]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/#find-what-you-need")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.md")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/reference/")]
@@ -288,14 +282,15 @@ public sealed class UserDocsReadingTests
 
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/#find-what-you-need")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]
     public void SiteLinkProblem_APageOrAnotherSite_IsNone(string target) =>
         UserDocs.SiteLinkProblem(target).ShouldBeNull();
 
-    // Fails when PagesUnder does not recurse, leaves out a nested index.md or a page of a folder, or lists
-    // site/index.md, an AGENTS.md or a CLAUDE*.md.
+    // Fails when PagesUnder does not recurse, leaves out site/index.md, a nested index.md or a page of a folder, or
+    // lists an AGENTS.md or a CLAUDE*.md.
     [Fact]
     public void PagesUnder_AFolder_ListsEveryPageButTheOnesOfAnAgent()
     {
@@ -325,7 +320,7 @@ public sealed class UserDocsReadingTests
 
             UserDocs
                 .PagesUnder(Path.Combine(root, "site"))
-                .ShouldBe(["site/a/b/c.md", "site/reference/databases/index.md", "site/top.md"]);
+                .ShouldBe(["site/a/b/c.md", "site/index.md", "site/reference/databases/index.md", "site/top.md"]);
         }
         finally
         {

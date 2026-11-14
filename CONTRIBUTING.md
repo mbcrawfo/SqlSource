@@ -41,7 +41,7 @@ The eleven test projects, the four libraries they share and a stand-in of the to
 
 `tools/MutationReport` is a console program that compares the reports of two mutation runs, which [`tools/mutation-test.sh`](tools/README.md#mutation-testing) runs, and prepares [the evidence of a test review](tools/README.md#the-test-reviews-commands); it builds with the solution and is never packed.
 
-`site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
+`site/` is the user manual, which docfx builds into the site published at `https://mbcrawfo.github.io/SqlSource/`: the landing page, `site/index.md`, the errors, `site/diagnostics.md`, the pages that the documentation overhaul has not yet moved, and three folders, `site/start/`, `site/guides/` and `site/reference/`, each with the `toc.yml` that is its sidebar.  `tools/build-site.sh` builds it into `artifacts/site`, and docfx serves it at `http://localhost:8080` to read it before a pull request:
 
 ```bash
 dotnet docfx site/docfx.json --serve

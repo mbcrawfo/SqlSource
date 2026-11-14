@@ -1,6 +1,6 @@
 # Diagnostics
 
-Each section of this page is one `SQLSRC` diagnostic, under its id.  The help link of a build error opens the section of that error.  How errors are reported, and the list of the errors by area, are on the page [How errors are reported](errors.md).  The samples of the tool's errors on this page leave out the `see:` line that the tool prints.
+Each section of this page is one `SQLSRC` diagnostic, under its id.  The help link of a build error opens the section of that error.  How errors are reported, and the list of the errors by area, are on the page [How errors are reported](reference/errors.md).  The samples of the tool's errors on this page leave out the `see:` line that the tool prints.
 
 ## SQLSRC001
 
@@ -769,9 +769,9 @@ A string or a quoted identifier starts and never ends.  The error is at the open
 SELECT 'unfinished FROM users;
 ```
 
-Close the quote.  If the SQL is valid for your database, SqlSource is reading it by the rules of another one: `'it\'s'` is one string in MySQL and an unclosed one elsewhere.  Set the dialect of the file.  A few constructs are read differently from the database whatever the dialect: see [what is still read differently](dialects.md#still-read-differently).
+Close the quote.  If the SQL is valid for your database, SqlSource is reading it by the rules of another one: `'it\'s'` is one string in MySQL and an unclosed one elsewhere.  Set the dialect of the file.  A few constructs are read differently from the database whatever the dialect: see [what is still read differently](reference/dialects.md#still-read-differently).
 
-See: [What each dialect changes](dialects.md#what-a-dialect-changes)
+See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
 ## SQLSRC102
 
@@ -790,7 +790,7 @@ Close the comment.  Whether a `/*` inside a comment needs its own `*/` depends o
 
 SQLite accepts a comment that is still open at the end of the file.  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
 
-See: [What each dialect changes](dialects.md#what-a-dialect-changes)
+See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
 ## SQLSRC103
 
@@ -809,7 +809,7 @@ Rename the query, for example to `GetUser`.
 
 The name ends at `->`, when the marker has one.
 
-See: [Queries and names](sql-files.md#queries-and-names)
+See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 ## SQLSRC104
 
@@ -821,7 +821,7 @@ Two `-- name:` markers in one file have the same name.  The error is at the seco
 
 Rename one of the queries.
 
-See: [Queries and names](sql-files.md#queries-and-names)
+See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 ## SQLSRC105
 
@@ -838,7 +838,7 @@ get-user.sql
 
 Add a `-- name:` marker at the top of the file, or rename the file.  If the file is not meant to be a query of this type, move it out of the type's folder or point the type's `Source` somewhere else.
 
-See: [A file with no `-- name:`](sql-files.md#a-file-with-no-name)
+See: [A file with no `-- name:`](reference/sql-files.md#a-file-with-no-name)
 
 ## SQLSRC106
 
@@ -857,7 +857,7 @@ SELECT 1;
 
 Move the SQL below a `-- name:` marker, or delete it.
 
-See: [The file header](sql-files.md#the-file-header)
+See: [The file header](reference/sql-files.md#the-file-header)
 
 ## SQLSRC107
 
@@ -875,7 +875,7 @@ SELECT 1;
 
 Move the summary below the `-- name:` marker.
 
-See: [Summaries](sql-files.md#summaries)
+See: [Summaries](reference/sql-files.md#summaries)
 
 ## SQLSRC108
 
@@ -895,7 +895,7 @@ SELECT 2;
 
 Move the marker below the `-- name:` marker of the query it describes, or delete it.
 
-See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
+See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
 ## SQLSRC109
 
@@ -975,7 +975,7 @@ SELECT id FROM users WHERE team_id = @team;
 
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
-See: [Marker index](sql-files.md#marker-index)
+See: [Marker index](reference/sql-files.md#marker-index)
 
 ## SQLSRC112
 
@@ -1022,7 +1022,7 @@ A query, or a whole file without `-- name:` markers, holds nothing but whitespac
 
 Write the SQL, or delete the query.
 
-See: [Queries and names](sql-files.md#queries-and-names)
+See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 ## SQLSRC114
 
@@ -1040,7 +1040,7 @@ The same holds for the name in a `-- token:` marker, and for a token in a commen
 
 Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
-See: [Tokens](parameters-and-tokens.md#tokens)
+See: [Tokens](reference/tokens.md#tokens)
 
 ## SQLSRC115
 
@@ -1069,7 +1069,7 @@ SELECT 1;
 
 A file cannot mix dialects.  Put the queries for another database in a file of their own.
 
-See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
+See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
 ## SQLSRC116
 
@@ -1110,7 +1110,7 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 
 The table is this error's, with two exceptions.  A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
-See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
+See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
 ## SQLSRC117
 
@@ -1137,9 +1137,9 @@ SELECT * FROM events WHERE id > @n;
 
 A marker that gives only a C# type, `-- param: @page -> PageNumber`, has no type either: the C# type is not the database's.
 
-Give the type, in the database's own words: `-- param: @page int`, or `-- param: @page int -> PageNumber`.  Under `mssql`, remove the marker when the name is a variable that the query declares, and give the type when it is a parameter that SqlSource took for a variable: see [variables declared with `DECLARE`](parameters-and-tokens.md#declared-variables).  Correct a misspelt name.
+Give the type, in the database's own words: `-- param: @page int`, or `-- param: @page int -> PageNumber`.  Under `mssql`, remove the marker when the name is a variable that the query declares, and give the type when it is a parameter that SqlSource took for a variable: see [variables declared with `DECLARE`](reference/parameters.md#declared-variables).  Correct a misspelt name.
 
-See: [Giving a parameter a type: `-- param:`](parameters-and-tokens.md#param-marker)
+See: [Giving a parameter a type: `-- param:`](reference/parameters.md#param-marker)
 
 ## SQLSRC118
 
@@ -1156,7 +1156,7 @@ SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 
 Declare the parameter with its type: `-- param: @page int`.
 
-See: [Defaults](parameters-and-tokens.md#token-defaults)
+See: [Defaults](reference/tokens.md#token-defaults)
 
 ## SQLSRC119
 
@@ -1211,7 +1211,7 @@ SELECT id FROM {{table/* users or archive */}};
 
 The second and third are errors only for a type that keeps the query's comments, and that type gets no members and no models from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
 
-See: [Defaults](parameters-and-tokens.md#token-defaults)
+See: [Defaults](reference/tokens.md#token-defaults)
 
 ## SQLSRC121
 
@@ -1247,7 +1247,7 @@ is_global = true
 dotnet_diagnostic.SQLSRC121.severity = none
 ```
 
-See: [Parameters](parameters-and-tokens.md#query-parameters)
+See: [Parameters](reference/parameters.md#query-parameters)
 
 ## SQLSRC122
 
@@ -1407,7 +1407,7 @@ WHERE category IN @categories OR parent_category = @categories;
 
 Write the list after `IN` at each place, `parent_category IN @categories`, or give the single value a parameter of its own.  In a token's default, move the list out of the token, or give the default a parameter that is no list.  Remove `json` from the marker: `-- param: @categories -> Category`.
 
-See: [List parameters](parameters-and-tokens.md#list-parameters)
+See: [List parameters](reference/parameters.md#list-parameters)
 
 ## SQLSRC127
 
@@ -1415,7 +1415,7 @@ See: [List parameters](parameters-and-tokens.md#list-parameters)
 
 Reported by: the build.
 
-A [list](parameters-and-tokens.md#list-parameters) of a SQL Server query whose output is `methods` or `repository` stands after a `NOT`, as in `category NOT IN @categories` or `NOT (category IN @categories)`, and inside an aggregate such as `COUNT` or `SUM`, in a `GROUP BY`, or in an `OUTPUT` clause.  SQL Server refuses the form that the query method sends an empty list in there, so the method would fail whenever the list is empty or null.  The aggregates of `geometry` and `geography`, such as `geometry::UnionAggregate`, are aggregates too, and an aggregate that `OVER` follows is not one of these places.  A `NOT` reaches only the condition it stands in: one in a `WHERE` reaches no list in the `HAVING` after it, and one before a `CASE` or an `IIF` no list in its `WHEN` or its condition.  A list that no `NOT` reaches runs empty everywhere.  The message names the list and where it stands.
+A [list](reference/parameters.md#list-parameters) of a SQL Server query whose output is `methods` or `repository` stands after a `NOT`, as in `category NOT IN @categories` or `NOT (category IN @categories)`, and inside an aggregate such as `COUNT` or `SUM`, in a `GROUP BY`, or in an `OUTPUT` clause.  SQL Server refuses the form that the query method sends an empty list in there, so the method would fail whenever the list is empty or null.  The aggregates of `geometry` and `geography`, such as `geometry::UnionAggregate`, are aggregates too, and an aggregate that `OVER` follows is not one of these places.  A `NOT` reaches only the condition it stands in: one in a `WHERE` reaches no list in the `HAVING` after it, and one before a `CASE` or an `IIF` no list in its `WHEN` or its condition.  A list that no `NOT` reaches runs empty everywhere.  The message names the list and where it stands.
 
 ```sql error
 -- name: CountOtherProducts
@@ -1439,7 +1439,7 @@ SELECT COUNT(other) AS others
 FROM tested;
 ```
 
-See: [List parameters](parameters-and-tokens.md#list-parameters)
+See: [List parameters](reference/parameters.md#list-parameters)
 
 ## SQLSRC200
 
@@ -1624,7 +1624,7 @@ For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in t
 
 For any other database, and for queries that only want their SQL, set the output to `sql`: `"output": "sql"` in a settings file, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; under the output `models` the file's constants and token methods are generated as before, and under `methods` or `repository` its queries get no method.
 
-See: [Database support](dialects.md#database-support)
+See: [Database support](reference/databases/index.md#database-support)
 
 ## SQLSRC210
 
@@ -1646,7 +1646,7 @@ SELECT id, name FROM users {{where}};
 
 Give the token a default where it stands, `{{where:WHERE deleted_at IS NULL}}`, or once for the query with a marker, `-- token: {{where:WHERE deleted_at IS NULL}}`.  An empty default, `{{where:}}`, describes the query with nothing there.  The default is a sample for describing and nothing else: the generated method still takes the token as an argument.  A query that only wants its SQL can instead have the output `sql`, which needs no default.  The error is reported once for each token without a default, at the name of its query.  Until it is mended, the query is not described and gets no error about its entry in the sidecar; under the output `models` its constant or token method is generated as before, and under `methods` or `repository` it gets no method.
 
-See: [Defaults](parameters-and-tokens.md#token-defaults)
+See: [Defaults](reference/tokens.md#token-defaults)
 
 ## SQLSRC211
 
@@ -1737,7 +1737,7 @@ See: [Connections](tool.md#connections)
 
 Reported by: the tool.
 
-No dialect of this release gets this error: the tool describes `postgres` and `mssql`, the two dialects that pass [SQLSRC209](#sqlsrc209).  It is kept for a database whose dialect passes that check before the tool can describe it, where it would be reported at each query that the run would have described, and each would count as failed.  A dialect that the tool does not describe at all is SQLSRC209, every row marked No in [database support](dialects.md#database-support).
+No dialect of this release gets this error: the tool describes `postgres` and `mssql`, the two dialects that pass [SQLSRC209](#sqlsrc209).  It is kept for a database whose dialect passes that check before the tool can describe it, where it would be reported at each query that the run would have described, and each would count as failed.  A dialect that the tool does not describe at all is SQLSRC209, every row marked No in [database support](reference/databases/index.md#database-support).
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'mssql'
@@ -1745,7 +1745,7 @@ No dialect of this release gets this error: the tool describes `postgres` and `m
 
 A tool of an earlier release reported it so for `mssql`, which that release could not describe.  Update the tool, together with the `SqlSource` package, as [SQLSRC206](#sqlsrc206) asks.
 
-See: [Database support](dialects.md#database-support)
+See: [Database support](reference/databases/index.md#database-support)
 
 ## SQLSRC217
 
@@ -2234,7 +2234,7 @@ One difference has no `@` in it: a parameter that is an array of a domain, `-- p
 
 An error of the check that says nothing of how Npgsql reads the SQL, such as a lost connection, is [SQLSRC225](#sqlsrc225) at the same step.  If the SQL is plain and the two still differ, report it.
 
-For SQL Server, the tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case, and the message names each one that only one of them reads.  Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](parameters-and-tokens.md#declared-variables) when it stands after a comma of a list of declarations, and that list ends at a `;` or at a word that starts a statement, such as `SELECT` or `SET`.  A label is no such word, and neither is a word of the statements of Service Broker, such as `RECEIVE`.  So in this query SqlSource reads `@p` as a variable, and SQL Server as a parameter:
+For SQL Server, the tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case, and the message names each one that only one of them reads.  Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](reference/parameters.md#declared-variables) when it stands after a comma of a list of declarations, and that list ends at a `;` or at a word that starts a statement, such as `SELECT` or `SET`.  A label is no such word, and neither is a word of the statements of Service Broker, such as `RECEIVE`.  So in this query SqlSource reads `@p` as a variable, and SQL Server as a parameter:
 
 ```sql mssql
 -- name: NextMessage
@@ -2502,7 +2502,7 @@ Reported by: the build.
 
 No dialect of this release gets this error: `postgres` and `mssql` are both typed.  It is kept for a database that SqlSource can describe before it can give types for it, where it would be reported once for the file, at its first query that needs types, with no other error about the entries of the file's queries.
 
-See: [Dialects](dialects.md)
+See: [Database support](reference/databases/index.md#database-support)
 
 ## SQLSRC244
 
@@ -2534,7 +2534,7 @@ The sidecar has an entry for a query that does not need one: a query that was re
 
 Run `dotnet sqlsource describe` and commit the sidecar it writes, which has no such entry.  When no query of the file needs an entry any more, a run of `describe` over the whole project deletes the sidecar.
 
-A `.sql` file that two projects include is the exception when one of them misses a settings file of its folder that the other finds, such as one a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The query's output can then be `sql` in one project and not in the other.  A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.  A run over only the project that warns removes the entry, and the other project's build then reports [SQLSRC241](#sqlsrc241).  For such a file the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [known issues](sql-files.md#known-issues).
+A `.sql` file that two projects include is the exception when one of them misses a settings file of its folder that the other finds, such as one a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The query's output can then be `sql` in one project and not in the other.  A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.  A run over only the project that warns removes the entry, and the other project's build then reports [SQLSRC241](#sqlsrc241).  For such a file the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [a file in two projects](reference/sidecars.md#limit-file-in-two-projects).
 
 This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`.
 
@@ -3055,7 +3055,7 @@ Write the SQL in the query, with a query parameter where the string took a value
 SELECT id, total FROM dbo.orders WHERE customer_id = @customer_id;
 ```
 
-Or `EXEC` a literal string, `EXEC(N'SELECT id, total FROM dbo.orders')`, which SQL Server can read.  A part of the SQL that changes between calls, such as the name of a table, can be a [token](parameters-and-tokens.md#tokens), which the generated method takes as an argument.
+Or `EXEC` a literal string, `EXEC(N'SELECT id, total FROM dbo.orders')`, which SQL Server can read.  A part of the SQL that changes between calls, such as the name of a table, can be a [token](reference/tokens.md#tokens), which the generated method takes as an argument.
 
 See: [What SQL Server can describe](sqlserver.md#what-can-be-described)
 
@@ -3241,7 +3241,7 @@ A query's name marker gives it the shape `one`, `one-optional` or `many`, and it
 
 Remove the shape, which gives a query without rows the shape `rowcount`, or write `-> rowcount` for the number of rows the statement affected, or `-> none` for nothing.  When the statement should return rows, change it, and run `dotnet sqlsource describe` again.  The error is reported only while the query's output is `methods` or `repository`, since a shape changes nothing under `models` or `sql`.
 
-See: [Result shapes](sql-files.md#result-shapes)
+See: [Result shapes](reference/sql-files.md#result-shapes)
 
 ## SQLSRC273
 

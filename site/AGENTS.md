@@ -2,9 +2,31 @@
 
 Rules for the user documentation, this folder and the two packed readmes, beside root rule 4.
 
+## Where a new thing goes
+
+| New thing | Goes in | What fails if it does not |
+|----|----|----|
+| Setting, as a settings-file key or a marker | A `setting-<name>` section of `settings.md`; a row under its `#all-settings` that names every place it can be written | A reviewer |
+| Marker | A row in the marker index of `reference/sql-files.md` | A reviewer |
+| Generator parameter | Each place that the comment on the list in `DiagnosticsDocumentTests` names | `DiagnosticsDocumentTests` |
+| MSBuild property | Its section of `settings.md`; a row under `#all-settings` | A reviewer |
+| Attribute, or a property of one | `generator.md#attribute` | A reviewer |
+| Command, option, environment variable, exit code | The command reference of `tool.md` | A reviewer |
+| Diagnostic | A `## SQLSRCnnn` section of `diagnostics.md`, in id order | `DiagnosticsDocumentTests` |
+| Dialect | Its rows in `reference/dialects.md` and `reference/databases/index.md`; the section of `SQLSRC019` | A reviewer |
+| Database that can be described | A folder under `reference/databases/`, as `reference/databases/AGENTS.md` says; a row in `reference/databases/index.md`; the README's list; an example project | A reviewer |
+| Feature that meets the line for Get started | The getting-started steps of `README.md`; its rules in Reference | A reviewer |
+| Any other feature | A reference section; a guide when it is a task; an example, as root rule 4 says | `SiteTocTests`, for a new page |
+| Limit | `## Limits` of the page that owns it, with its own anchor; a row in `guides/troubleshooting.md` | `SiteStructureTests` |
+
+## Structure
+
+- **Three folders, one job each.**  `start/` is the path of a newcomer, read in order; `guides/` holds one task on each page; `reference/` is look-up, one page for each thing.  The root holds `index.md`, the landing page and the site's root, and `diagnostics.md`.
+- **A fact has one home.**  A rule, a value, a default or a limit is stated in one reference section; every other page restates it in a sentence or two and links there.
+- **Pages not yet moved.**  `concepts.md`, `settings.md`, `generator.md`, `tool.md`, `postgresql.md`, `sqlserver.md` and `recipes.md` wait at the root for their phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.  Change one in place, and add no page at the root.  A limit of one is a bullet of its "Known issues", and a recipe is a sample and a link to the rules.
+- **A new page** gets an entry in the `toc.yml` of its folder, under its group.  Aim at 600 to 3,500 words for a page and at most nine entries for a group; a reviewer holds both.
 - **`README.md`**, beyond root rule 4: the databases it works with, getting started in five steps, "Only want to generate models?", "Just want to keep your SQL out of code files?", a FAQ of five to ten items, "NodaTime and other libraries", "Custom type mapping" and "Where to next".  A FAQ answer is a few sentences that link to a recipe where one exists.
-- **This folder**: the entry page, `README.md`, holds "Find what you need" and "The pages", which says what each page holds.
-- `sql-files.md` opens with the marker index; `parameters-and-tokens.md` holds `DECLARE` and token validation; `tool.md` gives the workflow, then the command reference; a database page covers describing it, its types and models, and its query methods.
+- **The site.**  docfx publishes every page here but each `AGENTS.md`.  `tools/build-site.sh` builds it and fails on any docfx warning.  The tests are in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/`; none checks whether a page is true and free of internals.
 
 ## Write effects, never internals
 
@@ -18,41 +40,24 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|tech-debt|superpowers|TD-0|D-0" <pages>
 ```
 
-## Conventions
+## Writing
 
-- **Example first.**  A reference section opens with an example, then the rules.
-- **Terms.**  Use the terms of `concepts.md#glossary`, *inside a query*, and *folder*, never "directory" in prose.  Never say "parameter" or "database" alone where it is ambiguous: say *query parameter* (`@id`), *generator parameter* or *logical database*.
 - **State what SqlSource does, as fact.**  No page says that a feature is coming, works "today" or is in development; `StatusLanguageTests` holds the phrases.  A sentence that says something is not tested, or was checked on one platform, is a fact about support and stays.
-- **Settings are documented in `settings.md` only**, each in a section anchored `setting-<name>`; other pages link to it and never repeat a setting's values or precedence.
-- A setting's row under `#all-settings` names every place it can be written.
-- A new setting or marker gets its row and its section, and a marker its row in the marker index of `sql-files.md`.  A new generator parameter goes in each place that the comment on the list in `DiagnosticsDocumentTests` names.
-- **Recipes hold examples, not rules.**  Each is a sample and a link to the rules, so it cannot drift from them.
-- **Anchors.**  A heading of this folder linked from anywhere gets an `<a id>` anchor on the line above, kept when the heading is reworded; "Known issues" gets `<a id="known-issues"></a>`.
+- **Plain language**, by ASD-STE100 as a guideline, for text you write or change; a reviewer holds it.  One instruction in a sentence.  At most 20 words in a step and 25 in a description.  A paragraph has one topic and at most six sentences.
+- Active voice and present tense, not "will".  A condition comes first: "If the column can be null, ...".  "Must" for what is required and "can" for what is allowed.  A list for conditions and alternatives.
+- **Terms.**  One term for one thing.  Use the terms of `concepts.md#glossary`, *inside a query*, and *folder*, never "directory" in prose.  Never say "parameter" or "database" alone where it is ambiguous: say *query parameter* (`@id`), *generator parameter* or *logical database*.
+- **Tabs.**  A docfx tab holds a sample or a few sentences, never a heading or an `<a id>`: an anchor in a tab that is not selected is a dead link target.  A long difference between databases is two anchored sections.  A tab group that names one described database names them all.
+- **Anchors.**  A heading of this folder linked from anywhere gets an `<a id>` anchor on the line above, kept when the heading is reworded.
 - **Links.**  Pages of this folder link to each other relatively, and to any other file of the repository by `https://github.com/mbcrawfo/SqlSource/blob/main/<path>`: only this folder is published.
 - **SQL samples** are marked by the info strings `UserDocsSamplesTests` reads; never weaken the test.  Put no fence inside a blockquote.
 - **No `--prerelease`.**  Install and update commands are written for a stable release, with no `--prerelease` and no sentence about previews.
-- **Known issues.**  A page that documents behaviour ends with "Known issues": what a user can plausibly hit from the open items of `docs/tech-debt` and `docs/deferred`, by its effect in the user's words and what to do.  Leave out what a user cannot see, such as a test gap, duplicated code or a cost with no visible effect.
-- Add one in the PR that opens its item; remove it in the PR that closes it, found by its effect, as it names no id.  A page's first one brings the section and a link from the entry page's "Find a problem that is not an error" row.
-- **`diagnostics.md`.**  A new diagnostic gets a `## SQLSRCnnn` section whose first bold line is its descriptor's title, then its "Reported by" line, a "Database" line when it is an error of describing a query against its database, and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.  Its id joins its area's row in `errors.md#errors-by-area`.
-- A new diagnostic's id also joins the lists of `errors.md` that it belongs in: its row of `#who-reports`, the warnings and information of `#severity`, and the ids with no file and line of `#where-an-error-is-reported`.  No test checks these.
-- Only the title and one paragraph stand before `## SQLSRC001`.  Never give a heading another anchor: every error's help link is the lower-case id's slug.
-- **A new page** gets an entry in `toc.yml`, the site's sidebar, in the order of "The pages", and is listed under "The pages" of the entry page, with a "Find what you need" row for each need it answers.
-- **The site.**  docfx publishes every page of this folder but `AGENTS.md`, and `index.md` only redirects the site's root to `README.html`.  `tools/build-site.sh` builds it and fails on any docfx warning.
-- **Tests.**  The tests in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/DiagnosticsDocumentTests.cs` say in comments what fails them.  None checks whether a page is true today and free of internals.
 
-## When a phase lands
+## Limits and diagnostics
 
-Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-generation-epic-design.md`), and every later feature, does in its PR what root rule 4 and this file ask, and:
-
-- **Recipes** go in `recipes.md` where a task is new.  **The README** changes where the common path does: getting started, a scenario, a FAQ answer, the supported environments.
-
-The pages each phase touches, besides those:
-
-| Phase | Pages |
-|----|----|
-| 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode and what each editor shows, the new options in the command reference.  `recipes.md`: starting the watcher with each editor.  `settings.md`: what turns it on.  README: step 5 |
-| 10. Bug reports | `tool.md`: making a bundle, what it holds before you share it, the new commands in the command reference |
-
-A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A new dialect gets its rows in `dialects.md`'s tables and its name in `SQLSRC019`'s section of `diagnostics.md`, where `dialect` lists the names; `settings.md`'s Dialect row changes only for a dialect with options.
+- **Limits.**  A page that owns behaviour ends with `## Limits`, under `<a id="limits"></a>`: what a user can plausibly hit from the open items of `docs/tech-debt` and `docs/deferred`.  Each is an h3 under its own anchor, `limit-<name>`: what the user sees, why, and what to do.  Leave out what a user cannot see, such as a test gap or duplicated code.
+- Add a limit in the PR that opens its item, with its row in `guides/troubleshooting.md`.  Remove both in the PR that closes it, found by its effect, as a limit names no id.
+- **`diagnostics.md` stays at the root, and a `## SQLSRCnnn` heading never gets another anchor**: every error's help link is `diagnostics.html#sqlsrcnnn`, compiled into the packages.  Nothing but the title and one paragraph stands before `## SQLSRC001`.
+- A new diagnostic gets a section whose first bold line is its descriptor's title, then its "Reported by" line, a "Database" line when it is an error of describing a query against its database, and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.  Its id joins its area's row in `reference/errors.md#errors-by-area`.
+- A new diagnostic's id also joins the lists of `reference/errors.md` that it belongs in: its row of `#who-reports`, the warnings and information of `#severity`, and the ids with no file and line of `#where-an-error-is-reported`.  No test checks these.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

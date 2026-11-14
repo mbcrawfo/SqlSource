@@ -32,7 +32,7 @@ public static partial class OrderQueries
 
     // A method of your own that passes a list: ListOrdersByStatusesParams.Statuses is an IEnumerable<string>?, which
     // takes this array, a List<string> or any other sequence, and the method sends one parameter for each value.  See
-    // site/parameters-and-tokens.md#list-parameters.
+    // site/reference/parameters.md#list-parameters.
     public static Task<ListOrdersByStatusesDto[]> ListOrdersNotCancelledAsync(
         DbConnection connection,
         CancellationToken cancellationToken = default

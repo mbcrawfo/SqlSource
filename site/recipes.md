@@ -490,7 +490,7 @@ Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN cus
 SELECT id, name FROM customers WHERE id = @id;
 ```
 
-Rules: [column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker), [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
+Rules: [column types](settings.md#setting-column-types), [giving a parameter a type](reference/parameters.md#param-marker), [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
 
 <a id="class-in-a-json-column"></a>
 
@@ -636,7 +636,7 @@ public partial class UserRepository(DbConnection connection)
 
 `GetUserDto` is the generated [model](generator.md#models) of `GetUser`.  Under `models` SqlSource opens no connection and binds no value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
-Rules: [constants](generator.md#constants), [query parameters](parameters-and-tokens.md#query-parameters), [output](settings.md#setting-output).
+Rules: [constants](generator.md#constants), [query parameters](reference/parameters.md#query-parameters), [output](settings.md#setting-output).
 
 <a id="models-through-dapper"></a>
 
@@ -695,7 +695,7 @@ The input model is the parameter object, and the output model is the type of a r
   WHERE c.id = @customerId;
   ```
 
-- **A [list parameter](parameters-and-tokens.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  Dapper sends one parameter for each value of a list on SQL Server, and a null list as an empty one, but it rewrites every `@ids` of the query: `@ids IS NULL` is an error from two values up, and true for an empty list as for a null one.  On PostgreSQL it sends a list as one array: write `id = ANY(@ids)` there, an [array parameter](postgresql.md#array-parameters).
+- **A [list parameter](reference/parameters.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  Dapper sends one parameter for each value of a list on SQL Server, and a null list as an empty one, but it rewrites every `@ids` of the query: `@ids IS NULL` is an error from two values up, and true for an empty list as for a null one.  On PostgreSQL it sends a list as one array: write `id = ANY(@ids)` there, an [array parameter](postgresql.md#array-parameters).
 
 Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).
 
@@ -936,7 +936,7 @@ var counted = await reports.CountRows(table);
 
 The query's method takes the text of the token, and runs the query with the token replaced.  Under the output `sql` or `models`, the query is instead a method that returns the SQL, `Sql.CountRows(table)`, for your own code to run.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
 
-Rules: [tokens](parameters-and-tokens.md#tokens), [the signature](generator.md#repository-signature), [token methods](generator.md#token-methods), [defaults](parameters-and-tokens.md#token-defaults).
+Rules: [tokens](reference/tokens.md#tokens), [the signature](generator.md#repository-signature), [token methods](generator.md#token-methods), [defaults](reference/tokens.md#token-defaults).
 
 <a id="filter-by-a-list"></a>
 
@@ -958,7 +958,7 @@ var everyOrder = await orders.ListOrdersByStatuses(new ListOrdersByStatusesParam
 
 `@statuses`, written after `IN` with no parentheses, is a list, and `ListOrdersByStatusesParams.Statuses` an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The method sends a parameter for each status.  A null list returns every order, by the test `@statuses IS NULL`, and an empty one returns none.  The same query runs on SQL Server as it is.  On PostgreSQL, `status = ANY(@statuses)` sends the list as one array instead.
 
-Rules: [list parameters](parameters-and-tokens.md#list-parameters), [array parameters](postgresql.md#array-parameters).
+Rules: [list parameters](reference/parameters.md#list-parameters), [array parameters](postgresql.md#array-parameters).
 
 <a id="test-project-sees-internals"></a>
 
