@@ -1,10 +1,16 @@
 # Run queries in a transaction (or with a timeout)
 
+At the end of this page, two queries run in one transaction that you commit, and a query can run with a command timeout of its own.
+
 <a id="queries-in-a-transaction"></a>
 
 ## Run queries in a transaction
 
-A repository method takes no transaction and no command timeout: each call gets a connection of its own.  Give the queries that must run together `-- output: methods`, whose methods take the connection, a transaction and a timeout, and are by default `internal` extension methods of `DbConnection`.  Then write a method of your own on the repository that opens a connection from its data source, begins the transaction and calls them, as `await connection.GetBalance(new GetBalanceParams(id), transaction)`, and commits.  One file can hold queries of both outputs, and a query that needs a command timeout takes `methods` the same way.  To run one query for many items in one transaction, such as adding many rows, give it `-- generator: collection-method`: its second method takes a collection of its input models and runs them all in a transaction of its own, as [inserting many rows](../guides/many-rows.md#insert-many-rows) shows.  See [the recipe](#queries-in-a-transaction) and [methods that take a connection](../reference/connection-methods.md#methods-that-take-a-connection).
+A repository method takes no transaction, and each call gets a connection of its own.  So two calls of repository methods never run in one transaction.  Give each query that must run in the transaction the line `-- output: methods`.  The method of such a query takes your connection and your transaction.  By default, it is an `internal` extension method of the connection.
+
+The sample is a second repository of the same application, `AccountRepository`.  Its queries are in `AccountRepository.sql`, beside the class:
+
+# [PostgreSQL](#tab/postgresql)
 
 ```sql postgres
 -- name: GetAccount -> one-optional
@@ -44,6 +50,106 @@ public partial interface IAccountRepository
 }
 ```
 
-A repository method takes no transaction, so the queries that run in one take the output `methods`, whose methods take the connection and the transaction, and a method of your own on the repository opens the connection, begins the transaction and calls them.  `GetAccount` runs alone, and stays a repository method.  Give every method the transaction: [the connection](../reference/connection-methods.md#method-connection) says why.  A query that needs a command timeout takes `methods` in the same way, and its `commandTimeout`.
+# [SQL Server](#tab/sqlserver)
 
-Rules: [transactions and timeouts](../reference/repositories.md#repository-transactions), [the connection](../reference/connection-methods.md#method-connection), [the signature](../reference/connection-methods.md#method-signature), [the interface](../reference/repositories.md#repository-interface).
+```sql mssql
+-- name: GetAccount -> one-optional
+SELECT id, owner, balance FROM accounts WHERE id = @accountId;
+
+-- name: GetBalance -> one
+-- output: methods
+SELECT balance FROM accounts WITH (UPDLOCK) WHERE id = @accountId;
+
+-- name: SetBalance -> none
+-- output: methods
+UPDATE accounts SET balance = @balance WHERE id = @accountId;
+```
+
+```csharp
+[SqlSourceGenerate]
+public partial class AccountRepository(string connectionString)
+{
+    public async Task Withdraw(int accountId, decimal amount, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var account = await connection.GetBalance(
+            new GetBalanceParams(accountId), transaction, cancellationToken: cancellationToken);
+        await connection.SetBalance(
+            new SetBalanceParams(account.Balance - amount, accountId), transaction, cancellationToken: cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+}
+
+// Adds Withdraw to the generated interface, beside GetAccount
+public partial interface IAccountRepository
+{
+    Task Withdraw(int accountId, decimal amount, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+`Withdraw` is a method of your own on the repository.  It opens a connection, begins the transaction, calls the two methods and commits.
+
+- **Give every method the transaction.**  On SQL Server, a method that does not get it throws `InvalidOperationException`.
+- **If a call throws before the commit**, the transaction is disposed and rolled back, and no change of it is saved.
+- **The `partial interface` adds `Withdraw` to `IAccountRepository`**, so code that takes the interface can call it.
+
+<a id="timeout"></a>
+
+## Set a command timeout
+
+A repository method runs with the driver's default timeout.  If a query needs a timeout of its own, give it `-- output: methods` in the same way.  Its method takes the argument `commandTimeout`, in seconds:
+
+# [PostgreSQL](#tab/postgresql)
+
+```csharp
+public async Task<decimal> GetBalanceSlowly(int accountId, CancellationToken cancellationToken = default)
+{
+    await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+    var account = await connection.GetBalance(
+        new GetBalanceParams(accountId), commandTimeout: 60, cancellationToken: cancellationToken);
+    return account.Balance;
+}
+```
+
+# [SQL Server](#tab/sqlserver)
+
+```csharp
+public async Task<decimal> GetBalanceSlowly(int accountId, CancellationToken cancellationToken = default)
+{
+    await using var connection = new SqlConnection(connectionString);
+    var account = await connection.GetBalance(
+        new GetBalanceParams(accountId), commandTimeout: 60, cancellationToken: cancellationToken);
+    return account.Balance;
+}
+```
+
+---
+
+The method is part of `AccountRepository`.  A method of `-- output: methods` opens a closed connection itself, and closes it again before it returns.
+
+<a id="two-outputs"></a>
+
+## One file, two outputs
+
+The output of a query says what SqlSource generates for it.  The default output, `repository`, gives a method of the repository, which opens its own connection.  The output `methods` gives a method that takes your connection.  One file can hold queries of both outputs: `GetAccount` stays a method of the repository.
+
+## If it does not work
+
+- `InvalidOperationException` on SQL Server, about a pending local transaction: give the method the transaction.
+- [SQLSRC241](../diagnostics.md#sqlsrc241) for the new queries: describe them, as [Your first query](first-query.md#describe) shows.
+
+## What you have now
+
+A repository method of your own that runs two queries in one transaction, and a query with its own command timeout.
+
+To insert many rows in one call and one transaction, see [Insert or update many rows in one call (bulk)](../guides/many-rows.md).  To compare all the outputs, see [Choose what is generated (output modes)](../guides/output-modes.md).
+
+Rules: [transactions and timeouts](../reference/repositories.md#repository-transactions), [the connection](../reference/connection-methods.md#method-connection), [the signature](../reference/connection-methods.md#method-signature), [where the methods go](../reference/connection-methods.md#method-location), [the output](../reference/settings.md#setting-output), [the interface](../reference/repositories.md#repository-interface).
+
+Next: [Test code that uses a repository](testing.md)

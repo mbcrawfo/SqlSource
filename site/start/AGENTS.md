@@ -2,13 +2,14 @@
 
 Get started: the path of a newcomer, read in order.
 
-- **The line for Get started.**  A topic is here only when an application with one PostgreSQL or SQL Server database and the default `repository` output needs it before its first release.  Transactions are here, and are where the `methods` output is introduced, by the need for it.  Anything else is a guide.
-- **The pages are written by the `get-started` phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.**  Until then `toc.yml` lists `concepts.md`, a page here holds only what a move placed on it, and a change to getting started goes in `README.md`.
-- **The pages are read in the order of `toc.yml`**, and each ends with "Next:" and a link to the next page.
-- **One running example and the `repository` output.**  The samples are the files of `examples/PostgresExamples/Repository` and `examples/SqlServerExamples/Repository`, which compile.
-- **Give each step whole.**  Never send the reader to Reference in the middle of a step.  State a rule in its common form, and link its owner under "Rules:" near the end of the page.
-- **A page here owns no rule**: no `## Limits`, no `setting-<name>` anchor, no table of values or defaults.
-- **Put a trap of the first hour where it bites**, stated in full with its error id and the fix, such as a `.env` file at the repository's root that is not read.
-- **A difference between databases is a tab** of a sample or at most three sentences; a longer one is two anchored sections.
+- **The line.**  A topic is here only when an application with one PostgreSQL or SQL Server database and the default `repository` output needs it before its first release.  Anything else is a guide or a reference section.
+- **The order is `toc.yml`'s.**  Each page ends with a line that starts "Next:" and links the next page; `errors.md` links the landing page's table of needs.
+- **One running example**: `UserRepository` and its queries, whose text is that of `examples/PostgresExamples/Repository` and `examples/SqlServerExamples/Repository`.  A change to those files changes the pages.
+- **The `repository` output only.**  `transactions.md` alone shows `-- output: methods`, by the need for a transaction or a timeout.  No page asks the reader to choose an output or a dialect.
+- **Each step is whole.**  No step sends the reader to Reference; a page links its owners in its closing "Rules:" line.
+- **A rule in its common form.**  No `## Limits`, no `setting-<name>` anchor, no table of a setting's values or defaults.
+- **A first-hour trap stands in the step or the tab where it bites**, in full, with its error id and the fix, and its id also stands on `errors.md`.
+- **Both databases on every page.**  A tab holds a sample or at most three sentences, and each page reads right with the first tab showing.
+- **`SupportedVersionsTests` holds the two minimum database versions of `install.md`** to `../reference/databases/index.md`.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.
