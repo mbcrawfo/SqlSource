@@ -4,7 +4,7 @@
 
 ## The three attributes
 
-SqlSource has three attributes.  This table gives each attribute, its properties and the section that tells how to use them.
+SqlSource has three attributes that you write on your code.  This table gives each attribute, its properties and the section that tells how to use them.
 
 | Attribute | Property | Section |
 |----|----|----|

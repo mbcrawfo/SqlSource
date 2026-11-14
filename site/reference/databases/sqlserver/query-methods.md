@@ -196,4 +196,3 @@ A query's [collection method](../../collection-methods.md#collection-methods) ru
   SELECT SUM(hit) AS outside
   FROM tested;
   ```
-

@@ -93,7 +93,7 @@ The suffix ends the name of the [model](#models) generated for a query's paramet
 - It stands in the file header only, not inside a query.  It can also be `inputModelSuffix` or `outputModelSuffix` in a settings file.
 - It ends a [table model's](#table-models) name too, `UsersRow`, and not a name that `-- input-model:` or `-- output-model:` gives.  Two equal suffixes give a query's two models one name, which is [SQLSRC257](../diagnostics.md#sqlsrc257).
 
-The rules of the names are on [this page](#model-names).
+The rules of the names are under [Names](#model-names).
 
 <a id="setting-model-name"></a>
 
@@ -138,7 +138,7 @@ The namespace the generated [models](#models) go in.  The default is the namespa
 - Two types in two namespaces that claim one file, or read one table, get a model each, one in each namespace, unless this setting gives them one.
 - A namespace that is, or starts with, the full name of a type of your project gives models whose names cannot be used: [SQLSRC258](../diagnostics.md#sqlsrc258).
 
-The rules are on [this page](#model-namespace).
+The rules are under [Namespace](#model-namespace).
 
 <a id="model-accessibility"></a>
 
@@ -197,7 +197,7 @@ The shape of the [model](#models) generated for a query's parameters (input) and
 - It stands in the file header and inside a query, as two markers.  It can also be `inputModelType` or `outputModelType` in a settings file.
 - Two queries that share a model must give it one shape, or the later is [SQLSRC257](../diagnostics.md#sqlsrc257).
 
-What each shape looks like is on [this page](#model-shape).  To read rows through Dapper into sorted models, make them classes: see [the recipe](../recipes.md#models-through-dapper).
+What each shape looks like is under [Shape](#model-shape).  To read rows through Dapper into sorted models, make them classes: see [the recipe](../recipes.md#models-through-dapper).
 
 <a id="model-documentation"></a>
 

@@ -36,7 +36,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **Part of your SQL is missing from the generated SQL.**  SqlSource can read a comment or a string differently from your database, and then removes SQL that your database runs.  See [what is still read differently](../reference/dialects.md#still-read-differently).
 - **An empty list after `IN` matches the rows whose value is null, on SQL Server.**  A connection with `ANSI_NULLS` off takes `= NULL` as true for a null.  See [`ANSI_NULLS` off](../reference/databases/sqlserver/query-methods.md#limit-ansi-nulls-off).
 - **Dapper sends no value for a parameter such as `@account_id`.**  Dapper sends a property of the input model only to a parameter written as `@` and the property's name.  See [parameter names for Dapper](dapper.md#limit-parameter-names).
-- **A `rowcount` method returns `-1`, on SQL Server.**  `SET NOCOUNT ON` in a query or a command without parameters stays on for the connection's session.  See [`rowcount` after `SET NOCOUNT ON`](../reference/databases/sqlserver/query-methods.md#limit-rowcount-after-nocount).
+- **A `rowcount` method returns `-1`, on SQL Server.**  `SET NOCOUNT ON` in a query or command that has no parameters stays on for the connection's session.  See [`rowcount` after `SET NOCOUNT ON`](../reference/databases/sqlserver/query-methods.md#limit-rowcount-after-nocount).
 
 <a id="not-described"></a>
 

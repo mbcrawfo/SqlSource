@@ -1598,7 +1598,7 @@ internal static partial class Queries;
 
 Write the value where the attribute is: `Source = "Queries"`.  A constant, `nameof`, a concatenation and an interpolated string are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
 
-See: [Limits](reference/attributes.md#limit-source-written-as-text)
+See: [`Source` written as text](reference/attributes.md#limit-source-written-as-text)
 
 ## SQLSRC209
 
