@@ -261,11 +261,16 @@ public sealed partial class SkillDataTests
             .ShouldBeEmpty();
     }
 
+    // measure.sh knows no other mark, and runs a project with one it does not know as a plain one.
     [Fact]
-    public void Projects_OnlyTheAllocationProject_IsNotRun() =>
+    public void Projects_TheMarkedLines_AreTheSyncAsyncProjectsAndTheAllocationProject() =>
         Listed("projects.txt")
             .Where(line => line.Contains(' ', StringComparison.Ordinal))
-            .ShouldBe(["tests/DatabaseTests/QueryMethodAllocation not-run"]);
+            .ShouldBe([
+                "tests/DatabaseTests/Postgres.SyncAsync sync-async",
+                "tests/DatabaseTests/SqlServer.SyncAsync sync-async",
+                "tests/DatabaseTests/QueryMethodAllocation not-run",
+            ]);
 
     [Fact]
     public void Exclusions_EveryLine_IsAFolderThatExists() =>

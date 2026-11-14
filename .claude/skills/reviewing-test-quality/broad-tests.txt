@@ -19,6 +19,23 @@ SqlSource.DatabaseTests.Postgres.Describer.FixtureCasesTests.
 SqlSource.DatabaseTests.SqlServer.Describer.FixtureCasesTests.
 
 # The realistic corpora: every case's query generated in process, and described, generated and called on a server.
+# The classes that run the corpus, and not the namespaces, which also hold tests of one case or of the harness.
 SqlSource.Tool.Tests.Realistic.RealisticGenerationTests.
-SqlSource.DatabaseTests.Postgres.Realistic.
-SqlSource.DatabaseTests.SqlServer.Realistic.
+SqlSource.DatabaseTests.Postgres.Realistic.RealisticCasesTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Describer.RealisticDescriptionTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Describer.RealisticNullabilityNoiseTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Describer.RealisticNullabilitySafetyTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Generation.RealisticClaimsTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Generation.RealisticDapperTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Generation.RealisticMethodTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Generation.RealisticModelNullabilityTests.
+SqlSource.DatabaseTests.Postgres.Realistic.Generation.RealisticModelRefusalTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.RealisticCasesTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Describer.RealisticDescriptionTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Describer.RealisticNullabilityNoiseTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Describer.RealisticNullabilitySafetyTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Generation.RealisticClaimsTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Generation.RealisticDapperTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Generation.RealisticMethodTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Generation.RealisticModelNullabilityTests.
+SqlSource.DatabaseTests.SqlServer.Realistic.Generation.RealisticModelRefusalTests.
