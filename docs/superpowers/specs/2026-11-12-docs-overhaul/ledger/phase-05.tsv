@@ -1,0 +1,92 @@
+# base e18924713d86373b8f2d8837df12d65dc407239b
+unit	disposition	to	arg	words	note
+site/tool.md:1	move	site/reference/cli.md#tool	-	-	level: the h1 The tool is the h2 of the new anchor tool; the page's h1 is new
+site/tool.md:3-8	merge-pair	site/reference/cli.md#tool	MP-10	-	The opening of the term Tool, with its sample; merges/MP-10.md
+site/tool.md:10-12	restated-from	site/reference/cli.md#tool	site/reference/describing.md#which-queries	-	Moves whole, word for word; its facts are owned by which-queries and by settings.md#setting-output, and phase 18 cuts it
+site/tool.md:14	move	site/reference/cli.md	-	-	position: "This page has two parts" > "The tool's pages have two parts"; navigation, moved whole after the new opening, since its second sentence states what diagnose and replay do
+site/tool.md:18	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	-
+@site/tool.md:20	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Phase 1's sentence, which lost the status clause (phase-01 row site/tool.md:20/1)
+@site/tool.md:22	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Phase 1's commands, without --prerelease (phase-01 row site/tool.md:22)
+site/tool.md:27	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	-
+@site/tool.md:29	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Phase 1's paragraph, without --prerelease (phase-01 row site/tool.md:29)
+site/tool.md:33-50	move	site/reference/describing.md#which-queries	-	-	The link of line 48 stays at generator.md#known-issues, re-based, until phase 6
+site/tool.md:54-89	move	site/reference/connections.md#connections	-	-	The link of line 89 to #known-issues goes to #limit-short-password
+site/tool.md:93	move	site/reference/connections.md#env-file	-	-	level: h3 to h2, as spec step 2 lists it
+site/tool.md:95-127	move	site/reference/connections.md#env-file	-	-	-
+site/tool.md:131	move	site/reference/sidecars.md#sidecar-files	-	-	-
+site/tool.md:133	merge-pair	site/reference/sidecars.md#sidecar-files	MP-10	-	The opening of the term Sidecar; merges/MP-10.md
+site/tool.md:135-168	move	site/reference/sidecars.md#sidecar-files	-	-	-
+@site/tool.md:168	move	site/reference/sidecars.md#sidecar-files	-	-	Phase 2's paragraph from the preamble of diagnostics.md (phase-02 row site/diagnostics.md:315/4), in its place before the JSON Schema paragraph
+site/tool.md:172	move	site/reference/sidecars.md#sidecars-in-git	-	-	level: h3 to h2, as spec step 2 lists it
+site/tool.md:174-187	move	site/reference/sidecars.md#sidecars-in-git	-	-	-
+site/tool.md:191-206	move	site/reference/sidecars.md#describing-again	-	-	-
+site/tool.md:210-234	merge-pair	site/reference/msbuild.md#running-in-the-build	MP-06	-	merges/MP-06.md; phase 7 places settings.md 959-980 beside it
+site/tool.md:235	corrected	site/reference/msbuild.md#running-in-the-build	C-01	only the tool checks that value, so the tool writes the error and the build lists it	C-01: the build reads the database setting too (MethodPlanner.DatabaseOf calls QuerySettings.ResolveDatabase); the bullet is otherwise word for word, and is part of MP-06
+site/tool.md:236-246	merge-pair	site/reference/msbuild.md#running-in-the-build	MP-06	-	The links of lines 238 and 246 to #known-issues go to describing.md#limit-several-target-frameworks and connections.md#limit-short-password
+site/tool.md:250-259	move	site/reference/describing.md#after-a-schema-change	-	-	-
+site/tool.md:263-313	move	site/reference/describing.md#describe-on-save	-	-	The link of line 313 to #known-issues goes to #limit-saves-not-seen
+site/tool.md:317-330	move	site/reference/describing.md#what-your-editor-shows	-	-	The link of line 327 to the recipe goes to guides/describe-on-save.md#start-the-watcher-with-your-editor
+site/tool.md:334-351	move	site/reference/describing.md#check-in-ci	-	-	The link of line 346 to the recipe goes to guides/ci.md#check-sidecars-in-ci
+site/tool.md:355-369	move	site/reference/cli.md#summary	-	-	-
+site/tool.md:373-390	merge-pair	site/guides/report-a-bug.md#report-a-bug	MP-19	-	merges/MP-19.md; phase 8 places README.md 234-236 beside it
+site/tool.md:394	move	site/reference/bundles.md#bundle-contents	-	-	level: h3 to h2, as spec step 2 lists it
+site/tool.md:396-404	move	site/reference/bundles.md#bundle-contents	-	-	-
+site/tool.md:405	move	site/reference/bundles.md#bundle-contents	-	-	position: "take the private route below instead" > "take the private route instead", the words private route linked to guides/report-a-bug.md#raw-bundle; the section is on another page now
+site/tool.md:409	move	site/guides/report-a-bug.md#raw-bundle	-	-	level: h3 to h2, as spec step 2 lists it
+site/tool.md:411-437	move	site/guides/report-a-bug.md#raw-bundle	-	-	-
+site/tool.md:441-456	move	site/reference/cli.md#command-reference	-	-	-
+site/tool.md:460-472	move	site/reference/cli.md#arguments	-	-	-
+site/tool.md:476-492	move	site/reference/cli.md#options	-	-	-
+site/tool.md:496-506	move	site/reference/cli.md#environment-variables	-	-	-
+site/tool.md:510-518	move	site/reference/cli.md#exit-codes	-	-	-
+site/tool.md:522-536	move	site/reference/cli.md#verbose	-	-	-
+site/tool.md:540-558	move	site/reference/cli.md#logs	-	-	The link of line 552 to #known-issues goes to connections.md#limit-short-password
+site/tool.md:562-567	move	site/reference/cli.md#requirements	-	-	Both links of line 567, to each database's index.md#connecting, take databases/index.md#supported-versions, the table of supported versions; the words stay
+site/tool.md:571	move	site/reference/bundles.md#diagnose	-	-	level: h3 to h2, as spec step 2 lists it
+site/tool.md:573-589	move	site/reference/bundles.md#diagnose	-	-	-
+site/tool.md:593	move	site/reference/bundles.md#replay	-	-	level: h3 to h2, as spec step 2 lists it
+site/tool.md:595-600	move	site/reference/bundles.md#replay	-	-	-
+site/tool.md:601	move	site/reference/bundles.md#replay	-	-	position: "none of the requirements above but" > "none of the requirements but"; the requirements are on cli.md now
+site/tool.md:602-625	move	site/reference/bundles.md#replay	-	-	-
+site/tool.md:629	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires: six bullets are limits under ## Limits of their pages, one is the second text of MP-08, and one is a pointer that goes
+site/tool.md:631	move	site/reference/cli.md#limit-path-through-a-symbolic-link	-	-	Still a bullet, under its h3
+site/tool.md:632	move	site/reference/describing.md#limit-several-target-frameworks	-	-	Still a bullet, under its h3
+site/tool.md:633	restated-from	-	site/settings.md#known-issues	-	A pointer to settings.md 1058-1068, which phase 7 makes the limit reference/msbuild.md#limit-file-added-by-a-target
+@site/tool.md:636	move-split	-	-	-	Line 634 at the baseline, whose last sentence phase 3 mended (phase-03 row site/tool.md:634): the bullet stands after phase 3's text of the limit, and its last sentence goes
+@site/tool.md:636/1	merge-pair	site/reference/sidecars.md#limit-file-in-two-projects	MP-08	**A `.sql` file that two projects list, when only one of them finds a settings file of it,** has one sidecar for both, and a run on one of the two projects can leave out, or remove, the entries that only the other needs.  This takes, for example, a build target of your own that adds the file, or a settings file named `SqlSource.json` that one of the projects lists itself.  Make both projects find the same settings files, and describe the whole solution in one run.	The bullet but its last sentence, after phase 3's bullet; merges/MP-08.md
+@site/tool.md:636/2	restated-from	-	site/reference/sidecars.md#limit-file-in-two-projects	See a file in two projects.	Its last sentence points at the text that now stands directly above it
+site/tool.md:635	move	site/reference/describing.md#limit-saves-not-seen	-	-	Still a bullet, under its h3
+site/tool.md:636	move	site/reference/describing.md#limit-editors-not-checked	-	-	Still a bullet, under its h3
+site/tool.md:637	move	site/reference/describing.md#limit-folder-changes-not-seen	-	-	Still a bullet, under its h3
+site/tool.md:638	move	site/reference/connections.md#limit-short-password	-	-	Still a bullet, under its h3
+site/recipes.md:125-181	move	site/guides/ci.md#check-sidecars-in-ci	-	-	Today's order: lines 127-153 under the new h3 PostgreSQL, 155-181 under the new h3 SQL Server, until phase 12
+site/recipes.md:185-196	move	site/start/keep-up-to-date.md#after-a-migration	-	-	The one unit of the page until phase 10 writes it
+site/recipes.md:200-202	move	site/guides/describe-on-save.md#start-the-watcher-with-your-editor	-	-	-
+site/recipes.md:204	move	site/guides/describe-on-save.md#vs-code	-	-	level: h3 to h2, as spec step 2 lists it, under the new anchor vs-code
+site/recipes.md:206-241	move	site/guides/describe-on-save.md#vs-code	-	-	The task of 206-235 is byte-identical, a block at the left margin that EditorRecipeTests reads
+site/recipes.md:243	move	site/guides/describe-on-save.md#rider	-	-	level: h3 to h2, as spec step 2 lists it, under the new anchor rider
+site/recipes.md:245-248	move	site/guides/describe-on-save.md#rider	-	-	-
+site/recipes.md:250	move	site/guides/describe-on-save.md#visual-studio	-	-	level: h3 to h2, as spec step 2 lists it, under the new anchor visual-studio
+site/recipes.md:252-254	move	site/guides/describe-on-save.md#visual-studio	-	-	-
+site/diagnostics.md:3623	corrected	site/diagnostics.md#sqlsrc294	C-03	See: When a bundle cannot be made safe	C-03: the link to tool.md#known-issues goes, since none of its eight bullets is about a bundle; the line keeps guides/report-a-bug.md#raw-bundle
+@site/reference/sidecars.md:3	restated-from	-	site/reference/sidecars.md#sidecar-files	-	Phase 3's sentence that pointed to tool.md#sidecar-files: the section now stands on this page
+@site/guides/troubleshooting.md:5	move	site/guides/troubleshooting.md	-	-	position: ", [the generator] and [the tool]" > " and [the generator]"; the link to the tool's known issues goes, since each of its limits has its entry
+-	new	site/reference/cli.md	-	-	The h1 The sqlsource command and the opening sentences, which link describing.md, msbuild.md#running-in-the-build, bundles.md and errors.md#the-tools-errors; the anchor tool
+-	new	site/reference/cli.md#options	-	-	The sentence that introduces the tool's other options and its table of six rows: --help, --version, --query, --out, --no-obfuscate and --scrub
+-	new	site/reference/cli.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/describing.md	-	-	The h1 What describe does (watch, check, force)
+-	new	site/reference/describing.md#describe	-	-	The anchor describe, the heading What describe does and its sentence, from the facts of tool.md 3
+-	new	site/reference/describing.md#limits	-	-	The heading Limits and its anchor; the h3 of 4 limits and their anchors
+-	new	site/reference/connections.md	-	-	The h1 Connections and the .env file
+-	new	site/reference/connections.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/msbuild.md	-	-	The h1 MSBuild properties and the build; phase 7 fills the page
+-	new	site/reference/bundles.md	-	-	The h1 Bug-report bundles (diagnose, replay) and the sentence that links guides/report-a-bug.md
+-	new	site/guides/report-a-bug.md	-	-	The h1 Report a wrong model
+-	new	site/guides/ci.md	-	-	The h1 Check the sidecars in CI; the h3 PostgreSQL and SQL Server with their anchors ci-postgresql and ci-sql-server
+-	new	site/guides/describe-on-save.md	-	-	The h1 Describe queries as you save (watch); the anchors vs-code, rider and visual-studio
+-	new	site/start/keep-up-to-date.md	-	-	The h1 Keep your queries up to date; phase 10 writes the page
+-	new	site/guides/troubleshooting.md	-	-	6 entries: 2 under not-described, 3 under watch, 1 under secrets, one for each limit of this phase
+-	new	site/AGENTS.md	-	-	Not a user document: the row Command, option, environment variable, exit code names reference/cli.md and CliReferenceTests; tool.md leaves the pages not yet moved; the schema link is on reference/sidecars.md
+-	new	src/SqlSource.Tool/AGENTS.md	-	-	Not a user document: lines 14, 15 and 30 name the pages of site/reference/ (8,174 bytes)
+-	new	src/SqlSource.Tool/Watching/AGENTS.md	-	-	Not a user document: line 5 names reference/describing.md#describe-on-save and the task of guides/describe-on-save.md
+-	new	tests/SqlSource.Repository.Tests/Documentation/AGENTS.md	-	-	Not a user document: its first bullet names CliReferenceTests
