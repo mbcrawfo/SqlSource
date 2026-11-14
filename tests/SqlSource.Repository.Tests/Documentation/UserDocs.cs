@@ -17,7 +17,7 @@ internal static partial class UserDocs
     public const string RepositoryUrl = "https://github.com/mbcrawfo/SqlSource/blob/main/";
 
     // Where the manual is published, and the folder of the repository it is built from.  A page `<path>.md` of the
-    // folder, at any depth, is `<path>.html` of the site, and the site's root redirects to README.html.
+    // folder, at any depth, is `<path>.html` of the site, and the site's root is the landing page, site/index.md.
     public const string SiteUrl = "https://mbcrawfo.github.io/SqlSource/";
 
     internal const string Site = "site";
@@ -32,8 +32,8 @@ internal static partial class UserDocs
     private static readonly ConcurrentDictionary<string, Document> Documents = new(StringComparer.Ordinal);
 
     // The pages of the manual, as repository-relative paths with '/': every .md file of site/, in its folders, but the
-    // AGENTS.md and CLAUDE*.md files, which are guidance for an agent, and site/index.md, which only sends the site's
-    // root to README.html.  docfx publishes these.
+    // AGENTS.md and CLAUDE*.md files, which are guidance for an agent.  The landing page, site/index.md, is one of
+    // them.  docfx publishes these.
     public static IReadOnlyList<string> SitePages { get; } = PagesUnder(RepositoryRoot.Path(Site));
 
     // The pages of the manual in the folder `site`, as SitePages lists them: paths from the folder above it.
@@ -43,8 +43,7 @@ internal static partial class UserDocs
                 .EnumerateFiles(site, "*.md", SearchOption.AllDirectories)
                 .Select(path => Path.GetRelativePath(Path.GetDirectoryName(site)!, path).Replace('\\', '/'))
                 .Where(path =>
-                    path != $"{Site}/index.md"
-                    && Path.GetFileName(path) is not "AGENTS.md"
+                    Path.GetFileName(path) is not "AGENTS.md"
                     && !Path.GetFileName(path).StartsWith("CLAUDE", StringComparison.Ordinal)
                 )
                 .Order(StringComparer.Ordinal),
@@ -107,8 +106,8 @@ internal static partial class UserDocs
     // without the slash after the repository's name.
     public static bool IsSiteLink(string target) => SiteLinkPattern().IsMatch(target);
 
-    // What is wrong with a link to the site: it must name a page, `<path>.html`, or be the root with no anchor, since
-    // the root's redirect drops the anchor.  Null when the form is right, and for a link to anything else.
+    // What is wrong with a link to the site: it must name a page, `<path>.html`, or be the root, with an anchor or
+    // without.  Null when the form is right, and for a link to anything else.
     public static string? SiteLinkProblem(string target)
     {
         if (!IsSiteLink(target))
@@ -118,7 +117,7 @@ internal static partial class UserDocs
 
         if (!target.StartsWith(SiteUrl, StringComparison.Ordinal))
         {
-            return $"write the site's address as {SiteUrl}: the root without its slash drops an anchor too";
+            return $"write the site's address as {SiteUrl}";
         }
 
         var rest = target[SiteUrl.Length..];
@@ -126,9 +125,7 @@ internal static partial class UserDocs
         var page = hash < 0 ? rest : rest[..hash];
         if (page.Length == 0)
         {
-            return hash < 0
-                ? null
-                : $"name the page, {SiteUrl}README.html#<anchor>: the root's redirect drops the anchor";
+            return null;
         }
 
         return SitePagePattern().IsMatch(page)
@@ -163,7 +160,7 @@ internal static partial class UserDocs
             var page = path[SiteUrl.Length..];
             if (page.Length == 0)
             {
-                return ($"{Site}/README.md", anchor);
+                return ($"{Site}/index.md", anchor);
             }
 
             return SitePagePattern().Match(page) is { Success: true } name

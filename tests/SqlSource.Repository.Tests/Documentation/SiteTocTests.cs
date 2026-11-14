@@ -8,18 +8,21 @@ using Xunit;
 
 namespace SqlSource.Repository.Tests.Documentation;
 
-// The sidebar of the manual's site is site/toc.yml, and a folder of pages has a toc.yml of its own that the entry for
-// the folder leads to.  docfx publishes a page that no toc.yml lists, with no warning and no way to reach the page but
-// a link, and fails on an entry whose page is gone.
+// The top bar of the manual's site is site/toc.yml, and a folder of pages has a toc.yml of its own, its sidebar, that
+// the entry for the folder leads to.  The landing page, site/index.md, is in no toc.yml.  docfx publishes a page that
+// no toc.yml lists, with no warning and no way to reach the page but a link, and fails on an entry whose page is gone.
 public sealed partial class SiteTocTests
 {
     // The folder of the made-up pages of a test, written so that InboundSiteReferenceTests does not read them as
     // references to pages of the site.
     private const string MadeUpFolder = "site/a";
 
+    // The site's root, which shows no sidebar.
+    private const string LandingPage = "site/index.md";
+
     // Fails when a toc.yml of site/, at any depth, has an entry that names no page of the site or a folder with no
-    // toc.yml, when a page is named by more than one entry, when a page is in no toc.yml, or when a toc.yml but the
-    // root's is led to by no entry.
+    // toc.yml, when a page is named by more than one entry, when a page but site/index.md is in no toc.yml, or when a
+    // toc.yml but the root's is led to by no entry.
     [Fact]
     public void Toc_ListsEveryPageOnce_AndNothingElse()
     {
@@ -35,7 +38,8 @@ public sealed partial class SiteTocTests
     }
 
     // Fails when a problem of a nested set of toc.yml files, a folder with none, a gone page, a page named twice, a
-    // toc.yml that two entries lead to, a page listed nowhere or a toc.yml that no entry leads to, goes unreported.
+    // toc.yml that two entries lead to, a page listed nowhere or a toc.yml that no entry leads to, goes unreported, or
+    // when the landing page, which no toc.yml lists, is reported.
     [Fact]
     public void Problems_OfANestedSet_AreFound()
     {
@@ -52,6 +56,7 @@ public sealed partial class SiteTocTests
         string[] pages =
         [
             "site/diagnostics.md",
+            LandingPage,
             $"{MadeUpFolder}/page.md",
             $"{MadeUpFolder}/twice.md",
             $"{MadeUpFolder}/none.md",
@@ -129,7 +134,12 @@ public sealed partial class SiteTocTests
                 .Where(group => group.Count() > 1)
                 .Select(group => $"{group.Key} is led to by more than one entry")
         );
-        problems.AddRange(pages.Except(named, StringComparer.Ordinal).Select(page => $"{page} is in no toc.yml"));
+        problems.AddRange(
+            pages
+                .Except(named, StringComparer.Ordinal)
+                .Where(page => page != LandingPage)
+                .Select(page => $"{page} is in no toc.yml")
+        );
         return problems;
     }
 

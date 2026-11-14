@@ -1,26 +1,6 @@
-- name: Manual
-  href: README.md
-- name: Concepts
-  href: concepts.md
-- name: .sql files
-  href: sql-files.md
-- name: Settings
-  href: settings.md
-- name: Parameters and tokens
-  href: parameters-and-tokens.md
-- name: Dialects
-  href: dialects.md
-- name: The generator
-  href: generator.md
-- name: The tool
-  href: tool.md
-- name: PostgreSQL
-  href: postgresql.md
-- name: SQL Server
-  href: sqlserver.md
-- name: Recipes
-  href: recipes.md
-- name: How errors are reported
-  href: errors.md
-- name: Diagnostics
-  href: diagnostics.md
+- name: Get started
+  href: start/
+- name: Guides
+  href: guides/
+- name: Reference
+  href: reference/

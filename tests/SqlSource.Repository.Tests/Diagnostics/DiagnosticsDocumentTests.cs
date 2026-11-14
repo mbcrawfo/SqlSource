@@ -16,8 +16,8 @@ using Xunit;
 namespace SqlSource.Repository.Tests.Diagnostics;
 
 // site/diagnostics.md is the list of diagnostics a user reads, under its title and one paragraph, and the table of
-// areas of site/errors.md lists each by its area.  These tests keep both complete: a descriptor that is added,
-// removed or renamed fails them until both say the same, and its section says what reports it.
+// areas of site/reference/errors.md lists each by its area.  These tests keep both complete: a descriptor that is
+// added, removed or renamed fails them until both say the same, and its section says what reports it.
 public sealed partial class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
@@ -111,13 +111,14 @@ public sealed partial class DiagnosticsDocumentTests
         }
     }
 
-    // The table of areas in site/errors.md links each id from one row, and the rows of all the areas together are in
-    // id order.  Fails when a descriptor is added and no row links it, when an id is linked twice or no longer exists,
-    // or when an id is linked from a row out of order: a new id above the last goes in the last row, or a new row.
+    // The table of areas in site/reference/errors.md links each id from one row, as ../diagnostics.md#sqlsrcNNN, and
+    // the rows of all the areas together are in id order.  Fails when a descriptor is added and no row links it, when
+    // an id is linked twice or no longer exists, or when an id is linked from a row out of order: a new id above the
+    // last goes in the last row, or a new row.
     [Fact]
     public void ErrorsPage_AreaTable_LinksEveryDiagnosticOnceInIdOrder()
     {
-        var lines = File.ReadAllLines(RepositoryRoot.Path("site", "errors.md"));
+        var lines = File.ReadAllLines(RepositoryRoot.Path("site", "reference", "errors.md"));
         var start = Array.IndexOf(lines, "<a id=\"errors-by-area\"></a>");
         start.ShouldBeGreaterThanOrEqualTo(0);
 
@@ -170,7 +171,7 @@ public sealed partial class DiagnosticsDocumentTests
         }
     }
 
-    [GeneratedRegex(@"diagnostics\.md#(sqlsrc\d+)")]
+    [GeneratedRegex(@"\]\(\.\./diagnostics\.md#(sqlsrc\d+)\)")]
     private static partial Regex SectionLink();
 
     // The lines of a section after its title that are not blank.

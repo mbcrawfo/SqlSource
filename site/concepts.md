@@ -26,19 +26,19 @@ The rest of this page defines the words the manual uses.  Each is used in this o
 
 #### Query
 
-The SQL that follows a `-- name:` line, up to the next `-- name:` line or the end of the file.  A file with no `-- name:` line is one query.  Each query becomes one member of the generated code, named after the query.  See [queries and names](sql-files.md#queries-and-names).
+The SQL that follows a `-- name:` line, up to the next `-- name:` line or the end of the file.  A file with no `-- name:` line is one query.  Each query becomes one member of the generated code, named after the query.  See [queries and names](reference/sql-files.md#queries-and-names).
 
 <a id="marker"></a>
 
 #### Marker
 
-A line comment that starts its line and has the form `-- word: value`, where the word is one SqlSource knows, such as `-- name: GetUser` or `-- summary: Loads one user.`  Nothing else in a comment is read.  The [marker index](sql-files.md#marker-index) lists every marker.
+A line comment that starts its line and has the form `-- word: value`, where the word is one SqlSource knows, such as `-- name: GetUser` or `-- summary: Loads one user.`  Nothing else in a comment is read.  The [marker index](reference/sql-files.md#marker-index) lists every marker.
 
 <a id="file-header"></a>
 
 #### File header
 
-The part of a `.sql` file before its first `-- name:` line.  It holds comments, such as a licence, and the markers that apply to every query in the file.  See [the file header](sql-files.md#the-file-header).
+The part of a `.sql` file before its first `-- name:` line.  It holds comments, such as a licence, and the markers that apply to every query in the file.  See [the file header](reference/sql-files.md#the-file-header).
 
 <a id="sidecar"></a>
 
@@ -88,7 +88,7 @@ SqlSource uses the word "parameter" for three different things.  The manual alwa
 
 #### Query parameter
 
-A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written, but for a [list](parameters-and-tokens.md#list-parameters), `IN @ids`, which a query method writes as one parameter for each value.  A `-- param:` marker gives one its database type, whether it can be null, or a C# type of your choice.  See [parameters and tokens](parameters-and-tokens.md).
+A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written, but for a [list](reference/parameters.md#list-parameters), `IN @ids`, which a query method writes as one parameter for each value.  A `-- param:` marker gives one its database type, whether it can be null, or a C# type of your choice.  See [parameters and tokens](reference/parameters.md).
 
 <a id="generator-parameter"></a>
 
@@ -100,7 +100,7 @@ An option that changes what the generator does with a query, such as `keep-comme
 
 #### Token
 
-A place in a query's SQL, written `{{table}}`, that your code fills in with text when it asks for the SQL.  A query parameter cannot stand for a table name or a clause; a token can.  A token is replaced by plain text substitution and nothing is escaped, so it must only carry text that your own code chooses.  See [parameters and tokens](parameters-and-tokens.md).
+A place in a query's SQL, written `{{table}}`, that your code fills in with text when it asks for the SQL.  A query parameter cannot stand for a table name or a clause; a token can.  A token is replaced by plain text substitution and nothing is escaped, so it must only carry text that your own code chooses.  See [parameters and tokens](reference/tokens.md).
 
 ### Two meanings of database
 
@@ -108,7 +108,7 @@ A place in a query's SQL, written `{{table}}`, that your code fills in with text
 
 #### Dialect
 
-The set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  It is named after a database, such as `postgres` or `mssql`, and it is set for a project, for some of its files, or for one file.  A dialect connects to nothing.  See [dialects](dialects.md) and [the dialect setting](settings.md#setting-dialect).
+The set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  It is named after a database, such as `postgres` or `mssql`, and it is set for a project, for some of its files, or for one file.  A dialect connects to nothing.  See [dialects](reference/dialects.md) and [the dialect setting](settings.md#setting-dialect).
 
 <a id="logical-database"></a>
 
