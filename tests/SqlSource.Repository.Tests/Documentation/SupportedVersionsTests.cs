@@ -30,6 +30,7 @@ public sealed partial class SupportedVersionsTests
 
     private const string DefaultImagesFile = "tests/DatabaseTests/TestHarness/DefaultImages.cs";
     private const string NightlyFile = ".github/workflows/nightly.yml";
+    private const string BuildFile = ".github/workflows/build.yml";
     private const string SqlServerContainerFile = "tests/DatabaseTests/TestHarness/SqlServerContainer.cs";
 
     // The two server minimums of the table, as its "Server versions supported" cells give them.  For the tests that
@@ -54,9 +55,9 @@ public sealed partial class SupportedVersionsTests
             );
 
     // Fails when the SQL Server row's "Server versions supported" is not the year of SqlServerErrors.MinimumRelease,
-    // the release below which the describer refuses a server.
+    // the release the describer's refusal names.
     [Fact]
-    public void SqlServerServerSupported_IsTheDescribersMinimum()
+    public void SqlServerServerSupported_IsTheYearOfMinimumRelease()
     {
         var year = YearPattern().Match(SqlServerErrors.MinimumRelease);
         year.Success.ShouldBeTrue($"SqlServerErrors.MinimumRelease, '{SqlServerErrors.MinimumRelease}', has no year");
@@ -67,6 +68,45 @@ public sealed partial class SupportedVersionsTests
                 $"{Page}, {SqlServer}, '{ServerSupported}' should be the year of SqlServerErrors.MinimumRelease, "
                     + $"'{SqlServerErrors.MinimumRelease}'"
             );
+    }
+
+    // Fails when the SQL Server row's "Server versions supported" is not the year of the image of
+    // SqlServerContainer.ImageBuilds whose build has SqlServerSession.MinimumMajorVersion, the major below which the
+    // describer refuses a server, and when no image, or images of more than one year, have that major.
+    [Fact]
+    public void SqlServerServerSupported_IsTheYearOfTheDescribersMinimumMajor()
+    {
+        var major = SqlServerSession.MinimumMajorVersion;
+        var years = YearsOfMajor(ImageBuilds(), major);
+        var year = years.ShouldHaveSingleItem(
+            $"{SqlServerContainerFile} should have, in ImageBuilds, the image of one year whose build starts with "
+                + $"'{major}.', SqlServerSession.MinimumMajorVersion; it has {years.Count}: {string.Join(", ", years)}"
+        );
+
+        FirstNumber(Table(), SqlServer, ServerSupported)
+            .ShouldBe(
+                VersionOf(year.ToString(CultureInfo.InvariantCulture)),
+                $"{Page}, {SqlServer}, '{ServerSupported}' should be {year}, the year of the image of ImageBuilds "
+                    + $"whose build has the major SqlServerSession.MinimumMajorVersion, {major}"
+            );
+    }
+
+    // Fails when YearsOfMajor reads a build's major by a prefix without its dot, so that major 1 finds the build
+    // 14.0, misses the image whose build has the major, or gives a year twice for two images of one release.
+    [Fact]
+    public void YearsOfMajor_OfMadeUpBuilds_FindsTheImagesOfThatMajor()
+    {
+        List<ImageBuild> builds =
+        [
+            new("mcr.microsoft.com/mssql/server:2019-CU1-ubuntu-20.04", 2019, "15.0.4000.1"),
+            new("mcr.microsoft.com/mssql/server:2017-CU1-ubuntu-18.04", 2017, "14.0.3000.1"),
+            new("mcr.microsoft.com/mssql/server:2017-CU2-ubuntu-18.04", 2017, "14.0.3100.1"),
+        ];
+
+        YearsOfMajor(builds, 14).ShouldBe([2017]);
+        YearsOfMajor(builds, 15).ShouldBe([2019]);
+        YearsOfMajor(builds, 1).ShouldBeEmpty();
+        YearsOfMajor(builds, 13).ShouldBeEmpty();
     }
 
     // Fails when the PostgreSQL row's "Server versions tested" is not the set of the majors of the images the tests
@@ -84,8 +124,9 @@ public sealed partial class SupportedVersionsTests
                     + $"Postgres in {DefaultImagesFile} and of each `image: postgres:` of {NightlyFile}"
             );
 
-    // Fails when the SQL Server row's "Server versions tested" is not the set of the years of the images of
-    // SqlServerContainer.ImageBuilds, the default, the floor and the images of the nightly run.
+    // Fails when the SQL Server row's "Server versions tested" is not the set of the years of the images the tests
+    // run: DefaultImages.SqlServer, each `image: mcr.microsoft.com/mssql/server:` of the nightly run, and the floor,
+    // SQLSERVER_FLOOR_IMAGE of the build.
     [Fact]
     public void SqlServerServerTested_IsTheYearsOfTheTestImages() =>
         AllNumbers(Table(), SqlServer, ServerTested)
@@ -93,11 +134,30 @@ public sealed partial class SupportedVersionsTests
             .Distinct()
             .Order()
             .ShouldBe(
-                SqlServerImageYears(),
+                [.. SqlServerTestImages().Select(YearOfImage).Distinct().Order()],
                 ignoreOrder: false,
-                customMessage: $"{Page}, {SqlServer}, '{ServerTested}' should be the years of the keys of "
-                    + $"ImageBuilds in {SqlServerContainerFile}"
+                customMessage: $"{Page}, {SqlServer}, '{ServerTested}' should be the years of SqlServer in "
+                    + $"{DefaultImagesFile}, of each `image: mcr.microsoft.com/mssql/server:` of {NightlyFile} and "
+                    + $"of SQLSERVER_FLOOR_IMAGE in {BuildFile}"
             );
+
+    // Fails when the keys of SqlServerContainer.ImageBuilds are not the images the tests run, so that a row stays for
+    // an image no test runs, or an image runs that has no build recorded.
+    [Fact]
+    public void SqlServerImageBuilds_AreTheTestImages()
+    {
+        var keys = ImageBuilds().Select(build => build.Image).ToList();
+        var images = SqlServerTestImages();
+
+        keys.Except(images, StringComparer.Ordinal)
+            .Select(image => $"ImageBuilds in {SqlServerContainerFile} has a row for {image}, which no test runs")
+            .Concat(
+                images
+                    .Except(keys, StringComparer.Ordinal)
+                    .Select(image => $"{image} is run by the tests and has no row of ImageBuilds")
+            )
+            .ShouldBeEmpty();
+    }
 
     // Fails when the PostgreSQL row's "Driver versions supported" is not the version that ends the title of
     // SQLSRC247, SqlDiagnostics.NpgsqlTooOld, below which no query method is generated.
@@ -164,7 +224,20 @@ public sealed partial class SupportedVersionsTests
 
         PostgresDefaultImageMajors().Count.ShouldBe(2, $"{DefaultImagesFile} should name PostgresFloor and Postgres");
         PostgresNightlyMajors().ShouldNotBeEmpty($"{NightlyFile} should name the images of the nightly run");
-        SqlServerImageYears().ShouldNotBeEmpty($"{SqlServerContainerFile} should name the images of ImageBuilds");
+
+        Images(DefaultImagesFile, SqlServerConstantPattern())
+            .Count.ShouldBe(1, $"{DefaultImagesFile} should name SqlServer");
+        Images(NightlyFile, NightlySqlServerPattern())
+            .ShouldNotBeEmpty($"{NightlyFile} should name the SQL Server images of the nightly run");
+        Images(BuildFile, SqlServerFloorPattern()).Count.ShouldBe(1, $"{BuildFile} should name SQLSERVER_FLOOR_IMAGE");
+
+        var text = File.ReadAllText(RepositoryRoot.Path(SqlServerContainerFile));
+        ImageBuilds()
+            .Count.ShouldBe(
+                text.Split("[\"mcr.microsoft.com/mssql/server:").Length - 1,
+                $"{SqlServerContainerFile}: each key of ImageBuilds should be read with its build"
+            );
+        ImageBuilds().ShouldNotBeEmpty($"{SqlServerContainerFile} should name the images of ImageBuilds");
     }
 
     // Fails when ReadTable reads a table before the anchor or after the first one, keeps the delimiter row, or does not
@@ -299,16 +372,58 @@ public sealed partial class SupportedVersionsTests
                 .Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)),
         ];
 
-    private static List<int> SqlServerImageYears() =>
+    // Each row of SqlServerContainer.ImageBuilds: its image, the image's year and the build its server reports.
+    private static List<ImageBuild> ImageBuilds() =>
         [
-            .. ImageBuildsKeyPattern()
+            .. ImageBuildsRowPattern()
                 .Matches(File.ReadAllText(RepositoryRoot.Path(SqlServerContainerFile)))
-                .Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture))
+                .Select(match => new ImageBuild(
+                    match.Groups[1].Value,
+                    YearOfImage(match.Groups[1].Value),
+                    match.Groups[2].Value
+                )),
+        ];
+
+    // The years of the images whose build has the major: its first part, read up to its dot.
+    private static List<int> YearsOfMajor(IReadOnlyList<ImageBuild> builds, int major) =>
+        [
+            .. builds
+                .Where(build => build.Build.StartsWith($"{major}.", StringComparison.Ordinal))
+                .Select(build => build.Year)
                 .Distinct()
                 .Order(),
         ];
 
+    // The SQL Server images the tests run: DefaultImages.SqlServer, the images of the nightly run and the floor of the
+    // build.
+    private static List<string> SqlServerTestImages() =>
+        [
+            .. Images(DefaultImagesFile, SqlServerConstantPattern())
+                .Concat(Images(NightlyFile, NightlySqlServerPattern()))
+                .Concat(Images(BuildFile, SqlServerFloorPattern()))
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal),
+        ];
+
+    // The first group of each line of the file that the pattern matches.
+    private static List<string> Images(string file, Regex pattern) =>
+        [
+            .. File.ReadAllLines(RepositoryRoot.Path(file))
+                .Select(line => pattern.Match(line))
+                .Where(match => match.Success)
+                .Select(match => match.Groups[1].Value),
+        ];
+
+    private static int YearOfImage(string image)
+    {
+        var match = SqlServerImageYearPattern().Match(image);
+        match.Success.ShouldBeTrue($"the image '{image}' has no year after its colon");
+        return int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+    }
+
     internal sealed record SupportedTable(IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows);
+
+    private sealed record ImageBuild(string Image, int Year, string Build);
 
     [GeneratedRegex(@"\d+(?:\.\d+)*")]
     private static partial Regex NumberPattern();
@@ -330,7 +445,23 @@ public sealed partial class SupportedVersionsTests
     [GeneratedRegex(@"^\s*image:\s*postgres:(\d+)\.\d+\s*$")]
     private static partial Regex NightlyPostgresPattern();
 
-    // `["mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04"] =`, a key of ImageBuilds.
-    [GeneratedRegex(@"\[""mcr\.microsoft\.com/mssql/server:(\d{4})-[^""]*""\]\s*=")]
-    private static partial Regex ImageBuildsKeyPattern();
+    // `["mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04"] = "17.0.5015.4"`, a row of ImageBuilds.
+    [GeneratedRegex(@"\[""(mcr\.microsoft\.com/mssql/server:[^""]+)""\]\s*=\s*""([^""]+)""")]
+    private static partial Regex ImageBuildsRowPattern();
+
+    // `const string SqlServer = "mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04"`.
+    [GeneratedRegex(@"const string SqlServer = ""(mcr\.microsoft\.com/mssql/server:[^""]+)""")]
+    private static partial Regex SqlServerConstantPattern();
+
+    // `image: mcr.microsoft.com/mssql/server:2019-CU32-GDR12-ubuntu-20.04`, an entry of the nightly run's matrix.
+    [GeneratedRegex(@"^\s*image:\s*(mcr\.microsoft\.com/mssql/server:\S+)\s*$")]
+    private static partial Regex NightlySqlServerPattern();
+
+    // `SQLSERVER_FLOOR_IMAGE: mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04`, of the build.
+    [GeneratedRegex(@"^\s*SQLSERVER_FLOOR_IMAGE:\s*(mcr\.microsoft\.com/mssql/server:\S+)\s*$")]
+    private static partial Regex SqlServerFloorPattern();
+
+    // The year of `mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04`.
+    [GeneratedRegex(@"^mcr\.microsoft\.com/mssql/server:(\d{4})-")]
+    private static partial Regex SqlServerImageYearPattern();
 }

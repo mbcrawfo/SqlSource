@@ -10,9 +10,9 @@ namespace SqlSource.Repository.Tests.Documentation;
 
 // The manual's site has a fixed shape: the landing page and the errors at the root of site/, and every other page in
 // one of three folders, start/, guides/ and reference/.  Each database that can be described has a folder of
-// site/reference/databases/ with the same five pages, and a tab group that gives a tab to one database gives one to
-// each.  Each limit of a page, a `## Limits` section and each `limit-` anchor in it, is listed on
-// site/guides/troubleshooting.md, for a reader who has a symptom and no error id.
+// site/reference/databases/ with the same five pages, a tab group that gives a tab to one database gives one to each,
+// and a tab for a database has the folder's name as its id.  Each limit of a page, a `## Limits` section and each
+// `limit-` anchor in it, is listed on site/guides/troubleshooting.md, for a reader who has a symptom and no error id.
 public sealed partial class SiteStructureTests
 {
     // The pages that wait at the root of site/ for their phase of the documentation overhaul to move them.  The list
@@ -37,6 +37,17 @@ public sealed partial class SiteStructureTests
     private static readonly IReadOnlyList<string> Folders = ["start", "guides", "reference"];
 
     private const string Databases = "site/reference/databases";
+
+    private const string SupportedVersionsPage = $"{Databases}/index.md";
+
+    // The dialect of each database folder, for the tests of made-up lines.
+    private static readonly IReadOnlyDictionary<string, string> MadeUpDialects = new Dictionary<string, string>(
+        StringComparer.Ordinal
+    )
+    {
+        ["postgresql"] = "postgres",
+        ["sqlserver"] = "mssql",
+    };
 
     private static readonly IReadOnlyList<string> DatabasePages =
     [
@@ -122,24 +133,25 @@ public sealed partial class SiteStructureTests
     }
 
     // Fails when a tab group of a page of the site gives a tab to one database folder of site/reference/databases/ and
-    // not to another: a sample for one described database alone.
+    // not to another, a sample for one described database alone, or when a tab names a database by an id that is not
+    // its folder's name: the folder's name in another case, or the database's dialect.
     [Fact]
-    public void TabGroups_ThatNameADatabase_NameEach()
+    public void TabGroups_ThatNameADatabase_NameEachByItsFolder()
     {
-        var databases = DatabaseNames();
+        var dialects = DatabaseDialects();
         UserDocs
             .SitePages.SelectMany(page =>
-                PartialTabGroups(page, File.ReadAllLines(RepositoryRoot.Path(page)), databases)
+                TabGroupProblems(page, File.ReadAllLines(RepositoryRoot.Path(page)), dialects)
             )
             .ShouldBeEmpty();
     }
 
-    // Fails when PartialTabGroups misses a group with one database alone, reports a group with each database or with
+    // Fails when TabGroupProblems misses a group with one database alone, reports a group with each database or with
     // none, reads a tab heading in a fenced block, or takes two groups for one: groups parted by another heading, by a
     // `---` line, and groups of tab headings of two levels.
     [Fact]
-    public void PartialTabGroups_OfMadeUpLines_AreFound() =>
-        PartialTabGroups(
+    public void TabGroupProblems_OfMadeUpLines_FindPartialGroups() =>
+        TabGroupProblems(
                 $"{MadeUpFolder}/page.md",
                 [
                     "# Page",
@@ -174,7 +186,7 @@ public sealed partial class SiteStructureTests
                     "",
                     "#### [SQL Server](#tab/sqlserver)",
                 ],
-                ["postgresql", "sqlserver"]
+                MadeUpDialects
             )
             .ShouldBe([
                 $"{MadeUpFolder}/page.md:3: the tab group has tabs for postgresql and none for sqlserver: give each "
@@ -187,6 +199,55 @@ public sealed partial class SiteStructureTests
                     + "database folder of site/reference/databases/ its tab",
             ]);
 
+    // Fails when TabGroupProblems misses a tab id that is a database folder's name in another case, or a database's
+    // dialect in its own case or another, the first segment of a dependent tab's id included, or reports a tab id
+    // that is the folder's name or names no database.
+    [Fact]
+    public void TabGroupProblems_OfMadeUpLines_FindTabIdsThatAreNotTheFolderName() =>
+        TabGroupProblems(
+                $"{MadeUpFolder}/page.md",
+                [
+                    "## [PostgreSQL](#tab/postgres)",
+                    "",
+                    "## [SQL Server](#tab/SqlServer)",
+                    "",
+                    "## Between",
+                    "",
+                    "## [PostgreSQL](#tab/PostgreSQL)",
+                    "",
+                    "## [SQL Server](#tab/mssql)",
+                    "",
+                    "## Next",
+                    "",
+                    "## [PostgreSQL](#tab/postgres/npgsql8)",
+                    "",
+                    "## [SQL Server](#tab/MSSQL)",
+                    "",
+                    "## Then",
+                    "",
+                    "## [PostgreSQL](#tab/postgresql)",
+                    "",
+                    "## [SQL Server](#tab/sqlserver)",
+                    "",
+                    "## Last",
+                    "",
+                    "## [MySQL](#tab/mysql)",
+                ],
+                MadeUpDialects
+            )
+            .ShouldBe([
+                MisnamedTab(1, "postgres", "postgresql"),
+                MisnamedTab(3, "SqlServer", "sqlserver"),
+                MisnamedTab(7, "PostgreSQL", "postgresql"),
+                MisnamedTab(9, "mssql", "sqlserver"),
+                MisnamedTab(13, "postgres", "postgresql"),
+                MisnamedTab(15, "MSSQL", "sqlserver"),
+            ]);
+
+    private static string MisnamedTab(int line, string id, string folder) =>
+        $"{MadeUpFolder}/page.md:{line}: the tab id '{id}' names the database {folder}: use the folder's name, "
+        + $"`{folder}`, as the tab id";
+
     // The names of the folders directly in site/reference/databases/, which are the databases that can be described.
     internal static IReadOnlyList<string> DatabaseNames() =>
         [
@@ -197,16 +258,49 @@ public sealed partial class SiteStructureTests
                 .Order(StringComparer.Ordinal),
         ];
 
-    // Each docfx tab group of the lines that has a tab for one of the databases and none for another: one problem for
-    // each, with the line of its first tab.  A group is a run of tab headings, `#... [Text](#tab/<id>)`, of one level,
-    // with no other heading and no `---` line between them, outside fenced blocks: docfx ends a group at either.  A
-    // dependent tab's id holds slashes, and its first segment names the tab.
-    internal static IReadOnlyList<string> PartialTabGroups(
+    // The dialect of each database folder of site/reference/databases/, as the table of
+    // site/reference/databases/index.md#supported-versions gives it: a row's `dialect` cell, without its backticks,
+    // under the folder of the `<folder>/index.md` link of its Pages cell.
+    internal static IReadOnlyDictionary<string, string> DatabaseDialects()
+    {
+        var table = SupportedVersionsTests.ReadTable(File.ReadAllLines(RepositoryRoot.Path(SupportedVersionsPage)));
+        var headers = table.Headers.ToList();
+        var dialect = headers.IndexOf("`dialect`");
+        var pages = headers.IndexOf("Pages");
+        dialect.ShouldBeGreaterThanOrEqualTo(0, $"{SupportedVersionsPage}#supported-versions has no column `dialect`");
+        pages.ShouldBeGreaterThanOrEqualTo(0, $"{SupportedVersionsPage}#supported-versions has no column Pages");
+
+        var dialects = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var row in table.Rows)
+        {
+            row.Count.ShouldBeGreaterThan(
+                Math.Max(dialect, pages),
+                $"{SupportedVersionsPage}#supported-versions: the row '{row[0]}' has too few cells"
+            );
+            var folder = PagesCellFolder().Match(row[pages]);
+            folder.Success.ShouldBeTrue(
+                $"{SupportedVersionsPage}#supported-versions: the Pages cell of '{row[0]}', '{row[pages]}', links "
+                    + "no <folder>/index.md"
+            );
+            dialects.Add(folder.Groups[1].Value, row[dialect].Trim('`'));
+        }
+
+        return dialects;
+    }
+
+    // The problems of the docfx tab groups of the lines, given the dialect of each database folder.  Each group that
+    // has a tab for one of the databases and none for another is one problem, with the line of its first tab.  Each
+    // tab whose id is not a folder's name but is, in any case, a folder's name or a database's dialect is one problem,
+    // with its line.  A group is a run of tab headings, `#... [Text](#tab/<id>)`, of one level, with no other heading
+    // and no `---` line between them, outside fenced blocks: docfx ends a group at either.  A dependent tab's id holds
+    // slashes, and its first segment names the tab.
+    internal static IReadOnlyList<string> TabGroupProblems(
         string page,
         IReadOnlyList<string> lines,
-        IReadOnlyCollection<string> databases
+        IReadOnlyDictionary<string, string> dialects
     )
     {
+        var databases = dialects.Keys.Order(StringComparer.Ordinal).ToList();
         var problems = new List<string>();
         var groupLine = 0;
         var groupLevel = 0;
@@ -268,7 +362,25 @@ public sealed partial class SiteStructureTests
                 groupLevel = level;
             }
 
-            groupIds.Add(tab.Groups[1].Value);
+            var id = tab.Groups[1].Value;
+            groupIds.Add(id);
+            if (!databases.Contains(id, StringComparer.Ordinal))
+            {
+                var named = dialects
+                    .Where(pair =>
+                        string.Equals(id, pair.Key, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(id, pair.Value, StringComparison.OrdinalIgnoreCase)
+                    )
+                    .Select(pair => pair.Key)
+                    .FirstOrDefault();
+                if (named is not null)
+                {
+                    problems.Add(
+                        $"{page}:{index + 1}: the tab id '{id}' names the database {named}: use the folder's name, "
+                            + $"`{named}`, as the tab id"
+                    );
+                }
+            }
         }
 
         Close();
@@ -341,16 +453,32 @@ public sealed partial class SiteStructureTests
             ]);
 
     // Fails when the reading finds no site/index.md or troubleshooting page, no page with `## Limits`, fewer than two
-    // `limit-` anchors, or no link of the troubleshooting page: a reading that finds nothing would make the tests above
-    // pass.
+    // `limit-` anchors, or no link of the troubleshooting page, and when the dialects read from the table of supported
+    // versions are not one for each database folder, or one is empty: a reading that finds nothing would make the
+    // tests above pass.
     [Fact]
-    public void Reading_OfTheSite_FindsPagesLimitsAndLinks()
+    public void Reading_OfTheSite_FindsPagesLimitsLinksAndDialects()
     {
         UserDocs.SitePages.ShouldContain("site/index.md");
         UserDocs.SitePages.ShouldContain(Troubleshooting);
         PagesWithLimits().ShouldNotBeEmpty();
         LimitAnchors().Count.ShouldBeGreaterThanOrEqualTo(2);
         TroubleshootingTargets().ShouldNotBeEmpty();
+
+        var dialects = DatabaseDialects();
+        dialects.Count.ShouldBeGreaterThanOrEqualTo(
+            2,
+            $"{SupportedVersionsPage}#supported-versions should have a row for each database folder"
+        );
+        dialects
+            .Keys.Order(StringComparer.Ordinal)
+            .ShouldBe(
+                DatabaseNames(),
+                ignoreOrder: false,
+                customMessage: $"{SupportedVersionsPage}#supported-versions should link the index.md of each folder "
+                    + $"of {Databases}/"
+            );
+        dialects.Values.ShouldAllBe(value => value.Length > 0, "each `dialect` cell should name a dialect");
     }
 
     // The pages whose text, outside fenced blocks, has a `## Limits` heading.
@@ -447,6 +575,10 @@ public sealed partial class SiteStructureTests
     // The text of a docfx tab heading, whose whole text links to `#tab/<id>`: the first segment of the id.
     [GeneratedRegex(@"^\[[^\]]*\]\(#tab/([^/)\s]+)[^)\s]*\)$")]
     private static partial Regex TabHeadingText();
+
+    // The folder of the link of a Pages cell, `[PostgreSQL](postgresql/index.md)`.
+    [GeneratedRegex(@"\]\(([^/()\s]+)/index\.md\)")]
+    private static partial Regex PagesCellFolder();
 
     [GeneratedRegex(@"^##\s+Limits\s*$")]
     private static partial Regex LimitsHeading();
