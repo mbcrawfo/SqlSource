@@ -6,9 +6,9 @@ For the order in which SqlSource chooses the C# type of a property, see [how a C
 
 ## The order of the properties
 
-The input model has a property for each [query parameter](../concepts.md#query-parameter), in the order of the query's [parameter list](parameters.md#query-parameters): the order in which the parameters first appear in the SQL, then those that only a `-- param:` marker declares.  The output model has a property for each column, in the order of the select list.
+The input model has a property for each [query parameter](parameters.md#query-parameters), in the order of the query's [parameter list](parameters.md#query-parameters): the order in which the parameters first appear in the SQL, then those that only a `-- param:` marker declares.  The output model has a property for each column, in the order of the select list.
 
-The [generator parameters](generator-parameters.md#setting-generator-parameters) `sort-input` and `sort-output` sort the properties of the input model or of the output model by name, character by character by their codes, so that upper case comes before lower case: `BX` before `Ba`.  A record's parameters are in the same order, so a sorted record no longer matches its columns by position and name.  A [query method](query-methods.md#reading-rows) reads a sorted model as well as any other; to read rows into sorted models through Dapper, make them classes, as [the recipe](../recipes.md#models-through-dapper) shows.
+The [generator parameters](generator-parameters.md#setting-generator-parameters) `sort-input` and `sort-output` sort the properties of the input model or of the output model by name, character by character by their codes, so that upper case comes before lower case: `BX` before `Ba`.  A record's parameters are in the same order, so a sorted record no longer matches its columns by position and name.  A [query method](query-methods.md#reading-rows) reads a sorted model as well as any other; to read rows into sorted models through Dapper, make them classes, as [the recipe](../guides/dapper.md#models-through-dapper) shows.
 
 <a id="property-names"></a>
 

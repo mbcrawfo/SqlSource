@@ -4,6 +4,8 @@
 
 ## Query methods
 
+What a described query whose [output](settings.md#setting-output) is `repository` or `methods` becomes: an asynchronous method that sends the query's parameters, runs it and reads its rows into its models, or, under the generator parameter `method-type`, a [synchronous one](#synchronous-methods) instead or beside it.  Under `repository` it is an instance method of a [repository](repositories.md#repository-methods), which gets its own connection; under `methods` it takes the connection, and opens it when it is closed.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](#query-methods).
+
 ```sql postgres
 -- name: GetUser -> one-optional
 -- summary: Loads one user by id.

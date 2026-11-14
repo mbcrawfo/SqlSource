@@ -4,6 +4,8 @@
 
 ## What describe does
 
+To ask a database, without running a query, what the query's parameters and columns are.  The tool does it and writes the answer to the query's [sidecar](sidecars.md#sidecar-files).  It needs your schema, not your data.  See [which queries are described](#which-queries).
+
 `describe` connects to your database, asks it for the parameters and columns of each query it describes, and writes the answers to the [sidecar files](sidecars.md#sidecar-files).
 
 <a id="which-queries"></a>
@@ -21,7 +23,7 @@ TRUNCATE TABLE audit_log;
 
 `describe` finds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it runs on, and describes each query whose [output](settings.md#setting-output) is `models`, `methods` or `repository`.  `repository` is the default, so `GetUser` above is described.  `ResetAuditLog` asks for its SQL alone, and the tool leaves it out: it needs no database and no connection.
 
-A query is described through its [dialect](../concepts.md#dialect).  The tool can ask PostgreSQL, which is the dialect `postgres`, and SQL Server, which is `mssql`; the [database support table](databases/index.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be, every row marked No in [database support](databases/index.md#database-support), such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](../diagnostics.md#sqlsrc209), from the tool and in the build.  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.  Set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says, or set the dialect, when the files are PostgreSQL or SQL Server.
+A query is described through its [dialect](settings.md#setting-dialect).  The tool can ask PostgreSQL, which is the dialect `postgres`, and SQL Server, which is `mssql`; the [database support table](databases/index.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be, every row marked No in [database support](databases/index.md#database-support), such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](../diagnostics.md#sqlsrc209), from the tool and in the build.  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.  Set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says, or set the dialect, when the files are PostgreSQL or SQL Server.
 
 The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, which limits how `Source` can be written there: see [a limit](attributes.md#limit-source-written-as-text).
 

@@ -6,6 +6,8 @@ This page is about the settings file itself: its name, what it holds, and which 
 
 ## Settings files
 
+A file named `sqlsource.json` that sets [settings](settings.md#all-settings), such as the dialect and the output, for the `.sql` files of its folder and of every folder below it.  A file in a folder sets what differs there, and one that says `"root": true` keeps the settings files of the folders above it out.  See [settings files](#settings-files).
+
 ```jsonc
 // sqlsource.json, in the project's folder
 {

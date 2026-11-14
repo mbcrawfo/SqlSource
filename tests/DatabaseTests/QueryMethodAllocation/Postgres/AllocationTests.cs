@@ -15,8 +15,9 @@ using Xunit;
 namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
 
 // A generated method allocates no more for each call than a hand-written ADO.NET method of the same calls, written as
-// the manual's recipe for your own code writes one and as a careful developer would: it honours the same contract,
-// opening a closed connection and closing it again in a finally, setting the transaction and, when given, the timeout,
+// the manual's guide for your own code, site/guides/dapper.md#dapper-and-adonet, writes one and as a careful developer
+// would: it honours the same contract, opening a closed connection and closing it again in a finally, setting the
+// transaction and, when given, the timeout,
 // and passing the token; it binds the parameter as the generated method does, an NpgsqlParameter<int> named without
 // its '@' and with its DataTypeName, since binding by the described type is decided and its cost is the driver's on
 // both sides; and it reads each column by its ordinal with GetFieldValue into the same model, and the rows into an

@@ -14,7 +14,7 @@ SELECT 1 # x [y--z] -- c
 | `mysql` | `SELECT 1` | `#` starts a comment |
 | `mssql` | `SELECT 1 # x [y--z]` | `[y--z]` is a quoted identifier, and the last `--` starts a comment |
 
-The [dialect](../concepts.md#dialect) is the set of rules that SqlSource reads a `.sql` file by.  It connects to nothing and is not the [logical database](../concepts.md#logical-database).  This page covers how to choose one, its options, what each dialect changes, and what SqlSource still reads differently from the database.  Where a dialect is set, and which place wins, is on [the settings page](settings.md#setting-dialect).
+The [dialect](settings.md#setting-dialect) is the set of rules that SqlSource reads a `.sql` file by.  It connects to nothing and is not the [logical database](settings.md#setting-database).  This page covers how to choose one, its options, what each dialect changes, and what SqlSource still reads differently from the database.  Where a dialect is set, and which place wins, is on [the settings page](settings.md#setting-dialect).
 
 <a id="choosing-a-dialect"></a>
 
@@ -106,7 +106,7 @@ Four details:
 
 ### Markers under `mysql` and `mariadb`
 
-A [marker](../concepts.md#marker) is a `--` comment, so under `mysql` and `mariadb` it needs white space after the two dashes, as those databases need it: `-- name: GetUser` is a marker, and `--name: GetUser` is not a comment at all.  A `#` comment is never a marker, even where `#` starts a comment: `# name: GetUser` is a comment.
+A [marker](sql-files.md#marker) is a `--` comment, so under `mysql` and `mariadb` it needs white space after the two dashes, as those databases need it: `-- name: GetUser` is a marker, and `--name: GetUser` is not a comment at all.  A `#` comment is never a marker, even where `#` starts a comment: `# name: GetUser` is a comment.
 
 <a id="still-read-differently"></a>
 

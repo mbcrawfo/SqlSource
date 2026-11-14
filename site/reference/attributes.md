@@ -87,6 +87,12 @@ public partial class SharedQueries;
 
 This is separate from [which files the compiler is given](msbuild.md#included-files), which comes first: a type can only claim a file that the project includes.  The attribute itself is on [the Attributes page](#attribute).
 
+<a id="what-the-package-adds"></a>
+
+## What the package adds to your project
+
+- **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, the attributes you mark your types and converters with, and the exceptions its methods throw, are compiled into your project.
+
 <a id="limits"></a>
 
 ## Limits

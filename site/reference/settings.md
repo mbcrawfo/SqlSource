@@ -132,6 +132,8 @@ Three exceptions, stated plainly:
 
 ## Output
 
+The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](models.md#models), or its models and a [query method](query-methods.md#query-methods), which by default is a [repository](repositories.md#repository-methods)'s.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](#setting-output).
+
 ```sql
 -- output: models
 
@@ -154,7 +156,7 @@ TRUNCATE TABLE audit_log;
 
 As a marker it stands in the file header, for every query of the file, and inside a query.  It can also be `output` in a settings file.
 
-**`Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models`, `methods` or `repository`, and the build checks that each of them has a current entry in its file's [sidecar](../concepts.md#sidecar): a query that has none is [SQLSRC241](../diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](../diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  A file claimed by two types, or listed by two projects, is described once, and the build of a project checks its entries once for the file.
+**`Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models`, `methods` or `repository`, and the build checks that each of them has a current entry in its file's [sidecar](sidecars.md#sidecar-files): a query that has none is [SQLSRC241](../diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](../diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  A file claimed by two types, or listed by two projects, is described once, and the build of a project checks its entries once for the file.
 
 The tool can describe only some dialects: see [the database support table](databases/index.md#database-support).  The default output is `repository` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](../diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  Set the dialect and describe the queries, or set the output to `sql` for queries that want only their SQL.
 
@@ -163,6 +165,10 @@ A query whose output is `sql` or `models` gets its constant or token method.  A 
 <a id="setting-database"></a>
 
 ## Database
+
+A name for one particular database your queries run against, such as `billing`.  The tool uses it to choose which connection to describe a query through, a sidecar records it, and a [repository](repositories.md#repository-methods) that uses several marks a connection source for each.  A query belongs to the logical database its markers or settings name, and to the one named after its dialect when they name none.  See [the database setting](#setting-database).
+
+The two answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
 
 ```sql
 -- database: billing
@@ -175,7 +181,7 @@ SELECT id, total FROM invoices;
 SELECT id, kind FROM events;
 ```
 
-`Database` names the [logical database](../concepts.md#logical-database) a query belongs to: the one the `sqlsource` tool asks about it, through a connection you give it by that name.  It is not the dialect.  Two logical databases can share a dialect.
+`Database` names the [logical database](#setting-database) a query belongs to: the one the `sqlsource` tool asks about it, through a connection you give it by that name.  It is not the dialect.  Two logical databases can share a dialect.
 
 - The value is one word of letters, digits, `-`, `_` and `.`.  The rule is narrow because the tool makes the name of an environment variable of it: `billing` is read from `SQLSOURCE_CONNECTION_BILLING`.  Names are compared ignoring case, so `Billing` and `billing` are one database, spelled as the tool first meets it.
 - Without a value, a query belongs to the database named after its file's dialect: `postgres` for a PostgreSQL file, `mssql` for a SQL Server file.
@@ -188,6 +194,8 @@ To give the tool a connection for a name, see [connections](connections.md#conne
 <a id="setting-dialect"></a>
 
 ## Dialect
+
+The set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  It is named after a database, such as `postgres` or `mssql`, and it is set for a project, for some of its files, or for one file.  A dialect connects to nothing.  See [dialects](dialects.md) and [the dialect setting](#setting-dialect).
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -211,7 +219,7 @@ To give the tool a connection for a name, see [connections](connections.md#conne
 SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
 ```
 
-The [dialect](../concepts.md#dialect) is the set of rules by which SqlSource reads a `.sql` file.  It does not connect to anything.  The default is `ansi`.  The dialect names, the options of `mysql` and `mariadb`, and what each dialect changes are on [the dialects page](dialects.md).
+The [dialect](#setting-dialect) is the set of rules by which SqlSource reads a `.sql` file.  It does not connect to anything.  The default is `ansi`.  The dialect names, the options of `mysql` and `mariadb`, and what each dialect changes are on [the dialects page](dialects.md).
 
 - **Three places.**  A `-- dialect:` marker in the file, else the `dialect` of the nearest settings file of the file's folder, or of a folder above it, that sets one, else `ansi`.  Above, the files under `Reporting/` are read as `mssql`, and every other file of the project as `postgres`.
 - **A file has one dialect.**  The marker goes in the file header, before the first SQL, and not inside a query: anywhere else it is [SQLSRC115](../diagnostics.md#sqlsrc115).  It takes effect on the line after it, so comments above it are read by the dialect that the settings files give.

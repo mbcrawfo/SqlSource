@@ -6,6 +6,8 @@ A query parameter, such as `@id` in `WHERE id = @id`, carries a value from your 
 
 ## Query parameters
 
+A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written, but for a [list](#list-parameters), `IN @ids`, which a query method writes as one parameter for each value.  A `-- param:` marker gives one its database type, whether it can be null, or a C# type of your choice.
+
 ```sql
 -- name: GetUser
 SELECT id, name FROM users WHERE id = @id;
@@ -78,7 +80,7 @@ A parameter written directly after `IN` or `NOT IN`, with no parentheses, is a l
 - **A null value in a list of a reference type**, such as a `string`, is sent as a `NULL`.  After `IN` it matches nothing, and the other values still match.  After `NOT IN` it makes the condition match no row at all, as SQL's `id NOT IN (1, NULL)` is never true: keep nulls out of a list that `NOT IN` reads.
 - **A list may be used more than once**, and every use sends the same parameters.
 - **Each list is read once.**  An array, a `List<T>`, a `HashSet<T>` or any other `ICollection<T>` or `IReadOnlyCollection<T>` is counted when the method is called, and its values are read when they are sent.  Any other sequence, such as a LINQ query, is copied into an array once, when the method is called.  A collection whose count of values has changed by the time they are sent throws `InvalidOperationException`, "The list 'Excluded' changed after the query counted it.": leave a list as it is until the method's task completes, or, for a method that [streams its rows](return-types.md#streaming-rows), until the loop has its first row.
-- **In the outputs `sql` and `models`, the SQL holds the list as written**, `IN @categories`, for the code that runs it, and under `models` the input model's property is the same `IEnumerable<T>`.  Whether a library runs such SQL is the library's affair: Dapper, for one, sends one parameter for each value on SQL Server, as the query methods do, but only for a list that the query does not test for null, and sends a list to PostgreSQL as one array, which `IN @categories` cannot take: see [the recipe](../recipes.md#models-through-dapper).  On PostgreSQL, write [`= ANY(@categories)`](databases/postgresql/query-methods.md#array-parameters) for a query that Dapper runs.
+- **In the outputs `sql` and `models`, the SQL holds the list as written**, `IN @categories`, for the code that runs it, and under `models` the input model's property is the same `IEnumerable<T>`.  Whether a library runs such SQL is the library's affair: Dapper, for one, sends one parameter for each value on SQL Server, as the query methods do, but only for a list that the query does not test for null, and sends a list to PostgreSQL as one array, which `IN @categories` cannot take: see [the recipe](../guides/dapper.md#models-through-dapper).  On PostgreSQL, write [`= ANY(@categories)`](databases/postgresql/query-methods.md#array-parameters) for a query that Dapper runs.
 
 A change to a list's use, such as `IN (@ids)` to `IN @ids`, is a change to the SQL, so the query's sidecar is out of date until it is described again.
 

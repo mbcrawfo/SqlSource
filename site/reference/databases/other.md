@@ -2,6 +2,8 @@
 
 SqlSource can describe the queries of the databases marked Yes in the table of [database support](index.md#database-support), and of no other.  This page is for each database that the table marks No.
 
+For the steps to use SqlSource with one of these databases, with the output `sql`, see [Use MySQL, SQLite, Oracle or another database](../../guides/other-databases.md).
+
 <a id="not-described"></a>
 
 ## Databases that are not described

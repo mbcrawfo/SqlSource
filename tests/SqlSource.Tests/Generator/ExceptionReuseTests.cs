@@ -544,10 +544,10 @@ public sealed class ExceptionReuseTests
         + "framework before .NET 6, so it does not pass on the SqlState, IsTransient and BatchCommand of the "
         + "database's error.  Make Shared target .NET 6 or later, or add such a target to its TargetFrameworks.";
 
-    // The shared project of the manual's recipe, compiled for a framework before .NET 6, as SqlSource writes its
-    // exceptions there: its CollectionItemException has no SqlState, IsTransient or DbBatchCommand to pass on, and this
-    // project's DbException, of .NET 8 or later, has them.  The project reports it, uses the copy all the same, so that
-    // it sees one, and its methods compile against it.
+    // The shared project of site/guides/several-projects.md#share-the-exceptions, compiled for a framework before
+    // .NET 6, as SqlSource writes its exceptions there: its CollectionItemException has no SqlState, IsTransient or
+    // DbBatchCommand to pass on, and this project's DbException, of .NET 8 or later, has them.  The project reports it,
+    // uses the copy all the same, so that it sees one, and its methods compile against it.
     [Theory]
     [InlineData("netstandard2.0", false)]
     [InlineData("netstandard2.0", true)]

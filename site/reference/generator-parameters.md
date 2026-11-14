@@ -4,6 +4,8 @@
 
 ## Generator parameters
 
+An option that changes what the generator does with a query, such as `keep-comments`, turned on or off, or given one of its values, such as `transaction=serializable`, by a word in a `-- generator:` marker or in a [settings file](settings-file.md#settings-files).  Each place sets only the options it names, and the others keep the values that the places further out give them.  It has nothing to do with the parameters of the SQL.  See [generator parameters](#setting-generator-parameters).
+
 ```sql
 -- generator: keep-comments
 
@@ -19,7 +21,7 @@ SELECT COUNT(*) FROM {{table:users}};
 SELECT /* the database never sees this comment */ id FROM users;
 ```
 
-A [generator parameter](../concepts.md#generator-parameter) is an option that changes what SqlSource does with a query.  Each takes one of its own words, its values, and a word in a `-- generator:` line, or in `generatorParameters` in a settings file, gives it one.  Most are on or off, the common case, `transaction` also takes an isolation level, and `method-type` takes `async`, `sync` or `both`.  A query that no word reaches gets every default: `token-validation`, `table-models`, `array-pool`, `list-padding` and `transaction` are on, `method-type` is `async`, and the others are off.
+A [generator parameter](#setting-generator-parameters) is an option that changes what SqlSource does with a query.  Each takes one of its own words, its values, and a word in a `-- generator:` line, or in `generatorParameters` in a settings file, gives it one.  Most are on or off, the common case, `transaction` also takes an isolation level, and `method-type` takes `async`, `sync` or `both`.  A query that no word reaches gets every default: `token-validation`, `table-models`, `array-pool`, `list-padding` and `transaction` are on, `method-type` is `async`, and the others are off.
 
 | Parameter | Default |
 |----|----|
@@ -131,3 +133,9 @@ Whether a query whose output is `methods` or `repository` gets asynchronous meth
 ### `default`
 
 No parameter of its own: every parameter takes its default at the place that says it, and the place's other words apply over it
+
+<a id="three-kinds-of-parameter"></a>
+
+## Three kinds of parameter
+
+SqlSource uses the word "parameter" for three different things.  The manual always says which.

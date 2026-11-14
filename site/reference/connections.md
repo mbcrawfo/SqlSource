@@ -16,7 +16,7 @@ reports (postgres): 2 described, 0 skipped, 0 failed
 
 The first block is a [`.env` file](#env-file) in the folder of the project or solution the tool runs on, which gives the database `billing` its connection; `reports` gets its connection on the command line.
 
-Each query that is described belongs to a [logical database](../concepts.md#logical-database): the name that the [database setting](settings.md#setting-database) gives it, such as `billing`, or the default that the setting's section gives.  The tool connects to each logical database through the connection you give it under that name.
+Each query that is described belongs to a [logical database](settings.md#setting-database): the name that the [database setting](settings.md#setting-database) gives it, such as `billing`, or the default that the setting's section gives.  The tool connects to each logical database through the connection you give it under that name.
 
 A connection is given in one of four ways.  The first that gives one wins:
 

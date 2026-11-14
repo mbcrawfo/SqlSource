@@ -43,7 +43,7 @@ The tool plans a run with the generator's path resolver, readers of settings fil
 
 ## Glossary
 
-Each page uses these terms in the sense given here.  The words a user meets are defined in [the manual's glossary](../../site/concepts.md#glossary).
+Each page uses these terms in the sense given here.  The words a user meets are defined in [the manual's glossary](../../site/start/concepts.md#glossary).
 
 ### Bundle
 

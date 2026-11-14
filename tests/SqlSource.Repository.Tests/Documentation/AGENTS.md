@@ -6,6 +6,5 @@
 - **`UserDocs.cs` finds the user documents through `RepositoryRoot.Path`** and is the one place that knows what counts as a user document.
 - **A fenced block opens with `sql`, and a second word says how it is parsed**: a dialect, `fragment` for part of a file, or `error` for SQL that shows a mistake.  Mark a sample so; do not weaken the test.
 - **The two readmes are packed, so their links are absolute**: `https://mbcrawfo.github.io/SqlSource/<folder>/<page>.html` into the manual, `https://github.com/mbcrawfo/SqlSource/blob/main/<path>` elsewhere, and a test follows each to the file of the repository it shows.
-- **`SiteStructureTests.PagesNotYetMoved` only shrinks.**  It lists the pages that wait at the root of `site/` for their phase of the documentation overhaul.  The phase that moves one removes its name.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

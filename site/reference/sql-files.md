@@ -17,13 +17,15 @@ SELECT id, name FROM users ORDER BY name;
 
 ## What a marker is
 
-A [marker](../concepts.md#marker) is a line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows.  Nothing else in a comment is read.  The words are matched ignoring case, the blanks after `--` are optional, and the colon follows the word directly: `-- name: GetUser` and `--NAME:GetUser` are markers, `-- name : GetUser` is a comment.  A comment after SQL on the same line, or inside a block comment or a string, is not a marker either.  Under `mysql` and `mariadb` the two dashes need a space after them to start a comment at all, so there a marker needs one too: see [markers under `mysql` and `mariadb`](dialects.md#markers-under-mysql).
+A line comment that starts its line and has the form `-- word: value`, where the word is one SqlSource knows, such as `-- name: GetUser` or `-- summary: Loads one user.`  Nothing else in a comment is read.  The [marker index](#marker-index) lists every marker.
+
+A [marker](#marker) is a line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows.  Nothing else in a comment is read.  The words are matched ignoring case, the blanks after `--` are optional, and the colon follows the word directly: `-- name: GetUser` and `--NAME:GetUser` are markers, `-- name : GetUser` is a comment.  A comment after SQL on the same line, or inside a block comment or a string, is not a marker either.  Under `mysql` and `mariadb` the two dashes need a space after them to start a comment at all, so there a marker needs one too: see [markers under `mysql` and `mariadb`](dialects.md#markers-under-mysql).
 
 <a id="marker-index"></a>
 
 ## Marker index
 
-A marker stands in one of two places.  A marker that describes one query stands **inside the query**, under its `-- name:` line.  A marker that describes the whole file stands in the [file header](../concepts.md#file-header), before the first `-- name:` line.  A file with no `-- name:` line is one query and takes both kinds.
+A marker stands in one of two places.  A marker that describes one query stands **inside the query**, under its `-- name:` line.  A marker that describes the whole file stands in the [file header](#the-file-header), before the first `-- name:` line.  A file with no `-- name:` line is one query and takes both kinds.
 
 | Marker | Purpose | File header | Inside a query | Documented in |
 |----|----|----|----|----|
@@ -53,6 +55,8 @@ A marker that is a setting links to its section, and [the settings page](setting
 <a id="queries-and-names"></a>
 
 ## Queries and names
+
+The SQL that follows a `-- name:` line, up to the next `-- name:` line or the end of the file.  A file with no `-- name:` line is one query.  Each query becomes one or more members of the generated code, named after the query.  See [queries and names](#queries-and-names).
 
 ```sql
 -- name: GetUser
@@ -119,6 +123,8 @@ A `-- summary:` before the first `-- name:` line belongs to no query and is [SQL
 
 ## The file header
 
+The part of a `.sql` file before its first `-- name:` line.  It holds comments, such as a licence, and the markers that apply to every query in the file.  See [the file header](#the-file-header).
+
 ```sql
 -- Licensed under the MIT licence.
 -- dialect: postgres
@@ -128,7 +134,7 @@ A `-- summary:` before the first `-- name:` line belongs to no query and is [SQL
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-The [file header](../concepts.md#file-header) is the part of a file before its first `-- name:` line.  It may hold:
+The [file header](#the-file-header) is the part of a file before its first `-- name:` line.  It may hold:
 
 - Comments, such as a licence.  Comments in the header are never part of any query's SQL, even for a query that keeps its comments.
 - The markers whose "File header" column in the [index](#marker-index) says yes.  Those that are settings apply to every query in the file, unless a query gives its own.  [The settings page](settings.md#precedence) says which place wins when a setting is given in several.

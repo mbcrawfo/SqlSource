@@ -45,7 +45,7 @@ SELECT id, name FROM users
 WHERE (@name IS NULL OR name = @name);
 ```
 
-PostgreSQL gives each [query parameter](../../../concepts.md#query-parameter) a type from the way the query uses it: in `WHERE id = @id`, `@id` takes the type of `id`.  A [`-- param:` marker](../../parameters.md#param-marker) gives a parameter a type of your own instead, which PostgreSQL checks against every use.
+PostgreSQL gives each [query parameter](../../parameters.md#query-parameters) a type from the way the query uses it: in `WHERE id = @id`, `@id` takes the type of `id`.  A [`-- param:` marker](../../parameters.md#param-marker) gives a parameter a type of your own instead, which PostgreSQL checks against every use.
 
 - **A use that says nothing of the type** is [SQLSRC226](../../../diagnostics.md#sqlsrc226): `SELECT @p IS NULL` holds for a value of any type.  Cast the parameter where it is used, `@p::int`, or declare its type.
 - **PostgreSQL takes the type from the first use.**  In the optional filter above, the first `@name` says nothing, so without the marker the query is [SQLSRC227](../../../diagnostics.md#sqlsrc227).  Declare the type, as above, or turn the condition round: `(name = @name OR @name IS NULL)`.
