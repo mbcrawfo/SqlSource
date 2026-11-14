@@ -1,15 +1,19 @@
 # The test projects of the test review, one folder to a line.  measure.sh runs each, with coverage and each test's
-# time, but one marked not-run, and a run of the skill cuts each into slices.
+# time, but one marked not-run, and a run of the skill cuts each into slices.  A line's mark, after a space, says how
+# its project is run otherwise.
 tests/SqlSource.Tests
 tests/SqlSource.Tests.RoslynFloor
 tests/SqlSource.Repository.Tests
 tests/SqlSource.Tool.Tests
 tests/DatabaseTests/Postgres
 tests/DatabaseTests/Postgres.Npgsql8
-tests/DatabaseTests/Postgres.SyncAsync
 tests/DatabaseTests/SqlServer
 tests/DatabaseTests/SqlServer.SqlClient61
-tests/DatabaseTests/SqlServer.SyncAsync
+
+# Each is a test project only under RunSyncAsync=true, which only the nightly passes, and references no coverage
+# extension, so measure.sh runs it with the property and without coverage: its tests have times and no coverage.
+tests/DatabaseTests/Postgres.SyncAsync sync-async
+tests/DatabaseTests/SqlServer.SyncAsync sync-async
 
 # Its tests skip under coverage, and it is a test project only under RunQueryMethodAllocation=true, so it is reviewed
 # by reading.
