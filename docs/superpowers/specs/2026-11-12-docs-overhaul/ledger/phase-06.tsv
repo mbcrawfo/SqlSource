@@ -178,7 +178,7 @@ README.md:208	move	README.md	-	-	position: "See [the known issues]" > "See [the 
 -	new	site/guides/dapper.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
 -	new	site/reference/databases/sqlserver/query-methods.md#limits	-	-	The h3 of 1 limit and its anchor, limit-rowcount-after-nocount
 -	new	site/guides/troubleshooting.md	-	-	8 entries: 3 under at-run-time, 2 under wrong-model, 2 under wrong-result, 1 under not-described, one for each limit of this phase
--	new	site/AGENTS.md	-	-	Not a user document: the row Attribute, or a property of one names reference/attributes.md; generator.md leaves the pages not yet moved
+-	new	site/AGENTS.md	-	-	Not a user document: the row Attribute, or a property of one names reference/attributes.md; generator.md leaves the pages not yet moved; the row Setting says a setting-<name> section is on settings.md or on the reference page of what it changes (branch review R1-F2)
 -	new	tests/SqlSource.Repository.Tests/Documentation/SiteStructureTests.cs	-	-	Not a user document: generator.md leaves PagesNotYetMoved
 -	new	docs/architecture/generator.md	-	-	Not a user document: its links to the site take the pages of their anchors, and the bare page members.md; the words generator page become page on what is generated (no-loss review)
 -	new	docs/architecture/sidecar-format.md	-	-	Not a user document: the slug link settings.md#column-types becomes reference/model-properties.md#setting-column-types; #type-overrides is phase 7's
@@ -186,3 +186,5 @@ README.md:208	move	README.md	-	-	position: "See [the known issues]" > "See [the 
 -	new	examples/PostgresExamples/README.md	-	-	Not a user document: its links to generator.md and to the moved anchors of settings.md take their new pages, the bare page members.md; the same in examples/SqlServerExamples/README.md
 -	new	examples/PostgresExamples/Methods/OrderLineQueries.cs	-	-	Not a user document: the comments of OrderLineQueries.cs and OrderQueries.cs of both example projects name reference/query-methods.md and reference/members.md#setting-member-location
 -	new	tests/DatabaseTests/SqlServer.SyncAsync/KnownDifferences.cs	-	-	Not a user document: the comment and the message name site/reference/connection-methods.md; the quoted words stay
+-	new	src/SqlSource/Settings/AGENTS.md	-	-	Not a user document: line 16 says a setting is documented once, its section on site/settings.md or on the page of site/reference/ of what it changes (branch review R1-F2)
+-	new	site/guides/AGENTS.md	-	-	Not a user document: the rule Add no group for one page gains the exception of Other ways to use your SQL, which holds dapper.md alone until phase 8 (owner, p06 Q1, branch review R1-F3)
