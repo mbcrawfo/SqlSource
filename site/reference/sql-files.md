@@ -36,16 +36,16 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](../settings.md#setting-database) |
 | `-- output:` | What is generated for a query: its SQL alone (`sql`), its SQL and its models (`models`), its models and a method that takes a connection and runs it (`methods`), or its models and an instance method of the type that gets its own connection and runs it (`repository`, the default).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](../settings.md#setting-output) |
-| `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model | yes | no | [Suffix of a model's name](../settings.md#setting-model-suffix) |
-| `-- model-namespace:` | The namespace of the models | yes | no | [Namespace of the models](../settings.md#setting-model-namespace) |
-| `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](../settings.md#setting-model-type) |
-| `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](../settings.md#setting-model-name) |
-| `-- collection-type:` | The type that a query's method returns many rows in | yes | yes | [Collection type](../settings.md#setting-collection-type) |
-| `-- member-location:` | Where a query's members go: in a class nested in the type (`nested-class`), on the type (`class`), or, for a `methods` query's method, in the extension class (`extension-class`) | yes | yes | [Where the members go](../settings.md#setting-member-location) |
-| `-- visibility:` | How visible a query's members are, or its nested class: `public`, `internal`, `protected` or `private` | yes | yes | [Visibility](../settings.md#setting-visibility) |
-| `-- nested-class:` | The name of the class nested in the type that holds a query's members | yes | yes | [Name of the nested class](../settings.md#setting-nested-class) |
+| `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model | yes | no | [Suffix of a model's name](models.md#setting-model-suffix) |
+| `-- model-namespace:` | The namespace of the models | yes | no | [Namespace of the models](models.md#setting-model-namespace) |
+| `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](models.md#setting-model-type) |
+| `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](models.md#setting-model-name) |
+| `-- collection-type:` | The type that a query's method returns many rows in | yes | yes | [Collection type](return-types.md#setting-collection-type) |
+| `-- member-location:` | Where a query's members go: in a class nested in the type (`nested-class`), on the type (`class`), or, for a `methods` query's method, in the extension class (`extension-class`) | yes | yes | [Where the members go](members.md#setting-member-location) |
+| `-- visibility:` | How visible a query's members are, or its nested class: `public`, `internal`, `protected` or `private` | yes | yes | [Visibility](members.md#setting-visibility) |
+| `-- nested-class:` | The name of the class nested in the type that holds a query's members | yes | yes | [Name of the nested class](members.md#setting-nested-class) |
 | `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](../settings.md#setting-type-overrides) |
-| `-- column:` | Inside a query, says whether one column of the query's result can be null, `-- column: total not null`, or gives it a C# type after `->`, `-- column: total -> PostCount`, for its property in the output model, and leaves the column's name alone.  In the file header, gives a column of a table or view a C# type in every query of the file, `-- column: users.id -> UserId`, one entry for each line.  `-> json OrderMetadata` gives a column of a string type that holds JSON a class of yours | yes | yes | [Setting a column's nullability or type with a marker](../generator.md#column-marker), [column types](../settings.md#setting-column-types), [the JSON opt-in](../settings.md#json-opt-in) |
+| `-- column:` | Inside a query, says whether one column of the query's result can be null, `-- column: total not null`, or gives it a C# type after `->`, `-- column: total -> PostCount`, for its property in the output model, and leaves the column's name alone.  In the file header, gives a column of a table or view a C# type in every query of the file, `-- column: users.id -> UserId`, one entry for each line.  `-> json OrderMetadata` gives a column of a string type that holds JSON a class of yours | yes | yes | [Setting a column's nullability or type with a marker](model-properties.md#column-marker), [column types](model-properties.md#setting-column-types), [the JSON opt-in](../settings.md#json-opt-in) |
 | `-- library-types:` | Turns a library's types, such as NodaTime's or System.Text.Json's, on or off for the query methods, `-- library-types: nodatime=off`, one entry or more for each line | yes | yes | [Library types](../settings.md#setting-library-types) |
 
 A marker that is a setting links to its section of [the settings page](../settings.md#all-settings), which also says where else the setting can be given and which place wins.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
@@ -67,7 +67,7 @@ A `-- name:` line begins a query.  The query runs to the next `-- name:` line or
 - The name is a C# identifier, and not a reserved keyword such as `class`.  Anything else is [SQLSRC103](../diagnostics.md#sqlsrc103).  `get-user` is not a name.
 - Names are case-sensitive: `GetUser` and `getUser` are two queries.
 - A name is used once in a file ([SQLSRC104](../diagnostics.md#sqlsrc104)), and once among all the files of one type ([SQLSRC008](../diagnostics.md#sqlsrc008)).
-- The name of a query is not the name of the class its members go in: its nested class, `Sql` unless [it is named otherwise](../settings.md#setting-nested-class), for a query of any output, or the type itself when the constant or token method of a query whose output is `sql` or `models` goes on it ([SQLSRC009](../diagnostics.md#sqlsrc009)).  The other names a query method cannot have are with [a repository method's signature](../generator.md#repository-signature) and where [the `methods` methods go](../generator.md#method-location).  See [the generator](../generator.md#locations).
+- The name of a query is not the name of the class its members go in: its nested class, `Sql` unless [it is named otherwise](members.md#setting-nested-class), for a query of any output, or the type itself when the constant or token method of a query whose output is `sql` or `models` goes on it ([SQLSRC009](../diagnostics.md#sqlsrc009)).  The other names a query method cannot have are with [a repository method's signature](repositories.md#repository-signature) and where [the `methods` methods go](connection-methods.md#method-location).  See [the generator](members.md#locations).
 - The query has SQL in it.  A query that holds only comments and markers is [SQLSRC113](../diagnostics.md#sqlsrc113).
 
 The marker may be followed by `->` and a result shape: see [result shapes](#result-shapes).  The name ends at the `->`.
@@ -84,17 +84,17 @@ SELECT id, name FROM users WHERE id = @id;
 UPDATE users SET name = @name WHERE id = @id;
 ```
 
-A name can be followed by `->` and one of five shapes, which say what the [method](../generator.md#query-methods) of a query whose output is `methods` or `repository` returns:
+A name can be followed by `->` and one of five shapes, which say what the [method](query-methods.md#query-methods) of a query whose output is `methods` or `repository` returns:
 
 | Shape | The method returns |
 |----|----|
-| `many` | Every row, in the [collection type](../settings.md#setting-collection-type), an array by default |
+| `many` | Every row, in the [collection type](return-types.md#setting-collection-type), an array by default |
 | `one` | The one row, and throws when there are none or more than one |
 | `one-optional` | The one row, or null when there is none, and throws when there are more than one |
 | `none` | Nothing |
 | `rowcount` | The number of rows the statement affected |
 
-Without a shape, a query that returns rows is `many`, and one that returns none is `rowcount`.  `one`, `one-optional` and `many` on a query whose statement returns no rows are [SQLSRC272](../diagnostics.md#sqlsrc272); `none` and `rowcount` go on any query.  [What each shape returns](../generator.md#method-shapes) has the details.  A shape changes nothing under the output `sql` or `models`, and adding or changing one does not make the query's sidecar out of date.
+Without a shape, a query that returns rows is `many`, and one that returns none is `rowcount`.  `one`, `one-optional` and `many` on a query whose statement returns no rows are [SQLSRC272](../diagnostics.md#sqlsrc272); `none` and `rowcount` go on any query.  [What each shape returns](return-types.md#method-shapes) has the details.  A shape changes nothing under the output `sql` or `models`, and adding or changing one does not make the query's sidecar out of date.
 
 The case of a shape is ignored.  A word after `->` that is not one of the five, or no word at all, is [SQLSRC111](../diagnostics.md#sqlsrc111).  Text after a name with no `->`, as in `-- name: Get User`, is read as part of the name and is [SQLSRC103](../diagnostics.md#sqlsrc103).  A file with no `-- name:` line has no place to write a shape.
 
@@ -109,7 +109,7 @@ The case of a shape is ignored.  A word after `->` that is not one of the five, 
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-A `-- summary:` line inside a query becomes the documentation of its member, which IntelliSense shows beside the query's SQL, and of its [models](../generator.md#model-documentation).  Several are joined with a space.  A summary with no text is skipped, and the text is written as it is, so `<` and `&` appear as typed.
+A `-- summary:` line inside a query becomes the documentation of its member, which IntelliSense shows beside the query's SQL, and of its [models](models.md#model-documentation).  Several are joined with a space.  A summary with no text is skipped, and the text is written as it is, so `<` and `&` appear as typed.
 
 A query without a summary is documented with its name and its file: "The `GetUser` query from `Users.sql`."
 
@@ -195,4 +195,4 @@ Writing a marker twice in one place is fine when the value is the same.  The wor
 
 A comment of yours that happens to start with one of the words and a colon, such as `-- summary: see the ticket`, is read as a marker.  Reword it.
 
-An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves the query without models: under the output `models` it keeps its constant or token method, and under `methods` or `repository` it gets no method until it is fixed.  See [which queries get a method](../generator.md#which-methods), [what an error costs](errors.md#what-an-error-costs) and [diagnostics](../diagnostics.md).
+An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves the query without models: under the output `models` it keeps its constant or token method, and under `methods` or `repository` it gets no method until it is fixed.  See [which queries get a method](query-methods.md#which-methods), [what an error costs](errors.md#what-an-error-costs) and [diagnostics](../diagnostics.md).

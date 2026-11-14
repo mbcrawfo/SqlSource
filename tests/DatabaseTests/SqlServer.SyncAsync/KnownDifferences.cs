@@ -9,19 +9,19 @@ namespace SqlSource.DatabaseTests.SqlServer.SyncAsync;
 // reason, in the order they are applied.
 internal static class KnownDifferences
 {
-    // site/generator.md, "Give the method the transaction": SqlClient refuses a command on a connection with a pending
-    // transaction that the command was not given, from both methods, and names the call that refused it, so the
-    // asynchronous method's message says BeginExecuteReader where the synchronous one's says ExecuteReader, or
-    // ExecuteScalar, since SqlClient runs ExecuteScalarAsync through BeginExecuteReader.
+    // site/reference/connection-methods.md, "Give the method the transaction": SqlClient refuses a command on a
+    // connection with a pending transaction that the command was not given, from both methods, and names the call that
+    // refused it, so the asynchronous method's message says BeginExecuteReader where the synchronous one's says
+    // ExecuteReader, or ExecuteScalar, since SqlClient runs ExecuteScalarAsync through BeginExecuteReader.
     public static KnownDifference SqlClientPendingTransactionMessage { get; } =
         new(
             nameof(SqlClientPendingTransactionMessage),
             "Microsoft.Data.SqlClient refuses a command on a connection that has a transaction the command was not "
                 + "given, and throws InvalidOperationException (\"... requires the command to have a transaction when "
                 + "the connection assigned to the command is in a pending local transaction ...\") before anything is "
-                + "sent (site/generator.md, \"Give the method the transaction\"): the message names the call that "
-                + "refused it, BeginExecuteReader or BeginExecuteNonQuery from the asynchronous method, and "
-                + "ExecuteReader, ExecuteScalar or ExecuteNonQuery from the synchronous one, since SqlClient runs "
+                + "sent (site/reference/connection-methods.md, \"Give the method the transaction\"): the message names "
+                + "the call that refused it, BeginExecuteReader or BeginExecuteNonQuery from the asynchronous method, "
+                + "and ExecuteReader, ExecuteScalar or ExecuteNonQuery from the synchronous one, since SqlClient runs "
                 + "ExecuteScalarAsync through BeginExecuteReader.",
             static (_, asyncRun, syncRun) =>
                 asyncRun.Failure is { Type: InvalidOperation } asyncFailure

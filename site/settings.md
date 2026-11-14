@@ -39,19 +39,19 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `database` in a settings file; `-- database:` in the file header and inside a query |
 | [Dialect](#setting-dialect) | A dialect's name, with options for `mysql` and `mariadb`: see [the dialects page](reference/dialects.md#choosing-a-dialect).  Default `ansi` | `dialect` in a settings file; `-- dialect:` in the file header |
 | [Generator parameters](#setting-generator-parameters) | Words separated by spaces, or an array of them in a settings file, each a parameter alone, with `=` and one of its values, or with `=default`, or `default` alone.  The parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` and `method-type`, and each place sets only those it names.  Each but `method-type` takes `on` or `off`, and `transaction` also `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`; `method-type` takes `async`, `sync` or `both`.  Default: `token-validation`, `table-models`, `array-pool`, `list-padding` and `transaction` on, `method-type` `async`, the others off | `generatorParameters` in a settings file; `-- generator:` in the file header and inside a query |
-| [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `inputModelSuffix`, `outputModelSuffix` in a settings file; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header |
-| [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `modelNamespace` in a settings file; `-- model-namespace:` in the file header |
-| [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `inputModelType`, `outputModelType` in a settings file; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query |
-| [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query |
+| [Input and output model suffix](reference/models.md#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `inputModelSuffix`, `outputModelSuffix` in a settings file; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header |
+| [Model namespace](reference/models.md#setting-model-namespace) | A namespace.  Default: the namespace of the type | `modelNamespace` in a settings file; `-- model-namespace:` in the file header |
+| [Input and output model type](reference/models.md#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `inputModelType`, `outputModelType` in a settings file; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query |
+| [One query's model name](reference/models.md#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query |
 | [Type overrides](#setting-type-overrides) | Entries `"key": "type"`, each a database type and the C# type it gets, or `"key": "default"`.  Default: none | `typeOverrides` in a settings file; `-- type-override:` in the file header and inside a query |
-| [Column types](#setting-column-types) | Entries `"key": "type"`, each a column of a table or view, `table.column` or `schema.table.column`, and the C# type it gets, or `"key": "default"`, or `"key": { "type": "type", "json": true }` for a column that holds JSON, the [JSON opt-in](#json-opt-in).  Default: none | `columnTypes` in a settings file; `-- column:` in the file header, and inside a query for a column of the query's result |
+| [Column types](reference/model-properties.md#setting-column-types) | Entries `"key": "type"`, each a column of a table or view, `table.column` or `schema.table.column`, and the C# type it gets, or `"key": "default"`, or `"key": { "type": "type", "json": true }` for a column that holds JSON, the [JSON opt-in](#json-opt-in).  Default: none | `columnTypes` in a settings file; `-- column:` in the file header, and inside a query for a column of the query's result |
 | [Library types](#setting-library-types) | Entries `"library": "state"`, the library `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`.  Default: on for PostgreSQL where the project references the library's plugin, `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and off otherwise; `json` off | `libraryTypes` in a settings file; `-- library-types:` in the file header and inside a query |
-| [Member location](#setting-member-location) | `extension-class`, `class`, `nested-class`.  Default `nested-class` for the output `sql` or `models`, `extension-class` for `methods`, and `class` for `repository` | `memberLocation` in a settings file; `-- member-location:` in the file header and inside a query |
-| [Visibility](#setting-visibility) | `public`, `internal`, `protected`, `private`.  Default `public` for `repository`, and otherwise by the member location, as [its section](#setting-visibility) says | `visibility` in a settings file; `-- visibility:` in the file header and inside a query |
-| [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `-- nested-class:` in the file header and inside a query |
+| [Member location](reference/members.md#setting-member-location) | `extension-class`, `class`, `nested-class`.  Default `nested-class` for the output `sql` or `models`, `extension-class` for `methods`, and `class` for `repository` | `memberLocation` in a settings file; `-- member-location:` in the file header and inside a query |
+| [Visibility](reference/members.md#setting-visibility) | `public`, `internal`, `protected`, `private`.  Default `public` for `repository`, and otherwise by the member location, as [its section](reference/members.md#setting-visibility) says | `visibility` in a settings file; `-- visibility:` in the file header and inside a query |
+| [Nested class](reference/members.md#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `-- nested-class:` in the file header and inside a query |
 | [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: the file named for the type in that folder | `Source` on the attribute |
-| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `-- collection-type:` in the file header and inside a query |
-| [Repository interfaces](#repository-interfaces) | Whether a repository gets its interface, `true` or `false`, and its name, a C# identifier.  Default: on, named `I` and the type's name | `GenerateInterface` and `InterfaceName` on the attribute; `SqlSourceRepositoryInterfaces`, a property of the project, `false` to turn them off |
+| [Collection type](reference/return-types.md#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](reference/return-types.md#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `-- collection-type:` in the file header and inside a query |
+| [Repository interfaces](reference/repositories.md#repository-interfaces) | Whether a repository gets its interface, `true` or `false`, and its name, a C# identifier.  Default: on, named `I` and the type's name | `GenerateInterface` and `InterfaceName` on the attribute; `SqlSourceRepositoryInterfaces`, a property of the project, `false` to turn them off |
 | [Running the tool in the build](#online-build) | `auto`, `true`, `false`.  Default `auto` | `SqlSourceOnline`, a property of the project |
 | [The build's `.env` file](#setting-env-file) | A path, from the project's folder when it is relative, or `none`.  Default: the `.env` in the project's folder | `SqlSourceEnvFile`, a property of the project |
 
@@ -78,13 +78,13 @@ The rules:
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
 - **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file that is empty or white space.  `Source`, on the attribute, is the exception: see [Source](#setting-source).
 - **A setting has only the places its row of [the table](#all-settings) lists.**  A key of a settings file that is not in it, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place).
-- **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](#setting-member-location).  Only what follows from the type itself can differ: the namespace of the models, which is the type's own unless the [model namespace](#setting-model-namespace) is set, and the default [visibility](#setting-visibility) of the members of `sql`, `models` and `methods` queries on the type, which follows the type's own accessibility.  A type that needs other settings needs a file of its own.
+- **Every type that claims a file gets the same settings for its queries.**  The places of a query's settings are the query, its file and the settings files of the file's folder, so two types that claim one file take the same settings from it: one output, one suffix, one shape of model, one [member location](reference/members.md#setting-member-location).  Only what follows from the type itself can differ: the namespace of the models, which is the type's own unless the [model namespace](reference/models.md#setting-model-namespace) is set, and the default [visibility](reference/members.md#setting-visibility) of the members of `sql`, `models` and `methods` queries on the type, which follows the type's own accessibility.  A type that needs other settings needs a file of its own.
 
 Three exceptions, stated plainly:
 
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
 - **`Source` exists only on the attribute.**  It has nothing to choose between.
-- **A type override, a column type, a library of the library types, or a generator parameter, replaces only what it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column, a library or a generator parameter, replaces the entry below it for that key, and `default` takes the key out.  The generator parameters also take `default` alone, which takes every parameter out, back to its default.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types), [library types](#setting-library-types) and [generator parameters](#setting-generator-parameters).
+- **A type override, a column type, a library of the library types, or a generator parameter, replaces only what it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column, a library or a generator parameter, replaces the entry below it for that key, and `default` takes the key out.  The generator parameters also take `default` alone, which takes every parameter out, back to its default.  See [type overrides](#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types), [library types](#setting-library-types) and [generator parameters](#setting-generator-parameters).
 
 <a id="a-value-that-is-wrong"></a>
 
@@ -115,9 +115,9 @@ TRUNCATE TABLE audit_log;
 | Value | A query gets |
 |----|----|
 | `sql` | Its SQL: a constant, or a method where the query has tokens |
-| `models` | Its SQL, and its [models](generator.md#models): types for its parameters and for a row of its result |
-| `methods` | Its models, and a [method that takes a connection](generator.md#methods-that-take-a-connection) and runs the query, which holds its SQL in place of a constant |
-| `repository` | Its models, and a [repository method](generator.md#repository-methods): an instance method of the type that gets its own connection and runs the query, which holds its SQL in place of a constant |
+| `models` | Its SQL, and its [models](reference/models.md#models): types for its parameters and for a row of its result |
+| `methods` | Its models, and a [method that takes a connection](reference/connection-methods.md#methods-that-take-a-connection) and runs the query, which holds its SQL in place of a constant |
+| `repository` | Its models, and a [repository method](reference/repositories.md#repository-methods): an instance method of the type that gets its own connection and runs the query, which holds its SQL in place of a constant |
 
 As a marker it stands in the file header, for every query of the file, and inside a query.  It can also be `output` in a settings file.
 
@@ -125,7 +125,7 @@ As a marker it stands in the file header, for every query of the file, and insid
 
 The tool can describe only some dialects: see [the database support table](reference/databases/index.md#database-support).  The default output is `repository` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  Set the dialect and describe the queries, or set the output to `sql` for queries that want only their SQL.
 
-A query whose output is `sql` or `models` gets its constant or token method.  A query whose output is `models`, `methods` or `repository`, and whose entry in its sidecar is current, also gets its [models](generator.md#models); one whose output is `sql` gets none.  A query whose output is `methods` or `repository` gets no constant and no token method: its [method](generator.md#query-methods) holds its SQL and runs it, when the query meets the conditions of [which queries get a method](generator.md#which-methods).  A `repository` query's type needs a connection for it, as [the connection](generator.md#repository-connection) says, and a `methods` query's method takes one, so set `methods` for a query that your own code runs on a connection or in a transaction that it manages.  A project that runs the SQL itself, through Dapper or its own ADO.NET code, sets `models`.
+A query whose output is `sql` or `models` gets its constant or token method.  A query whose output is `models`, `methods` or `repository`, and whose entry in its sidecar is current, also gets its [models](reference/models.md#models); one whose output is `sql` gets none.  A query whose output is `methods` or `repository` gets no constant and no token method: its [method](reference/query-methods.md#query-methods) holds its SQL and runs it, when the query meets the conditions of [which queries get a method](reference/query-methods.md#which-methods).  A `repository` query's type needs a connection for it, as [the connection](reference/repositories.md#repository-connection) says, and a `methods` query's method takes one, so set `methods` for a query that your own code runs on a connection or in a transaction that it manages.  A project that runs the SQL itself, through Dapper or its own ADO.NET code, sets `models`.
 
 <a id="setting-database"></a>
 
@@ -211,14 +211,14 @@ A [generator parameter](concepts.md#generator-parameter) is an option that chang
 |----|----|----|
 | `keep-comments` | off | Comments and blank lines stay in the generated SQL: see [what reaches the generated SQL](reference/sql-files.md#generated-sql).  A PostgreSQL [collection method](reference/databases/postgresql/query-methods.md#collection-methods) sends its SQL without them all the same |
 | `token-validation` | on | The method of a query with tokens checks its arguments, and `token-validation=off` turns the check off: see [validation](reference/tokens.md#token-validation) |
-| `sort-input`, `sort-output` | off | The properties of the query's input model, or of its output model, are sorted by name: see [the order of the properties](generator.md#property-order) |
-| `table-models` | on | A query that reads a whole table gets a row model named after the table, and with `table-models=off` it gets one named after the query: see [table models](generator.md#table-models) |
-| `async-method-suffix` | off | The name of a query's [method](generator.md#method-signature) ends with `Async`: `GetUserAsync` for `GetUser`.  A synchronous method's never does, and under `method-type=both` an asynchronous method's always does, as [synchronous methods](generator.md#synchronous-methods) say |
-| `array-pool` | on | A [`many`](generator.md#method-shapes) method that returns a collection reads its rows into buffers borrowed from .NET's shared array pool, unless it returns an `ImmutableList<T>` or an `IImmutableList<T>`, and so does a [collection method](generator.md#collection-methods) that reads rows, of the shape `many`, `one` or `one-optional`.  Once the pool holds buffers of the sizes it needs, a method that reads through the pool allocates no collection for a result of up to about 1,000 rows but the one it returns.  With `array-pool=off`, every such method reads its rows into a collection that it allocates and grows, as hand-written code usually does, and as a method that returns one of the two immutable lists always does.  Turn it off to keep the pool out of a project, or to compare the two.  A method that [streams its rows](#streaming-rows) holds no collection, so it is the same with `array-pool` on or off |
+| `sort-input`, `sort-output` | off | The properties of the query's input model, or of its output model, are sorted by name: see [the order of the properties](reference/model-properties.md#property-order) |
+| `table-models` | on | A query that reads a whole table gets a row model named after the table, and with `table-models=off` it gets one named after the query: see [table models](reference/models.md#table-models) |
+| `async-method-suffix` | off | The name of a query's [method](reference/connection-methods.md#method-signature) ends with `Async`: `GetUserAsync` for `GetUser`.  A synchronous method's never does, and under `method-type=both` an asynchronous method's always does, as [synchronous methods](reference/query-methods.md#synchronous-methods) say |
+| `array-pool` | on | A [`many`](reference/return-types.md#method-shapes) method that returns a collection reads its rows into buffers borrowed from .NET's shared array pool, unless it returns an `ImmutableList<T>` or an `IImmutableList<T>`, and so does a [collection method](reference/collection-methods.md#collection-methods) that reads rows, of the shape `many`, `one` or `one-optional`.  Once the pool holds buffers of the sizes it needs, a method that reads through the pool allocates no collection for a result of up to about 1,000 rows but the one it returns.  With `array-pool=off`, every such method reads its rows into a collection that it allocates and grows, as hand-written code usually does, and as a method that returns one of the two immutable lists always does.  Turn it off to keep the pool out of a project, or to compare the two.  A method that [streams its rows](reference/return-types.md#streaming-rows) holds no collection, so it is the same with `array-pool` on or off |
 | `list-padding` | on | A query method pads each [list parameter](reference/parameters.md#list-parameters) to one of a few sizes, 1, 2, 4 and so on to 512 and then each multiple of 512, with its last value repeated, so that the database sees a few forms of the query, and keeps a plan of each, whatever the counts: see [padding](reference/parameters.md#list-padding).  With `list-padding=off`, a query method sends each list at its own count of values, so each count is a form of its own, and a list sends a parameter for each of its values alone |
-| `collection-method` | off | A query with parameters whose output is `repository` or `methods` also gets a [collection method](generator.md#collection-methods), an overload of its method that runs it for each item of a collection of its input models, 1,000 items to a round trip, and returns what every item returned |
-| `transaction` | on | The transaction that a collection method begins of its own: at the database's default isolation level under `on`, at the level that `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot` names, and none under `off`.  A transaction that the caller gives the method, or an ambient one, is used instead, whatever it says: see [transactions](generator.md#collection-transactions).  It changes nothing for a query without `collection-method`, and an isolation level that the query's database does not have is [SQLSRC297](diagnostics.md#sqlsrc297) |
-| `method-type` | async | Whether a query whose output is `methods` or `repository` gets asynchronous methods or synchronous ones: under `async` it gets an asynchronous method, under `sync` a [synchronous method](generator.md#synchronous-methods) in its place, and under `both` the two.  A query's [collection method](generator.md#collection-methods) follows it in the same way, and so does a repository's [interface](generator.md#repository-interface), which has a member for each.  It changes nothing at the output `sql` or `models`.  `method-type` takes no `on`, so the word `method-type` alone is [SQLSRC111](diagnostics.md#sqlsrc111): write one of its values |
+| `collection-method` | off | A query with parameters whose output is `repository` or `methods` also gets a [collection method](reference/collection-methods.md#collection-methods), an overload of its method that runs it for each item of a collection of its input models, 1,000 items to a round trip, and returns what every item returned |
+| `transaction` | on | The transaction that a collection method begins of its own: at the database's default isolation level under `on`, at the level that `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot` names, and none under `off`.  A transaction that the caller gives the method, or an ambient one, is used instead, whatever it says: see [transactions](reference/collection-methods.md#collection-transactions).  It changes nothing for a query without `collection-method`, and an isolation level that the query's database does not have is [SQLSRC297](diagnostics.md#sqlsrc297) |
+| `method-type` | async | Whether a query whose output is `methods` or `repository` gets asynchronous methods or synchronous ones: under `async` it gets an asynchronous method, under `sync` a [synchronous method](reference/query-methods.md#synchronous-methods) in its place, and under `both` the two.  A query's [collection method](reference/collection-methods.md#collection-methods) follows it in the same way, and so does a repository's [interface](reference/repositories.md#repository-interface), which has a member for each.  It changes nothing at the output `sql` or `models`.  `method-type` takes no `on`, so the word `method-type` alone is [SQLSRC111](diagnostics.md#sqlsrc111): write one of its values |
 | `default` | | No parameter of its own: every parameter takes its default at the place that says it, and the place's other words apply over it |
 
 **A word** is `name`, `name=value` or `name=default`, with no space around its `=`, since a `-- generator:` line separates its words by white space.  `name=value` gives the parameter one of its values, `keep-comments=off` or `transaction=serializable`, and `name` alone is `name=on`, which `method-type` does not take.  `name=default` gives the parameter its default, whatever the places below say.  Names and values are matched ignoring case: `Keep-Comments=OFF` is `keep-comments=off`.
@@ -249,146 +249,6 @@ A parameter has the value of the nearest place that names it, and its default wh
 | One parameter given two different values in one place, such as `keep-comments` and `keep-comments=off`.  `keep-comments=default` beside either is one too, even where the default is the same | [SQLSRC112](diagnostics.md#sqlsrc112), at the later word | [SQLSRC020](diagnostics.md#sqlsrc020), at the later element, and the first applies |
 
 A mistake in a `-- generator:` line leaves its file without members until it is fixed, as [a value that is wrong](#a-value-that-is-wrong) says.  The same value given twice is no mistake, and nor is `default` beside other words.
-
-<a id="setting-model-suffix"></a>
-
-## Suffix of a model's name
-
-```sql
--- input-model-suffix: Args
--- output-model-suffix: Row
-
--- name: GetUser
-SELECT id, name FROM users WHERE id = @id;
-```
-
-The suffix ends the name of the [model](generator.md#models) generated for a query's parameters (input) and for a row of its result (output).  The defaults are `Params` and `Dto`, so `GetUser` gets `GetUserParams` and `GetUserDto`; above, it gets `GetUserArgs` and `GetUserRow`.
-
-- The value is one or more characters that a C# identifier can contain, such as letters, digits and `_`.  A space or a period is not one.
-- It stands in the file header only, not inside a query.  It can also be `inputModelSuffix` or `outputModelSuffix` in a settings file.
-- It ends a [table model's](generator.md#table-models) name too, `UsersRow`, and not a name that `-- input-model:` or `-- output-model:` gives.  Two equal suffixes give a query's two models one name, which is [SQLSRC257](diagnostics.md#sqlsrc257).
-
-The rules of the names are on [the generator page](generator.md#model-names).
-
-<a id="setting-model-namespace"></a>
-
-## Namespace of the models
-
-```sql
--- model-namespace: App.Models
-
--- name: ListUsers
-SELECT id, name FROM users;
-```
-
-The namespace the generated [models](generator.md#models) go in.  The default is the namespace of the type that claims the file.  Above, the models of `ListUsers` are in `App.Models`.
-
-- The value is C# identifiers joined by periods, none of them a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.
-- It stands in the file header only.  It can also be `modelNamespace` in a settings file.
-- A name with a period that `-- input-model:` or `-- output-model:` gives is a full name, and ignores this setting.
-- Two types in two namespaces that claim one file, or read one table, get a model each, one in each namespace, unless this setting gives them one.
-- A namespace that is, or starts with, the full name of a type of your project gives models whose names cannot be used: [SQLSRC258](diagnostics.md#sqlsrc258).
-
-The rules are on [the generator page](generator.md#model-namespace).
-
-<a id="setting-model-type"></a>
-
-## Shape of a model
-
-```sql
--- output-model-type: sealed class
-
--- name: ListUsers
--- input-model-type: record
-SELECT id, name FROM users WHERE id > @min;
-```
-
-The shape of the [model](generator.md#models) generated for a query's parameters (input) and for a row of its result (output): `record`, `sealed record`, `class` or `sealed class`.  The default is `sealed record` for both.  A record is positional; a class has a property with `get` and `set` for each column or parameter.  Above, every output model of the file is a `sealed class`, and the input model of `ListUsers` a `record`.
-
-- It stands in the file header and inside a query, as two markers.  It can also be `inputModelType` or `outputModelType` in a settings file.
-- Two queries that share a model must give it one shape, or the later is [SQLSRC257](diagnostics.md#sqlsrc257).
-
-What each shape looks like is on [the generator page](generator.md#model-shape).  To read rows through Dapper into sorted models, make them classes: see [the recipe](recipes.md#models-through-dapper).
-
-<a id="setting-model-name"></a>
-
-## Name of one query's model
-
-```sql
--- name: GetUser
--- input-model: UserArgs
--- output-model: App.Models.UserRow
-SELECT id, name FROM users WHERE id = @id;
-```
-
-`-- input-model:` and `-- output-model:` name the [model](generator.md#models) of one query's parameters and of its result rows, whole, with no suffix.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.  Above, `GetUser` gets `UserArgs`, in the namespace its models would have without the marker, and `UserRow` in the namespace `App.Models`, whatever the [model namespace](#setting-model-namespace) says.
-
-- It stands inside a query only.  It has no key in a settings file, since a name is for one query.
-- `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119), and `-- output-model:` on a query whose statement returns no rows is [SQLSRC259](diagnostics.md#sqlsrc259).
-- `-- output-model:` wins over the name of a [table model](generator.md#table-models).
-- Two queries that give one name share one model when their models are the same, and are [SQLSRC257](diagnostics.md#sqlsrc257) otherwise: see [shared models](generator.md#shared-models).  A name that cannot be used, such as that of a type of your project, is [SQLSRC258](diagnostics.md#sqlsrc258).
-
-<a id="setting-collection-type"></a>
-
-## Collection type
-
-```sql
--- name: ListUsers
--- collection-type: IReadOnlyList
-SELECT id, name FROM users;
-```
-
-The type that the [method](generator.md#query-methods) of a query whose result shape is `many` returns its rows in.  The default is `Array`.  Above, `ListUsers` returns `Task<IReadOnlyList<ListUsersDto>>`.
-
-| Value | Returns | Holding |
-|----|----|----|
-| `Array` (the default) | `T[]` | An array |
-| `IEnumerable` | `IEnumerable<T>` | An array |
-| `IReadOnlyCollection` | `IReadOnlyCollection<T>` | An array |
-| `IReadOnlyList` | `IReadOnlyList<T>` | An array |
-| `ICollection` | `ICollection<T>` | A `List<T>` |
-| `IList` | `IList<T>` | A `List<T>` |
-| `List` | `List<T>` | A `List<T>` |
-| `ImmutableArray` | `ImmutableArray<T>` | An `ImmutableArray<T>` |
-| `ImmutableList` | `ImmutableList<T>` | An `ImmutableList<T>` |
-| `IImmutableList` | `IImmutableList<T>` | An `ImmutableList<T>` |
-| `IAsyncEnumerable` | `IAsyncEnumerable<T>` | Nothing: each row is read as the loop asks for it |
-
-`T` is the query's output model.  Every collection but `IAsyncEnumerable` is filled before the method's task completes, `IEnumerable` included, so reading it runs no query.
-
-- It stands in the file header and inside a query.  It can also be `collectionType` in a settings file.
-- It changes nothing for a query whose shape is not `many`, and nothing under the output `sql` or `models`.
-
-<a id="streaming-rows"></a>
-
-### Streaming rows
-
-```sql postgres
--- name: StreamUsers
--- collection-type: IAsyncEnumerable
-SELECT id, name FROM users ORDER BY id;
-```
-
-```csharp
-// Generated, shown without global::
-public IAsyncEnumerable<StreamUsersDto> StreamUsers(
-    CancellationToken cancellationToken = default)
-
-// Your code
-await foreach (var user in users.StreamUsers(cancellationToken))
-{
-    await writer.WriteLineAsync(user.Name);
-}
-```
-
-The method of a `many` query whose collection type is `IAsyncEnumerable` returns `IAsyncEnumerable<T>`, and gives your loop each row as it is read.  So the loop starts on the first row while the rest are still to come, and the rows are never all held at once.  The method takes the arguments that every [query method](generator.md#method-signature) takes, and its name ends with `Async` under `async-method-suffix`, as every method's does, and under `method-type=both`.  A stream has no synchronous method: under [`method-type=sync`](generator.md#synchronous-methods) such a query is [SQLSRC298](diagnostics.md#sqlsrc298), and under `method-type=both` it gets its stream alone, and a synchronous [collection method](generator.md#collection-methods), which returns an array, when it has one.
-
-- **The call checks the arguments and runs nothing.**  A null `connection` or `parameters` throws when the method is called, and so does a token's text that is blank, unless [`token-validation=off`](reference/tokens.md#token-validation) is in effect.  A repository method gets its connection from its source, and the connection is opened, the values of the `parameters` model read and the query sent when the loop asks for the first row, not at the call, and each loop over the result runs the query again with the values the model holds then.  An enumerator that is disposed before it asks for a row opens nothing.  On SQL Server, a transaction that has completed is refused when the loop asks for the first row, not at the call, and the connection is not opened: see [what a method reads and throws](reference/databases/sqlserver/query-methods.md#method-results).
-- **The connection stays open until the loop ends.**  A closed connection is opened for the loop and closed again when the loop ends: when it finishes, at a `break`, at an exception in its body, or when the enumerator is disposed.  An open connection stays open.  A repository method holds the connection it got for the whole loop, and disposes it when the loop ends, unless it borrowed it.  While the loop runs, the connection is busy with the query, so another command on it in the loop's body is refused by the driver: Npgsql throws `NpgsqlOperationInProgressException`, and Microsoft.Data.SqlClient, on a connection without `MultipleActiveResultSets`, `InvalidOperationException`.  Run such a command on another connection, or read the rows into a collection first.
-- **Leaving the loop early reads the rest of the rows.**  At a `break`, or an exception in the loop's body, the rows still to come, and on SQL Server the statements after them, are read and discarded before the loop ends, so on a large result that takes as long as reading them.  The query is not cancelled, and a transaction is left as it was, unless the database raises an error for one of those rows, such as a division by zero, or SQL Server for one of those statements.  That error is thrown when the loop ends, whatever ended it: at the `break`, and in place of an exception that the loop's body threw, so that an error in the query's rows, which may have changed your transaction, always reaches your code.  On PostgreSQL it also aborts a transaction that the query ran in, as any error does, so the transaction's next command is refused until it is rolled back; on SQL Server it may have rolled the transaction back, depending on the error and on `XACT_ABORT`, and when it leaves the transaction open and a later error of the batch rolls it back, the loop throws `TransactionRolledBackException` with that error as its `InnerException`: see [what a method reads and throws](reference/databases/sqlserver/query-methods.md#method-results).  To keep the body's exception, catch it in the loop's body, keep it in a variable and `break`.  Around the loop, catch the database's exception, `PostgresException` or `SqlException`, and on SQL Server `TransactionRolledBackException` too, and throw the exception you kept in its place if there is one, or else throw the exception you caught again.  After the loop, throw the exception you kept if there is one, since a `break` with no later row failing ends the loop with no exception at all.  Or have the query return only the rows the loop needs, with a `WHERE` or a `LIMIT` or `TOP`, so that no row is left to fail.
-- **Each row is read as every `many` method reads it**, with the same checks and [converters](#converters).  An error at a row that the loop reads, such as a null in a column whose property cannot be null, or an error that the database raises for that row, is thrown by the loop when it reaches that row, after the rows before it: see [how a row is read](generator.md#reading-rows).  A row that the loop leaves unread is not checked or converted: of its errors, only one that the database raises can reach your code, as the item above says.  On SQL Server, when such a check or converter throws for a row in a transaction, or the database raises an error for that row that leaves the transaction open, and an error that the rest of the query raises then rolls the transaction back, the loop throws `TransactionRolledBackException` with that exception or error as its `InnerException`: see [what a method reads and throws](reference/databases/sqlserver/query-methods.md#method-results).
-- **Either token cancels.**  The method's `cancellationToken`, and a token given to `WithCancellation`, each cancel the loop, which throws what the driver throws when a method is cancelled: see [PostgreSQL](reference/databases/postgresql/query-methods.md#method-results) and [SQL Server](reference/databases/sqlserver/query-methods.md#method-results).
-- **On SQL Server, a query of several statements** gives the rows of its first result set, and its other statements run before the loop ends.  An error that one of them raises is thrown after the last row, or at a `break`, as the item above says, and depending on the error and on `XACT_ABORT` it may have rolled back the transaction the query ran in: see [what a method reads and throws](reference/databases/sqlserver/query-methods.md#method-results).
 
 <a id="setting-type-overrides"></a>
 
@@ -427,11 +287,11 @@ A type override gives a database type the C# type of your choice, in place of th
 
 In the example, every query of the project gets `timestamptz` as a `System.DateTimeOffset`, `public.user_status` as `MyApp.UserStatus`, and `int4[]` as a list.  The files under `Legacy/` get `date` as a `System.DateTime` too.  Every query of the `.sql` file gets `numeric` as a `double`, and `ListEvents` gets `timestamptz` from the type map, a `System.DateTime`, while it keeps the project's other entries.
 
-To give one column, or one parameter, a C# type of its own, where two columns of one database type need two C# types, see [column types](#setting-column-types) and [`-- param:`](reference/parameters.md#param-marker).  Either wins over the type override.
+To give one column, or one parameter, a C# type of its own, where two columns of one database type need two C# types, see [column types](reference/model-properties.md#setting-column-types) and [`-- param:`](reference/parameters.md#param-marker).  Either wins over the type override.
 
 For a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232).
 
-Each property of a generated [model](generator.md#models) has the C# type of its column or parameter, the type override's included.  A [query method](generator.md#query-methods) reads and sends a column or parameter as that type, through your [converters](#converters) when the type has them.
+Each property of a generated [model](reference/models.md#models) has the C# type of its column or parameter, the type override's included.  A [query method](reference/query-methods.md#query-methods) reads and sends a column or parameter as that type, through your [converters](#converters) when the type has them.
 
 **Every place, merged by type.**  The type override is `typeOverrides` in the settings files of a `.sql` file's folder and of the folders above it, and the `-- type-override:` marker in the file header and inside a query.  For each query the entries add up from the farthest settings file to the nearest, then the file header, then the query, and an entry for a type replaces the entry of a place below for that type alone.  A settings file's entries reach only the `.sql` files of its folder and the folders below it.  An entry replaces the entry below for its key however that key is spelled, and its own spelling is the one kept: a query's `public."Status"=MyApp.Status` over `"public.Status": "MyApp.Status"` in the project's settings file leaves a type `status`, which the project's entry mapped too, to the type map, since the quoted key maps `Status` alone.  So a query that needs one type otherwise names that type, and keeps the rest of the project's entries.  This is one of the exceptions to the rule that the most specific place wins whole: see [which place wins](#precedence).  `default` takes the type out of the entries of every place below, and a key with no entry anywhere has the type map's C# type, or a library's in a query method.  Nothing removes every entry at once.
 
@@ -454,7 +314,7 @@ Each property of a generated [model](generator.md#models) has the C# type of its
 **The type** is a C# type that a property can have:
 
 - **A keyword**, `int`, `string`, `double` and the others of the built-in types; **a full name from its namespace**, `System.DateTimeOffset` or `MyApp.Ids.UserKey`, which may start with `global::`; or **a short name**, without its namespace, `DateTimeOffset` or `UserKey`.  A nested type is written with its full name, with a `.` before its name, as in C#: `MyApp.Outer.Inner`.
-- **A short name is the one type of that name** and number of type arguments, in any namespace, that your project and its references have and your project can see: a type of a reference counts when it is `public`, or `internal` in a reference that gives your project its internals with `InternalsVisibleTo`.  A type nested in another, and a `file` type, are not found by one.  Your project's own type wins over a reference's of the same full name.  The generated code writes the type's full name, so the `using` lines of your files do not matter, and a short name and the full name of its type are one type, to [shared models](generator.md#shared-models) and to converters.  A type argument may be a short name too, in any name: `System.Collections.Generic.List<UserKey>`, or `List<UserKey>`.  `global::UserKey` is a type of the global namespace alone.  A short name that finds a type of an assembly your project has only through a package it does not reference itself is the warning [SQLSRC284](diagnostics.md#sqlsrc284), since it may not be the type you meant; write the full name to use it without the warning.
+- **A short name is the one type of that name** and number of type arguments, in any namespace, that your project and its references have and your project can see: a type of a reference counts when it is `public`, or `internal` in a reference that gives your project its internals with `InternalsVisibleTo`.  A type nested in another, and a `file` type, are not found by one.  Your project's own type wins over a reference's of the same full name.  The generated code writes the type's full name, so the `using` lines of your files do not matter, and a short name and the full name of its type are one type, to [shared models](reference/models.md#shared-models) and to converters.  A type argument may be a short name too, in any name: `System.Collections.Generic.List<UserKey>`, or `List<UserKey>`.  `global::UserKey` is a type of the global namespace alone.  A short name that finds a type of an assembly your project has only through a package it does not reference itself is the warning [SQLSRC284](diagnostics.md#sqlsrc284), since it may not be the type you meant; write the full name to use it without the warning.
 - **A generic type** names its type arguments, each of which may end in `?`: `System.Collections.Generic.List<int?>`.  White space inside `<>` and `[]` is allowed.
 - **An array** is the element and its ranks: `long[]`, `int?[]`, `int[,]`.
 - **No `?` at the end of the whole type.**  Whether a property can be null is decided by its column, by which columns can be null on [PostgreSQL](reference/databases/postgresql/nullability.md#nullability) and on [SQL Server](reference/databases/sqlserver/nullability.md#nullability), or by its parameter's [`-- param:` marker](reference/parameters.md#param-marker), so `int4=int?` is not valid.  A tuple, `dynamic`, `void`, a pointer, and anything after the type are not valid either.
@@ -493,7 +353,7 @@ public readonly record struct Email(string Value)
 SELECT id, email FROM users WHERE email = @email;
 ```
 
-A type override, a [column type](#setting-column-types) or a `-- param:` marker names a C# type, and the driver reads and sends only the types it knows.  A converter is how a [query method](generator.md#query-methods) reads and sends a C# type of your choice, one the driver does not know among them, through a type the driver reads: a `static` method marked `[SqlSourceConverter]` that takes one value and returns it converted.  Above, `email` is a domain over `text`, which Npgsql reads as a `string`.  PostgreSQL gives a parameter compared with a column of a domain the domain's base type, `text` here, so [`-- param:`](reference/parameters.md#param-marker) declares `@email` as the domain, which the type override then gives the type `Email`.  SQL Server gives a parameter compared with, or written to, a column of an alias type that alias type, so with an alias type `dbo.Email` and `dbo.Email=MyApp.Email`, a SQL Server query needs no `-- param:`.  The method of `FindUser` reads the column `email` as a `string` and gives it to `FromDatabase`, and gives the `Email` of `@email` to `ToDatabase` and sends the `string` it returns.  `SqlSourceConverterAttribute` is generated into your project, beside `[SqlSourceGenerate]`, in the namespace `SqlSource`.
+A type override, a [column type](reference/model-properties.md#setting-column-types) or a `-- param:` marker names a C# type, and the driver reads and sends only the types it knows.  A converter is how a [query method](reference/query-methods.md#query-methods) reads and sends a C# type of your choice, one the driver does not know among them, through a type the driver reads: a `static` method marked `[SqlSourceConverter]` that takes one value and returns it converted.  Above, `email` is a domain over `text`, which Npgsql reads as a `string`.  PostgreSQL gives a parameter compared with a column of a domain the domain's base type, `text` here, so [`-- param:`](reference/parameters.md#param-marker) declares `@email` as the domain, which the type override then gives the type `Email`.  SQL Server gives a parameter compared with, or written to, a column of an alias type that alias type, so with an alias type `dbo.Email` and `dbo.Email=MyApp.Email`, a SQL Server query needs no `-- param:`.  The method of `FindUser` reads the column `email` as a `string` and gives it to `FromDatabase`, and gives the `Email` of `@email` to `ToDatabase` and sends the `string` it returns.  `SqlSourceConverterAttribute` is generated into your project, beside `[SqlSourceGenerate]`, in the namespace `SqlSource`.
 
 **A converter converts from its argument's type to its return type**, whatever its name.  A column needs the converter from the type the driver reads to its property's type, and a parameter the one back, so a query that has both, as `FindUser` does, needs both.  A query that needs the direction a type has no converter for, while the type has the other, is [SQLSRC280](diagnostics.md#sqlsrc280).  A method that takes and returns one type serves both directions: `System.DateTime AsUtc(System.DateTime value)` under `timestamp=System.DateTime` converts each `timestamp` as it is read and as it is sent.
 
@@ -515,7 +375,7 @@ A converter in any other type of a referenced assembly is not found.  When your 
 
 **A converter is a `static` method of one argument that returns a value**, `public` or `internal`, in a type that is not generic.  A method marked `[SqlSourceConverter]` that is not one is SQLSRC277, which lists each rule, in any project, whatever its output.  Its argument may be written with `?`, `Email?` or `string?`: it takes the type without the `?`, since it is never given null.  Its return type is never written with `?`.  A converter marked `[Obsolete]` as a warning is used, and the generated code turns the warning off; one marked `[Obsolete]` as an error is SQLSRC277.  Two converters between the same two types in one direction are [SQLSRC278](diagnostics.md#sqlsrc278), at both.
 
-**Null never reaches a converter.**  A column that holds a null gives its property null when the property can be null, and throws as any column does when it cannot: see [how a row is read](generator.md#reading-rows).  A parameter whose value is null is sent as the database's `NULL`.  So one pair of converters serves a property that can be null and one that cannot.
+**Null never reaches a converter.**  A column that holds a null gives its property null when the property can be null, and throws as any column does when it cannot: see [how a row is read](reference/query-methods.md#reading-rows).  A parameter whose value is null is sent as the database's `NULL`.  So one pair of converters serves a property that can be null and one that cannot.
 
 A PostgreSQL array parameter in a query method is an `IEnumerable<T>` of its element, as [array parameters](reference/databases/postgresql/query-methods.md#array-parameters) say, and its converters are those of the element.
 
@@ -563,62 +423,11 @@ A column or parameter of a type that holds JSON, given a class of your project b
 - **A type that holds JSON** is PostgreSQL's `json` and `jsonb`, a domain over one, and SQL Server's `json` and an alias type over it, with the [library types](#setting-library-types)' `json` on or off.  A column or parameter of another type that the type map reads as a `string`, such as `text` or `nvarchar(max)`, holds JSON only by [the JSON opt-in](#json-opt-in).  Without it, a class given to such a column keeps the rules above: its converters are used, and without them the driver is given the class, which throws `InvalidCastException`.  So an `Email` of yours over an `nvarchar` is never written as JSON.
 - **An array of PostgreSQL's JSON type**, `jsonb[]` given an `OrderMetadata[]`, is read and sent element by element.  A `NULL` element stays null for a class, and throws `InvalidCastException` for a struct written without `?`, as for an array that a converter converts, above.
 - **The default options** are System.Text.Json's own: property names as your class writes them, `Channel`, and matched with their case.  So JSON whose names are another case, `{"channel":"web"}`, written by other code in camelCase, reads as an `OrderMetadata` whose properties have their default values, with no error.  For other options, such as camelCase names, write a converter: see [the recipe](recipes.md#class-in-a-json-column).
-- **A JSON `null`**, the text `null`, is not a SQL `NULL`.  Read into a property of a class that cannot be null, it throws `InvalidCastException`, "Column 'metadata' holds a JSON null.", and into one that can be null it is null.  An element of an array that cannot be null throws the same, and one of `OrderMetadata?[]` is null.  A struct of yours follows the same rule: a JSON `null` is null in a `Point?` property or a `Point?[]` element, and throws the same `InvalidCastException` in a `Point` property or a `Point[]` element.  A SQL `NULL` never reaches the serializer, and gives its property null, or throws as any column does: see [how a row is read](generator.md#reading-rows).
+- **A JSON `null`**, the text `null`, is not a SQL `NULL`.  Read into a property of a class that cannot be null, it throws `InvalidCastException`, "Column 'metadata' holds a JSON null.", and into one that can be null it is null.  An element of an array that cannot be null throws the same, and one of `OrderMetadata?[]` is null.  A struct of yours follows the same rule: a JSON `null` is null in a `Point?` property or a `Point?[]` element, and throws the same `InvalidCastException` in a `Point` property or a `Point[]` element.  A SQL `NULL` never reaches the serializer, and gives its property null, or throws as any column does: see [how a row is read](reference/query-methods.md#reading-rows).
 - **Text that is not your class's JSON**, such as an array for an object, throws System.Text.Json's `JsonException` when it is read.
 - **Your converters replace the serializer.**  A [converter](#converters) of yours between `string` and the class is used in place of the serializer, in its direction, so that you choose the options: see [the recipe](recipes.md#class-in-a-json-column).  A SQL `NULL` never reaches it, but a JSON `null` does, as the text `null`, and what it gives for that is the converter's choice.  A class with a converter of one direction alone is [SQLSRC280](diagnostics.md#sqlsrc280) for a query that needs the other, and one whose converters are all of other types, such as `long`, is [SQLSRC279](diagnostics.md#sqlsrc279), and is not serialized.
 - **In a trimmed or AOT project** the serializer reads and writes your class by reflection, so the compiler warns, IL2026 and IL3050, at its calls in the generated methods, and an application whose publish turns System.Text.Json's reflection off, as a trimmed or AOT one does by default, throws `InvalidOperationException` when the method runs.  Write converters that use a `JsonSerializerContext` that System.Text.Json's source generator writes: see [the recipe](recipes.md#class-in-a-json-column).
 - **Only query methods use the serializer.**  A query whose output is `models` has no method, and its models keep the class as their property's type: read through Dapper, it needs a type handler of yours, as any type of yours does.
-
-<a id="setting-column-types"></a>
-
-## Column types
-
-```jsonc
-// sqlsource.json, in the project's folder
-{
-    "root": true,
-    "columnTypes": {
-        "users.id": "UserId",
-        "posts.created_by_user_id": "UserId",
-        "billing.invoices.id": "MyApp.Billing.InvoiceId",
-    },
-}
-```
-
-```sql postgres
--- column: posts.id -> PostId
-
--- name: ListPosts
--- column: total -> PostCount
--- param: @author -> UserId
-SELECT p.id, p.created_by_user_id, count(*) AS total
-FROM posts AS p
-WHERE p.created_by_user_id = @author
-GROUP BY p.id;
-```
-
-A column type gives one column of a table or view the C# type of your choice, in every query that reads it, where a [type override](#setting-type-overrides) gives every column of one database type the same C# type.  So `users.id` can be a `UserId` and `posts.id` a `PostId`, though both are `bigint`.  Above, `ListPostsDto` has `Id` a `PostId`, by the file header, `CreatedByUserId` a `UserId`, by the settings file, and `Total`, which no table gives, a `PostCount`, by its query's marker.  A parameter is no column of a table, so its [`-- param:` marker](reference/parameters.md#param-marker) gives `ListPostsParams.Author` its type.  The C# type is written as a type override's is, a keyword, a full name or a short name: see [the type](#setting-type-overrides).
-
-**The key is the column a value is read from**: `table.column`, which matches that column of a table or view of that name in any schema, or `schema.table.column`, which matches that schema's alone.  A query's column is read from a table's column when it is that column, under an alias or not, and not when it is an expression of it: `p.id AS post_id` is `posts.id`, and `count(*)`, `p.id + 1` and a column of a `UNION` are no table's column, so no key matches them.  Give such a column its type with a `-- column:` marker inside its query.  A column read from a view is the view's, so a view's columns need entries of their own: `users.id` does not reach the `id` of a view over `users`.
-
-- **A part of a key is plain or in double quotes**, by the rules of a type override's key: a plain part holds letters, digits, `_` and `$` and is compared ignoring case, and a part in quotes holds any character, with a quote inside it doubled, is compared exactly, and may be written with escapes, `U&"..."`.  In a settings file each `"` of a key is written `\"`, as JSON requires: `"\"Users\".id"`.  So `users.id` matches `Users.ID` too, and `"Users".id` the table `Users` alone.
-- **A key serves both databases.**  A settings file's entry maps the columns of PostgreSQL's queries and SQL Server's alike, and a marker those of its file.
-
-**Every place, merged by key.**  The column types are `columnTypes` in the settings files of a `.sql` file's folder and of the folders above it, a `-- column:` marker in the file header, and a `-- column:` marker inside a query, which names a column of the query's result.  For each column the query's marker wins, then the file header's entries, then those of the settings files, nearest first, and as for the type override, an entry for a key replaces the entries of a place below for that key alone, and `default` takes the column out of the entries of every place below.  Of the entries that match one column, the one of the most specific place wins; within one place, one with a schema wins over one without, and then one spelled exactly as the column's names over one that matches it only ignoring case.
-
-**Over the type override.**  A column's C# type is, in order: the column types, its query's `-- column: name -> type` first and then those of the other places by the column it is read from; then the type override, by its database type; then, in a query method, a library of the [library types](#setting-library-types) that is on; then the type map.  So a column type at any place wins over a type override at any place: naming a column is more specific than naming a type.  `-- column: name -> default` frees one column of a query for the type override.  A column type never reaches a parameter: a parameter's C# type is its [`-- param:` marker](reference/parameters.md#param-marker)'s, then the type override's, then a library's, then the type map's.
-
-**The nullability stays the column's**, as [which properties can be null](generator.md#model-nullability) decides it: `"users.id": "UserId"` gives a column that can be null the type `UserId?`.
-
-**What the type does.**  A type that a column type or a `-- param:` marker gives is one you chose, as a type override's is.  A [query method](generator.md#query-methods) reads and sends it through your [converters](#converters) when it has them, so a `UserId` over a `bigint` column is read as a `long` and given to `UserId`'s converter, and a PostgreSQL array mapped to an array of a type of yours, `"posts.tag_ids": "TagId[]"`, is converted as [converters](#converters) says of arrays.  A class of yours in a column that holds JSON is read and sent through System.Text.Json's serializer, as [a class in a JSON column](#json-class) says, and a column of a string type that holds JSON takes [the JSON opt-in](#json-opt-in).  A type that the project cannot find or use is [SQLSRC250](diagnostics.md#sqlsrc250) to [SQLSRC252](diagnostics.md#sqlsrc252), whose message names the key, or the marker, and the place.
-
-**In a settings file**, `columnTypes` is a JSON object with a member for each entry, `"users.id": "UserId"`, written by the type override's rules for a settings file: see [type overrides](#setting-type-overrides).  A member's value may also be an object, `{ "type": "OrderMetadata", "json": true }`, for [the JSON opt-in](#json-opt-in).  Two members of one object whose keys are one column's, `"users.id"` and `"\"users\".id"`, are [SQLSRC020](diagnostics.md#sqlsrc020), and the first applies.  A member that is not valid is [SQLSRC019](diagnostics.md#sqlsrc019), and the other members still apply.
-
-**In the file header**, a `-- column:` line holds one entry, `key -> type`, `key -> json type`, which is [the JSON opt-in](#json-opt-in), or `key -> default`, with or without spaces around its `->`, for every query of the file.  It gives a type and nothing else: a line without `->`, one that says `null` or `not null`, and one whose key has one part are [SQLSRC111](diagnostics.md#sqlsrc111).  Two lines that give one key two C# types are [SQLSRC112](diagnostics.md#sqlsrc112); the types are compared by how they are written, so `UserId` and `MyApp.UserId` are two.
-
-**Inside a query**, a `-- column:` line names a column of the query's result, as the query returns it, and gives it a C# type after `->`: `-- column: total -> PostCount`, or `-> json Type` for a column of a string type that holds JSON, [the JSON opt-in](#json-opt-in).  It wins over the column types of the other places and over the type override, and `-> default` takes the column out of the column types, so that the type override, or else a library or the type map, gives its type.  The same marker sets the column's nullability, before the `->` or alone: `-- column: note null -> NoteText`.  Its name is one part, so a name with a `.` outside quotes is [SQLSRC111](diagnostics.md#sqlsrc111): a column's source is mapped in the file header.  The rules of its name, of its nullability and of two markers for one column are on [the generator page](generator.md#column-marker).  In a file with no `-- name:` line, which is one query and takes both kinds, a key of two or three parts is the file header's kind, and a name of one part the query's.
-
-The `sqlsource` tool does not read `columnTypes`, and a `-- column:` marker changes nothing that is described: adding, changing or removing one leaves the query's sidecar current.
 
 <a id="json-opt-in"></a>
 
@@ -699,9 +508,9 @@ The library types say whether the query methods read and send a library's types,
 
 **Every place, merged by library.**  The library types are `libraryTypes` in the settings files of a `.sql` file's folder and of the folders above it, and the `-- library-types:` marker in the file header and inside a query.  For each query the entries add up from the farthest settings file to the nearest, then the file header, then the query, and an entry for a library replaces the entry of a place below for that library alone, as the [type override](#setting-type-overrides)'s entries do.  One value serves both databases: a file's dialect decides which database's types apply.
 
-**Only for query methods.**  A library's types reach only a query whose [output](#setting-output) is `methods` or `repository`, for each type that claims it.  A query whose output is `models` keeps the type map's types in its models, whatever the library types say: there they are read and checked, and do nothing else.  To give such a query a library's types, as for rows read through Dapper, name them with the type override or the column types.  A model that a query with a method, with the library on, and a `models` query share, or two queries with methods, one with the library on and one with it off, has two sets of types and is [SQLSRC257](diagnostics.md#sqlsrc257): name the models apart with [`-- output-model:`](#setting-model-name), or turn the library on or off alike for both.
+**Only for query methods.**  A library's types reach only a query whose [output](#setting-output) is `methods` or `repository`, for each type that claims it.  A query whose output is `models` keeps the type map's types in its models, whatever the library types say: there they are read and checked, and do nothing else.  To give such a query a library's types, as for rows read through Dapper, name them with the type override or the column types.  A model that a query with a method, with the library on, and a `models` query share, or two queries with methods, one with the library on and one with it off, has two sets of types and is [SQLSRC257](diagnostics.md#sqlsrc257): name the models apart with [`-- output-model:`](reference/models.md#setting-model-name), or turn the library on or off alike for both.
 
-**Below your own choices.**  A column's or parameter's C# type is its query's `-- column:` marker's or its `-- param:` marker's, then the [column types](#setting-column-types)', then the [type override](#setting-type-overrides)'s, then the library's, then the type map's: see [property types](generator.md#property-types).  So a project that maps `timestamptz` with the type override keeps its type with NodaTime on, and `"timestamptz": "default"` in a nearer settings file, or `-- type-override: timestamptz=default`, gives `timestamptz` back to the library there.
+**Below your own choices.**  A column's or parameter's C# type is its query's `-- column:` marker's or its `-- param:` marker's, then the [column types](reference/model-properties.md#setting-column-types)', then the [type override](#setting-type-overrides)'s, then the library's, then the type map's: see [property types](reference/type-mapping.md#property-types).  So a project that maps `timestamptz` with the type override keeps its type with NodaTime on, and `"timestamptz": "default"` in a nearer settings file, or `-- type-override: timestamptz=default`, gives `timestamptz` back to the library there.
 
 **What `on` needs.**  The project references what the library needs on the database of the query: on PostgreSQL the plugin, `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and on SQL Server `NodaTime`, or for NetTopologySuite `NetTopologySuite.IO.SqlServerBytes` with NetTopologySuite 2.5.0 or later referenced by name, since `NetTopologySuite.IO.SqlServerBytes` alone brings NetTopologySuite 2.0.0, which is [SQLSRC282](diagnostics.md#sqlsrc282); for `json`, System.Text.Json, which every .NET project has.  An entry that says `on` for a `methods` or `repository` query of a project without it is [SQLSRC281](diagnostics.md#sqlsrc281), at the entry, and the query keeps the type map's types.  A query method that reads NodaTime's types on PostgreSQL needs `UseNodaTime()` on the application's data source: see [PostgreSQL's query methods](reference/databases/postgresql/query-methods.md#method-results).  On SQL Server the query methods convert NodaTime's types themselves, and nothing is registered in the application.  `JsonElement` needs nothing registered on either database.  A query method that gets NodaTime's types from the library types, or on SQL Server converts a NodaTime type of your choice, needs NodaTime 3.1.9 or later: an older one is [SQLSRC282](diagnostics.md#sqlsrc282), and the query gets no method.  One that reads NetTopologySuite's types on PostgreSQL needs `UseNetTopologySuite()` on the data source in the same way, and on SQL Server nothing.  One that uses NetTopologySuite needs NetTopologySuite 2.5.0 or later, and on SQL Server also `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later: an older one is SQLSRC282 too.
 
@@ -712,112 +521,6 @@ The library types say whether the query methods read and send a library's types,
 **In a marker**, a `-- library-types:` line holds one entry or more, each `name=state` with no space around its `=`, separated by white space: `-- library-types: nodatime=on nettopologysuite=off json=on`.  The lines of one place add up, one for each library, and the same state twice is fine.  Two states for one library in the file header, or inside one query, are [SQLSRC112](diagnostics.md#sqlsrc112).  A line with no entry, or an entry that is not valid, is [SQLSRC111](diagnostics.md#sqlsrc111).
 
 The `sqlsource` tool does not read `libraryTypes`, and a `-- library-types:` marker changes nothing that is described: adding, changing or removing one leaves the query's sidecar current.
-
-<a id="setting-member-location"></a>
-
-## Where the members go
-
-```sql postgres
--- output: methods
-
--- name: GetUser -> one-optional
--- member-location: class
--- visibility: public
-SELECT id, name FROM users WHERE id = @id;
-
--- name: CountUsers
--- output: sql
-SELECT count(*) FROM users;
-```
-
-```csharp
-[SqlSourceGenerate]
-public static partial class UserQueries
-{
-    public static string CountText => Sql.CountUsers;
-}
-
-// elsewhere
-GetUserDto? user = await UserQueries.GetUser(connection, new GetUserParams(42));
-```
-
-The member location of a query says where its generated members go: its constant or token method, for the output `sql` or `models`, and its [query method](generator.md#query-methods), for `methods` or `repository`.  Above, `GetUser` is a public static method of `UserQueries` that takes the connection, and `CountUsers`, which writes no member location, is a constant of the private class `Sql` nested in it.
-
-| Member location | The members are | Used as |
-|----|----|----|
-| `nested-class`, the default for `sql` and `models` | Public static members of a static class nested in the type, `Sql` unless [the nested class](#setting-nested-class) names it.  A `methods` method there takes the connection as its first argument | `Sql.GetUser`, or `Sql.GetUser(connection, ...)` for a `methods` method |
-| `class`, the default for `repository` | Members of the type itself: a [repository method](generator.md#repository-methods) is an instance method, which gets its own connection, and any other member is static, a `methods` method taking the connection as its first argument | `users.GetUser(...)` for a repository method, `UserQueries.GetUser`, or `UserQueries.GetUser(connection, ...)` for a `methods` method |
-| `extension-class`, the default for `methods` | Extension methods of `DbConnection`, in a static class beside the type, named after it with `Extensions` after it.  Only a `methods` method can go there | `connection.GetUser(...)` |
-
-It is written `-- member-location:`, in the file header or inside a query, and `memberLocation` in a settings file, as `"memberLocation": "class"`.
-
-- **Each query has its own.**  A file may put some of its queries' members on the type, some in a nested class and some in the extension class, and two files of one type may place theirs differently.
-- **A repository method is always on the type.**  `class` fits a query whose output is `repository`, and `extension-class` or `nested-class` is [SQLSRC122](diagnostics.md#sqlsrc122).
-- **A value written in the file header or in a settings file reaches every query below it, whatever its output.**  `extension-class` on a query whose output is `sql`, `models` or `repository`, or `nested-class` on one whose output is `repository`, is [SQLSRC122](diagnostics.md#sqlsrc122), and its file gets no members and no models for the type until it is fixed, since a constant extends nothing and a repository method is the type's.  So `"memberLocation": "ExtensionClass"` in a settings file is an error at every such query of its folder and the folders below it.  Write `-- member-location:` on the queries it does not fit, or leave it out: each output's members go to its own default.
-- **The names a member cannot have**, and how the generated code is laid out, are on [the generator page](generator.md#locations).
-
-<a id="setting-visibility"></a>
-
-### Visibility
-
-```sql postgres
--- visibility: internal
-
--- name: GetUser -> one-optional
-SELECT id, name FROM users WHERE id = @id;
-```
-
-The visibility says how visible the members of a query's member location are: `public`, `internal`, `protected` or `private`.  Above, `GetUser` is an `internal` repository method of the type, which its interface leaves out.  It is written `-- visibility:`, in the file header or inside a query, and `visibility` in a settings file.  Without one, a repository method is `public`, whatever the accessibility of the type, unless that does not fit its models, as below, and any other query takes the default of its member location:
-
-| Member location | `visibility` sets | Default |
-|----|----|----|
-| `class` | Each constant, token method and query method on the type | `public` for a repository method.  Otherwise `public` when the type and every type around it are `public`, and `internal` otherwise |
-| `nested-class` | The nested class's own accessibility.  Its members are always `public` inside it | `private` |
-| `extension-class` | Each query method's accessibility.  The class is `public` when one of the type's methods in it is, and `internal` otherwise | `internal` |
-
-- **A value written in the file header or in a settings file reaches every query below it**, as a member location does, and is [SQLSRC123](diagnostics.md#sqlsrc123) where it does not fit, which leaves its file without members and without models for the type until it is fixed, or only the query's method when what does not fit is the models the method takes or returns.  A file of `sql` and `methods` queries with `-- visibility: private` in its header gives its constants a private nested class, and its query methods, which go to the extension class, the error: write `-- visibility:` or `-- member-location:` on those queries.  [The generator page](generator.md#placement-for-a-file) shows such a file.
-- **What does not fit**: `private` or `protected` in the extension class, which a class that is not nested cannot be; `public` in the extension class of a type that is not `public` with every type around it, for a query method that takes or returns a model, since the type's models are internal and such a method cannot take or return them; `public` or `protected` for a query method that takes or returns a model that is internal, on the type or for its nested class, when the type, or a type around it, is `protected` or `protected internal`, and none of them is `internal`, `private` or `private protected`, since a class derived from it in another assembly could call the method, and its models are internal; and `protected` where C# forbids it, on the type when it is a static class, a struct or a record struct, and for the nested class of a struct or a record struct.
-- **What fits, with no diagnostic**: `public` for members on a type that is `internal`, which are then internal in effect, as a repository method is by default; `protected` for the repository methods of an abstract base repository, whose derived types call them; `public` or `internal` for a nested class, which code outside the type then uses as `UserRepository.Sql.GetUser`; `protected` on a sealed class or record, which compiles with no warning from the generated code; a protected nested class in a static class; and, on a type that is `protected` or `protected internal`, or inside one, an `internal` or `private` query method or nested class, and constants and token methods of any visibility, which take no models.  A query method with no parameters and no rows takes no models either, so it fits wherever the visibility alone does, and so does one whose models a `public` type shares, which makes them public.
-- **A nested class has one visibility.**  A query that writes none for its class takes the one that another query of the type writes for it, in any of the type's files.  Two queries that write two different ones are [SQLSRC124](diagnostics.md#sqlsrc124), and every file with a query in that class gets no members and no models for the type until it is fixed.  A query method that writes none is [SQLSRC123](diagnostics.md#sqlsrc123) when the visibility it takes does not fit the models it takes or returns, which leaves out that method alone.
-- **A repository method's default can not fit either.**  On a type that is `protected` or `protected internal`, or inside one, with none of them `internal`, `private` or `private protected`, the default `public` does not fit a repository method that takes or returns a model, and is [SQLSRC123](diagnostics.md#sqlsrc123), which leaves out that method alone: write `-- visibility: internal` on the query, or in the file header for all of them.
-- **The models do not follow it.**  A query's models are `public` or `internal` by the type that claims it, whatever the visibility of its members: see [accessibility](generator.md#model-accessibility).
-
-<a id="setting-nested-class"></a>
-
-## Name of the nested class
-
-```jsonc
-// sqlsource.json, in the project's folder
-{
-    "root": true,
-    "nestedClass": "Queries",
-}
-```
-
-```sql postgres
--- nested-class: Statements
--- output: models
-
--- name: GetUser
-SELECT id, name FROM users WHERE id = @id;
-```
-
-```csharp
-// UserRepository.cs, beside the UserRepository.sql above
-[SqlSourceGenerate]
-public partial class UserRepository
-{
-    public string Get() => Statements.GetUser;
-}
-```
-
-This names the class nested in the type that holds a query's members when its [member location](#setting-member-location) is `nested-class`.  It is written `-- nested-class:`, in the file header or inside a query, and `nestedClass` in a settings file, and is `Sql` without one.  Above, the queries of the project are in a class `Queries`, and those of `UserRepository.sql` in `Statements`.
-
-- **Each query has its own**, so one file can fill two classes, as `Users.Get` and `Orders.List`, and two files of one type can fill one.  A class is written only when a query of the type puts a member in it.
-- **It is a setting of the `.sql` file**, taken from the settings files of its folder and the folders above it, as every other setting is, and not from those of the type's C# file.  For a type that reads the file named for it beside its C# file, as it does without [`Source`](#setting-source), the two are the same folder.
-- **It is ignored where the member location is not `nested-class`**, so a `nestedClass` for a whole project beside a file whose queries go on the type is no error.
-- **The value is one C# identifier that is not a keyword**: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  Nor is `file`, `required`, `scoped` or `extension`, which C# does not take as a class's name, or `var`, with which the query methods of the type would not compile.  A name in lower case, such as `queries`, or `record`, is fine, and gives no compiler warning in the generated code.  A value that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.
-- **A type that already has the name**, as a member, a nested type or a type parameter, or as its own name, is [SQLSRC007](diagnostics.md#sqlsrc007), and every file with a query in that class gets no members and no models for it until it is fixed.  The other names its members cannot have are on [the generator page](generator.md#locations).
 
 <a id="setting-source"></a>
 
@@ -846,7 +549,7 @@ public partial class SharedQueries;
 - A `Source` that matches nothing is [SQLSRC004](diagnostics.md#sqlsrc004), and no file named for the type when there is no `Source` is [SQLSRC005](diagnostics.md#sqlsrc005).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
-This is separate from [which files the compiler is given](#included-files), which comes first: a type can only claim a file that the project includes.  The attribute itself is on [the generator page](generator.md#attribute).
+This is separate from [which files the compiler is given](#included-files), which comes first: a type can only claim a file that the project includes.  The attribute itself is on [the Attributes page](reference/attributes.md#attribute).
 
 <a id="configure-a-folder"></a>
 
@@ -910,51 +613,6 @@ To turn the default off and list the files yourself:
 ```
 
 Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) compiles a sidecar it has just written for the first time, listed or not; every later build, like a build offline or in CI, compiles only the sidecars you list.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Source`](#setting-source), and a file no type claims is ignored.
-
-<a id="public-exceptions"></a>
-
-## Public exceptions
-
-```xml
-<PropertyGroup>
-    <SqlSourcePublicExceptions>true</SqlSourcePublicExceptions>
-</PropertyGroup>
-```
-
-`SqlSourcePublicExceptions` makes the exceptions that the query methods throw, [`UnexpectedRowCountException`](generator.md#unexpected-row-count), [`TransactionRolledBackException`](generator.md#transaction-rolled-back) and [`CollectionItemException`](generator.md#collection-item-exception), `public` in the project that sets it, so that every project that references it catches them by type.  Without it they are `internal`, and only a project that the project grants `InternalsVisibleTo` sees them.  `true` is matched ignoring case; any other value, and none, leaves them `internal`.
-
-- **It is a property of the project file**, and not a setting of a settings file: the exceptions are one set of types for the whole project.
-- **A project that sees the exceptions of a project it references** uses those and gets none of its own, so the property changes nothing there: see [projects that share internals](generator.md#projects-that-share-internals).
-- **Leave it off in a library you publish**, unless its callers must catch the exceptions by type.  Public exceptions are part of its public API, and an app that references two such libraries sees two copies: it gets [SQLSRC022](diagnostics.md#sqlsrc022) if it uses SqlSource, and an error that the name is ambiguous where it names one if it does not.
-
-<a id="repository-interfaces"></a>
-
-## Repository interfaces
-
-```xml
-<PropertyGroup>
-    <SqlSourceRepositoryInterfaces>false</SqlSourceRepositoryInterfaces>
-</PropertyGroup>
-```
-
-```csharp
-[SqlSourceGenerate(GenerateInterface = true, InterfaceName = "IUserStore")]
-public partial class UserRepository(NpgsqlDataSource dataSource);
-```
-
-A type that claims a query whose output is `repository` gets an [interface](generator.md#repository-interface) of its public repository methods, `IUserRepository` for `UserRepository`, unless one of these turns it off:
-
-| Written as | Sets | Default |
-|----|----|----|
-| `SqlSourceRepositoryInterfaces`, a property of the project | Whether the project's repositories get their interfaces.  `false`, matched ignoring case, turns them off; any other value, and none, leaves them on | On |
-| `GenerateInterface` on `[SqlSourceGenerate]` | Whether this type gets its interface, over the project's property | The project's property |
-| `InterfaceName` on `[SqlSourceGenerate]` | The interface's name: a C# identifier, without a namespace or type parameters | `I` and the type's name |
-
-Above, the project turns the interfaces off, and `UserRepository` turns its own back on, named `IUserStore`.  `GenerateInterface = false` turns one type's off in a project that leaves them on.
-
-- **It is a property of the project file**, and not a setting of a settings file: the settings of a `.sql` file reach its queries, and one type can claim the files of several folders.  The two properties of the attribute are not settings either: they belong to the type.
-- **A name that is taken** by something beside the type is [SQLSRC035](diagnostics.md#sqlsrc035), and a name that is not a C# identifier is [SQLSRC037](diagnostics.md#sqlsrc037): the type gets no interface, and keeps its methods.
-- **A type with no repository query** gets no interface, whatever these say.
 
 <a id="online-build"></a>
 
@@ -1048,7 +706,7 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 
 **Which files are checked.**  The build reads each settings file that the search of some `.sql` file or C# file of the project reaches, whether or not a type claims that `.sql` file, and reports each mistake in it at its file, line and column.  A `sqlsource.json` beyond the first `"root": true` is never read, so it cannot fail a build.  The C# files that the build writes itself, into its output and intermediate folders, reach no settings file, wherever those folders are, except in a build that names the project through a symbolic link while those folders are outside the project's folder and set by a relative path: see [known issues](#known-issues).  Nor do the C# files that a NuGet package adds to your project, as Polyfill does, from the folder where NuGet keeps its packages, so a broken `sqlsource.json` above that folder, in your home folder, say, is not read on their account.  Your own `.sql` and C# files still reach such a file when your project is in a folder below it, unless a `"root": true` stands between them, and its mistakes then fail the build and `sqlsource describe`: put `"root": true` in the settings file of your project's folder, or of your repository's.  A C# file that your project lists itself from another folder still reaches the settings files of its own folder.  A value that is wrong is not set by its file, so a farther settings file, or the default, gives the setting meanwhile.  The `sqlsource` tool reads the same settings files.  It reports the mistakes of [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC018](diagnostics.md#sqlsrc018) as the build does, and a value of `dialect`, `output` or `database` that is not valid, once in a run however many projects reach the file.  The build reports a value that is not valid for every key but `database`, which only the tool reads.
 
-**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The MSBuild properties of SqlSource that a project sets are [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included, [`SqlSourcePublicExceptions`](#public-exceptions), which makes the exceptions of the query methods public, [`SqlSourceOnline`](#online-build), which says whether the build runs the `sqlsource` tool, and [`SqlSourceEnvFile`](#setting-env-file), which names the `.env` file it reads.
+**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The MSBuild properties of SqlSource that a project sets are [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included, [`SqlSourcePublicExceptions`](reference/exceptions.md#public-exceptions), which makes the exceptions of the query methods public, [`SqlSourceOnline`](#online-build), which says whether the build runs the `sqlsource` tool, and [`SqlSourceEnvFile`](#setting-env-file), which names the `.env` file it reads.
 
 See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [SQLSRC016](diagnostics.md#sqlsrc016), a key that is not known; [SQLSRC017](diagnostics.md#sqlsrc017), a key written twice; [SQLSRC018](diagnostics.md#sqlsrc018), a value of the wrong JSON type; [SQLSRC019](diagnostics.md#sqlsrc019), a value that is not valid; [SQLSRC020](diagnostics.md#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, or a generator parameter given two different values in `generatorParameters`.
 

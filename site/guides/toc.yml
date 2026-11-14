@@ -10,3 +10,7 @@
       href: report-a-bug.md
     - name: "Troubleshooting: it built, but something is wrong"
       href: troubleshooting.md
+- name: Other ways to use your SQL
+  items:
+    - name: Use Dapper or your own ADO.NET code
+      href: dapper.md

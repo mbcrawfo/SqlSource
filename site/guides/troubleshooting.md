@@ -2,7 +2,7 @@
 
 Use this page when the build succeeds but something is wrong: an exception at run time, a wrong result, or nothing happens.  It also lists a build error that is not about your SQL.
 
-Some problems are listed in the known issues of [settings](../settings.md#known-issues) and [the generator](../generator.md#known-issues).
+Some problems are listed in the known issues of [settings](../settings.md#known-issues).
 
 <a id="at-run-time"></a>
 
@@ -12,6 +12,9 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **Null in a column whose property cannot be null, on SQL Server.**  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null where an overflow or a division by zero is otherwise an error.  See [`ANSI_WARNINGS` off](../reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off).
 - **A `SqlException`, and the transaction is rolled back, on SQL Server.**  An error before the rows can hide a later error of the batch that rolls the transaction back.  See [a hidden rollback](../reference/databases/sqlserver/query-methods.md#limit-hidden-rollback).
 - **`SqlException` 130 for an empty or null list, on SQL Server.**  A list after a `NOT` inside an aggregate of your own fails when it is empty or null.  See [a list in an aggregate of your own](../reference/databases/sqlserver/query-methods.md#limit-list-in-an-aggregate).
+- **`UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException` is not caught by its type.**  Another assembly catches these exceptions by their type only when it can see them.  See [an exception that is not caught by its type](../reference/exceptions.md#limit-caught-by-type).
+- **`InvalidCastException` from a query method with parameters, on a connection that wraps the driver's.**  The method works only on a connection whose commands take the driver's own parameters.  See [a connection that wraps the driver's](../reference/query-methods.md#limit-wrapped-connection).
+- **`NotSupportedException` from a collection method, on a connection that wraps the driver's.**  Most such connections cannot run a batch of commands.  See [a collection method on a connection that wraps the driver's](../reference/collection-methods.md#limit-wrapped-connection).
 
 <a id="wrong-model"></a>
 
@@ -23,6 +26,8 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **A property can be null though its column is never null, on SQL Server.**  SQL Server treats a column as possibly null when it cannot show that it never is.  See [columns treated as possibly null](../reference/databases/sqlserver/nullability.md#limit-columns-treated-as-nullable).
 - **SQLSRC267 in a project that uses EF Core 8 or 9.**  EF Core's SQL Server provider brings Microsoft.Data.SqlClient 5.1, which is too old.  See [EF Core and Microsoft.Data.SqlClient](../reference/databases/sqlserver/types.md#limit-ef-core-sqlclient).
 - **Only the first result set of a query has a model, on SQL Server.**  A query that returns several result sets gets a model of the first alone, and nothing is reported of the others.  See [several result sets](../reference/databases/sqlserver/index.md#limit-several-result-sets).
+- **A compiler warning at a `cref` that names one of the exceptions of SqlSource.**  A project that uses another project's exceptions, and also references a project whose exceptions it cannot see, gets CS0419 or CS1574.  See [a `cref` to the exceptions](../reference/exceptions.md#limit-cref).
+- **A compile error about `Microsoft.CodeAnalysis.EmbeddedAttribute`.**  SqlSource adds a declaration of this class to your project, and your own declaration of it must join it.  See [your own `EmbeddedAttribute`](../reference/attributes.md#limit-embedded-attribute).
 
 <a id="wrong-result"></a>
 
@@ -30,6 +35,8 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 
 - **Part of your SQL is missing from the generated SQL.**  SqlSource can read a comment or a string differently from your database, and then removes SQL that your database runs.  See [what is still read differently](../reference/dialects.md#still-read-differently).
 - **An empty list after `IN` matches the rows whose value is null, on SQL Server.**  A connection with `ANSI_NULLS` off takes `= NULL` as true for a null.  See [`ANSI_NULLS` off](../reference/databases/sqlserver/query-methods.md#limit-ansi-nulls-off).
+- **Dapper sends no value for a parameter such as `@account_id`.**  Dapper sends a property of the input model only to a parameter written as `@` and the property's name.  See [parameter names for Dapper](dapper.md#limit-parameter-names).
+- **A `rowcount` method returns `-1`, on SQL Server.**  `SET NOCOUNT ON` in a query or command that has no parameters stays on for the connection's session.  See [`rowcount` after `SET NOCOUNT ON`](../reference/databases/sqlserver/query-methods.md#limit-rowcount-after-nocount).
 
 <a id="not-described"></a>
 
@@ -44,6 +51,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **A query that writes a query parameter's name in two ways fails when it is described, on SQL Server.**  SqlSource compares names ignoring case alone, and SQL Server by its collation.  See [a name written in two ways](../reference/databases/sqlserver/index.md#limit-parameter-two-spellings).
 - **SQLSRC207 or SQLSRC212 for a project or `.sql` path that exists.**  If the current folder is reached through a symbolic link, a full path through the link does not match the real path.  See [a path through a symbolic link](../reference/cli.md#limit-path-through-a-symbolic-link).
 - **SQLSRC241 for a query that only another target framework includes.**  The tool reads a project with several target frameworks for its first framework alone.  See [several target frameworks](../reference/describing.md#limit-several-target-frameworks).
+- **SQLSRC208, and nothing is described for a type whose `Source` is a constant or `nameof`.**  The tool reads `[SqlSourceGenerate]` from your C# files as text, without compiling them.  See [`Source` written as text](../reference/attributes.md#limit-source-written-as-text).
 
 <a id="watch"></a>
 

@@ -1,0 +1,190 @@
+# base cf0750052e294ca6da41e3f1a21c2bd54ebc403c
+unit	disposition	to	arg	words	note
+site/generator.md:1	move-split	-	-	-	The h1 The generator goes: the page's h1 What is generated and where it goes, and the h2 What the generator writes with the anchor generator, are new
+site/generator.md:3	merge-pair	site/reference/members.md#generator	MP-10	-	The opening of the term Generator; merges/MP-10.md
+site/generator.md:5-32	move	site/reference/members.md#generator	-	-	-
+site/generator.md:36	move	site/reference/attributes.md#attribute	-	-	-
+site/generator.md:38	move	site/reference/attributes.md#attribute	-	-	position: "so the code above needs" > "so the code below needs", the sample of the generator being on members.md now and the attribute's own sample below it; "see [known issues]" > "see [the limit]", the link going to #limit-embedded-attribute on the same page
+site/generator.md:40-57	move	site/reference/attributes.md#attribute	-	-	-
+site/generator.md:61	merge-pair	site/reference/attributes.md#files-of-a-type	MP-07	-	merges/MP-07.md
+site/generator.md:63-77	merge-pair	site/reference/attributes.md#files-of-a-type	MP-07	-	-
+site/generator.md:81	merge-pair	site/reference/members.md#locations	MP-01	-	merges/MP-01.md
+site/generator.md:83-116	merge-pair	site/reference/members.md#locations	MP-01	-	-
+site/generator.md:120	merge-pair	site/reference/members.md#placement-for-a-file	MP-01	-	merges/MP-01.md
+site/generator.md:122-156	merge-pair	site/reference/members.md#placement-for-a-file	MP-01	-	-
+site/generator.md:160-175	move	site/reference/members.md#constants	-	-	-
+site/generator.md:179	merge-pair	site/reference/members.md#token-methods	MP-10	-	merges/MP-10.md
+site/generator.md:181-186	merge-pair	site/reference/members.md#token-methods	MP-10	-	-
+site/generator.md:192-231	move	site/reference/members.md#intellisense	-	-	-
+site/generator.md:235-268	move	site/reference/models.md#models	-	-	-
+site/generator.md:272	move	site/reference/models.md#which-models	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:274-287	move	site/reference/models.md#which-models	-	-	-
+site/generator.md:291	merge-pair	site/reference/models.md#model-names	MP-02	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:293-306	merge-pair	site/reference/models.md#model-names	MP-02	-	-
+site/generator.md:310	merge-pair	site/reference/models.md#model-namespace	MP-03	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:312	merge-pair	site/reference/models.md#model-namespace	MP-03	-	-
+site/generator.md:316	move	site/reference/models.md#model-accessibility	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:318-322	move	site/reference/models.md#model-accessibility	-	-	-
+site/generator.md:326	merge-pair	site/reference/models.md#model-shape	MP-04	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:328-352	merge-pair	site/reference/models.md#model-shape	MP-04	-	-
+site/generator.md:356	move	site/reference/model-properties.md#property-order	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:358-360	move	site/reference/model-properties.md#property-order	-	-	-
+site/generator.md:364	move	site/reference/model-properties.md#property-names	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:366-381	move	site/reference/model-properties.md#property-names	-	-	-
+site/generator.md:385	move	site/reference/type-mapping.md#property-types	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:387-409	move	site/reference/type-mapping.md#property-types	-	-	-
+site/generator.md:413	move	site/reference/model-properties.md#model-nullability	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:415-426	move	site/reference/model-properties.md#model-nullability	-	-	-
+site/generator.md:430	move	site/reference/model-properties.md#column-marker	-	-	level: h4 to h3, as spec step 2 lists it
+site/generator.md:432-450	move	site/reference/model-properties.md#column-marker	-	-	-
+site/generator.md:454	move	site/reference/models.md#model-documentation	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:456-460	move	site/reference/models.md#model-documentation	-	-	-
+site/generator.md:464	move	site/reference/models.md#table-models	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:466-492	move	site/reference/models.md#table-models	-	-	-
+site/generator.md:496	move	site/reference/models.md#shared-models	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:498-514	move	site/reference/models.md#shared-models	-	-	-
+site/generator.md:518	move	site/reference/models.md#unusable-model-names	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:520-527	move	site/reference/models.md#unusable-model-names	-	-	-
+site/generator.md:531	merge-pair	site/reference/query-methods.md#query-methods	MP-10	-	merges/MP-10.md
+site/generator.md:533-554	merge-pair	site/reference/query-methods.md#query-methods	MP-10	-	-
+site/generator.md:556	merge-pair	site/reference/query-methods.md#query-methods	MP-10	-	position: "and the exceptions, below, are the same" > "and the exceptions are the same"; what each shape returns and the exceptions are on return-types.md and exceptions.md now
+site/generator.md:560	move	site/reference/query-methods.md#which-methods	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:562-571	move	site/reference/query-methods.md#which-methods	-	-	-
+site/generator.md:575	merge-pair	site/reference/repositories.md#repository-methods	MP-10	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:577-613	merge-pair	site/reference/repositories.md#repository-methods	MP-10	-	-
+site/generator.md:617	move	site/reference/repositories.md#repository-signature	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:619-639	move	site/reference/repositories.md#repository-signature	-	-	-
+site/generator.md:643	move	site/reference/repositories.md#repository-connection	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:645-701	move	site/reference/repositories.md#repository-connection	-	-	-
+site/generator.md:704	move	site/reference/repositories.md#repository-connection	-	-	-
+site/generator.md:708	merge-pair	site/reference/repositories.md#repository-interface	MP-05	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:710-731	merge-pair	site/reference/repositories.md#repository-interface	MP-05	-	-
+site/generator.md:735	move	site/reference/repositories.md#repository-transactions	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:737-739	move	site/reference/repositories.md#repository-transactions	-	-	-
+site/generator.md:743	move	site/reference/connection-methods.md#methods-that-take-a-connection	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:745-774	move	site/reference/connection-methods.md#methods-that-take-a-connection	-	-	-
+site/generator.md:778	move	site/reference/connection-methods.md#method-location	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:780-791	move	site/reference/connection-methods.md#method-location	-	-	-
+site/generator.md:795	move	site/reference/connection-methods.md#method-signature	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:797-820	move	site/reference/connection-methods.md#method-signature	-	-	-
+site/generator.md:824	move	site/reference/connection-methods.md#method-connection	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:826-828	move	site/reference/connection-methods.md#method-connection	-	-	-
+site/generator.md:832	move	site/reference/return-types.md#method-shapes	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:834-849	move	site/reference/return-types.md#method-shapes	-	-	-
+site/generator.md:850	move	site/reference/return-types.md#method-shapes	-	-	position: "see [known issues]" > "see [a limit]"; the link goes to databases/sqlserver/query-methods.md#limit-rowcount-after-nocount
+site/generator.md:852	move	site/reference/return-types.md#method-shapes	-	-	-
+site/generator.md:856	move	site/reference/collection-methods.md#collection-methods	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:858-902	move	site/reference/collection-methods.md#collection-methods	-	-	-
+site/generator.md:906	move	site/reference/collection-methods.md#collection-transactions	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:908-926	move	site/reference/collection-methods.md#collection-transactions	-	-	-
+site/generator.md:930	move	site/reference/collection-methods.md#collection-failures	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:932-935	move	site/reference/collection-methods.md#collection-failures	-	-	-
+site/generator.md:939	move	site/reference/query-methods.md#synchronous-methods	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:941-1000	move	site/reference/query-methods.md#synchronous-methods	-	-	-
+site/generator.md:1004	move	site/reference/repositories.md#synchronous-repository-methods	-	-	level: h4 to h2, as spec step 2 lists it
+site/generator.md:1006-1051	move	site/reference/repositories.md#synchronous-repository-methods	-	-	-
+site/generator.md:1052	move	site/reference/repositories.md#synchronous-repository-methods	-	-	position: "as above" > "as for [a query method]", the words linked to query-methods.md#synchronous-methods, where the bullet of line 976 is now
+site/generator.md:1053-1054	move	site/reference/repositories.md#synchronous-repository-methods	-	-	-
+site/generator.md:1058	move	site/reference/query-methods.md#reading-rows	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:1060-1066	move	site/reference/query-methods.md#reading-rows	-	-	-
+site/generator.md:1070	move	site/reference/query-methods.md#method-parameters	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:1072-1076	move	site/reference/query-methods.md#method-parameters	-	-	-
+site/generator.md:1080	move	site/reference/exceptions.md#unexpected-row-count	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:1082-1096	move	site/reference/exceptions.md#unexpected-row-count	-	-	-
+site/generator.md:1097	move	site/reference/exceptions.md#unexpected-row-count	-	-	position: "see [known issues]" > "see [the limit]"; the link goes to #limit-caught-by-type on the same page
+site/generator.md:1101	move	site/reference/exceptions.md#transaction-rolled-back	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:1103-1120	move	site/reference/exceptions.md#transaction-rolled-back	-	-	-
+site/generator.md:1121	move	site/reference/exceptions.md#transaction-rolled-back	-	-	position: "see [known issues]" > "see [the limit]"; the link goes to #limit-caught-by-type on the same page
+site/generator.md:1125	move	site/reference/exceptions.md#collection-item-exception	-	-	level: h3 to h2, as spec step 2 lists it
+site/generator.md:1127-1143	move	site/reference/exceptions.md#collection-item-exception	-	-	-
+site/generator.md:1144	move	site/reference/exceptions.md#collection-item-exception	-	-	position: "see [known issues]" > "see [the limit]"; the link goes to #limit-caught-by-type on the same page
+site/generator.md:1148-1176	move	site/reference/exceptions.md#projects-that-share-internals	-	-	-
+site/generator.md:1180	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires: eight bullets are limits under ## Limits of their pages, and one is the second text of MP-09
+site/generator.md:1182	move	site/reference/attributes.md#limit-source-written-as-text	-	-	Still a bullet, under its h3
+site/generator.md:1183	merge-pair	site/guides/dapper.md#limit-parameter-names	MP-12	-	Still a bullet, under its h3; merges/MP-12.md
+site/generator.md:1184	move	site/reference/exceptions.md#limit-caught-by-type	-	-	Still a bullet, under its h3
+site/generator.md:1185	move	site/reference/exceptions.md#limit-cref	-	-	Still a bullet, under its h3
+site/generator.md:1186	move	site/reference/query-methods.md#limit-wrapped-connection	-	-	Still a bullet, under its h3
+site/generator.md:1187	move	site/reference/collection-methods.md#limit-wrapped-connection	-	-	position: "as for the query method above" > "as for [the query method]", the words linked to query-methods.md#limit-wrapped-connection, since line 1186 is on that page now; still a bullet, under its h3
+site/generator.md:1188	merge-pair	site/reference/databases/postgresql/query-methods.md#limit-connection-string-repository	MP-09	-	A second bullet under the h3, after the text of postgresql.md 528 that phase 4 placed; merges/MP-09.md
+site/generator.md:1189	move	site/reference/databases/sqlserver/query-methods.md#limit-rowcount-after-nocount	-	-	Still a bullet, under its h3, a new h3 under ## Limits of the page, after limit-hidden-rollback
+site/generator.md:1190	move	site/reference/attributes.md#limit-embedded-attribute	-	-	Still a bullet, under its h3
+site/settings.md:257	merge-pair	site/reference/models.md#setting-model-suffix	MP-02	-	level: h2 to h3, as spec step 2 lists it; the second text of its pair keeps its heading one level down
+site/settings.md:259-271	merge-pair	site/reference/models.md#setting-model-suffix	MP-02	-	-
+site/settings.md:273	merge-pair	site/reference/models.md#setting-model-suffix	MP-02	-	position: "on [the generator page]" > "under [Names]", the heading of the section its link goes to, #model-names on the same page
+site/settings.md:277	merge-pair	site/reference/models.md#setting-model-namespace	MP-03	-	level: h2 to h3, as spec step 2 lists it; the second text of its pair keeps its heading one level down
+site/settings.md:279-292	merge-pair	site/reference/models.md#setting-model-namespace	MP-03	-	-
+site/settings.md:294	merge-pair	site/reference/models.md#setting-model-namespace	MP-03	-	position: "on [the generator page]" > "under [Namespace]", the heading of the section its link goes to, #model-namespace on the same page
+site/settings.md:298	merge-pair	site/reference/models.md#setting-model-type	MP-04	-	level: h2 to h3, as spec step 2 lists it; the second text of its pair keeps its heading one level down
+site/settings.md:300-311	merge-pair	site/reference/models.md#setting-model-type	MP-04	-	-
+site/settings.md:313	merge-pair	site/reference/models.md#setting-model-type	MP-04	-	position: "on [the generator page]" > "under [Shape]", the heading of the section its link goes to, #model-shape on the same page
+site/settings.md:317	merge-pair	site/reference/models.md#setting-model-name	MP-02	-	level: h2 to h3, as spec step 2 lists it; the second text of its pair keeps its heading one level down
+site/settings.md:319-331	merge-pair	site/reference/models.md#setting-model-name	MP-02	-	-
+site/settings.md:335-362	move	site/reference/return-types.md#setting-collection-type	-	-	-
+site/settings.md:366	move	site/reference/return-types.md#streaming-rows	-	-	level: h3 to h2, as spec step 2 lists it
+site/settings.md:368-393	move	site/reference/return-types.md#streaming-rows	-	-	-
+site/settings.md:572-615	move	site/reference/model-properties.md#setting-column-types	-	-	-
+site/settings.md:617	move	site/reference/model-properties.md#setting-column-types	-	-	position: "on [the generator page]" > "under [Setting a column's nullability or type with a marker]", the heading of the section its link goes to, #column-marker on the same page
+site/settings.md:619	move	site/reference/model-properties.md#setting-column-types	-	-	-
+site/settings.md:716	merge-pair	site/reference/members.md#setting-member-location	MP-01	-	level: h2 to h3, as spec step 2 lists it; the second text of its pair keeps its heading one level down
+site/settings.md:718-754	merge-pair	site/reference/members.md#setting-member-location	MP-01	-	-
+site/settings.md:755	merge-pair	site/reference/members.md#setting-member-location	MP-01	-	position: "on [the generator page]" > "under [Where the members go]", the heading of the section its link goes to, #locations on the same page
+site/settings.md:759	move	site/reference/members.md#setting-visibility	-	-	level: h3 to h2, as spec step 2 lists it
+site/settings.md:761-774	move	site/reference/members.md#setting-visibility	-	-	-
+site/settings.md:776	move	site/reference/members.md#setting-visibility	-	-	position: "[The generator page]" > "[A placement for a whole file or folder]", the heading of the section its link goes to, #placement-for-a-file on the same page
+site/settings.md:777-781	move	site/reference/members.md#setting-visibility	-	-	-
+site/settings.md:785-817	move	site/reference/members.md#setting-nested-class	-	-	-
+site/settings.md:818	move	site/reference/members.md#setting-nested-class	-	-	position: "on [the generator page]" > "under [Where the members go]", the heading of the section its link goes to, #locations on the same page
+site/settings.md:914-926	move	site/reference/exceptions.md#public-exceptions	-	-	-
+site/settings.md:930	merge-pair	site/reference/repositories.md#repository-interfaces	MP-05	-	level: h2 to h3, as spec step 2 lists it; the second text of its pair keeps its heading one level down
+site/settings.md:932-951	merge-pair	site/reference/repositories.md#repository-interfaces	MP-05	-	-
+site/settings.md:953	corrected	site/reference/repositories.md#repository-interfaces	C-02	cannot be written in a settings file or a marker	C-02: "are not settings either" > "cannot be written in a settings file or a marker"; the project's property and the attribute's two properties are the only places (RepositoryInterfaces.cs, SqlSource.props); the bullet is otherwise word for word, and is part of MP-05
+site/settings.md:954-955	merge-pair	site/reference/repositories.md#repository-interfaces	MP-05	-	-
+@site/generator.md:188	merge-pair	site/reference/members.md#token-methods	MP-10	-	Phase 3's words (phase-03 row site/generator.md:188), part of the opening of the term Token method
+@site/generator.md:702	move	site/reference/repositories.md#repository-connection	-	-	Phase 4's words (phase-04 row site/generator.md:702); its link to databases/postgresql/query-methods.md#limit-connection-string-repository is re-based alone
+site/parameters-and-tokens.md:177	move	site/reference/tokens.md	-	-	position: "described on [the generator page]" > "described on [What is generated and where it goes]", the name of the page that holds members.md#token-methods
+site/postgresql.md:397	move	site/reference/databases/postgresql/index.md	-	-	position: "by the rules of the generator page" > "by the rules of the Models page", the page its link to models.md#models names
+@site/reference/databases/postgresql/query-methods.md:29	move	site/reference/databases/postgresql/query-methods.md	-	-	position: "on [the generator page]" > "on [the Query methods page]", the link going to query-methods.md#method-parameters; line 433 at the baseline, which phase 4 mended (phase-04 row site/postgresql.md:433)
+site/postgresql.md:493	move	site/reference/databases/postgresql/query-methods.md	-	-	position: "is a [known issue]" > "is a [limit]"; the link goes to query-methods.md#limit-wrapped-connection
+site/sqlserver.md:312	move	site/reference/databases/sqlserver/libraries.md	-	-	position: "has the [known issue]" > "has the [limit]"; the link goes to query-methods.md#limit-wrapped-connection
+site/sqlserver.md:386	move	site/reference/databases/sqlserver/index.md	-	-	position: "by the rules of the generator page" > "by the rules of the Models page", the page its link to models.md#models names
+site/sqlserver.md:421	move	site/reference/databases/sqlserver/query-methods.md	-	-	position: "on [the generator page]" > "on [the Query methods page]", the link going to query-methods.md#method-parameters
+site/sqlserver.md:485	move	site/reference/databases/sqlserver/query-methods.md	-	-	position: "See [the generator's known issues]" > "See [the limit]"; the link goes to #limit-rowcount-after-nocount on the same page
+site/sqlserver.md:488	move	site/reference/databases/sqlserver/query-methods.md	-	-	position: "is a [known issue]" > "is a [limit]"; the link goes to query-methods.md#limit-wrapped-connection
+site/tool.md:48	move	site/reference/describing.md	-	-	position: "see [the generator's known issues]" > "see [a limit]"; the link goes to attributes.md#limit-source-written-as-text
+site/diagnostics.md:1777	move	site/diagnostics.md	-	-	position: "See: [Known issues]" > "See: [`Source` written as text]", the name the limit's troubleshooting entry gives it; the link goes to reference/attributes.md#limit-source-written-as-text
+site/settings.md:847	move	site/settings.md	-	-	position: "on [the generator page]" > "on [the Attributes page]"; the link goes to reference/attributes.md#attribute.  The section waits at the root for phase 7
+site/recipes.md:702	move	site/recipes.md	-	-	position: "and [known issues]" > "and [a limit]"; the link goes to guides/dapper.md#limit-parameter-names
+README.md:29	move	README.md	-	-	position: "see [known issues]" > "see [a limit]"; the link goes to reference/query-methods.html#limit-wrapped-connection
+README.md:208	move	README.md	-	-	position: "See [the known issues]" > "See [the limit]"; the link goes to reference/query-methods.html#limit-wrapped-connection
+@site/guides/troubleshooting.md:5	move	site/guides/troubleshooting.md	-	-	position: "of [settings] and [the generator]" > "of [settings]"; the link to the generator's known issues goes, since each of its limits has its entry
+-	new	site/reference/members.md	-	-	The h1 What is generated and where it goes; the anchor generator and the h2 What the generator writes
+-	new	site/reference/models.md	-	-	The h1 Models
+-	new	site/reference/model-properties.md	-	-	The h1 Model properties: names, column types, nullable, and the sentence under it that links type-mapping.md#property-types
+-	new	site/reference/query-methods.md	-	-	The h1 Query methods
+-	new	site/reference/query-methods.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/return-types.md	-	-	The h1 What a method returns (arrays, lists, streaming)
+-	new	site/reference/repositories.md	-	-	The h1 Repositories
+-	new	site/reference/connection-methods.md	-	-	The h1 Methods that take a connection (transaction, timeout)
+-	new	site/reference/collection-methods.md	-	-	The h1 Collection methods (many items in one call)
+-	new	site/reference/collection-methods.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/exceptions.md	-	-	The h1 Exceptions
+-	new	site/reference/exceptions.md#limits	-	-	The heading Limits and its anchor; the h3 of 2 limits and their anchors
+-	new	site/reference/attributes.md	-	-	The h1 Attributes
+-	new	site/reference/attributes.md#attributes	-	-	The anchor attributes, the h2 The three attributes, its sentence and its table of attribute, property and section; the links to ../settings.md#setting-source and ../settings.md#converters wait for phase 7
+-	new	site/reference/attributes.md#limits	-	-	The heading Limits and its anchor; the h3 of 2 limits and their anchors
+-	new	site/reference/type-mapping.md	-	-	The h1 How a C# type is chosen, and type overrides; phase 7 fills the page
+-	new	site/guides/dapper.md	-	-	The h1 Use Dapper or your own ADO.NET code; phases 8 and 9 fill the page
+-	new	site/guides/dapper.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/databases/sqlserver/query-methods.md#limits	-	-	The h3 of 1 limit and its anchor, limit-rowcount-after-nocount
+-	new	site/guides/troubleshooting.md	-	-	8 entries: 3 under at-run-time, 2 under wrong-model, 2 under wrong-result, 1 under not-described, one for each limit of this phase
+-	new	site/AGENTS.md	-	-	Not a user document: the row Attribute, or a property of one names reference/attributes.md; generator.md leaves the pages not yet moved; the row Setting says a setting-<name> section is on settings.md or on the reference page of what it changes (branch review R1-F2)
+-	new	tests/SqlSource.Repository.Tests/Documentation/SiteStructureTests.cs	-	-	Not a user document: generator.md leaves PagesNotYetMoved
+-	new	docs/architecture/generator.md	-	-	Not a user document: its links to the site take the pages of their anchors, and the bare page members.md; the words generator page become page on what is generated (no-loss review)
+-	new	docs/architecture/sidecar-format.md	-	-	Not a user document: the slug link settings.md#column-types becomes reference/model-properties.md#setting-column-types; #type-overrides is phase 7's
+-	new	docs/deferred/D-0002-describing-call-and-data-definition.md	-	-	Not a user document: its link takes reference/query-methods.md#which-methods
+-	new	examples/PostgresExamples/README.md	-	-	Not a user document: its links to generator.md and to the moved anchors of settings.md take their new pages, the bare page members.md; the same in examples/SqlServerExamples/README.md
+-	new	examples/PostgresExamples/Methods/OrderLineQueries.cs	-	-	Not a user document: the comments of OrderLineQueries.cs and OrderQueries.cs of both example projects name reference/query-methods.md and reference/members.md#setting-member-location
+-	new	tests/DatabaseTests/SqlServer.SyncAsync/KnownDifferences.cs	-	-	Not a user document: the comment and the message name site/reference/connection-methods.md; the quoted words stay
+-	new	src/SqlSource/Settings/AGENTS.md	-	-	Not a user document: line 16 says a setting is documented once, its section on site/settings.md or on the page of site/reference/ of what it changes (branch review R1-F2)
+-	new	site/guides/AGENTS.md	-	-	Not a user document: the rule Add no group for one page gains the exception of Other ways to use your SQL, which holds dapper.md alone until phase 8 (owner, p06 Q1, branch review R1-F3)

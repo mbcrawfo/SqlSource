@@ -46,7 +46,7 @@ The part of a `.sql` file before its first `-- name:` line.  It holds comments, 
 
 The tool's record of what the database said about each query's parameters and columns.  It is the file `Users.sql.json` beside `Users.sql`.  It is committed with the project, so that a build needs no database, and it is never edited by hand: the tool writes it.  The build checks it, and reports a query that must be described and has no current entry in it.  See [sidecar files](reference/sidecars.md#sidecar-files).
 
-The generator builds the [models](generator.md#models) and the [query method](#query-method) of a query from its entry in the sidecar.
+The generator builds the [models](reference/models.md#models) and the [query method](#query-method) of a query from its entry in the sidecar.
 
 <a id="settings-file"></a>
 
@@ -60,25 +60,25 @@ A file named `sqlsource.json` that sets [settings](settings.md#all-settings), su
 
 #### Output
 
-The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](generator.md#models), or its models and a [query method](#query-method), which by default is a [repository](#repository)'s.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
+The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](reference/models.md#models), or its models and a [query method](#query-method), which by default is a [repository](#repository)'s.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
 
 <a id="query-method"></a>
 
 #### Query method
 
-What a described query whose [output](#output) is `repository` or `methods` becomes: an asynchronous method that sends the query's parameters, runs it and reads its rows into its models, or, under the generator parameter `method-type`, a [synchronous one](generator.md#synchronous-methods) instead or beside it.  Under `repository` it is an instance method of a [repository](#repository), which gets its own connection; under `methods` it takes the connection, and opens it when it is closed.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
+What a described query whose [output](#output) is `repository` or `methods` becomes: an asynchronous method that sends the query's parameters, runs it and reads its rows into its models, or, under the generator parameter `method-type`, a [synchronous one](reference/query-methods.md#synchronous-methods) instead or beside it.  Under `repository` it is an instance method of a [repository](#repository), which gets its own connection; under `methods` it takes the connection, and opens it when it is closed.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](reference/query-methods.md#query-methods).
 
 <a id="repository"></a>
 
 #### Repository
 
-A type marked `[SqlSourceGenerate]` whose queries have the output `repository`, the default.  Each such query is an instance method of the type, which gets a connection from a member of the type, its connection source, such as a connection string or a data source, so the code that calls it passes none.  The type also gets an interface of those methods, for code that takes a repository and a test that fakes one.  See [repository methods](generator.md#repository-methods).
+A type marked `[SqlSourceGenerate]` whose queries have the output `repository`, the default.  Each such query is an instance method of the type, which gets a connection from a member of the type, its connection source, such as a connection string or a data source, so the code that calls it passes none.  The type also gets an interface of those methods, for code that takes a repository and a test that fakes one.  See [repository methods](reference/repositories.md#repository-methods).
 
 <a id="token-method"></a>
 
 #### Token method
 
-What a query with a [token](#token) becomes in place of a constant: a static method that takes the text of each token and returns the SQL with the tokens filled in.  See [token methods](generator.md#token-methods).
+What a query with a [token](#token) becomes in place of a constant: a static method that takes the text of each token and returns the SQL with the tokens filled in.  See [token methods](reference/members.md#token-methods).
 
 ### Three kinds of parameter
 
@@ -124,7 +124,7 @@ The two answer different questions.  The dialect is *which kind of SQL* a file i
 
 #### Generator
 
-The part of the `SqlSource` package that runs in the compiler and writes C# from your `.sql` files.  See [the generator](generator.md).
+The part of the `SqlSource` package that runs in the compiler and writes C# from your `.sql` files.  See [the generator](reference/members.md#generator).
 
 <a id="tool"></a>
 

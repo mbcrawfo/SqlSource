@@ -86,7 +86,7 @@ A `.sql` file that no type claims is not read, so a folder of migration scripts 
 </ItemGroup>
 ```
 
-Rules: [which files belong to a type](generator.md#files-of-a-type), [which `.sql` files are included](settings.md#included-files).
+Rules: [which files belong to a type](reference/attributes.md#files-of-a-type), [which `.sql` files are included](settings.md#included-files).
 
 <a id="use-several-databases"></a>
 
@@ -118,7 +118,7 @@ public partial class Accounting(
     [SqlSourceConnection(Database = "reports")] NpgsqlDataSource reports);
 ```
 
-Rules: [database](settings.md#setting-database), [connections](reference/connections.md#connections), [a repository's connection](generator.md#repository-connection).
+Rules: [database](settings.md#setting-database), [connections](reference/connections.md#connections), [a repository's connection](reference/repositories.md#repository-connection).
 
 <a id="queries-in-a-transaction"></a>
 
@@ -162,9 +162,9 @@ public partial interface IAccountRepository
 }
 ```
 
-A repository method takes no transaction, so the queries that run in one take the output `methods`, whose methods take the connection and the transaction, and a method of your own on the repository opens the connection, begins the transaction and calls them.  `GetAccount` runs alone, and stays a repository method.  Give every method the transaction: [the connection](generator.md#method-connection) says why.  A query that needs a command timeout takes `methods` in the same way, and its `commandTimeout`.
+A repository method takes no transaction, so the queries that run in one take the output `methods`, whose methods take the connection and the transaction, and a method of your own on the repository opens the connection, begins the transaction and calls them.  `GetAccount` runs alone, and stays a repository method.  Give every method the transaction: [the connection](reference/connection-methods.md#method-connection) says why.  A query that needs a command timeout takes `methods` in the same way, and its `commandTimeout`.
 
-Rules: [transactions and timeouts](generator.md#repository-transactions), [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [the interface](generator.md#repository-interface).
+Rules: [transactions and timeouts](reference/repositories.md#repository-transactions), [the connection](reference/connection-methods.md#method-connection), [the signature](reference/connection-methods.md#method-signature), [the interface](reference/repositories.md#repository-interface).
 
 <a id="insert-many-rows"></a>
 
@@ -189,7 +189,7 @@ AddUserDto[] added = await users.AddUser(newUsers, cancellationToken);
 
 `-- generator: collection-method` gives `AddUser` a second method, which takes the input model of every user, adds them all in one transaction of its own, 1,000 to a round trip, and returns their ids in the order of the users.  When the database refuses one, such as a user whose row breaks a constraint, it throws `CollectionItemException`, whose `ItemIndex` is that user's position, and no user is added.  The same query runs on SQL Server with `OUTPUT inserted.id` before `VALUES` in place of `RETURNING id`.  At the output `methods`, the method also takes a transaction that your code began, and runs in it.
 
-Rules: [collection methods](generator.md#collection-methods), [transactions](generator.md#collection-transactions), [`CollectionItemException`](generator.md#collection-item-exception).
+Rules: [collection methods](reference/collection-methods.md#collection-methods), [transactions](reference/collection-methods.md#collection-transactions), [`CollectionItemException`](reference/exceptions.md#collection-item-exception).
 
 <a id="run-without-awaiting"></a>
 
@@ -219,7 +219,7 @@ public int Run(int id)
 GetUserNameDto? user = await connection.GetUserNameAsync(new GetUserNameParams(id), cancellationToken: cancellationToken);
 ```
 
-`-- generator: method-type=both` gives `GetUserName` a synchronous method, `GetUserName`, which returns the row or null and takes no cancellation token, beside its asynchronous method, `GetUserNameAsync`.  `method-type=sync` gives it the synchronous method alone.  A query with [`collection-method`](generator.md#collection-methods) gets its collection method the same way, synchronous, asynchronous or both.  Write it in the file header, or in `generatorParameters` of the folder's `sqlsource.json`, for every query it reaches.  On PostgreSQL, the data source it runs on has no `Multiplexing=true`.
+`-- generator: method-type=both` gives `GetUserName` a synchronous method, `GetUserName`, which returns the row or null and takes no cancellation token, beside its asynchronous method, `GetUserNameAsync`.  `method-type=sync` gives it the synchronous method alone.  A query with [`collection-method`](reference/collection-methods.md#collection-methods) gets its collection method the same way, synchronous, asynchronous or both.  Write it in the file header, or in `generatorParameters` of the folder's `sqlsource.json`, for every query it reaches.  On PostgreSQL, the data source it runs on has no `Multiplexing=true`.
 
 ```csharp
 // The same query at the default output, repository, without -- output: methods
@@ -233,7 +233,7 @@ public int Run(int id)
 
 A repository gets the same methods, and its interface a member for each, so `users` can be the interface.  Each gets its connection from the repository: a repository whose only connection is a method that returns a task marks a second one that returns none, as [the next recipe](#connection-from-a-provider) does.
 
-Rules: [synchronous methods](generator.md#synchronous-methods), [synchronous repository methods](generator.md#synchronous-repository-methods), [generator parameters](settings.md#setting-generator-parameters).
+Rules: [synchronous methods](reference/query-methods.md#synchronous-methods), [synchronous repository methods](reference/repositories.md#synchronous-repository-methods), [generator parameters](settings.md#setting-generator-parameters).
 
 <a id="connection-from-a-provider"></a>
 
@@ -274,9 +274,9 @@ public partial class OrderRepository(IConnectionFactory connections)
 }
 ```
 
-A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [the limit](reference/databases/postgresql/query-methods.md#limit-connection-string-repository) says.  `OrderRepository`'s methods are factories: each repository method calls one, opens the connection it returns when it is closed, and disposes it, an asynchronous method `OpenAsync` and a [synchronous one](generator.md#synchronous-repository-methods) `Open`.  A type whose queries are all asynchronous needs only `OpenAsync`.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
+A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [the limit](reference/databases/postgresql/query-methods.md#limit-connection-string-repository) says.  `OrderRepository`'s methods are factories: each repository method calls one, opens the connection it returns when it is closed, and disposes it, an asynchronous method `OpenAsync` and a [synchronous one](reference/repositories.md#synchronous-repository-methods) `Open`.  A type whose queries are all asynchronous needs only `OpenAsync`.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
 
-Rules: [the connection](generator.md#repository-connection).
+Rules: [the connection](reference/repositories.md#repository-connection).
 
 <a id="sql-server-repository"></a>
 
@@ -303,7 +303,7 @@ builder.Services.AddSingleton<IOrderRepository>(
 
 Microsoft.Data.SqlClient has no data source, so a SQL Server repository takes the connection string, found by its name, `connectionString`.  Each method makes a `SqlConnection` of it, opens it, runs the query and disposes the connection, which returns it to Microsoft.Data.SqlClient's pool.  The code that uses the repository takes the generated `IOrderRepository`.
 
-Rules: [the connection](generator.md#repository-connection), [the interface](generator.md#repository-interface), [connecting to SQL Server](reference/databases/sqlserver/index.md#connecting).
+Rules: [the connection](reference/repositories.md#repository-connection), [the interface](reference/repositories.md#repository-interface), [connecting to SQL Server](reference/databases/sqlserver/index.md#connecting).
 
 <a id="strongly-typed-id"></a>
 
@@ -346,7 +346,7 @@ GetCustomerDto? customer = await customers.GetCustomer(new GetCustomerParams(cus
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
-The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The other `bigint` columns of the project keep their `long`, and the same entries work on SQL Server.  A computed column, such as `max(customer_id)`, takes the type from a [`-- column:` marker](generator.md#column-marker) inside its query.
+The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The other `bigint` columns of the project keep their `long`, and the same entries work on SQL Server.  A computed column, such as `max(customer_id)`, takes the type from a [`-- column:` marker](reference/model-properties.md#column-marker) inside its query.
 
 Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN customer_id AS bigint`, or on SQL Server an alias type, map that type with the type override, and on PostgreSQL declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
 
@@ -357,7 +357,7 @@ Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN cus
 SELECT id, name FROM customers WHERE id = @id;
 ```
 
-Rules: [column types](settings.md#setting-column-types), [giving a parameter a type](reference/parameters.md#param-marker), [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
+Rules: [column types](reference/model-properties.md#setting-column-types), [giving a parameter a type](reference/parameters.md#param-marker), [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
 
 <a id="class-in-a-json-column"></a>
 
@@ -457,7 +457,7 @@ Rules: [a class in a JSON column](settings.md#json-class), [the JSON opt-in](set
 
 ## Use the queries with Dapper or your own ADO.NET code
 
-Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under `methods` or the default, `repository`, it has a [method](generator.md#query-methods) in place of the constant, so a file whose queries you run yourself sets the output to `models`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
+Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under `methods` or the default, `repository`, it has a [method](reference/query-methods.md#query-methods) in place of the constant, so a file whose queries you run yourself sets the output to `models`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
 
 ```sql
 -- output: models
@@ -501,9 +501,9 @@ public partial class UserRepository(DbConnection connection)
 }
 ```
 
-`GetUserDto` is the generated [model](generator.md#models) of `GetUser`.  Under `models` SqlSource opens no connection and binds no value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
+`GetUserDto` is the generated [model](reference/models.md#models) of `GetUser`.  Under `models` SqlSource opens no connection and binds no value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
-Rules: [constants](generator.md#constants), [query parameters](reference/parameters.md#query-parameters), [output](settings.md#setting-output).
+Rules: [constants](reference/members.md#constants), [query parameters](reference/parameters.md#query-parameters), [output](settings.md#setting-output).
 
 <a id="models-through-dapper"></a>
 
@@ -537,7 +537,7 @@ public partial class OrderRepository(DbConnection connection)
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 ```
 
-The input model is the parameter object, and the output model is the type of a row.  The output `models` gives the queries their constants and models, and no [method](generator.md#query-methods), which the default, `repository`, or `methods` would give in place of the constant.  What makes Dapper read them, with either database:
+The input model is the parameter object, and the output model is the type of a row.  The output `models` gives the queries their constants and models, and no [method](reference/query-methods.md#query-methods), which the default, `repository`, or `methods` would give in place of the constant.  What makes Dapper read them, with either database:
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
@@ -566,7 +566,7 @@ The input model is the parameter object, and the output model is the type of a r
 
 Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).
 
-Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [known issues](generator.md#known-issues) for parameters in snake_case.
+Rules: [models](reference/models.md#models), [property names](reference/model-properties.md#property-names), [the order of the properties](reference/model-properties.md#property-order), [which properties can be null](reference/model-properties.md#model-nullability), [the `-- column:` marker](reference/model-properties.md#column-marker), [shape of a model](reference/models.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [a limit](guides/dapper.md#limit-parameter-names) for parameters in snake_case.
 
 <a id="dapper-with-postgresql"></a>
 
@@ -803,7 +803,7 @@ var counted = await reports.CountRows(table);
 
 The query's method takes the text of the token, and runs the query with the token replaced.  Under the output `sql` or `models`, the query is instead a method that returns the SQL, `Sql.CountRows(table)`, for your own code to run.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
 
-Rules: [tokens](reference/tokens.md#tokens), [the signature](generator.md#repository-signature), [token methods](generator.md#token-methods), [defaults](reference/tokens.md#token-defaults).
+Rules: [tokens](reference/tokens.md#tokens), [the signature](reference/repositories.md#repository-signature), [token methods](reference/members.md#token-methods), [defaults](reference/tokens.md#token-defaults).
 
 <a id="filter-by-a-list"></a>
 
@@ -854,7 +854,7 @@ await Should.ThrowAsync<UnexpectedRowCountException>(() => users.GetActiveUser(n
 
 The test project uses App's `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException`, whether it uses SqlSource or not, and the attributes of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
 
-Rules: [projects that share internals](generator.md#projects-that-share-internals).
+Rules: [projects that share internals](reference/exceptions.md#projects-that-share-internals).
 
 <a id="share-the-exceptions"></a>
 
@@ -894,4 +894,4 @@ catch (UnexpectedRowCountException exception)
 
 Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).  Data.Shared targets .NET 6 or later, or adds such a target to its `TargetFrameworks`, so that its `CollectionItemException` passes on `SqlState`, `IsTransient` and `BatchCommand`; on `netstandard2.0` or `netstandard2.1` alone, a data project gets [SQLSRC038](diagnostics.md#sqlsrc038).
 
-Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022), [SQLSRC038](diagnostics.md#sqlsrc038).
+Rules: [projects that share internals](reference/exceptions.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022), [SQLSRC038](diagnostics.md#sqlsrc038).

@@ -17,7 +17,7 @@ public class UserRepository { }
 
 Add `partial` to the type named in the message.
 
-See: [The attribute](generator.md#attribute)
+See: [The attribute](reference/attributes.md#attribute)
 
 ## SQLSRC002
 
@@ -34,7 +34,7 @@ file partial class UserRepository { }
 
 Remove the `file` modifier, or move the attribute to a type that is not file-local.
 
-See: [The attribute](generator.md#attribute)
+See: [The attribute](reference/attributes.md#attribute)
 
 ## SQLSRC003
 
@@ -85,7 +85,7 @@ See: [Source](settings.md#setting-source)
 
 Reported by: the build.
 
-A query whose [member location](generator.md#locations) is `nested-class` puts its members in a class nested in the type, named `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise, and the type already has a member with that name.  The message names it.  The same error is reported when the type itself, or one of its type parameters, has the name: a nested class cannot share either name.
+A query whose [member location](reference/members.md#locations) is `nested-class` puts its members in a class nested in the type, named `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and the type already has a member with that name.  The message names it.  The same error is reported when the type itself, or one of its type parameters, has the name: a nested class cannot share either name.
 
 ```csharp
 [SqlSourceGenerate]
@@ -103,7 +103,7 @@ The error is reported at the type's `[SqlSourceGenerate]`, once for each name th
 
 Rename the member, the type or the type parameter, give the nested class another name with `-- nested-class:` in the file or `nestedClass` in a settings file, or write `-- member-location: class` so that the queries become members of the type itself.
 
-See: [Where the members go](generator.md#locations)
+See: [Where the members go](reference/members.md#locations)
 
 ## SQLSRC008
 
@@ -115,7 +115,7 @@ Two `.sql` files of one type each have a query with the same name, and a type ca
 
 Rename one of the queries.
 
-See: [Which files belong to a type](generator.md#files-of-a-type)
+See: [Which files belong to a type](reference/attributes.md#files-of-a-type)
 
 ## SQLSRC009
 
@@ -123,7 +123,7 @@ See: [Which files belong to a type](generator.md#files-of-a-type)
 
 Reported by: the build.
 
-A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](generator.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise, and no query method there can have it either.  An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `both`, and a synchronous method, under `sync` or `both`, has the query's name alone, so under `both` the class can have neither name, whatever the query's shape.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
+A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](reference/members.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and no query method there can have it either.  An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `both`, and a synchronous method, under `sync` or `both`, has the query's name alone, so under `both` the class can have neither name, whatever the query's shape.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
 
 ```sql
 -- name: Sql
@@ -133,7 +133,7 @@ SELECT 1;
 
 The error is at the query's name, and the file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- nested-class:` or `-- member-location:` on it.  A query method on the type or in the extension class has no member of the class to clash with: what its name cannot be is [SQLSRC274](#sqlsrc274).
 
-See: [Where the members go](generator.md#locations)
+See: [Where the members go](reference/members.md#locations)
 
 ## SQLSRC012
 
@@ -306,7 +306,7 @@ Correct the value, or remove it.  While it is wrong the setting is not set by th
 
 The rules are in [type overrides](settings.md#setting-type-overrides).
 
-`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
+`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](reference/model-properties.md#setting-column-types).
 
 `libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime`, `netTopologySuite` or `json`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](settings.md#setting-library-types).
 
@@ -366,7 +366,7 @@ CSC : error SQLSRC022: This project sees UnexpectedRowCountException, Transactio
 
 Add a shared project that references SqlSource, needs no query, and grants `InternalsVisibleTo` to each project that uses SqlSource and sees it, this project among them.  Have those projects reference it.  Each then uses the shared project's exceptions instead of writing its own, and this project sees one copy: see [the recipe](recipes.md#share-the-exceptions).  The shared project grants `InternalsVisibleTo` to every project that catches the exceptions by type, and to every project that uses SqlSource and sees a data project's internals, the data projects' test projects among them: such a project that does not see the shared project's copy gets its own, and its `catch (UnexpectedRowCountException)` compiles but does not catch what a data project's method throws.  The error has no file and line, because it is about the project's references.
 
-See: [Projects that share internals](generator.md#projects-that-share-internals)
+See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
 ## SQLSRC023
 
@@ -382,7 +382,7 @@ CSC : error SQLSRC023: The UnexpectedRowCountException, TransactionRolledBackExc
 
 Use the same version of SqlSource in every project of the solution, for example with central package management.  The error has no file and line, because it is about the project's references.
 
-See: [Projects that share internals](generator.md#projects-that-share-internals)
+See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
 ## SQLSRC024
 
@@ -486,7 +486,7 @@ The error is at the type's `[SqlSourceGenerate]`, once for each database without
 - When the type's repository queries use more than one database, no member is found by its name or type, since nothing says which database it is for: mark one member for each, `[SqlSourceConnection(Database = "reports")]`.
 - Or set the queries' [output](settings.md#setting-output) to `methods`, whose methods take the connection as an argument.
 
-See: [The connection](generator.md#repository-connection)
+See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC029
 
@@ -529,7 +529,7 @@ public partial class UserRepository
 }
 ```
 
-See: [The connection](generator.md#repository-connection)
+See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC030
 
@@ -556,7 +556,7 @@ public partial class UserRepository
 
 The error is at the member.  Each database that no member is marked for by name gets no repository method until it is fixed.  Set the member's `Database`, `[SqlSourceConnection(Database = "main")]`, and mark a member for each other database.
 
-See: [The connection](generator.md#repository-connection)
+See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC031
 
@@ -594,7 +594,7 @@ This is a warning, since a type that keeps a member for queries whose output is 
 </PropertyGroup>
 ```
 
-See: [The connection](generator.md#repository-connection)
+See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC032
 
@@ -621,7 +621,7 @@ public partial class UserRepository
 
 The error is at the member, and the repository queries of its database, or of every database when it names none, get no method.  An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.  Mark a member of one of the shapes above.
 
-See: [The connection](generator.md#repository-connection)
+See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC033
 
@@ -644,7 +644,7 @@ public partial class OrderRepository(NpgsqlDataSource dataSource);
 
 The error is at the member, and the repository queries of that database get no method.  Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`, and mark it for the database when the type uses several.
 
-See: [The connection](generator.md#repository-connection)
+See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC034
 
@@ -667,7 +667,7 @@ public static partial class UserQueries;
 
 The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of its repository queries gets a method.  Set their [output](settings.md#setting-output) to `methods`, whose methods are static or extension methods that take the connection, or remove `static` and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
 
-See: [Repository methods](generator.md#repository-methods)
+See: [Repository methods](reference/repositories.md#repository-methods)
 
 ## SQLSRC035
 
@@ -695,7 +695,7 @@ public partial class UserRepository(NpgsqlDataSource dataSource);
 
 The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface.  Name the interface otherwise with `[SqlSourceGenerate(InterfaceName = "IUserStore")]`, rename what has the name, or turn the interface off with `GenerateInterface = false`.  To add members to the interface yourself, declare it `partial interface IUserRepository`, which the generated part joins.
 
-See: [The interface](generator.md#repository-interface), [repository interfaces](settings.md#repository-interfaces)
+See: [The interface](reference/repositories.md#repository-interface), [repository interfaces](reference/repositories.md#repository-interfaces)
 
 ## SQLSRC036
 
@@ -718,7 +718,7 @@ public partial class UserRepository(NpgsqlDataSource parameters);
 
 The error is at the parameter, and the repository queries of that database get no method.  Rename the parameter, or store it in a field or property of the type, which is then the connection, marked `[SqlSourceConnection]` when it is not found by its name or type.
 
-See: [The connection](generator.md#repository-connection)
+See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC037
 
@@ -739,7 +739,7 @@ public partial class UserRepository(NpgsqlDataSource dataSource);
 
 The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface; its repository methods are still generated.  Write the interface's name alone, such as `InterfaceName = "IUserStore"`, which is declared beside the type with the type's type parameters, or remove `InterfaceName` to get `I` and the type's name.
 
-See: [The interface](generator.md#repository-interface), [repository interfaces](settings.md#repository-interfaces)
+See: [The interface](reference/repositories.md#repository-interface), [repository interfaces](reference/repositories.md#repository-interfaces)
 
 ## SQLSRC038
 
@@ -755,7 +755,7 @@ CSC : error SQLSRC038: The CollectionItemException that this project sees in Dat
 
 Make the project that holds the exceptions target .NET 6 or later, as `<TargetFramework>net8.0</TargetFramework>`, or add such a target beside the one it has, as `<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>`: a project on .NET 6 or later then gets the build for .NET 8.  The error has no file and line, because it is about the project's references.
 
-See: [Projects that share internals](generator.md#projects-that-share-internals)
+See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
 ## SQLSRC101
 
@@ -989,7 +989,7 @@ Two settings contradict each other.  The error is at the second.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
 - Two `-- column:` markers inside one query for one column, its name compared ignoring case, of which one says `null` and the other `not null`, or which give it two C# types, `default` among them.  One may give the nullability and the other the type.
-- Two `-- column:` markers in the file header that give one key two C# types.  The key is compared as [column types](settings.md#setting-column-types) compares it, so `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` two.
+- Two `-- column:` markers in the file header that give one key two C# types.  The key is compared as [column types](reference/model-properties.md#setting-column-types) compares it, so `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` two.
 - Two `-- param:` markers for one parameter that give different types, different nullability or different C# types after `->`.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
 - Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
@@ -1174,7 +1174,7 @@ SELECT COUNT(*) FROM users;
 
 Remove the marker.
 
-See: [Name of one query's model](settings.md#setting-model-name)
+See: [Name of one query's model](reference/models.md#setting-model-name)
 
 ## SQLSRC120
 
@@ -1255,7 +1255,7 @@ See: [Parameters](reference/parameters.md#query-parameters)
 
 Reported by: the build.
 
-A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](generator.md#locations) is `extension-class`.  A query whose output is `repository` has an instance method of the type, which cannot go in the extension class or in a nested class, and its member location is `extension-class` or `nested-class`; its default, `class`, fits.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql`, `models` or `repository`.  The message names the query, the type that claims the file and where the value was written; two types that claim one file each report the error.
+A query whose output is `sql` or `models` has a constant or a token method, which cannot go in the extension class, since only a query method extends the connection, and its [member location](reference/members.md#locations) is `extension-class`.  A query whose output is `repository` has an instance method of the type, which cannot go in the extension class or in a nested class, and its member location is `extension-class` or `nested-class`; its default, `class`, fits.  The value was written on the query, in the file's header or in a settings file.  A header or a settings file's `memberLocation` reaches every query below it, whatever its output, so a folder-wide `"memberLocation": "ExtensionClass"` is this error at each query of the folder whose output is `sql`, `models` or `repository`.  The message names the query, the type that claims the file and where the value was written; two types that claim one file each report the error.
 
 ```sql
 -- member-location: extension-class
@@ -1273,7 +1273,7 @@ For a query whose output is `repository`, the message names the location that do
 
 The error is at the query's `-- member-location:` marker when it has one, and at its name otherwise, and the file produces no members and no models for the type until it is fixed.  Write `-- member-location: class` or `-- member-location: nested-class` on the query, or keep `extension-class` to the files and folders whose queries are all `methods`; a `repository` query takes only `class`.
 
-See: [Where the members go](generator.md#locations)
+See: [Where the members go](reference/members.md#locations)
 
 ## SQLSRC123
 
@@ -1281,7 +1281,7 @@ See: [Where the members go](generator.md#locations)
 
 Reported by: the build.
 
-A query's visibility and its [member location](generator.md#locations) together are something C# cannot write.  The message names the query, the type that claims the file, the visibility, where it was written, or that it is the default of the `repository` output, the member location and the reason, one of these:
+A query's visibility and its [member location](reference/members.md#locations) together are something C# cannot write.  The message names the query, the type that claims the file, the visibility, where it was written, or that it is the default of the `repository` output, the member location and the reason, one of these:
 
 - the member location is `extension-class` and the visibility `private` or `protected`: the extension class is a class of the namespace, and its methods are public or internal;
 - the member location is `extension-class` and the visibility `public`, the type is not public, or a type around it is not, and the query's method takes or returns a model, as one with parameters or rows does: the type's models are internal then, and a public method cannot take them.  A query method with no parameters and no rows takes no models and fits, and so does one whose models the type shares with a public type, which makes them public;
@@ -1324,7 +1324,7 @@ A repository method that writes no visibility is `public`, the default of the `r
 
 Write `-- visibility: internal` on the query, or in the file header for every query of the file.  A repository method is always on the type, so the message of a repository query says to write `-- visibility:` alone.
 
-See: [Where the methods go](generator.md#method-location)
+See: [Where the methods go](reference/connection-methods.md#method-location)
 
 ## SQLSRC124
 
@@ -1340,7 +1340,7 @@ Queries of one type, in one file or in two, put their members in one nested clas
 
 The error is at the query that writes the second visibility, at its `-- visibility:` marker when it has one, else at its name.  Every file of the type with a query in that class produces no members and no models for the type until it is fixed, since neither visibility is more right than the other; two nested classes of one type, each of its own visibility, are fine.  Write one visibility for the class, or write it for one query and leave it to the others, or give the queries of the other visibility a class of their own with `-- nested-class:`, or put them on the type with `-- member-location: class`.
 
-See: [Name of the nested class](settings.md#setting-nested-class)
+See: [Name of the nested class](reference/members.md#setting-nested-class)
 
 ## SQLSRC125
 
@@ -1348,7 +1348,7 @@ See: [Name of the nested class](settings.md#setting-nested-class)
 
 Reported by: the build.
 
-A query whose output is `sql` or `models` and whose [member location](generator.md#locations) is `class` has its constant or token method on the type, and its name is taken: the type declares a member, a nested type or a type parameter of that name, or another query of the type puts its members in a nested class of that name.  A type cannot have two members of one name, and a token method cannot overload a method of yours of the same name, even with other parameters.  The message names the query, the type and what has the name.
+A query whose output is `sql` or `models` and whose [member location](reference/members.md#locations) is `class` has its constant or token method on the type, and its name is taken: the type declares a member, a nested type or a type parameter of that name, or another query of the type puts its members in a nested class of that name.  A type cannot have two members of one name, and a token method cannot overload a method of yours of the same name, even with other parameters.  The message names the query, the type and what has the name.
 
 ```sql
 -- name: Sql
@@ -1381,7 +1381,7 @@ public partial class UserRepository
 
 The error is at the query's name, and its file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- member-location: nested-class` on it; for a nested class of the type's queries you can also give that class another name with `-- nested-class:`.  A query named like the type itself is [SQLSRC009](#sqlsrc009), and a query method on the type that would take a name the type has is [SQLSRC274](#sqlsrc274).
 
-See: [Where the members go](generator.md#locations)
+See: [Where the members go](reference/members.md#locations)
 
 ## SQLSRC126
 
@@ -1598,7 +1598,7 @@ internal static partial class Queries;
 
 Write the value where the attribute is: `Source = "Queries"`.  A constant, `nameof`, a concatenation and an interpolated string are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
 
-See: [Known issues](generator.md#known-issues)
+See: [`Source` written as text](reference/attributes.md#limit-source-written-as-text)
 
 ## SQLSRC209
 
@@ -2637,7 +2637,7 @@ Reported by: the build.
 
 The error is at the name of each query that has a column or a parameter the type is chosen for.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.
 
-A C# type that you chose cannot be found.  It is a type that the [type override](settings.md#setting-type-overrides) gives a database type, that the [column types](settings.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
+A C# type that you chose cannot be found.  It is a type that the [type override](settings.md#setting-type-overrides) gives a database type, that the [column types](reference/model-properties.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC250: 'uuid' is mapped to 'MyApp.UserKey' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and no type of that name is found, or more than one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
@@ -2646,7 +2646,7 @@ A C# type that you chose cannot be found.  It is a type that the [type override]
 
 Write the name of a type that the project has, with its type arguments: `UserKey`, `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  For a short name that several types have, write the full name, from its namespace, of the one you mean: `MyApp.UserId`.  A nested type is written with its full name, with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the full name that the project can see, map to a type of the project's own, which is always chosen first.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
+See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC251
 
@@ -2664,7 +2664,7 @@ A C# type that you chose, by the type override, the column types or a marker, ca
 
 Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, as [accessibility](generator.md#model-accessibility) says, and a `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.
+The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, as [accessibility](reference/models.md#model-accessibility) says, and a `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC251: 'uuid' is mapped to 'App.UserKey' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
@@ -2672,7 +2672,7 @@ The same error is reported when the type is not `public` and the model that woul
 
 Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then.  Under the output `models` the query's constant or token method still is; under `methods` or `repository` the query gets no method.
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
+See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC252
 
@@ -2690,7 +2690,7 @@ A C# type that you chose, by the type override, the column types or a marker, is
 
 Choose another C# type.  For `System.Nullable<T>`, choose `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  For a generic type, give it type arguments that meet the constraints of its declaration.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
+See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC253
 
@@ -2720,7 +2720,7 @@ SELECT id, price * quantity AS total FROM order_lines;
 
 Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Property names](generator.md#property-names)
+See: [Property names](reference/model-properties.md#property-names)
 
 ## SQLSRC254
 
@@ -2750,7 +2750,7 @@ SELECT id, "unit-price" AS unit_price FROM order_lines;
 
 Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Property names](generator.md#property-names)
+See: [Property names](reference/model-properties.md#property-names)
 
 ## SQLSRC255
 
@@ -2780,7 +2780,7 @@ SELECT u.id AS user_id, o.id AS order_id FROM users u JOIN orders o ON o.user_id
 
 Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Property names](generator.md#property-names)
+See: [Property names](reference/model-properties.md#property-names)
 
 ## SQLSRC256
 
@@ -2809,9 +2809,9 @@ Give the column an alias, or rename the parameter, then run `dotnet sqlsource de
 SELECT id, to_string AS display_name FROM users;
 ```
 
-For a property named as its model, you can instead give the model [another name](settings.md#setting-model-name).  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+For a property named as its model, you can instead give the model [another name](reference/models.md#setting-model-name).  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Property names](generator.md#property-names)
+See: [Property names](reference/model-properties.md#property-names)
 
 ## SQLSRC257
 
@@ -2835,7 +2835,7 @@ SELECT id, name, email FROM users WHERE id = @id;
 SELECT id, name FROM users;
 ```
 
-Give one of the two queries [another model name](settings.md#setting-model-name), or make the two models the same, then run `dotnet sqlsource describe` if you changed a query:
+Give one of the two queries [another model name](reference/models.md#setting-model-name), or make the two models the same, then run `dotnet sqlsource describe` if you changed a query:
 
 ```sql postgres
 -- name: GetUser
@@ -2849,7 +2849,7 @@ SELECT id, name FROM users;
 
 The earlier query's model is still generated, and the later query has no model of that kind until the two agree.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Shared models](generator.md#shared-models)
+See: [Shared models](reference/models.md#shared-models)
 
 ## SQLSRC258
 
@@ -2862,7 +2862,7 @@ The error is at the name of each query that would have the model.
 A model's full name is one that a generated type cannot have, because the code would not compile or would be warned on:
 
 - a type of the project has the full name, the type that carries `[SqlSourceGenerate]` among them;
-- it is a namespace of the project, or a part of the model's namespace is a type of the project, as a [model namespace](settings.md#setting-model-namespace) of `App.Queries` beside a class `App.Queries`;
+- it is a namespace of the project, or a part of the model's namespace is a type of the project, as a [model namespace](reference/models.md#setting-model-namespace) of `App.Queries` beside a class `App.Queries`;
 - it is the namespace of another model, or a part of its namespace is another model, as `App.Data` beside `App.Data.Row`, which reports both;
 - its name is lower-case ASCII letters alone, as `usersdto`, which the compiler warns on, since such a name could become a keyword.
 
@@ -2878,7 +2878,7 @@ The model is not generated, and each query that would have it is told.  The mess
 SELECT id, name FROM users;
 ```
 
-Give the query [another model name](settings.md#setting-model-name), or set another [model namespace](settings.md#setting-model-namespace):
+Give the query [another model name](reference/models.md#setting-model-name), or set another [model namespace](reference/models.md#setting-model-namespace):
 
 ```sql postgres
 -- name: GetUsers
@@ -2888,7 +2888,7 @@ SELECT id, name FROM users;
 
 Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Names that cannot be used](generator.md#unusable-model-names)
+See: [Names that cannot be used](reference/models.md#unusable-model-names)
 
 ## SQLSRC259
 
@@ -2912,7 +2912,7 @@ DELETE FROM users WHERE id = @id;
 
 Remove the marker.  To read the rows the statement changes instead, add a `RETURNING` clause, or on SQL Server an `OUTPUT` clause, and run `dotnet sqlsource describe`.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Which queries get models](generator.md#which-models)
+See: [Which queries get models](reference/models.md#which-models)
 
 ## SQLSRC260
 
@@ -2947,7 +2947,7 @@ SELECT sum(amount) AS total, max(note) AS note FROM payments;
 
 Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Setting a column's nullability or type with a marker](generator.md#column-marker)
+See: [Setting a column's nullability or type with a marker](reference/model-properties.md#column-marker)
 
 ## SQLSRC261
 
@@ -3257,7 +3257,7 @@ CSC : error SQLSRC273: A query for PostgreSQL has the output methods or reposito
 
 Reference the package from the project: `Npgsql` 8.0 or later for PostgreSQL, `Microsoft.Data.SqlClient` 6.1 or later for SQL Server.  A project that runs its queries some other way, with Dapper on a connection that a package of its own brings, sets the output to `models`, which gives the SQL and the models without the methods.  The error has no file and line, because it is about the project's references, and it is reported once for the project and database, however many of its queries have the output `methods` or `repository`.  The models are still generated.
 
-See: [Query methods](generator.md#query-methods)
+See: [Query methods](reference/query-methods.md#query-methods)
 
 ## SQLSRC274
 
@@ -3269,7 +3269,7 @@ If several types claim the query's file, the query gets this error once.  A caus
 
 The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  Under the generator parameter [`method-type`](settings.md#setting-generator-parameters) a synchronous method has the query's name alone, and under `both` an asynchronous method always has `Async` after it, whatever `async-method-suffix` says, so that it never has the name of the synchronous method beside it.  Each name of a query's methods is checked, and the message names the one that is taken; a query with one taken gets none of its methods, but for a clash with a method of another type in an extension class, the last case below, which leaves out its methods of that name alone.  It is taken when it is:
 
-- under the [member location](generator.md#locations) `extension-class`, the default of the output `methods`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
+- under the [member location](reference/members.md#locations) `extension-class`, the default of the output `methods`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
 - for a `repository` query, also the name of the member of a base type, or the primary-constructor parameter, that its method gets its connection from, which the method would hide;
 - for a synchronous method of a `repository` query that takes no argument, which is one with no parameters and no tokens, also the name `Finalize`, since a method of that name and no argument would be taken for the type's finalizer, and the compiler warns of it; the query's asynchronous method, which takes a cancellation token, and a synchronous method that takes a parameter or a token are not refused;
@@ -3286,7 +3286,7 @@ The message names the query, the method's name and what takes it.
 
 Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For a query `Get` under `async-method-suffix` beside a query `GetAsync` without it, or for `Get` and `GetAsync` under `method-type=both`, rename one of them.  For the methods of two types, rename one of the queries, or write `-- member-location: class` in the files of one of the types to put its methods on the type itself.  The error is reported at the query's name, and the query's models are still generated.
 
-See: [Query methods](generator.md#query-methods)
+See: [Query methods](reference/query-methods.md#query-methods)
 
 ## SQLSRC275
 
@@ -3310,7 +3310,7 @@ A token of a `repository` query also cannot take the name of what its method get
 
 Rename the token, everywhere the query writes it and in its `-- token:` marker, or, for a `repository` query, rename the parameter.  The error is reported at the query's name, once for each such token, and the query's models are still generated.
 
-See: [Query methods](generator.md#query-methods)
+See: [Query methods](reference/query-methods.md#query-methods)
 
 ## SQLSRC276
 
@@ -3318,7 +3318,7 @@ See: [Query methods](generator.md#query-methods)
 
 Reported by: the build.
 
-Under the [member location](generator.md#locations) `extension-class`, the default of the output `methods`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
+Under the [member location](reference/members.md#locations) `extension-class`, the default of the output `methods`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
 
 - the project already has a type of the class's full name, or a namespace of it, such as a class `App.SampleExtensions` that you wrote;
 - SqlSource writes a model of that full name, named by `-- output-model:` or `-- input-model:`, or by a query's name and a suffix, or a model in a namespace of that name;
@@ -3332,7 +3332,7 @@ Two types of one accessibility that give one class share it, each writing a part
 
 Rename the type, or the type, namespace or model that has the class's name, or give the methods of the two types one widest visibility.  Or write `-- member-location: class` in the type's files, which puts the methods on the type itself and needs no extension class.  The error is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class, and the type's models are still generated.
 
-See: [Query methods](generator.md#query-methods)
+See: [Query methods](reference/query-methods.md#query-methods)
 
 ## SQLSRC277
 
@@ -3509,7 +3509,7 @@ is_global = true
 dotnet_diagnostic.SQLSRC284.severity = none
 ```
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
+See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC285
 
@@ -3747,9 +3747,9 @@ A query that turns on the `collection-method` generator parameter, and has param
 /work/App/Queries/Users.sql(2,10): error SQLSRC297: The query 'AddUser' asks for the transaction isolation level 'snapshot', which PostgreSQL does not have
 ```
 
-Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, `on`, which begins the transaction at the database's default level, or `off`, which begins none.  The query keeps its own method; only its [collection method](generator.md#collection-methods) is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
+Write a level the database has: `read-committed`, `repeatable-read` or `serializable`, `on`, which begins the transaction at the database's default level, or `off`, which begins none.  The query keeps its own method; only its [collection method](reference/collection-methods.md#collection-methods) is not generated until it is fixed.  A query without `collection-method`, or without parameters, is not reported, whatever `transaction` says.
 
-See: [A collection method's transactions](generator.md#collection-transactions)
+See: [A collection method's transactions](reference/collection-methods.md#collection-transactions)
 
 ## SQLSRC298
 
@@ -3759,15 +3759,15 @@ Reported by: the build.
 
 The error is at the query's name, once for the query.
 
-A query whose output is `methods` or `repository` streams its rows, with the [collection type](settings.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`, and the generator parameter [`method-type`](settings.md#setting-generator-parameters) is `sync`.  A stream reads each row as the caller asks for it, which only an asynchronous method can do, so there is no synchronous one.  The message names the query.
+A query whose output is `methods` or `repository` streams its rows, with the [collection type](reference/return-types.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`, and the generator parameter [`method-type`](settings.md#setting-generator-parameters) is `sync`.  A stream reads each row as the caller asks for it, which only an asynchronous method can do, so there is no synchronous one.  The message names the query.
 
 ```console
 /work/App/Queries/Users.sql(3,10): error SQLSRC298: The query 'ListUsers' streams its rows as an IAsyncEnumerable, which has no synchronous method; give it method-type=async or method-type=both
 ```
 
-Write `-- generator: method-type=async` in the query, or `method-type=both`, under which it keeps its stream, named with `Async` after the query's name, and gets no synchronous method, but for a synchronous [collection method](generator.md#collection-methods) when it has one.  Or give it a collection type that is read whole, such as `List`, which a synchronous method can return.  The query gets no method, and no [collection method](generator.md#collection-methods) either, until it is fixed; its models are still generated.  A query of another shape is not reported, whatever its collection type.
+Write `-- generator: method-type=async` in the query, or `method-type=both`, under which it keeps its stream, named with `Async` after the query's name, and gets no synchronous method, but for a synchronous [collection method](reference/collection-methods.md#collection-methods) when it has one.  Or give it a collection type that is read whole, such as `List`, which a synchronous method can return.  The query gets no method, and no [collection method](reference/collection-methods.md#collection-methods) either, until it is fixed; its models are still generated.  A query of another shape is not reported, whatever its collection type.
 
-See: [Collection type](settings.md#setting-collection-type)
+See: [Collection type](reference/return-types.md#setting-collection-type)
 
 ## SQLSRC299
 
@@ -3777,7 +3777,7 @@ Reported by: the build.
 
 The error is at the query's name, once for the query, beside its other errors.  A query that has no entry in its sidecar yet gets [SQLSRC241](#sqlsrc241), not this error.  It gets this error once it is described, as it gets the other errors about its method.  Its models are still generated.
 
-A query whose output is `repository` would have a [synchronous method](generator.md#synchronous-methods), under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `sync` or `both`, but the one member that gives its database's connection is a method that returns a `Task` or `ValueTask` of a connection, which a synchronous method cannot call.  The message names the query, the database, the type and the member.
+A query whose output is `repository` would have a [synchronous method](reference/query-methods.md#synchronous-methods), under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `sync` or `both`, but the one member that gives its database's connection is a method that returns a `Task` or `ValueTask` of a connection, which a synchronous method cannot call.  The message names the query, the database, the type and the member.
 
 ```csharp
 [SqlSourceGenerate]
@@ -3794,6 +3794,6 @@ public partial class UserRepository
 
 Mark a second member `[SqlSourceConnection]` beside it that returns no task: a connection string, a data source, a connection, or a method that returns a connection.  The synchronous methods then get their connection from it, and the asynchronous methods keep the one that returns a task.  Or write `-- generator: method-type=async` in the query, which then has no synchronous method.
 
-Under `method-type=both` the query keeps its asynchronous method, and its asynchronous [collection method](generator.md#collection-methods) when it has one, on the type and in its interface; only the synchronous ones are not generated until it is fixed.  Under `sync` the query gets no method.  A query under `method-type=async` is not reported.
+Under `method-type=both` the query keeps its asynchronous method, and its asynchronous [collection method](reference/collection-methods.md#collection-methods) when it has one, on the type and in its interface; only the synchronous ones are not generated until it is fixed.  Under `sync` the query gets no method.  A query under `method-type=async` is not reported.
 
-See: [Synchronous repository methods](generator.md#synchronous-repository-methods)
+See: [Synchronous repository methods](reference/repositories.md#synchronous-repository-methods)
