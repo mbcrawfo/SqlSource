@@ -2,6 +2,8 @@
   items:
     - name: Pass a list of values (IN)
       href: lists.md
+    - name: Fix a nullable property
+      href: nullability.md
     - name: Choose a table or a clause at run time
       href: dynamic-sql.md
 - name: Running queries
