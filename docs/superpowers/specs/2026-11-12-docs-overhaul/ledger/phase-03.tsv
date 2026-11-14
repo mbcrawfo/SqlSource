@@ -1,0 +1,82 @@
+# base 819169d1651d3ce0401fa0ba8ca22c75dc696c63
+unit	disposition	to	arg	words	note
+site/README.md:1-3	move	site/index.md	-	-	Line 3 moves whole; phase 10 corrects its second sentence (C-06)
+site/README.md:5-56	move	site/index.md#find-what-you-need	-	-	-
+site/README.md:57	move-split	-	-	-	The eight links to known issues become one link to guides/troubleshooting.md
+site/README.md:57/1	move	site/index.md#find-what-you-need	-	| Find a problem that is not an error |	The cell is one link, Troubleshooting
+site/README.md:57/2	move	site/guides/troubleshooting.md	-	*	The links to the known issues of settings, the generator, the tool, PostgreSQL and SQL Server, in its one sentence that links known issues
+site/README.md:57/3	restated-from	-	site/guides/troubleshooting.md#wrong-model	*	The links to the known issues of .sql files, parameters and tokens and dialects: their limits and pointers are entries of guides/troubleshooting.md
+@site/README.md:57	move	site/index.md#find-what-you-need	-	-	The row that phase 2 added for errors.md, now linking reference/errors.md
+site/README.md:107-111	move	site/index.md#the-three-parts	-	-	-
+site/README.md:112	move	site/index.md#the-three-parts	-	-	Links reference/parameters.md, and its last word, tokens, gains a link to reference/tokens.md
+site/README.md:113	move	site/index.md#the-three-parts	-	-	Links reference/dialects.md, and the words which databases can be described gain a link to reference/databases/index.md#database-support
+site/README.md:114-119	move	site/index.md#the-three-parts	-	-	-
+@site/README.md:72	move	site/index.md#the-three-parts	-	-	The bullet that phase 2 added for errors.md, now linking reference/errors.md
+-	new	site/index.md	-	-	The anchors find-what-you-need and the-three-parts
+@site/errors.md	move	site/reference/errors.md	-	-	Written by phase 2; only its links change
+site/sql-files.md:1-14	move	site/reference/sql-files.md	-	-	-
+site/sql-files.md:16	merge-pair	site/reference/sql-files.md#marker	MP-10	-	-
+-	new	site/reference/sql-files.md#marker	-	-	The heading What a marker is and its anchor marker
+site/sql-files.md:20-47	move	site/reference/sql-files.md#marker-index	-	-	-
+site/sql-files.md:51-69	move	site/reference/sql-files.md#queries-and-names	-	-	-
+site/sql-files.md:73-95	move	site/reference/sql-files.md#result-shapes	-	-	-
+site/sql-files.md:99-112	move	site/reference/sql-files.md#summaries	-	-	-
+site/sql-files.md:116-134	move	site/reference/sql-files.md#the-file-header	-	-	-
+site/sql-files.md:138-147	move	site/reference/sql-files.md#a-file-with-no-name	-	-	-
+site/sql-files.md:151-160	move	site/reference/sql-files.md#generated-sql	-	-	-
+site/sql-files.md:164-192	move	site/reference/sql-files.md#markers-in-the-wrong-place	-	-	-
+site/sql-files.md:194	move	site/reference/sql-files.md#markers-in-the-wrong-place	fact	-	Word for word, but its last sentence gains a link to errors.md#what-an-error-costs, the owner of the rule that the paragraph states
+-	new	site/reference/sql-files.md#markers-in-the-wrong-place	-	-	The words what an error costs in the last sentence of sql-files.md:194, linked to errors.md#what-an-error-costs
+site/sql-files.md:198	move-split	-	-	-	The heading Known issues goes; its one bullet is the limit limit-file-in-two-projects of reference/sidecars.md, and the anchor known-issues retires
+site/sql-files.md:200	merge-pair	site/reference/sidecars.md#limit-file-in-two-projects	MP-08	-	Still a bullet, under its h3
+-	new	site/reference/sidecars.md	-	-	The h1 Sidecar files and the sentence that points to tool.md#sidecar-files for what a sidecar is; phase 5 removes the sentence
+-	new	site/reference/sidecars.md#limits	-	-	The heading Limits and its anchor limits; the h3 of limit-file-in-two-projects and its anchor
+site/parameters-and-tokens.md:1	move-split	-	-	-	The heading Parameters and tokens goes: reference/parameters.md and reference/tokens.md each have their own h1
+site/parameters-and-tokens.md:3-18	move	site/reference/tokens.md#token-or-parameter	-	-	-
+site/parameters-and-tokens.md:22-37	move	site/reference/parameters.md#query-parameters	-	-	-
+site/parameters-and-tokens.md:41-66	move	site/reference/parameters.md#param-marker	-	-	-
+site/parameters-and-tokens.md:70-98	move	site/reference/parameters.md#list-parameters	-	-	The link of line 91 to #known-issues goes to sqlserver.md#known-issues until phase 4
+site/parameters-and-tokens.md:102-113	move	site/reference/parameters.md#list-padding	-	-	-
+site/parameters-and-tokens.md:117-125	move	site/reference/parameters.md#list-limit	-	-	-
+site/parameters-and-tokens.md:129-142	move	site/reference/parameters.md#declared-variables	-	-	-
+site/parameters-and-tokens.md:146-155	move	site/reference/parameters.md#names-read-as-parameters	-	-	-
+site/parameters-and-tokens.md:156	move	site/reference/parameters.md#names-read-as-parameters	-	-	position: "See known issues" > "See limits"; the link goes to #limit-parameter-taken-for-a-variable
+site/parameters-and-tokens.md:160-185	move	site/reference/tokens.md#tokens	-	-	-
+site/parameters-and-tokens.md:189	move	site/reference/tokens.md#token-defaults	-	-	h3 to h2, as the map lists it
+site/parameters-and-tokens.md:191-209	move	site/reference/tokens.md#token-defaults	-	-	-
+site/parameters-and-tokens.md:213	move	site/reference/tokens.md#token-marker	-	-	h4 to h3, as the map lists it
+site/parameters-and-tokens.md:215-222	move	site/reference/tokens.md#token-marker	-	-	-
+site/parameters-and-tokens.md:226	move	site/reference/tokens.md#token-ignore	-	-	h3 to h2, as the map lists it
+site/parameters-and-tokens.md:228-238	move	site/reference/tokens.md#token-ignore	-	-	-
+site/parameters-and-tokens.md:242	move	site/reference/tokens.md#token-validation	-	-	h3 to h2, as the map lists it
+site/parameters-and-tokens.md:244-254	move	site/reference/tokens.md#token-validation	-	-	-
+site/parameters-and-tokens.md:258	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires: its first bullet is a limit of reference/parameters.md, and the other two are pointers that go
+site/parameters-and-tokens.md:260	move	site/reference/parameters.md#limit-parameter-taken-for-a-variable	-	-	Still a bullet, under its h3
+site/parameters-and-tokens.md:261	restated-from	-	site/reference/parameters.md#names-read-as-parameters	-	A pointer: the section has the rows for a user variable and for a procedure's parameter; guides/troubleshooting.md#wrong-model has its entry
+site/parameters-and-tokens.md:262	restated-from	-	site/sqlserver.md#known-issues	-	A pointer to the bullet of sqlserver.md 555-565, which phase 4 makes a limit; line 91 links it there
+-	new	site/reference/parameters.md	-	-	The h1 and the first paragraph, which links tokens.md#token-or-parameter
+-	new	site/reference/parameters.md#limits	-	-	The heading Limits and its anchor limits; the h3 of limit-parameter-taken-for-a-variable and its anchor
+-	new	site/reference/tokens.md	-	-	The h1
+-	new	site/reference/tokens.md#token-or-parameter	-	-	The heading Token or parameter and its anchor token-or-parameter
+site/dialects.md:1-14	move	site/reference/dialects.md	-	-	-
+site/dialects.md:15	move	site/reference/dialects.md	-	-	Its definition of the dialect is in merges/MP-10.md
+-	new	site/reference/dialects.md	-	-	The first paragraph: set postgres or mssql and stop reading
+site/dialects.md:19-38	move	site/reference/dialects.md#choosing-a-dialect	-	-	-
+site/dialects.md:42-76	move	site/reference/dialects.md#dialect-options	-	-	-
+site/dialects.md:80-101	move	site/reference/dialects.md#what-a-dialect-changes	-	-	-
+site/dialects.md:105-107	move	site/reference/dialects.md#markers-under-mysql	-	-	-
+site/dialects.md:111-128	move	site/reference/dialects.md#still-read-differently	-	-	-
+site/dialects.md:132	move	site/reference/databases/index.md#database-support	-	-	-
+site/dialects.md:134-143	merge-pair	site/reference/databases/index.md#database-support	MP-23	-	-
+site/dialects.md:145	move-split	-	-	-	Sentences 1 to 3 stay with the table; sentences 4 and 5, on DuckDB, go to databases/other.md
+site/dialects.md:145/1	move	site/reference/databases/index.md#database-support	-	Every dialect is read, and the queries of every `.sql` file whose output is `sql` or `models` get their constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases marked Yes.	Sentences 1 to 3
+site/dialects.md:145/2	move	site/reference/databases/other.md#duckdb	-	A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models`, `methods` or `repository`, and the build asks for its entries, so give a DuckDB file the output `sql`: see the output setting.	Sentences 4 and 5
+site/dialects.md:147	move	site/reference/databases/other.md#not-described	-	-	-
+site/dialects.md:151	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires; its one bullet is a pointer that goes
+site/dialects.md:153	restated-from	-	site/reference/dialects.md#still-read-differently	-	A pointer: the section is the list; guides/troubleshooting.md#wrong-result has its entry
+-	new	site/reference/databases/index.md	-	-	The h1 Supported databases and versions
+-	new	site/reference/databases/other.md	-	-	The h1 Other databases and its opening sentence, which gives every row marked No and one of them their referents
+-	new	site/reference/databases/other.md#not-described	-	-	The heading Databases that are not described and its anchor
+-	new	site/reference/databases/other.md#which-dialect	-	-	The heading Which dialect to set, its anchor, and the sentence that points to dialects.md#choosing-a-dialect
+-	new	site/reference/databases/other.md#duckdb	-	-	The heading DuckDB and its anchor
+-	new	site/guides/troubleshooting.md	-	-	The whole page: its title, two sentences, the six h2 headings with their anchors, and four entries: two limits and two pointers
