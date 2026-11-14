@@ -39,7 +39,8 @@ public sealed partial class SiteTocTests
 
     // Fails when a problem of a nested set of toc.yml files, a folder with none, a gone page, a page named twice, a
     // toc.yml that two entries lead to, a page listed nowhere or a toc.yml that no entry leads to, goes unreported, or
-    // when the landing page, which no toc.yml lists, is reported.
+    // when the landing page, which no toc.yml lists, is reported, or another index.md, which a toc.yml must list, is
+    // not.
     [Fact]
     public void Problems_OfANestedSet_AreFound()
     {
@@ -60,11 +61,12 @@ public sealed partial class SiteTocTests
             $"{MadeUpFolder}/page.md",
             $"{MadeUpFolder}/twice.md",
             $"{MadeUpFolder}/none.md",
+            $"{MadeUpFolder}/index.md",
         ];
 
         var problems = Problems(tocs, pages);
 
-        problems.Count.ShouldBe(6);
+        problems.Count.ShouldBe(7);
         problems.ShouldContain(problem =>
             problem.Contains("site/b/toc.yml") && problem.Contains("more than one entry")
         );
@@ -76,6 +78,9 @@ public sealed partial class SiteTocTests
         );
         problems.ShouldContain(problem =>
             problem.Contains($"{MadeUpFolder}/none.md") && problem.Contains("no toc.yml")
+        );
+        problems.ShouldContain(problem =>
+            problem.Contains($"{MadeUpFolder}/index.md") && problem.Contains("no toc.yml")
         );
     }
 

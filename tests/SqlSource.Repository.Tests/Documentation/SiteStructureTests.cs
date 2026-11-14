@@ -28,6 +28,10 @@ public sealed partial class SiteStructureTests
 
     private const string Troubleshooting = "site/guides/troubleshooting.md";
 
+    // The folder of the made-up page of a test, written so that InboundSiteReferenceTests does not read it as a
+    // reference to a page of the site.
+    private const string MadeUpFolder = "site/a";
+
     private static readonly IReadOnlyList<string> RootPages = ["index.md", "diagnostics.md"];
 
     private static readonly IReadOnlyList<string> Folders = ["start", "guides", "reference"];
@@ -84,6 +88,53 @@ public sealed partial class SiteStructureTests
             .ShouldBeEmpty();
     }
 
+    // Fails when an h3 under a `## Limits` heading, on any page, does not stand under its own `limit-` anchor: a limit
+    // with no such anchor could have no row in site/guides/troubleshooting.md and pass the test above.
+    [Fact]
+    public void Limits_EachStandsUnderALimitAnchor() =>
+        UserDocs
+            .SitePages.SelectMany(page => UnanchoredLimits(page, File.ReadAllLines(RepositoryRoot.Path(page))))
+            .ShouldBeEmpty();
+
+    // Fails when UnanchoredLimits misses an h3 of `## Limits` with no anchor, or with an anchor that does not start
+    // with `limit-`, or reports one that has its anchor, an h3 under another h2, or a line inside a fenced block.
+    [Fact]
+    public void UnanchoredLimits_OfMadeUpLines_AreFound() =>
+        UnanchoredLimits(
+                $"{MadeUpFolder}/page.md",
+                [
+                    "## Other",
+                    "",
+                    "### Not a limit",
+                    "",
+                    "<a id=\"limits\"></a>",
+                    "",
+                    "## Limits",
+                    "",
+                    "<a id=\"limit-ok\"></a>",
+                    "",
+                    "### Has its anchor",
+                    "",
+                    "### No anchor",
+                    "",
+                    "<a id=\"list-in-aggregate\"></a>",
+                    "",
+                    "### Another anchor",
+                    "",
+                    "```sql fragment",
+                    "### inside a block",
+                    "```",
+                    "",
+                    "## After",
+                    "",
+                    "### Not a limit either",
+                ]
+            )
+            .ShouldBe([
+                $"{MadeUpFolder}/page.md:13: the limit '### No anchor' stands under no <a id=\"limit-...\"> line",
+                $"{MadeUpFolder}/page.md:17: the limit '### Another anchor' stands under no <a id=\"limit-...\"> line",
+            ]);
+
     // Fails when the reading finds no site/index.md or troubleshooting page, no page with `## Limits`, fewer than two
     // `limit-` anchors, or no link of the troubleshooting page: a reading that finds nothing would make the tests above
     // pass.
@@ -119,6 +170,51 @@ public sealed partial class SiteStructureTests
             }),
         ];
 
+    // Each h3 of a `## Limits` section, outside fenced blocks, whose last line above that is not blank is not a
+    // `limit-` anchor: one problem for each, with its line.
+    internal static IReadOnlyList<string> UnanchoredLimits(string page, IReadOnlyList<string> lines)
+    {
+        var problems = new List<string>();
+        var fenced = false;
+        var inLimits = false;
+        var above = "";
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var line = lines[index];
+            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                fenced = !fenced;
+            }
+            else if (!fenced && line.StartsWith('#'))
+            {
+                if (LimitsHeading().IsMatch(line))
+                {
+                    inLimits = true;
+                }
+                else if (line.StartsWith("### ", StringComparison.Ordinal))
+                {
+                    if (inLimits && !LimitAnchorLine().IsMatch(above))
+                    {
+                        problems.Add(
+                            $"{page}:{index + 1}: the limit '{line}' stands under no <a id=\"limit-...\"> line"
+                        );
+                    }
+                }
+                else if (!line.StartsWith("####", StringComparison.Ordinal))
+                {
+                    inLimits = false;
+                }
+            }
+
+            if (line.Trim().Length > 0)
+            {
+                above = line.Trim();
+            }
+        }
+
+        return problems;
+    }
+
     private static List<(string Path, string Anchor)> LimitAnchors() =>
         [
             .. UserDocs.SitePages.SelectMany(page =>
@@ -141,4 +237,7 @@ public sealed partial class SiteStructureTests
 
     [GeneratedRegex(@"^##\s+Limits\s*$")]
     private static partial Regex LimitsHeading();
+
+    [GeneratedRegex(@"^<a id=""limit-[^""]+""></a>$")]
+    private static partial Regex LimitAnchorLine();
 }
