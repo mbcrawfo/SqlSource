@@ -14,7 +14,7 @@ SELECT 1 # x [y--z] -- c
 | `mysql` | `SELECT 1` | `#` starts a comment |
 | `mssql` | `SELECT 1 # x [y--z]` | `[y--z]` is a quoted identifier, and the last `--` starts a comment |
 
-The [dialect](../concepts.md#dialect) is the set of rules that SqlSource reads a `.sql` file by.  It connects to nothing and is not the [logical database](../concepts.md#logical-database).  This page covers how to choose one, its options, what each dialect changes, and what SqlSource still reads differently from the database.  Where a dialect is set, and which place wins, is on [the settings page](../settings.md#setting-dialect).
+The [dialect](../concepts.md#dialect) is the set of rules that SqlSource reads a `.sql` file by.  It connects to nothing and is not the [logical database](../concepts.md#logical-database).  This page covers how to choose one, its options, what each dialect changes, and what SqlSource still reads differently from the database.  Where a dialect is set, and which place wins, is on [the settings page](settings.md#setting-dialect).
 
 <a id="choosing-a-dialect"></a>
 
@@ -73,9 +73,9 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 ```
 
 - **Options are not case-sensitive** and come in any order.  Spaces around the name and each option are ignored.
-- **Only `mysql` and `mariadb` have options.**  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect, and so is an empty one, as in `mysql,`.  Errors by place are on [the settings page](../settings.md#setting-dialect).
+- **Only `mysql` and `mariadb` have options.**  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect, and so is an empty one, as in `mysql,`.  Errors by place are on [the settings page](settings.md#setting-dialect).
 - **In a `-- dialect:` marker, the value is the rest of the line**: the name, then the options, separated by commas.  Nothing else may follow it on the line, a comment included.
-- **A value written in several places**, options included, follows [the rules of the dialect setting](../settings.md#setting-dialect).
+- **A value written in several places**, options included, follows [the rules of the dialect setting](settings.md#setting-dialect).
 
 <a id="what-a-dialect-changes"></a>
 

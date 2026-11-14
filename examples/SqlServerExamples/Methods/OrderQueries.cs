@@ -10,7 +10,7 @@ namespace SqlServerExamples.Methods;
 // OrderQueries.ListOrdersOfUserAsync(connection, ...), and CountOrderLines is a method of the private nested class Sql,
 // which only this class's own code calls.  The header's async-method-suffix puts Async at the end of each method's
 // name.  See site/reference/members.md#setting-member-location and
-// site/settings.md#setting-generator-parameters.
+// site/reference/generator-parameters.md#setting-generator-parameters.
 [SqlSourceGenerate]
 public static partial class OrderQueries
 {

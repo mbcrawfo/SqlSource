@@ -37,7 +37,7 @@ In the same PR as the fix:
 1. Delete the item file.
 2. Remove its row from the table in `README.md`.  The table lists active items only; git history is the record of resolved ones.
 3. Remove any references to the id from code and docs by searching for the item's actual id, for example `grep -r "TD-0003" .`.
-4. Remove its limit from `site/`, if it has one, with its row of `site/guides/troubleshooting.md`.  A limit names no id, so search the `## Limits` sections, and the "Known issues" of a page not yet moved, for the effect.
+4. Remove its limit from `site/`, if it has one, with its row of `site/guides/troubleshooting.md`.  A limit names no id, so search the `## Limits` sections for the effect.
 
 Never mark an item resolved without the fix, and never merge a fix that leaves its item behind.
 

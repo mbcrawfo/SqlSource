@@ -6,7 +6,7 @@ SqlSource can describe the queries of the databases marked Yes in the table of [
 
 ## Databases that are not described
 
-A query that must be described and whose dialect has no database to ask, every row marked No, is [SQLSRC209](../../diagnostics.md#sqlsrc209), from the tool and in the build.  The default output is `repository`, which must be described, so a project that sets neither the dialect nor the output gets it for every file.  It goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](../../settings.md#setting-output).  Under the output `models` the query's constant or token method is generated either way; under `methods` it gets neither a method nor a constant.
+A query that must be described and whose dialect has no database to ask, every row marked No, is [SQLSRC209](../../diagnostics.md#sqlsrc209), from the tool and in the build.  The default output is `repository`, which must be described, so a project that sets neither the dialect nor the output gets it for every file.  It goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](../settings.md#setting-output).  Under the output `models` the query's constant or token method is generated either way; under `methods` it gets neither a method nor a constant.
 
 <a id="which-dialect"></a>
 
@@ -18,4 +18,4 @@ To find the dialect for your database, see [choosing a dialect](../dialects.md#c
 
 ## DuckDB
 
-A database that merely shares a dialect with one of the databases marked Yes, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models`, `methods` or `repository`, and the build asks for its entries, so give a DuckDB file the output `sql`: see [the output setting](../../settings.md#setting-output).
+A database that merely shares a dialect with one of the databases marked Yes, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models`, `methods` or `repository`, and the build asks for its entries, so give a DuckDB file the output `sql`: see [the output setting](../settings.md#setting-output).

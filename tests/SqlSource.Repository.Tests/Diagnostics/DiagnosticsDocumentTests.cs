@@ -134,27 +134,13 @@ public sealed partial class DiagnosticsDocumentTests
     }
 
     // The section of SQLSRC109 tells a user what the generator parameters are.  A generator parameter that is added is
-    // added to this list and to the section together; each name here must be in the section and known to the parser.
-    // It also goes in site/settings.md, in the Values cell of the Generator parameters row and in the table of
-    // parameters under #setting-generator-parameters, which no test checks.
+    // added to GeneratorParameterNames.All and to the section together; each name, and `default`, must be in the
+    // section and known to the parser.  It also goes in site/reference/generator-parameters.md, in the table and in a
+    // section of its own, which SettingsReferenceTests checks.
     [Fact]
     public void Document_UnknownGeneratorParameterSection_ListsEveryGeneratorParameter()
     {
-        string[] parameters =
-        [
-            "keep-comments",
-            "token-validation",
-            "sort-input",
-            "sort-output",
-            "table-models",
-            "async-method-suffix",
-            "array-pool",
-            "list-padding",
-            "collection-method",
-            "transaction",
-            "method-type",
-            "default",
-        ];
+        string[] parameters = [.. GeneratorParameterNames.All, "default"];
         var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);
 
         foreach (var parameter in parameters)

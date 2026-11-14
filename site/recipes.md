@@ -62,7 +62,7 @@ $ dotnet sqlsource describe
 
 Add `"output": "sql"` to `Reporting/sqlsource.json`, or `-- output: sql` to a file, when the reports want their SQL alone: the tool then leaves them out and needs no connection for them.
 
-Rules: [configure one folder differently](settings.md#configure-a-folder), [settings files](settings.md#settings-files), [dialect](settings.md#setting-dialect), [which place wins](settings.md#precedence), [connections](reference/connections.md#connections).
+Rules: [configure one folder differently](guides/folders-and-files.md#configure-a-folder), [settings files](reference/settings-file.md#settings-files), [dialect](reference/settings.md#setting-dialect), [which place wins](reference/settings.md#precedence), [connections](reference/connections.md#connections).
 
 <a id="leave-migration-scripts-out"></a>
 
@@ -86,7 +86,7 @@ A `.sql` file that no type claims is not read, so a folder of migration scripts 
 </ItemGroup>
 ```
 
-Rules: [which files belong to a type](reference/attributes.md#files-of-a-type), [which `.sql` files are included](settings.md#included-files).
+Rules: [which files belong to a type](reference/attributes.md#files-of-a-type), [which `.sql` files are included](reference/msbuild.md#included-files).
 
 <a id="use-several-databases"></a>
 
@@ -118,7 +118,7 @@ public partial class Accounting(
     [SqlSourceConnection(Database = "reports")] NpgsqlDataSource reports);
 ```
 
-Rules: [database](settings.md#setting-database), [connections](reference/connections.md#connections), [a repository's connection](reference/repositories.md#repository-connection).
+Rules: [database](reference/settings.md#setting-database), [connections](reference/connections.md#connections), [a repository's connection](reference/repositories.md#repository-connection).
 
 <a id="queries-in-a-transaction"></a>
 
@@ -233,7 +233,7 @@ public int Run(int id)
 
 A repository gets the same methods, and its interface a member for each, so `users` can be the interface.  Each gets its connection from the repository: a repository whose only connection is a method that returns a task marks a second one that returns none, as [the next recipe](#connection-from-a-provider) does.
 
-Rules: [synchronous methods](reference/query-methods.md#synchronous-methods), [synchronous repository methods](reference/repositories.md#synchronous-repository-methods), [generator parameters](settings.md#setting-generator-parameters).
+Rules: [synchronous methods](reference/query-methods.md#synchronous-methods), [synchronous repository methods](reference/repositories.md#synchronous-repository-methods), [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
 
 <a id="connection-from-a-provider"></a>
 
@@ -357,7 +357,7 @@ Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN cus
 SELECT id, name FROM customers WHERE id = @id;
 ```
 
-Rules: [column types](reference/model-properties.md#setting-column-types), [giving a parameter a type](reference/parameters.md#param-marker), [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
+Rules: [column types](reference/model-properties.md#setting-column-types), [giving a parameter a type](reference/parameters.md#param-marker), [converters](reference/converters.md#converters), [type overrides](reference/type-mapping.md#setting-type-overrides).
 
 <a id="class-in-a-json-column"></a>
 
@@ -451,7 +451,7 @@ internal sealed partial class OrderJson : JsonSerializerContext;
 
 On SQL Server, the same works for a `json` column.  A column of a string type that holds JSON, such as an `nvarchar(max)` before SQL Server 2025, says so with the JSON opt-in, `"orders.metadata": { "type": "OrderMetadata", "json": true }`, and a parameter with `-- param: @metadata -> json OrderMetadata`.
 
-Rules: [a class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in), [converters](settings.md#converters), JSON on [PostgreSQL](reference/databases/postgresql/libraries.md#json) and [SQL Server](reference/databases/sqlserver/libraries.md#json).
+Rules: [a class in a JSON column](reference/library-types-and-json.md#json-class), [the JSON opt-in](reference/library-types-and-json.md#json-opt-in), [converters](reference/converters.md#converters), JSON on [PostgreSQL](reference/databases/postgresql/libraries.md#json) and [SQL Server](reference/databases/sqlserver/libraries.md#json).
 
 <a id="dapper-and-adonet"></a>
 
@@ -503,7 +503,7 @@ public partial class UserRepository(DbConnection connection)
 
 `GetUserDto` is the generated [model](reference/models.md#models) of `GetUser`.  Under `models` SqlSource opens no connection and binds no value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
-Rules: [constants](reference/members.md#constants), [query parameters](reference/parameters.md#query-parameters), [output](settings.md#setting-output).
+Rules: [constants](reference/members.md#constants), [query parameters](reference/parameters.md#query-parameters), [output](reference/settings.md#setting-output).
 
 <a id="models-through-dapper"></a>
 
@@ -566,7 +566,7 @@ The input model is the parameter object, and the output model is the type of a r
 
 Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).
 
-Rules: [models](reference/models.md#models), [property names](reference/model-properties.md#property-names), [the order of the properties](reference/model-properties.md#property-order), [which properties can be null](reference/model-properties.md#model-nullability), [the `-- column:` marker](reference/model-properties.md#column-marker), [shape of a model](reference/models.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [a limit](guides/dapper.md#limit-parameter-names) for parameters in snake_case.
+Rules: [models](reference/models.md#models), [property names](reference/model-properties.md#property-names), [the order of the properties](reference/model-properties.md#property-order), [which properties can be null](reference/model-properties.md#model-nullability), [the `-- column:` marker](reference/model-properties.md#column-marker), [shape of a model](reference/models.md#setting-model-type), [the type override](reference/type-mapping.md#setting-type-overrides), and [a limit](guides/dapper.md#limit-parameter-names) for parameters in snake_case.
 
 <a id="dapper-with-postgresql"></a>
 
@@ -595,7 +595,7 @@ Rules: [models](reference/models.md#models), [property names](reference/model-pr
 
   A `DateTimeOffset` parameter is sent as a `timestamptz`, which takes an offset of 0 alone.  Another offset throws `ArgumentException`, so pass `value.ToUniversalTime()`.
 
-  A type of yours that has [converters](settings.md#converters) for the query methods needs no more than a handler that calls them, here for a domain over `text` mapped to `Email`, whose converters take and return a `string`:
+  A type of yours that has [converters](reference/converters.md#converters) for the query methods needs no more than a handler that calls them, here for a domain over `text` mapped to `Email`, whose converters take and return a `string`:
 
   ```csharp
   using System.Data;
@@ -760,7 +760,7 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
 
   A `DateOnly` parameter is then sent as a `date`, and a `TimeOnly` as a `time`.
 
-  A type of yours that has [converters](settings.md#converters) for the query methods needs no more than a handler that calls them, here for an alias type over `nvarchar` mapped to `Email`, whose converters take and return a `string`:
+  A type of yours that has [converters](reference/converters.md#converters) for the query methods needs no more than a handler that calls them, here for an alias type over `nvarchar` mapped to `Email`, whose converters take and return a `string`:
 
   ```csharp
   using System.Data;

@@ -10,10 +10,10 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 |----|----|
 | Understand how the generator, the tool and a sidecar fit together, or what a word means | [Concepts](concepts.md) |
 | Write a `.sql` file, or look up a marker | [The marker index](reference/sql-files.md#marker-index) |
-| Look up a setting, or where it can be written | [All settings](settings.md#all-settings) |
-| Know which place wins when a setting is written twice | [Which place wins](settings.md#precedence) |
-| Configure part of a project differently | [Configure one folder differently](settings.md#configure-a-folder), or the [recipe](recipes.md#folder-with-another-dialect) |
-| Leave some `.sql` files out | [Which `.sql` files are included](settings.md#included-files), or the [recipe](recipes.md#leave-migration-scripts-out) |
+| Look up a setting, or where it can be written | [All settings](reference/settings.md#all-settings) |
+| Know which place wins when a setting is written twice | [Which place wins](reference/settings.md#precedence) |
+| Configure part of a project differently | [Configure one folder differently](guides/folders-and-files.md#configure-a-folder), or the [recipe](recipes.md#folder-with-another-dialect) |
+| Leave some `.sql` files out | [Which `.sql` files are included](reference/msbuild.md#included-files), or the [recipe](recipes.md#leave-migration-scripts-out) |
 | Give a query parameter a type | [Giving a parameter a type](reference/parameters.md#param-marker) |
 | Filter by a list of values, `IN @ids`, or by an optional one | [List parameters](reference/parameters.md#list-parameters), or the [recipe](recipes.md#filter-by-a-list) |
 | Choose a table name or a clause at run time | [Tokens](reference/tokens.md#tokens), or the [recipe](recipes.md#table-name-at-run-time) |
@@ -26,7 +26,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Fake a repository in a test, add members to its interface, or turn the interface off | [The interface](reference/repositories.md#repository-interface), [repository interfaces](reference/repositories.md#repository-interfaces) |
 | Run queries on a connection or in a transaction that my own code manages, or with a timeout | [Methods that take a connection](reference/connection-methods.md#methods-that-take-a-connection), [transactions and timeouts](reference/repositories.md#repository-transactions) |
 | Choose where a query's members go and how visible they are, for a file, a folder or one query | [Where the members go](reference/members.md#setting-member-location), [visibility](reference/members.md#setting-visibility), [the nested class](reference/members.md#setting-nested-class) |
-| Choose what a query method returns its rows in, or give the methods `Async` names | [Collection type](reference/return-types.md#setting-collection-type), [generator parameters](settings.md#setting-generator-parameters) |
+| Choose what a query method returns its rows in, or give the methods `Async` names | [Collection type](reference/return-types.md#setting-collection-type), [generator parameters](reference/generator-parameters.md#setting-generator-parameters) |
 | Process each row as it is read, without holding them all | [Streaming rows](reference/return-types.md#streaming-rows) |
 | Call a query from code that does not await, with a synchronous method | [Synchronous methods](reference/query-methods.md#synchronous-methods), or the [recipe](recipes.md#run-without-awaiting) |
 | Run several queries in a transaction | [The recipe](recipes.md#queries-in-a-transaction) |
@@ -35,9 +35,9 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
 | Let a test project see the internals of another project, or catch another project's exceptions by type | [Projects that share internals](reference/exceptions.md#projects-that-share-internals), [public exceptions](reference/exceptions.md#public-exceptions), or the recipes for [a test project](recipes.md#test-project-sees-internals) and [two data projects](recipes.md#share-the-exceptions) |
 | Install the tool and describe my queries | [Install the tool](reference/cli.md#install-the-tool) |
-| Have the build describe my queries, or keep it from doing so | [Running in the build](reference/msbuild.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
+| Have the build describe my queries, or keep it from doing so | [Running in the build](reference/msbuild.md#running-in-the-build), [running the tool in the build](reference/msbuild.md#online-build) |
 | Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](reference/connections.md#connections), [a `.env` file](reference/connections.md#env-file), or the [recipe](recipes.md#use-several-databases) |
-| Keep one `.env` file at the root of a repository, or read another file or none | [A `.env` file](reference/connections.md#env-file), [the build's `.env` file](settings.md#setting-env-file) |
+| Keep one `.env` file at the root of a repository, or read another file or none | [A `.env` file](reference/connections.md#env-file), [the build's `.env` file](reference/msbuild.md#setting-env-file) |
 | Keep the sidecars current after a schema change | [After a schema change](reference/describing.md#after-a-schema-change) |
 | Set up git for the sidecars, or mend a merge conflict in one | [Sidecars in git](reference/sidecars.md#sidecars-in-git) |
 | Describe each query as I save it, and have my editor start that | [Describe on save](reference/describing.md#describe-on-save), [what your editor shows](reference/describing.md#what-your-editor-shows), or the [recipe](guides/describe-on-save.md#start-the-watcher-with-your-editor) |
@@ -48,12 +48,12 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Know what the tool needs of my database | [PostgreSQL](reference/databases/postgresql/index.md#connecting), [SQL Server](reference/databases/sqlserver/index.md#connecting) |
 | Know why a column is recorded as possibly null | Which columns can be null in [PostgreSQL](reference/databases/postgresql/nullability.md#nullability) and [SQL Server](reference/databases/sqlserver/nullability.md#nullability) |
 | Know which queries the tool cannot describe | What can be described in [PostgreSQL](reference/databases/postgresql/index.md#what-can-be-described) and [SQL Server](reference/databases/sqlserver/index.md#what-can-be-described) |
-| Know which C# type a PostgreSQL or SQL Server type gets, or choose another | Types of [PostgreSQL](reference/databases/postgresql/types.md#type-map) and [SQL Server](reference/databases/sqlserver/types.md#types), [type overrides](settings.md#setting-type-overrides) |
-| Read PostgreSQL's or SQL Server's dates and times as NodaTime's types, or turn them off | [NodaTime on PostgreSQL](reference/databases/postgresql/libraries.md#nodatime), [NodaTime on SQL Server](reference/databases/sqlserver/libraries.md#nodatime), [library types](settings.md#setting-library-types) |
-| Read PostGIS's or SQL Server's spatial types as NetTopologySuite's geometries, or turn them off | [NetTopologySuite on PostgreSQL](reference/databases/postgresql/libraries.md#nettopologysuite), [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite), [library types](settings.md#setting-library-types) |
-| Read and send JSON as System.Text.Json's types, or as a class of my own | JSON on [PostgreSQL](reference/databases/postgresql/libraries.md#json) and [SQL Server](reference/databases/sqlserver/libraries.md#json), [a class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in), or the [recipe](recipes.md#class-in-a-json-column) |
+| Know which C# type a PostgreSQL or SQL Server type gets, or choose another | Types of [PostgreSQL](reference/databases/postgresql/types.md#type-map) and [SQL Server](reference/databases/sqlserver/types.md#types), [type overrides](reference/type-mapping.md#setting-type-overrides) |
+| Read PostgreSQL's or SQL Server's dates and times as NodaTime's types, or turn them off | [NodaTime on PostgreSQL](reference/databases/postgresql/libraries.md#nodatime), [NodaTime on SQL Server](reference/databases/sqlserver/libraries.md#nodatime), [library types](reference/library-types-and-json.md#setting-library-types) |
+| Read PostGIS's or SQL Server's spatial types as NetTopologySuite's geometries, or turn them off | [NetTopologySuite on PostgreSQL](reference/databases/postgresql/libraries.md#nettopologysuite), [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite), [library types](reference/library-types-and-json.md#setting-library-types) |
+| Read and send JSON as System.Text.Json's types, or as a class of my own | JSON on [PostgreSQL](reference/databases/postgresql/libraries.md#json) and [SQL Server](reference/databases/sqlserver/libraries.md#json), [a class in a JSON column](reference/library-types-and-json.md#json-class), [the JSON opt-in](reference/library-types-and-json.md#json-opt-in), or the [recipe](recipes.md#class-in-a-json-column) |
 | Give one column or one parameter a C# type of its own, such as an id's | [Column types](reference/model-properties.md#setting-column-types), [giving a parameter a type](reference/parameters.md#param-marker), or the [recipe](recipes.md#strongly-typed-id) |
-| Read and send a type of my own, such as an id or an `Email`, in the query methods | [Converters](settings.md#converters), or the [recipe](recipes.md#strongly-typed-id) |
+| Read and send a type of my own, such as an id or an `Email`, in the query methods | [Converters](reference/converters.md#converters), or the [recipe](recipes.md#strongly-typed-id) |
 | See a whole project that uses SqlSource, with its database | [The PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md), [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
 | Know where an error is reported, what it costs, or whether the build or the tool reports it | [How errors are reported](reference/errors.md) |
@@ -65,7 +65,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 
 - [Concepts](concepts.md): how the pieces fit together, and the terms the manual uses.
 - [`.sql` files](reference/sql-files.md): the file format, and an index of every marker.
-- [Settings](settings.md): every setting, where it can be set and which place wins.
+- [Settings](reference/settings.md): every setting, where it can be set and which place wins.
 - [Parameters and tokens](reference/parameters.md): query parameters, `-- param:`, list parameters and [tokens](reference/tokens.md).
 - [Dialects](reference/dialects.md): how each database's comments and strings are read, and [which databases can be described](reference/databases/index.md#database-support).
 - [The generator](reference/members.md): what the `SqlSource` package generates.
