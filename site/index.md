@@ -18,7 +18,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Filter by a list of values, `IN @ids`, or by an optional one | [List parameters](reference/parameters.md#list-parameters), or the [recipe](recipes.md#filter-by-a-list) |
 | Choose a table name or a clause at run time | [Tokens](reference/tokens.md#tokens), or the [recipe](recipes.md#table-name-at-run-time) |
 | Choose the dialect a file is read by | [Choosing a dialect](reference/dialects.md#choosing-a-dialect) |
-| Use SQL Server, or another database | [SQL Server](sqlserver.md), [database support](reference/databases/index.md#database-support) |
+| Use SQL Server, or another database | [SQL Server](reference/databases/sqlserver/index.md), [database support](reference/databases/index.md#database-support) |
 | See what the generator writes, and where it goes | [The generator](generator.md#locations) |
 | Know which models a query gets, what they are named, and what their properties are | [Models](generator.md#models) |
 | Run a query with its generated method, and know what it returns and throws | [Query methods](generator.md#query-methods) |
@@ -45,13 +45,13 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |
 | Report a model, a type or a nullability that is wrong, or a query the tool should describe and refuses | [Reporting a wrong model](tool.md#report-a-bug), [what is renamed before you share it](tool.md#bundle-contents) |
 | Check a bug-report bundle that someone gave me, or my own before I attach it | [Checking a bundle with `replay`](tool.md#replay) |
-| Know what the tool needs of my database | [PostgreSQL](postgresql.md#connecting), [SQL Server](sqlserver.md#connecting) |
-| Know why a column is recorded as possibly null | Which columns can be null in [PostgreSQL](postgresql.md#nullability) and [SQL Server](sqlserver.md#nullability) |
-| Know which queries the tool cannot describe | What can be described in [PostgreSQL](postgresql.md#what-can-be-described) and [SQL Server](sqlserver.md#what-can-be-described) |
-| Know which C# type a PostgreSQL or SQL Server type gets, or choose another | Types of [PostgreSQL](postgresql.md#type-map) and [SQL Server](sqlserver.md#types), [type overrides](settings.md#setting-type-overrides) |
-| Read PostgreSQL's or SQL Server's dates and times as NodaTime's types, or turn them off | [NodaTime on PostgreSQL](postgresql.md#nodatime), [NodaTime on SQL Server](sqlserver.md#nodatime), [library types](settings.md#setting-library-types) |
-| Read PostGIS's or SQL Server's spatial types as NetTopologySuite's geometries, or turn them off | [NetTopologySuite on PostgreSQL](postgresql.md#nettopologysuite), [NetTopologySuite on SQL Server](sqlserver.md#nettopologysuite), [library types](settings.md#setting-library-types) |
-| Read and send JSON as System.Text.Json's types, or as a class of my own | JSON on [PostgreSQL](postgresql.md#json) and [SQL Server](sqlserver.md#json), [a class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in), or the [recipe](recipes.md#class-in-a-json-column) |
+| Know what the tool needs of my database | [PostgreSQL](reference/databases/postgresql/index.md#connecting), [SQL Server](reference/databases/sqlserver/index.md#connecting) |
+| Know why a column is recorded as possibly null | Which columns can be null in [PostgreSQL](reference/databases/postgresql/nullability.md#nullability) and [SQL Server](reference/databases/sqlserver/nullability.md#nullability) |
+| Know which queries the tool cannot describe | What can be described in [PostgreSQL](reference/databases/postgresql/index.md#what-can-be-described) and [SQL Server](reference/databases/sqlserver/index.md#what-can-be-described) |
+| Know which C# type a PostgreSQL or SQL Server type gets, or choose another | Types of [PostgreSQL](reference/databases/postgresql/types.md#type-map) and [SQL Server](reference/databases/sqlserver/types.md#types), [type overrides](settings.md#setting-type-overrides) |
+| Read PostgreSQL's or SQL Server's dates and times as NodaTime's types, or turn them off | [NodaTime on PostgreSQL](reference/databases/postgresql/libraries.md#nodatime), [NodaTime on SQL Server](reference/databases/sqlserver/libraries.md#nodatime), [library types](settings.md#setting-library-types) |
+| Read PostGIS's or SQL Server's spatial types as NetTopologySuite's geometries, or turn them off | [NetTopologySuite on PostgreSQL](reference/databases/postgresql/libraries.md#nettopologysuite), [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite), [library types](settings.md#setting-library-types) |
+| Read and send JSON as System.Text.Json's types, or as a class of my own | JSON on [PostgreSQL](reference/databases/postgresql/libraries.md#json) and [SQL Server](reference/databases/sqlserver/libraries.md#json), [a class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in), or the [recipe](recipes.md#class-in-a-json-column) |
 | Give one column or one parameter a C# type of its own, such as an id's | [Column types](settings.md#setting-column-types), [giving a parameter a type](reference/parameters.md#param-marker), or the [recipe](recipes.md#strongly-typed-id) |
 | Read and send a type of my own, such as an id or an `Email`, in the query methods | [Converters](settings.md#converters), or the [recipe](recipes.md#strongly-typed-id) |
 | See a whole project that uses SqlSource, with its database | [The PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md), [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md) |
@@ -70,8 +70,8 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 - [Dialects](reference/dialects.md): how each database's comments and strings are read, and [which databases can be described](reference/databases/index.md#database-support).
 - [The generator](generator.md): what the `SqlSource` package generates.
 - [The tool](tool.md): the `SqlSource.Tool` package, its `sqlsource` command, running it in the build, and making and checking a bug-report bundle.
-- [PostgreSQL](postgresql.md): how SqlSource works with PostgreSQL.
-- [SQL Server](sqlserver.md): how SqlSource works with SQL Server.
+- [PostgreSQL](reference/databases/postgresql/index.md): how SqlSource works with PostgreSQL.
+- [SQL Server](reference/databases/sqlserver/index.md): how SqlSource works with SQL Server.
 - [Recipes](recipes.md): short how-tos, each a sample and a link to the rules.
 - [How errors are reported](reference/errors.md): warnings and information, where an error is reported, what it costs, whether the build or the tool reports it, and every error by area.
 - [Diagnostics](diagnostics.md): what each `SQLSRC` error means and how to fix it.

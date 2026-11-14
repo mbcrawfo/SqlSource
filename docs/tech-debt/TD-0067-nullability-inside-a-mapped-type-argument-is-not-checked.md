@@ -10,7 +10,7 @@ The conversion that a constraint type asks for is checked with `Compilation.Clas
 
 ## Impact
 
-Low.  The model compiles, with a warning for its property, which fails the build only where warnings are errors.  A user who sees it can map the type with arguments whose nullability the constraint takes, as the known issue of [`site/postgresql.md`](../../site/postgresql.md#known-issues) says.
+Low.  The model compiles, with a warning for its property, which fails the build only where warnings are errors.  A user who sees it can map the type with arguments whose nullability the constraint takes, as the known issue of [`site/settings.md`](../../site/settings.md#known-issues) says.
 
 ## Proposed fix
 

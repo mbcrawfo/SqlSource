@@ -174,7 +174,7 @@ In a SQL Server project (`"dialect": "mssql"` in its `sqlsource.json`), the serv
           SQLSOURCE_CONNECTION: Server=localhost,1433;Database=app;User ID=sa;Password=Ci-Passw0rd;TrustServerCertificate=True
 ```
 
-`TrustServerCertificate=True` is for the job's own server, whose certificate nothing trusts: see [connecting to SQL Server](sqlserver.md#connecting).
+`TrustServerCertificate=True` is for the job's own server, whose certificate nothing trusts: see [connecting to SQL Server](reference/databases/sqlserver/index.md#connecting).
 
 Name the server's exact version in the image, a PostgreSQL minor or a SQL Server cumulative update, and move it when you move your database: a tag such as `-latest` moves to a new server without a word, and a new server can describe a query otherwise than the one your sidecars were written on.
 
@@ -407,7 +407,7 @@ public partial class OrderRepository(IConnectionFactory connections)
 }
 ```
 
-A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [known issues](generator.md#known-issues) says.  `OrderRepository`'s methods are factories: each repository method calls one, opens the connection it returns when it is closed, and disposes it, an asynchronous method `OpenAsync` and a [synchronous one](generator.md#synchronous-repository-methods) `Open`.  A type whose queries are all asynchronous needs only `OpenAsync`.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
+A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [the limit](reference/databases/postgresql/query-methods.md#limit-connection-string-repository) says.  `OrderRepository`'s methods are factories: each repository method calls one, opens the connection it returns when it is closed, and disposes it, an asynchronous method `OpenAsync` and a [synchronous one](generator.md#synchronous-repository-methods) `Open`.  A type whose queries are all asynchronous needs only `OpenAsync`.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
 
 Rules: [the connection](generator.md#repository-connection).
 
@@ -436,7 +436,7 @@ builder.Services.AddSingleton<IOrderRepository>(
 
 Microsoft.Data.SqlClient has no data source, so a SQL Server repository takes the connection string, found by its name, `connectionString`.  Each method makes a `SqlConnection` of it, opens it, runs the query and disposes the connection, which returns it to Microsoft.Data.SqlClient's pool.  The code that uses the repository takes the generated `IOrderRepository`.
 
-Rules: [the connection](generator.md#repository-connection), [the interface](generator.md#repository-interface), [connecting to SQL Server](sqlserver.md#connecting).
+Rules: [the connection](generator.md#repository-connection), [the interface](generator.md#repository-interface), [connecting to SQL Server](reference/databases/sqlserver/index.md#connecting).
 
 <a id="strongly-typed-id"></a>
 
@@ -584,7 +584,7 @@ internal sealed partial class OrderJson : JsonSerializerContext;
 
 On SQL Server, the same works for a `json` column.  A column of a string type that holds JSON, such as an `nvarchar(max)` before SQL Server 2025, says so with the JSON opt-in, `"orders.metadata": { "type": "OrderMetadata", "json": true }`, and a parameter with `-- param: @metadata -> json OrderMetadata`.
 
-Rules: [a class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in), [converters](settings.md#converters), JSON on [PostgreSQL](postgresql.md#json) and [SQL Server](sqlserver.md#json).
+Rules: [a class in a JSON column](settings.md#json-class), [the JSON opt-in](settings.md#json-opt-in), [converters](settings.md#converters), JSON on [PostgreSQL](reference/databases/postgresql/libraries.md#json) and [SQL Server](reference/databases/sqlserver/libraries.md#json).
 
 <a id="dapper-and-adonet"></a>
 
@@ -695,7 +695,7 @@ The input model is the parameter object, and the output model is the type of a r
   WHERE c.id = @customerId;
   ```
 
-- **A [list parameter](reference/parameters.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  Dapper sends one parameter for each value of a list on SQL Server, and a null list as an empty one, but it rewrites every `@ids` of the query: `@ids IS NULL` is an error from two values up, and true for an empty list as for a null one.  On PostgreSQL it sends a list as one array: write `id = ANY(@ids)` there, an [array parameter](postgresql.md#array-parameters).
+- **A [list parameter](reference/parameters.md#list-parameters), `IN @ids`, works on SQL Server alone, and only without a null test.**  Dapper sends one parameter for each value of a list on SQL Server, and a null list as an empty one, but it rewrites every `@ids` of the query: `@ids IS NULL` is an error from two values up, and true for an empty list as for a null one.  On PostgreSQL it sends a list as one array: write `id = ANY(@ids)` there, an [array parameter](reference/databases/postgresql/query-methods.md#array-parameters).
 
 Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).
 
@@ -958,7 +958,7 @@ var everyOrder = await orders.ListOrdersByStatuses(new ListOrdersByStatusesParam
 
 `@statuses`, written after `IN` with no parentheses, is a list, and `ListOrdersByStatusesParams.Statuses` an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The method sends a parameter for each status.  A null list returns every order, by the test `@statuses IS NULL`, and an empty one returns none.  The same query runs on SQL Server as it is.  On PostgreSQL, `status = ANY(@statuses)` sends the list as one array instead.
 
-Rules: [list parameters](reference/parameters.md#list-parameters), [array parameters](postgresql.md#array-parameters).
+Rules: [list parameters](reference/parameters.md#list-parameters), [array parameters](reference/databases/postgresql/query-methods.md#array-parameters).
 
 <a id="test-project-sees-internals"></a>
 

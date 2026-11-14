@@ -535,7 +535,8 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
     // ExecuteReaderAsync throws it and no reader is left to read the rest.  The failed conversion after the rows rolls
     // back the transaction, and with so few rows SqlClient's exception lists the divide by zero alone.  The method has
     // no way to tell that from a divide by zero that rolled the transaction back itself, so it throws it as it is, and
-    // the caller learns of the rollback only from the transaction's Connection, as the manual's known issue says.
+    // the caller learns of the rollback only from the transaction's Connection, as the manual's limit says
+    // (site/reference/databases/sqlserver/query-methods.md#limit-hidden-rollback).
     [Fact]
     public async Task ListFailingBeforeTheRowsThenFailConversion_InATransaction_ThrowsTheDivideByZeroAndRollsBack()
     {
