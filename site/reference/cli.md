@@ -89,6 +89,17 @@ A relative path is taken from the current folder.
 
 A run with `--project`, `--database` or a `.sql` path writes only the sidecars of the files whose queries it selected, and deletes none.
 
+The tool has six more options: `--help` and `--version`, and four that `diagnose` alone takes.
+
+| Option | What it does |
+|----|----|
+| `--help` | Prints the options of the tool, or of a command when it follows one, such as `dotnet sqlsource diagnose --help` |
+| `--version` | Prints the version of the tool, as `dotnet sqlsource --version` |
+| `--query <file>:<name>` | Of `diagnose`: the query to report, by its `.sql` file and its name.  See [making a bundle with `diagnose`](bundles.md#diagnose) |
+| `--out <path>` | Of `diagnose`: where to write the bundle, a zip, with its mapping beside it.  See [making a bundle with `diagnose`](bundles.md#diagnose) |
+| `--no-obfuscate` | Of `diagnose`: writes a raw bundle, with your names and SQL as they are, and no mapping.  See [making a bundle with `diagnose`](bundles.md#diagnose) |
+| `--scrub <bundle>` | Of `diagnose`: renames a raw bundle with no database, and writes it and its mapping at `--out`.  See [making a bundle with `diagnose`](bundles.md#diagnose) |
+
 <a id="environment-variables"></a>
 
 ### Environment variables
