@@ -6,7 +6,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 
 | New thing | Goes in | What fails if it does not |
 |----|----|----|
-| Setting, as a settings-file key or a marker | A `setting-<name>` section of `settings.md`; a row under its `#all-settings` that names every place it can be written | A reviewer |
+| Setting, as a settings-file key or a marker | A `setting-<name>` section of `settings.md` or of the reference page of what it changes; a row under its `#all-settings` that names every place it can be written | A reviewer |
 | Marker | A row in the marker index of `reference/sql-files.md` | A reviewer |
 | Generator parameter | Each place that the comment on the list in `DiagnosticsDocumentTests` names | `DiagnosticsDocumentTests` |
 | MSBuild property | Its section of `settings.md`; a row under `#all-settings` | A reviewer |
