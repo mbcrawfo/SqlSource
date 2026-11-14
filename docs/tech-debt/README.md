@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0114`
+Next id: `TD-0116`
 
 ## Active items
 
@@ -38,6 +38,8 @@ Next id: `TD-0114`
 | [TD-0094](TD-0094-roslyn-4-14-features-are-not-used-yet.md) | Open | 2026-10-31 | Low | Only the compiler's handling of `Microsoft.CodeAnalysis.EmbeddedAttribute` was adopted when the floor moved from Roslyn 4.8.0 to 4.14.0; the rest of the API that 4.9 to 4.14 added for pipelines, caching and allocation was not looked at, and four style rules about collection expressions on `ImmutableArray<T>` are suggestions for `src/SqlSource` until its calls are measured |
 | [TD-0095](TD-0095-a-cref-to-a-reused-exception-can-be-ambiguous.md) | Open | 2026-11-02 | Low | A project that uses a referenced copy of the exceptions and also references another SqlSource assembly whose copy it cannot see gets CS0419 at its own bound crefs to any of the three exceptions, and CS1574 at those to a member of one, since a cref is bound without regard to accessibility |
 | [TD-0097](TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md) | Open | 2026-11-03 | Medium | What phase 9's design says Visual Studio and VS Code show of a sidecar another process wrote, their design-time builds, the VS Code task and the file events of their saves was checked in Rider on macOS alone |
+| [TD-0114](TD-0114-generator-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 2,504 mutants of `src/SqlSource` fail no test of their own folder or are run by none, most in `MethodPlanner.cs`, `ModelReader.cs` and `ExceptionProbe.cs`, though the driver tests and the golden corpus may reach them |
+| [TD-0115](TD-0115-tool-code-its-own-tests-do-not-check.md) | Open | 2026-11-13 | Low | 1,881 mutants of `src/SqlSource.Tool` fail no test of their own folder or are run by none, most in `WatchSession.cs`, `SqlServerLive.cs` and `DiagnoseRun.cs`, though the command tests and the database projects may reach them |
 
 ## Columns
 

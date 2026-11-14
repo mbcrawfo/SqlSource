@@ -7,7 +7,8 @@
 # scope that passes removes it.  Every start and end is a line of measure.log in the run folder.
 # Usage: measure.sh <run folder> mutation [<scope> ...]
 #        measure.sh <run folder> tests [<project folder> ...]
-# With no scope every scope is run, and with no project every project that projects.txt does not mark not-run.
+# With no scope every scope is run, and with no project every project that projects.txt does not mark not-run.  A
+# project marked sync-async is run with -p:RunSyncAsync=true and without coverage, which it has no extension for.
 # The results are mutation/<scope>/reports/mutation-report.json, and results.xunit.xml and coverage.cobertura.xml in
 # tests/<project folder without its tests/>, where condense looks for them.
 set -euo pipefail
@@ -92,14 +93,30 @@ run_scope() {
     note "end scope $name exit $status seconds $((SECONDS - started))"
 }
 
+# The mark that projects.txt gives a project folder, or nothing.
+mark_of() {
+    local line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        if [[ "${line%% *}" == "$1" && "$line" == *' '* ]]; then
+            echo "${line#* }"
+            return
+        fi
+    done <"$here/projects.txt"
+}
+
 run_project() {
-    local project="${1%/}" output started status=0
+    local project="${1%/}" output started status=0 options
     output="$run/tests/${project#tests/}"
     mkdir -p "$output"
+    if [[ "$(mark_of "$project")" == sync-async* ]]; then
+        options=(-p:RunSyncAsync=true)
+    else
+        options=(--coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml)
+    fi
     note "start tests $project"
     started=$SECONDS
-    dotnet test --project "$root/$project" --results-directory "$output" \
-        --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml \
+    dotnet test --project "$root/$project" --results-directory "$output" "${options[@]}" \
         --report-xunit-xml --report-xunit-xml-filename results.xunit.xml || status=$?
     if [[ "$status" -ne 0 ]]; then
         failed=1

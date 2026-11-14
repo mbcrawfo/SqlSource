@@ -52,6 +52,7 @@ With no name after `mutation` or `tests`, every scope or every project that is r
 
 - Stryker builds in the working tree, so **nothing else that builds runs in the checkout until the command has ended**: no `dotnet run`, no test, no `pre-commit-validation.sh`.
 - `tests/DatabaseTests/QueryMethodAllocation` is sliced and reviewed by reading and is never run: its tests skip under coverage.
+- The two `SyncAsync` projects, marked `sync-async`, run with `-p:RunSyncAsync=true` and without coverage, which they have no extension for: their tests have times and no coverage.
 - `$R/measure.log` has a line for each start and end, with the seconds and the exit code.  A scope that failed has a file `failed` in its folder: run it once more by name.  One that fails twice has its folder removed from `$R/mutation/`, its tests are judged by reading, and `run-notes.md` names it.  A fault of Stryker that [tools/README.md](../../../tools/README.md#limits) does not describe is put to the owner.
 - A test project with failing tests still gives its times: note it.  One that does not build gives none, and its slices say `Not run`: fix the cause or ask the owner, since a cost finding needs the times.
 
