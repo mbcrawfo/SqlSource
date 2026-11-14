@@ -2,6 +2,8 @@
   items:
     - name: Pass a list of values (IN)
       href: lists.md
+    - name: Fix a nullable property
+      href: nullability.md
     - name: Choose a table or a clause at run time
       href: dynamic-sql.md
 - name: Running queries
@@ -42,6 +44,8 @@
       href: troubleshooting.md
 - name: Other ways to use your SQL
   items:
+    - name: Choose what is generated (output modes)
+      href: output-modes.md
     - name: Use Dapper or your own ADO.NET code
       href: dapper.md
     - name: Use MySQL, SQLite, Oracle or another database

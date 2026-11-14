@@ -97,3 +97,143 @@ SELECT id, name FROM customers WHERE id = @id;
 ```
 
 Rules: [column types](../reference/model-properties.md#setting-column-types), [giving a parameter a type](../reference/parameters.md#param-marker), [converters](../reference/converters.md#converters), [type overrides](../reference/type-mapping.md#setting-type-overrides).
+
+<a id="vogen"></a>
+
+## An id type made by Vogen or StronglyTypedId
+
+If your id type is made by Vogen or StronglyTypedId, write two converters for it.  Without them, the query method throws `InvalidCastException`.
+
+1. **Declare your type**, here with Vogen:
+
+   ```csharp
+   using Vogen;
+
+   [ValueObject<long>]
+   public readonly partial struct CustomerId;
+   ```
+
+2. **Give the column and the parameter your type.**  Map the column in `sqlsource.json`, and the parameter in its `-- param:` line:
+
+   ```jsonc
+   // sqlsource.json, in the project's folder
+   {
+       "root": true,
+       "columnTypes": {
+           "customers.id": "CustomerId",
+       },
+   }
+   ```
+
+   ```sql postgres
+   -- name: GetCustomer -> one-optional
+   -- param: @id -> CustomerId
+   SELECT id, name FROM customers WHERE id = @id;
+   ```
+
+3. **Write two converters** in a class of your project.  Each calls a member of your type:
+
+   ```csharp
+   using SqlSource;
+
+   internal static class IdConversions
+   {
+       [SqlSourceConverter]
+       public static CustomerId ToCustomerId(long value) => CustomerId.From(value);
+
+       [SqlSourceConverter]
+       public static long FromCustomerId(CustomerId id) => id.Value;
+   }
+   ```
+
+   For a type of StronglyTypedId, call its constructor, `new CustomerId(value)`, in place of `From`.
+
+4. **Call the method** with your type:
+
+   ```csharp
+   GetCustomerDto? customer = await customers.GetCustomer(new GetCustomerParams(CustomerId.From(42)));
+   ```
+
+**What you get.**  `GetCustomerDto.Id` and `GetCustomerParams.Id` are a `CustomerId`.  The method reads `id` as a `long`, and gives it to `ToCustomerId`.  It sends `@id` as the `long` that `FromCustomerId` returns.
+
+**The rules you need.**
+
+- SqlSource converts a type only through methods marked `[SqlSourceConverter]`.  It never calls the `Value`, `From` or constructor of your type itself.  See [the limit](../reference/converters.md#limit-vogen-and-stronglytypedid).
+- A converter converts from the type of its argument to its return type, whatever its name.  A column needs the converter to your type, and a parameter the converter back.  See [Converters](../reference/converters.md#converters).
+- A converter takes or returns exactly the type that the driver reads: a `long` for a `bigint`, an `int` for an `integer`.  A converter of another type is not used.  See [Converters](../reference/converters.md#converters).
+- Null never reaches a converter, so one pair serves `CustomerId` and `CustomerId?`.  See [Converters](../reference/converters.md#converters).
+- A query whose output is `models` calls no converter.  To read it through Dapper, see [Run the models through Dapper](dapper.md#models-through-dapper).  See [Converters](../reference/converters.md#converters).
+
+<a id="enum"></a>
+
+## Read a column as a C# enum
+
+If you want a C# enum for a column, map the column to your enum.  PostgreSQL and SQL Server need different steps, and a missing step gives `InvalidCastException`.
+
+**On PostgreSQL**, map the enum type of your schema to your C# enum with a type override:
+
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "postgres",
+    "typeOverrides": {
+        "public.order_status": "MyApp.OrderStatus",
+    },
+}
+```
+
+```csharp
+namespace MyApp;
+
+public enum OrderStatus
+{
+    Pending,
+    Shipped,
+    Cancelled,
+}
+```
+
+Then map the enum in Npgsql, on the data source that your application builds:
+
+```csharp
+var builder = new NpgsqlDataSourceBuilder(connectionString);
+builder.MapEnum<OrderStatus>();
+await using var dataSource = builder.Build();
+```
+
+**On SQL Server**, which has no enum types, declare the enum over the type of its column.  Here `priority` is a `tinyint`, so the enum is over `byte`:
+
+```sql mssql
+-- name: ListTicketsByPriority
+-- type-override: tinyint = MyApp.Priority
+SELECT id, title, priority
+FROM dbo.tickets
+WHERE priority = @priority;
+```
+
+```csharp
+namespace MyApp;
+
+public enum Priority : byte
+{
+    Low = 1,
+    High = 2,
+}
+```
+
+**What you get.**  On PostgreSQL, each `order_status` column and parameter is an `OrderStatus`.  On SQL Server, the column `priority` and the parameter `@priority` of the query are a `Priority`.
+
+**The rules you need.**
+
+- A type override gives each column and parameter of a database type your C# type.  A `-- type-override:` line inside a query changes that query only.  See [Type overrides](../reference/type-mapping.md#setting-type-overrides).
+- On PostgreSQL, the method asks Npgsql for your enum, so the data source that the methods run on must call `MapEnum<T>()`.  See [What a method reads and throws](../reference/databases/postgresql/query-methods.md#method-results).
+- On PostgreSQL, a repository made from a connection string has none of the mappings of your data source.  Give it your data source.  See [the limit](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository).
+- On SQL Server, an enum is read only from a column of its own underlying type.  An enum over `int`, the default, reads an `int`, and one over `byte` a `tinyint`.  See [Reading a row](../reference/databases/sqlserver/query-methods.md#reading-a-row).
+
+## If it does not work
+
+- **`InvalidCastException` when the query runs.**  The driver was given a type that it cannot read.  It is a type of yours with no converters, or a PostgreSQL enum that the data source does not map.  Write the converters, or call `MapEnum<T>()`.  See [`InvalidCastException`](troubleshooting.md#invalidcastexception).
+- **`InvalidCastException` for an enum, on PostgreSQL, though your data source calls `MapEnum<T>()`.**  A repository made from a connection string makes connections that have none of the mappings of your data source.  Give the repository your data source.  See [a repository made from a connection string](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository).
+- **`InvalidCastException` for an enum, on SQL Server.**  The enum is not over the type of its column, such as an enum over `int` for a `tinyint`.  Declare it over the type of the column.  See [Reading a row](../reference/databases/sqlserver/query-methods.md#reading-a-row).
+- **SQLSRC279.**  A converter takes or returns another type than the driver reads, such as an `int` for a `bigint`.  Change it to the type that the error names.  See [SQLSRC279](../diagnostics.md#sqlsrc279).

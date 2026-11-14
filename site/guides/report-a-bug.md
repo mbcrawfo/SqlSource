@@ -23,6 +23,24 @@ When a query gets a model, a type or a nullability that is wrong for what your d
 
 Attach the zip to the issue, and keep the mapping to yourself: it lists each new name beside the name of yours it stands for, so that you can read what a maintainer finds in your own names.  To see what the maintainer will see, run [`replay`](../reference/bundles.md#replay) on the zip: it says `reproduced`, and its lines name the new names.
 
+<a id="what-is-safe"></a>
+
+## What is safe to post
+
+If you are not sure that you can post the zip, this list says what a bundle holds, renames and keeps.
+
+**What you get.**  A bundle holds the one query and what your database answered when it was described.  It holds what SqlSource made of that answer, or the error that refused the query.  It also holds the versions of `sqlsource`, of the server and its driver, of .NET and of the operating system.  It holds none of your other queries, your settings files, your code, your connection string or a log.
+
+**The rules you need.**
+
+- **Every name of yours gets a new name**, such as `t_4f0a9c21` for a table.  This includes schemas, tables, views, columns, aliases, functions, types, indexes, the database's name, the logical database, the query's name, its query parameters and its tokens.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
+- **Every string literal gets a new one**: `'active'` becomes `'l_9b3e07d4'`.  A comment is left empty.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
+- **A server's error keeps only its code**, and the query parameters it names, renamed.  Its message is left out.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
+- **Numbers are kept.**  A name of yours that is spelled as a word of the database is kept too, such as a column `name` or `date`.  So are the database's own names, such as `public` and `dbo`.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
+- **If a number in your query is a value that you must not share**, such as an account number, do not post the bundle.  Take the private route instead.  See [When a bundle cannot be made safe](#raw-bundle).
+- **`diagnose` checks the bundle before it writes it.**  It writes no bundle that still holds a word of yours other than the names and numbers this list keeps.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
+- **Keep the mapping to yourself.**  It is written beside the zip, and lists each new name beside your own name.  See [Making a bundle with `diagnose`](../reference/bundles.md#diagnose).
+
 <a id="raw-bundle"></a>
 
 ## When a bundle cannot be made safe
