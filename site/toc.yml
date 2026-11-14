@@ -20,5 +20,7 @@
   href: sqlserver.md
 - name: Recipes
   href: recipes.md
+- name: How errors are reported
+  href: errors.md
 - name: Diagnostics
   href: diagnostics.md

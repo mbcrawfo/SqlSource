@@ -54,6 +54,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Read and send a type of my own, such as an id or an `Email`, in the query methods | [Converters](settings.md#converters), or the [recipe](recipes.md#strongly-typed-id) |
 | See a whole project that uses SqlSource, with its database | [The PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md), [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
+| Know where an error is reported, what it costs, or whether the build or the tool reports it | [How errors are reported](errors.md) |
 | Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues), [PostgreSQL](postgresql.md#known-issues) and [SQL Server](sqlserver.md#known-issues) |
 
 ## The pages
@@ -68,4 +69,5 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 - [PostgreSQL](postgresql.md): how SqlSource works with PostgreSQL.
 - [SQL Server](sqlserver.md): how SqlSource works with SQL Server.
 - [Recipes](recipes.md): short how-tos, each a sample and a link to the rules.
+- [How errors are reported](errors.md): warnings and information, where an error is reported, what it costs, whether the build or the tool reports it, and every error by area.
 - [Diagnostics](diagnostics.md): what each `SQLSRC` error means and how to fix it.
