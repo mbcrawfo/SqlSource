@@ -6,7 +6,7 @@ The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.m
 
 ## Delivered instead
 
-Converters, sub-phase 8.2: a static method marked `[SqlSourceConverter]`, read by [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) and chosen by [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs), converts a type override's C# type to and from the type the base map reads the database type as, for the columns and parameters of the generated query methods.  Its database side is the base map's type exactly, so it serves every database type the base map gives a C# type, and the manual documents it under [converters](../../site/settings.md#converters).
+Converters, sub-phase 8.2: a static method marked `[SqlSourceConverter]`, read by [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) and chosen by [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs), converts a type override's C# type to and from the type the base map reads the database type as, for the columns and parameters of the generated query methods.  Its database side is the base map's type exactly, so it serves every database type the base map gives a C# type, and the manual documents it under [converters](../../site/reference/converters.md#converters).
 
 The database types the base map gives none have nothing to convert from:
 

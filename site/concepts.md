@@ -52,7 +52,7 @@ The generator builds the [models](reference/models.md#models) and the [query met
 
 #### Settings file
 
-A file named `sqlsource.json` that sets [settings](settings.md#all-settings), such as the dialect and the output, for the `.sql` files of its folder and of every folder below it.  A file in a folder sets what differs there, and one that says `"root": true` keeps the settings files of the folders above it out.  See [settings files](settings.md#settings-files).
+A file named `sqlsource.json` that sets [settings](reference/settings.md#all-settings), such as the dialect and the output, for the `.sql` files of its folder and of every folder below it.  A file in a folder sets what differs there, and one that says `"root": true` keeps the settings files of the folders above it out.  See [settings files](reference/settings-file.md#settings-files).
 
 ### What a query gets
 
@@ -60,7 +60,7 @@ A file named `sqlsource.json` that sets [settings](settings.md#all-settings), su
 
 #### Output
 
-The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](reference/models.md#models), or its models and a [query method](#query-method), which by default is a [repository](#repository)'s.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
+The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](reference/models.md#models), or its models and a [query method](#query-method), which by default is a [repository](#repository)'s.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](reference/settings.md#setting-output).
 
 <a id="query-method"></a>
 
@@ -94,7 +94,7 @@ A value you pass when you run a query, written in the SQL as `@` and a name: `@i
 
 #### Generator parameter
 
-An option that changes what the generator does with a query, such as `keep-comments`, turned on or off, or given one of its values, such as `transaction=serializable`, by a word in a `-- generator:` marker or in a [settings file](#settings-file).  Each place sets only the options it names, and the others keep the values that the places further out give them.  It has nothing to do with the parameters of the SQL.  See [generator parameters](settings.md#setting-generator-parameters).
+An option that changes what the generator does with a query, such as `keep-comments`, turned on or off, or given one of its values, such as `transaction=serializable`, by a word in a `-- generator:` marker or in a [settings file](#settings-file).  Each place sets only the options it names, and the others keep the values that the places further out give them.  It has nothing to do with the parameters of the SQL.  See [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
 
 <a id="token"></a>
 
@@ -108,13 +108,13 @@ A place in a query's SQL, written `{{table}}`, that your code fills in with text
 
 #### Dialect
 
-The set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  It is named after a database, such as `postgres` or `mssql`, and it is set for a project, for some of its files, or for one file.  A dialect connects to nothing.  See [dialects](reference/dialects.md) and [the dialect setting](settings.md#setting-dialect).
+The set of rules by which SqlSource reads a `.sql` file: where a comment or a string starts and ends, which differs from one database to the next.  It is named after a database, such as `postgres` or `mssql`, and it is set for a project, for some of its files, or for one file.  A dialect connects to nothing.  See [dialects](reference/dialects.md) and [the dialect setting](reference/settings.md#setting-dialect).
 
 <a id="logical-database"></a>
 
 #### Logical database
 
-A name for one particular database your queries run against, such as `billing`.  The tool uses it to choose which connection to describe a query through, a sidecar records it, and a [repository](#repository) that uses several marks a connection source for each.  A query belongs to the logical database its markers or settings name, and to the one named after its dialect when they name none.  See [the database setting](settings.md#setting-database).
+A name for one particular database your queries run against, such as `billing`.  The tool uses it to choose which connection to describe a query through, a sidecar records it, and a [repository](#repository) that uses several marks a connection source for each.  A query belongs to the logical database its markers or settings name, and to the one named after its dialect when they name none.  See [the database setting](reference/settings.md#setting-database).
 
 The two answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
 

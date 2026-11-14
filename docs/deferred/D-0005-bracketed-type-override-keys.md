@@ -14,7 +14,7 @@ The owner chose not to take brackets for now.  `[]` after a key already means an
 
 ## Remaining work
 
-A bracketed part, `]]` for a bracket inside it, in `TypeKeyText.TryReadPart`, without changing what a plain, a quoted or an array key means: decide whether a bracketed part is compared exactly, as a double-quoted one is, or ignoring case, as SQL Server compares names by default; tests for each form at each level of the override, and a key such as `[int[]]` that mixes the two meanings of brackets; the manual's override section and its known issue.
+A bracketed part, `]]` for a bracket inside it, in `TypeKeyText.TryReadPart`, without changing what a plain, a quoted or an array key means: decide whether a bracketed part is compared exactly, as a double-quoted one is, or ignoring case, as SQL Server compares names by default; tests for each form at each level of the override, and a key such as `[int[]]` that mixes the two meanings of brackets; the manual's override section, and its limit, `site/reference/type-mapping.md#limit-key-in-brackets`, with its entry in `site/guides/troubleshooting.md`.
 
 ## Trigger
 

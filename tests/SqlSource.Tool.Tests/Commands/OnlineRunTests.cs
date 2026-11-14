@@ -472,9 +472,9 @@ public sealed class OnlineRunTests : IDisposable
         File.Exists(stale).ShouldBeTrue();
     }
 
-    // The value of a settings file's database is read by the tool alone, so the compiler never reports a wrong one and
-    // the run writes it, however many of the errors beside it the compiler does report.  The keys are written in the
-    // order of the row, so that an error is not taken for the one before or after it.
+    // The value of a settings file's database is checked by the tool alone, so the compiler never reports a wrong one
+    // and the run writes it, however many of the errors beside it the compiler does report.  The keys are written in
+    // the order of the row, so that an error is not taken for the one before or after it.
     [Theory]
     [InlineData("auto", "database")]
     [InlineData("true", "database")]

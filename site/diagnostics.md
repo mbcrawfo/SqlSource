@@ -61,7 +61,7 @@ public partial class UserRepository { }
 
 Check the spelling, and that the path starts from the folder of this source file and not from the project.  If the file exists, check that the build sees it.  The package registers the `.sql` files under the project's own folder, so a file outside it, such as a linked file, must be listed as an `AdditionalFiles` item.  So must every `.sql` file of a project that sets `SqlSourceIncludeFiles` to `false`.
 
-See: [Source](settings.md#setting-source)
+See: [Source](reference/attributes.md#setting-source)
 
 ## SQLSRC005
 
@@ -77,7 +77,7 @@ Without `Source`, the type gets the `.sql` file named for it in the folder of th
 
 Add `UserRepository.sql` next to the source file, or rename the file you have.  For a file of another name, or several, set `Source`: `Source = "Users.sql"` for one file, `Source = "."` for every `.sql` file of the folder.  If the file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
 
-See: [Source](settings.md#setting-source)
+See: [Source](reference/attributes.md#setting-source)
 
 ## SQLSRC007
 
@@ -123,7 +123,7 @@ See: [Which files belong to a type](reference/attributes.md#files-of-a-type)
 
 Reported by: the build.
 
-A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](reference/members.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and no query method there can have it either.  An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `both`, and a synchronous method, under `sync` or `both`, has the query's name alone, so under `both` the class can have neither name, whatever the query's shape.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
+A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](reference/members.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and no query method there can have it either.  An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `both`, and a synchronous method, under `sync` or `both`, has the query's name alone, so under `both` the class can have neither name, whatever the query's shape.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
 
 ```sql
 -- name: Sql
@@ -176,7 +176,7 @@ Remove the item, since the package already includes the file.  To change the ite
 
 The error is reported only for a `.sql` file that a type uses.
 
-See: [Source](settings.md#setting-source)
+See: [Source](reference/attributes.md#setting-source)
 
 ## SQLSRC015
 
@@ -196,7 +196,7 @@ A settings file, `sqlsource.json`, holds one JSON object, and this one does not:
 
 Correct the JSON.  While it is wrong the file gives nothing: none of its settings applies, and neither does its `root`.
 
-See: [Settings files](settings.md#settings-files)
+See: [Settings files](reference/settings-file.md#settings-files)
 
 ## SQLSRC016
 
@@ -215,7 +215,7 @@ A key of the top-level object of a settings file is not one of its keys.  Keys a
 
 The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes`, `nestedClass`, `memberLocation` and `visibility`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
 
-See: [Settings files](settings.md#settings-files)
+See: [Settings files](reference/settings-file.md#settings-files)
 
 ## SQLSRC017
 
@@ -235,7 +235,7 @@ A key is written twice in the top-level object of a settings file.  The first me
 
 Remove one of the two members, and keep the value you want.
 
-See: [Settings files](settings.md#settings-files)
+See: [Settings files](reference/settings-file.md#settings-files)
 
 ## SQLSRC018
 
@@ -259,7 +259,7 @@ A value of a settings file is not of the JSON type its key takes.  `root` takes 
 
 Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, and so does `[]`.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
 
-See: [Settings files](settings.md#settings-files)
+See: [Settings files](reference/settings-file.md#settings-files)
 
 ## SQLSRC019
 
@@ -296,7 +296,7 @@ Correct the value, or remove it.  While it is wrong the setting is not set by th
 
 `output` takes `sql`, `models`, `methods` or `repository`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`, `memberLocation` takes `extension-class`, `class` or `nested-class`, and `visibility` takes `public`, `internal`, `protected` or `private`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name, and `nestedClass` takes one identifier that is none of those and not `var`.  `database` takes one word of letters, digits, `-`, `_` and `.`.
 
-`generatorParameters` takes one word in each element: a generator parameter, `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` or `method-type`, alone or followed by `=on`, `=off` or `=default`, or `default` alone, in any case; `transaction` also takes the words of an isolation level, and `method-type` takes only `=async`, `=sync`, `=both` or `=default`.  A name that is not one is reported, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them, and so is a value that is not one of the parameter's or `default`, and `default` followed by `=`.  `[]` names no parameter and changes nothing, and `["default"]` gives every parameter its default.  The rules are in [generator parameters](settings.md#setting-generator-parameters).
+`generatorParameters` takes one word in each element: a generator parameter, `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` or `method-type`, alone or followed by `=on`, `=off` or `=default`, or `default` alone, in any case; `transaction` also takes the words of an isolation level, and `method-type` takes only `=async`, `=sync`, `=both` or `=default`.  A name that is not one is reported, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them, and so is a value that is not one of the parameter's or `default`, and `default` followed by `=`.  `[]` names no parameter and changes nothing, and `["default"]` gives every parameter its default.  The rules are in [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
 
 `typeOverrides` takes members `"key": "type"`, and the key and the type of each are trimmed:
 
@@ -304,13 +304,13 @@ Correct the value, or remove it.  While it is wrong the setting is not set by th
 - **A key is not written in brackets.**  `"[dbo].[Email]"` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly and is written `"\"dbo\".\"Email\""` as a JSON key.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
 - **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `"int4": "int"` and not `"int4": "int?"`.  It may also be `default`.
 
-The rules are in [type overrides](settings.md#setting-type-overrides).
+The rules are in [type overrides](reference/type-mapping.md#setting-type-overrides).
 
 `columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](reference/model-properties.md#setting-column-types).
 
-`libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime`, `netTopologySuite` or `json`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](settings.md#setting-library-types).
+`libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime`, `netTopologySuite` or `json`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](reference/library-types-and-json.md#setting-library-types).
 
-See: [Settings files](settings.md#settings-files)
+See: [Settings files](reference/settings-file.md#settings-files)
 
 ## SQLSRC020
 
@@ -338,7 +338,7 @@ In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states
 
 Remove one of the two, and keep the C# type or the state you want.
 
-See: [Settings files](settings.md#settings-files)
+See: [Settings files](reference/settings-file.md#settings-files)
 
 ## SQLSRC021
 
@@ -400,7 +400,7 @@ The project sets the MSBuild property `SqlSourceOnline` to a value that is not `
 
 Set `SqlSourceOnline` to `auto`, `true` or `false`, or remove it to get `auto`.  The property can come from the project file or from a `Directory.Build.props` above it.
 
-See: [Running the tool in the build](settings.md#online-build)
+See: [Running the tool in the build](reference/msbuild.md#online-build)
 
 ## SQLSRC025
 
@@ -428,7 +428,7 @@ Reported by: the build.
 
 The warning is at the project file.  A project can list `SQLSRC026` in the MSBuild property `MSBuildWarningsAsMessages`, which turns the warning into a message.
 
-`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](settings.md#setting-env-file) names, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
+`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) names, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
 ```console
 /repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.
@@ -478,13 +478,13 @@ public partial class UserRepository
 /work/App/UserRepository.cs(1,2): error SQLSRC028: 'App.UserRepository' has no connection for the database 'postgres', which its repository queries use.  Add a string field, property or primary-constructor parameter named connectionString, or one of a DbDataSource type, or mark the member that gives the connection [SqlSourceConnection].  Or set the output of its repository queries to methods.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection, and the repository queries of that database get no method.  The database is the one the queries' [database](settings.md#setting-database) setting names, or their dialect's name.
+The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection, and the repository queries of that database get no method.  The database is the one the queries' [database](reference/settings.md#setting-database) setting names, or their dialect's name.
 
 - Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`, or mark the member that gives the connection `[SqlSourceConnection]`.
 - When a member is marked, no other is found by its name or type: mark the one for this database too.
 - A primary-constructor parameter that the type also passes to its base type, or uses to initialize a field or property, is not found by its name or type, and the message names it: keep the value in a field or property named `connectionString` or of a `DbDataSource` type, or mark the parameter `[SqlSourceConnection]`.
 - When the type's repository queries use more than one database, no member is found by its name or type, since nothing says which database it is for: mark one member for each, `[SqlSourceConnection(Database = "reports")]`.
-- Or set the queries' [output](settings.md#setting-output) to `methods`, whose methods take the connection as an argument.
+- Or set the queries' [output](reference/settings.md#setting-output) to `methods`, whose methods take the connection as an argument.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -665,7 +665,7 @@ public static partial class UserQueries;
 /work/App/UserQueries.cs(1,2): error SQLSRC034: 'App.UserQueries' is static, and the method of a repository query is an instance method.  Set the output of its repository queries to methods, or remove static.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of its repository queries gets a method.  Set their [output](settings.md#setting-output) to `methods`, whose methods are static or extension methods that take the connection, or remove `static` and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
+The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of its repository queries gets a method.  Set their [output](reference/settings.md#setting-output) to `methods`, whose methods are static or extension methods that take the connection, or remove `static` and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
 
 See: [Repository methods](reference/repositories.md#repository-methods)
 
@@ -911,7 +911,7 @@ A `-- generator:` marker holds a word whose name is not a generator parameter.  
 
 Correct the parameter.  A dialect is not a generator parameter: it has a marker of its own, `-- dialect: name`.
 
-See: [Generator parameters](settings.md#setting-generator-parameters)
+See: [Generator parameters](reference/generator-parameters.md#setting-generator-parameters)
 
 ## SQLSRC110
 
@@ -923,7 +923,7 @@ A `-- generator:` marker has nothing after the colon.
 
 Add a generator parameter, or delete the line.
 
-See: [Generator parameters](settings.md#setting-generator-parameters)
+See: [Generator parameters](reference/generator-parameters.md#setting-generator-parameters)
 
 ## SQLSRC111
 
@@ -933,7 +933,7 @@ Reported by: the build and the tool.
 
 A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
 
-- A generator parameter's value is one of its own words, `on` or `off`, and for `transaction` also `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`, and `async`, `sync` or `both` for `method-type`, which takes no `on` or `off`, or `default`, and the message lists them: `keep-comments=true` is this error, and so is `method-type` alone, which is `method-type=on`, and `default` followed by `=`, as in `default=on`.  See [generator parameters](settings.md#setting-generator-parameters).
+- A generator parameter's value is one of its own words, `on` or `off`, and for `transaction` also `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`, and `async`, `sync` or `both` for `method-type`, which takes no `on` or `off`, or `default`, and the message lists them: `keep-comments=true` is this error, and so is `method-type` alone, which is `method-type=on`, and `default` followed by `=`, as in `default=on`.  See [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of a settings file's `dialect`, in [SQLSRC019](#sqlsrc019).  The value is the rest of the line, so nothing else may follow it.
 
@@ -948,10 +948,10 @@ A generator parameter has a value it does not take; what follows a name in a `--
 - `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.
 - `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  No part of either is a reserved keyword or `file`, `required`, `scoped` or `extension`, and no generic type is named.
 - `-- nested-class:` takes one identifier that is none of those and not `var`, with which the query methods of the type would not compile: `Queries`, and not `class`, `file` or `App.Sql`.  `-- member-location:` takes `extension-class`, `class` or `nested-class`, and `-- visibility:` takes `public`, `internal`, `protected` or `private`, in any case and with or without hyphens and spaces.
-- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
+- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](reference/type-mapping.md#setting-type-overrides).
 - The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
 - A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- `-- library-types:` takes one entry or more, each `name=state` with no space around its `=`, separated by white space, as in `-- library-types: nodatime=off`.  The library is `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`, matched ignoring case, hyphens and spaces.  A line with no entry, an entry without `=`, `nodatime = on` with spaces, and a library or a state that is not one are this error, which the message lists.  See [library types](settings.md#setting-library-types).
+- `-- library-types:` takes one entry or more, each `name=state` with no space around its `=`, separated by white space, as in `-- library-types: nodatime=off`.  The library is `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`, matched ignoring case, hyphens and spaces.  A line with no entry, an entry without `=`, `nodatime = on` with spaces, and a library or a state that is not one are this error, which the message lists.  See [library types](reference/library-types-and-json.md#setting-library-types).
 
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
@@ -993,7 +993,7 @@ Two settings contradict each other.  The error is at the second.
 - Two `-- param:` markers for one parameter that give different types, different nullability or different C# types after `->`.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
 - Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
-- Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](settings.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two; and the C# types are compared by how they are named, so `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.  The same holds for the C# types of `-- column:` and `-- param:` markers.
+- Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](reference/type-mapping.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two; and the C# types are compared by how they are named, so `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.  The same holds for the C# types of `-- column:` and `-- param:` markers.
 - Two entries of `-- library-types:` markers that give one library two states, in the file header or inside one query, on one line or two: `nodatime=on` and `nodatime=off`.
 
 ```sql error
@@ -1005,7 +1005,7 @@ SELECT id, name FROM users;
 
 Remove one of the two.  A query's `-- generator:` word for a generator parameter replaces the file header's for that parameter, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either, nor is `default` beside other words of `-- generator:`.
 
-See: [A value that is wrong](settings.md#a-value-that-is-wrong)
+See: [A value that is wrong](reference/settings.md#a-value-that-is-wrong)
 
 ## SQLSRC113
 
@@ -1182,7 +1182,7 @@ See: [Name of one query's model](reference/models.md#setting-model-name)
 
 Reported by: the build and the tool.
 
-A token and a comment overlap: the comment is not wholly inside the token's default, nor outside the token.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens three ways.
+A token and a comment overlap: the comment is not wholly inside the token's default, nor outside the token.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](reference/generator-parameters.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens three ways.
 
 A comment inside a default holds `}}`.  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
 
@@ -1612,7 +1612,7 @@ A query whose output is `models`, `methods` or `repository` is described by a da
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'methods' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in the [settings file](settings.md#settings-files) of the project's folder for every file under it, in that of the files' own folder for those files alone, or with `-- dialect: postgres` or `-- dialect: mssql` at the top of the file:
+For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in the [settings file](reference/settings-file.md#settings-files) of the project's folder for every file under it, in that of the files' own folder for those files alone, or with `-- dialect: postgres` or `-- dialect: mssql` at the top of the file:
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -1654,7 +1654,7 @@ See: [Defaults](reference/tokens.md#token-defaults)
 
 Reported by: the tool.
 
-Each query that is described belongs to one logical database: the one its `-- database:` marker names, or else the `database` of the nearest [settings file](settings.md#settings-files) of its file's folder, or of a folder above it, that sets one, or else the name of its file's dialect.  A name is one database across the whole run, with one connection, and the dialect picks the driver of that connection.  Here two files give one name two dialects.  Names are compared ignoring case.
+Each query that is described belongs to one logical database: the one its `-- database:` marker names, or else the `database` of the nearest [settings file](reference/settings-file.md#settings-files) of its file's folder, or of a folder above it, that sets one, or else the name of its file's dialect.  A name is one database across the whole run, with one connection, and the dialect picks the driver of that connection.  Here two files give one name two dialects.  Names are compared ignoring case.
 
 ```console
 /work/App/Queries/Reports.sql(1,10): error SQLSRC211: The database 'main' has the dialect 'mssql' here and 'postgres' in '/work/App/Queries/Users.sql'
@@ -1662,7 +1662,7 @@ Each query that is described belongs to one logical database: the one its `-- da
 
 Give the queries of one of the two files another database, or the dialect of the other file.  The database keeps the dialect of the first file that names it, in the order of the projects and then of the files' paths.  The error is reported once for each other file, at its first query of that database, and no query of that database in that file is described until it is mended.  A query whose output is `sql` belongs to no database and is not counted, and neither is a file that already has [SQLSRC209](#sqlsrc209).
 
-See: [Database](settings.md#setting-database)
+See: [Database](reference/settings.md#setting-database)
 
 ## SQLSRC212
 
@@ -1694,7 +1694,7 @@ A query that must be described belongs to a database that the run has no connect
     help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env.  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another
 ```
 
-Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run reads, whether or not it is there: the one in the folder of the solution or project it runs on, or the one `--env-file` names.  It ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`, so a `.env` that sits elsewhere, such as in a folder above the project's, is seen not to be read.  Under `--env-file none` it says `The run reads no .env file` instead.  The run never reads a `.env` in a folder above its own.  A run on a solution reads the `.env` beside the solution, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`, in the place of the sentence above.  Move the file, or its connection variables, to the solution's folder, or name the file with [`--env-file`](reference/connections.md#env-file), or for a build with [`SqlSourceEnvFile`](settings.md#setting-env-file).  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
+Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run reads, whether or not it is there: the one in the folder of the solution or project it runs on, or the one `--env-file` names.  It ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`, so a `.env` that sits elsewhere, such as in a folder above the project's, is seen not to be read.  Under `--env-file none` it says `The run reads no .env file` instead.  The run never reads a `.env` in a folder above its own.  A run on a solution reads the `.env` beside the solution, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`, in the place of the sentence above.  Move the file, or its connection variables, to the solution's folder, or name the file with [`--env-file`](reference/connections.md#env-file), or for a build with [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file).  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
 
 See: [Connections](reference/connections.md#connections)
 
@@ -2474,9 +2474,9 @@ The query's output is `models`, `methods` or `repository`, which needs a descrip
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'methods' needs one.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `repository`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](settings.md#settings-files) of the project's folder, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  When the sidecar exists and has the entry, the build does not see it: a project that sets `SqlSourceIncludeFiles` to `false`, or lists a `.sql` file from outside its folder, lists the sidecar as an `AdditionalFiles` item too, as [included files](settings.md#included-files) says.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `repository`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](reference/settings-file.md#settings-files) of the project's folder, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  When the sidecar exists and has the entry, the build does not see it: a project that sets `SqlSourceIncludeFiles` to `false`, or lists a `.sql` file from outside its folder, lists the sidecar as an `AdditionalFiles` item too, as [included files](reference/msbuild.md#included-files) says.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Output](settings.md#setting-output)
+See: [Output](reference/settings.md#setting-output)
 
 ## SQLSRC242
 
@@ -2492,7 +2492,7 @@ The query's entry in the sidecar was described against a kind of database that i
 
 Check that the file's dialect is the right one, then run `dotnet sqlsource describe` and commit the sidecar it writes.
 
-See: [Dialect](settings.md#setting-dialect)
+See: [Dialect](reference/settings.md#setting-dialect)
 
 ## SQLSRC243
 
@@ -2557,12 +2557,12 @@ A column or a parameter of the query has a database type that Npgsql, or Microso
 What to do depends on the type:
 
 - **`regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation` and `regdictionary`.**  Cast the column to `oid` in the query, `SELECT 'users'::regclass::oid AS relation`, which Npgsql reads as a `uint`.  Cast an array of one to `oid[]`, as the message says.
-- **A composite type, which includes a table's row type, and a base type of an extension that SqlSource does not know.**  Map it with the [type override](settings.md#setting-type-overrides) to the C# type that your application reads it as, `public.address=MyApp.Address` for a type that the data source maps, or select its fields as columns of their own.
+- **A composite type, which includes a table's row type, and a base type of an extension that SqlSource does not know.**  Map it with the [type override](reference/type-mapping.md#setting-type-overrides) to the C# type that your application reads it as, `public.address=MyApp.Address` for a type that the data source maps, or select its fields as columns of their own.
 - **A range of a subtype that SqlSource does not know, and a multirange of one.**  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
 - **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`, or cast the column to `text` in the query, as the message says.
 - **`pg_snapshot`, `txid_snapshot`, `pg_node_tree`, and any other base type of `pg_catalog` that SqlSource does not know, such as `aclitem`.**  No version of Npgsql reads them, so a type override would build and fail when the query runs.  Cast the column to `text` in the query, and an array of one to `text[]`, as the message says.
-- **PostGIS's `geometry` and `geography`**, in any schema, and an array of one or a domain over one.  Reference `Npgsql.NetTopologySuite`, and a query whose output is `methods` or `repository` reads them as NetTopologySuite's `Geometry`, as the message says: see [NetTopologySuite on PostgreSQL](reference/databases/postgresql/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with the plugin too, and so does one where the [library types](settings.md#setting-library-types) turn NetTopologySuite off, since only the query methods where it is on get its types: give the query the output `methods` or `repository`, or map the type with the type override to the C# type your code reads it as, by the key the message names, `public.geometry`.
-- **`geography` and `geometry` of SQL Server.**  Reference `NetTopologySuite.IO.SqlServerBytes` and NetTopologySuite 2.5.0 or later, and turn NetTopologySuite on with the [library types](settings.md#setting-library-types), and a query whose output is `methods` or `repository` reads them as NetTopologySuite's `Geometry`: see [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with NetTopologySuite on.  Or reference the package `Microsoft.SqlServer.Types`, which Microsoft.Data.SqlClient needs to read them, and map the type with the type override to that package's type for it, as the message says: `geography=Microsoft.SqlServer.Types.SqlGeography` or `geometry=Microsoft.SqlServer.Types.SqlGeometry`.
+- **PostGIS's `geometry` and `geography`**, in any schema, and an array of one or a domain over one.  Reference `Npgsql.NetTopologySuite`, and a query whose output is `methods` or `repository` reads them as NetTopologySuite's `Geometry`, as the message says: see [NetTopologySuite on PostgreSQL](reference/databases/postgresql/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with the plugin too, and so does one where the [library types](reference/library-types-and-json.md#setting-library-types) turn NetTopologySuite off, since only the query methods where it is on get its types: give the query the output `methods` or `repository`, or map the type with the type override to the C# type your code reads it as, by the key the message names, `public.geometry`.
+- **`geography` and `geometry` of SQL Server.**  Reference `NetTopologySuite.IO.SqlServerBytes` and NetTopologySuite 2.5.0 or later, and turn NetTopologySuite on with the [library types](reference/library-types-and-json.md#setting-library-types), and a query whose output is `methods` or `repository` reads them as NetTopologySuite's `Geometry`: see [NetTopologySuite on SQL Server](reference/databases/sqlserver/libraries.md#nettopologysuite).  A query whose output is `models` gets this error with NetTopologySuite on.  Or reference the package `Microsoft.SqlServer.Types`, which Microsoft.Data.SqlClient needs to read them, and map the type with the type override to that package's type for it, as the message says: `geography=Microsoft.SqlServer.Types.SqlGeography` or `geometry=Microsoft.SqlServer.Types.SqlGeometry`.
 - **`hierarchyid` of SQL Server.**  Microsoft.Data.SqlClient reads it only when the application references the package `Microsoft.SqlServer.Types`.  Reference it, and map the type with the type override to that package's type, as the message says: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`.
 - **A SQL Server type that this version of SqlSource does not know, and a CLR type of your own assembly.**  Map it with the type override to the C# type that your application reads it as, as the message says: `sys.newtype=MyApp.NewType` for a type of a newer SQL Server, or `dbo."Money"=MyApp.Money` for a CLR type of the schema `dbo`.
 - **A parameter with no type, `record`, `unknown`, `void`, a kind of type that this version of SqlSource does not know, or a SQL Server type with no name.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
@@ -2625,7 +2625,7 @@ The project does not reference Npgsql, and a column or a parameter of the query 
 /work/App/Queries/Users.sql(1,10): error SQLSRC249: The column 'born' has the type 'date', whose C# type depends on Npgsql, and this project does not reference it.  Reference Npgsql, or map it with the type override for the Npgsql the application runs on: date=System.DateTime on Npgsql 8 and 9, date=System.DateOnly on Npgsql 10.
 ```
 
-Reference the `Npgsql` package from the project, at the version the application runs on: every type then gets the C# type of that version.  A project that keeps its queries apart from the driver can map each type that differs with the [type override](settings.md#setting-type-overrides) instead, for the version the application runs on, as the message says: `"typeOverrides": { "date": "System.DateOnly", "time": "System.TimeOnly" }` in the [settings file](settings.md#settings-files) of the project's folder for Npgsql 10.  An entry for `date` maps an array or a domain of `date` too.  The message offers only C# types that a project without Npgsql can name: for `cidr`, `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.  `daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version, so for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.  Every other type has the same C# type on every version of Npgsql, and needs neither.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
+Reference the `Npgsql` package from the project, at the version the application runs on: every type then gets the C# type of that version.  A project that keeps its queries apart from the driver can map each type that differs with the [type override](reference/type-mapping.md#setting-type-overrides) instead, for the version the application runs on, as the message says: `"typeOverrides": { "date": "System.DateOnly", "time": "System.TimeOnly" }` in the [settings file](reference/settings-file.md#settings-files) of the project's folder for Npgsql 10.  An entry for `date` maps an array or a domain of `date` too.  The message offers only C# types that a project without Npgsql can name: for `cidr`, `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.  `daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version, so for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.  Every other type has the same C# type on every version of Npgsql, and needs neither.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
 See: [Which version of Npgsql](reference/databases/postgresql/types.md#which-npgsql)
 
@@ -2637,7 +2637,7 @@ Reported by: the build.
 
 The error is at the name of each query that has a column or a parameter the type is chosen for.  A query gets it once: for its first column or parameter that has no C# type.  Parameters come before columns.
 
-A C# type that you chose cannot be found.  It is a type that the [type override](settings.md#setting-type-overrides) gives a database type, that the [column types](reference/model-properties.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
+A C# type that you chose cannot be found.  It is a type that the [type override](reference/type-mapping.md#setting-type-overrides) gives a database type, that the [column types](reference/model-properties.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC250: 'uuid' is mapped to 'MyApp.UserKey' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and no type of that name is found, or more than one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
@@ -2646,7 +2646,7 @@ A C# type that you chose cannot be found.  It is a type that the [type override]
 
 Write the name of a type that the project has, with its type arguments: `UserKey`, `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  For a short name that several types have, write the full name, from its namespace, of the one you mean: `MyApp.UserId`.  A nested type is written with its full name, with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the full name that the project can see, map to a type of the project's own, which is always chosen first.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
+See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC251
 
@@ -2672,7 +2672,7 @@ The same error is reported when the type is not `public` and the model that woul
 
 Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then.  Under the output `models` the query's constant or token method still is; under `methods` or `repository` the query gets no method.
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
+See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC252
 
@@ -2690,7 +2690,7 @@ A C# type that you chose, by the type override, the column types or a marker, is
 
 Choose another C# type.  For `System.Nullable<T>`, choose `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  For a generic type, give it type arguments that meet the constraints of its declaration.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
+See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC253
 
@@ -2963,7 +2963,7 @@ The type override has an entry for the name the database gives an array type, an
 
 Rename the entry to the key the message gives: the member `"public.user_status[]": "System.Collections.Generic.List<string>"` in a settings file's `typeOverrides`, or `-- type-override: public.user_status[]=System.Collections.Generic.List<string>` in a marker.  When the type override already has an entry for that key, remove the one the message names.  Under the output `models` the query's constant or token method is still generated; under `methods` or `repository` the query gets no method until the error is fixed.
 
-See: [Type overrides](settings.md#setting-type-overrides)
+See: [Type overrides](reference/type-mapping.md#setting-type-overrides)
 
 ## SQLSRC262
 
@@ -3267,7 +3267,7 @@ Reported by: the build.
 
 If several types claim the query's file, the query gets this error once.  A cause that belongs to one type, such as a member of that type, is the exception: each type that has it reports it.  If two types of one namespace claim the file, each gives the query a method of one signature.  The query then gets one error for each type, each naming the other.  The query also gets each other error about its method, and gets no method until all are fixed.
 
-The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  Under the generator parameter [`method-type`](settings.md#setting-generator-parameters) a synchronous method has the query's name alone, and under `both` an asynchronous method always has `Async` after it, whatever `async-method-suffix` says, so that it never has the name of the synchronous method beside it.  Each name of a query's methods is checked, and the message names the one that is taken; a query with one taken gets none of its methods, but for a clash with a method of another type in an extension class, the last case below, which leaves out its methods of that name alone.  It is taken when it is:
+The method of a query whose output is `methods` or `repository` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  Under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) a synchronous method has the query's name alone, and under `both` an asynchronous method always has `Async` after it, whatever `async-method-suffix` says, so that it never has the name of the synchronous method beside it.  Each name of a query's methods is checked, and the message names the one that is taken; a query with one taken gets none of its methods, but for a clash with a method of another type in an extension class, the last case below, which leaves out its methods of that name alone.  It is taken when it is:
 
 - under the [member location](reference/members.md#locations) `extension-class`, the default of the output `methods`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `class`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type that is on the type too, or of a nested class that the type's queries put members in;
@@ -3366,7 +3366,7 @@ Change the method so that it is a converter, or remove its `[SqlSourceConverter]
 
 A converter declared in a referenced assembly, on a type that a type override, a column type or a `-- param:` marker names, is reported at the name of each query whose output is `methods` or `repository` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's converter is used only when the project can call it: when it is `public`, or `internal` in a library that gives the project its internals with `InternalsVisibleTo`.
 
-See: [Converters](settings.md#converters)
+See: [Converters](reference/converters.md#converters)
 
 ## SQLSRC278
 
@@ -3386,7 +3386,7 @@ Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error
 
 Two such converters declared in referenced assemblies, on the types that a type override, a column type or a `-- param:` marker names, are reported at the name of each query whose output is `methods` or `repository` and whose method would convert through one of them, and that query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
 
-See: [Converters](settings.md#converters)
+See: [Converters](reference/converters.md#converters)
 
 ## SQLSRC279
 
@@ -3408,9 +3408,9 @@ The error has a second form, when the column's or parameter's database type has 
 /work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or remove the converters of 'App.Address'.
 ```
 
-For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `"public.email": "App.Email"` or `posts.tag_ids` under `"posts.tag_ids": "TagId[]"`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  On SQL Server, the query methods of a project that references NodaTime convert NodaTime's types themselves, so a NodaTime type given to a database type that it is not converted from, as `datetimeoffset=NodaTime.LocalDateTime`, is this error too, and the message names the type it is converted from and to: see [NodaTime on SQL Server](reference/databases/sqlserver/libraries.md#nodatime).  So are System.Text.Json's types, on SQL Server and, for `JsonNode`, `JsonObject` and `JsonArray`, on Npgsql 8 and 9, which the query methods convert from and to a `string`: one given to a database type that is not read as a `string`, as `int=System.Text.Json.JsonElement` on SQL Server, is this error, for a column and a parameter alike, and the message says that its converters convert from and to `string`, not `int`: see JSON on [SQL Server](reference/databases/sqlserver/libraries.md#json) and [PostgreSQL](reference/databases/postgresql/libraries.md#json).  A class of yours in a column that holds JSON whose converters are all of other types than `string` is this error too, and is not read through System.Text.Json's serializer: see [a class in a JSON column](settings.md#json-class).  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `"public.email": "App.Email"` or `posts.tag_ids` under `"posts.tag_ids": "TagId[]"`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  On SQL Server, the query methods of a project that references NodaTime convert NodaTime's types themselves, so a NodaTime type given to a database type that it is not converted from, as `datetimeoffset=NodaTime.LocalDateTime`, is this error too, and the message names the type it is converted from and to: see [NodaTime on SQL Server](reference/databases/sqlserver/libraries.md#nodatime).  So are System.Text.Json's types, on SQL Server and, for `JsonNode`, `JsonObject` and `JsonArray`, on Npgsql 8 and 9, which the query methods convert from and to a `string`: one given to a database type that is not read as a `string`, as `int=System.Text.Json.JsonElement` on SQL Server, is this error, for a column and a parameter alike, and the message says that its converters convert from and to `string`, not `int`: see JSON on [SQL Server](reference/databases/sqlserver/libraries.md#json) and [PostgreSQL](reference/databases/postgresql/libraries.md#json).  A class of yours in a column that holds JSON whose converters are all of other types than `string` is this error too, and is not read through System.Text.Json's serializer: see [a class in a JSON column](reference/library-types-and-json.md#json-class).  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
-See: [Converters](settings.md#converters)
+See: [Converters](reference/converters.md#converters)
 
 ## SQLSRC280
 
@@ -3426,7 +3426,7 @@ A type override, a column type or a `-- param:` marker gives a column or a param
 
 Add the converter that the message names, a static method marked `[SqlSourceConverter]` that takes the one type and returns the other, on the type itself or in a class of the project.  A method that takes a type and returns the same type serves both directions.  For an array whose elements are converted one by one, the message names the element of the column or parameter, and the converter to add is of the element's type.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
-See: [Converters](settings.md#converters)
+See: [Converters](reference/converters.md#converters)
 
 ## SQLSRC281
 
@@ -3442,7 +3442,7 @@ The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a 
 
 Reference the package the message names from the project.  Or, where the error points, set the library to `off`, or remove the entry, for those queries: a library that nothing turns on is on only where the project references what it needs.  The error is reported at the entry that says `on`, the member of the settings file or the line of the marker, once for each database whose `methods` or `repository` queries it reaches, however many queries, files and types those are.  A query whose output is `models` or `sql` is not reported.  The queries keep their methods and their models, with the C# types they have while the library is off.
 
-See: [Library types](settings.md#setting-library-types)
+See: [Library types](reference/library-types-and-json.md#setting-library-types)
 
 ## SQLSRC282
 
@@ -3450,7 +3450,7 @@ See: [Library types](settings.md#setting-library-types)
 
 Reported by: the build.
 
-The project references a version of a library older than SqlSource supports, and a query whose output is `methods` or `repository` uses the library: a column or parameter of the query has one of the library's types, which the [library types](settings.md#setting-library-types) give it or which SqlSource converts for it.  SqlSource needs NodaTime 3.1.9 or later, NetTopologySuite 2.5.0 or later, and for a query of SQL Server that uses NetTopologySuite, `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later.  `NetTopologySuite.IO.SqlServerBytes` 2.1.0 alone brings NetTopologySuite 2.0.0, so a SQL Server project references NetTopologySuite by name too.  The message names the package, the version the project references and the oldest that SqlSource supports.
+The project references a version of a library older than SqlSource supports, and a query whose output is `methods` or `repository` uses the library: a column or parameter of the query has one of the library's types, which the [library types](reference/library-types-and-json.md#setting-library-types) give it or which SqlSource converts for it.  SqlSource needs NodaTime 3.1.9 or later, NetTopologySuite 2.5.0 or later, and for a query of SQL Server that uses NetTopologySuite, `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later.  `NetTopologySuite.IO.SqlServerBytes` 2.1.0 alone brings NetTopologySuite 2.0.0, so a SQL Server project references NetTopologySuite by name too.  The message names the package, the version the project references and the oldest that SqlSource supports.
 
 ```console
 CSC : error SQLSRC282: This project references NodaTime 3.1.8, and SqlSource needs NodaTime 3.1.9 or later for the query methods that use it, so they are not generated.  Update the package.
@@ -3458,7 +3458,7 @@ CSC : error SQLSRC282: This project references NodaTime 3.1.8, and SqlSource nee
 
 Until the package is updated, a query that uses the library gets no method; its models are still generated, with the library's types.  Any other error about its method is reported beside this one: fix it too, or the query still has no method once the package is updated.  The queries that do not use the library keep their methods.  Update the package to the version the message gives or later.  When another package brings the older version, reference the library's package from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project and package, however many queries and databases use the library, and never for a query whose output is `models` or `sql`.
 
-See: [Library types](settings.md#setting-library-types)
+See: [Library types](reference/library-types-and-json.md#setting-library-types)
 
 ## SQLSRC283
 
@@ -3476,7 +3476,7 @@ A column type, a `-- column:` marker or a `-- param:` marker gives a column or a
 
 Remove the word `json` from the place the message names, or `"json": true` from the column type, to map the column or parameter as any other type is mapped.  Or move the opt-in to the column or parameter that holds JSON, and give it your class: a `string` column of a database that has no JSON type, or a `json` or `jsonb` column, on which the opt-in is allowed and changes nothing.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A query whose output is `models` is not reported.
 
-See: [The JSON opt-in](settings.md#json-opt-in), [a class in a JSON column](settings.md#json-class)
+See: [The JSON opt-in](reference/library-types-and-json.md#json-opt-in), [a class in a JSON column](reference/library-types-and-json.md#json-class)
 
 ## SQLSRC284
 
@@ -3509,7 +3509,7 @@ is_global = true
 dotnet_diagnostic.SQLSRC284.severity = none
 ```
 
-See: [Type overrides](settings.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
+See: [Type overrides](reference/type-mapping.md#setting-type-overrides), [column types](reference/model-properties.md#setting-column-types)
 
 ## SQLSRC285
 
@@ -3524,7 +3524,7 @@ $ dotnet sqlsource describe /work/App
 /work/App/.env : error SQLSRC285: '/work/App/.env' cannot be read: Access to the path '/work/App/.env' is denied.
 ```
 
-Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment, with `--env-file none`, or in a build [`SqlSourceEnvFile`](settings.md#setting-env-file) `none`, so that the run reads no file.
+Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment, with `--env-file none`, or in a build [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) `none`, so that the run reads no file.
 
 See: [A `.env` file](reference/connections.md#env-file)
 
@@ -3759,7 +3759,7 @@ Reported by: the build.
 
 The error is at the query's name, once for the query.
 
-A query whose output is `methods` or `repository` streams its rows, with the [collection type](reference/return-types.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`, and the generator parameter [`method-type`](settings.md#setting-generator-parameters) is `sync`.  A stream reads each row as the caller asks for it, which only an asynchronous method can do, so there is no synchronous one.  The message names the query.
+A query whose output is `methods` or `repository` streams its rows, with the [collection type](reference/return-types.md#setting-collection-type) `IAsyncEnumerable` and the shape `many`, and the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) is `sync`.  A stream reads each row as the caller asks for it, which only an asynchronous method can do, so there is no synchronous one.  The message names the query.
 
 ```console
 /work/App/Queries/Users.sql(3,10): error SQLSRC298: The query 'ListUsers' streams its rows as an IAsyncEnumerable, which has no synchronous method; give it method-type=async or method-type=both
@@ -3777,7 +3777,7 @@ Reported by: the build.
 
 The error is at the query's name, once for the query, beside its other errors.  A query that has no entry in its sidecar yet gets [SQLSRC241](#sqlsrc241), not this error.  It gets this error once it is described, as it gets the other errors about its method.  Its models are still generated.
 
-A query whose output is `repository` would have a [synchronous method](reference/query-methods.md#synchronous-methods), under the generator parameter [`method-type`](settings.md#setting-generator-parameters) `sync` or `both`, but the one member that gives its database's connection is a method that returns a `Task` or `ValueTask` of a connection, which a synchronous method cannot call.  The message names the query, the database, the type and the member.
+A query whose output is `repository` would have a [synchronous method](reference/query-methods.md#synchronous-methods), under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `sync` or `both`, but the one member that gives its database's connection is a method that returns a `Task` or `ValueTask` of a connection, which a synchronous method cannot call.  The message names the query, the database, the type and the member.
 
 ```csharp
 [SqlSourceGenerate]

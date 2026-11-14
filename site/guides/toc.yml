@@ -1,5 +1,9 @@
 - name: Recipes
   href: ../recipes.md
+- name: Projects
+  items:
+    - name: Give a folder its own settings, or leave files out
+      href: folders-and-files.md
 - name: Workflow
   items:
     - name: Describe queries as you save (watch)

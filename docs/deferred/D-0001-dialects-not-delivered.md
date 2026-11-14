@@ -14,7 +14,7 @@ Seven of the eight cover every engine whose ADO.NET providers have more than 100
 
 ## Remaining work
 
-A dialect is a value of `SqlDialect`, a name in `SqlDialectName`, a static property of `SqlDialectRules`, a row in the theory `Lex_Construct_IsReadByTheRulesOfTheDialect`, and, in the user documentation, a row of "Choosing a dialect" and a column of "What each dialect changes" in `site/reference/dialects.md`, a row of "Database support" in `site/reference/databases/index.md`, and a value in the Dialect row of `site/settings.md`.  A quoting form that no reader has is a new `QuoteReader` in `Parsing/Quoting/`.
+A dialect is a value of `SqlDialect`, a name in `SqlDialectName`, a static property of `SqlDialectRules`, a row in the theory `Lex_Construct_IsReadByTheRulesOfTheDialect`, and, in the user documentation, a row of "Choosing a dialect" and a column of "What each dialect changes" in `site/reference/dialects.md`, a row of "Database support" in `site/reference/databases/index.md`, and the section `site/reference/settings.md#setting-dialect`.  A quoting form that no reader has is a new `QuoteReader` in `Parsing/Quoting/`.
 
 | Engine | Read correctly today by | What it needs |
 |----|----|----|

@@ -47,7 +47,7 @@ Where the method goes is described on [What is generated and where it goes](memb
 - **A name that is used more than once is one token**, and every occurrence is replaced.  It is one argument.
 - **A token is replaced wherever it is written**, including inside a string or a quoted identifier.
 - **Braces around anything that is not a name, or a name and a default, are not a token.**  `{{table-name}}`, `{{1st}}`, `{{order by}}` and `{{name:` with no closing `}}` stay in the SQL as written, and nothing is reported.
-- **Comments are removed before tokens are found**, so a `{{x}}` in a comment is not a token.  A query that keeps its comments (the `keep-comments` [generator parameter](../settings.md#setting-generator-parameters)) is the exception: a kept comment is part of the SQL, and a token in it is replaced like any other.
+- **Comments are removed before tokens are found**, so a `{{x}}` in a comment is not a token.  A query that keeps its comments (the `keep-comments` [generator parameter](generator-parameters.md#setting-generator-parameters)) is the exception: a kept comment is part of the SQL, and a token in it is replaced like any other.
 - **A query that gains its first token changes from a constant to a method**, or its query method gains an argument, so the code that uses it stops compiling until it passes the arguments.
 
 <a id="token-defaults"></a>
@@ -115,6 +115,6 @@ SELECT id, name FROM users {{whereClause}};
 
 By default the method, a token method or a query method, checks each argument with `ArgumentException.ThrowIfNullOrWhiteSpace`: null throws `ArgumentNullException`, and an empty or blank string throws `ArgumentException`.  The check is that a value is present, not that it is safe.
 
-An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `token-validation=off` generator parameter.  Where a generator parameter can be written, and which place wins, is on [the settings page](../settings.md#setting-generator-parameters).
+An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `token-validation=off` generator parameter.  Where a generator parameter can be written, and which place wins, is on [the generator parameters page](generator-parameters.md#setting-generator-parameters).
 
 With validation off the method checks nothing.  An empty argument leaves nothing where its token was, and a null argument throws `NullReferenceException`.

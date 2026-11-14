@@ -12,7 +12,7 @@ Reusing a referenced copy is how the exceptions avoid CS0436 between projects th
 
 ## Impact
 
-Only a project with all three: it reuses a friend's exceptions, it references another SqlSource assembly that grants it no `InternalsVisibleTo`, and it builds a documentation file with crefs to the exceptions.  It gets a warning, which fails the build under `TreatWarningsAsErrors`.  The manual's known issue gives the workaround.  No generated code is affected.
+Only a project with all three: it reuses a friend's exceptions, it references another SqlSource assembly that grants it no `InternalsVisibleTo`, and it builds a documentation file with crefs to the exceptions.  It gets a warning, which fails the build under `TreatWarningsAsErrors`.  The manual's limit, `site/reference/exceptions.md#limit-cref`, gives the workaround.  No generated code is affected.
 
 ## Proposed fix
 

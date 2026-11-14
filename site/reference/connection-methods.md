@@ -33,7 +33,7 @@ namespace App
 GetUserDto? user = await connection.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](../settings.md#setting-output) is `methods` gets a method that takes the connection to run on, for code that manages its connections, its transactions and its timeouts itself.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, and leaves a connection that was open as it was.
+A query whose [output](settings.md#setting-output) is `methods` gets a method that takes the connection to run on, for code that manages its connections, its transactions and its timeouts itself.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, and leaves a connection that was open as it was.
 
 <a id="method-location"></a>
 
@@ -66,7 +66,7 @@ internal static async Task<ListFromDto[]> ListFrom(
     CancellationToken cancellationToken = default)
 ```
 
-The method has the name of the query, with `Async` after it under the [generator parameter](../settings.md#setting-generator-parameters) `async-method-suffix`: `ListFromAsync`.  A [synchronous method](query-methods.md#synchronous-methods) has the query's name alone, and beside one, under `method-type=both`, the asynchronous method always has `Async` after it.  Its arguments, in this order:
+The method has the name of the query, with `Async` after it under the [generator parameter](generator-parameters.md#setting-generator-parameters) `async-method-suffix`: `ListFromAsync`.  A [synchronous method](query-methods.md#synchronous-methods) has the query's name alone, and beside one, under `method-type=both`, the asynchronous method always has `Async` after it.  Its arguments, in this order:
 
 | Argument | What it is |
 |----|----|

@@ -10,8 +10,12 @@
       href: dialects.md
 - name: Settings
   items:
-    - name: Settings
-      href: ../settings.md
+    - name: "Settings: every setting, and where you write it"
+      href: settings.md
+    - name: sqlsource.json
+      href: settings-file.md
+    - name: Generator parameters
+      href: generator-parameters.md
     - name: Attributes
       href: attributes.md
     - name: MSBuild properties and the build
@@ -40,6 +44,10 @@
   items:
     - name: How a C# type is chosen, and type overrides
       href: type-mapping.md
+    - name: Library types and JSON
+      href: library-types-and-json.md
+    - name: Converters
+      href: converters.md
 - name: The sqlsource tool
   items:
     - name: The sqlsource command

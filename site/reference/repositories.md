@@ -40,7 +40,7 @@ var users = new UserRepository(dataSource);
 GetUserDto? user = await users.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](../settings.md#setting-output) is `repository`, the default, gets an instance method of the type that claims it, a repository.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method gets a connection from a member of the repository, here a new one from the data source `dataSource`, sends each parameter, runs the query, reads its row into the output model, and disposes the connection before it returns or throws.  So the code that calls it passes no connection, and needs none.  The repository also gets [an interface](#repository-interface) of its public repository methods, `IUserRepository`, for the code that uses it.  The method is asynchronous by default, and the generator parameter `method-type` gives the query a synchronous method instead or beside it, as [synchronous repository methods](#synchronous-repository-methods) say.
+A query whose [output](settings.md#setting-output) is `repository`, the default, gets an instance method of the type that claims it, a repository.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method gets a connection from a member of the repository, here a new one from the data source `dataSource`, sends each parameter, runs the query, reads its row into the output model, and disposes the connection before it returns or throws.  So the code that calls it passes no connection, and needs none.  The repository also gets [an interface](#repository-interface) of its public repository methods, `IUserRepository`, for the code that uses it.  The method is asynchronous by default, and the generator parameter `method-type` gives the query a synchronous method instead or beside it, as [synchronous repository methods](#synchronous-repository-methods) say.
 
 <a id="repository-signature"></a>
 
@@ -53,7 +53,7 @@ public async Task<ListFromDto[]> ListFrom(
     CancellationToken cancellationToken = default)
 ```
 
-The method has the name of the query, with `Async` after it under the [generator parameter](../settings.md#setting-generator-parameters) `async-method-suffix`, `ListFromAsync`, and always under `method-type=both`.  A [synchronous method](#synchronous-repository-methods) has the query's name alone.  Its arguments, in this order:
+The method has the name of the query, with `Async` after it under the [generator parameter](generator-parameters.md#setting-generator-parameters) `async-method-suffix`, `ListFromAsync`, and always under `method-type=both`.  A [synchronous method](#synchronous-repository-methods) has the query's name alone.  Its arguments, in this order:
 
 | Argument | What it is |
 |----|----|
@@ -65,7 +65,7 @@ It takes no connection, no transaction and no command timeout: see [transactions
 
 - **It is an instance method of the type, `public` by default**, whatever the accessibility of the type: a public method of an internal type is internal in effect.  On a type that is `protected` or `protected internal`, or inside one, a method that takes or returns a model cannot be `public`, since its models are internal, and is [SQLSRC123](../diagnostics.md#sqlsrc123) until you write `-- visibility: internal` on it.  [`visibility`](members.md#setting-visibility) gives it another, such as `protected` for the methods of an abstract base repository, which its derived types expose as they choose.  A method that is not `public` is left out of the interface.
 - **It is always on the type.**  A [member location](members.md#setting-member-location) of `class` fits, and `extension-class` or `nested-class` is [SQLSRC122](../diagnostics.md#sqlsrc122).
-- **Its name is not taken** by a member of the type, the type itself or one of its type parameters, a constant or token method that another query puts on the type, a nested class of the type's queries, or, for a public method, the name of the type's interface, nor is a [synchronous method](../settings.md#setting-generator-parameters) that takes no argument named `Finalize`, which would be taken for the type's finalizer ([SQLSRC274](../diagnostics.md#sqlsrc274)).  A token is not named `parameters` or `cancellationToken`, nor as any other argument a query method can have ([SQLSRC275](../diagnostics.md#sqlsrc275)).
+- **Its name is not taken** by a member of the type, the type itself or one of its type parameters, a constant or token method that another query puts on the type, a nested class of the type's queries, or, for a public method, the name of the type's interface, nor is a [synchronous method](generator-parameters.md#setting-generator-parameters) that takes no argument named `Finalize`, which would be taken for the type's finalizer ([SQLSRC274](../diagnostics.md#sqlsrc274)).  A token is not named `parameters` or `cancellationToken`, nor as any other argument a query method can have ([SQLSRC275](../diagnostics.md#sqlsrc275)).
 - A type's repository methods are in the file of its methods, `App.UserRepository-Methods.g.cs`, with its other query methods and its interface.
 
 <a id="repository-connection"></a>
@@ -114,7 +114,7 @@ The rule to remember: **a method is a factory, and a field, a property or a para
   }
   ```
 
-- **Several databases.**  A repository whose queries use more than one [logical database](../settings.md#setting-database) marks one member for each, or a pair, with the database's name, which is compared ignoring case.  Nothing is found by its name or type then, since nothing says which database a member is for.
+- **Several databases.**  A repository whose queries use more than one [logical database](settings.md#setting-database) marks one member for each, or a pair, with the database's name, which is compared ignoring case.  Nothing is found by its name or type then, since nothing says which database a member is for.
 
   ```csharp
   [SqlSourceGenerate(Source = ".")]
@@ -131,7 +131,7 @@ The rule to remember: **a method is a factory, and a field, a property or a para
 - **A borrowed connection runs the command in no transaction.**  A repository method gives its command no transaction, so on SQL Server, Microsoft.Data.SqlClient refuses it on a connection that has a pending transaction, with `InvalidOperationException`, from a synchronous method as from an asynchronous one; Npgsql runs it in the connection's transaction.  To run queries in a transaction, give them the output `methods`: see [transactions and timeouts](#repository-transactions).
 - **A PostgreSQL connection string makes a bare connection**, which knows none of the plugins and mappings of your data source: see [limits](databases/postgresql/query-methods.md#limit-connection-string-repository).  Give a PostgreSQL repository a data source.
 
-The attribute is `SqlSource.SqlSourceConnectionAttribute`, generated into your project beside `[SqlSourceGenerate]`.  Its one property, `Database`, names the [logical database](../settings.md#setting-database) as the `database` setting does.
+The attribute is `SqlSource.SqlSourceConnectionAttribute`, generated into your project beside `[SqlSourceGenerate]`.  Its one property, `Database`, names the [logical database](settings.md#setting-database) as the `database` setting does.
 
 <a id="repository-interface"></a>
 

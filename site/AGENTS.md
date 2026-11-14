@@ -6,10 +6,10 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 
 | New thing | Goes in | What fails if it does not |
 |----|----|----|
-| Setting, as a settings-file key or a marker | A `setting-<name>` section of `settings.md` or of the reference page of what it changes; a row under its `#all-settings` that names every place it can be written | A reviewer |
-| Marker | A row in the marker index of `reference/sql-files.md` | A reviewer |
-| Generator parameter | Each place that the comment on the list in `DiagnosticsDocumentTests` names | `DiagnosticsDocumentTests` |
-| MSBuild property | Its section of `settings.md`; a row under `#all-settings` | A reviewer |
+| Setting, as a settings-file key or a marker | A `setting-<name>` section on the reference page of what it changes; a row in the matrix of `reference/settings.md` | `SettingsReferenceTests` |
+| Marker | A row in the marker index of `reference/sql-files.md` | `SettingsReferenceTests` |
+| Generator parameter | `reference/generator-parameters.md`; the section of `SQLSRC109` | `SettingsReferenceTests`, `DiagnosticsDocumentTests` |
+| MSBuild property | A section on the reference page of what it changes; a row in `reference/msbuild.md#properties` and in the matrix; its name in the list of `SettingsReferenceTests` | `SettingsReferenceTests`, once listed; a reviewer otherwise |
 | Attribute, or a property of one | `reference/attributes.md` | A reviewer |
 | Command, option, environment variable, exit code | `reference/cli.md` | `CliReferenceTests`, for a command, an option and a `SQLSOURCE_` variable; a reviewer, for an exit code and another variable |
 | Diagnostic | A `## SQLSRCnnn` section of `diagnostics.md`, in id order | `DiagnosticsDocumentTests` |
@@ -23,7 +23,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 
 - **Three folders, one job each.**  `start/` is the path of a newcomer, read in order; `guides/` holds one task on each page; `reference/` is look-up, one page for each thing.  The root holds `index.md`, the landing page and the site's root, and `diagnostics.md`.
 - **A fact has one home.**  A rule, a value, a default or a limit is stated in one reference section; every other page restates it in a sentence or two and links there.
-- **Pages not yet moved.**  `concepts.md`, `settings.md` and `recipes.md` wait at the root for their phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.  Change one in place, and add no page at the root.  A limit of one is a bullet of its "Known issues", and a recipe is a sample and a link to the rules.
+- **Pages not yet moved.**  `concepts.md` and `recipes.md` wait at the root for their phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.  Change one in place, and add no page at the root.  A recipe is a sample and a link to the rules.
 - **A new page** gets an entry in the `toc.yml` of its folder, under its group.  Aim at 600 to 3,500 words for a page and at most nine entries for a group; a reviewer holds both.
 - **`README.md`**, beyond root rule 4: the databases it works with, getting started in five steps, "Only want to generate models?", "Just want to keep your SQL out of code files?", a FAQ of five to ten items, "NodaTime and other libraries", "Custom type mapping" and "Where to next".  A FAQ answer is a few sentences that link to a recipe where one exists.
 - **The site.**  docfx publishes every page here but each `AGENTS.md`.  `tools/build-site.sh` builds it and fails on any docfx warning.  The tests are in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/`; none checks whether a page is true and free of internals.

@@ -2,8 +2,6 @@
 
 Use this page when the build succeeds but something is wrong: an exception at run time, a wrong result, or nothing happens.  It also lists a build error that is not about your SQL.
 
-Some problems are listed in the known issues of [settings](../settings.md#known-issues).
-
 <a id="at-run-time"></a>
 
 ## An exception at run time
@@ -15,6 +13,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **`UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException` is not caught by its type.**  Another assembly catches these exceptions by their type only when it can see them.  See [an exception that is not caught by its type](../reference/exceptions.md#limit-caught-by-type).
 - **`InvalidCastException` from a query method with parameters, on a connection that wraps the driver's.**  The method works only on a connection whose commands take the driver's own parameters.  See [a connection that wraps the driver's](../reference/query-methods.md#limit-wrapped-connection).
 - **`NotSupportedException` from a collection method, on a connection that wraps the driver's.**  Most such connections cannot run a batch of commands.  See [a collection method on a connection that wraps the driver's](../reference/collection-methods.md#limit-wrapped-connection).
+- **`InvalidCastException` for an id type made by Vogen or StronglyTypedId.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and such a type has no method marked so.  See [Vogen and StronglyTypedId](../reference/converters.md#limit-vogen-and-stronglytypedid).
 
 <a id="wrong-model"></a>
 
@@ -28,6 +27,9 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **Only the first result set of a query has a model, on SQL Server.**  A query that returns several result sets gets a model of the first alone, and nothing is reported of the others.  See [several result sets](../reference/databases/sqlserver/index.md#limit-several-result-sets).
 - **A compiler warning at a `cref` that names one of the exceptions of SqlSource.**  A project that uses another project's exceptions, and also references a project whose exceptions it cannot see, gets CS0419 or CS1574.  See [a `cref` to the exceptions](../reference/exceptions.md#limit-cref).
 - **A compile error about `Microsoft.CodeAnalysis.EmbeddedAttribute`.**  SqlSource adds a declaration of this class to your project, and your own declaration of it must join it.  See [your own `EmbeddedAttribute`](../reference/attributes.md#limit-embedded-attribute).
+- **SQLSRC019 or SQLSRC111 for a type override's key written `[dbo].[Email]`.**  A key cannot be written in brackets, as T-SQL writes a name.  See [a key in brackets](../reference/type-mapping.md#limit-key-in-brackets).
+- **A compiler warning in a model for a `?` inside a type argument.**  SqlSource does not check a `?` inside a type argument against the constraints of a generic type.  See [a `?` inside a type argument](../reference/type-mapping.md#limit-nullable-type-argument).
+- **One C# type cannot be converted two ways in two files.**  The converters of a C# type serve every column and parameter of that type in the project.  See [one conversion for each type](../reference/converters.md#limit-one-conversion-per-type).
 
 <a id="wrong-result"></a>
 
@@ -52,6 +54,8 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **SQLSRC207 or SQLSRC212 for a project or `.sql` path that exists.**  If the current folder is reached through a symbolic link, a full path through the link does not match the real path.  See [a path through a symbolic link](../reference/cli.md#limit-path-through-a-symbolic-link).
 - **SQLSRC241 for a query that only another target framework includes.**  The tool reads a project with several target frameworks for its first framework alone.  See [several target frameworks](../reference/describing.md#limit-several-target-frameworks).
 - **SQLSRC208, and nothing is described for a type whose `Source` is a constant or `nameof`.**  The tool reads `[SqlSourceGenerate]` from your C# files as text, without compiling them.  See [`Source` written as text](../reference/attributes.md#limit-source-written-as-text).
+- **A settings file or a `.sql` file is ignored when the project is built through a symbolic link.**  A path through a link and the real path reach different settings files.  See [a build through a symbolic link](../reference/settings-file.md#limit-symbolic-link).
+- **SQLSRC241 for a `.sql` file that a build target of your own adds.**  The tool leaves out a file that a target adds while the build runs.  See [a file added by a target](../reference/msbuild.md#limit-file-added-by-a-target).
 
 <a id="watch"></a>
 

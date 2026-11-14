@@ -17,7 +17,7 @@ public sealed partial class SiteStructureTests
 {
     // The pages that wait at the root of site/ for their phase of the documentation overhaul to move them.  The list
     // only shrinks: the phase that moves a page removes its name.
-    internal static readonly IReadOnlyList<string> PagesNotYetMoved = ["concepts.md", "recipes.md", "settings.md"];
+    internal static readonly IReadOnlyList<string> PagesNotYetMoved = ["concepts.md", "recipes.md"];
 
     private const string Troubleshooting = "site/guides/troubleshooting.md";
 
