@@ -13,7 +13,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 ## A model that looks wrong
 
 - **A query parameter is missing from the input model.**  Under the `mssql` dialect, a parameter after a `DECLARE` with no `;` can be taken for a variable.  See [a parameter taken for a variable](../reference/parameters.md#limit-parameter-taken-for-a-variable).
-- **The input model has a property for a name that is not a query parameter**, such as `@x` written for an absolute value on PostgreSQL.  SqlSource finds query parameters by how the SQL is written, not by what the database does with it.  A MySQL or MariaDB user variable, and the parameter of a procedure that the SQL creates, are read as query parameters too.  With the output `sql` that they need, they change no generated code.  See [names that are read as parameters](../reference/parameters.md#names-read-as-parameters).
+- **The input model has a property for a name that is not a query parameter**, such as `@x` written for an absolute value on PostgreSQL.  SqlSource finds query parameters by how the SQL is written, not by what the database does with it.  A MySQL or MariaDB user variable, and the parameter of a procedure that the SQL creates, are read as query parameters too.  Their queries need the output `sql`, under which these names change no generated code.  See [names that are read as parameters](../reference/parameters.md#names-read-as-parameters).
 
 <a id="wrong-result"></a>
 
