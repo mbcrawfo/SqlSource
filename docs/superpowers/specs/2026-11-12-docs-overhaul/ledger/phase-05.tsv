@@ -53,7 +53,9 @@ site/tool.md:552	move	site/reference/cli.md#logs	-	-	position: "([known issues])
 site/tool.md:554-558	move	site/reference/cli.md#logs	-	-	-
 site/tool.md:562-567	move	site/reference/cli.md#requirements	-	-	Both links of line 567, to each database's index.md#connecting, take databases/index.md#supported-versions, the table of supported versions; the words stay
 site/tool.md:571	move	site/reference/bundles.md#diagnose	-	-	level: h3 to h2, as spec step 2 lists it
-site/tool.md:573-589	move	site/reference/bundles.md#diagnose	-	-	-
+site/tool.md:573-577	move	site/reference/bundles.md#diagnose	-	-	-
+site/tool.md:579	move	site/reference/bundles.md#diagnose	-	-	position: "see [reporting a wrong model] for what it holds and what it prints" > "see [what is renamed before you share it] for what it holds, and [reporting a wrong model] for what it prints"; what a bundle holds is #bundle-contents on this page now, no longer under the guide's section (branch review R1-F1)
+site/tool.md:581-589	move	site/reference/bundles.md#diagnose	-	-	-
 site/tool.md:593	move	site/reference/bundles.md#replay	-	-	level: h3 to h2, as spec step 2 lists it
 site/tool.md:595-600	move	site/reference/bundles.md#replay	-	-	-
 site/tool.md:601	move	site/reference/bundles.md#replay	-	-	position: "none of the requirements above but" > "none of the requirements but"; the requirements are on cli.md now
@@ -83,6 +85,7 @@ site/diagnostics.md:3623	corrected	site/diagnostics.md#sqlsrc294	C-03	See: When 
 @site/guides/troubleshooting.md:5	move	site/guides/troubleshooting.md	-	-	position: ", [the generator] and [the tool]" > " and [the generator]"; the link to the tool's known issues goes, since each of its limits has its entry
 site/README.md:115	corrected	site/index.md	-	the `SqlSource.Tool` package and its `sqlsource` command	The words running it in the build, and making and checking a bug-report bundle go: the page it links, reference/cli.md, no longer holds them (no-loss review); phase 10 writes the landing page new
 src/SqlSource.Tool/README.md:50	corrected	src/SqlSource.Tool/README.md	-	has every option and the exit codes	The words the whole workflow go: the page it links, reference/cli.md, no longer holds the workflow (accuracy review); the rest of the tool readme is phase 11's
+README.md:236	move	README.md	-	-	position: "See [reporting a wrong model] for what is renamed and kept, and for" > "See [what is renamed before you share it] for what is renamed and kept, and [reporting a wrong model] for"; what is renamed and kept is reference/bundles.md#bundle-contents now, not the guide (branch review R1-F1)
 -	new	site/reference/cli.md	-	-	The h1 The sqlsource command and the opening sentences, which link describing.md, msbuild.md#running-in-the-build, bundles.md and errors.md#the-tools-errors; the anchor tool
 -	new	site/reference/cli.md#options	-	-	The sentence that introduces the tool's other options and its table of six rows: --help, --version, --query, --out, --no-obfuscate and --scrub
 -	new	site/reference/cli.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
@@ -107,3 +110,4 @@ src/SqlSource.Tool/README.md:50	corrected	src/SqlSource.Tool/README.md	-	has eve
 -	new	docs/tech-debt/TD-0034-redaction-of-a-describers-text-has-holes.md	-	-	Not a user document: its known issue of the tool's page is the limit connections.md#limit-short-password
 -	new	docs/tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md	-	-	Not a user document: the words and those of site/tool.md point there go
 -	new	examples/PostgresExamples/README.md	-	-	Not a user document: the connections are linked on reference/connections.md, the commands on reference/cli.md; the same in examples/SqlServerExamples/README.md
+-	new	docs/tech-debt/TD-0023-path-without-an-equals-sign-is-printed-as-given.md	-	-	Not a user document: lines 8 and 18 said the manual invites a user to attach a log to an issue; the manual says to send it privately (branch review, outside the change)

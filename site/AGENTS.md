@@ -11,7 +11,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 | Generator parameter | Each place that the comment on the list in `DiagnosticsDocumentTests` names | `DiagnosticsDocumentTests` |
 | MSBuild property | Its section of `settings.md`; a row under `#all-settings` | A reviewer |
 | Attribute, or a property of one | `generator.md#attribute` | A reviewer |
-| Command, option, environment variable, exit code | `reference/cli.md` | `CliReferenceTests` |
+| Command, option, environment variable, exit code | `reference/cli.md` | `CliReferenceTests`, for a command, an option and a `SQLSOURCE_` variable; a reviewer, for an exit code and another variable |
 | Diagnostic | A `## SQLSRCnnn` section of `diagnostics.md`, in id order | `DiagnosticsDocumentTests` |
 | Dialect | Its rows in `reference/dialects.md` and `reference/databases/index.md`; the section of `SQLSRC019` | A reviewer |
 | Database that can be described | A folder of the five pages under `reference/databases/`; a row in `reference/databases/index.md`; a tab in every tab group that names a database; the README's list; an example project | `SiteStructureTests`, for the folder and the tabs; a reviewer, for the rest |

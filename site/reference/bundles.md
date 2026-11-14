@@ -27,7 +27,7 @@ $ dotnet sqlsource diagnose App.slnx --project src/App/App.csproj --query src/Ap
 $ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
 ```
 
-`diagnose` writes the bug-report bundle of one query: see [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) for what it holds and what it prints.
+`diagnose` writes the bug-report bundle of one query: see [what is renamed before you share it](#bundle-contents) for what it holds, and [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) for what it prints.
 
 | Option | What it does |
 |----|----|
