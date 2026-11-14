@@ -13,7 +13,7 @@ namespace SqlSource.Repository.Tests.Documentation;
 
 // The table of site/reference/settings.md#all-settings, the matrix, is where a user looks up every place a setting can
 // be written.  These tests fail when a key of the settings file's schema, a marker that is a setting, or a property of
-// the test's list of MSBuild properties has no row of the matrix or has two; when its key column holds a name the
+// this test's list of MSBuild properties has no row of the matrix or has two; when its key column holds a name the
 // schema does not, or its MSBuild property column a property the list does not; when its file header and query columns
 // disagree with where the parser lets a marker stand; or when an <a id="setting-..."> of the manual is linked by no row
 // or by two.  They also fail when a marker has no row of the marker index of site/reference/sql-files.md, a generator
