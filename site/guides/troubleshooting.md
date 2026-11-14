@@ -57,4 +57,4 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 
 ## A secret in the output
 
-- **A short password, or a connection string in the wrong place, shows in the output or a log.**  The tool does not hide a password shorter than four characters, or one that is the name of its logical database or dialect.  See [a short password](../reference/connections.md#limit-short-password).
+- **A short password, or a password typed in the wrong place, shows in the output or a log.**  The tool does not hide a password shorter than four characters, or one that is the name of its logical database or dialect.  See [a short password](../reference/connections.md#limit-short-password).

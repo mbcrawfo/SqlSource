@@ -13,7 +13,7 @@ site/tool.md:27	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	-
 @site/tool.md:29	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Phase 1's paragraph, without --prerelease (phase-01 row site/tool.md:29)
 site/tool.md:33-50	move	site/reference/describing.md#which-queries	-	-	The link of line 48 stays at generator.md#known-issues, re-based, until phase 6
 site/tool.md:54-87	move	site/reference/connections.md#connections	-	-	-
-site/tool.md:89	move	site/reference/connections.md#connections	-	-	position: "see [known issues]" > "see [limits]"; the link goes to #limit-short-password on the same page, as phase 4 mended such words
+site/tool.md:89	move	site/reference/connections.md#connections	-	-	position: "see [known issues]" > "see [the limit]"; the link goes to #limit-short-password on the same page, as phase 4 mended such words
 site/tool.md:93	move	site/reference/connections.md#env-file	-	-	level: h3 to h2, as spec step 2 lists it
 site/tool.md:95-127	move	site/reference/connections.md#env-file	-	-	-
 site/tool.md:131	move	site/reference/sidecars.md#sidecar-files	-	-	-
@@ -31,7 +31,7 @@ site/tool.md:240-244	merge-pair	site/reference/msbuild.md#running-in-the-build	M
 site/tool.md:246	merge-pair	site/reference/msbuild.md#running-in-the-build	MP-06	-	position: "([known issues])" > "([a limit])"; the link goes to connections.md#limit-short-password
 site/tool.md:250-259	move	site/reference/describing.md#after-a-schema-change	-	-	-
 site/tool.md:263-311	move	site/reference/describing.md#describe-on-save	-	-	-
-site/tool.md:313	move	site/reference/describing.md#describe-on-save	-	-	position: "see [known issues]" > "see [limits]"; the link goes to #limit-saves-not-seen on the same page
+site/tool.md:313	move	site/reference/describing.md#describe-on-save	-	-	position: "see [known issues]" > "see [the limit]"; the link goes to #limit-saves-not-seen on the same page
 site/tool.md:317-330	move	site/reference/describing.md#what-your-editor-shows	-	-	The link of line 327 to the recipe goes to guides/describe-on-save.md#start-the-watcher-with-your-editor
 site/tool.md:334-351	move	site/reference/describing.md#check-in-ci	-	-	The link of line 346 to the recipe goes to guides/ci.md#check-sidecars-in-ci
 site/tool.md:355-369	move	site/reference/cli.md#summary	-	-	-
