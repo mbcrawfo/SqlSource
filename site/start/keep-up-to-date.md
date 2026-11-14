@@ -56,7 +56,7 @@ $ git commit -m "Describe the queries again after the migration"
 
 ---
 
-`--force` describes each query again, whether or not it changed.  If the change broke a query, such as one that reads a column you dropped, the tool reports what your database said.
+`--force` describes each query again, whether or not it changed.  The number in the line is the count of your project's queries, so yours can differ.  If the change broke a query, such as one that reads a column you dropped, the tool reports what your database said.
 
 <a id="merge-conflict"></a>
 

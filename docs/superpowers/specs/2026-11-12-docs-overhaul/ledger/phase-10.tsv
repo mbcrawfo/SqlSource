@@ -198,7 +198,7 @@ README.md:187-189	move	site/start/testing.md	fact	-	Rewritten here: start/ has n
 -	new	site/start/keep-up-to-date.md	site/reference/sidecars.md#sidecars-in-git	31	The title, the opening with the search words; no sample
 -	new	site/start/keep-up-to-date.md#what-to-commit	site/reference/sidecars.md#sidecars-in-git,site/reference/sidecars.md#sidecar-files	87	The section; R/sidecars.md#sidecars-in-git's block
 -	new	site/start/keep-up-to-date.md#the-build-describes	site/reference/msbuild.md#running-in-the-build	96	The section; no sample
--	new	site/start/keep-up-to-date.md#after-a-migration	site/reference/describing.md#after-a-schema-change	128	The section; recipes.md 189-194, with the summary line of first-query.md
+-	new	site/start/keep-up-to-date.md#after-a-migration	site/reference/describing.md#after-a-schema-change	144	The section; recipes.md 189-194, with the summary line of first-query.md
 -	new	site/start/keep-up-to-date.md#merge-conflict	site/reference/sidecars.md#sidecars-in-git	75	The section; no sample
 -	new	site/start/keep-up-to-date.md#in-ci	site/reference/msbuild.md#running-in-the-build,site/reference/describing.md#check-in-ci	86	The section; the command of R/describing.md#check-in-ci
 -	new	site/start/keep-up-to-date.md#if-it-does-not-work	site/diagnostics.md#sqlsrc244,site/diagnostics.md#sqlsrc237,site/reference/msbuild.md#running-in-the-build	60	The h2 If it does not work: the traps of the page, each with its id and fix; no anchor, known by its slug
