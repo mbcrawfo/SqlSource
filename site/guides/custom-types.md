@@ -234,5 +234,6 @@ public enum Priority : byte
 ## If it does not work
 
 - **`InvalidCastException` when the query runs.**  The driver was given a type that it cannot read.  It is a type of yours with no converters, or a PostgreSQL enum that the data source does not map.  Write the converters, or call `MapEnum<T>()`.  See [`InvalidCastException`](troubleshooting.md#invalidcastexception).
+- **`InvalidCastException` for an enum, on PostgreSQL, though your data source calls `MapEnum<T>()`.**  A repository made from a connection string makes connections that have none of the mappings of your data source.  Give the repository your data source.  See [a repository made from a connection string](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository).
 - **`InvalidCastException` for an enum, on SQL Server.**  The enum is not over the type of its column, such as an enum over `int` for a `tinyint`.  Declare it over the type of the column.  See [Reading a row](../reference/databases/sqlserver/query-methods.md#reading-a-row).
 - **SQLSRC279.**  A converter takes or returns another type than the driver reads, such as an `int` for a `bigint`.  Change it to the type that the error names.  See [SQLSRC279](../diagnostics.md#sqlsrc279).
