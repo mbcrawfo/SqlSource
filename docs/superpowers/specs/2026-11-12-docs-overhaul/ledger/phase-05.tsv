@@ -111,3 +111,4 @@ README.md:236	move	README.md	-	-	position: "See [reporting a wrong model] for wh
 -	new	docs/tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md	-	-	Not a user document: the words and those of site/tool.md point there go
 -	new	examples/PostgresExamples/README.md	-	-	Not a user document: the connections are linked on reference/connections.md, the commands on reference/cli.md; the same in examples/SqlServerExamples/README.md
 -	new	docs/tech-debt/TD-0023-path-without-an-equals-sign-is-printed-as-given.md	-	-	Not a user document: lines 8 and 18 said the manual invites a user to attach a log to an issue; the manual says to send it privately (branch review, outside the change)
+-	new	src/SqlSource/Generation/Chains/SettingsFileSide.cs	-	-	Not a user document: the summary of SettingsFileSides.Reports says which side checks a value, not reads it, as C-01 corrects (owner, p05 Q1: fix here)
