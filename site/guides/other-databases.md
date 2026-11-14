@@ -58,7 +58,7 @@ using SqlSource;
 public sealed partial class UserQueries;
 ```
 
-**What you get.**  The class gets `UserQueries.sql`, the file named for it in its folder.  The class must be `partial`.  See [The attribute](../reference/attributes.md#attribute).
+**What you get.**  The class gets `UserQueries.sql`, the file named for it in its folder.  The class must be `partial`.  See [The attribute](../reference/attributes.md#attribute) and [Source](../reference/attributes.md#setting-source).
 
 <a id="dialect-and-output"></a>
 
@@ -116,7 +116,7 @@ public sealed partial class UserQueries(SqliteConnection connection)
 **The rules you need.**
 
 - `Sql` is a private class nested in `UserQueries`, so only its own code can use it.  See [Where the members go](../reference/members.md#locations).
-- The SQL is as you wrote it, without its markers and comments, and a query parameter such as `@id` stays in it: give the database its value yourself.  See [Constants](../reference/members.md#constants) and [What reaches the generated SQL](../reference/sql-files.md#generated-sql).
+- The SQL is as you wrote it, without its markers and comments.  A query parameter such as `@id` stays in it: give the database its value yourself.  See [Constants](../reference/members.md#constants) and [What reaches the generated SQL](../reference/sql-files.md#generated-sql).
 - Nothing in a token is escaped.  Pass only text that your own code chooses.  See [Token methods](../reference/members.md#token-methods).
 
 <a id="what-you-do-not-get"></a>

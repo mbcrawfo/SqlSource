@@ -8,7 +8,7 @@ Make a nullable property, such as `string?` or `int?`, not null, and stop the nu
 
 ## Why a property is nullable
 
-SqlSource treats a column as possibly null unless it can show that it never is.  The cost is a null check in your code, never a wrong value.  You can overrule it in the `.sql` file.
+SqlSource treats a column as possibly null unless it can show that it never is.  See which columns can be null on [PostgreSQL](../reference/databases/postgresql/nullability.md#nullability) and [SQL Server](../reference/databases/sqlserver/nullability.md#nullability).  The cost is a null check in your code, never a wrong value.  You can overrule it in the `.sql` file.
 
 **The rules you need.**
 
@@ -58,16 +58,16 @@ The alias is in brackets: `EOMONTH(placed_at) AS [month_end!]`.
 
 **The rules you need.**
 
-- The build does not check a `!` or a `not null`.  If the column is null after all, the method throws.  See [Which properties can be null](../reference/model-properties.md#model-nullability).
+- The build does not check a `!` or a `not null`.  If the column is null after all, the method throws.  See [How a row is read](../reference/query-methods.md#reading-rows).
 - The `-- column:` line names the column as the query returns it.  It is a comment, so the query needs no describing again.  See [Setting a column's nullability or type with a marker](../reference/model-properties.md#column-marker).
-- The `!` stays in the column's name.  A change to an alias changes the query, so run `dotnet sqlsource describe`.  See [Describing again](../reference/sidecars.md#describing-again).
+- The `!` stays in the column's name.  A change to an alias changes the query, so run `dotnet sqlsource describe`.  See [Which properties can be null](../reference/model-properties.md#model-nullability) and [Describing again](../reference/sidecars.md#describing-again).
 - With Dapper, use the `-- column:` line, since Dapper matches columns to properties by name.  See [Which properties can be null](../reference/model-properties.md#model-nullability).
 
 <a id="nullable"></a>
 
 ## Say that a column can be null
 
-If a method throws "Column 'name' is null." or "Data is Null.", a null reached a property that cannot be null.  Remove your `!` or `not null`, if any.  Otherwise, add `-- column: <name> null`:
+If a method throws "Column 'name' is null." or "Data is Null.", a null reached a property that cannot be null.  See [How a row is read](../reference/query-methods.md#reading-rows).  Remove your `!` or `not null`, if any.  Otherwise, add `-- column: <name> null`:
 
 ```sql postgres
 -- name: ListUserNames
@@ -90,6 +90,8 @@ Or end the alias with `?`: `AS "name?"` on PostgreSQL, `AS [name?]` on SQL Serve
 
 If a query parameter can be null, add `null` to its `-- param:` line:
 
+# [PostgreSQL](#tab/postgresql)
+
 ```sql postgres
 -- name: FindUsers
 -- param: @name text null
@@ -98,6 +100,19 @@ FROM users
 WHERE @name IS NULL OR name = @name
 ORDER BY name;
 ```
+
+# [SQL Server](#tab/sqlserver)
+
+```sql mssql
+-- name: FindUsers
+-- param: @name nvarchar(100) null
+SELECT id, name, email
+FROM users
+WHERE @name IS NULL OR name = @name
+ORDER BY name;
+```
+
+---
 
 **What you get.**  `FindUsersParams.Name` is a `string?`, so `new FindUsersParams(null)` finds every user.
 
@@ -137,6 +152,6 @@ To fix one, [say that the column is never null](#not-null).  See [Which columns 
 
 ## If it does not work
 
-- **"Column 'name' is null." on PostgreSQL, or `SqlNullValueException`, "Data is Null.", on SQL Server.**  A null reached a property that cannot be null: [say that the column can be null](#nullable).  See [How a row is read](../reference/query-methods.md#reading-rows).  On SQL Server, also run no `SET ANSI_WARNINGS OFF` on the connection: see [the limit](../reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off).
+- **"Column 'name' is null." on PostgreSQL, or `SqlNullValueException`, "Data is Null.", on SQL Server.**  A null reached a property that cannot be null: [say that the column can be null](#nullable).  See [How a row is read](../reference/query-methods.md#reading-rows).  On SQL Server, do not run `SET ANSI_WARNINGS OFF` on the connection: see [the limit](../reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off).
 - **SQLSRC260.**  The `-- column:` line names no column of the result, or the alias already ends in `!` or `?`.  Keep the mark or the line's `null` or `not null`, not both.  See [SQLSRC260](../diagnostics.md#sqlsrc260).
 - **SQLSRC227 on PostgreSQL.**  `@name IS NULL` does not fix the type of `@name`.  Give the type in its `-- param:` line.  See [SQLSRC227](../diagnostics.md#sqlsrc227).

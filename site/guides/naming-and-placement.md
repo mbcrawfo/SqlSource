@@ -77,7 +77,7 @@ If you need a class and not a record, set the shape of the models:
 }
 ```
 
-**What you get.**  Each output model is a `class`, with a `get` and a `set` for each property, and no constructor of its own.  The input models stay records.  See [Shape](../reference/models.md#model-shape).
+**What you get.**  Each output model is a `class`, with a `get` and a `set` for each property, and no constructor of its own.  Your input models, such as `GetUserParams`, are still records, since the sample sets only `outputModelType`.  See [Shape](../reference/models.md#model-shape).
 
 **The rules you need.**
 
@@ -139,7 +139,7 @@ ListOrdersOfUserDto[] orders = await OrderQueries.ListOrdersOfUser(connection, n
 
 **The rules you need.**
 
-- With no member location, a repository method is a public instance method of your class.  A `methods` method is an `internal` extension method of `DbConnection`, in the class `OrderQueriesExtensions`.  See [Where the members go](../reference/members.md#locations).
+- Remove the `-- member-location:` and `-- visibility:` lines of `ListOrdersOfUser`, and it is an `internal` extension method of `DbConnection`, in the class `OrderQueriesExtensions`.  In a repository, a query's method is a public instance method of your class.  See [Where the members go](../reference/members.md#locations).
 - Only a `methods` method can go in the extension class.  See [Where the members go](../reference/members.md#setting-member-location).
 - `-- visibility: internal` makes a repository method internal, and its interface leaves it out.  See [Visibility](../reference/members.md#setting-visibility).
 - The models do not follow the visibility.  They are `public` or `internal` as your class is.  See [Where the members go](../reference/members.md#locations).

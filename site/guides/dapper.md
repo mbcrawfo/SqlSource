@@ -4,7 +4,7 @@
 
 ## Models for Dapper, start to end
 
-**Before you start.**  Add the package and Dapper in your project's folder.  Install the tool once, at the root of your repository: skip `dotnet new tool-manifest` if you have a tool manifest.
+**Before you start.**  Add the package and Dapper in your project's folder.  Install the tool once, at the root of your repository.  If the repository has a tool manifest, skip `dotnet new tool-manifest`.
 
 ```console
 $ dotnet add package SqlSource
@@ -76,7 +76,7 @@ $ dotnet add package Microsoft.Data.SqlClient
 
 For the SQL alone, set the output to `sql`, and go on at [Only the SQL](#sql-only).
 
-4. **Give the tool your connection.**  Write it in a `.env` file in your project's folder, and add `.env` to your `.gitignore`.  `SQLSOURCE_CONNECTION` serves a project with one database:
+4. **Give the tool your connection.**  Write it in a `.env` file in your project's folder.  Add `.env` to your `.gitignore`.  `SQLSOURCE_CONNECTION` serves a project with one database:
 
 # [PostgreSQL](#tab/postgresql)
 

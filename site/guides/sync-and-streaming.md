@@ -58,6 +58,13 @@ FROM users
 ORDER BY created_at, id;
 ```
 
+```jsonc
+// Methods/sqlsource.json
+{
+  "output": "methods",
+}
+```
+
 ```csharp
 [SqlSourceGenerate]
 public sealed partial class UserQueries(DbConnection connection)
@@ -74,11 +81,11 @@ public sealed partial class UserQueries(DbConnection connection)
 }
 ```
 
-**What you get.**  At the output `methods`, as here, `StreamUsersOldestFirst` is a method of the connection that returns an `IAsyncEnumerable<StreamUsersOldestFirstDto>`.  A repository gets the same method, `users.StreamUsersOldestFirst(cancellationToken)`.
+**What you get.**  At the output `methods`, which the folder's `sqlsource.json` sets, `StreamUsersOldestFirst` is a method of the connection that returns an `IAsyncEnumerable<StreamUsersOldestFirstDto>`.  A repository gets the same method, `users.StreamUsersOldestFirst(cancellationToken)`.
 
 **The rules you need.**
 
-- `-- collection-type: IAsyncEnumerable` on a query that returns rows makes its method stream them.  The loop starts on the first row while the rest are still to come, and the rows are never all held at once.  See [Streaming rows](../reference/return-types.md#streaming-rows) and [Collection type](../reference/return-types.md#setting-collection-type).
+- `-- collection-type: IAsyncEnumerable` on a query whose shape is `many` makes its method stream them.  The loop starts on the first row while the rest are still to come, and the rows are never all held at once.  See [Streaming rows](../reference/return-types.md#streaming-rows) and [Collection type](../reference/return-types.md#setting-collection-type).
 - The call runs nothing.  The query runs when the loop asks for the first row, and each loop over the result runs it again.  See [Streaming rows](../reference/return-types.md#streaming-rows).
 - The connection stays open until the loop ends, and is busy with the query.  Run no other command on it in the body of the loop.  Use another connection, or read the rows into a collection first.  See [Streaming rows](../reference/return-types.md#streaming-rows).
 - If the loop ends early, at a `break` or an exception, the method reads the rest of the rows and discards them.  On a large result, that takes as long as reading them.  To stop early, have the query return only the rows that the loop needs, with a `WHERE`, `LIMIT` or `TOP`.  See [Streaming rows](../reference/return-types.md#streaming-rows).

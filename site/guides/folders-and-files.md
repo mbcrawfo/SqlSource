@@ -66,6 +66,7 @@ Rules: [which files belong to a type](../reference/attributes.md#files-of-a-type
 If you want one class for every `.sql` file of a folder, and not one class for each file, write `Source = "."` on the class:
 
 ```text
+sqlsource.json          "root": true, "dialect": "postgres"
 Models/
     sqlsource.json      "output": "models"
     StoreQueries.cs     [SqlSourceGenerate(Source = ".")] on StoreQueries

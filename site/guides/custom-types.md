@@ -229,10 +229,10 @@ public enum Priority : byte
 - A type override gives each column and parameter of a database type your C# type.  A `-- type-override:` line inside a query changes that query only.  See [Type overrides](../reference/type-mapping.md#setting-type-overrides).
 - On PostgreSQL, the method asks Npgsql for your enum, so the data source that the methods run on must call `MapEnum<T>()`.  See [What a method reads and throws](../reference/databases/postgresql/query-methods.md#method-results).
 - On PostgreSQL, a repository made from a connection string has none of the mappings of your data source.  Give it your data source.  See [the limit](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository).
-- On SQL Server, an enum is read only from a column of its own underlying type: an enum over `int`, the default, from an `int`, and one over `byte` from a `tinyint`.  See [Reading a row](../reference/databases/sqlserver/query-methods.md#reading-a-row).
+- On SQL Server, an enum is read only from a column of its own underlying type.  An enum over `int`, the default, reads an `int`, and one over `byte` a `tinyint`.  See [Reading a row](../reference/databases/sqlserver/query-methods.md#reading-a-row).
 
 ## If it does not work
 
-- **`InvalidCastException` when the query runs.**  The driver was given a type that it cannot read: a type of yours with no converters, or a PostgreSQL enum that the data source does not map.  Write the converters, or call `MapEnum<T>()`.  See [`InvalidCastException`](troubleshooting.md#invalidcastexception).
+- **`InvalidCastException` when the query runs.**  The driver was given a type that it cannot read.  It is a type of yours with no converters, or a PostgreSQL enum that the data source does not map.  Write the converters, or call `MapEnum<T>()`.  See [`InvalidCastException`](troubleshooting.md#invalidcastexception).
 - **`InvalidCastException` for an enum, on SQL Server.**  The enum is not over the type of its column, such as an enum over `int` for a `tinyint`.  Declare it over the type of the column.  See [Reading a row](../reference/databases/sqlserver/query-methods.md#reading-a-row).
 - **SQLSRC279.**  A converter takes or returns another type than the driver reads, such as an `int` for a `bigint`.  Change it to the type that the error names.  See [SQLSRC279](../diagnostics.md#sqlsrc279).

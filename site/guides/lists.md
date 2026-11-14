@@ -49,8 +49,8 @@ FindUsersByIdsDto[] found = await users.FindUsersByIds(new FindUsersByIdsParams(
 **The rules you need.**
 
 - An array parameter is not a list.  `id = ANY(@ids)` sends one parameter, whatever the count of values, so no limit of parameters applies to it.  `id IN @ids` sends one parameter for each value.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
-- Use `IN @ids` if one query must run on PostgreSQL and on SQL Server, which has no arrays.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters) and [Lists on SQL Server](../reference/databases/sqlserver/query-methods.md#list-parameters).
-- Use `= ANY(@ids)` if Dapper runs the query.  Dapper sends a list to PostgreSQL as one array, which `IN @ids` cannot take.  See [List parameters](../reference/parameters.md#list-parameters).
+- If one query must run on PostgreSQL and on SQL Server, which has no arrays, use `IN @ids`.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters) and [Lists on SQL Server](../reference/databases/sqlserver/query-methods.md#list-parameters).
+- If Dapper runs the query, use `= ANY(@ids)`.  Dapper sends a list to PostgreSQL as one array, which `IN @ids` cannot take.  See [List parameters](../reference/parameters.md#list-parameters).
 - Do not write `IN (@ids)`, with parentheses.  It compares with one array.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
 - Under the output `models`, the property of an array is a `T[]`, and the property of a list an `IEnumerable<T>`.  See [Array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
 
@@ -93,7 +93,7 @@ For more values than the limit, send them as one parameter.  On SQL Server, send
 
 # [PostgreSQL](#tab/postgresql)
 
-Write `id = ANY(@ids)`, as [the section above](#postgresql-arrays) shows.
+Write `id = ANY(@ids)`, as [On PostgreSQL: one array with ANY](#postgresql-arrays) shows.
 
 # [SQL Server](#tab/sqlserver)
 

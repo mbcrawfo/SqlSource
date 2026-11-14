@@ -72,7 +72,7 @@ Rules: [check in CI](../reference/describing.md#check-in-ci), [connections](../r
 
 ## Read the exit code
 
-If your pipeline must tell a forgotten sidecar from a check that could not run, read the exit code of `describe --check`.  This step takes the place of the `describe --check` step of the PostgreSQL job:
+If your pipeline must tell a forgotten sidecar from a check that could not run, read the exit code of `describe --check`.  This step takes the place of the `describe --check` step of your job.  Keep that step's `env`:
 
 ```yaml
       - run: |
@@ -84,8 +84,6 @@ If your pipeline must tell a forgotten sidecar from a check that could not run, 
             echo "::error::The check could not be made. Read the errors above."
           fi
           exit "$status"
-        env:
-          SQLSOURCE_CONNECTION: Host=localhost;Database=app;Username=postgres;Password=ci
 ```
 
 **What you get.**  The step fails in both cases, and GitHub Actions shows which one as an error of the run.  `|| status=$?` keeps the code, since GitHub Actions stops a step at the first command that fails.

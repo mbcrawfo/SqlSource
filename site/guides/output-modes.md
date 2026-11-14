@@ -22,7 +22,7 @@ Choose the output of a query, `repository`, `methods`, `models` or `sql`, and so
 **The rules you need.**
 
 - A repository method takes no transaction and no command timeout.  See [Transactions and timeouts](../reference/repositories.md#repository-transactions).
-- A `methods` method is by default an `internal` extension method of `DbConnection`, called as `connection.GetUser(...)`.  See [Methods that take a connection](../reference/connection-methods.md#methods-that-take-a-connection).
+- A `methods` method is by default an `internal` extension method of `DbConnection`, called as `connection.GetUser(...)`.  See [Where the methods go](../reference/connection-methods.md#method-location).
 - Under `models` and `sql`, a query with a token gets a method that returns its SQL in place of a constant.  See [Token methods](../reference/members.md#token-methods).
 
 <a id="set-the-output"></a>
@@ -67,7 +67,7 @@ For the `.sql` files of a folder and of its subfolders, write `output` in a `sql
 
 - If the output is set in several places, the nearest place to the query wins.  See [Which place wins](../reference/settings.md#precedence).
 - One file can hold queries of several outputs.  See [Output](../reference/settings.md#setting-output).
-- A constant is in a private class `Sql` nested in your class, so only your class's own code can use it.  See [Constants](../reference/members.md#constants).
+- A constant is in a private class `Sql` nested in your class, so only your class's own code can use it.  See [Where the members go](../reference/members.md#locations).
 
 <a id="which-need-a-database"></a>
 

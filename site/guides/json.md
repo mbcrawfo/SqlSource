@@ -137,7 +137,7 @@ public sealed record OrderMetadata(string Channel, int Priority);
 **The rules you need.**
 
 - `"json": true` in a column type, or the word `json` before the type in a marker, says that a column or a parameter holds JSON.  The type override takes no `json`.  See [The JSON opt-in](../reference/library-types-and-json.md#json-opt-in).
-- A column type never reaches a parameter.  Give each parameter its own `-- param:` line, with `-> json`.  See [A class in a JSON column](../reference/library-types-and-json.md#json-class).
+- A column type never reaches a parameter.  Give each parameter its own `-- param:` line, with `-> json`.  See [Column types](../reference/model-properties.md#setting-column-types).
 - For one query only, write `-- column: metadata -> json OrderMetadata` inside it.  See [Setting a column's nullability or type with a marker](../reference/model-properties.md#column-marker).
 - On PostgreSQL, the same works for a `text` or a `varchar` column.  A `json` or `jsonb` column needs no `json` word.  See JSON on [PostgreSQL](../reference/databases/postgresql/libraries.md#json) and [SQL Server](../reference/databases/sqlserver/libraries.md#json).
 - If you add or remove `json`, the query stays described: you need not run `dotnet sqlsource describe`.  See [The JSON opt-in](../reference/library-types-and-json.md#json-opt-in).
@@ -145,6 +145,6 @@ public sealed record OrderMetadata(string Channel, int Priority);
 
 ## If it does not work
 
-- **SQLSRC283.**  `json` is on a column or a parameter of another type than a string or JSON type, such as an `int`, or before a type that is not a class of yours.  Remove `json`, or move it to the column that holds JSON.  See [SQLSRC283](../diagnostics.md#sqlsrc283).
+- **SQLSRC283.**  `json` is on a column or a parameter whose type is not a string or JSON type, such as an `int`.  Or it is before a type that is not a class of yours.  Remove `json`, or move it to the column that holds JSON.  See [SQLSRC283](../diagnostics.md#sqlsrc283).
 - **`InvalidCastException` for your class in a string column.**  The column or the parameter has no `json`, so the driver is given your class.  Write `json` before the type.  See [A class in a JSON column](../reference/library-types-and-json.md#json-class).
 - **`JsonException` when a row is read.**  The text of the column is not the JSON of your class, such as an array for an object.  See [A class in a JSON column](../reference/library-types-and-json.md#json-class).

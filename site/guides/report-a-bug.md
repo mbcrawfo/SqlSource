@@ -38,7 +38,7 @@ If you are not sure that you can post the zip, this list says what a bundle hold
 - **A server's error keeps only its code**, and the query parameters it names, renamed.  Its message is left out.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
 - **Numbers are kept.**  A name of yours that is spelled as a word of the database is kept too, such as a column `name` or `date`.  So are the database's own names, such as `public` and `dbo`.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
 - **If a number in your query is a value that you must not share**, such as an account number, do not post the bundle.  Take the private route instead.  See [When a bundle cannot be made safe](#raw-bundle).
-- **`diagnose` checks the bundle before it writes it.**  It writes no bundle that still holds a word of yours other than those kept above.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
+- **`diagnose` checks the bundle before it writes it.**  It writes no bundle that still holds a word of yours other than the names and numbers this list keeps.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents).
 - **Keep the mapping to yourself.**  It is written beside the zip, and lists each new name beside your own name.  See [Making a bundle with `diagnose`](../reference/bundles.md#diagnose).
 
 <a id="raw-bundle"></a>
