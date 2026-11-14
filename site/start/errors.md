@@ -1,6 +1,6 @@
 # When something goes wrong
 
-At the end of this page, you can read a SQLSRC build error, find its fix, and know where to look when a method throws an exception at run time.
+At the end of this page, you can read a SQLSRC build error, find its fix, and find the fix of an exception at run time.
 
 <a id="read-an-error"></a>
 
@@ -37,7 +37,7 @@ An error of the build that has no file, such as one about a package version, sta
 - [SQLSRC209](../diagnostics.md#sqlsrc209): the query needs a dialect that can be described.  Name your database in `sqlsource.json`, as [Your first query](first-query.md#name-your-database) shows.
 - [SQLSRC213](../diagnostics.md#sqlsrc213): your database has no connection.  Put the `.env` file in the folder of your project, not at the root of your repository.
 - [SQLSRC220](../diagnostics.md#sqlsrc220): the project was not restored.  Run `dotnet restore`, then run the tool again.
-- [SQLSRC224](../diagnostics.md#sqlsrc224): your database could not be opened.  Check that it runs, and check the connection string and the password.  For SQL Server in a local container, add `TrustServerCertificate=True`.
+- [SQLSRC224](../diagnostics.md#sqlsrc224): your database could not be opened.  Check that it runs.  Check the connection string and the password.  For SQL Server in a local container, add `TrustServerCertificate=True`.
 - [SQLSRC226](../diagnostics.md#sqlsrc226) and [SQLSRC227](../diagnostics.md#sqlsrc227): the type of a parameter could not be determined, or its first use does not fix it.  Add a `-- param:` line with the type, such as `-- param: @name text null`.
 - [SQLSRC021](../diagnostics.md#sqlsrc021): the compiler is too old.  Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later.
 - [SQLSRC267](../diagnostics.md#sqlsrc267): Microsoft.Data.SqlClient is older than 6.1, often because EF Core 8 or 9 brings 5.1.  Reference Microsoft.Data.SqlClient 6.1 or later in your project file.

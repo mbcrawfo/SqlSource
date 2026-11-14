@@ -1,6 +1,6 @@
 # Write queries
 
-At the end of this page, your `.sql` file holds several queries, and you can write a query parameter, an optional filter, an `IN` list, and a query that returns one row or no rows.
+At the end of this page, your `.sql` file holds queries with parameters, an optional filter, an `IN` list, and one row or no rows.
 
 <a id="several-queries"></a>
 
@@ -53,7 +53,7 @@ int renamed = await users.RenameUser(new RenameUserParams("Ada Lovelace", 1));
 
 ## An optional filter
 
-To filter by a value only when the caller gives one, test the parameter for null.  This query finds the users with a name, or every user when the name is null:
+To filter by a value only when the caller gives one, test the parameter for null.  Add this query to `UserRepository.sql`:
 
 # [PostgreSQL](#tab/postgresql)
 
@@ -89,7 +89,7 @@ If your database cannot work out the type of a parameter, the tool reports [SQLS
 
 ## A list after IN
 
-To filter by a list of values, write the parameter directly after `IN`, with no parentheses:
+To filter by a list of values, write the parameter directly after `IN`, with no parentheses.  Add this query to `UserRepository.sql`:
 
 ```sql postgres
 -- name: ListUsersByIds
@@ -112,7 +112,7 @@ The method sends one parameter for each value.  An empty list finds no rows.
 
 ## A column that is never null
 
-A property is nullable when your database cannot show that its column is never null.  The result of a function is often such a column.  If you know that the column is never null, add a `-- column:` line with `not null`:
+A property is nullable when your database cannot show that its column is never null.  The result of a function is often such a column.  If you know that the column is never null, add a `-- column:` line with `not null`.  Add this query to `UserRepository.sql`:
 
 # [PostgreSQL](#tab/postgresql)
 

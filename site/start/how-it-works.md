@@ -1,6 +1,6 @@
 # How SqlSource works
 
-This page says what happened on the last page: how the source generator, the tool and the sidecar file work together when you describe a query and build.
+This page says how the source generator, the tool and the sidecar file worked together on the last page, to describe a query and build.
 
 <a id="picture"></a>
 

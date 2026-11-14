@@ -1,6 +1,6 @@
 # Test code that uses a repository (mock or fake)
 
-At the end of this page, a unit test checks code that uses your repository, with a fake or a mock of its interface and no database.
+At the end of this page, a unit test checks your code with a fake or a mock of the repository's interface, and no database.
 
 <a id="interface"></a>
 
@@ -41,6 +41,16 @@ public sealed class FakeUserRepository : IUserRepository
         Task.FromResult(Users.Values.Select(user => new ListUserNamesDto(user.Id, user.Name)).ToArray());
 
     public Task<int> RenameUser(RenameUserParams parameters, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<FindUsersDto[]> FindUsers(FindUsersParams parameters, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<ListUsersByIdsDto[]> ListUsersByIds(
+        ListUsersByIdsParams parameters, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<ListDisplayNamesDto[]> ListDisplayNames(CancellationToken cancellationToken = default) =>
         throw new NotImplementedException();
 }
 ```
@@ -86,7 +96,7 @@ public async Task Greet_KnownUser_SaysTheirName_WithAMock()
 
 ## Add a member of your own
 
-The interface is `partial`.  To add a method of your own to it, declare the method in a `partial interface` of the same name, and write it in the class:
+The interface is `partial`.  To add a method of your own, declare it in a `partial interface` of the same name.  Then write it in the class:
 
 ```csharp
 public partial interface IUserRepository

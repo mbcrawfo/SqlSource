@@ -2,7 +2,7 @@
 
 This tutorial is a quick start for PostgreSQL and SQL Server: at its end, one SQL query runs from your C# code.
 
-The steps use a table `users` with the columns `id`, `name`, `email` and `created_at`, none of which can be null.  If your database has no such table, create it:
+The steps use a table `users` with the columns `id`, `name`, `email` and `created_at`, none of which can be null.  If your database has no such table, create it with one row:
 
 # [PostgreSQL](#tab/postgresql)
 
@@ -13,6 +13,8 @@ CREATE TABLE users (
     email text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+INSERT INTO users (name, email) VALUES ('Ada', 'ada@example.com');
 ```
 
 # [SQL Server](#tab/sqlserver)
@@ -24,6 +26,8 @@ CREATE TABLE users (
     email nvarchar(200) NOT NULL,
     created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
+
+INSERT INTO users (name, email) VALUES ('Ada', 'ada@example.com');
 ```
 
 ---
@@ -115,7 +119,7 @@ The file tells SqlSource which database you use.  It applies to the `.sql` files
 
 Build again.  The error is now [SQLSRC241](../diagnostics.md#sqlsrc241): the query has no description yet.  Steps 4 and 5 add one.
 
-Without this file, the build reports SQLSRC209 for every `.sql` file of the project.
+Without this file, the build reports SQLSRC209 for each `.sql` file that a class reads.
 
 <a id="connection"></a>
 
@@ -141,7 +145,10 @@ Use `TrustServerCertificate=True` only for a server of your own, such as SQL Ser
 
 Add `.env` to your `.gitignore` file, since it holds your password.
 
-Put the `.env` file in the folder of your project.  The tool does not read a `.env` file in a folder above that one.  If your `.env` file is at the root of your repository, the tool does not read it, and reports [SQLSRC213](../diagnostics.md#sqlsrc213).  To keep the file at the root, name it with `SqlSourceEnvFile` in `Directory.Build.props` for the build, and with `--env-file` for the tool: see [the build's `.env` file](../reference/msbuild.md#setting-env-file).
+Put the `.env` file in the folder of your project.  The tool does not read a `.env` file in a folder above that one.  If your `.env` file is at the root of your repository, the tool does not read it, and reports [SQLSRC213](../diagnostics.md#sqlsrc213).  To keep the file at the root, name it in two places, as [the build's `.env` file](../reference/msbuild.md#setting-env-file) shows:
+
+- For the build, set `SqlSourceEnvFile` in `Directory.Build.props`.
+- For the tool, pass `--env-file`.
 
 <a id="describe"></a>
 
@@ -149,7 +156,7 @@ Put the `.env` file in the folder of your project.  The tool does not read a `.e
 
 To describe a query, the tool asks your database what the query's parameters and columns are.  It does not run the query.  It writes the answer to `UserRepository.sql.json`, the sidecar file of `UserRepository.sql`.
 
-From the folder of your project, run the tool, then add the sidecar to git:
+Run the tool from the folder of your project.  Then add the sidecar to git:
 
 # [PostgreSQL](#tab/postgresql)
 
@@ -173,8 +180,8 @@ The first word of the line is the name that SqlSource gives your database.  The 
 
 Build again: the build succeeds.  Commit the sidecar with your code, since every build reads it.  With the `.env` file in place, `dotnet build` also describes a new query for you before it compiles.
 
-- If the tool reports [SQLSRC220](../diagnostics.md#sqlsrc220), the project is not restored.  Run `dotnet restore`, then run the tool again.
-- If the tool reports [SQLSRC224](../diagnostics.md#sqlsrc224), it could not open your database.  Check that the database runs, and that the connection string names it, a login and the right password.
+- If the tool reports [SQLSRC220](../diagnostics.md#sqlsrc220), the project is not restored.  Run `dotnet restore`.  Then run the tool again.
+- If the tool reports [SQLSRC224](../diagnostics.md#sqlsrc224), it could not open your database.  Check that the database runs.  Check that the connection string names it, a login and the right password.
 
 <a id="call-the-methods"></a>
 
@@ -220,11 +227,11 @@ GetUserDto { Id = 1, Name = Ada, Email = ada@example.com }
 
 `GetUser` returns null when no user has that id.
 
-If your table `users` has exactly the columns `id`, `name` and `email`, in that order, the model is `UsersDto`, not `GetUserDto`.  A query that reads every column of a table gets a model named after the table.  Write `UsersDto` in your code in place of `GetUserDto`.
+If your table `users` has only the columns `id`, `name` and `email`, in that order, the model is `UsersDto`.  A query that reads every column of a table gets a model named after the table.  Write `UsersDto` in your code in place of `GetUserDto`.
 
 ## If it does not work
 
-- [SQLSRC209](../diagnostics.md#sqlsrc209) for every file: the project has no `sqlsource.json`.  Add the file of step 3.
+- [SQLSRC209](../diagnostics.md#sqlsrc209) for each file that a class reads: the project has no `sqlsource.json`.  Add the file of step 3.
 - [SQLSRC241](../diagnostics.md#sqlsrc241): the query is not described yet.  Do steps 4 and 5.
 - [SQLSRC213](../diagnostics.md#sqlsrc213): the tool found no connection.  Put the `.env` file in the folder of your project, as step 4 says.
 - [SQLSRC220](../diagnostics.md#sqlsrc220): the project is not restored.  Run `dotnet restore`.

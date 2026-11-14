@@ -2,7 +2,7 @@
 
 You use Dapper: start with [Use Dapper](../guides/dapper.md).  Your database is not PostgreSQL or SQL Server: start with [another database](../guides/other-databases.md).
 
-At the end of this page, your project has the SqlSource NuGet package and your database's driver package, and your repository has the `sqlsource` tool, on a supported .NET version.
+At the end of this page, your project has the SqlSource NuGet package and your driver package.  Your repository has the tool, on a supported .NET version.
 
 <a id="requirements"></a>
 
@@ -39,7 +39,7 @@ $ dotnet add package Npgsql
 $ dotnet add package Microsoft.Data.SqlClient
 ```
 
-If your project uses EF Core 8 or 9, it gets Microsoft.Data.SqlClient 5.1, and the build reports [SQLSRC267](../diagnostics.md#sqlsrc267).  Reference version 6.1 or later in your project file:
+If your project uses EF Core 8 or 9 and does not reference Microsoft.Data.SqlClient itself, it gets 5.1, and the build reports [SQLSRC267](../diagnostics.md#sqlsrc267).  Reference version 6.1 or later in your project file:
 
 ```xml
 <ItemGroup>
@@ -73,7 +73,7 @@ If the tool and the package have different versions, the tool can report [SQLSRC
 
 ## What each package adds to your project
 
-- **`SqlSource`** runs inside the compiler when you build.  It adds no runtime dependency: no SqlSource assembly ships with your application.  Only the code it generates is compiled into your project, with the attributes you write and the exceptions its methods throw.
+- **`SqlSource`** runs inside the compiler when you build.  It adds no runtime dependency: no SqlSource assembly ships with your application.  Your project compiles only the code it generates, with the attributes you write and the exceptions its methods throw.
 - **`SqlSource.Tool`** adds the `sqlsource` command to your repository.  It describes your queries, as the next page shows.
 
 ## If it does not work

@@ -1,14 +1,14 @@
 # Run queries in a transaction (or with a timeout)
 
-At the end of this page, two queries run in one transaction that you commit, and a query can run with a command timeout of its own.
+At the end of this page, two queries run in one transaction that you commit or roll back, and a query has its own timeout.
 
 <a id="queries-in-a-transaction"></a>
 
 ## Run queries in a transaction
 
-A repository method takes no transaction, and each call gets a connection of its own.  So two calls of repository methods never run in one transaction.  Give each query that must run in the transaction the line `-- output: methods`.  The method of such a query takes your connection and your transaction.  By default, it is an `internal` extension method of the connection.
+A repository method takes no transaction, and each call gets a connection of its own.  So two calls of repository methods do not run in one transaction of yours.  Give each query that must run in the transaction the line `-- output: methods`.  The method of such a query takes your connection and your transaction.  By default, it is an `internal` extension method of the connection.
 
-The sample is a second repository of the same application, `AccountRepository`.  Its queries are in `AccountRepository.sql`, beside the class:
+The sample is a second repository of the same application, `AccountRepository`.  It reads a table `accounts` with the columns `id`, `owner` and `balance`.  Its queries are in `AccountRepository.sql`, beside the class:
 
 # [PostgreSQL](#tab/postgresql)
 
@@ -26,6 +26,9 @@ UPDATE accounts SET balance = @balance WHERE id = @accountId;
 ```
 
 ```csharp
+using Npgsql;
+using SqlSource;
+
 [SqlSourceGenerate]
 public partial class AccountRepository(NpgsqlDataSource dataSource)
 {
@@ -66,6 +69,9 @@ UPDATE accounts SET balance = @balance WHERE id = @accountId;
 ```
 
 ```csharp
+using Microsoft.Data.SqlClient;
+using SqlSource;
+
 [SqlSourceGenerate]
 public partial class AccountRepository(string connectionString)
 {
@@ -96,7 +102,6 @@ public partial interface IAccountRepository
 `Withdraw` is a method of your own on the repository.  It opens a connection, begins the transaction, calls the two methods and commits.
 
 - **Give every method the transaction.**  On SQL Server, a method that does not get it throws `InvalidOperationException`.
-- **If a call throws before the commit**, the transaction is disposed and rolled back, and no change of it is saved.
 - **The `partial interface` adds `Withdraw` to `IAccountRepository`**, so code that takes the interface can call it.
 
 <a id="timeout"></a>

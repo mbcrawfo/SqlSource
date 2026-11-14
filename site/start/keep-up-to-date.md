@@ -1,6 +1,6 @@
 # Keep your queries up to date
 
-At the end of this page, you know what to commit to git, and what to do after a change to a query, a schema change or migration, a merge conflict in a sidecar, and in CI.
+At the end of this page, you know what to commit to git.  You also know what to do after a schema change or migration, a merge conflict, and in CI.
 
 <a id="what-to-commit"></a>
 
@@ -34,7 +34,7 @@ Commit the sidecars that the build writes.  A build with no connection does not 
 
 ## After a schema change
 
-No build sees a change to your schema, such as a migration.  After a migration, describe every query again, then commit the sidecars that changed:
+No build sees a change to your schema, such as a migration.  After a migration, describe every query again.  Then commit the sidecars that changed:
 
 # [PostgreSQL](#tab/postgresql)
 
@@ -56,7 +56,7 @@ $ git commit -m "Describe the queries again after the migration"
 
 ---
 
-`--force` describes each query again, whether or not it changed.  A query that the change broke, such as one that reads a column you dropped, is reported with what your database said.
+`--force` describes each query again, whether or not it changed.  If the change broke a query, such as one that reads a column you dropped, the tool reports what your database said.
 
 <a id="merge-conflict"></a>
 
@@ -87,7 +87,7 @@ $ dotnet sqlsource describe --check
 
 ## If it does not work
 
-- [SQLSRC244](../diagnostics.md#sqlsrc244): a query changed after it was described.  Build with your `.env` file in place, or run `dotnet sqlsource describe`, and commit the sidecar.
+- [SQLSRC244](../diagnostics.md#sqlsrc244): a query changed after it was described.  Build with your `.env` file in place, or run `dotnet sqlsource describe`.  Then commit the sidecar.
 - [SQLSRC237](../diagnostics.md#sqlsrc237): a sidecar holds a merge conflict.  Run `dotnet sqlsource describe`.
 - A build does not describe: the `.env` file is not in the folder of your project.
 

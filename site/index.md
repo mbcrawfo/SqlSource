@@ -1,6 +1,6 @@
 # SqlSource
 
-SqlSource keeps the SQL of your C# project in `.sql` files, out of your code files, and generates the C# that runs it.  For each query, the build gives you a method, a record for its parameters and a record for its rows.  SQL in a file of its own is easier to work with than SQL in a C# string: your editor highlights it, SQL tools format it, and a search finds it.  A renamed query, or a column that your code reads and the query no longer returns, is a compile error.  With PostgreSQL or SQL Server, the `sqlsource` tool checks every query against your database's schema.
+SqlSource keeps the SQL of your C# project in `.sql` files, out of your code files, and generates the C# that runs it.  For each query, the build gives you a method, a record for its parameters and a record for its rows.  SQL in a file of its own is easier to work with than SQL in a C# string.  Your editor highlights it, SQL tools format it, and a search finds it.  A renamed or removed query, or a column that your code reads and the query no longer returns, is a compile error.  With PostgreSQL or SQL Server, the `sqlsource` tool checks every query against your database's schema.
 
 ```sql postgres
 -- name: GetUser -> one-optional
