@@ -69,7 +69,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 - [Parameters and tokens](reference/parameters.md): query parameters, `-- param:`, list parameters and [tokens](reference/tokens.md).
 - [Dialects](reference/dialects.md): how each database's comments and strings are read, and [which databases can be described](reference/databases/index.md#database-support).
 - [The generator](generator.md): what the `SqlSource` package generates.
-- [The tool](reference/cli.md): the `SqlSource.Tool` package, its `sqlsource` command, running it in the build, and making and checking a bug-report bundle.
+- [The tool](reference/cli.md): the `SqlSource.Tool` package and its `sqlsource` command.
 - [PostgreSQL](reference/databases/postgresql/index.md): how SqlSource works with PostgreSQL.
 - [SQL Server](reference/databases/sqlserver/index.md): how SqlSource works with SQL Server.
 - [Recipes](recipes.md): short how-tos, each a sample and a link to the rules.
