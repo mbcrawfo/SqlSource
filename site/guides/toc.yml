@@ -44,6 +44,8 @@
       href: troubleshooting.md
 - name: Other ways to use your SQL
   items:
+    - name: Choose what is generated (output modes)
+      href: output-modes.md
     - name: Use Dapper or your own ADO.NET code
       href: dapper.md
     - name: Use MySQL, SQLite, Oracle or another database

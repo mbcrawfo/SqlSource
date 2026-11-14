@@ -4,6 +4,123 @@
 
 ## Models for Dapper, start to end
 
+**Before you start.**  Add the package and Dapper in your project's folder.  Install the tool once, at the root of your repository: skip `dotnet new tool-manifest` if you have a tool manifest.
+
+```console
+$ dotnet add package SqlSource
+$ dotnet add package Dapper
+$ dotnet new tool-manifest
+$ dotnet tool install SqlSource.Tool
+```
+
+Add your database's driver too:
+
+# [PostgreSQL](#tab/postgresql)
+
+```console
+$ dotnet add package Npgsql
+```
+
+# [SQL Server](#tab/sqlserver)
+
+```console
+$ dotnet add package Microsoft.Data.SqlClient
+```
+
+---
+
+1. **Write a query.**  Save it as `Models/Users.sql`:
+
+   ```sql postgres
+   -- name: GetUser
+   -- summary: One user, every column of the table.
+   SELECT *
+   FROM users
+   WHERE id = @userId;
+   ```
+
+2. **Mark a partial class**, in `Models/StoreQueries.cs`.  `Source = "."` gives it every `.sql` file of its folder:
+
+   ```csharp
+   using SqlSource;
+
+   [SqlSourceGenerate(Source = ".")]
+   public sealed partial class StoreQueries;
+   ```
+
+3. **Set the dialect of your database and the output.**  Save this as `sqlsource.json`, beside your project file:
+
+# [PostgreSQL](#tab/postgresql)
+
+```jsonc
+// sqlsource.json, beside your project file
+{
+    "root": true,
+    "dialect": "postgres",
+    "output": "models",
+}
+```
+
+# [SQL Server](#tab/sqlserver)
+
+```jsonc
+// sqlsource.json, beside your project file
+{
+    "root": true,
+    "dialect": "mssql",
+    "output": "models",
+}
+```
+
+---
+
+For the SQL alone, set the output to `sql`, and go on at [Only the SQL](#sql-only).
+
+4. **Give the tool your connection.**  Write it in a `.env` file in your project's folder, and add `.env` to your `.gitignore`.  `SQLSOURCE_CONNECTION` serves a project with one database:
+
+# [PostgreSQL](#tab/postgresql)
+
+```dotenv
+SQLSOURCE_CONNECTION="Host=localhost;Port=55432;Database=examples;Username=examples;Password=examples"
+```
+
+# [SQL Server](#tab/sqlserver)
+
+```dotenv
+SQLSOURCE_CONNECTION="Server=localhost,51433;Database=examples;User ID=sa;Password=Examples-Passw0rd;TrustServerCertificate=True"
+```
+
+---
+
+5. **Describe the query.**  The tool asks your database about it, and writes the answer to `Models/Users.sql.json`.  Commit that file:
+
+   ```console
+   $ dotnet sqlsource describe
+   $ git add Models/Users.sql.json
+   ```
+
+6. **Run the query through Dapper**, into its models:
+
+   ```csharp
+   // Models/StoreQueries.cs
+   using System.Data.Common;
+   using System.Threading.Tasks;
+   using Dapper;
+   using SqlSource;
+
+   [SqlSourceGenerate(Source = ".")]
+   public sealed partial class StoreQueries(DbConnection connection)
+   {
+       // SELECT * gives the model of the table, UsersDto, which every query that reads the whole table shares.
+       public Task<UsersDto?> GetUserAsync(int userId) =>
+           connection.QuerySingleOrDefaultAsync<UsersDto>(Sql.GetUser, new GetUserParams(userId));
+   }
+   ```
+
+   Once, when your application starts, set `DefaultTypeMap.MatchNamesWithUnderscores = true`, as [Run the models through Dapper](#models-through-dapper) shows.
+
+More: [the tool](../reference/cli.md#install-the-tool), [dialect](../reference/settings.md#setting-dialect), [connections](../reference/connections.md#connections), [`.env`](../reference/connections.md#env-file), connecting to [PostgreSQL](../reference/databases/postgresql/index.md#connecting) and [SQL Server](../reference/databases/sqlserver/index.md#connecting), [describe](../reference/describing.md#describe).
+
 Set the output to `models`, to run the queries yourself, with Dapper or your own ADO.NET code.  A query whose output is `models` gets its models, once the tool has described it, as in step 5, and a constant that holds its SQL, or a method that returns it when the query has a token, in place of the method that runs it.  Add `output` to the `sqlsource.json` of step 3: this sample and those below show that one file again, not a file of their own:
 
 ```jsonc
