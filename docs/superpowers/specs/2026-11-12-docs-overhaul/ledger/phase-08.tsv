@@ -1,0 +1,196 @@
+# base 4f244433fd8b81e6e993a227f1fd04cb19e5f8ad
+unit	disposition	to	arg	words	note
+site/recipes.md:1	move-split	-	-	-	Heading only: the page goes, and each recipe stands under its own heading on its guide
+site/recipes.md:3	restated-from	-	site/index.md#the-three-parts	-	Navigation: the page goes; each recipe stands on its guide, and the guides are the Guides sidebar
+site/recipes.md:5	restated-from	-	site/guides/several-databases.md#folder-with-another-dialect	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:6	restated-from	-	site/guides/folders-and-files.md#leave-migration-scripts-out	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:7	restated-from	-	site/guides/several-databases.md#use-several-databases	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:8	restated-from	-	site/guides/ci.md#check-sidecars-in-ci	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:9	restated-from	-	site/start/keep-up-to-date.md#after-a-migration	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:10	restated-from	-	site/guides/describe-on-save.md#start-the-watcher-with-your-editor	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:11	restated-from	-	site/start/transactions.md#queries-in-a-transaction	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:12	restated-from	-	site/guides/many-rows.md#insert-many-rows	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:13	restated-from	-	site/guides/sync-and-streaming.md#run-without-awaiting	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:14	restated-from	-	site/guides/repository-connection.md#connection-from-a-provider	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:15	restated-from	-	site/guides/repository-connection.md#sql-server-repository	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:16	restated-from	-	site/guides/custom-types.md#strongly-typed-id	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:17	restated-from	-	site/guides/json.md#class-in-a-json-column	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:18	restated-from	-	site/guides/dapper.md#dapper-and-adonet	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:19	restated-from	-	site/guides/dapper.md#models-through-dapper	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:20	restated-from	-	site/guides/dynamic-sql.md#table-name-at-run-time	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:21	restated-from	-	site/guides/lists.md#filter-by-a-list	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:22	restated-from	-	site/guides/several-projects.md#test-project-sees-internals	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:23	restated-from	-	site/guides/several-projects.md#share-the-exceptions	-	Navigation: a link of the list of 19, which the Guides sidebar is; the recipe it links stands at the owner
+site/recipes.md:27-65	merge-pair	site/guides/several-databases.md#folder-with-another-dialect	MP-14	-	-
+site/recipes.md:69-89	merge-pair	site/guides/folders-and-files.md#leave-migration-scripts-out	MP-15	-	-
+site/recipes.md:93-121	merge-pair	site/guides/several-databases.md#use-several-databases	MP-14	-	-
+site/recipes.md:258-300	merge-pair	site/start/transactions.md#queries-in-a-transaction	MP-13	-	-
+site/recipes.md:304-325	move	site/guides/many-rows.md#insert-many-rows	-	-	-
+site/recipes.md:329-369	move	site/guides/sync-and-streaming.md#run-without-awaiting	-	-	-
+site/recipes.md:373-409	move	site/guides/repository-connection.md#connection-from-a-provider	-	-	-
+site/recipes.md:411-412	move	site/guides/repository-connection.md#connection-from-a-provider	-	-	-
+site/recipes.md:416-439	move	site/guides/repository-connection.md#sql-server-repository	-	-	-
+site/recipes.md:443-493	merge-pair	site/guides/custom-types.md#strongly-typed-id	MP-21	-	-
+site/recipes.md:497-587	merge-pair	site/guides/json.md#class-in-a-json-column	MP-20	-	-
+site/recipes.md:591-639	merge-pair	site/guides/dapper.md#dapper-and-adonet	MP-22	-	-
+site/recipes.md:643-701	merge-pair	site/guides/dapper.md#models-through-dapper	MP-12	-	-
+site/recipes.md:706-785	move	site/guides/dapper.md#dapper-with-postgresql	-	-	-
+site/recipes.md:789-920	move	site/guides/dapper.md#dapper-with-sql-server	-	-	-
+site/recipes.md:924-939	merge-pair	site/guides/dynamic-sql.md#table-name-at-run-time	MP-16	-	-
+site/recipes.md:943-961	merge-pair	site/guides/lists.md#filter-by-a-list	MP-17	-	-
+site/recipes.md:965-990	merge-pair	site/guides/several-projects.md#test-project-sees-internals	MP-18	-	-
+site/recipes.md:994-1030	merge-pair	site/guides/several-projects.md#share-the-exceptions	MP-18	-	-
+@site/recipes.md:277	move	site/guides/repository-connection.md#connection-from-a-provider	-	-	The recipe's line 410 as phase 4 left it
+@site/recipes.md:569	merge-pair	site/guides/dapper.md#models-through-dapper	MP-12	-	The recipe's line 702 as phase 6 left it
+site/concepts.md:27	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+@site/concepts.md:29	corrected	site/start/concepts.md	C-08	Each query becomes one or more members of the generated code, named after the query	C-08 on the parked page too, so that no page says the false thing; phase 10 removes the page
+site/concepts.md:29	corrected	site/reference/sql-files.md#queries-and-names	C-08	Each query becomes one or more members of the generated code, named after the query	C-08: "one member" > "one or more members": under method-type=both a query has two methods, and a collection method beside them (src/SqlSource/Settings/MethodType.cs); made in both copies, here and on the parked page
+site/concepts.md:33	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:35	merge-pair	site/reference/sql-files.md#marker	MP-10	-	-
+site/concepts.md:39	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:41	merge-pair	site/reference/sql-files.md#the-file-header	MP-10	-	-
+site/concepts.md:45	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:47	merge-pair	site/reference/sidecars.md#sidecar-files	MP-10	-	-
+site/concepts.md:49	merge-pair	site/reference/sidecars.md#sidecar-files	MP-10	-	-
+site/concepts.md:53	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:55	merge-pair	site/reference/settings-file.md#settings-files	MP-10	-	-
+site/concepts.md:61	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:63	merge-pair	site/reference/settings.md#setting-output	MP-10	-	-
+site/concepts.md:67	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:69	merge-pair	site/reference/query-methods.md#query-methods	MP-10	-	-
+site/concepts.md:73	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:75	merge-pair	site/reference/repositories.md#repository-methods	MP-10	-	-
+site/concepts.md:79	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:81	merge-pair	site/reference/members.md#token-methods	MP-10	-	-
+site/concepts.md:89	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:91	move-split	-	-	-	The term stands in its section; its closing sentence, which only points at that section's page, goes (map 6.4)
+site/concepts.md:91/1	merge-pair	site/reference/parameters.md#query-parameters	MP-10	A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written, but for a list, `IN @ids`, which a query method writes as one parameter for each value.  A `-- param:` marker gives one its database type, whether it can be null, or a C# type of your choice.	-
+site/concepts.md:91/2	restated-from	-	site/reference/parameters.md#query-parameters	See parameters and tokens.	Navigation: it points at the page the term now stands on (map 6.4); the parked page keeps it until phase 10
+site/concepts.md:95	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:97	merge-pair	site/reference/generator-parameters.md#setting-generator-parameters	MP-10	-	-
+site/concepts.md:101	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:103	move-split	-	-	-	The term stands in its section; its closing sentence, which only points at that section's page, goes (map 6.4)
+site/concepts.md:103/1	merge-pair	site/reference/tokens.md#tokens	MP-10	A place in a query's SQL, written `{{table}}`, that your code fills in with text when it asks for the SQL.  A query parameter cannot stand for a table name or a clause; a token can.  A token is replaced by plain text substitution and nothing is escaped, so it must only carry text that your own code chooses.	-
+site/concepts.md:103/2	restated-from	-	site/reference/tokens.md#tokens	See parameters and tokens.	Navigation: it points at the page the term now stands on (map 6.4); the parked page keeps it until phase 10
+site/concepts.md:109	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:111	merge-pair	site/reference/settings.md#setting-dialect	MP-10	-	-
+site/concepts.md:115	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:117	merge-pair	site/reference/settings.md#setting-database	MP-10	-	-
+site/concepts.md:119	move	site/reference/settings.md#setting-database	-	-	The statement of dialect against logical database, after the term Logical database
+site/concepts.md:125	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:127	move-split	-	-	-	The term stands in its section; its closing sentence, which only points at that section's page, goes (map 6.4)
+site/concepts.md:127/1	merge-pair	site/reference/members.md#generator	MP-10	The part of the `SqlSource` package that runs in the compiler and writes C# from your `.sql` files.	-
+site/concepts.md:127/2	restated-from	-	site/reference/members.md#generator	See the generator.	Navigation: it points at the page the term now stands on (map 6.4); the parked page keeps it until phase 10
+site/concepts.md:131	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:133	move-split	-	-	-	The term stands in its section; its closing sentence, which only points at that section's page, goes (map 6.4)
+site/concepts.md:133/1	merge-pair	site/reference/cli.md#tool	MP-10	The `sqlsource` command of the `SqlSource.Tool` package.  Its `describe` command asks a database about your queries and writes the sidecars.	-
+site/concepts.md:133/2	restated-from	-	site/reference/cli.md#tool	See the tool.	Navigation: it points at the page the term now stands on (map 6.4); the parked page keeps it until phase 10
+site/concepts.md:137	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:139	merge-pair	site/reference/describing.md#describe	MP-10	-	-
+site/concepts.md:57	move-split	-	-	-	Group heading only: it stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:105	move-split	-	-	-	Group heading only: it stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:121	move-split	-	-	-	Group heading only: it stays on the parked page, site/start/concepts.md, until phase 10
+site/concepts.md:83	move	site/reference/generator-parameters.md#three-kinds-of-parameter	-	-	The h2 of the new section at the foot of the page; the heading also stays on the parked page until phase 10
+site/concepts.md:85	move	site/reference/generator-parameters.md#three-kinds-of-parameter	-	-	-
+@README.md:7	move-split	-	-	-	The README's line 9 as phase 1 left it.  Sentence 2 is placed on D/index.md; the README keeps the whole line until phase 11
+@README.md:7/1	restated-from	-	site/reference/databases/index.md#database-support	**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.	Phase 10 and 11: it stays in the README
+@README.md:7/2	merge-pair	site/reference/databases/index.md#supported-versions	MP-23	Describing queries, in which the `sqlsource` tool asks your database about each query's parameters and columns, works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see database support.	-
+@README.md:7/3	restated-from	-	site/guides/other-databases.md#dialect-and-output	So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as Just want to keep your SQL out of code files? shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see only generating models.	Phase 10 and 11: navigation to the steps for each database, G/other-databases.md and G/dapper.md; it stays in the README
+README.md:19	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	The README keeps its copy until phase 11
+@README.md:19-22	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	The block of the README's lines 21-24 as phase 1 left it, without --prerelease.  The README keeps its copy until phase 11
+README.md:26	corrected	site/reference/attributes.md#what-the-package-adds	C-07	Only the code it generates, the attributes you mark your types and converters with, and the exceptions its methods throw, are compiled into your project	C-07: "and the attributes ..., their enums and the exception its methods throw" > "the attributes ..., and the exceptions its methods throw": the package adds three attributes, no enum and three exceptions (AttributeSource.cs, Exceptions/ExceptionSource.cs); made in the README's own copy too
+README.md:27	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Its link "step 5" names describing.md#describe; phase 10 makes the words true with S/first-query.md#describe.  The README keeps its copy until phase 11
+@README.md:27	move-split	-	-	-	The README's line 29 as phase 6 left it.  Sentences 1 to 4 are placed on the site; the README keeps the whole line until phase 11
+@README.md:27/1	move	site/reference/msbuild.md#build-requirements	-	**Supported environments.**  A project that uses SqlSource targets .NET 8 or later and compiles C# 12 or later, the default for .NET 8.  It builds in the .NET SDK 9.0.300 or later, or in Visual Studio 2022 17.14 or later; the .NET 8 SDK and Visual Studio before 17.14 are not supported, and a build on one stops with SQLSRC021.	-
+@README.md:27/2	merge-pair	site/reference/databases/index.md#supported-versions	MP-23	The tool runs on .NET 8 or later, with the .NET SDK that builds your project installed, since it asks MSBuild about your projects; it describes PostgreSQL 14 or later and SQL Server 2017 or later, and accepts Azure SQL, which is not tested.	-
+@README.md:27/3	merge-pair	site/reference/databases/index.md#supported-versions	MP-23	A project that references Npgsql for its PostgreSQL queries references Npgsql 8 or later, and one that references Microsoft.Data.SqlClient for its SQL Server queries references version 6.1 or later; the methods that run the queries need that reference, and a SQL Server project on EF Core 8 or 9 references Microsoft.Data.SqlClient 6.1 itself, since EF Core brings 5.1.	-
+@README.md:27/4	restated-from	-	site/reference/query-methods.md#limit-wrapped-connection	The methods also need a connection whose commands take the driver's own parameters, which a connection that wraps the driver's may not: see a limit.	Phase 10 and 11: it stays in the README
+README.md:132	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:167	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:185	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:187	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:191	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:195	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:210	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:214	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:218	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:222	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:226	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:230	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:234	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:238	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+README.md:252	move	README.md	-	-	Phase 11: the heading stays, and one pointer to the site stands under it
+@README.md:206	move	site/guides/troubleshooting.md#invalidcastexception	-	-	The README's line 208 as phase 6 left it
+README.md:134	merge-pair	site/guides/dapper.md#models	MP-22	-	Its words "as in step 5" and "the sqlsource.json of step 3" name the README's steps; phase 9 numbers the walkthrough of this page so that they are true
+README.md:136-143	merge-pair	site/guides/dapper.md#models	MP-22	-	-
+README.md:145	merge-pair	site/guides/dapper.md#models	MP-22	-	-
+README.md:147-161	merge-pair	site/guides/dapper.md#models	MP-22	-	-
+README.md:163	merge-pair	site/guides/dapper.md#models-through-dapper	MP-12	-	-
+README.md:165	merge-pair	site/guides/dapper.md#models	MP-22	-	-
+README.md:169	move	site/guides/dapper.md#sql-only	-	-	Its words "Follow steps 1 to 3" name the README's steps; phase 9 numbers the walkthrough of this page so that they are true
+README.md:171-178	move	site/guides/dapper.md#sql-only	-	-	-
+README.md:180	move	site/guides/dapper.md#sql-only	-	-	position: "as [Only want to generate models?] shows" > "as [Models for Dapper, start to end] shows", the heading of #models on the same page; the README's heading is not on the site
+README.md:181	move	site/guides/other-databases.md#dialect-and-output	-	-	-
+README.md:183	move	site/guides/dapper.md#sql-only	-	-	Placed once, at the foot of the section; phase 9 writes the links of G/other-databases.md
+README.md:189	move	site/start/testing.md	-	-	The one unit of the page, under its title; phase 10 writes the page
+README.md:193	merge-pair	site/start/transactions.md#queries-in-a-transaction	MP-13	-	-
+README.md:197	move	site/guides/troubleshooting.md#invalidcastexception	-	-	-
+README.md:199	move	site/guides/troubleshooting.md#invalidcastexception	-	-	-
+README.md:200	move	site/guides/troubleshooting.md#invalidcastexception	-	-	-
+README.md:202	move	site/guides/troubleshooting.md#invalidcastexception	-	-	-
+README.md:204	move	site/guides/troubleshooting.md#invalidcastexception	-	-	-
+README.md:206	move	site/guides/troubleshooting.md#invalidcastexception	-	-	-
+README.md:212	move	site/guides/naming-and-placement.md#model-namespace-task	-	-	-
+README.md:216	merge-pair	site/guides/several-databases.md#use-several-databases	MP-14	-	-
+README.md:220	merge-pair	site/guides/folders-and-files.md#leave-migration-scripts-out	MP-15	-	-
+README.md:224	merge-pair	site/guides/dynamic-sql.md#table-name-at-run-time	MP-16	-	-
+README.md:228	merge-pair	site/guides/lists.md#list-after-in	MP-17	-	-
+README.md:232	merge-pair	site/guides/several-projects.md#test-project-sees-internals	MP-18	-	-
+@README.md:234	merge-pair	site/guides/report-a-bug.md#report-a-bug	MP-19	-	The README's line 236 as phase 5 left it, above the text of tool.md 373-390 that phase 5 placed
+README.md:240	move	site/guides/nodatime-and-spatial.md#nodatime-postgresql	-	-	-
+README.md:242	move	site/guides/nodatime-and-spatial.md#nodatime-sql-server	-	-	-
+README.md:246	move	site/guides/nodatime-and-spatial.md#ef-core-and-dapper	-	-	-
+README.md:248	merge-pair	site/guides/json.md#turn-json-on	MP-20	-	-
+README.md:250	move	site/guides/nodatime-and-spatial.md#ef-core-and-dapper	-	-	The last line of the page, its one place; phase 12 may restate it on G/json.md
+README.md:256-266	move	site/guides/custom-types.md#type-override	-	-	-
+README.md:270	move	site/guides/custom-types.md#one-column	-	-	-
+README.md:272-282	move	site/guides/custom-types.md#one-column	-	-	-
+README.md:284-286	move	site/guides/custom-types.md#one-column	-	-	-
+README.md:244	move-split	-	-	-	Sentence 1 is about PostgreSQL; sentences 2 to 4 stand once, under nts-sql-server; phase 12 restates sentence 3 for PostgreSQL
+README.md:244/1	move	site/guides/nodatime-and-spatial.md#nts-postgresql	-	A PostgreSQL project that references `Npgsql.NetTopologySuite` gets NetTopologySuite's `Geometry` for PostGIS's `geometry` and `geography` in its query methods, read and sent by the plugin, so its application calls `UseNetTopologySuite()` on the `NpgsqlDataSourceBuilder` of the data source that the methods run on.	-
+README.md:244/2	move	site/guides/nodatime-and-spatial.md#nts-sql-server	-	A SQL Server project that references `NetTopologySuite.IO.SqlServerBytes`, and NetTopologySuite 2.5.0 or later by name, since `NetTopologySuite.IO.SqlServerBytes` alone brings 2.0.0, gets it for `geography` and `geometry` when it turns NetTopologySuite on, with `"libraryTypes": { "netTopologySuite": "on" }`, and the query methods read and send each value themselves, with nothing to call on the connection.  On both, a type override gives a column a shape, such as `NetTopologySuite.Geometries.Point`.  See NetTopologySuite on PostgreSQL and NetTopologySuite on SQL Server.	-
+README.md:254	restated-from	site/guides/custom-types.md#type-override	site/reference/type-mapping.md#setting-type-overrides	-	Moved word for word; phase 12 cuts it to three sentences
+README.md:268	restated-from	site/guides/custom-types.md#type-override	site/reference/type-mapping.md#setting-type-overrides	-	position: "see [the FAQ]" > "see [troubleshooting]", its link to G/troubleshooting.md#invalidcastexception; the README's FAQ is not on the site.  Phase 12 cuts it
+README.md:288	restated-from	site/guides/custom-types.md#one-column	site/reference/type-mapping.md#setting-type-overrides	-	Moved word for word; phase 12 cuts it
+-	new	site/guides/several-databases.md	-	-	The h1 Use several databases, the page's sidebar title (map section 1)
+-	new	site/guides/many-rows.md	-	-	The h1 Insert or update many rows in one call (bulk), the page's sidebar title (map section 1)
+-	new	site/guides/sync-and-streaming.md	-	-	The h1 Call a query without await, or stream rows, the page's sidebar title (map section 1)
+-	new	site/guides/repository-connection.md	-	-	The h1 Give a repository its connection, the page's sidebar title (map section 1)
+-	new	site/guides/naming-and-placement.md	-	-	The h1 Change names, namespaces and visibility, the page's sidebar title (map section 1)
+-	new	site/guides/custom-types.md	-	-	The h1 Use your own types: ids, enums, value objects, the page's sidebar title (map section 1)
+-	new	site/guides/json.md	-	-	The h1 Read and write JSON columns, the page's sidebar title (map section 1)
+-	new	site/guides/nodatime-and-spatial.md	-	-	The h1 Use NodaTime and NetTopologySuite, the page's sidebar title (map section 1)
+-	new	site/guides/dynamic-sql.md	-	-	The h1 Choose a table or a clause at run time, the page's sidebar title (map section 1)
+-	new	site/guides/lists.md	-	-	The h1 Pass a list of values (IN), the page's sidebar title (map section 1)
+-	new	site/guides/several-projects.md	-	-	The h1 Use SqlSource in several projects, the page's sidebar title (map section 1)
+-	new	site/guides/other-databases.md	-	-	The h1 Use MySQL, SQLite, Oracle or another database, the page's sidebar title (map section 1)
+-	new	site/start/transactions.md	-	-	The h1 Run queries in a transaction (or with a timeout), the page's sidebar title (map section 1)
+-	new	site/start/testing.md	-	-	The h1 Test code that uses a repository (mock or fake), the page's sidebar title (map section 1)
+-	new	site/guides/naming-and-placement.md#model-namespace-task	-	-	The heading The namespace of the models, with its <a id> (map section 3)
+-	new	site/guides/custom-types.md#type-override	-	-	The heading Give a database type a C# type, with its <a id> (map section 3)
+-	new	site/guides/custom-types.md#one-column	-	-	The heading Give one column or one parameter its own type, with its <a id> (map section 3)
+-	new	site/guides/json.md#turn-json-on	-	-	The heading Turn JSON on, with its <a id> (map section 3)
+-	new	site/guides/nodatime-and-spatial.md#nodatime-postgresql	-	-	The heading NodaTime on PostgreSQL, with its <a id> (map section 3)
+-	new	site/guides/nodatime-and-spatial.md#nodatime-sql-server	-	-	The heading NodaTime on SQL Server, with its <a id> (map section 3)
+-	new	site/guides/nodatime-and-spatial.md#nts-postgresql	-	-	The heading NetTopologySuite on PostgreSQL, with its <a id> (map section 3)
+-	new	site/guides/nodatime-and-spatial.md#nts-sql-server	-	-	The heading NetTopologySuite on SQL Server, with its <a id> (map section 3)
+-	new	site/guides/nodatime-and-spatial.md#ef-core-and-dapper	-	-	The heading With Entity Framework Core or Dapper in the same project, with its <a id> (map section 3)
+-	new	site/guides/dapper.md#models	-	-	The heading Models for Dapper, start to end, with its <a id> (map section 3)
+-	new	site/guides/dapper.md#sql-only	-	-	The heading Only the SQL, with its <a id> (map section 3)
+-	new	site/guides/lists.md#list-after-in	-	-	The heading Pass a list after IN, with its <a id> (map section 3)
+-	new	site/guides/troubleshooting.md#invalidcastexception	-	-	The heading `InvalidCastException`, an h3 under at-run-time, with its <a id> (map section 3)
+-	new	site/guides/other-databases.md#dialect-and-output	-	-	The heading Set the dialect of your database and the output `sql`, with its <a id> (map section 3)
+-	new	site/reference/attributes.md#what-the-package-adds	-	-	The heading What the package adds to your project, with its <a id> (map section 3)
+-	new	site/reference/msbuild.md#build-requirements	-	-	The heading What the build needs, with its <a id> (map section 3)
+-	new	README.md	-	-	The pointer under each of 14 README headings: one sentence, "See [<sidebar title>](<site URL>).", spec step 5
+-	new	site/reference/databases/other.md	-	-	The sentence that sends a reader to G/other-databases.md for the steps with the output sql, after the opening paragraph
