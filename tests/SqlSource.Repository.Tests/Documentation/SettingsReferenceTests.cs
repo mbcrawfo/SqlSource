@@ -201,10 +201,9 @@ public sealed partial class SettingsReferenceTests
             && next.Contains($"`{name}`", StringComparison.Ordinal);
     }
 
-    // Each name of the list is read by the package's build files, as $(Name), $(Name.Trim()) or a
-    // CompilerVisibleProperty, so that a property renamed there fails.  A new property there fails nothing: the list is
-    // this test's, and the documentation overhaul left out on purpose a classification of every property the build
-    // reads.
+    // Each name of the list is read by the package's build files, as $(Name), a member call $(Name.Method()) or a
+    // CompilerVisibleProperty, so that a property renamed there fails.  A new property there fails nothing: the build
+    // files read properties of their own too, so this list alone says which are a user's.
     [Fact]
     public void ProjectProperties_EachOne_IsReadByTheBuildFiles()
     {
