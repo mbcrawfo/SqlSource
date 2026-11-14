@@ -1,8 +1,18 @@
-- name: Concepts
-  href: concepts.md
+- name: Install
+  href: install.md
+- name: Your first query
+  href: first-query.md
+- name: How SqlSource works
+  href: how-it-works.md
+- name: Write queries
+  href: write-queries.md
+- name: Call your queries
+  href: call-queries.md
 - name: Run queries in a transaction (or with a timeout)
   href: transactions.md
 - name: Test code that uses a repository (mock or fake)
   href: testing.md
 - name: Keep your queries up to date
   href: keep-up-to-date.md
+- name: When something goes wrong
+  href: errors.md
