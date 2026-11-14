@@ -1,6 +1,6 @@
 # Keep your queries up to date
 
-At the end of this page, you know what to commit to git.  You also know what to do after a schema change or migration, a merge conflict, and in CI.
+This page says what to commit to git, and what to do after a schema change or migration, a merge conflict, and in CI.
 
 <a id="what-to-commit"></a>
 

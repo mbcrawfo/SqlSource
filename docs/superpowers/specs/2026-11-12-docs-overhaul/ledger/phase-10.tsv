@@ -4,9 +4,9 @@ unit	disposition	to	arg	words	note
 README.md:1	move	site/index.md	-	-	The title of the landing page; The README keeps its own copy until phase 11 cuts it
 README.md:3	move	README.md	-	-	phase 11: the badges stay in the README
 README.md:5	move	site/index.md	fact	-	Item 1 of the landing page, in plain language: what SqlSource does and why.  What the paragraph leaves out stands with its owner: the editor shows a query's SQL (start/write-queries.md#summaries, R/members.md#intellisense); the tool records what the database says, from which the code is generated (start/how-it-works.md#picture, R/sidecars.md#sidecar-files); any other query gets a constant (index.md#databases, R/settings.md#setting-output); The README keeps its own copy until phase 11 cuts it
-README.md:9	restated-from	site/index.md	site/guides/other-databases.md#dialect-and-output	-	Sentences 3 to 5 alone (phase 8 placed 1 and 2, with its parts): which steps to follow for which database.  The landing page's line for the other readers, also on install.md; the Dapper path is G/dapper.md
+README.md:9	move	README.md	-	-	The unit stays in the README, as phases 1 and 8 placed it, until phase 11.  Its sentences 3 to 5, which steps to follow for which database, are also restated as the landing page's line for the other readers (site/index.md, start/install.md), owned by G/other-databases.md#dialect-and-output and G/dapper.md
 README.md:15	move	site/start/install.md#add-the-package	fact	-	The command that adds the package, which a start/ page owns: without --prerelease, by the owner's ruling of phase 1 (ledger/phase-01.tsv, README.md:15); The README keeps its own copy until phase 11 cuts it
-README.md:29	restated-from	-	site/reference/query-methods.md#limit-wrapped-connection	-	Sentence 5 alone (phase 8 placed the unit), 'The methods also need a connection whose commands take the driver's own parameters, which a connection that wraps the driver's may not: see known issues.': not restated on install.md (spec, Calls): with the repository output the method opens its own connection, so it is no first-hour trap
+README.md:29	move	README.md	-	-	The unit stays in the README, as phase 8 placed it, until phase 11.  Its sentence 5, 'The methods also need a connection whose commands take the driver's own parameters, which a connection that wraps the driver's may not: see known issues.', is not restated on install.md (spec, Calls): with the repository output the method opens its own connection, so it is no first-hour trap.  Its owner is R/query-methods.md#limit-wrapped-connection
 README.md:11	move-split	-	-	-	Heading only: its parts stand on site/start/install.md, whose title is Install; phase 11 keeps the README's Install
 README.md:31	move-split	-	-	-	Heading only: the site owns the walkthrough, site/start/first-query.md; phase 11 keeps the README's Use
 README.md:33	move-split	-	-	-	Heading only: step 1 of site/start/first-query.md, Write a query
@@ -62,6 +62,7 @@ site/concepts.md:5	move	site/start/how-it-works.md#picture	-	-	The diagram, byte
 site/concepts.md:17	restated-from	-	site/start/how-it-works.md#words	-	Navigation: the six words of how-it-works.md, each linking the section that defines it
 site/concepts.md:21	move-split	-	-	-	Heading only: no glossary page (decision 9); the anchor glossary retires
 site/concepts.md:23	move-split	-	-	-	Group heading only
+site/concepts.md:27-139	restated-from	-	site/start/how-it-works.md#words	-	The parked copies; each term's owner is its phase-08 row (owner, p10 Q1)
 @site/start/concepts.md	restated-from	-	site/start/how-it-works.md#words	-	The parked page as it stands at the base: its second copies of the 17 terms and their headings; each term stands in its reference section, as ledger/phase-08.tsv says; the 18 anchors retire
 site/README.md:1	move	site/index.md	fact	-	The title becomes SqlSource
 site/README.md:3	move-split	-	-	-	Three sentences
@@ -140,7 +141,7 @@ site/recipes.md:185-196	move	site/start/keep-up-to-date.md#after-a-migration	fac
 site/recipes.md:258-300	merge-pair	site/start/transactions.md#queries-in-a-transaction	MP-13	-	Merged here with README.md 191-193 (merges/MP-13.md): start/ has no rewrite phase.  The SQL block stays byte for byte as the PostgreSQL tab.  Fenced block changed: the C# block gains using Npgsql; and using SqlSource;, so that it compiles when a reader copies it whole (accuracy review AC-2)
 README.md:191-193	merge-pair	site/start/transactions.md#queries-in-a-transaction	MP-13	-	Merged here with recipes.md 258-300 (merges/MP-13.md); its collection-method sentence is the closing link to G/many-rows.md; the README keeps its copy until phase 11
 README.md:187-189	move	site/start/testing.md	fact	-	Rewritten here: start/ has no rewrite phase.  Its settings (SqlSourceRepositoryInterfaces, GenerateInterface, InterfaceName) are left to R/repositories.md#repository-interfaces, linked in Rules:; the README keeps its copy until phase 11
--	new	site/start/install.md	site/reference/msbuild.md#build-requirements	48	The title, the opening with the search words, the line for the other readers; no sample
+-	new	site/start/install.md	site/reference/msbuild.md#build-requirements	55	The title, the opening with the search words, the line for the other readers; no sample
 -	new	site/start/install.md#requirements	site/reference/msbuild.md#build-requirements,site/reference/databases/index.md#supported-versions,site/reference/cli.md#requirements,site/diagnostics.md#sqlsrc021	115	The section; no sample
 -	new	site/start/install.md#add-the-package	site/reference/repositories.md#repository-connection,site/reference/databases/sqlserver/types.md#limit-ef-core-sqlclient	105	The section; The add command is README 16 without --prerelease (the owner's ruling of phase 1: ledger/phase-01.tsv, README.md:15); the driver commands as the walk ran them; the PackageReference is D/sqlserver/types.md#limit-ef-core-sqlclient's
 -	new	site/start/install.md#install-the-tool-step	site/reference/cli.md#install-the-tool,site/diagnostics.md#sqlsrc206	116	The section; README 22-23 without --prerelease (the owner's ruling of phase 1: ledger/phase-01.tsv, README.md:15); walk
@@ -172,7 +173,7 @@ README.md:187-189	move	site/start/testing.md	fact	-	Rewritten here: start/ has n
 -	new	site/start/write-queries.md#summaries	site/reference/sql-files.md#summaries,site/reference/members.md#intellisense,site/reference/sidecars.md#describing-again	35	The section; no sample
 -	new	site/start/write-queries.md#if-it-does-not-work	site/diagnostics.md#sqlsrc226,site/diagnostics.md#sqlsrc227,site/diagnostics.md#sqlsrc244,site/reference/model-properties.md#column-marker	80	The h2 If it does not work: the traps of the page, each with its id and fix; no anchor, known by its slug
 -	new	site/start/write-queries.md#what-you-have-now	site/reference/sql-files.md#queries-and-names	72	The h2 What you have now, with the closing links, the Rules: line and Next:; no anchor, known by its slug
--	new	site/start/call-queries.md	site/reference/repositories.md#repository-methods	30	The title, the opening with the search words; no sample
+-	new	site/start/call-queries.md	site/reference/repositories.md#repository-methods	29	The title, the opening with the search words; no sample
 -	new	site/start/call-queries.md#repository	site/reference/repositories.md#repository-methods,site/reference/repositories.md#repository-connection	83	The section; the example classes, as on first-query.md
 -	new	site/start/call-queries.md#register	site/reference/repositories.md#repository-interface	64	The section; README 189 (PostgreSQL), recipes.md 431-435 (SQL Server), with UserRepository; compiled by the reviewer
 -	new	site/start/call-queries.md#models	site/reference/models.md#model-names,site/reference/models.md#table-models,site/reference/model-properties.md#model-nullability	107	The section; the generated records as the walk generated them
@@ -180,8 +181,8 @@ README.md:187-189	move	site/start/testing.md	fact	-	Rewritten here: start/ has n
 -	new	site/start/call-queries.md#cancellation	site/reference/repositories.md#repository-signature	48	The section; compiled by the reviewer
 -	new	site/start/call-queries.md#missing-row	site/reference/exceptions.md#unexpected-row-count,site/reference/return-types.md#method-shapes	70	The section; compiled by the reviewer
 -	new	site/start/call-queries.md#if-it-does-not-work	site/reference/models.md#table-models,site/diagnostics.md#sqlsrc241,site/diagnostics.md#sqlsrc244	46	The h2 If it does not work: the traps of the page, each with its id and fix; no anchor, known by its slug
--	new	site/start/call-queries.md#what-you-have-now	site/reference/repositories.md#repository-methods	64	The h2 What you have now, with the closing links, the Rules: line and Next:; no anchor, known by its slug
--	new	site/start/transactions.md	site/reference/repositories.md#repository-transactions	35	The title, the opening with the search words; no sample
+-	new	site/start/call-queries.md#what-you-have-now	site/reference/repositories.md#repository-methods	63	The h2 What you have now, with the closing links, the Rules: line and Next:; no anchor, known by its slug
+-	new	site/start/transactions.md	site/reference/repositories.md#repository-transactions	32	The title, the opening with the search words; no sample
 -	new	site/start/transactions.md#queries-in-a-transaction	site/reference/repositories.md#repository-transactions,site/reference/connection-methods.md#method-connection,site/reference/connection-methods.md#method-location,site/reference/repositories.md#repository-interface	451	The section; recipes.md 260-271 byte for byte and 273-296 with two using lines (PostgreSQL tab); the SQL Server tab is new, run in both walks
 -	new	site/start/transactions.md#timeout	site/reference/connection-methods.md#method-signature,site/reference/connection-methods.md#method-connection	136	The section; compiled by the reviewer (walk)
 -	new	site/start/transactions.md#two-outputs	site/reference/settings.md#setting-output	56	The section; no sample
@@ -194,7 +195,7 @@ README.md:187-189	move	site/start/testing.md	fact	-	Rewritten here: start/ has n
 -	new	site/start/testing.md#your-own-member	site/reference/repositories.md#repository-interface	70	The section; compiled by the reviewer (walk), as generator.md 718-722 shows
 -	new	site/start/testing.md#if-it-does-not-work	site/reference/repositories.md#repository-interface,site/guides/several-projects.md#test-project-sees-internals	53	The h2 If it does not work: the traps of the page, each with its id and fix; no anchor, known by its slug
 -	new	site/start/testing.md#what-you-have-now	site/reference/repositories.md#repository-interface	46	The h2 What you have now, with the closing links, the Rules: line and Next:; no anchor, known by its slug
--	new	site/start/keep-up-to-date.md	site/reference/sidecars.md#sidecars-in-git	38	The title, the opening with the search words; no sample
+-	new	site/start/keep-up-to-date.md	site/reference/sidecars.md#sidecars-in-git	31	The title, the opening with the search words; no sample
 -	new	site/start/keep-up-to-date.md#what-to-commit	site/reference/sidecars.md#sidecars-in-git,site/reference/sidecars.md#sidecar-files	87	The section; R/sidecars.md#sidecars-in-git's block
 -	new	site/start/keep-up-to-date.md#the-build-describes	site/reference/msbuild.md#running-in-the-build	96	The section; no sample
 -	new	site/start/keep-up-to-date.md#after-a-migration	site/reference/describing.md#after-a-schema-change	128	The section; recipes.md 189-194, with the summary line of first-query.md
@@ -202,7 +203,7 @@ README.md:187-189	move	site/start/testing.md	fact	-	Rewritten here: start/ has n
 -	new	site/start/keep-up-to-date.md#in-ci	site/reference/msbuild.md#running-in-the-build,site/reference/describing.md#check-in-ci	86	The section; the command of R/describing.md#check-in-ci
 -	new	site/start/keep-up-to-date.md#if-it-does-not-work	site/diagnostics.md#sqlsrc244,site/diagnostics.md#sqlsrc237,site/reference/msbuild.md#running-in-the-build	60	The h2 If it does not work: the traps of the page, each with its id and fix; no anchor, known by its slug
 -	new	site/start/keep-up-to-date.md#what-you-have-now	site/reference/sidecars.md#sidecars-in-git	71	The h2 What you have now, with the closing links, the Rules: line and Next:; no anchor, known by its slug
--	new	site/start/errors.md	site/reference/errors.md#where-an-error-is-reported	31	The title, the opening with the search words; no sample
+-	new	site/start/errors.md	site/reference/errors.md#where-an-error-is-reported	28	The title, the opening with the search words; no sample
 -	new	site/start/errors.md#read-an-error	site/reference/errors.md#where-an-error-is-reported	143	The section; the SQLSRC241 line as the walk printed it, with the folder shortened to /work
 -	new	site/start/errors.md#what-an-error-costs	site/reference/errors.md#what-an-error-costs,site/reference/msbuild.md#running-in-the-build	91	The section; no sample
 -	new	site/start/errors.md#first-errors	site/diagnostics.md#sqlsrc241,site/diagnostics.md#sqlsrc244,site/diagnostics.md#sqlsrc209,site/diagnostics.md#sqlsrc213,site/diagnostics.md#sqlsrc220,site/diagnostics.md#sqlsrc224,site/diagnostics.md#sqlsrc226,site/diagnostics.md#sqlsrc227,site/diagnostics.md#sqlsrc021,site/diagnostics.md#sqlsrc267,site/diagnostics.md#sqlsrc206	248	The section; no sample

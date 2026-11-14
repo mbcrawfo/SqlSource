@@ -1,6 +1,6 @@
 # Call your queries
 
-At the end of this page, your application gets the repository by dependency injection, and calls it with a cancellation token to get models, or DTOs.
+At the end of this page, your application gets the repository by dependency injection and calls it with a cancellation token for models, or DTOs.
 
 <a id="repository"></a>
 
@@ -117,7 +117,7 @@ A query whose shape is `one` throws `UnexpectedRowCountException` when it return
 
 ## What you have now
 
-An application that gets `IUserRepository` from dependency injection, calls its three methods, and reads their models.
+An application that gets `IUserRepository` from dependency injection, calls its methods, and reads their models.
 
 Rules: [repository methods](../reference/repositories.md#repository-methods), [the connection](../reference/repositories.md#repository-connection), [the interface](../reference/repositories.md#repository-interface), [model names](../reference/models.md#model-names), [table models](../reference/models.md#table-models), [what each shape returns](../reference/return-types.md#method-shapes), [the signature](../reference/repositories.md#repository-signature), [`UnexpectedRowCountException`](../reference/exceptions.md#unexpected-row-count).  Guides: [names with `Async`](../guides/naming-and-placement.md), [methods for code that does not await](../guides/sync-and-streaming.md), [another way to give a repository its connection](../guides/repository-connection.md).
 

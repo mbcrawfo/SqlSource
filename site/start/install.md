@@ -2,7 +2,7 @@
 
 You use Dapper: start with [Use Dapper](../guides/dapper.md).  Your database is not PostgreSQL or SQL Server: start with [another database](../guides/other-databases.md).
 
-At the end of this page, your project has the SqlSource NuGet package and your driver package.  Your repository has the tool, on a supported .NET version.
+At the end of this page, your project has the SqlSource NuGet package, and your repository has the tool, on a supported .NET version.  Your project also has the driver package of your database.
 
 <a id="requirements"></a>
 

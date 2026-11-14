@@ -1,6 +1,6 @@
 # Run queries in a transaction (or with a timeout)
 
-At the end of this page, two queries run in one transaction that you commit or roll back, and a query has its own timeout.
+At the end of this page, two queries run in one transaction that you commit, and a query has its own timeout.
 
 <a id="queries-in-a-transaction"></a>
 
