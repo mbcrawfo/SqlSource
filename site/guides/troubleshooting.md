@@ -1,6 +1,6 @@
 # Troubleshooting: it built, but something is wrong
 
-Use this page when the build succeeds but something is wrong: an exception at run time, a wrong result, or nothing happens.
+Use this page when the build succeeds but something is wrong: an exception at run time, a wrong result, or nothing happens.  It also lists a build error that is not about your SQL.
 
 Some problems are listed in the known issues of [settings](../settings.md#known-issues), [the generator](../generator.md#known-issues) and [the tool](../tool.md#known-issues).
 
@@ -9,7 +9,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 ## An exception at run time
 
 - **`InvalidCastException` for a NodaTime, PostGIS, enum or composite type, on PostgreSQL.**  A repository made from a connection string makes connections that have none of the plugins and mappings of your data source.  See [a repository made from a connection string](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository).
-- **`SqlNullValueException` from a column whose property cannot be null, on SQL Server.**  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null where an overflow or a division by zero is otherwise an error.  See [`ANSI_WARNINGS` off](../reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off).
+- **Null in a column whose property cannot be null, on SQL Server.**  With `ANSI_WARNINGS` and `ARITHABORT` both off, SQL Server returns null where an overflow or a division by zero is otherwise an error.  See [`ANSI_WARNINGS` off](../reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off).
 - **A `SqlException`, and the transaction is rolled back, on SQL Server.**  An error before the rows can hide a later error of the batch that rolls the transaction back.  See [a hidden rollback](../reference/databases/sqlserver/query-methods.md#limit-hidden-rollback).
 - **`SqlException` 130 for an empty or null list, on SQL Server.**  A list after a `NOT` inside an aggregate of your own fails when it is empty or null.  See [a list in an aggregate of your own](../reference/databases/sqlserver/query-methods.md#limit-list-in-an-aggregate).
 
@@ -40,8 +40,8 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **Describing is slow on a table with thousands of partitions, on PostgreSQL.**  The tool looks at every partition of a partitioned table.  See [many partitions](../reference/databases/postgresql/index.md#limit-many-partitions).
 - **A function marked `IMMUTABLE` runs while a query is described, on PostgreSQL.**  PostgreSQL can compute a call of such a function with constant arguments in advance.  See [what describing does](../reference/databases/postgresql/index.md#what-describing-does).
 - **SQLSRC228 for a `-- param:` type name, on SQL Server.**  SqlSource and SQL Server can read a character that Unicode added or reclassified after version 3.2 in different ways.  See [a type name with such a character](../reference/databases/sqlserver/index.md#limit-type-name-unicode).
-- **SQLSRC231 for a parameter name with a rare character, on SQL Server.**  SqlSource and SQL Server can read a character that Unicode added or reclassified after version 3.2 in different ways.  See [a parameter name with such a character](../reference/databases/sqlserver/index.md#limit-parameter-name-unicode).
-- **Two query parameters where SQL Server sees one.**  SqlSource compares names ignoring case alone, and SQL Server by its collation.  See [a name written in two ways](../reference/databases/sqlserver/index.md#limit-parameter-two-spellings).
+- **SQLSRC231 for a parameter name with a character that Unicode added or reclassified after version 3.2, on SQL Server.**  SqlSource and SQL Server can read a character that Unicode added or reclassified after version 3.2 in different ways.  See [a parameter name with such a character](../reference/databases/sqlserver/index.md#limit-parameter-name-unicode).
+- **A query that writes a query parameter's name in two ways fails when it is described, on SQL Server.**  SqlSource compares names ignoring case alone, and SQL Server by its collation.  See [a name written in two ways](../reference/databases/sqlserver/index.md#limit-parameter-two-spellings).
 
 <a id="watch"></a>
 

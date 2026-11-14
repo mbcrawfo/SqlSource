@@ -135,8 +135,8 @@ public sealed partial class SiteStructureTests
     }
 
     // Fails when PartialTabGroups misses a group with one database alone, reports a group with each database or with
-    // none, reads a tab heading in a fenced block, or takes two groups for one: groups parted by another heading, and
-    // groups of tab headings of two levels.
+    // none, reads a tab heading in a fenced block, or takes two groups for one: groups parted by another heading, by a
+    // `---` line, and groups of tab headings of two levels.
     [Fact]
     public void PartialTabGroups_OfMadeUpLines_AreFound() =>
         PartialTabGroups(
@@ -169,6 +169,10 @@ public sealed partial class SiteStructureTests
                     "### [SQL Server](#tab/sqlserver)",
                     "",
                     "#### [PostgreSQL](#tab/postgresql)",
+                    "",
+                    "---",
+                    "",
+                    "#### [SQL Server](#tab/sqlserver)",
                 ],
                 ["postgresql", "sqlserver"]
             )
@@ -178,6 +182,8 @@ public sealed partial class SiteStructureTests
                 $"{MadeUpFolder}/page.md:25: the tab group has tabs for sqlserver and none for postgresql: give each "
                     + "database folder of site/reference/databases/ its tab",
                 $"{MadeUpFolder}/page.md:27: the tab group has tabs for postgresql and none for sqlserver: give each "
+                    + "database folder of site/reference/databases/ its tab",
+                $"{MadeUpFolder}/page.md:31: the tab group has tabs for sqlserver and none for postgresql: give each "
                     + "database folder of site/reference/databases/ its tab",
             ]);
 
@@ -193,8 +199,8 @@ public sealed partial class SiteStructureTests
 
     // Each docfx tab group of the lines that has a tab for one of the databases and none for another: one problem for
     // each, with the line of its first tab.  A group is a run of tab headings, `#... [Text](#tab/<id>)`, of one level,
-    // with no other heading between them, outside fenced blocks.  A dependent tab's id holds slashes, and its first
-    // segment names the tab.
+    // with no other heading and no `---` line between them, outside fenced blocks: docfx ends a group at either.  A
+    // dependent tab's id holds slashes, and its first segment names the tab.
     internal static IReadOnlyList<string> PartialTabGroups(
         string page,
         IReadOnlyList<string> lines,
@@ -232,7 +238,18 @@ public sealed partial class SiteStructureTests
                 continue;
             }
 
-            if (fenced || TabGroupHeading().Match(line) is not { Success: true } heading)
+            if (fenced)
+            {
+                continue;
+            }
+
+            if (line.Trim() == "---")
+            {
+                Close();
+                continue;
+            }
+
+            if (TabGroupHeading().Match(line) is not { Success: true } heading)
             {
                 continue;
             }

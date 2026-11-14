@@ -14,7 +14,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 | Command, option, environment variable, exit code | The command reference of `tool.md` | A reviewer |
 | Diagnostic | A `## SQLSRCnnn` section of `diagnostics.md`, in id order | `DiagnosticsDocumentTests` |
 | Dialect | Its rows in `reference/dialects.md` and `reference/databases/index.md`; the section of `SQLSRC019` | A reviewer |
-| Database that can be described | A folder of the five pages under `reference/databases/`; a row in `reference/databases/index.md`; a tab in every tab group that names a database; the README's list; an example project | `SiteStructureTests` |
+| Database that can be described | A folder of the five pages under `reference/databases/`; a row in `reference/databases/index.md`; a tab in every tab group that names a database; the README's list; an example project | `SiteStructureTests`, for the folder and the tabs; a reviewer, for the rest |
 | Feature that meets the line for Get started | The getting-started steps of `README.md`; its rules in Reference | A reviewer |
 | Any other feature | A reference section; a guide when it is a task; an example, as root rule 4 says | `SiteTocTests`, for a new page |
 | Limit | `## Limits` of the page that owns it, with its own anchor; a row in `guides/troubleshooting.md` | `SiteStructureTests` |
