@@ -8,7 +8,7 @@ namespace PostgresExamples;
 // UtcDateTimeOffsetHandler.  Its data source calls neither UseNodaTime() nor UseNetTopologySuite(), which
 // Methods.StoreDataSource.CreateDataSource calls for the generated methods: after UseNodaTime(), Npgsql gives Dapper
 // an Instant for every timestamptz, which UtcDateTimeOffsetHandler cannot read.  See
-// site/guides/dapper.md#models-through-dapper.
+// site/guides/dapper.md#models-through-dapper and site/guides/dapper.md#dapper-with-postgresql.
 public static class DapperSetup
 {
     static DapperSetup()

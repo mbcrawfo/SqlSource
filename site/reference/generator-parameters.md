@@ -138,4 +138,4 @@ No parameter of its own: every parameter takes its default at the place that say
 
 ## Three kinds of parameter
 
-SqlSource uses the word "parameter" for three different things.  The manual always says which.
+SqlSource uses the word "parameter" for three different things: [query parameters](parameters.md#query-parameters), [generator parameters](#setting-generator-parameters) and [tokens](tokens.md#tokens).  The manual always says which.

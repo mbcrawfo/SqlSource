@@ -40,6 +40,6 @@ public int Run(int id)
 }
 ```
 
-A repository gets the same methods, and its interface a member for each, so `users` can be the interface.  Each gets its connection from the repository: a repository whose only connection is a method that returns a task marks a second one that returns none, as [the next recipe](repository-connection.md#connection-from-a-provider) does.
+A repository gets the same methods, and its interface a member for each, so `users` can be the interface.  Each gets its connection from the repository: a repository whose only connection is a method that returns a task marks a second one that returns none, as [the recipe](repository-connection.md#connection-from-a-provider) does.
 
 Rules: [synchronous methods](../reference/query-methods.md#synchronous-methods), [synchronous repository methods](../reference/repositories.md#synchronous-repository-methods), [generator parameters](../reference/generator-parameters.md#setting-generator-parameters).

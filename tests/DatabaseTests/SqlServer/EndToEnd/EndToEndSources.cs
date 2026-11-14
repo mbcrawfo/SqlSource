@@ -9,11 +9,11 @@ using SqlSource.DatabaseTests.SqlServer.EndToEnd.Types;
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
 // The connections that the tests run the end-to-end queries and the realistic cases on, through the generated methods
-// or through Dapper, set up as the manual's Dapper guide, site/guides/dapper.md#models-through-dapper, tells a project
-// to and no further: Dapper matches snake_case columns to properties and has a handler for each type that a type
-// override of a query it reads names and SqlClient does not give.  The methods read the types of Types/ that have
-// converters, Email among them, through those instead.  A test disposes the connection it is given, and one that needs
-// it open, a Dapper test or one that holds a transaction, opens it first.
+// or through Dapper, set up as the manual's Dapper guide, site/guides/dapper.md#models-through-dapper and
+// #dapper-with-sql-server, tells a project to and no further: Dapper matches snake_case columns to properties and has a
+// handler for each type that a type override of a query it reads names and SqlClient does not give.  The methods read
+// the types of Types/ that have converters, Email among them, through those instead.  A test disposes the connection it
+// is given, and one that needs it open, a Dapper test or one that holds a transaction, opens it first.
 internal static class EndToEndSources
 {
     // Dapper's settings are the process's, so they are made once, before the first connection.

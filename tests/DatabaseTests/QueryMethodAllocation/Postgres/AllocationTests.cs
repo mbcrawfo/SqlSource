@@ -17,34 +17,32 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
 // A generated method allocates no more for each call than a hand-written ADO.NET method of the same calls, written as
 // the manual's guide for your own code, site/guides/dapper.md#dapper-and-adonet, writes one and as a careful developer
 // would: it honours the same contract, opening a closed connection and closing it again in a finally, setting the
-// transaction and, when given, the timeout,
-// and passing the token; it binds the parameter as the generated method does, an NpgsqlParameter<int> named without
-// its '@' and with its DataTypeName, since binding by the described type is decided and its cost is the driver's on
-// both sides; and it reads each column by its ordinal with GetFieldValue into the same model, and the rows into an
-// array, the collection the method returns, through what the generated method reads them into.  So each query has two
-// pairs: its method of AccountQueries, which reads its rows into the pooled buffer, against a hand-written method that
-// reads them into RowBufferByHand of this project, the same buffer by hand; and the method of
-// its copy GetAccountNameUnpooled, ListAccountsUnpooled or ListClosedBeforeUnpooled in the same file, the same query
-// under array-pool=off by its own marker, which reads them into a List and copies it, against a hand-written method
-// that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
+// transaction and, when given, the timeout, and passing the token; it binds the parameter as the generated method does,
+// an NpgsqlParameter<int> named without its '@' and with its DataTypeName, since binding by the described type is
+// decided and its cost is the driver's on both sides; and it reads each column by its ordinal with GetFieldValue into
+// the same model, and the rows into an array, the collection the method returns, through what the generated method
+// reads them into.  So each query has two pairs: its method of AccountQueries, which reads its rows into the pooled
+// buffer, against a hand-written method that reads them into RowBufferByHand of this project, the same buffer by hand;
+// and the method of its copy GetAccountNameUnpooled, ListAccountsUnpooled or ListClosedBeforeUnpooled in the same file,
+// the same query under array-pool=off by its own marker, which reads them into a List and copies it, against a
+// hand-written method that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
 // List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against rows read into RowBufferByHand and
 // copied by ToList or ToImmutableArray, and its twin with array-pool=off against a List that is returned as it is or an
-// ImmutableArray builder that is drained, since those are what the generated method returns.  Three more tests hold
-// the pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300 rows, to allocating less than a List
-// copied to an array, a List grown by doubling and an ImmutableArray builder that is drained, each by at least a given
-// number of bytes, since a pooled buffer exists to save a list's growth arrays and the pairs above, against
-// RowBufferByHand, cannot see what the buffer itself costs.  The streaming StreamAccounts of StreamingQueries has a
-// pair of its own, against a hand-written static local async iterator that makes the same calls and yields each row,
-// for the whole of a call, from the first MoveNextAsync to the disposal.  In each pair the two make the same calls, so
-// what the generated method allocates beyond the hand-written one is the difference of their own state, which the
-// margin holds, and an object that it allocates on each call shows.  Both run on the same open connection of one data
-// source, with the same token, and ConfigureAwait(false) on each await.  The two are compared by the commonest
-// difference of pairs of calls, one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes counts
-// every thread, since an awaited continuation runs where the driver completes it, so the class is in
-// the collection MeasuresPostgres, which runs alone on a container of its own, and the assembly runs no two tests at
-// once.  That keeps other tests out of the count, but not the process's own background work, which the commonest
-// difference leaves out, and the class skips under coverage, whose collector allocates in the process too often for it
-// to leave out.
+// ImmutableArray builder that is drained, since those are what the generated method returns.  Three more tests hold the
+// pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300 rows, to allocating less than a List copied
+// to an array, a List grown by doubling and an ImmutableArray builder that is drained, each by at least a given number
+// of bytes, since a pooled buffer exists to save a list's growth arrays and the pairs above, against RowBufferByHand,
+// cannot see what the buffer itself costs.  The streaming StreamAccounts of StreamingQueries has a pair of its own,
+// against a hand-written static local async iterator that makes the same calls and yields each row, for the whole of a
+// call, from the first MoveNextAsync to the disposal.  In each pair the two make the same calls, so what the generated
+// method allocates beyond the hand-written one is the difference of their own state, which the margin holds, and an
+// object that it allocates on each call shows.  Both run on the same open connection of one data source, with the same
+// token, and ConfigureAwait(false) on each await.  The two are compared by the commonest difference of pairs of calls,
+// one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes counts every thread, since an awaited
+// continuation runs where the driver completes it, so the class is in the collection MeasuresPostgres, which runs alone
+// on a container of its own, and the assembly runs no two tests at once.  That keeps other tests out of the count, but
+// not the process's own background work, which the commonest difference leaves out, and the class skips under coverage,
+// whose collector allocates in the process too often for it to leave out.
 [Collection(MeasuresPostgres.Name)]
 public sealed partial class AllocationTests(PostgresApp postgres)
 {

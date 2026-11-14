@@ -168,7 +168,7 @@ A query whose output is `sql` or `models` gets its constant or token method.  A 
 
 A name for one particular database your queries run against, such as `billing`.  The tool uses it to choose which connection to describe a query through, a sidecar records it, and a [repository](repositories.md#repository-methods) that uses several marks a connection source for each.  A query belongs to the logical database its markers or settings name, and to the one named after its dialect when they name none.  See [the database setting](#setting-database).
 
-The two answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
+The dialect and the logical database answer different questions.  The dialect is *which kind of SQL* a file is written in; the logical database is *which database* the tool asks about it.  Several logical databases can share a dialect: `billing` and `reports` can both be `postgres`.
 
 ```sql
 -- database: billing

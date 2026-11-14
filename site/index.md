@@ -72,6 +72,6 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 - [The tool](reference/cli.md): the `SqlSource.Tool` package and its `sqlsource` command.
 - [PostgreSQL](reference/databases/postgresql/index.md): how SqlSource works with PostgreSQL.
 - [SQL Server](reference/databases/sqlserver/index.md): how SqlSource works with SQL Server.
-- [Recipes](guides/lists.md): short how-tos, each a sample and a link to the rules.
+- [Guides](guides/lists.md): short how-tos, each a sample and a link to the rules.
 - [How errors are reported](reference/errors.md): warnings and information, where an error is reported, what it costs, whether the build or the tool reports it, and every error by area.
 - [Diagnostics](diagnostics.md): what each `SQLSRC` error means and how to fix it.

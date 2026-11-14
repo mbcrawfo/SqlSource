@@ -26,7 +26,8 @@ site/recipes.md:69-89	merge-pair	site/guides/folders-and-files.md#leave-migratio
 site/recipes.md:93-121	merge-pair	site/guides/several-databases.md#use-several-databases	MP-14	-	-
 site/recipes.md:258-300	merge-pair	site/start/transactions.md#queries-in-a-transaction	MP-13	-	-
 site/recipes.md:304-325	move	site/guides/many-rows.md#insert-many-rows	-	-	-
-site/recipes.md:329-369	move	site/guides/sync-and-streaming.md#run-without-awaiting	-	-	-
+site/recipes.md:329-366	move	site/guides/sync-and-streaming.md#run-without-awaiting	-	-	-
+site/recipes.md:368-369	move	site/guides/sync-and-streaming.md#run-without-awaiting	-	-	-
 site/recipes.md:373-409	move	site/guides/repository-connection.md#connection-from-a-provider	-	-	-
 site/recipes.md:411-412	move	site/guides/repository-connection.md#connection-from-a-provider	-	-	-
 site/recipes.md:416-439	move	site/guides/repository-connection.md#sql-server-repository	-	-	-
@@ -40,6 +41,7 @@ site/recipes.md:924-939	merge-pair	site/guides/dynamic-sql.md#table-name-at-run-
 site/recipes.md:943-961	merge-pair	site/guides/lists.md#filter-by-a-list	MP-17	-	-
 site/recipes.md:965-990	merge-pair	site/guides/several-projects.md#test-project-sees-internals	MP-18	-	-
 site/recipes.md:994-1030	merge-pair	site/guides/several-projects.md#share-the-exceptions	MP-18	-	-
+site/recipes.md:367	move	site/guides/sync-and-streaming.md#run-without-awaiting	-	-	position: "as [the next recipe] does" > "as [the recipe] does": the recipe it links is on another guide now, repository-connection.md#connection-from-a-provider (no-loss review)
 @site/recipes.md:277	move	site/guides/repository-connection.md#connection-from-a-provider	-	-	The recipe's line 410 as phase 4 left it
 @site/recipes.md:569	merge-pair	site/guides/dapper.md#models-through-dapper	MP-12	-	The recipe's line 702 as phase 6 left it
 site/concepts.md:27	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
@@ -76,7 +78,7 @@ site/concepts.md:109	move-split	-	-	-	Heading only: the term's anchor is never p
 site/concepts.md:111	merge-pair	site/reference/settings.md#setting-dialect	MP-10	-	-
 site/concepts.md:115	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
 site/concepts.md:117	merge-pair	site/reference/settings.md#setting-database	MP-10	-	-
-site/concepts.md:119	move	site/reference/settings.md#setting-database	-	-	The statement of dialect against logical database, after the term Logical database
+site/concepts.md:119	move	site/reference/settings.md#setting-database	-	-	position: "The two answer" > "The dialect and the logical database answer": the group heading Two meanings of database is not carried, and Dialect stands below (no-loss review)
 site/concepts.md:125	move-split	-	-	-	Heading only: the term's anchor is never put on a reference page (MP-10); the heading stays on the parked page, site/start/concepts.md, until phase 10
 site/concepts.md:127	move-split	-	-	-	The term stands in its section; its closing sentence, which only points at that section's page, goes (map 6.4)
 site/concepts.md:127/1	merge-pair	site/reference/members.md#generator	MP-10	The part of the `SqlSource` package that runs in the compiler and writes C# from your `.sql` files.	-
@@ -91,14 +93,15 @@ site/concepts.md:57	move-split	-	-	-	Group heading only: it stays on the parked 
 site/concepts.md:105	move-split	-	-	-	Group heading only: it stays on the parked page, site/start/concepts.md, until phase 10
 site/concepts.md:121	move-split	-	-	-	Group heading only: it stays on the parked page, site/start/concepts.md, until phase 10
 site/concepts.md:83	move	site/reference/generator-parameters.md#three-kinds-of-parameter	-	-	The h2 of the new section at the foot of the page; the heading also stays on the parked page until phase 10
-site/concepts.md:85	move	site/reference/generator-parameters.md#three-kinds-of-parameter	-	-	-
+site/concepts.md:85	move	site/reference/generator-parameters.md#three-kinds-of-parameter	-	-	position: "for three different things." > "for three different things: [query parameters], [generator parameters] and [tokens].": the three terms are on other sections now (accuracy review)
+site/README.md:118	move	site/index.md#the-three-parts	-	-	position: "[Recipes](recipes.md)" > "[Guides](guides/lists.md)": the page is gone; phase 10 writes the landing page new (accuracy review)
 @README.md:7	move-split	-	-	-	The README's line 9 as phase 1 left it.  Sentence 2 is placed on D/index.md; the README keeps the whole line until phase 11
 @README.md:7/1	restated-from	-	site/reference/databases/index.md#database-support	**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.	Phase 10 and 11: it stays in the README
 @README.md:7/2	merge-pair	site/reference/databases/index.md#supported-versions	MP-23	Describing queries, in which the `sqlsource` tool asks your database about each query's parameters and columns, works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see database support.	-
 @README.md:7/3	restated-from	-	site/guides/other-databases.md#dialect-and-output	So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as Just want to keep your SQL out of code files? shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see only generating models.	Phase 10 and 11: navigation to the steps for each database, G/other-databases.md and G/dapper.md; it stays in the README
 README.md:19	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	The README keeps its copy until phase 11
 @README.md:19-22	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	The block of the README's lines 21-24 as phase 1 left it, without --prerelease.  The README keeps its copy until phase 11
-README.md:26	corrected	site/reference/attributes.md#what-the-package-adds	C-07	Only the code it generates, the attributes you mark your types and converters with, and the exceptions its methods throw, are compiled into your project	C-07: "and the attributes ..., their enums and the exception its methods throw" > "the attributes ..., and the exceptions its methods throw": the package adds three attributes, no enum and three exceptions (AttributeSource.cs, Exceptions/ExceptionSource.cs); made in the README's own copy too
+README.md:26	corrected	site/reference/attributes.md#what-the-package-adds	C-07	Only the code it generates, the attributes you mark your types, their connection sources and your converters with, and the exceptions its methods throw, are compiled into your project	C-07: "and the attributes you mark your types and converters with, their enums and the exception its methods throw" > "the attributes you mark your types, their connection sources and your converters with, and the exceptions its methods throw": the package adds three attributes, SqlSourceConnection among them, which marks a field, property, method or parameter (accuracy review), no enum and three exceptions (AttributeSource.cs, Exceptions/ExceptionSource.cs); made in the README's own copy too
 README.md:27	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Its link "step 5" names describing.md#describe; phase 10 makes the words true with S/first-query.md#describe.  The README keeps its copy until phase 11
 @README.md:27	move-split	-	-	-	The README's line 29 as phase 6 left it.  Sentences 1 to 4 are placed on the site; the README keeps the whole line until phase 11
 @README.md:27/1	move	site/reference/msbuild.md#build-requirements	-	**Supported environments.**  A project that uses SqlSource targets .NET 8 or later and compiles C# 12 or later, the default for .NET 8.  It builds in the .NET SDK 9.0.300 or later, or in Visual Studio 2022 17.14 or later; the .NET 8 SDK and Visual Studio before 17.14 are not supported, and a build on one stops with SQLSRC021.	-
@@ -144,14 +147,14 @@ README.md:212	move	site/guides/naming-and-placement.md#model-namespace-task	-	-	
 README.md:216	merge-pair	site/guides/several-databases.md#use-several-databases	MP-14	-	-
 README.md:220	merge-pair	site/guides/folders-and-files.md#leave-migration-scripts-out	MP-15	-	-
 README.md:224	merge-pair	site/guides/dynamic-sql.md#table-name-at-run-time	MP-16	-	-
-README.md:228	merge-pair	site/guides/lists.md#list-after-in	MP-17	-	-
+README.md:228	merge-pair	site/guides/lists.md#list-after-in	MP-17	-	position: "Yes: write the parameter" > "Write the parameter": it answered the README's question, which stays in the README (content reviews)
 README.md:232	merge-pair	site/guides/several-projects.md#test-project-sees-internals	MP-18	-	-
 @README.md:234	merge-pair	site/guides/report-a-bug.md#report-a-bug	MP-19	-	The README's line 236 as phase 5 left it, above the text of tool.md 373-390 that phase 5 placed
 README.md:240	move	site/guides/nodatime-and-spatial.md#nodatime-postgresql	-	-	-
 README.md:242	move	site/guides/nodatime-and-spatial.md#nodatime-sql-server	-	-	-
 README.md:246	move	site/guides/nodatime-and-spatial.md#ef-core-and-dapper	-	-	-
 README.md:248	merge-pair	site/guides/json.md#turn-json-on	MP-20	-	-
-README.md:250	move	site/guides/nodatime-and-spatial.md#ef-core-and-dapper	-	-	The last line of the page, its one place; phase 12 may restate it on G/json.md
+README.md:250	move	site/guides/nodatime-and-spatial.md#ef-core-and-dapper	-	-	position: "show all three libraries" > "show NodaTime, NetTopologySuite and System.Text.Json": the page covers two of them (accuracy review).  The last line of the page, its one place; phase 12 may restate it on G/json.md
 README.md:256-266	move	site/guides/custom-types.md#type-override	-	-	-
 README.md:270	move	site/guides/custom-types.md#one-column	-	-	-
 README.md:272-282	move	site/guides/custom-types.md#one-column	-	-	-
