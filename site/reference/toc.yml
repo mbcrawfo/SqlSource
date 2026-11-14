@@ -12,12 +12,34 @@
   items:
     - name: Settings
       href: ../settings.md
+    - name: Attributes
+      href: attributes.md
     - name: MSBuild properties and the build
       href: msbuild.md
 - name: Generated code
   items:
-    - name: The generator
-      href: ../generator.md
+    - name: What is generated and where it goes
+      href: members.md
+    - name: Models
+      href: models.md
+    - name: "Model properties: names, column types, nullable"
+      href: model-properties.md
+    - name: Query methods
+      href: query-methods.md
+    - name: What a method returns (arrays, lists, streaming)
+      href: return-types.md
+    - name: Repositories
+      href: repositories.md
+    - name: Methods that take a connection (transaction, timeout)
+      href: connection-methods.md
+    - name: Collection methods (many items in one call)
+      href: collection-methods.md
+    - name: Exceptions
+      href: exceptions.md
+- name: Types
+  items:
+    - name: How a C# type is chosen, and type overrides
+      href: type-mapping.md
 - name: The sqlsource tool
   items:
     - name: The sqlsource command

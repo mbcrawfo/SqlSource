@@ -9,7 +9,7 @@ namespace PostgresExamples.Methods;
 // ListOrdersOfUser, FindOrder and ListOrdersByStatuses are public static methods, which any code calls as
 // OrderQueries.ListOrdersOfUserAsync(connection, ...), and CountOrderLines is a method of the private nested class Sql,
 // which only this class's own code calls.  The header's async-method-suffix puts Async at the end of each method's
-// name.  See site/settings.md#setting-member-location and
+// name.  See site/reference/members.md#setting-member-location and
 // site/settings.md#setting-generator-parameters.
 [SqlSourceGenerate]
 public static partial class OrderQueries

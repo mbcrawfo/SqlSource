@@ -50,7 +50,7 @@ SELECT id, EOMONTH(placed_at) AS month_end
 FROM dbo.orders;
 ```
 
-If `placed_at` is `NOT NULL`, the last day of its month is never null, though SQL Server treats `EOMONTH` as possibly null: the marker gives the property `MonthEnd` the type `System.DateTime` and not `System.DateTime?`.  The build does not check the marker: a [query method](../../../generator.md#reading-rows) throws when such a column is null after all.  An alias `AS [month_end!]` does the same without the marker, and the mark is left out of the property's name; it stays in the column's name, which Dapper matches to the property's by name, so with Dapper write the marker.  See [which properties can be null](../../../generator.md#model-nullability) and [the `-- column:` marker](../../../generator.md#column-marker).
+If `placed_at` is `NOT NULL`, the last day of its month is never null, though SQL Server treats `EOMONTH` as possibly null: the marker gives the property `MonthEnd` the type `System.DateTime` and not `System.DateTime?`.  The build does not check the marker: a [query method](../../query-methods.md#reading-rows) throws when such a column is null after all.  An alias `AS [month_end!]` does the same without the marker, and the mark is left out of the property's name; it stays in the column's name, which Dapper matches to the property's by name, so with Dapper write the marker.  See [which properties can be null](../../model-properties.md#model-nullability) and [the `-- column:` marker](../../model-properties.md#column-marker).
 
 <a id="limits"></a>
 
