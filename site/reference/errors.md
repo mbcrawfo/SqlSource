@@ -70,7 +70,7 @@ A query can get several errors at once.  If a query has an error about describin
 
 The section of an error says when it costs less.  [SQLSRC297](../diagnostics.md#sqlsrc297) costs only the collection method, [SQLSRC299](../diagnostics.md#sqlsrc299) only the synchronous methods, and [SQLSRC281](../diagnostics.md#sqlsrc281) costs nothing.
 
-While a `.sql` file has an error of its own, the build checks less of its sidecar: see [sidecar files](../tool.md#sidecar-files).
+While a `.sql` file has an error of its own, the build checks less of its sidecar: see [sidecar files](sidecars.md#sidecar-files).
 
 <a id="who-reports"></a>
 
@@ -81,12 +81,12 @@ Two things report errors: the build of your project, and the `sqlsource` tool, s
 | Reported by | Ids | What you see |
 |----|----|----|
 | The build alone | `SQLSRC001` to `SQLSRC013`, `SQLSRC020` to `SQLSRC038`, `SQLSRC121` to `SQLSRC125`, `SQLSRC127`, `SQLSRC237` to `SQLSRC261`, `SQLSRC267` to `SQLSRC270`, `SQLSRC272` to `SQLSRC284`, and `SQLSRC297` to `SQLSRC299` | The build reports them, and the tool never does.  [SQLSRC020](../diagnostics.md#sqlsrc020), a key that a settings file repeats, is the build's alone.  [SQLSRC122](../diagnostics.md#sqlsrc122) to [SQLSRC125](../diagnostics.md#sqlsrc125) depend on the type that claims the file, and [SQLSRC127](../diagnostics.md#sqlsrc127) on the query's output |
-| The tool alone | `SQLSRC200` to `SQLSRC208`, `SQLSRC211` to `SQLSRC236`, `SQLSRC262` to `SQLSRC266`, `SQLSRC271`, and `SQLSRC285` to `SQLSRC296` | The tool reports them.  A build shows them only when it runs the tool, as [running in the build](../tool.md#running-in-the-build) says |
+| The tool alone | `SQLSRC200` to `SQLSRC208`, `SQLSRC211` to `SQLSRC236`, `SQLSRC262` to `SQLSRC266`, `SQLSRC271`, and `SQLSRC285` to `SQLSRC296` | The tool reports them.  A build shows them only when it runs the tool, as [running in the build](msbuild.md#running-in-the-build) says |
 | The build and the tool: how a `.sql` file is written | `SQLSRC101` to `SQLSRC120`, and `SQLSRC126` | The tool reports them with the same id as the build.  The problem is the same, and so is the fix |
 | The build and the tool: a settings file | `SQLSRC015` to `SQLSRC019` | The tool reports them at the same line and column as the build.  It reports them only for a settings file that applies to a `.sql` file or a C# file of a project it runs on.  It reports each once in a run, however many of those projects the file applies to.  The tool reports [SQLSRC019](../diagnostics.md#sqlsrc019) for `dialect`, `output` and `database` alone.  The build reports it for every key but `database`, whose value the tool alone checks |
 | The build and the tool: a query that cannot be described | `SQLSRC209` and `SQLSRC210` | Each reports them at the same place: the query that must be described and cannot be |
 
-In a build that runs the tool, the build lists each error that both report once: see [running in the build](../tool.md#running-in-the-build).
+In a build that runs the tool, the build lists each error that both report once: see [running in the build](msbuild.md#running-in-the-build).
 
 <a id="the-tools-errors"></a>
 
@@ -103,7 +103,7 @@ The tool prints its errors itself, in your terminal.  Each error has the format 
 
 Lines under the error tell you more.  A `help:` line, when the error has one, says what to do.  The last line, `see:`, links to the error's section of [Diagnostics](../diagnostics.md).
 
-The tool's exit code says whether it reported an error: see [exit codes](../tool.md#exit-codes).  In a build that runs the tool, each of its errors is an error of the build: see [running in the build](../tool.md#running-in-the-build).
+The tool's exit code says whether it reported an error: see [exit codes](cli.md#exit-codes).  In a build that runs the tool, each of its errors is an error of the build: see [running in the build](msbuild.md#running-in-the-build).
 
 <a id="errors-by-area"></a>
 

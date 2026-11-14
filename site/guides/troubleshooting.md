@@ -2,7 +2,7 @@
 
 Use this page when the build succeeds but something is wrong: an exception at run time, a wrong result, or nothing happens.  It also lists a build error that is not about your SQL.
 
-Some problems are listed in the known issues of [settings](../settings.md#known-issues), [the generator](../generator.md#known-issues) and [the tool](../tool.md#known-issues).
+Some problems are listed in the known issues of [settings](../settings.md#known-issues) and [the generator](../generator.md#known-issues).
 
 <a id="at-run-time"></a>
 
@@ -42,11 +42,19 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **SQLSRC228 for a `-- param:` type name, on SQL Server.**  SqlSource and SQL Server can read a character that Unicode added or reclassified after version 3.2 in different ways.  See [a type name with such a character](../reference/databases/sqlserver/index.md#limit-type-name-unicode).
 - **SQLSRC231 for a parameter name with a character that Unicode added or reclassified after version 3.2, on SQL Server.**  SqlSource and SQL Server can read a character that Unicode added or reclassified after version 3.2 in different ways.  See [a parameter name with such a character](../reference/databases/sqlserver/index.md#limit-parameter-name-unicode).
 - **A query that writes a query parameter's name in two ways fails when it is described, on SQL Server.**  SqlSource compares names ignoring case alone, and SQL Server by its collation.  See [a name written in two ways](../reference/databases/sqlserver/index.md#limit-parameter-two-spellings).
+- **SQLSRC207 or SQLSRC212 for a project or `.sql` path that exists.**  If the current folder is reached through a symbolic link, a full path through the link does not match the real path.  See [a path through a symbolic link](../reference/cli.md#limit-path-through-a-symbolic-link).
+- **SQLSRC241 for a query that only another target framework includes.**  The tool reads a project with several target frameworks for its first framework alone.  See [several target frameworks](../reference/describing.md#limit-several-target-frameworks).
 
 <a id="watch"></a>
 
 ## The watch does nothing
 
+- **Saving a file starts no pass of `describe --watch`.**  The saves of editors other than Rider on macOS, and saves on Windows, have not been checked.  See [saves that are not seen](../reference/describing.md#limit-saves-not-seen).
+- **In Visual Studio or VS Code, the models do not change after the watch writes a sidecar.**  What these editors show after a pass has not been checked.  See [editors that have not been checked](../reference/describing.md#limit-editors-not-checked).
+- **After a folder is deleted and made again, saves in it start no pass.**  The watch does not see a few changes to folders far from your project.  See [folder changes that are not seen](../reference/describing.md#limit-folder-changes-not-seen).
+
 <a id="secrets"></a>
 
 ## A secret in the output
+
+- **A short password, or a password typed in the wrong place, shows in the output or a log.**  The tool does not hide a password shorter than four characters, or one that is the name of its logical database or dialect.  See [a short password](../reference/connections.md#limit-short-password).

@@ -17,8 +17,8 @@ internal static class SettingsFileSides
 {
     /// <summary>
     /// Whether <paramref name="side" /> reports <paramref name="error" />.  Both report a problem of the file as a
-    /// file.  A value of a setting is reported by the side that reads it: the build reads every setting but
-    /// <c>database</c>, and the tool reads <c>dialect</c>, <c>output</c> and <c>database</c>.
+    /// file.  A value of a setting is reported by the side that checks it: the build checks every setting but
+    /// <c>database</c>, and the tool checks <c>dialect</c>, <c>output</c> and <c>database</c>.
     /// </summary>
     public static bool Reports(SettingsFileSide side, SettingsFileError error) =>
         error.IsAboutTheFile

@@ -150,7 +150,7 @@ SELECT id, kind FROM events;
 - One name is one database for a whole run, with one connection and one dialect.  Two files that give one name two dialects are [SQLSRC211](diagnostics.md#sqlsrc211).
 - Only the tool reads this setting.  The build does not, so a wrong `database` in a settings file is reported by the tool and not by the build.
 
-To give the tool a connection for a name, see [the command reference](tool.md#command-reference).
+To give the tool a connection for a name, see [the command reference](reference/cli.md#command-reference).
 
 <a id="setting-dialect"></a>
 
@@ -909,7 +909,7 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A build that [runs the tool](tool.md#running-in-the-build) compiles a sidecar it has just written for the first time, listed or not; every later build, like a build offline or in CI, compiles only the sidecars you list.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Source`](#setting-source), and a file no type claims is ignored.
+Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) compiles a sidecar it has just written for the first time, listed or not; every later build, like a build offline or in CI, compiles only the sidecars you list.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Source`](#setting-source), and a file no type claims is ignored.
 
 <a id="public-exceptions"></a>
 
@@ -966,7 +966,7 @@ Above, the project turns the interfaces off, and `UserRepository` turns its own 
 </PropertyGroup>
 ```
 
-`SqlSourceOnline` says whether a build of the project runs `dotnet sqlsource describe` on it before it compiles, as [running in the build](tool.md#running-in-the-build) describes.  `false` above keeps the build on the committed sidecars on every machine.
+`SqlSourceOnline` says whether a build of the project runs `dotnet sqlsource describe` on it before it compiles, as [running in the build](reference/msbuild.md#running-in-the-build) describes.  `false` above keeps the build on the committed sidecars on every machine.
 
 | Value | The build runs the tool |
 |----|----|
@@ -994,7 +994,7 @@ Above, the project turns the interfaces off, and `UserRepository` turns its own 
 </Project>
 ```
 
-`SqlSourceEnvFile` names the [`.env` file](tool.md#env-file) that a build of the project reads its connections from, in place of the `.env` in the project's folder.  The `Directory.Build.props` above gives every project below it the one `.env` beside it, at the root of the repository: `$(MSBuildThisFileDirectory)` is the folder of the file that writes it.
+`SqlSourceEnvFile` names the [`.env` file](reference/connections.md#env-file) that a build of the project reads its connections from, in place of the `.env` in the project's folder.  The `Directory.Build.props` above gives every project below it the one `.env` beside it, at the root of the repository: `$(MSBuildThisFileDirectory)` is the folder of the file that writes it.
 
 | Value | The build reads |
 |----|----|
@@ -1005,7 +1005,7 @@ Above, the project turns the interfaces off, and `UserRepository` turns its own 
 - **The value is trimmed**, and `none` is matched ignoring case.  To name a file called `none`, write `./none`.
 - **It decides whether `auto` runs the tool**, as [running the tool in the build](#online-build) says: the file named turns it on when it is there.  A path where there is no file, or a folder, turns nothing on and is no error.  Under `none` only `SQLSOURCE_CONNECTION` in the environment turns `auto` on.  A symbolic link that leads to no file is the exception: the build counts it as there and the tool reads nothing from it, so each build starts the tool, which goes on offline.  Remove the link, or set `SqlSourceEnvFile` to `none`.
 - **A change to the file** runs the tool again at the next build, as a change to the project's own `.env` does.
-- **It reaches only the build's run.**  A `describe` or `describe --watch` that you run yourself reads the `.env` in the folder of the project or solution it runs on, and `--env-file` names another, as [the `.env` file](tool.md#env-file) says: with the example above, `dotnet sqlsource describe src/App/App.csproj --env-file .env` at the root of the repository reads the file the build reads.
+- **It reaches only the build's run.**  A `describe` or `describe --watch` that you run yourself reads the `.env` in the folder of the project or solution it runs on, and `--env-file` names another, as [the `.env` file](reference/connections.md#env-file) says: with the example above, `dotnet sqlsource describe src/App/App.csproj --env-file .env` at the root of the repository reads the file the build reads.
 - **Where it is written.**  In the project file, in a `Directory.Build.props` above it for every project there, on the command line as `-p:SqlSourceEnvFile=none`, or as a variable of the environment.  It is a property of the build, not a key of a settings file.
 
 <a id="settings-files"></a>
@@ -1067,7 +1067,7 @@ See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [S
   </Target>
   ```
 
-  Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.  A build that [runs the tool](tool.md#running-in-the-build) describes such a file without it in a project with one target framework, and leaves it out, as `sqlsource` does, in a project with several.  In a project that is not of the .NET SDK, or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only it reaches, such as the one beside it, with no error; the same line fixes that too.
+  Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) describes such a file without it in a project with one target framework, and leaves it out, as `sqlsource` does, in a project with several.  In a project that is not of the .NET SDK, or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only it reaches, such as the one beside it, with no error; the same line fixes that too.
 - **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
 - **A C# type that is generic can give its model a warning for a `?` inside a type argument**, in a type override, a column type or a `-- param:` marker.  A type argument written with a `?` where a constraint forbids null is [SQLSRC252](diagnostics.md#sqlsrc252) at the query, but a `?` inside a type argument is not.  An override such as `MyApp.Names<System.Collections.Generic.List<string?>>`, where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, is accepted, and the generated model gets the compiler's warning CS8631.  Give the type arguments the nullability that the constraints ask for.  See [type overrides](#setting-type-overrides).
 - **A type made by Vogen or StronglyTypedId needs converters written for it.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and never through a type's `Value` property and its `From` method or constructor, so such a type with no converter is given to the driver as it is, which throws `InvalidCastException`.  Write the two converters in a class of your project, each calling the type's own members:

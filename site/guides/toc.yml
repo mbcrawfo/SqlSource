@@ -2,5 +2,11 @@
   href: ../recipes.md
 - name: Workflow
   items:
+    - name: Describe queries as you save (watch)
+      href: describe-on-save.md
+    - name: Check the sidecars in CI
+      href: ci.md
+    - name: Report a wrong model
+      href: report-a-bug.md
     - name: "Troubleshooting: it built, but something is wrong"
       href: troubleshooting.md

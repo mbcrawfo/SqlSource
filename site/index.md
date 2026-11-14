@@ -34,17 +34,17 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
 | Let a test project see the internals of another project, or catch another project's exceptions by type | [Projects that share internals](generator.md#projects-that-share-internals), [public exceptions](settings.md#public-exceptions), or the recipes for [a test project](recipes.md#test-project-sees-internals) and [two data projects](recipes.md#share-the-exceptions) |
-| Install the tool and describe my queries | [Install the tool](tool.md#install-the-tool) |
-| Have the build describe my queries, or keep it from doing so | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
-| Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](tool.md#connections), [a `.env` file](tool.md#env-file), or the [recipe](recipes.md#use-several-databases) |
-| Keep one `.env` file at the root of a repository, or read another file or none | [A `.env` file](tool.md#env-file), [the build's `.env` file](settings.md#setting-env-file) |
-| Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |
-| Set up git for the sidecars, or mend a merge conflict in one | [Sidecars in git](tool.md#sidecars-in-git) |
-| Describe each query as I save it, and have my editor start that | [Describe on save](tool.md#describe-on-save), [what your editor shows](tool.md#what-your-editor-shows), or the [recipe](recipes.md#start-the-watcher-with-your-editor) |
-| Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
-| Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |
-| Report a model, a type or a nullability that is wrong, or a query the tool should describe and refuses | [Reporting a wrong model](tool.md#report-a-bug), [what is renamed before you share it](tool.md#bundle-contents) |
-| Check a bug-report bundle that someone gave me, or my own before I attach it | [Checking a bundle with `replay`](tool.md#replay) |
+| Install the tool and describe my queries | [Install the tool](reference/cli.md#install-the-tool) |
+| Have the build describe my queries, or keep it from doing so | [Running in the build](reference/msbuild.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
+| Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](reference/connections.md#connections), [a `.env` file](reference/connections.md#env-file), or the [recipe](recipes.md#use-several-databases) |
+| Keep one `.env` file at the root of a repository, or read another file or none | [A `.env` file](reference/connections.md#env-file), [the build's `.env` file](settings.md#setting-env-file) |
+| Keep the sidecars current after a schema change | [After a schema change](reference/describing.md#after-a-schema-change) |
+| Set up git for the sidecars, or mend a merge conflict in one | [Sidecars in git](reference/sidecars.md#sidecars-in-git) |
+| Describe each query as I save it, and have my editor start that | [Describe on save](reference/describing.md#describe-on-save), [what your editor shows](reference/describing.md#what-your-editor-shows), or the [recipe](guides/describe-on-save.md#start-the-watcher-with-your-editor) |
+| Set up CI | [Check in CI](reference/describing.md#check-in-ci), or the [recipe](guides/ci.md#check-sidecars-in-ci) |
+| Look up a command, an option or an exit code | [The command reference](reference/cli.md#command-reference) |
+| Report a model, a type or a nullability that is wrong, or a query the tool should describe and refuses | [Reporting a wrong model](guides/report-a-bug.md#report-a-bug), [what is renamed before you share it](reference/bundles.md#bundle-contents) |
+| Check a bug-report bundle that someone gave me, or my own before I attach it | [Checking a bundle with `replay`](reference/bundles.md#replay) |
 | Know what the tool needs of my database | [PostgreSQL](reference/databases/postgresql/index.md#connecting), [SQL Server](reference/databases/sqlserver/index.md#connecting) |
 | Know why a column is recorded as possibly null | Which columns can be null in [PostgreSQL](reference/databases/postgresql/nullability.md#nullability) and [SQL Server](reference/databases/sqlserver/nullability.md#nullability) |
 | Know which queries the tool cannot describe | What can be described in [PostgreSQL](reference/databases/postgresql/index.md#what-can-be-described) and [SQL Server](reference/databases/sqlserver/index.md#what-can-be-described) |
@@ -69,7 +69,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 - [Parameters and tokens](reference/parameters.md): query parameters, `-- param:`, list parameters and [tokens](reference/tokens.md).
 - [Dialects](reference/dialects.md): how each database's comments and strings are read, and [which databases can be described](reference/databases/index.md#database-support).
 - [The generator](generator.md): what the `SqlSource` package generates.
-- [The tool](tool.md): the `SqlSource.Tool` package, its `sqlsource` command, running it in the build, and making and checking a bug-report bundle.
+- [The tool](reference/cli.md): the `SqlSource.Tool` package and its `sqlsource` command.
 - [PostgreSQL](reference/databases/postgresql/index.md): how SqlSource works with PostgreSQL.
 - [SQL Server](reference/databases/sqlserver/index.md): how SqlSource works with SQL Server.
 - [Recipes](recipes.md): short how-tos, each a sample and a link to the rules.

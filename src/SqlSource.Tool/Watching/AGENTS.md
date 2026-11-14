@@ -2,7 +2,7 @@
 
 How a watch works: [watch mode](../../../docs/architecture/tool.md#watch-mode).
 
-- **`WatchSession.ChangeDetectedMarker` and `WatchSession.WatchingMarker` are a contract with users' editors.**  The manual's [describe on save](../../../site/tool.md#describe-on-save) quotes them, the VS Code recipe in `site/recipes.md` reads them in its problem matcher, and `EditorRecipeTests` of `tests/SqlSource.Repository.Tests/Watching/` holds the two together.  Change them only with both.
+- **`WatchSession.ChangeDetectedMarker` and `WatchSession.WatchingMarker` are a contract with users' editors.**  The manual's [describe on save](../../../site/reference/describing.md#describe-on-save) quotes them, the VS Code task of `site/guides/describe-on-save.md` reads them in its problem matcher, and `EditorRecipeTests` of `tests/SqlSource.Repository.Tests/Watching/` holds the two together.  Change them only with both.
 - **A pass reports on a `Reporter` of its own over the session's trace**, never on the session's: an error of one pass must not stop the next from deleting a sidecar.
 - **The callbacks of a `WatchRequest` run on the watch's own thread.**  They classify the change, or keep it while an evaluation runs, under the session's lock and return; nothing waits or runs a pass there.
 - **No watch is made or closed while the session's lock is held.**  Closing a poller waits for its poll, whose report waits for the lock, so the two would hang; collect under the lock and close after it.

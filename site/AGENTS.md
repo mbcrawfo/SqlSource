@@ -11,7 +11,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 | Generator parameter | Each place that the comment on the list in `DiagnosticsDocumentTests` names | `DiagnosticsDocumentTests` |
 | MSBuild property | Its section of `settings.md`; a row under `#all-settings` | A reviewer |
 | Attribute, or a property of one | `generator.md#attribute` | A reviewer |
-| Command, option, environment variable, exit code | The command reference of `tool.md` | A reviewer |
+| Command, option, environment variable, exit code | `reference/cli.md` | `CliReferenceTests`, for a command, an option and a `SQLSOURCE_` variable; a reviewer, for an exit code and another variable |
 | Diagnostic | A `## SQLSRCnnn` section of `diagnostics.md`, in id order | `DiagnosticsDocumentTests` |
 | Dialect | Its rows in `reference/dialects.md` and `reference/databases/index.md`; the section of `SQLSRC019` | A reviewer |
 | Database that can be described | A folder of the five pages under `reference/databases/`; a row in `reference/databases/index.md`; a tab in every tab group that names a database; the README's list; an example project | `SiteStructureTests`, for the folder and the tabs; a reviewer, for the rest |
@@ -23,14 +23,14 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 
 - **Three folders, one job each.**  `start/` is the path of a newcomer, read in order; `guides/` holds one task on each page; `reference/` is look-up, one page for each thing.  The root holds `index.md`, the landing page and the site's root, and `diagnostics.md`.
 - **A fact has one home.**  A rule, a value, a default or a limit is stated in one reference section; every other page restates it in a sentence or two and links there.
-- **Pages not yet moved.**  `concepts.md`, `settings.md`, `generator.md`, `tool.md` and `recipes.md` wait at the root for their phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.  Change one in place, and add no page at the root.  A limit of one is a bullet of its "Known issues", and a recipe is a sample and a link to the rules.
+- **Pages not yet moved.**  `concepts.md`, `settings.md`, `generator.md` and `recipes.md` wait at the root for their phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.  Change one in place, and add no page at the root.  A limit of one is a bullet of its "Known issues", and a recipe is a sample and a link to the rules.
 - **A new page** gets an entry in the `toc.yml` of its folder, under its group.  Aim at 600 to 3,500 words for a page and at most nine entries for a group; a reviewer holds both.
 - **`README.md`**, beyond root rule 4: the databases it works with, getting started in five steps, "Only want to generate models?", "Just want to keep your SQL out of code files?", a FAQ of five to ten items, "NodaTime and other libraries", "Custom type mapping" and "Where to next".  A FAQ answer is a few sentences that link to a recipe where one exists.
 - **The site.**  docfx publishes every page here but each `AGENTS.md`.  `tools/build-site.sh` builds it and fails on any docfx warning.  The tests are in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/`; none checks whether a page is true and free of internals.
 
 ## Write effects, never internals
 
-- Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (`tool.md` links `schemas/sidecar-v1.schema.json` once, for the curious).
+- Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (`reference/sidecars.md` links `schemas/sidecar-v1.schema.json` once, for the curious).
 - Never link into the project's notes or source, and never cite an item's id.
 - Say what makes a column possibly null, not what the sidecar records, and what the user's database experiences.
 - A type map is the database type and the C# type a user gets, with the driver version where that changes it; not how the driver is detected or what is set on a `DbParameter`.  A generated method is its signature and what it returns and throws; not how it reads a row.

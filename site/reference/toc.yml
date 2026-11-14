@@ -12,16 +12,24 @@
   items:
     - name: Settings
       href: ../settings.md
+    - name: MSBuild properties and the build
+      href: msbuild.md
 - name: Generated code
   items:
     - name: The generator
       href: ../generator.md
 - name: The sqlsource tool
   items:
-    - name: The tool
-      href: ../tool.md
+    - name: The sqlsource command
+      href: cli.md
+    - name: What describe does (watch, check, force)
+      href: describing.md
+    - name: Connections and the .env file
+      href: connections.md
     - name: Sidecar files
       href: sidecars.md
+    - name: Bug-report bundles (diagnose, replay)
+      href: bundles.md
 - name: Supported databases
   items:
     - name: Supported databases and versions

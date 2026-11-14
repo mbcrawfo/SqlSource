@@ -63,17 +63,17 @@ This example's sidecars are committed and current.  They are written by `tools/d
 dotnet run --project src/SqlSource.Tool -- describe --check examples/PostgresExamples/PostgresExamples.csproj
 ```
 
-See [the tool](../../site/tool.md) for the commands and the connections.
+See [the tool](../../site/reference/cli.md) for the commands and [connections](../../site/reference/connections.md) for the connections.
 
 ## Describe as you save, and in the build
 
-In a project of your own, copy [`.env.example`](.env.example) to `.env` in the project's folder, and add `.env` to your `.gitignore`, since it holds your password; the tool reads the connection from it, as [the `.env` file](../../site/tool.md#env-file) says.  Then run:
+In a project of your own, copy [`.env.example`](.env.example) to `.env` in the project's folder, and add `.env` to your `.gitignore`, since it holds your password; the tool reads the connection from it, as [the `.env` file](../../site/reference/connections.md#env-file) says.  Then run:
 
 ```bash
 dotnet sqlsource describe --watch
 ```
 
-It describes again each time you save a query, as [describe on save](../../site/tool.md#describe-on-save) says, and your editor can start it for you: see [the recipe](../../site/recipes.md#start-the-watcher-with-your-editor).  A build of your project also describes before it compiles, as [running in the build](../../site/tool.md#running-in-the-build) says, so a query that the database rejects is an error of the build, and you need not run `describe` after a change.
+It describes again each time you save a query, as [describe on save](../../site/reference/describing.md#describe-on-save) says, and your editor can start it for you: see [the recipe](../../site/guides/describe-on-save.md#start-the-watcher-with-your-editor).  A build of your project also describes before it compiles, as [running in the build](../../site/reference/msbuild.md#running-in-the-build) says, so a query that the database rejects is an error of the build, and you need not run `describe` after a change.
 
 This example differs in two ways.  The watch runs from the source, as the commands above do, from the repository's root.  It reads the `.env` of this folder when it runs on the project, so the `export` above is not needed:
 
