@@ -3,7 +3,9 @@ unit	disposition	to	arg	words	note
 site/tool.md:1	move	site/reference/cli.md#tool	-	-	level: the h1 The tool is the h2 of the new anchor tool; the page's h1 is new
 site/tool.md:3-8	merge-pair	site/reference/cli.md#tool	MP-10	-	The opening of the term Tool, with its sample; merges/MP-10.md
 site/tool.md:10-12	restated-from	site/reference/cli.md#tool	site/reference/describing.md#which-queries	-	Moves whole, word for word; its facts are owned by which-queries and by settings.md#setting-output, and phase 18 cuts it
-site/tool.md:14	move	site/reference/cli.md	-	-	position: "This page has two parts" > "The tool's pages have two parts"; navigation, moved whole after the new opening, since its second sentence states what diagnose and replay do
+site/tool.md:14	move-split	-	-	-	Navigation: its first sentence is false now that the workflow is on other pages (accuracy review), and the new opening of cli.md says what the page holds; its second sentence moves, since it states what diagnose and replay do
+site/tool.md:14/1	move	site/reference/cli.md	fact	This page has two parts: the workflow, from installing the tool and running it in the build to checking the sidecars in CI and reporting a model that is wrong, and the command reference.	Its fact stands in new words in the opening of cli.md, which says what the page holds and links the pages of the workflow
+site/tool.md:14/2	move	site/reference/cli.md	-	The tool's `diagnose` command makes a bug-report bundle of one query that you can attach to an issue, and its `replay` command checks a bundle with no database: see reporting a wrong model and checking a bundle with `replay`.	After the new opening
 site/tool.md:18	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	-
 @site/tool.md:20	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Phase 1's sentence, which lost the status clause (phase-01 row site/tool.md:20/1)
 @site/tool.md:22	merge-pair	site/reference/cli.md#install-the-tool	MP-11	-	Phase 1's commands, without --prerelease (phase-01 row site/tool.md:22)
@@ -34,7 +36,8 @@ site/tool.md:396-404	move	site/reference/bundles.md#bundle-contents	-	-	-
 site/tool.md:405	move	site/reference/bundles.md#bundle-contents	-	-	position: "take the private route below instead" > "take the private route instead", the words private route linked to guides/report-a-bug.md#raw-bundle; the section is on another page now
 site/tool.md:409	move	site/guides/report-a-bug.md#raw-bundle	-	-	level: h3 to h2, as spec step 2 lists it
 site/tool.md:411-437	move	site/guides/report-a-bug.md#raw-bundle	-	-	-
-site/tool.md:441-456	move	site/reference/cli.md#command-reference	-	-	-
+site/tool.md:441-454	move	site/reference/cli.md#command-reference	-	-	-
+site/tool.md:456	move	site/reference/cli.md#command-reference	-	-	position: "The arguments and options below" > "The arguments and the first table of options below"; the second table of #options holds the six options that are not describe's
 site/tool.md:460-472	move	site/reference/cli.md#arguments	-	-	-
 site/tool.md:476-492	move	site/reference/cli.md#options	-	-	-
 site/tool.md:496-506	move	site/reference/cli.md#environment-variables	-	-	-
@@ -71,6 +74,7 @@ site/recipes.md:252-254	move	site/guides/describe-on-save.md#visual-studio	-	-	-
 site/diagnostics.md:3623	corrected	site/diagnostics.md#sqlsrc294	C-03	See: When a bundle cannot be made safe	C-03: the link to tool.md#known-issues goes, since none of its eight bullets is about a bundle; the line keeps guides/report-a-bug.md#raw-bundle
 @site/reference/sidecars.md:3	restated-from	-	site/reference/sidecars.md#sidecar-files	-	Phase 3's sentence that pointed to tool.md#sidecar-files: the section now stands on this page
 @site/guides/troubleshooting.md:5	move	site/guides/troubleshooting.md	-	-	position: ", [the generator] and [the tool]" > " and [the generator]"; the link to the tool's known issues goes, since each of its limits has its entry
+src/SqlSource.Tool/README.md:50	corrected	src/SqlSource.Tool/README.md	-	has every option and the exit codes	The words the whole workflow go: the page it links, reference/cli.md, no longer holds the workflow (accuracy review); the rest of the tool readme is phase 11's
 -	new	site/reference/cli.md	-	-	The h1 The sqlsource command and the opening sentences, which link describing.md, msbuild.md#running-in-the-build, bundles.md and errors.md#the-tools-errors; the anchor tool
 -	new	site/reference/cli.md#options	-	-	The sentence that introduces the tool's other options and its table of six rows: --help, --version, --query, --out, --no-obfuscate and --scrub
 -	new	site/reference/cli.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
@@ -90,3 +94,8 @@ site/diagnostics.md:3623	corrected	site/diagnostics.md#sqlsrc294	C-03	See: When 
 -	new	src/SqlSource.Tool/AGENTS.md	-	-	Not a user document: lines 14, 15 and 30 name the pages of site/reference/ (8,174 bytes)
 -	new	src/SqlSource.Tool/Watching/AGENTS.md	-	-	Not a user document: line 5 names reference/describing.md#describe-on-save and the task of guides/describe-on-save.md
 -	new	tests/SqlSource.Repository.Tests/Documentation/AGENTS.md	-	-	Not a user document: its first bullet names CliReferenceTests
+-	new	docs/architecture/tool.md	-	-	Not a user document: the words tool page become tool pages; its references take the pages of their anchors, #the-summary becomes cli.md#summary, and its known issues of the watch become a link to describing.md#limit-folder-changes-not-seen
+-	new	docs/tech-debt/TD-0097-ide-checks-of-phase-9-ran-in-rider-on-macos-alone.md	-	-	Not a user document: lines 20 and 259 name the limit describing.md#limit-editors-not-checked in place of a known issue of the tool's page; its links to the recipe take guides/describe-on-save.md
+-	new	docs/tech-debt/TD-0034-redaction-of-a-describers-text-has-holes.md	-	-	Not a user document: its known issue of the tool's page is the limit connections.md#limit-short-password
+-	new	docs/tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md	-	-	Not a user document: the words and those of site/tool.md point there go
+-	new	examples/PostgresExamples/README.md	-	-	Not a user document: the connections are linked on reference/connections.md, the commands on reference/cli.md; the same in examples/SqlServerExamples/README.md

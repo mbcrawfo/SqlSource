@@ -68,7 +68,7 @@ This example's sidecars are committed and current.  They are written by `tools/d
 dotnet run --project src/SqlSource.Tool -- describe --check examples/SqlServerExamples/SqlServerExamples.csproj
 ```
 
-See [the tool](../../site/reference/cli.md) for the commands and the connections.
+See [the tool](../../site/reference/cli.md) for the commands and [connections](../../site/reference/connections.md) for the connections.
 
 ## Describe as you save, and in the build
 

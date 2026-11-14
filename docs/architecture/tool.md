@@ -1,6 +1,6 @@
 # The tool
 
-How `src/SqlSource.Tool` runs `sqlsource describe`: how a command line is read and a run ends, the steps from a [run unit](README.md#run-unit) to the [sidecars](README.md#sidecar), how `describe --watch` runs them again after each change, what each folder does and needs, and how a run reports and logs.  How `sqlsource replay` runs the pipeline from a bug-report bundle, how `sqlsource diagnose` makes one, and how a bundle is renamed, is [bundles and replay](bundles.md).  What a user types and sees is in the manual's [tool page](../../site/reference/cli.md).  The terms are the [glossary's](README.md#glossary).
+How `src/SqlSource.Tool` runs `sqlsource describe`: how a command line is read and a run ends, the steps from a [run unit](README.md#run-unit) to the [sidecars](README.md#sidecar), how `describe --watch` runs them again after each change, what each folder does and needs, and how a run reports and logs.  How `sqlsource replay` runs the pipeline from a bug-report bundle, how `sqlsource diagnose` makes one, and how a bundle is renamed, is [bundles and replay](bundles.md).  What a user types and sees is in the manual's [tool pages](../../site/reference/cli.md).  The terms are the [glossary's](README.md#glossary).
 
 ## The command line
 

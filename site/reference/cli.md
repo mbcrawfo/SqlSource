@@ -2,7 +2,7 @@
 
 This page says how to install the `sqlsource` tool, and lists its commands, options, environment variables and exit codes.  See also [what `describe` does](describing.md), [how a build runs it](msbuild.md#running-in-the-build), [the bundles of `diagnose` and `replay`](bundles.md) and [how the tool reports errors](errors.md#the-tools-errors).
 
-The tool's pages have two parts: [the workflow](#install-the-tool), from installing the tool and running it in the build to checking the sidecars in CI and reporting a model that is wrong, and [the command reference](#command-reference).  The tool's `diagnose` command makes a bug-report bundle of one query that you can attach to an issue, and its `replay` command checks a bundle with no database: see [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) and [checking a bundle with `replay`](bundles.md#replay).
+The tool's `diagnose` command makes a bug-report bundle of one query that you can attach to an issue, and its `replay` command checks a bundle with no database: see [reporting a wrong model](../guides/report-a-bug.md#report-a-bug) and [checking a bundle with `replay`](bundles.md#replay).
 
 <a id="tool"></a>
 
@@ -51,7 +51,7 @@ dotnet sqlsource diagnose --scrub <bundle> --out <path>
 dotnet sqlsource replay <bundle> [--verbose] [--log <path>]
 ```
 
-`dotnet sqlsource --help`, and `--help` after a command, such as `dotnet sqlsource diagnose --help`, print the options, and `dotnet sqlsource --version` the version of the tool.  The arguments and options below are those of `describe`; `diagnose` is in [making a bundle with `diagnose`](bundles.md#diagnose), and `replay` in [checking a bundle with `replay`](bundles.md#replay).
+`dotnet sqlsource --help`, and `--help` after a command, such as `dotnet sqlsource diagnose --help`, print the options, and `dotnet sqlsource --version` the version of the tool.  The arguments and the first table of options below are those of `describe`; `diagnose` is in [making a bundle with `diagnose`](bundles.md#diagnose), and `replay` in [checking a bundle with `replay`](bundles.md#replay).
 
 <a id="arguments"></a>
 

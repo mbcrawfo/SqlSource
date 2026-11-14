@@ -17,7 +17,7 @@ The owner ran the checklist on the machine and IDE at hand and chose, on 2026-11
 
 ## Impact
 
-The watcher of sub-phase 9.3, and the manual's recipes and "what each IDE shows" of sub-phase 9.4, rest on statements that are unverified outside Rider on macOS; the manual says so as a known issue of its page on the tool.  If one is wrong, the manual tells a Visual Studio or VS Code user something their IDE does not do, such as that a saved file refreshes the models, and the VS Code recipe may not show or clear its problems.
+The watcher of sub-phase 9.3, and the manual's recipes and "what each IDE shows" of sub-phase 9.4, rest on statements that are unverified outside Rider on macOS; the manual says so as a limit, [editors not checked](../../site/reference/describing.md#limit-editors-not-checked).  If one is wrong, the manual tells a Visual Studio or VS Code user something their IDE does not do, such as that a saved file refreshes the models, and the VS Code recipe may not show or clear its problems.
 
 ## Proposed fix
 
@@ -256,4 +256,4 @@ echo "sample written to $(pwd); open it in the IDE, or run: dotnet build"
 
 ## Trigger
 
-When Visual Studio, VS Code, or Rider on another system, is at hand to run the procedure, or when a user reports that a recipe of [starting the watcher with your editor](../../site/guides/describe-on-save.md#start-the-watcher-with-your-editor), or [what your editor shows](../../site/reference/describing.md#what-your-editor-shows), does not do what the manual says.  The manual's page on the tool says, as a known issue, that Visual Studio and VS Code were not checked; the change that closes this item removes it.
+When Visual Studio, VS Code, or Rider on another system, is at hand to run the procedure, or when a user reports that a recipe of [starting the watcher with your editor](../../site/guides/describe-on-save.md#start-the-watcher-with-your-editor), or [what your editor shows](../../site/reference/describing.md#what-your-editor-shows), does not do what the manual says.  The manual's limit [editors not checked](../../site/reference/describing.md#limit-editors-not-checked) says that Visual Studio and VS Code were not checked; the change that closes this item removes it.

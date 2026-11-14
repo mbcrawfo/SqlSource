@@ -47,4 +47,4 @@ $ dotnet sqlsource replay ../report.zip
 - `diagnose` describes the one query again and writes a bug-report bundle of it, a zip with your names and strings renamed, to attach to an issue, and beside it a mapping of the new names, which you keep to yourself: see [reporting a wrong model](https://mbcrawfo.github.io/SqlSource/guides/report-a-bug.html#report-a-bug).
 - `replay` runs SqlSource from a bundle with no database, and says whether it gives the bundle's answer: see [checking a bundle with `replay`](https://mbcrawfo.github.io/SqlSource/reference/bundles.html#replay).
 
-[The tool's manual page](https://mbcrawfo.github.io/SqlSource/reference/cli.html) has the whole workflow, every option and the exit codes.  [The SqlSource readme](https://github.com/mbcrawfo/SqlSource/blob/main/README.md) says what SqlSource does and how to start.
+[The tool's manual page](https://mbcrawfo.github.io/SqlSource/reference/cli.html) has every option and the exit codes.  [The SqlSource readme](https://github.com/mbcrawfo/SqlSource/blob/main/README.md) says what SqlSource does and how to start.

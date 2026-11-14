@@ -42,7 +42,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 - **SQLSRC228 for a `-- param:` type name, on SQL Server.**  SqlSource and SQL Server can read a character that Unicode added or reclassified after version 3.2 in different ways.  See [a type name with such a character](../reference/databases/sqlserver/index.md#limit-type-name-unicode).
 - **SQLSRC231 for a parameter name with a character that Unicode added or reclassified after version 3.2, on SQL Server.**  SqlSource and SQL Server can read a character that Unicode added or reclassified after version 3.2 in different ways.  See [a parameter name with such a character](../reference/databases/sqlserver/index.md#limit-parameter-name-unicode).
 - **A query that writes a query parameter's name in two ways fails when it is described, on SQL Server.**  SqlSource compares names ignoring case alone, and SQL Server by its collation.  See [a name written in two ways](../reference/databases/sqlserver/index.md#limit-parameter-two-spellings).
-- **SQLSRC207 or SQLSRC212 for a project or `.sql` path that exists.**  A full path through a symbolic link does not match the real path that the tool compares it with.  See [a path through a symbolic link](../reference/cli.md#limit-path-through-a-symbolic-link).
+- **SQLSRC207 or SQLSRC212 for a project or `.sql` path that exists.**  If the current folder is reached through a symbolic link, a full path through the link does not match the real path.  See [a path through a symbolic link](../reference/cli.md#limit-path-through-a-symbolic-link).
 - **SQLSRC241 for a query that only another target framework includes.**  The tool reads a project with several target frameworks for its first framework alone.  See [several target frameworks](../reference/describing.md#limit-several-target-frameworks).
 
 <a id="watch"></a>
@@ -57,4 +57,4 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 
 ## A secret in the output
 
-- **A short password shows in the output or a log.**  The tool does not hide a password shorter than four characters, or one that is the name of its logical database or dialect.  See [a short password](../reference/connections.md#limit-short-password).
+- **A short password, or a connection string in the wrong place, shows in the output or a log.**  The tool does not hide a password shorter than four characters, or one that is the name of its logical database or dialect.  See [a short password](../reference/connections.md#limit-short-password).

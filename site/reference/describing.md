@@ -4,7 +4,7 @@
 
 ## What describe does
 
-`describe` connects to your database, asks it for the parameters and columns of each query, and writes the answers to the [sidecar files](sidecars.md#sidecar-files) beside your `.sql` files.
+`describe` connects to your database, asks it for the parameters and columns of each query it describes, and writes the answers to the [sidecar files](sidecars.md#sidecar-files).
 
 <a id="which-queries"></a>
 
@@ -138,7 +138,7 @@ billing (postgres): 15 same, 1 differ, 0 failed
 
 <a id="limit-several-target-frameworks"></a>
 
-### SQLSRC241 for a query that only a second target framework claims
+### SQLSRC241 for a query that only another target framework includes
 
 - **A project with several target frameworks is read for its first framework alone**, by `describe` and by a build that runs the tool.  A `.sql` file or a C# file that the project includes only for another framework, and a `[SqlSourceGenerate]` under an `#if` that only another framework defines, are not seen, and their queries are not described: the build for that framework reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each that must be.  A project that references SqlSource for a later framework only is left out of a solution's run without a word, and is [SQLSRC204](../diagnostics.md#sqlsrc204) when you name it; its build reports SQLSRC241 in the same way.  Include the `.sql` files and the attributed types for every framework, or for the first one listed.
 
