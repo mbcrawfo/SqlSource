@@ -9,8 +9,10 @@ using Xunit;
 namespace SqlSource.Repository.Tests.Documentation;
 
 // The manual's site has a fixed shape: the landing page and the errors at the root of site/, and every other page in
-// one of three folders, start/, guides/ and reference/.  Each limit of a page, a `## Limits` section and each
-// `limit-` anchor in it, is listed on site/guides/troubleshooting.md, for a reader who has a symptom and no error id.
+// one of three folders, start/, guides/ and reference/.  Each database that can be described has a folder of
+// site/reference/databases/ with the same five pages, and a tab group that gives a tab to one database gives one to
+// each.  Each limit of a page, a `## Limits` section and each `limit-` anchor in it, is listed on
+// site/guides/troubleshooting.md, for a reader who has a symptom and no error id.
 public sealed partial class SiteStructureTests
 {
     // The pages that wait at the root of site/ for their phase of the documentation overhaul to move them.  The list
@@ -33,6 +35,17 @@ public sealed partial class SiteStructureTests
     private static readonly IReadOnlyList<string> RootPages = ["index.md", "diagnostics.md"];
 
     private static readonly IReadOnlyList<string> Folders = ["start", "guides", "reference"];
+
+    private const string Databases = "site/reference/databases";
+
+    private static readonly IReadOnlyList<string> DatabasePages =
+    [
+        "index.md",
+        "nullability.md",
+        "types.md",
+        "libraries.md",
+        "query-methods.md",
+    ];
 
     // Fails when a .md file stands directly in site/ and is not index.md, diagnostics.md, a page not yet moved or a
     // file of an agent, and when a name of PagesNotYetMoved has no file, so that a moved page cannot stay listed.
@@ -67,6 +80,183 @@ public sealed partial class SiteStructureTests
             .Except(Folders, StringComparer.Ordinal)
             .Select(name => $"site/{name}/ is a folder of site/ other than start/, guides/ and reference/")
             .ShouldBeEmpty();
+
+    // Fails when a folder directly in site/reference/databases/ lacks one of its five pages or holds a file or folder
+    // beside them, a file of an agent aside, and when fewer than two such folders are found, so that a reading that
+    // finds none cannot pass.
+    [Fact]
+    public void DatabaseFolders_EachHoldsTheFivePages()
+    {
+        var databases = DatabaseNames();
+        databases.Count.ShouldBeGreaterThanOrEqualTo(2, $"{Databases}/ should hold a folder for each database");
+
+        databases
+            .SelectMany(database =>
+            {
+                var folder = $"{Databases}/{database}";
+                var entries = Directory
+                    .EnumerateFileSystemEntries(RepositoryRoot.Path(folder))
+                    .Select(Path.GetFileName)
+                    .OfType<string>()
+                    .Where(name =>
+                        name != "AGENTS.md"
+                        && !name.StartsWith("CLAUDE", StringComparison.Ordinal)
+                        // A file the system makes, such as .DS_Store, is not in the repository.
+                        && !name.StartsWith('.')
+                    )
+                    .ToList();
+
+                return DatabasePages
+                    .Except(entries, StringComparer.Ordinal)
+                    .Select(name => $"{folder}/ has no {name}: each database folder holds the same five pages")
+                    .Concat(
+                        entries
+                            .Except(DatabasePages, StringComparer.Ordinal)
+                            .Select(name =>
+                                $"{folder}/{name} is not one of the five pages of a database folder: "
+                                + string.Join(", ", DatabasePages)
+                            )
+                    );
+            })
+            .ShouldBeEmpty();
+    }
+
+    // Fails when a tab group of a page of the site gives a tab to one database folder of site/reference/databases/ and
+    // not to another: a sample for one described database alone.
+    [Fact]
+    public void TabGroups_ThatNameADatabase_NameEach()
+    {
+        var databases = DatabaseNames();
+        UserDocs
+            .SitePages.SelectMany(page =>
+                PartialTabGroups(page, File.ReadAllLines(RepositoryRoot.Path(page)), databases)
+            )
+            .ShouldBeEmpty();
+    }
+
+    // Fails when PartialTabGroups misses a group with one database alone, reports a group with each database or with
+    // none, reads a tab heading in a fenced block, or takes two groups for one: groups parted by another heading, and
+    // groups of tab headings of two levels.
+    [Fact]
+    public void PartialTabGroups_OfMadeUpLines_AreFound() =>
+        PartialTabGroups(
+                $"{MadeUpFolder}/page.md",
+                [
+                    "# Page",
+                    "",
+                    "## [PostgreSQL](#tab/postgresql)",
+                    "",
+                    "Alone.",
+                    "",
+                    "## Between",
+                    "",
+                    "## [PostgreSQL](#tab/postgresql/npgsql8)",
+                    "",
+                    "```markdown",
+                    "## Inside a block",
+                    "```",
+                    "",
+                    "## [SQL Server](#tab/sqlserver)",
+                    "",
+                    "## Next",
+                    "",
+                    "## [Command line](#tab/cli)",
+                    "",
+                    "## [MSBuild](#tab/msbuild)",
+                    "",
+                    "## Last",
+                    "",
+                    "### [SQL Server](#tab/sqlserver)",
+                    "",
+                    "#### [PostgreSQL](#tab/postgresql)",
+                ],
+                ["postgresql", "sqlserver"]
+            )
+            .ShouldBe([
+                $"{MadeUpFolder}/page.md:3: the tab group has tabs for postgresql and none for sqlserver: give each "
+                    + "database folder of site/reference/databases/ its tab",
+                $"{MadeUpFolder}/page.md:25: the tab group has tabs for sqlserver and none for postgresql: give each "
+                    + "database folder of site/reference/databases/ its tab",
+                $"{MadeUpFolder}/page.md:27: the tab group has tabs for postgresql and none for sqlserver: give each "
+                    + "database folder of site/reference/databases/ its tab",
+            ]);
+
+    // The names of the folders directly in site/reference/databases/, which are the databases that can be described.
+    internal static IReadOnlyList<string> DatabaseNames() =>
+        [
+            .. Directory
+                .EnumerateDirectories(RepositoryRoot.Path(Databases))
+                .Select(Path.GetFileName)
+                .OfType<string>()
+                .Order(StringComparer.Ordinal),
+        ];
+
+    // Each docfx tab group of the lines that has a tab for one of the databases and none for another: one problem for
+    // each, with the line of its first tab.  A group is a run of tab headings, `#... [Text](#tab/<id>)`, of one level,
+    // with no other heading between them, outside fenced blocks.  A dependent tab's id holds slashes, and its first
+    // segment names the tab.
+    internal static IReadOnlyList<string> PartialTabGroups(
+        string page,
+        IReadOnlyList<string> lines,
+        IReadOnlyCollection<string> databases
+    )
+    {
+        var problems = new List<string>();
+        var groupLine = 0;
+        var groupLevel = 0;
+        var groupIds = new List<string>();
+
+        void Close()
+        {
+            var present = databases.Where(database => groupIds.Contains(database, StringComparer.Ordinal)).ToList();
+            var missing = databases.Except(present, StringComparer.Ordinal).ToList();
+            if (present.Count > 0 && missing.Count > 0)
+            {
+                problems.Add(
+                    $"{page}:{groupLine}: the tab group has tabs for {string.Join(", ", present)} and none for "
+                        + $"{string.Join(", ", missing)}: give each database folder of {Databases}/ its tab"
+                );
+            }
+
+            groupIds.Clear();
+            groupLevel = 0;
+        }
+
+        var fenced = false;
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var line = lines[index];
+            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                fenced = !fenced;
+                continue;
+            }
+
+            if (fenced || TabGroupHeading().Match(line) is not { Success: true } heading)
+            {
+                continue;
+            }
+
+            var level = heading.Groups[1].Length;
+            if (TabHeadingText().Match(heading.Groups[2].Value) is not { Success: true } tab)
+            {
+                Close();
+                continue;
+            }
+
+            if (level != groupLevel)
+            {
+                Close();
+                groupLine = index + 1;
+                groupLevel = level;
+            }
+
+            groupIds.Add(tab.Groups[1].Value);
+        }
+
+        Close();
+        return problems;
+    }
 
     // Fails when a page with a `## Limits` heading is not linked from site/guides/troubleshooting.md, or when a
     // `limit-` anchor, on any page, is named by no link of that page.
@@ -232,6 +422,14 @@ public sealed partial class SiteStructureTests
                 .Select(link => UserDocs.Resolve(link.File, link.Target))
                 .OfType<(string Path, string Anchor)>(),
         ];
+
+    // An ATX heading: its level and its text.
+    [GeneratedRegex(@"^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$")]
+    private static partial Regex TabGroupHeading();
+
+    // The text of a docfx tab heading, whose whole text links to `#tab/<id>`: the first segment of the id.
+    [GeneratedRegex(@"^\[[^\]]*\]\(#tab/([^/)\s]+)[^)\s]*\)$")]
+    private static partial Regex TabHeadingText();
 
     [GeneratedRegex(@"^##\s+Limits\s*$")]
     private static partial Regex LimitsHeading();
