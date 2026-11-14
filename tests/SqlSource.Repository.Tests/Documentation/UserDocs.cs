@@ -92,6 +92,12 @@ internal static partial class UserDocs
     public static IEnumerable<(string File, int Line, string Info, string Text)> FencedBlocks() =>
         Files.SelectMany(file => Load(file).BlockList.Select(block => (file, block.Line, block.Info, block.Text)));
 
+    // The fenced blocks of one document, each with its info string.
+    public static IReadOnlyList<(int Line, string Info, string Text)> BlocksOf(string file) => Load(file).BlockList;
+
+    // The inline code spans of one document outside its fenced blocks, each without its backticks and trimmed.
+    public static IReadOnlyList<(int Line, string Text)> CodeSpans(string file) => Load(file).CodeSpanList;
+
     // Whether a link names a file of this repository on GitHub, in any of the forms of its URLs that show one.
     public static bool IsRepositoryLink(string target) => RepositoryLinkPattern().IsMatch(target);
 
@@ -229,6 +235,7 @@ internal static partial class UserDocs
         var blocks = new List<(int Line, string Info, string Text)>();
         var unsupported = new List<(int Line, string Message)>();
         var tabs = new List<(int Line, string Id)>();
+        var spans = new List<(int Line, string Text)>();
 
         // Front matter, between a first line of '---' and the next one, is for docfx: it is not Markdown to read.
         var start = 0;
@@ -277,6 +284,11 @@ internal static partial class UserDocs
             }
 
             // What is inside inline code is not Markdown: it makes no link and no anchor.
+            foreach (Match span in CodeSpanPattern().Matches(line))
+            {
+                spans.Add((number, span.Value.Trim('`').Trim()));
+            }
+
             var text = CodeSpanPattern().Replace(line, " ");
 
             // A tab of docfx is a heading whose whole text links to `#tab/<id>`: no anchor and no link.
@@ -330,7 +342,7 @@ internal static partial class UserDocs
             blocks.Add((unclosed.Line, unclosed.Info, string.Join('\n', content)));
         }
 
-        return new Document(anchors, links, blocks, unsupported, tabs);
+        return new Document(anchors, links, blocks, unsupported, tabs, spans);
     }
 
     // A backtick fence's info string has no backtick: otherwise the line is a code span.
@@ -385,7 +397,8 @@ internal static partial class UserDocs
         IReadOnlyList<(int Line, string Target)> LinkList,
         IReadOnlyList<(int Line, string Info, string Text)> BlockList,
         IReadOnlyList<(int Line, string Message)> Unsupported,
-        IReadOnlyList<(int Line, string Id)> TabList
+        IReadOnlyList<(int Line, string Id)> TabList,
+        IReadOnlyList<(int Line, string Text)> CodeSpanList
     );
 
     // The start of a fenced block: three or more backticks or tildes, then the info string.

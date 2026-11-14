@@ -10,6 +10,6 @@ Get started: the path of a newcomer, read in order.
 - **A rule in its common form.**  No `## Limits`, no `setting-<name>` anchor, no table of a setting's values or defaults.
 - **A first-hour trap stands in the step or the tab where it bites**, in full, with its error id and the fix, and its id also stands on `errors.md`.
 - **Both databases on every page.**  A tab holds a sample or at most three sentences, and each page reads right with the first tab showing.
-- **`SupportedVersionsTests` holds the two minimum database versions of `install.md`** to `../reference/databases/index.md`.
+- **`SupportedVersionsTests` holds the two minimum database versions of `install.md`** to `../reference/databases/index.md`.  `ReadmeTests` holds the install and update commands of the two readmes to `install.md`, so a command changes in all three files in one commit.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.
