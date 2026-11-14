@@ -23,6 +23,9 @@
 
 - `git diff 28e20e3c -- site/postgresql.md site/sqlserver.md` holds only links that phase 3 retargeted (pg 3, 48, 52, 57, 119, 163, 401, 433, 440, 465; ms 3, 20, 48, 84, 157, 390, 449, 453).  No feature work, so no `@` rows for these pages.
 - `guides/troubleshooting.md`'s sentence of known issues also links settings, the generator and the tool; only its PostgreSQL and SQL Server links go, and the sentence's list closes on "and [the tool]".
+- The link words "known issues" of the nine links that now reach a limit (pg 427; ms 118, 166, 451, 452, 484; `generator.md` 702; `recipes.md` 410; `parameters-and-tokens.md` 91) name a section that is gone, so each is mended to "limits", "a limit" or "the limit", with the note `position`, as phase 3 mended `parameters-and-tokens.md` 156.  The four links that stay at `generator.md#known-issues` keep their words.
+- The outline's row "Database that can be described" says "a row in `databases/index.md`"; `site/AGENTS.md` writes the path from `site/`, `reference/databases/index.md`, as its other rows do.
+- C-05 is a correction of a file that is no user document, so its ledger row is `new` with `arg` `C-05`: a `corrected` row needs a unit.
 
 ## Review Focus
 
