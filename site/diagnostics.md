@@ -2502,7 +2502,7 @@ Reported by: the build.
 
 No dialect of this release gets this error: `postgres` and `mssql` are both typed.  It is kept for a database that SqlSource can describe before it can give types for it, where it would be reported once for the file, at its first query that needs types, with no other error about the entries of the file's queries.
 
-See: [Dialects](reference/databases/index.md#database-support)
+See: [Database support](reference/databases/index.md#database-support)
 
 ## SQLSRC244
 
@@ -2534,7 +2534,7 @@ The sidecar has an entry for a query that does not need one: a query that was re
 
 Run `dotnet sqlsource describe` and commit the sidecar it writes, which has no such entry.  When no query of the file needs an entry any more, a run of `describe` over the whole project deletes the sidecar.
 
-A `.sql` file that two projects include is the exception when one of them misses a settings file of its folder that the other finds, such as one a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The query's output can then be `sql` in one project and not in the other.  A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.  A run over only the project that warns removes the entry, and the other project's build then reports [SQLSRC241](#sqlsrc241).  For such a file the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [known issues](reference/sidecars.md#limit-file-in-two-projects).
+A `.sql` file that two projects include is the exception when one of them misses a settings file of its folder that the other finds, such as one a build target of your own adds, or one named in another case, such as `SqlSource.json`, that one project lists itself.  The query's output can then be `sql` in one project and not in the other.  A run of `describe` over both projects keeps the entry that the other project needs, so the warning stays.  A run over only the project that warns removes the entry, and the other project's build then reports [SQLSRC241](#sqlsrc241).  For such a file the warning clears when both projects find the same settings files, or when the project lists `SQLSRC245` in `NoWarn`.  See [a file in two projects](reference/sidecars.md#limit-file-in-two-projects).
 
 This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`.
 

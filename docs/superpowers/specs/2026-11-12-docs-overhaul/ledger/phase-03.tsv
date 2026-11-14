@@ -5,7 +5,9 @@ site/README.md:5-56	move	site/index.md#find-what-you-need	-	-	-
 site/README.md:57	move-split	-	-	-	The eight links to known issues become one link to guides/troubleshooting.md
 site/README.md:57/1	move	site/index.md#find-what-you-need	-	| Find a problem that is not an error |	The cell is one link, Troubleshooting
 site/README.md:57/2	move	site/guides/troubleshooting.md	-	*	The links to the known issues of settings, the generator, the tool, PostgreSQL and SQL Server, in its one sentence that links known issues
-site/README.md:57/3	restated-from	-	site/guides/troubleshooting.md#wrong-model	*	The links to the known issues of .sql files, parameters and tokens and dialects: their limits and pointers are entries of guides/troubleshooting.md
+site/README.md:57/3	restated-from	-	site/guides/troubleshooting.md#not-described	*	The link to the known issues of .sql files: its one bullet is the limit of reference/sidecars.md, an entry of this section
+site/README.md:57/4	restated-from	-	site/guides/troubleshooting.md#wrong-model	*	The link to the known issues of parameters and tokens: its limit and its pointer to names-read-as-parameters are entries of this section; its pointer to SQL Server's known issues stays on sqlserver.md
+site/README.md:57/5	restated-from	-	site/guides/troubleshooting.md#wrong-result	*	The link to the known issues of dialects: its pointer to still-read-differently is an entry of this section
 @site/README.md:57	move	site/index.md#find-what-you-need	-	-	The row that phase 2 added for errors.md, now linking reference/errors.md
 site/README.md:107-111	move	site/index.md#the-three-parts	-	-	-
 site/README.md:112	move	site/index.md#the-three-parts	-	-	Links reference/parameters.md, and its last word, tokens, gains a link to reference/tokens.md
@@ -23,7 +25,8 @@ site/sql-files.md:73-95	move	site/reference/sql-files.md#result-shapes	-	-	-
 site/sql-files.md:99-112	move	site/reference/sql-files.md#summaries	-	-	-
 site/sql-files.md:116-134	move	site/reference/sql-files.md#the-file-header	-	-	-
 site/sql-files.md:138-147	move	site/reference/sql-files.md#a-file-with-no-name	-	-	-
-site/sql-files.md:151-160	move	site/reference/sql-files.md#generated-sql	-	-	-
+site/sql-files.md:151-159	move	site/reference/sql-files.md#generated-sql	-	-	-
+site/sql-files.md:160	move	site/reference/sql-files.md#generated-sql	-	-	position: "see parameters and tokens" > "see list parameters"; its first link and this one go to parameters.md#list-parameters
 site/sql-files.md:164-192	move	site/reference/sql-files.md#markers-in-the-wrong-place	-	-	-
 site/sql-files.md:194	move	site/reference/sql-files.md#markers-in-the-wrong-place	fact	-	Word for word, but its last sentence gains a link to errors.md#what-an-error-costs, the owner of the rule that the paragraph states
 -	new	site/reference/sql-files.md#markers-in-the-wrong-place	-	-	The words what an error costs in the last sentence of sql-files.md:194, linked to errors.md#what-an-error-costs
@@ -70,7 +73,7 @@ site/dialects.md:132	move	site/reference/databases/index.md#database-support	-	-
 site/dialects.md:134-143	merge-pair	site/reference/databases/index.md#database-support	MP-23	-	-
 site/dialects.md:145	move-split	-	-	-	Sentences 1 to 3 stay with the table; sentences 4 and 5, on DuckDB, go to databases/other.md
 site/dialects.md:145/1	move	site/reference/databases/index.md#database-support	-	Every dialect is read, and the queries of every `.sql` file whose output is `sql` or `models` get their constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases marked Yes.	Sentences 1 to 3
-site/dialects.md:145/2	move	site/reference/databases/other.md#duckdb	-	A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models`, `methods` or `repository`, and the build asks for its entries, so give a DuckDB file the output `sql`: see the output setting.	Sentences 4 and 5
+site/dialects.md:145/2	move	site/reference/databases/other.md#duckdb	-	A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models`, `methods` or `repository`, and the build asks for its entries, so give a DuckDB file the output `sql`: see the output setting.	position: "with one of them" > "with one of the databases marked Yes", since the sentence no longer follows the table; sentences 4 and 5
 site/dialects.md:147	move	site/reference/databases/other.md#not-described	-	-	-
 site/dialects.md:151	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires; its one bullet is a pointer that goes
 site/dialects.md:153	restated-from	-	site/reference/dialects.md#still-read-differently	-	A pointer: the section is the list; guides/troubleshooting.md#wrong-result has its entry
@@ -80,3 +83,7 @@ site/dialects.md:153	restated-from	-	site/reference/dialects.md#still-read-diffe
 -	new	site/reference/databases/other.md#which-dialect	-	-	The heading Which dialect to set, its anchor, and the sentence that points to dialects.md#choosing-a-dialect
 -	new	site/reference/databases/other.md#duckdb	-	-	The heading DuckDB and its anchor
 -	new	site/guides/troubleshooting.md	-	-	The whole page: its title, two sentences, the six h2 headings with their anchors, and four entries: two limits and two pointers
+site/diagnostics.md:2583	move	site/diagnostics.md#sqlsrc243	-	-	position: "See: Dialects" > "See: Database support"; the link goes to reference/databases/index.md#database-support
+site/diagnostics.md:2611	move	site/diagnostics.md#sqlsrc245	-	-	position: "See known issues" > "See a file in two projects"; the link goes to reference/sidecars.md#limit-file-in-two-projects
+site/tool.md:634	move	site/tool.md	-	-	position: "the known issues of .sql files" > "a file in two projects"; the link goes to reference/sidecars.md#limit-file-in-two-projects, and phase 5 moves the bullet
+site/generator.md:188	move	site/generator.md	-	-	position: "parameters and tokens" > "tokens"; the link goes to reference/tokens.md#tokens

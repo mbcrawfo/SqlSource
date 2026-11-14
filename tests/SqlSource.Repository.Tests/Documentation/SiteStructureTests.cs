@@ -84,7 +84,9 @@ public sealed partial class SiteStructureTests
             .ShouldBeEmpty();
     }
 
-    // A reading that finds nothing would make the tests above pass.
+    // Fails when the reading finds no site/index.md or troubleshooting page, no page with `## Limits`, fewer than two
+    // `limit-` anchors, or no link of the troubleshooting page: a reading that finds nothing would make the tests above
+    // pass.
     [Fact]
     public void Reading_OfTheSite_FindsPagesLimitsAndLinks()
     {

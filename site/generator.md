@@ -185,7 +185,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 
 A query with a token whose output is `sql` or `models` is a `static string` method with the name of the query, as visible as a constant would be, `ListFrom(string table, string orderBy)`, in place of a constant.  Under `methods` or `repository` the query's [method](#query-methods) takes the tokens instead, and runs the query.  Its parameters, and what it returns, are under [tokens](reference/tokens.md#tokens).
 
-A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](concepts.md#query-parameter) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [parameters and tokens](reference/tokens.md#tokens).
+A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](concepts.md#query-parameter) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [tokens](reference/tokens.md#tokens).
 
 <a id="intellisense"></a>
 

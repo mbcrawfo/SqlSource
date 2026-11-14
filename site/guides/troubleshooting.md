@@ -13,7 +13,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 ## A model that looks wrong
 
 - **A query parameter is missing from the input model.**  Under the `mssql` dialect, a parameter after a `DECLARE` with no `;` can be taken for a variable.  See [a parameter taken for a variable](../reference/parameters.md#limit-parameter-taken-for-a-variable).
-- **A MySQL or MariaDB user variable, or a parameter of a procedure that the SQL creates, is a query parameter.**  SqlSource reads each of them as a parameter.  See [names that are read as parameters](../reference/parameters.md#names-read-as-parameters).
+- **The input model has a property for a name that is not a query parameter**, such as `@x` written for an absolute value on PostgreSQL.  SqlSource reads `@` and a name as a query parameter wherever it is written.  The same holds for a MySQL user variable and for the parameter of a procedure that the SQL creates.  See [names that are read as parameters](../reference/parameters.md#names-read-as-parameters).
 
 <a id="wrong-result"></a>
 
@@ -25,7 +25,7 @@ Some problems are listed in the known issues of [settings](../settings.md#known-
 
 ## A query is not described, or a file is not found
 
-- **Two projects include one `.sql` file, and entries go from its sidecar.**  A run of the tool on one project can remove the entries that the other project needs.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
+- **Two projects include one `.sql` file, and entries are missing from its sidecar.**  A run of the tool on one project can remove the entries that the other project needs.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
 
 <a id="watch"></a>
 

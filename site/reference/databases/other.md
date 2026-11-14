@@ -1,6 +1,6 @@
 # Other databases
 
-SqlSource can describe the queries of the databases marked Yes in the table of [database support](index.md#database-support), and of no other.  This page is for a database of every row marked No.
+SqlSource can describe the queries of the databases marked Yes in the table of [database support](index.md#database-support), and of no other.  This page is for each database that the table marks No.
 
 <a id="not-described"></a>
 
@@ -18,4 +18,4 @@ To find the dialect for your database, see [choosing a dialect](../dialects.md#c
 
 ## DuckDB
 
-A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models`, `methods` or `repository`, and the build asks for its entries, so give a DuckDB file the output `sql`: see [the output setting](../../settings.md#setting-output).
+A database that merely shares a dialect with one of the databases marked Yes, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models`, `methods` or `repository`, and the build asks for its entries, so give a DuckDB file the output `sql`: see [the output setting](../../settings.md#setting-output).

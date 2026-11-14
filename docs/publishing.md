@@ -60,7 +60,7 @@ gh workflow run docs.yml --ref main
 
 It builds the branch it runs on, so a run on `main` between releases publishes pages that may describe what is not released yet.  It is not the way to keep the site current between releases.
 
-One exception holds until the documentation overhaul closes (`docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`).  Each of its phases 3 to 11 moves pages of the site and, in the same pull request, points the links of `README.md` and `src/SqlSource.Tool/README.md` at the new addresses.  The readmes on `main` then link to pages that the published site does not have.  So after each of those pull requests merges, and once more when the overhaul closes, run `docs.yml` on `main` by hand.  The pull request that closes the overhaul takes this paragraph out.
+One exception holds until the documentation overhaul closes (`docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`).  Each of its phases 3 to 11 changes the pages of the site or the links of `README.md` and `src/SqlSource.Tool/README.md` to them.  The readmes on `main` can then link to pages that the published site does not have.  So after each of those pull requests merges, and once more when the overhaul closes, run `docs.yml` on `main` by hand.  The pull request that closes the overhaul takes this paragraph out.
 
 ### External configuration
 
