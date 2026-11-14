@@ -1,0 +1,135 @@
+# base d73d4e0e183561e4da0cb5bb2b6849fa33120fc2
+unit	disposition	to	arg	words	note
+site/postgresql.md:1-2	move	site/reference/databases/postgresql/index.md	-	-	-
+site/postgresql.md:3	move	site/reference/databases/postgresql/index.md	-	-	position: "This page is about" > "These pages are about"; the page is five pages now
+site/postgresql.md:5-18	move	site/reference/databases/postgresql/index.md	-	-	-
+site/postgresql.md:22-24	move	site/reference/databases/postgresql/index.md#connecting	-	-	-
+site/postgresql.md:25	merge-pair	site/reference/databases/index.md#supported-versions	MP-23	-	Whole, beside the table; a new bullet in #connecting links the table in its place
+site/postgresql.md:26-27	move	site/reference/databases/postgresql/index.md#connecting	-	-	-
+site/postgresql.md:31-35	move	site/reference/databases/postgresql/index.md#what-describing-does	-	-	-
+site/postgresql.md:39-57	move	site/reference/databases/postgresql/index.md#parameters	-	-	-
+site/postgresql.md:61-72	move	site/reference/databases/postgresql/index.md#what-can-be-described	-	-	-
+site/postgresql.md:76-148	move	site/reference/databases/postgresql/nullability.md#nullability	-	-	-
+site/postgresql.md:152-160	move	site/reference/databases/postgresql/types.md#type-map	-	-	-
+site/postgresql.md:161	move	site/reference/databases/postgresql/types.md#type-map	-	-	position: "is decided above" > "is decided in Which columns can be null"; the section is on nullability.md now
+site/postgresql.md:162-163	move	site/reference/databases/postgresql/types.md#type-map	-	-	-
+site/postgresql.md:167	move	site/reference/databases/postgresql/types.md#which-npgsql	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:168-174	move	site/reference/databases/postgresql/types.md#which-npgsql	-	-	-
+site/postgresql.md:178	move	site/reference/databases/postgresql/types.md#type-table	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:179-233	move	site/reference/databases/postgresql/types.md#type-table	-	-	-
+site/postgresql.md:237	move	site/reference/databases/postgresql/types.md#type-notes	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:238-247	move	site/reference/databases/postgresql/types.md#type-notes	-	-	-
+site/postgresql.md:251	move	site/reference/databases/postgresql/libraries.md#nodatime	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:252-290	move	site/reference/databases/postgresql/libraries.md#nodatime	-	-	-
+site/postgresql.md:294	move	site/reference/databases/postgresql/libraries.md#nettopologysuite	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:295-323	move	site/reference/databases/postgresql/libraries.md#nettopologysuite	-	-	-
+site/postgresql.md:327	move	site/reference/databases/postgresql/libraries.md#json	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:328-375	move	site/reference/databases/postgresql/libraries.md#json	-	-	-
+site/postgresql.md:379-405	move	site/reference/databases/postgresql/index.md#models	-	-	-
+site/postgresql.md:409-426	move	site/reference/databases/postgresql/query-methods.md#query-methods	-	-	-
+site/postgresql.md:427	move	site/reference/databases/postgresql/query-methods.md#query-methods	-	-	position: "as known issues says" > "as the limit says"; the link goes to #limit-connection-string-repository on the same page
+site/postgresql.md:431	move	site/reference/databases/postgresql/query-methods.md#method-parameters	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:433	move	site/reference/databases/postgresql/query-methods.md#method-parameters	-	-	position: "as above" > "as in Parameters"; the link goes to index.md#parameters, now on another page
+site/postgresql.md:434-441	move	site/reference/databases/postgresql/query-methods.md#method-parameters	-	-	-
+site/postgresql.md:445	move	site/reference/databases/postgresql/query-methods.md#array-parameters	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:446-465	move	site/reference/databases/postgresql/query-methods.md#array-parameters	-	-	-
+site/postgresql.md:469	move	site/reference/databases/postgresql/query-methods.md#method-results	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:470-472	move	site/reference/databases/postgresql/query-methods.md#method-results	-	-	-
+site/postgresql.md:473	move	site/reference/databases/postgresql/query-methods.md#method-results	-	-	Whole; its clause tested on Npgsql 8 and 10 is restated by the cell Driver versions tested of databases/index.md#supported-versions, and stands in merges/MP-23.md
+site/postgresql.md:474-493	move	site/reference/databases/postgresql/query-methods.md#method-results	-	-	The bold words of line 490 stay byte-identical: KnownDifferences.cs quotes them, with the new path; the link of line 493 stays at generator.md#known-issues until phase 6
+site/postgresql.md:497	move	site/reference/databases/postgresql/query-methods.md#collection-methods	-	-	h3 to h2, as spec step 2 lists it
+site/postgresql.md:498-518	move	site/reference/databases/postgresql/query-methods.md#collection-methods	-	-	-
+site/postgresql.md:522	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires: four bullets are limits under ## Limits of their pages, and two are pointers that go
+site/postgresql.md:524	move	site/reference/databases/postgresql/nullability.md#limit-columns-treated-as-nullable	-	-	Still a bullet, under its h3
+site/postgresql.md:525	move	site/reference/databases/postgresql/index.md#limit-operator-on-oid	-	-	Still a bullet, under its h3
+site/postgresql.md:526	move	site/reference/databases/postgresql/index.md#limit-many-partitions	-	-	Still a bullet, under its h3
+site/postgresql.md:527	restated-from	-	site/reference/databases/postgresql/index.md#what-describing-does	-	A pointer: the section states that an IMMUTABLE function can run; guides/troubleshooting.md#not-described has its entry
+site/postgresql.md:528	merge-pair	site/reference/databases/postgresql/query-methods.md#limit-connection-string-repository	MP-09	-	Still a bullet, under its h3; phase 6 places generator.md 1188 beside it
+site/postgresql.md:529	restated-from	-	site/reference/query-methods.md#limit-wrapped-connection	-	A pointer to generator.md 1186, which phase 6 makes that limit
+site/sqlserver.md:1-2	move	site/reference/databases/sqlserver/index.md	-	-	-
+site/sqlserver.md:3	move	site/reference/databases/sqlserver/index.md	-	-	position: "This page is about" > "These pages are about"; the page is five pages now
+site/sqlserver.md:5-20	move	site/reference/databases/sqlserver/index.md	-	-	-
+site/sqlserver.md:24-27	move	site/reference/databases/sqlserver/index.md#connecting	-	-	-
+site/sqlserver.md:28	move-split	-	-	-	Sentences 1 and 2 stand beside the table of supported versions, sentence 3 under #azure-sql; a new bullet in #connecting links both in its place
+site/sqlserver.md:28/1	merge-pair	site/reference/databases/index.md#supported-versions	MP-23	**SQL Server 2017 and later are supported**, and SqlSource is tested on 2017, 2019, 2022 and 2025.  An older server is SQLSRC235.	Sentences 1 and 2, as a bullet
+site/sqlserver.md:28/2	merge-pair	site/reference/databases/index.md#azure-sql	MP-23	Azure SQL Database and Azure SQL Managed Instance are accepted whatever version they report, and are not tested.	Sentence 3, as a paragraph
+site/sqlserver.md:29-30	move	site/reference/databases/sqlserver/index.md#connecting	-	-	-
+site/sqlserver.md:34-36	move	site/reference/databases/sqlserver/index.md#what-describing-does	-	-	-
+site/sqlserver.md:40-64	move	site/reference/databases/sqlserver/index.md#parameters	-	-	-
+site/sqlserver.md:68-90	move	site/reference/databases/sqlserver/index.md#what-can-be-described	-	-	-
+site/sqlserver.md:94-117	move	site/reference/databases/sqlserver/nullability.md#nullability	-	-	-
+site/sqlserver.md:118	move	site/reference/databases/sqlserver/nullability.md#nullability	-	-	position: "see known issues" > "see limits"; the link goes to #limit-ansi-warnings-off on the same page
+site/sqlserver.md:119-142	move	site/reference/databases/sqlserver/nullability.md#nullability	-	-	-
+site/sqlserver.md:146-157	move	site/reference/databases/sqlserver/types.md#types	-	-	-
+site/sqlserver.md:161	move	site/reference/databases/sqlserver/types.md#which-sqlclient	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:162-165	move	site/reference/databases/sqlserver/types.md#which-sqlclient	-	-	-
+site/sqlserver.md:166	move	site/reference/databases/sqlserver/types.md#which-sqlclient	-	-	position: "see known issues" > "see limits"; the link goes to #limit-ef-core-sqlclient on the same page
+site/sqlserver.md:167-168	move	site/reference/databases/sqlserver/types.md#which-sqlclient	-	-	-
+site/sqlserver.md:172	move	site/reference/databases/sqlserver/types.md#type-table	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:173-201	move	site/reference/databases/sqlserver/types.md#type-table	-	-	-
+site/sqlserver.md:205	move	site/reference/databases/sqlserver/types.md#type-notes	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:206-213	move	site/reference/databases/sqlserver/types.md#type-notes	-	-	-
+site/sqlserver.md:217	move	site/reference/databases/sqlserver/libraries.md#nodatime	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:218-269	move	site/reference/databases/sqlserver/libraries.md#nodatime	-	-	-
+site/sqlserver.md:273	move	site/reference/databases/sqlserver/libraries.md#nettopologysuite	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:274-319	move	site/reference/databases/sqlserver/libraries.md#nettopologysuite	-	-	The link of line 312 stays at generator.md#known-issues until phase 6
+site/sqlserver.md:323	move	site/reference/databases/sqlserver/libraries.md#json	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:324-365	move	site/reference/databases/sqlserver/libraries.md#json	-	-	-
+site/sqlserver.md:369-393	move	site/reference/databases/sqlserver/index.md#models	-	-	-
+site/sqlserver.md:397-415	move	site/reference/databases/sqlserver/query-methods.md#query-methods	-	-	-
+site/sqlserver.md:419	move	site/reference/databases/sqlserver/query-methods.md#method-parameters	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:420-438	move	site/reference/databases/sqlserver/query-methods.md#method-parameters	-	-	-
+site/sqlserver.md:442	move	site/reference/databases/sqlserver/query-methods.md#list-parameters	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:443-450	move	site/reference/databases/sqlserver/query-methods.md#list-parameters	-	-	-
+site/sqlserver.md:451	move	site/reference/databases/sqlserver/query-methods.md#list-parameters	-	-	position: "a known issue" > "a limit"; the link goes to #limit-list-in-an-aggregate on the same page
+site/sqlserver.md:452	move	site/reference/databases/sqlserver/query-methods.md#list-parameters	-	-	position: "see known issues" > "see limits"; the link goes to #limit-ansi-nulls-off on the same page
+site/sqlserver.md:453-468	move	site/reference/databases/sqlserver/query-methods.md#list-parameters	-	-	-
+site/sqlserver.md:472	move	site/reference/databases/sqlserver/query-methods.md#method-results	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:473-475	move	site/reference/databases/sqlserver/query-methods.md#method-results	-	-	-
+site/sqlserver.md:476-480	move	site/reference/databases/sqlserver/query-methods.md#reading-a-row	-	-	-
+site/sqlserver.md:481	move	site/reference/databases/sqlserver/query-methods.md#null-values	-	-	-
+site/sqlserver.md:482-483	move	site/reference/databases/sqlserver/query-methods.md#errors-and-rollbacks	-	-	-
+site/sqlserver.md:484	move	site/reference/databases/sqlserver/query-methods.md#errors-and-rollbacks	-	-	position: "see known issues" > "see limits"; the link goes to #limit-hidden-rollback on the same page
+site/sqlserver.md:485	move	site/reference/databases/sqlserver/query-methods.md#rowcount	-	-	Its link stays at generator.md#known-issues until phase 6
+site/sqlserver.md:486-488	move	site/reference/databases/sqlserver/query-methods.md#timeout-and-cancel	-	-	The link of line 488 stays at generator.md#known-issues until phase 6
+site/sqlserver.md:492	move	site/reference/databases/sqlserver/query-methods.md#collection-methods	-	-	h3 to h2, as spec step 2 lists it
+site/sqlserver.md:493-516	move	site/reference/databases/sqlserver/query-methods.md#collection-methods	-	-	-
+site/sqlserver.md:520	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires: ten bullets are limits under ## Limits of their pages, and two are pointers that go
+site/sqlserver.md:522-528	move	site/reference/databases/sqlserver/types.md#limit-ef-core-sqlclient	-	-	Still a bullet with its sample, under its h3
+site/sqlserver.md:530	move	site/reference/databases/sqlserver/nullability.md#limit-columns-treated-as-nullable	-	-	Still a bullet, under its h3
+site/sqlserver.md:532	move	site/reference/databases/sqlserver/nullability.md#limit-ansi-warnings-off	-	-	Still a bullet, under its h3
+site/sqlserver.md:534	move	site/reference/databases/sqlserver/query-methods.md#limit-ansi-nulls-off	-	-	Still a bullet, under its h3
+site/sqlserver.md:536-547	move	site/reference/databases/sqlserver/query-methods.md#limit-hidden-rollback	-	-	Still a bullet with its sample, under its h3
+site/sqlserver.md:549	move	site/reference/databases/sqlserver/index.md#limit-several-result-sets	-	-	Still a bullet, under its h3
+site/sqlserver.md:551	restated-from	-	site/reference/databases/sqlserver/query-methods.md#limit-rowcount-after-nocount	-	A pointer to generator.md 1189, which phase 6 makes that limit on this page; the bullet of line 485 links it until then
+site/sqlserver.md:553	restated-from	-	site/reference/query-methods.md#limit-wrapped-connection	-	A pointer to generator.md 1186, which phase 6 makes that limit
+site/sqlserver.md:555-565	move	site/reference/databases/sqlserver/query-methods.md#limit-list-in-an-aggregate	-	-	Still a bullet with its sample, under its h3
+site/sqlserver.md:567	move	site/reference/databases/sqlserver/index.md#limit-type-name-unicode	-	-	Still a bullet, under its h3
+site/sqlserver.md:569	move	site/reference/databases/sqlserver/index.md#limit-parameter-name-unicode	-	-	Still a bullet, under its h3
+site/sqlserver.md:571	move	site/reference/databases/sqlserver/index.md#limit-parameter-two-spellings	-	-	Still a bullet, under its h3
+site/generator.md:702	move	site/generator.md	-	-	position: "see known issues" > "see limits"; the link goes to reference/databases/postgresql/query-methods.md#limit-connection-string-repository
+site/recipes.md:410	move	site/recipes.md	-	-	position: "as known issues says" > "as the limit says"; the link goes to reference/databases/postgresql/query-methods.md#limit-connection-string-repository
+site/parameters-and-tokens.md:91	move	site/reference/parameters.md#list-parameters	-	-	position: "see known issues" > "see limits"; the link goes to databases/sqlserver/query-methods.md#limit-list-in-an-aggregate
+@site/guides/troubleshooting.md:3	move-split	-	-	-	The paragraph keeps its one sentence whole and gains a new one, since the entry of SQLSRC267 stands under wrong-model, as the spec places it
+@site/guides/troubleshooting.md:3/1	move	site/guides/troubleshooting.md	-	Use this page when the build succeeds but something is wrong: an exception at run time, a wrong result, or nothing happens.	Its one sentence, whole
+-	new	site/guides/troubleshooting.md	-	-	The sentence It also lists a build error that is not about your SQL, after the first sentence of line 3
+@site/guides/troubleshooting.md:5	move	site/guides/troubleshooting.md	-	-	position: ", the tool, PostgreSQL and SQL Server" > " and the tool"; the links to the known issues of the two moved pages go, since each of their limits has its entry
+-	new	site/reference/databases/index.md#supported-versions	-	-	The anchor, the heading Supported versions and its table of two rows, as new text.  Sources: the server cells from postgresql.md 25 and sqlserver.md 28; 8 or later and 6.1 or later from postgresql.md 167-174 and sqlserver.md 161-168; 8, 10 from postgresql.md 473; 6.1, 7 from tests/DatabaseTests/SqlServer.SqlClient61/SqlServer.SqlClient61.csproj (6.1.7) and Directory.Packages.props (7.1.1)
+-	new	site/reference/databases/index.md#azure-sql	-	-	The anchor and the heading Azure SQL
+-	new	site/reference/databases/postgresql/index.md#connecting	-	-	The bullet in place of line 25, which links the table and names SQLSRC235
+-	new	site/reference/databases/sqlserver/index.md#connecting	-	-	The bullet in place of line 28, which links the table and #azure-sql and names SQLSRC235
+-	new	site/reference/databases/postgresql/index.md#limits	-	-	The heading Limits and its anchor; the h3 of 2 limits and their anchors
+-	new	site/reference/databases/postgresql/nullability.md	-	-	The h1 PostgreSQL: which columns can be null; the heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/databases/postgresql/types.md	-	-	The h1 PostgreSQL: types
+-	new	site/reference/databases/postgresql/libraries.md	-	-	The h1 PostgreSQL: NodaTime, NetTopologySuite and JSON
+-	new	site/reference/databases/postgresql/query-methods.md	-	-	The h1 PostgreSQL: running queries; the heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/databases/sqlserver/index.md#limits	-	-	The heading Limits and its anchor; the h3 of 4 limits and their anchors
+-	new	site/reference/databases/sqlserver/nullability.md	-	-	The h1 SQL Server: which columns can be null; the heading Limits and its anchor; the h3 of 2 limits and their anchors
+-	new	site/reference/databases/sqlserver/types.md	-	-	The h1 SQL Server: types; the heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/databases/sqlserver/libraries.md	-	-	The h1 SQL Server: NodaTime, NetTopologySuite and JSON
+-	new	site/reference/databases/sqlserver/query-methods.md	-	-	The h1 SQL Server: running queries; the 5 h3 of #method-results with their anchors (reading-a-row, null-values, errors-and-rollbacks, rowcount, timeout-and-cancel); the heading Limits and its anchor; the h3 of 3 limits and their anchors
+-	new	site/guides/troubleshooting.md	-	-	15 entries: 14 limits of the two database folders and the pointer for a function marked IMMUTABLE
+-	new	site/reference/databases/AGENTS.md	-	-	Not a user document: two new bullets, on #supported-versions and on tab ids, and a sentence on SiteStructureTests; the bullet on the pages not yet moved goes
+-	new	site/AGENTS.md	-	-	Not a user document: the row Database that can be described takes the outline's words; postgresql.md and sqlserver.md leave the pages not yet moved
+-	new	tests/SqlSource.Repository.Tests/Documentation/AGENTS.md	-	-	Not a user document: SupportedVersionsTests and the database checks of SiteStructureTests are named
+-	new	docs/tech-debt/TD-0067-nullability-inside-a-mapped-type-argument-is-not-checked.md	C-05	-	C-05, not a user document, so no unit: its link and its text name site/settings.md#known-issues, where the bullet it means is (settings.md 1070); phase 7 gives it its last target

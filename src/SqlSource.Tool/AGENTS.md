@@ -12,7 +12,7 @@ Where each of the tool's tests goes: [`tests/README.md`](../../tests/README.md).
 - **It targets `net8.0` with `RollForward` `Major`, and references a current Roslyn by `VersionOverride`.**  Do not raise the target: a user with only the .NET 8 SDK must be able to run it.  `tools/check-tool-install.sh` runs the packed tool on the newest runtime the machine has.
 - **The tool writes English**, and `SatelliteResourceLanguages` keeps other languages out of the package.  A test compares no text that System.CommandLine wrote.
 - **`README.md` here is the package's short page on nuget.org**: what the tool is for, how to install it, its commonest commands, and links to the manual and the repository's `README.md`.  Keep it that short.
-- **The tool's behaviour is documented in `site/tool.md`**, where a new option, environment variable, exit code or command goes; in `settings.md` beside it for the logical database setting; and in `postgresql.md` and `sqlserver.md`.
+- **The tool's behaviour is documented in `site/tool.md`**, where a new option, environment variable, exit code or command goes; in `settings.md` beside it for the logical database setting; and in `reference/databases/`.
 
 ## The host
 

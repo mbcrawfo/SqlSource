@@ -21,7 +21,7 @@ The rule is to rely on the server where it is accurate and to correct it only wh
 
 ## Impact
 
-Low.  Nothing is wrong, and of the corpus's columns that cannot be `NULL`, 15 of the 193 of the cases that run on 2017 and 15 of the 209 of those that run on 2025, about one in thirteen, are answered nullable.  Each that remains is a property with a `?` that a user meets as a `!` or a check added by hand, as TD-0051 is for PostgreSQL; the manual's [SQL Server known issues](../../site/sqlserver.md#known-issues) say what a user can do.  The count grows with every case of a kind above.
+Low.  Nothing is wrong, and of the corpus's columns that cannot be `NULL`, 15 of the 193 of the cases that run on 2017 and 15 of the 209 of those that run on 2025, about one in thirteen, are answered nullable.  Each that remains is a property with a `?` that a user meets as a `!` or a check added by hand, as TD-0051 is for PostgreSQL; the manual's [SQL Server limit](../../site/reference/databases/sqlserver/nullability.md#limit-columns-treated-as-nullable) says what a user can do.  The count grows with every case of a kind above.
 
 ## Proposed fix
 

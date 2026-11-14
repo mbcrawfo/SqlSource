@@ -21,7 +21,7 @@
 
 ## Known differences
 
-- **`KnownDifferences.cs` holds a driver's limit alone, with its reason and a note of its effect in `site/sqlserver.md`**, and a row in the readme's table.
+- **`KnownDifferences.cs` holds a driver's limit alone, with its reason and a note of its effect in `site/reference/databases/sqlserver/query-methods.md`**, and a row in the readme's table.
 - **One that changes what a caller's `catch` sees or what is left in the database is added only once the owner has ruled it the driver's limit**, and never to hide a difference that the generated methods could avoid.
 
 ## Project

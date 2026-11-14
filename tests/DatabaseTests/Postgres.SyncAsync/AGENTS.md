@@ -19,7 +19,7 @@
 
 ## Known differences
 
-- **`KnownDifferences.cs` holds a driver's limit alone, with its reason and a note of its effect in `site/postgresql.md`**, and a row in the readme's table.
+- **`KnownDifferences.cs` holds a driver's limit alone, with its reason and a note of its effect in `site/reference/databases/postgresql/query-methods.md`**, and a row in the readme's table.
 - **One that changes what a caller's `catch` sees or what is left in the database is added only once the owner has ruled it the driver's limit**, as `NpgsqlMultiplexingRefusesSyncIo` is, and never to hide a difference that the generated methods could avoid.
 - **Every condition of a rewrite has a row in `KnownDifferencesTests` that fails without it**, since a rewrite that matches too much hides a difference.
 
