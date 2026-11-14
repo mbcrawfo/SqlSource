@@ -1,7 +1,7 @@
 # base 3a40cb138e5910c6332e892f5942c717514c854a
 unit	disposition	to	arg	words	note
 site/settings.md:1	move-split	-	-	-	The h1 Settings goes: the page's h1 is Settings: every setting, and where you write it, new
-site/settings.md:3	corrected	site/reference/settings.md	C-02	A setting is a named choice that changes what SqlSource generates or does	C-02: the one definition of the map; "Every setting is defined here" goes, since each setting is defined on the page of what it changes; its examples and its three reaches stay
+site/settings.md:3	corrected	site/reference/settings.md	C-02	A setting is a named choice that changes what SqlSource generates or does	C-02: the one definition of the map; "Every setting is defined here" goes, since each setting is defined on the page of what it changes; its examples, now before its five places, and its three reaches stay; a fourth reach, to one type, is added for the attribute's place
 site/settings.md:5-12	move	site/reference/settings.md#places	-	-	-
 site/settings.md:14-21	move	site/reference/settings.md#places	-	-	-
 site/settings.md:23-26	move	site/reference/settings.md#places	-	-	-
@@ -14,7 +14,7 @@ site/settings.md:93-98	move	site/reference/settings.md#a-value-that-is-wrong	-	-
 site/settings.md:102-130	move	site/reference/settings.md#setting-output	-	-	-
 site/settings.md:134-152	move	site/reference/settings.md#setting-database	-	-	-
 site/settings.md:153	corrected	site/reference/settings.md#setting-database	C-01	The build reads it to choose the connection source of a repository method	C-01: "Only the tool reads this setting.  The build does not, so a wrong database in a settings file is reported by the tool and not by the build" becomes three sentences; MethodPlanner.DatabaseOf calls QuerySettings.ResolveDatabase, RunPlanner 260, SQLSRC030 and SQLSRC031
-site/settings.md:155	move	site/reference/settings.md#setting-database	-	-	Its link goes to connections.md#connections in place of cli.md#command-reference, as the map's row says
+site/settings.md:155	move	site/reference/settings.md#setting-database	-	-	position: "see [the command reference]" > "see [connections]"; its link goes to connections.md#connections in place of cli.md#command-reference, as the map's row says
 site/settings.md:159-181	move	site/reference/settings.md#setting-dialect	-	-	-
 site/settings.md:183	move	site/reference/settings.md#setting-dialect	-	-	Its words about the dialect's places; merges/MP-10.md, with the opening of the term Dialect
 site/settings.md:185-189	move	site/reference/settings.md#setting-dialect	-	-	-
@@ -105,7 +105,7 @@ site/sql-files.md:47	move	site/reference/sql-files.md	-	-	position: "links to it
 site/parameters-and-tokens.md:252	move	site/reference/tokens.md	-	-	position: "is on [the settings page]" > "is on [the generator parameters page]"; the link goes to generator-parameters.md#setting-generator-parameters
 @site/guides/troubleshooting.md:5	restated-from	-	site/guides/troubleshooting.md#wrong-model	-	Phase 3's sentence that pointed to the known issues of settings goes: each of the six limits it pointed to has its own entry on this page
 -	new	site/reference/settings.md	-	-	The h1 Settings: every setting, and where you write it; the sentence after the definition that links settings-file.md
--	new	site/reference/settings.md#places	-	-	The anchor places and the h2 The places a setting is written; the fourth sample, the sample of public-exceptions (settings.md 916-920 at the baseline); the table of the five places; the sentence and the five bullets of what is not a setting
+-	new	site/reference/settings.md#places	-	-	The anchor places and the h2 The places a setting is written; the fourth sample, the sample of public-exceptions (settings.md 916-920 at the baseline); the table of the five places and the sentence under it on a file with no -- name: line; the sentence and the five bullets of what is not a setting
 -	new	site/reference/settings.md#all-settings	-	-	The matrix of 22 rows and eight columns, in place of phase 1's table: rows 1 to 17, 19 and 20 are the old rows, rows 18, 21 and 22 are new
 -	new	site/reference/settings-file.md	-	-	The h1 sqlsource.json and its opening of two sentences, which link settings.md#all-settings and settings.md#precedence; the five anchors file-name, file-contents, files-of-a-sql-file, which-files-are-checked and settings-file-in-the-build above the bold parts
 -	new	site/reference/settings-file.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
@@ -120,7 +120,7 @@ site/parameters-and-tokens.md:252	move	site/reference/tokens.md	-	-	position: "i
 -	new	site/guides/troubleshooting.md	-	-	6 entries: 1 under at-run-time, 3 under wrong-model, 2 under not-described, one for each limit of this phase
 -	new	docs/tech-debt/TD-0067-nullability-inside-a-mapped-type-argument-is-not-checked.md	C-05	-	C-05, not a user document, so no unit: its link and its words name site/reference/type-mapping.md#limit-nullable-type-argument
 -	new	site/AGENTS.md	-	-	Not a user document: four rows of Where a new thing goes name SettingsReferenceTests; settings.md leaves the pages not yet moved, with the sentence on Known issues
--	new	site/guides/AGENTS.md	-	-	Not a user document: the exception for a group of one page names Projects too, until phase 8 (owner question p07 Q1)
+-	new	site/guides/AGENTS.md	-	-	Not a user document: the exception for a group of one page names Projects too, until phase 8 (the owner approved it, p07 Q1)
 -	new	tests/SqlSource.Repository.Tests/Documentation/SiteStructureTests.cs	-	-	Not a user document: settings.md leaves PagesNotYetMoved
 -	new	tests/SqlSource.Repository.Tests/Documentation/SettingsReferenceTests.cs	-	-	Not a user document: the new test of the matrix, the marker index, the generator parameters and the five properties
 site/settings.md:212/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The header cells Parameter and Default

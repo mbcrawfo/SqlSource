@@ -4,7 +4,7 @@
 
 ## The properties
 
-A project can set five MSBuild properties of SqlSource.  Write each in the project file, in a `Directory.Build.props` above it, or as `-p:` on the command line.
+A project can set five MSBuild properties of SqlSource.  Write each in the project file, in a `Directory.Build.props` above it, as `-p:` on the command line, or as a variable of the environment.
 
 | Property | What it sets | Default | Section |
 |----|----|----|----|

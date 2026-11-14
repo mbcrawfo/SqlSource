@@ -1,6 +1,6 @@
 # Settings: every setting, and where you write it
 
-A setting is a named choice that changes what SqlSource generates or does, and that you write in one of five places: which dialect the SQL is written in, which comments to keep, which database the tool asks about a query.  A setting can apply to a whole project, to some of its files or to one query.  This page shows the five places, lists every setting with the places that can hold it, and says which place wins when a setting is written in several.  The output, the database and the dialect are defined below.  Every other setting is defined on the page of the thing it changes.
+A setting is a named choice that changes what SqlSource generates or does, such as which dialect the SQL is written in, which comments to keep or which database the tool asks about a query, and that you write in one of five places.  A setting can apply to a whole project, to some of its files, to one type or to one query.  This page shows the five places, lists every setting with the places that can hold it, and says which place wins when a setting is written in several.  The output, the database and the dialect are defined below.  Every other setting is defined on the page of the thing it changes.
 
 The settings file, `sqlsource.json`, has [a page of its own](settings-file.md): its name, what it holds, and which `.sql` files it reaches.
 
@@ -43,11 +43,13 @@ internal partial class Reports(NpgsqlDataSource dataSource);
 | A marker in the file header | A `-- word:` line before the first `-- name:` line | Every query of the file |
 | A key of a settings file | A member of `sqlsource.json` | The `.sql` files of its folder and of every folder below it |
 | A property of an attribute | `[SqlSourceGenerate(Source = "...")]` | The type, or the member, that carries the attribute |
-| An MSBuild property of the project | An element of the project file or of a `Directory.Build.props` above it, or `-p:` on the command line | The whole project |
+| An MSBuild property of the project | An element of the project file or of a `Directory.Build.props` above it, `-p:` on the command line, or a variable of the environment | The whole project |
+
+A file with no `-- name:` line is one query, and takes the markers of the file header and those of a query.
 
 The first block writes settings as markers in a `.sql` file, the second in a [settings file](settings-file.md#settings-files), `sqlsource.json`, which applies to the `.sql` files of its folder and of every folder below it, the third as a property of the attribute, and the fourth as an MSBuild property of the project.  Which of the five places a setting accepts is in [the table](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](../guides/folders-and-files.md#configure-a-folder).
 
-These are not settings, and have no row in the table:
+These are not settings, and have no row in [the table of all settings](#all-settings):
 
 - The markers that describe one query's own content: `-- name:`, `-- summary:`, `-- param:`, `-- token:` and `-- token-ignore:`.
 - The keys `root` and `$schema` of a settings file.
@@ -80,7 +82,7 @@ Each name links to its section, which gives its values and its rules.  The other
 | [Nested class](members.md#setting-nested-class) | `nestedClass` | `-- nested-class:` | yes | yes | | | `Sql` |
 | [`Source`](attributes.md#setting-source) | | | no | no | `Source` | | The file named for the type in the folder of the C# file |
 | [Repository interfaces](repositories.md#repository-interfaces) | | | no | no | `GenerateInterface`, `InterfaceName` | `SqlSourceRepositoryInterfaces` | On, named `I` and the type's name |
-| [A repository's connection](repositories.md#repository-connection) | | | no | no | `[SqlSourceConnection]`, `Database` | | None: the build finds the connection source by its name or type |
+| [A repository's connection](repositories.md#repository-connection) | | | no | no | `Database` of `[SqlSourceConnection]` | | None: the build finds the connection source by its name or type |
 | [Running the tool in the build](msbuild.md#online-build) | | | no | no | | `SqlSourceOnline` | `auto` |
 | [The build's `.env` file](msbuild.md#setting-env-file) | | | no | no | | `SqlSourceEnvFile` | The `.env` in the project's folder |
 | [Which `.sql` files are included](msbuild.md#included-files) | | | no | no | | `SqlSourceIncludeFiles` | On: every `.sql` file under the project's folder |
@@ -181,7 +183,7 @@ SELECT id, kind FROM events;
 - One name is one database for a whole run, with one connection and one dialect.  Two files that give one name two dialects are [SQLSRC211](../diagnostics.md#sqlsrc211).
 - The tool reads the setting to choose the connection it describes a query through.  The build reads it to choose the connection source of a [repository method](repositories.md#repository-connection).  A `database` value that is not valid in a settings file is reported by the tool alone.
 
-To give the tool a connection for a name, see [the command reference](connections.md#connections).
+To give the tool a connection for a name, see [connections](connections.md#connections).
 
 <a id="setting-dialect"></a>
 

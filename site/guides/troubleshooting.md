@@ -13,7 +13,7 @@ Use this page when the build succeeds but something is wrong: an exception at ru
 - **`UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException` is not caught by its type.**  Another assembly catches these exceptions by their type only when it can see them.  See [an exception that is not caught by its type](../reference/exceptions.md#limit-caught-by-type).
 - **`InvalidCastException` from a query method with parameters, on a connection that wraps the driver's.**  The method works only on a connection whose commands take the driver's own parameters.  See [a connection that wraps the driver's](../reference/query-methods.md#limit-wrapped-connection).
 - **`NotSupportedException` from a collection method, on a connection that wraps the driver's.**  Most such connections cannot run a batch of commands.  See [a collection method on a connection that wraps the driver's](../reference/collection-methods.md#limit-wrapped-connection).
-- **`InvalidCastException` for an id type made by Vogen or StronglyTypedId.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and such a type has none of its own.  See [Vogen and StronglyTypedId](../reference/converters.md#limit-vogen-and-stronglytypedid).
+- **`InvalidCastException` for an id type made by Vogen or StronglyTypedId.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and such a type has no method marked so.  See [Vogen and StronglyTypedId](../reference/converters.md#limit-vogen-and-stronglytypedid).
 
 <a id="wrong-model"></a>
 

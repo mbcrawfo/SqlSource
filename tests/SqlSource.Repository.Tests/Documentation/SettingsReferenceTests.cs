@@ -13,11 +13,12 @@ namespace SqlSource.Repository.Tests.Documentation;
 
 // The table of site/reference/settings.md#all-settings, the matrix, is where a user looks up every place a setting can
 // be written.  These tests fail when a key of the settings file's schema, a marker that is a setting, or an MSBuild
-// property of the project has no row of it or has two, when its key column holds a name the schema does not, when its
-// file header and query columns disagree with where the parser lets a marker stand, or when an <a id="setting-...">
-// of the manual is linked by no row or by two.  They also fail when a marker has no row of the marker index of
-// site/reference/sql-files.md, a generator parameter no row and no section of site/reference/generator-parameters.md,
-// or one of the five properties no row of site/reference/msbuild.md#properties.  They check neither the defaults nor
+// property of the project has no row of it or has two, when its key column holds a name the schema does not or its
+// MSBuild property column a property that the test's list does not, when its file header and query columns disagree
+// with where the parser lets a marker stand, or when an <a id="setting-..."> of the manual is linked by no row or by
+// two.  They also fail when a marker has no row of the marker index of site/reference/sql-files.md, a generator
+// parameter no row, or no section with an h3 that names it, of site/reference/generator-parameters.md, or one of the
+// five properties no row of site/reference/msbuild.md#properties.  They check neither the defaults nor
 // the words of a row.  A finder that finds nothing fails too, so that a change to how a page is read cannot pass them
 // all by finding no row.
 public sealed partial class SettingsReferenceTests
@@ -170,12 +171,34 @@ public sealed partial class SettingsReferenceTests
         var noRow = GeneratorParameterNames
             .All.Where(name => !cells.Any(cell => cell.Contains($"[`{name}`](#gp-{name})", StringComparison.Ordinal)))
             .ToList();
-        var noSection = GeneratorParameterNames
-            .All.Where(name => !lines.Contains($"<a id=\"gp-{name}\"></a>"))
-            .ToList();
+        var noSection = GeneratorParameterNames.All.Where(name => !HasSection(lines, name)).ToList();
 
         noRow.ShouldBeEmpty($"Each generator parameter has a row of the table of {GeneratorParametersPage}");
-        noSection.ShouldBeEmpty($"Each generator parameter has an <a id=\"gp-<name>\"> of {GeneratorParametersPage}");
+        noSection.ShouldBeEmpty(
+            $"Each generator parameter has an <a id=\"gp-<name>\"> of {GeneratorParametersPage}, and an h3 under it "
+                + "that names it"
+        );
+    }
+
+    // Whether the page has the line <a id="gp-<name>">, and the first line after it that is neither blank nor another
+    // anchor is an h3 that holds the name in code font: sort-input and sort-output share one heading, with both anchors
+    // above it.
+    private static bool HasSection(string[] lines, string name)
+    {
+        var at = Array.IndexOf(lines, $"<a id=\"gp-{name}\"></a>");
+        if (at < 0)
+        {
+            return false;
+        }
+
+        var next = lines
+            .Skip(at + 1)
+            .FirstOrDefault(static line =>
+                line.Trim().Length > 0 && !line.StartsWith("<a id=", StringComparison.Ordinal)
+            );
+        return next is not null
+            && next.StartsWith("### ", StringComparison.Ordinal)
+            && next.Contains($"`{name}`", StringComparison.Ordinal);
     }
 
     [Fact]
@@ -194,8 +217,15 @@ public sealed partial class SettingsReferenceTests
         var cells = Matrix().Select(static row => Code(row[MsBuildColumn])).ToList();
 
         var notOnce = NotInExactlyOneRow(ProjectProperties, name => cells.Count(cell => cell.Contains(name)));
+        var unknown = cells
+            .SelectMany(static cell => cell)
+            .Where(static name => !ProjectProperties.Contains(name))
+            .ToList();
 
         notOnce.ShouldBeEmpty("Each property is in the MSBuild property cell of exactly one row");
+        unknown.ShouldBeEmpty(
+            "The MSBuild property column of the matrix holds only the properties of this test's list"
+        );
     }
 
     [Fact]
