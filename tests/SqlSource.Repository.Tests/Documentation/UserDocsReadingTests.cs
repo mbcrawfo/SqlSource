@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Linq;
 using Shouldly;
 using Xunit;
@@ -13,6 +15,66 @@ public sealed class UserDocsReadingTests
         UserDocs
             .Read(["# Title", "## Same", "## Same", "## Same"])
             .AnchorSet.ShouldBe(["title", "same", "same-1", "same-2"], ignoreOrder: true);
+
+    // Fails when a docfx tab heading gives an anchor or a link, or is not kept as a tab.
+    [Fact]
+    public void Anchors_TabGroup_GiveNoAnchorAndNoLink()
+    {
+        var document = UserDocs.Read([
+            "# Title",
+            "# [PostgreSQL](#tab/postgres)",
+            "Text.",
+            "",
+            "# [SQL Server](#tab/mssql)",
+            "Text.",
+            "",
+            "---",
+        ]);
+
+        document.AnchorSet.ShouldBe(["title"]);
+        document.LinkList.ShouldBeEmpty();
+        document.Unsupported.ShouldBeEmpty();
+        document.TabList.ShouldBe([(2, "postgres"), (5, "mssql")]);
+    }
+
+    // Fails when a tab id with a slash, as docfx allows, is not read as a tab.
+    [Fact]
+    public void Anchors_TabHeadingWithAPathId_IsATab()
+    {
+        var document = UserDocs.Read(["# [Linux](#tab/linux/x64)"]);
+
+        document.AnchorSet.ShouldBeEmpty();
+        document.TabList.ShouldBe([(1, "linux/x64")]);
+    }
+
+    // Fails when a tab heading makes the next heading of the same words take a suffix.
+    [Fact]
+    public void Anchors_TabHeading_IsNotCountedForASuffix() =>
+        UserDocs.Read(["# [Same](#tab/a)", "# Same"]).AnchorSet.ShouldBe(["same"]);
+
+    // Fails when front matter gives a link, or moves the line numbers of what follows it.
+    [Fact]
+    public void FrontMatter_IsNotRead()
+    {
+        var document = UserDocs.Read(["---", "title: Start", "[a](b.md)", "---", "# Title", "[c](d.md)"]);
+
+        document.AnchorSet.ShouldBe(["title"]);
+        document.LinkList.ShouldBe([(6, "d.md")]);
+        document.Unsupported.ShouldBeEmpty();
+    }
+
+    // Fails when a first line of three dashes with no closing line hides the rest of the page.
+    [Fact]
+    public void FrontMatter_WithNoClosingLine_IsText() =>
+        UserDocs.Read(["---", "[a](b.md)"]).LinkList.ShouldBe([(2, "b.md")]);
+
+    // Fails when a rule directly under a paragraph of a tab is not reported, though Markdown reads it as a heading.
+    [Fact]
+    public void Unsupported_RuleUnderAParagraphOfATab_IsReported() =>
+        UserDocs
+            .Read(["# [PostgreSQL](#tab/postgres)", "Text.", "---"])
+            .Unsupported.Select(form => form.Line)
+            .ShouldBe([3]);
 
     [Theory]
     [InlineData("""<a id="one"></a>""", "one")]
@@ -131,7 +193,7 @@ public sealed class UserDocsReadingTests
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md#x", "README.md", "x")]
     [InlineData("https://github.com/mbcrawfo/SqlSource/tree/main/site/", "site", "")]
     [InlineData("https://GitHub.com/MBCrawfo/sqlsource/blob/main/LICENSE", "LICENSE", "")]
-    [InlineData("../site/README.md#y", "site/README.md", "y")]
+    [InlineData("../site/index.md#y", "site/index.md", "y")]
     [InlineData("#z", "site/page.md", "z")]
     public void Resolve_LinkToThisRepository_GivesItsPathAndAnchor(string target, string path, string anchor) =>
         UserDocs.Resolve("site/page.md", target).ShouldBe((path, anchor));
@@ -174,30 +236,38 @@ public sealed class UserDocsReadingTests
 
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc024", "site/diagnostics.md", "sqlsrc024")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/#find-what-you-need", "site/index.md", "find-what-you-need")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/index.md", "")]
     [InlineData(
-        "https://mbcrawfo.github.io/SqlSource/README.html#what-works-today",
-        "site/README.md",
-        "what-works-today"
+        "https://mbcrawfo.github.io/SqlSource/reference/cli.html#exit-codes",
+        "site/reference/cli.md",
+        "exit-codes"
     )]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/", "site/README.md", "")]
+    [InlineData(
+        "https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/types.html",
+        "site/reference/databases/postgresql/types.md",
+        ""
+    )]
     public void Resolve_SiteUrl_IsThePageOfSite(string target, string path, string anchor)
     {
         UserDocs.IsSiteLink(target).ShouldBeTrue();
         UserDocs.Resolve("README.md", target).ShouldBe((path, anchor));
     }
 
-    // The root is a redirect to README.html that drops the anchor, and the site has no folders and no page that is
-    // not built from a .md file.
+    // The site has no page that is not built from a .md file, and only one spelling of its address.
     [Theory]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/#what-works-today")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.md")]
-    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
-    [InlineData("https://mbcrawfo.github.io/SqlSource#what-works-today")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/reference/")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/reference/cli")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource#find-what-you-need")]
     [InlineData("https://mbcrawfo.github.io/SqlSource")]
     [InlineData("http://mbcrawfo.github.io/SqlSource/tool.html")]
     [InlineData("http://mbcrawfo.github.io/SqlSource/")]
     [InlineData("HTTPS://MBCRAWFO.GITHUB.IO/SqlSource/tool.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/../README.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/./tool.html")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/../tool.html")]
     public void SiteLinkProblem_NotAPageOfTheSite_IsReported(string target)
     {
         UserDocs.IsSiteLink(target).ShouldBeTrue();
@@ -212,8 +282,90 @@ public sealed class UserDocsReadingTests
 
     [Theory]
     [InlineData("https://mbcrawfo.github.io/SqlSource/")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/#find-what-you-need")]
     [InlineData("https://mbcrawfo.github.io/SqlSource/tool.html#exit-codes")]
+    [InlineData("https://mbcrawfo.github.io/SqlSource/sub/tool.html")]
     [InlineData("https://github.com/mbcrawfo/SqlSource/blob/main/README.md")]
     public void SiteLinkProblem_APageOrAnotherSite_IsNone(string target) =>
         UserDocs.SiteLinkProblem(target).ShouldBeNull();
+
+    // Fails when PagesUnder does not recurse, leaves out site/index.md, a nested index.md or a page of a folder, or
+    // lists an AGENTS.md or a CLAUDE*.md.
+    [Fact]
+    public void PagesUnder_AFolder_ListsEveryPageButTheOnesOfAnAgent()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            foreach (
+                var file in new[]
+                {
+                    "site/a/b/c.md",
+                    "site/reference/databases/index.md",
+                    "site/top.md",
+                    "site/index.md",
+                    "site/AGENTS.md",
+                    "site/sub/AGENTS.md",
+                    "site/CLAUDE.local.md",
+                    "site/sub/CLAUDE.md",
+                    "site/sub/image.png",
+                    "docs/outside.md",
+                }
+            )
+            {
+                var path = Path.Combine(root, file);
+                _ = Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, "");
+            }
+
+            UserDocs
+                .PagesUnder(Path.Combine(root, "site"))
+                .ShouldBe(["site/a/b/c.md", "site/index.md", "site/reference/databases/index.md", "site/top.md"]);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    // Fails when Exists accepts a path of another case, a path through a file, or rejects the exact one.  On a disk
+    // that ignores case a plain File.Exists finds `site/Tool.md` for `site/tool.md`, as GitHub does not.
+    [Theory]
+    [InlineData("site/Tool.md", true)]
+    [InlineData("site/Tool.md/", true)]
+    [InlineData("site", true)]
+    [InlineData("site/sub", true)]
+    [InlineData("site/sub/Page.md", true)]
+    [InlineData("site/tool.md", false)]
+    [InlineData("site/TOOL.md", false)]
+    [InlineData("Site/Tool.md", false)]
+    [InlineData("SITE", false)]
+    [InlineData("site/Sub/Page.md", false)]
+    [InlineData("site/sub/page.md", false)]
+    [InlineData("site/Tool.md/x", false)]
+    [InlineData("site/missing.md", false)]
+    public void Exists_Path_NeedsItsExactCase(string path, bool exists)
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            _ = Directory.CreateDirectory(Path.Combine(root, "site", "sub"));
+            File.WriteAllText(Path.Combine(root, "site", "Tool.md"), "");
+            File.WriteAllText(Path.Combine(root, "site", "sub", "Page.md"), "");
+
+            UserDocs.Exists(root, path).ShouldBe(exists);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    // Fails when the real repository's Exists is a plain File.Exists: `site/Tool.md` is not a file, `site/tool.md` is.
+    [Fact]
+    public void Exists_OfTheRepository_NeedsTheCaseOfTheFile()
+    {
+        UserDocs.Exists("site/tool.md").ShouldBeTrue();
+        UserDocs.Exists("site/Tool.md").ShouldBeFalse();
+    }
 }

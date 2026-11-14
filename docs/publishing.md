@@ -25,7 +25,7 @@ Packages go to nuget.org through [trusted publishing](https://learn.microsoft.co
 
 1. Set `VersionPrefix` in `Directory.Build.props` to the version being released.  If that changes it, run `tools/describe-end-to-end.sh` in the same pull request, as step 7 says.
 2. In the same pull request, record the diagnostics the release ships.  Move every entry of `src/SqlSource/AnalyzerReleases.Unshipped.md` to `src/SqlSource/AnalyzerReleases.Shipped.md`, under a new `## Release <version>` heading, keeping the `### New Rules`, `### Removed Rules` and `### Changed Rules` tables as they are.  Leave the unshipped file with its two header lines only.  Skip this when the unshipped file has no entries.  Nothing checks that it was done, and a release that skips it makes the next removal or change of a diagnostic impossible to record correctly.
-3. For the first stable release only, in the same pull request, take the `--prerelease` flags and the sentences that explain them out of `README.md`, `src/SqlSource.Tool/README.md`, `examples/PostgresExamples/README.md`, `examples/SqlServerExamples/README.md` and `site/` (`git grep -- --prerelease` finds them), switch the NuGet badge of `README.md` from `nuget/vpre` to `nuget/v` if it should show releases alone, and take out the rule of `schemas/AGENTS.md` that lets `settings-v1.schema.json` and `sidecar-v1.schema.json` change in place before the first stable release, with the paragraph of `docs/architecture/sidecar-format.md`'s compatibility that says the same.
+3. For the first stable release only, in the same pull request, switch the NuGet badge of `README.md` from `nuget/vpre` to `nuget/v` if it should show releases alone, and take out the rule of `schemas/AGENTS.md` that lets `settings-v1.schema.json` and `sidecar-v1.schema.json` change in place before the first stable release, with the paragraph of `docs/architecture/sidecar-format.md`'s compatibility that says the same.
 4. Merge that to `main`.
 5. Tag the merged commit and push the tag:
 
@@ -59,6 +59,8 @@ gh workflow run docs.yml --ref main
 ```
 
 It builds the branch it runs on, so a run on `main` between releases publishes pages that may describe what is not released yet.  It is not the way to keep the site current between releases.
+
+One exception holds until the documentation overhaul closes (`docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`).  Each of its phases 3 to 11 changes the pages of the site or the links of `README.md` and `src/SqlSource.Tool/README.md` to them.  The readmes on `main` can then link to pages that the published site does not have.  So after each of those pull requests merges, and once more when the overhaul closes, run `docs.yml` on `main` by hand.  The pull request that closes the overhaul takes this paragraph out.
 
 ### External configuration
 

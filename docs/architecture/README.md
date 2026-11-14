@@ -1,6 +1,6 @@
 # Architecture
 
-These pages explain how SqlSource's code works and how its parts hand work to each other, for a developer who needs to understand a component before changing it.  What a user writes and sees is in [the manual](../../site/README.md), and the rules for editing a folder's code are in the `AGENTS.md` beside it.
+These pages explain how SqlSource's code works and how its parts hand work to each other, for a developer who needs to understand a component before changing it.  What a user writes and sees is in [the manual](../../site/index.md), and the rules for editing a folder's code are in the `AGENTS.md` beside it.
 
 ## Components
 

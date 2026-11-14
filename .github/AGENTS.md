@@ -19,10 +19,11 @@
 
 ## Workflows
 
-- **The check steps in `workflows/build.yml` mirror `pre-commit-validation.sh`.**  A check added to or removed from one is added to or removed from the other in the same commit.  The steps `Pull test images`, `Build PostGIS image` and `Check the tests built no PostGIS image` of the `build` job and the jobs `Test on PostgreSQL 14` and `Test on SQL Server 2017` are the ones the script has no counterpart for.
+- **The check steps in `workflows/build.yml` mirror `pre-commit-validation.sh`.**  A check added to or removed from one is added to or removed from the other in the same commit.  The steps `Pull test images`, `Build PostGIS image` and `Check the tests built no PostGIS image` of the `test` matrix and the jobs `Test on PostgreSQL 14` and `Test on SQL Server 2017` are the ones the script has no counterpart for.
 - CI runs every check on every change; the skips of a plain script run are local, so a trigger added to the script is no change to the workflow.
 - A check that needs only Docker goes in the `lint` job.  One that needs the .NET SDK goes in the job whose build it shares, or in a job of its own when it would make that job the slowest.
-- **No job of `workflows/build.yml` `needs` another**, so the `packages` artifact can exist in a run whose lint or tests failed: anything that consumes it must `needs` the whole `build.yml` call, as `publish.yml` does, never a single job inside it.
+- **No job of `workflows/build.yml` `needs` another but `coverage`**, which needs the `test` matrix for its `cobertura-*` artifacts.  So the `packages` artifact can exist in a run whose lint or tests failed: anything that consumes it must `needs` the whole `build.yml` call, as `publish.yml` does, never a single job inside it.
+- **Every test project of `SqlSource.slnx` is named by a leg of the `test` matrix of `workflows/build.yml`, or listed in `NightlyOnly` of `tests/SqlSource.Repository.Tests/CiTestProjectsTests.cs`**, which fails otherwise: CI runs no `dotnet test --solution`.
 - **Every `--report-github` comes with `--report-github-summary-include-passed false`.**  A step's summary holds 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it; the passed tests of the solution alone are past the limit.
 - **The allocation tests of `tests/DatabaseTests/QueryMethodAllocation` run only in the `allocation-postgres` and `allocation-sqlserver` jobs of `workflows/nightly.yml`**, each passing `-p:RunQueryMethodAllocation=true` and filtering to one engine's namespace, without coverage, since the collector allocates in the process they measure; no step of `workflows/build.yml` runs them, and the two jobs run the default images alone.
 - **The comparisons of `tests/DatabaseTests/Postgres.SyncAsync` and `tests/DatabaseTests/SqlServer.SyncAsync` run only in the `sync-async-postgres` and `sync-async-sqlserver` jobs of `workflows/nightly.yml`**, each passing `-p:RunSyncAsync=true`, without coverage, on the default image alone; no step of `workflows/build.yml` runs them.
@@ -36,6 +37,7 @@
   - Find the pull request from the event, never from the artifact.
   - It is bound to three names: `name: CI` in `workflows/ci.yml`, the `coverage` artifact that `workflows/build.yml` uploads, and `SummaryGithub.md` inside it.  Change one and change the workflow in the same commit.
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
+- **Local actions live in `.github/actions/<name>/action.yml`**, and a job checks out the repository before it uses one.  `postgis-image` is the one way a job gets the PostGIS image; it never builds after a load from the cache, since BuildKit's cache does not hold a loaded image, so the jobs of `workflows/nightly.yml` pass `use-cache: false` to build it every night.
 - Fold workflow lines over the 120-character `.editorconfig` limit with `>-` or `\`.
 - Run `tools/actionlint.sh` after any change.  A change to `publish.yml` or `coverage-comment.yml` is never exercised before merge: a manual run of `publish.yml` on a branch skips every job, and a pull request runs the `coverage-comment.yml` on `main`, so actionlint and a careful read are the only checks; say in the pull request that the change is untried.
 

@@ -19,21 +19,6 @@ public sealed partial class AgentsFileTests
 
     private const int MaxRootBytes = 16 * 1024;
 
-    // The folders that hold no AGENTS.md of this repository: git's, the worktrees and settings of local tools, and
-    // what a build or a test run writes.
-    private static readonly HashSet<string> SkippedFolders =
-    [
-        with(StringComparer.Ordinal),
-        ".git",
-        ".claude",
-        ".vs",
-        ".idea",
-        "bin",
-        "obj",
-        "node_modules",
-        "TestResults",
-    ];
-
     // The repository-relative paths, with '/', of every AGENTS.md.
     private static readonly IReadOnlyList<string> Files =
     [
@@ -124,7 +109,7 @@ public sealed partial class AgentsFileTests
         foreach (var child in Directory.EnumerateDirectories(folder))
         {
             var name = Path.GetFileName(child);
-            if (SkippedFolders.Contains(name))
+            if (RepositoryFolders.Skipped.Contains(name))
             {
                 continue;
             }

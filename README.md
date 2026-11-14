@@ -4,23 +4,21 @@
 
 SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files, and generates the C# that uses it: for a query that your database has described, a type for its parameters, a type for its rows and a method that runs it, and for any other query a constant that holds it.  SQL in a file of its own is cleaner than SQL in a C# string: your editor highlights it, SQL linters and formatters work on it, and it is easy to find when you search for a table or a column.  A query that is renamed or removed is a compile error where it is used, and so is a column that your code reads and the query no longer returns, and your editor shows a query's SQL wherever it is used.  With PostgreSQL or SQL Server, the `sqlsource` tool checks every query against your database's schema, and records what the database says of its parameters and columns, from which the types and the methods are generated.
 
-**Status:** SqlSource is in early development.  Its tool asks a PostgreSQL or SQL Server database about each query's parameters and columns, which SqlSource calls describing the query.  From that description the build generates a model for each query's parameters and rows, which turns a column that does not match your code into a build error, and a method of your repository class that opens a connection, runs the query and reads its rows into the model, with an interface of those methods to fake in tests.  For a query you run yourself it generates a constant, or a method that fills in a `{{token}}` chosen at run time.  On a machine with a connection to your database, the build runs the tool itself before it compiles, and the tool can describe each query as you save it.  [What works today](https://mbcrawfo.github.io/SqlSource/README.html#what-works-today) has the full list.
-
-**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see [database support](https://mbcrawfo.github.io/SqlSource/dialects.html#database-support).  So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models).
+**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries, in which the `sqlsource` tool asks your database about each query's parameters and columns, works with PostgreSQL 14 or later, and with SQL Server 2017 or later and Azure SQL, which is accepted and not tested; other databases are not described: see [database support](https://mbcrawfo.github.io/SqlSource/reference/databases/index.html#database-support).  So with PostgreSQL or SQL Server, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 3 and set the output to `sql`, which gives you a constant for each query and needs no description, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  To run the queries yourself, through Dapper or your own ADO.NET code, see [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models).
 
 ## Installation
 
-Until the first release the packages are previews, so the commands include `--prerelease`.  In the folder of each project that has queries:
+In the folder of each project that has queries:
 
 ```console
-$ dotnet add package SqlSource --prerelease
+$ dotnet add package SqlSource
 ```
 
 Once, at the root of your repository, to install the tool (skip the first command if the repository already has a tool manifest):
 
 ```console
 $ dotnet new tool-manifest
-$ dotnet tool install SqlSource.Tool --prerelease
+$ dotnet tool install SqlSource.Tool
 ```
 
 - **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, and the attributes you mark your types and converters with, their enums and the exception its methods throw, are compiled into your project.
@@ -55,7 +53,7 @@ ORDER BY name;
 - **`@id`** is a query parameter.  It stays in the SQL as written, and you give its value when you run the query.
 - **`-- param:`** gives a parameter a type, in your database's own words, and says whether it can be null.  Add one where it helps: here it gives `@name` the type that PostgreSQL cannot work out from `@name IS NULL`, and says that it may be null.  `text` is PostgreSQL's word; SQL Server would say `nvarchar(100)`.  Without one, the database works out the type from how the parameter is used.
 
-More: [the marker index](https://mbcrawfo.github.io/SqlSource/sql-files.html#marker-index), which lists every `-- word:` line that SqlSource reads, [the SQL your editor shows](https://mbcrawfo.github.io/SqlSource/generator.html#intellisense), [result shapes](https://mbcrawfo.github.io/SqlSource/sql-files.html#result-shapes), [parameters and tokens](https://mbcrawfo.github.io/SqlSource/parameters-and-tokens.html).
+More: [the marker index](https://mbcrawfo.github.io/SqlSource/reference/sql-files.html#marker-index), which lists every `-- word:` line that SqlSource reads, [the SQL your editor shows](https://mbcrawfo.github.io/SqlSource/generator.html#intellisense), [result shapes](https://mbcrawfo.github.io/SqlSource/reference/sql-files.html#result-shapes), [parameters and tokens](https://mbcrawfo.github.io/SqlSource/reference/parameters.html).
 
 ### 2. Mark a partial type
 
@@ -84,7 +82,7 @@ Save this as `sqlsource.json`, beside your project file:
 }
 ```
 
-A settings file applies to the `.sql` files of its folder and of every folder below it, so this one reads every `.sql` file of the project as PostgreSQL.  Databases disagree about where a comment or a string ends, and SqlSource takes the comments out of your SQL, so it reads each file by the rules of your database: its dialect.  The dialect also tells the tool which database to ask.  The default is `ansi`; set the one named for your database, such as `postgres` (PostgreSQL), `mssql` (SQL Server), `mysql` or `sqlite`.  More: [choosing a dialect](https://mbcrawfo.github.io/SqlSource/dialects.html#choosing-a-dialect), [settings files](https://mbcrawfo.github.io/SqlSource/settings.html#settings-files), [settings](https://mbcrawfo.github.io/SqlSource/settings.html#all-settings) for everything else you can set for a project, a folder or one query.
+A settings file applies to the `.sql` files of its folder and of every folder below it, so this one reads every `.sql` file of the project as PostgreSQL.  Databases disagree about where a comment or a string ends, and SqlSource takes the comments out of your SQL, so it reads each file by the rules of your database: its dialect.  The dialect also tells the tool which database to ask.  The default is `ansi`; set the one named for your database, such as `postgres` (PostgreSQL), `mssql` (SQL Server), `mysql` or `sqlite`.  More: [choosing a dialect](https://mbcrawfo.github.io/SqlSource/reference/dialects.html#choosing-a-dialect), [settings files](https://mbcrawfo.github.io/SqlSource/settings.html#settings-files), [settings](https://mbcrawfo.github.io/SqlSource/settings.html#all-settings) for everything else you can set for a project, a folder or one query.
 
 ### 4. Use the queries
 
@@ -180,7 +178,7 @@ Follow steps 1 to 3, set the output to `sql`, and skip the tool.  For a SQL Serv
 - **`sql` asks for each query's SQL and nothing else**: its constant, or, for a query with a `{{token}}`, a method that fills it in, which you run as [Only want to generate models?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models) shows, without the models.  It needs no database, no tool and no sidecar.  It tells the tool to leave these queries out, so a run on the project reports nothing for them, and the build to need no sidecar for them and to generate no models.  Without it the default output, `repository`, asks for every query to be described, and for a method that runs it, and the build reports an error for each file or query that is not.
 - **Any dialect works**: `mssql` for SQL Server, `mysql`, `sqlite`, the default `ansi` and the others.  Set the one named for your database, so that SqlSource reads your comments and strings as your database does.
 
-More: [output](https://mbcrawfo.github.io/SqlSource/settings.html#setting-output), [database support](https://mbcrawfo.github.io/SqlSource/dialects.html#database-support).
+More: [output](https://mbcrawfo.github.io/SqlSource/settings.html#setting-output), [database support](https://mbcrawfo.github.io/SqlSource/reference/databases/index.html#database-support).
 
 ## FAQ
 
@@ -221,11 +219,11 @@ A `.sql` file that no `[SqlSourceGenerate]` type claims is not read, so scripts 
 
 ### How do I choose a table name at run time?
 
-Write a token with a default, `{{table:orders}}`, where the name goes.  The query becomes a method that takes the text to put there.  The default is only a sample that the tool describes the query with; a query whose output is `sql` needs none.  Nothing is escaped, so pass only text that your own code chooses, never a value a user typed.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#table-name-at-run-time) and [tokens](https://mbcrawfo.github.io/SqlSource/parameters-and-tokens.html#tokens).
+Write a token with a default, `{{table:orders}}`, where the name goes.  The query becomes a method that takes the text to put there.  The default is only a sample that the tool describes the query with; a query whose output is `sql` needs none.  Nothing is escaped, so pass only text that your own code chooses, never a value a user typed.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#table-name-at-run-time) and [tokens](https://mbcrawfo.github.io/SqlSource/reference/tokens.html#tokens).
 
 ### Can I pass a list to `IN`?
 
-Yes: write the parameter directly after `IN`, with no parentheses, `WHERE id IN @ids`.  Its property in the input model is an `IEnumerable<int>`, which takes an array, a `List<int>` or any other sequence, and the query method sends a parameter for each value, on PostgreSQL and on SQL Server.  `(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#filter-by-a-list) and [list parameters](https://mbcrawfo.github.io/SqlSource/parameters-and-tokens.html#list-parameters).
+Yes: write the parameter directly after `IN`, with no parentheses, `WHERE id IN @ids`.  Its property in the input model is an `IEnumerable<int>`, which takes an array, a `List<int>` or any other sequence, and the query method sends a parameter for each value, on PostgreSQL and on SQL Server.  `(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#filter-by-a-list) and [list parameters](https://mbcrawfo.github.io/SqlSource/reference/parameters.html#list-parameters).
 
 ### My test project sees the internals of my main project
 
@@ -285,7 +283,7 @@ Where two columns of one database type need two C# types, `users.id` a `UserId` 
 -- param: @author -> UserId
 ```
 
-A C# type may be written by its short name, `UserId`, wherever SqlSource takes one, when the project and its references have one type of that name that the project can see; the generated code writes its full name.  See [column types](https://mbcrawfo.github.io/SqlSource/settings.html#setting-column-types) and [giving a parameter a type](https://mbcrawfo.github.io/SqlSource/parameters-and-tokens.html#param-marker).
+A C# type may be written by its short name, `UserId`, wherever SqlSource takes one, when the project and its references have one type of that name that the project can see; the generated code writes its full name.  See [column types](https://mbcrawfo.github.io/SqlSource/settings.html#setting-column-types) and [giving a parameter a type](https://mbcrawfo.github.io/SqlSource/reference/parameters.html#param-marker).
 
 ## Where to next
 
@@ -294,8 +292,8 @@ A C# type may be written by its short name, `UserId`, wherever SqlSource takes o
 | Run a query, in a transaction, and know what its method returns and throws | [Query methods](https://mbcrawfo.github.io/SqlSource/generator.html#query-methods) |
 | Give a repository its connection another way, or use several databases | [A repository's connection](https://mbcrawfo.github.io/SqlSource/generator.html#repository-connection) |
 | Configure one part of a project differently | [Configure one folder differently](https://mbcrawfo.github.io/SqlSource/settings.html#configure-a-folder) |
-| Look up a marker or a setting | [The marker index](https://mbcrawfo.github.io/SqlSource/sql-files.html#marker-index), [all settings](https://mbcrawfo.github.io/SqlSource/settings.html#all-settings) |
-| Use SQL Server, or another database | [SQL Server](https://mbcrawfo.github.io/SqlSource/sqlserver.html), [database support](https://mbcrawfo.github.io/SqlSource/dialects.html#database-support) |
+| Look up a marker or a setting | [The marker index](https://mbcrawfo.github.io/SqlSource/reference/sql-files.html#marker-index), [all settings](https://mbcrawfo.github.io/SqlSource/settings.html#all-settings) |
+| Use SQL Server, or another database | [SQL Server](https://mbcrawfo.github.io/SqlSource/sqlserver.html), [database support](https://mbcrawfo.github.io/SqlSource/reference/databases/index.html#database-support) |
 | Keep the sidecars current after a schema change | [After a schema change](https://mbcrawfo.github.io/SqlSource/tool.html#after-a-schema-change) |
 | Set up CI | [Check in CI](https://mbcrawfo.github.io/SqlSource/tool.html#check-in-ci), [a GitHub Actions job](https://mbcrawfo.github.io/SqlSource/recipes.html#check-sidecars-in-ci) |
 | Look up a build error or a tool error | [Diagnostics](https://mbcrawfo.github.io/SqlSource/diagnostics.html) |

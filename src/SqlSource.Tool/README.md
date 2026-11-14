@@ -4,11 +4,11 @@ The `sqlsource` command of [SqlSource](https://github.com/mbcrawfo/SqlSource/blo
 
 ## Install
 
-Install it as a local tool, from the root of your repository, at the version of the `SqlSource` package your projects use (skip the first command if the repository already has a tool manifest).  Until the first release the package is a preview, so the command includes `--prerelease`:
+Install it as a local tool, from the root of your repository, at the version of the `SqlSource` package your projects use (skip the first command if the repository already has a tool manifest).
 
 ```console
 $ dotnet new tool-manifest
-$ dotnet tool install SqlSource.Tool --prerelease
+$ dotnet tool install SqlSource.Tool
 ```
 
 ## Use

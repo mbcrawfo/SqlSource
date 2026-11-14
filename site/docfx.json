@@ -2,7 +2,7 @@
   "build": {
     "content": [
       {
-        "files": ["*.md", "toc.yml"],
+        "files": ["**/*.md", "**/toc.yml"],
         "exclude": ["**/AGENTS.md", "**/CLAUDE*.md"]
       }
     ],
