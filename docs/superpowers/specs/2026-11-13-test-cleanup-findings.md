@@ -914,7 +914,7 @@ None.  The one finding left at **needs measurement** was measured again and conf
 
 ## Tests that stay as cover
 
-294 tests, each named as cover by a confirmed **delete**, **fold** or **demote** in a phase, with the findings that lean on it.  None may be removed, nor lose the rows that make it a cover, while those findings stand; a phase that changes one keeps what makes it a cover.
+293 tests, each named as cover by a confirmed **delete**, **fold** or **demote** in a phase, with the findings that lean on it.  None may be removed, nor lose the rows that make it a cover, while those findings stand; a phase that changes one keeps what makes it a cover.
 
 - `tests/DatabaseTests/Postgres.Npgsql8/AllTypesQueryTests.cs`
   - `AllTypesQueryTests.Int4Array_LazySequence_IsEnumeratedOnce`: F-DatabaseTests.Postgres.Npgsql8-1-01 (phase 88)
