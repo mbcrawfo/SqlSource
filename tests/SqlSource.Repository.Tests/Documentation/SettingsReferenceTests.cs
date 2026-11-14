@@ -12,15 +12,15 @@ using Xunit;
 namespace SqlSource.Repository.Tests.Documentation;
 
 // The table of site/reference/settings.md#all-settings, the matrix, is where a user looks up every place a setting can
-// be written.  These tests fail when a key of the settings file's schema, a marker that is a setting, or an MSBuild
-// property of the project has no row of it or has two, when its key column holds a name the schema does not or its
-// MSBuild property column a property that the test's list does not, when its file header and query columns disagree
-// with where the parser lets a marker stand, or when an <a id="setting-..."> of the manual is linked by no row or by
-// two.  They also fail when a marker has no row of the marker index of site/reference/sql-files.md, a generator
-// parameter no row, or no section with an h3 that names it, of site/reference/generator-parameters.md, or one of the
-// five properties no row of site/reference/msbuild.md#properties.  They check neither the defaults nor
-// the words of a row.  A finder that finds nothing fails too, so that a change to how a page is read cannot pass them
-// all by finding no row.
+// be written.  These tests fail when a key of the settings file's schema, a marker that is a setting, or a property of
+// the test's list of MSBuild properties has no row of the matrix or has two; when its key column holds a name the
+// schema does not, or its MSBuild property column a property the list does not; when its file header and query columns
+// disagree with where the parser lets a marker stand; or when an <a id="setting-..."> of the manual is linked by no row
+// or by two.  They also fail when a marker has no row of the marker index of site/reference/sql-files.md, a generator
+// parameter no row, or no section with an h3 that names it, of site/reference/generator-parameters.md, and a property
+// of the list no row of site/reference/msbuild.md#properties, or no read in the package's build files.  They check
+// neither the defaults nor the words of a row.  A finder that finds nothing fails too, so that a change to how a page
+// is read cannot pass them all by finding no row.
 public sealed partial class SettingsReferenceTests
 {
     private const string SettingsPage = "site/reference/settings.md";
@@ -199,6 +199,29 @@ public sealed partial class SettingsReferenceTests
         return next is not null
             && next.StartsWith("### ", StringComparison.Ordinal)
             && next.Contains($"`{name}`", StringComparison.Ordinal);
+    }
+
+    // Each name of the list is read by the package's build files, as $(Name), $(Name.Trim()) or a
+    // CompilerVisibleProperty, so that a property renamed there fails.  A new property there fails nothing: the list is
+    // this test's, and the documentation overhaul left out on purpose a classification of every property the build
+    // reads.
+    [Fact]
+    public void ProjectProperties_EachOne_IsReadByTheBuildFiles()
+    {
+        var build = string.Concat(
+            File.ReadAllText(RepositoryRoot.Path("src", "SqlSource", "build", "SqlSource.props")),
+            File.ReadAllText(RepositoryRoot.Path("src", "SqlSource", "build", "SqlSource.targets"))
+        );
+
+        var unread = ProjectProperties
+            .Where(name =>
+                !build.Contains($"$({name})", StringComparison.Ordinal)
+                && !build.Contains($"$({name}.", StringComparison.Ordinal)
+                && !build.Contains($"<CompilerVisibleProperty Include=\"{name}\"", StringComparison.Ordinal)
+            )
+            .ToList();
+
+        unread.ShouldBeEmpty("Each property of the list is read by SqlSource.props or SqlSource.targets");
     }
 
     [Fact]

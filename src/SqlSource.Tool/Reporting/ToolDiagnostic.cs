@@ -24,7 +24,7 @@ internal sealed record ToolDiagnostic(
     /// <summary>
     /// Whether the build's compiler does not report this error although it reports others of its descriptor.  A
     /// descriptor the compiler reports is left out of the build's run by default, so an error is marked only when the
-    /// compiler is known not to report it, as for the value of a <c>database</c> setting, which only the tool reads.
+    /// compiler is known not to report it, as for the value of a <c>database</c> setting, which only the tool checks.
     /// </summary>
     public bool IsNotReportedByTheCompiler { get; init; }
 

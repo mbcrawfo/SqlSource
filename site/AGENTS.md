@@ -9,7 +9,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 | Setting, as a settings-file key or a marker | A `setting-<name>` section on the reference page of what it changes; a row in the matrix of `reference/settings.md` | `SettingsReferenceTests` |
 | Marker | A row in the marker index of `reference/sql-files.md` | `SettingsReferenceTests` |
 | Generator parameter | `reference/generator-parameters.md`; the section of `SQLSRC109` | `SettingsReferenceTests`, `DiagnosticsDocumentTests` |
-| MSBuild property | A section of `reference/msbuild.md`, and a row in its table of `#properties` and in the matrix; its name in the list of `SettingsReferenceTests` | `SettingsReferenceTests`, once its list holds the name; a reviewer otherwise |
+| MSBuild property | A section on the reference page of what it changes; a row in `reference/msbuild.md#properties` and in the matrix; its name in the list of `SettingsReferenceTests` | `SettingsReferenceTests` |
 | Attribute, or a property of one | `reference/attributes.md` | A reviewer |
 | Command, option, environment variable, exit code | `reference/cli.md` | `CliReferenceTests`, for a command, an option and a `SQLSOURCE_` variable; a reviewer, for an exit code and another variable |
 | Diagnostic | A `## SQLSRCnnn` section of `diagnostics.md`, in id order | `DiagnosticsDocumentTests` |

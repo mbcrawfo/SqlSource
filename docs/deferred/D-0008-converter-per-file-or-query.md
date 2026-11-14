@@ -17,7 +17,7 @@ The research judged a converter per file a rare need, and naming one in the entr
 - **The grammar**: in a settings file, a member of `typeOverrides` or `columnTypes` whose value is an object, `{"type": "MyApp.Email", "converter": "MyApp.EmailConverter"}`, which needs no suffix; in a marker, a suffix after the C# type of the entry, with a character that the value allows, `|` for one, since `:` is taken by `global::` and `,` and `<>` by type arguments; `SQLSRC019` and `SQLSRC111` for a converter that is not valid.
 - **The levels**: `TypeOverride` gains the converter type, merged by the override's precedence, and `SQLSRC112` compares it.
 - **Resolution and use**: the converter type resolved as a mapped type is, its static methods read by `ConverterReader` and checked as `SQLSRC277`, and its edges used before the project's and the mapped type's for the properties that entry types, which `PropertyType` or the slice of `MethodsInput` must then carry.
-- **The manual**: the suffix in [type overrides](../../site/reference/type-mapping.md#setting-type-overrides) and [converters](../../site/reference/converters.md#converters), and the known issue removed.
+- **The manual**: the suffix in [type overrides](../../site/reference/type-mapping.md#setting-type-overrides) and [converters](../../site/reference/converters.md#converters), and its limit, `site/reference/converters.md#limit-one-conversion-per-type`, removed with its entry in `site/guides/troubleshooting.md`.
 
 ## Trigger
 
