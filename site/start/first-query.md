@@ -145,10 +145,18 @@ Use `TrustServerCertificate=True` only for a server of your own, such as SQL Ser
 
 Add `.env` to your `.gitignore` file, since it holds your password.
 
-Put the `.env` file in the folder of your project.  The tool does not read a `.env` file in a folder above that one.  If your `.env` file is at the root of your repository, the tool does not read it, and reports [SQLSRC213](../diagnostics.md#sqlsrc213).  To keep the file at the root, name it in two places, as [the build's `.env` file](../reference/msbuild.md#setting-env-file) shows:
+Put the `.env` file in the folder of your project.  The tool does not read a `.env` file in a folder above that one.  If your `.env` file is at the root of your repository, the tool does not read it, and reports [SQLSRC213](../diagnostics.md#sqlsrc213).  To keep the file at the root, name it in two places.  For the build, add this file at the root of your repository:
 
-- For the build, set `SqlSourceEnvFile` in `Directory.Build.props`.
-- For the tool, pass `--env-file`.
+```xml
+<!-- Directory.Build.props, at the root of the repository -->
+<Project>
+    <PropertyGroup>
+        <SqlSourceEnvFile>$(MSBuildThisFileDirectory).env</SqlSourceEnvFile>
+    </PropertyGroup>
+</Project>
+```
+
+For the tool, give the path of the file from the folder of your project.  If your project is one folder below the root, run `dotnet sqlsource describe --env-file ../.env` in step 5.
 
 <a id="describe"></a>
 
@@ -242,6 +250,6 @@ If your table `users` has only the columns `id`, `name` and `email`, in that ord
 
 A query in `Queries/UserRepository.sql`, its committed sidecar, and a class `UserRepository` whose method `GetUser` returns a row of your database.
 
-Rules: [queries and names](../reference/sql-files.md#queries-and-names), [result shapes](../reference/sql-files.md#result-shapes), [summaries](../reference/sql-files.md#summaries), [query parameters](../reference/parameters.md#query-parameters), [the attribute](../reference/attributes.md#attribute), [which file a class reads](../reference/attributes.md#setting-source), [the connection](../reference/repositories.md#repository-connection), [the dialect](../reference/settings.md#setting-dialect), [the logical database](../reference/settings.md#setting-database), [settings files](../reference/settings-file.md#settings-files), [the `.env` file](../reference/connections.md#env-file), connecting to [PostgreSQL](../reference/databases/postgresql/index.md#connecting) and [SQL Server](../reference/databases/sqlserver/index.md#connecting), [what describe does](../reference/describing.md#describe), [which queries are described](../reference/describing.md#which-queries), [sidecar files](../reference/sidecars.md#sidecar-files), [repository methods](../reference/repositories.md#repository-methods), [model names](../reference/models.md#model-names), [table models](../reference/models.md#table-models).
+Rules: [queries and names](../reference/sql-files.md#queries-and-names), [result shapes](../reference/sql-files.md#result-shapes), [summaries](../reference/sql-files.md#summaries), [query parameters](../reference/parameters.md#query-parameters), [the attribute](../reference/attributes.md#attribute), [which file a class reads](../reference/attributes.md#setting-source), [the connection](../reference/repositories.md#repository-connection), [the dialect](../reference/settings.md#setting-dialect), [the logical database](../reference/settings.md#setting-database), [settings files](../reference/settings-file.md#settings-files), [the `.env` file](../reference/connections.md#env-file), [the build's `.env` file](../reference/msbuild.md#setting-env-file), connecting to [PostgreSQL](../reference/databases/postgresql/index.md#connecting) and [SQL Server](../reference/databases/sqlserver/index.md#connecting), [what describe does](../reference/describing.md#describe), [which queries are described](../reference/describing.md#which-queries), [sidecar files](../reference/sidecars.md#sidecar-files), [repository methods](../reference/repositories.md#repository-methods), [model names](../reference/models.md#model-names), [table models](../reference/models.md#table-models).
 
 Next: [How SqlSource works](how-it-works.md)
