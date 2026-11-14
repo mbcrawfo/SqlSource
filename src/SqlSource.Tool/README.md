@@ -1,6 +1,6 @@
 # SqlSource.Tool
 
-`sqlsource describe`, the command of [SqlSource](https://github.com/mbcrawfo/SqlSource/blob/main/README.md), asks your database what the parameters and columns of each query are, and writes the answers to sidecar files beside your `.sql` files: see [what describe does](https://mbcrawfo.github.io/SqlSource/reference/describing.html#describe).  You commit the sidecar files with your project, since every build reads them.  The tool describes PostgreSQL and SQL Server queries.
+`sqlsource describe`, a command of the [SqlSource](https://github.com/mbcrawfo/SqlSource/blob/main/README.md) tool, asks your database about the parameters and columns of each query.  It writes the answers to sidecar files beside your `.sql` files: see [what describe does](https://mbcrawfo.github.io/SqlSource/reference/describing.html#describe).  You commit the sidecar files with your project, since every build reads them.  The tool describes PostgreSQL and SQL Server queries.
 
 ## Install
 
@@ -13,13 +13,13 @@ $ dotnet tool install SqlSource.Tool
 
 ## Use
 
-Give the tool the connection string of your database in a `.env` file, and keep that file out of git, since it holds your password:
+Give the tool the connection string of your database in a `.env` file:
 
 ```dotenv
 SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password=secret"
 ```
 
-Put the `.env` file in the folder of your project: the tool never reads a `.env` file in a folder above it.  See [the `.env` file](https://mbcrawfo.github.io/SqlSource/reference/connections.html#env-file).  Then run the tool from the folder of your project:
+Keep that file out of git, since it holds your password.  Put it in the folder of your project: the tool does not look for a `.env` file in a folder above it.  See [the `.env` file](https://mbcrawfo.github.io/SqlSource/reference/connections.html#env-file).  Then run the tool from the folder of your project:
 
 ```console
 $ dotnet sqlsource describe
@@ -30,7 +30,7 @@ $ dotnet sqlsource describe --watch
 
 - `describe` describes each query that is new or changed, and writes the sidecars.
 - `describe --force` describes every query again: run it after a change to your schema.
-- `describe --check` writes nothing, and fails when a sidecar is out of date: run it in CI.
+- `describe --check` writes nothing, and fails when a sidecar is missing or out of date: run it in CI.
 - `describe --watch` describes again each time you save a file: see [describe on save](https://mbcrawfo.github.io/SqlSource/guides/describe-on-save.html).
 
 [What describe does](https://mbcrawfo.github.io/SqlSource/reference/describing.html) has the rules of each.  A build with a connection runs `describe` itself before it compiles, and a build in CI never does: see [running in the build](https://mbcrawfo.github.io/SqlSource/reference/msbuild.html#running-in-the-build).

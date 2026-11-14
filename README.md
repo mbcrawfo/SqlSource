@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml?query=branch%3Amain) [![NuGet](https://img.shields.io/nuget/vpre/SqlSource.svg)](https://www.nuget.org/packages/SqlSource/)
 
-[SqlSource](https://mbcrawfo.github.io/SqlSource/) keeps the SQL of your C# project in `.sql` files, and generates the C# that runs it: a method, and records for its parameters and rows.  SQL in a file of its own is easier to work with: your editor highlights it, SQL tools format it, and a search finds it.  A renamed or removed query, or a column that your code reads and the query no longer returns, is a compile error.  With PostgreSQL or SQL Server, the `sqlsource` tool checks every query against your database's schema.
+[SqlSource](https://mbcrawfo.github.io/SqlSource/) keeps your SQL in `.sql` files and generates the C# that runs it: a method, and records for its parameters and rows.  SQL in a file of its own is easier to work with: your editor highlights it, SQL tools format it, and a search finds it.  A renamed or removed query, or a column that your code reads and the query no longer returns, is a compile error.  With PostgreSQL or SQL Server, the `sqlsource` tool checks every query against your database's schema.
 
 A query in `Queries/UserRepository.sql`, and the C# that calls it:
 
@@ -20,7 +20,7 @@ var users = new UserRepository(dataSource);
 GetUserDto? user = await users.GetUser(new GetUserParams(1));
 ```
 
-[Your first query](https://mbcrawfo.github.io/SqlSource/start/first-query.html) makes this pair, for PostgreSQL and for SQL Server.
+[Your first query](https://mbcrawfo.github.io/SqlSource/start/first-query.html) makes this pair, and its SQL Server form.
 
 ## Supported databases
 
@@ -52,7 +52,7 @@ Your project targets .NET 8 or later, and you build it with the .NET SDK 9.0.300
 1. [Write a query](https://mbcrawfo.github.io/SqlSource/start/first-query.html#write-a-query) in a `.sql` file, such as `Queries/UserRepository.sql`.
 2. [Mark a partial class](https://mbcrawfo.github.io/SqlSource/start/first-query.html#mark-a-partial-class) of the same name, in the same folder, with `[SqlSourceGenerate]`.
 3. [Name your database](https://mbcrawfo.github.io/SqlSource/start/first-query.html#name-your-database) in a `sqlsource.json` file beside your project file: `"dialect": "postgres"` or `"dialect": "mssql"`.
-4. [Put your connection string](https://mbcrawfo.github.io/SqlSource/start/first-query.html#connection) in a `.env` file in the folder of your project, and build.  The build [describes the query](https://mbcrawfo.github.io/SqlSource/start/first-query.html#describe) and writes its sidecar file, which you commit.
+4. [Put your connection string](https://mbcrawfo.github.io/SqlSource/start/first-query.html#connection) in a `.env` file in the folder of your project.  Then build: the build [describes the query](https://mbcrawfo.github.io/SqlSource/start/first-query.html#describe) and writes its sidecar file, which you commit.
 5. [Call the method](https://mbcrawfo.github.io/SqlSource/start/first-query.html#call-the-methods), `GetUser`, with its record of parameters, `GetUserParams`.
 
 [The full walkthrough](https://mbcrawfo.github.io/SqlSource/start/first-query.html) gives each file, the commands and the errors you can see on the way.
@@ -62,7 +62,7 @@ Your project targets .NET 8 or later, and you build it with the .NET SDK 9.0.300
 By default, each query is a method of your class, which opens its own connection.
 
 - **Your own connection, transaction or timeout**: give the query the output `methods`.  Its method takes your connection and your transaction: see [Run queries in a transaction](https://mbcrawfo.github.io/SqlSource/start/transactions.html).
-- **Dapper or your own ADO.NET code**: if you cannot use the methods, the output `models` gives you the models and the SQL, and you run the query: see [Use Dapper](https://mbcrawfo.github.io/SqlSource/guides/dapper.html).
+- **Dapper or your own ADO.NET code**: if you cannot use the methods, the output `models` gives you the models and the SQL.  You run the query yourself: see [Use Dapper](https://mbcrawfo.github.io/SqlSource/guides/dapper.html).
 - **Only the SQL, on any database**: the output `sql` gives you each query's SQL as a constant, with no tool: see [another database](https://mbcrawfo.github.io/SqlSource/guides/other-databases.html).
 
 ## Documentation
