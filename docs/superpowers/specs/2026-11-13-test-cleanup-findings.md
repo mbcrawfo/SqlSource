@@ -1008,7 +1008,7 @@ None.  The one finding left at **needs measurement** was measured again and conf
   - `SqlServerDatabasesTests.Image_OfTheRun_IsInTheMapOfBuilds`: F-DatabaseTests.SqlServer-1-04 (phase 85)
 - `tests/SqlSource.Repository.Tests/Diagnostics/DiagnosticsDocumentTests.cs`
   - `DiagnosticsDocumentTests.Document_Sections_AreTheDescriptorsInOrder`: F-SqlSource.Tests-1-01 (phase 02)
-  - `DiagnosticsDocumentTests.Document_Table_ListsEveryDescriptorWithItsTitleAndAnchor`: F-SqlSource.Tests-1-01 (phase 02)
+  - `DiagnosticsDocumentTests.Document_EachSection_StartsWithItsDescriptorsTitle`: F-SqlSource.Tests-1-01 (phase 02)
 - `tests/SqlSource.Repository.Tests/Documentation/UserDocsLinksTests.cs`
   - `UserDocsLinksTests.Links_OfTheUserDocs_AreFound`: F-SqlSource.Repository.Tests-1-02 (phase 75)
   - `UserDocsLinksTests.RelativeLinks_OfTheUserDocs_ReachAFileAndAnchorThatExist`: F-SqlSource.Repository.Tests-1-02 (phase 75)
