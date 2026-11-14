@@ -8,6 +8,8 @@ The tool's `diagnose` command makes a bug-report bundle of one query that you ca
 
 ## The tool
 
+The `sqlsource` command of the `SqlSource.Tool` package.  Its `describe` command asks a database about your queries and writes the sidecars.
+
 The `SqlSource.Tool` package adds the `sqlsource` command to a project.  Its `describe` command connects to your database, asks it what the parameters and columns of each of your queries are, and writes the answers into [sidecar files](sidecars.md#sidecar-files) beside your `.sql` files.  You commit the sidecars with the project, so that a build needs no database.  On a machine that has a connection, the build [runs `describe` itself](msbuild.md#running-in-the-build) before it compiles.
 
 ```console
@@ -33,6 +35,15 @@ $ dotnet tool install SqlSource.Tool
 The first command creates the tool manifest, a `dotnet-tools.json` file, which records the tool and its version.  Commit that file.  Anyone who clones the repository, and a build server, then gets the same version with `dotnet tool restore`.  A build that [runs the tool](msbuild.md#running-in-the-build) starts this version too.  To run the tool, give it a connection to your database: see [connections](connections.md#connections).
 
 Keep the tool at the version of the `SqlSource` package your projects use: the two are released together under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool`.  A package and a tool of different versions can stop the tool from reading your project ([SQLSRC206](../diagnostics.md#sqlsrc206)).  What else the tool needs is under [requirements](#requirements).
+
+Once, at the root of your repository, to install the tool (skip the first command if the repository already has a tool manifest):
+
+```console
+$ dotnet new tool-manifest
+$ dotnet tool install SqlSource.Tool
+```
+
+- **`SqlSource.Tool`** adds the `sqlsource` command, which describes your queries ([step 5](describing.md#describe)).  Commit the `dotnet-tools.json` that `dotnet new tool-manifest` creates, and keep the tool at the version of the `SqlSource` package.  A project that only keeps its SQL out of code files does not need it.
 
 <a id="command-reference"></a>
 

@@ -4,6 +4,8 @@
 
 ## Repository methods
 
+A type marked `[SqlSourceGenerate]` whose queries have the output `repository`, the default.  Each such query is an instance method of the type, which gets a connection from a member of the type, its connection source, such as a connection string or a data source, so the code that calls it passes none.  The type also gets an interface of those methods, for code that takes a repository and a test that fakes one.  See [repository methods](#repository-methods).
+
 ```sql postgres
 -- name: GetUser -> one-optional
 -- summary: Loads one user by id.
@@ -193,7 +195,7 @@ Above, the project turns the interfaces off, and `UserRepository` turns its own 
 
 ## Transactions and timeouts
 
-A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, in no transaction of yours, under the driver's default timeout.  A query that must run in a transaction with others, or that needs its own timeout, takes the output `methods` instead, in its own file or with `-- output: methods` on the query, and your own code in the repository opens a connection, begins the transaction and calls its [method that takes a connection](connection-methods.md#methods-that-take-a-connection).  See [the recipe](../recipes.md#queries-in-a-transaction).
+A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, in no transaction of yours, under the driver's default timeout.  A query that must run in a transaction with others, or that needs its own timeout, takes the output `methods` instead, in its own file or with `-- output: methods` on the query, and your own code in the repository opens a connection, begins the transaction and calls its [method that takes a connection](connection-methods.md#methods-that-take-a-connection).  See [the recipe](../start/transactions.md#queries-in-a-transaction).
 
 A repository's [collection method](collection-methods.md#collection-methods) begins a transaction of its own, by the generator parameter `transaction`, and commits it before it returns, so that its items are added all together or not at all.  It begins none when an ambient transaction, such as a `TransactionScope`'s, is open, and runs in that one instead, or, on a connection that is not in it, such as a borrowed connection opened before the scope, in no transaction at all, as under `transaction=off`: see [transactions](collection-methods.md#collection-transactions).
 

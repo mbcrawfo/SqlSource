@@ -3,7 +3,7 @@
 Get started: the path of a newcomer, read in order.
 
 - **The line for Get started.**  A topic is here only when an application with one PostgreSQL or SQL Server database and the default `repository` output needs it before its first release.  Transactions are here, and are where the `methods` output is introduced, by the need for it.  Anything else is a guide.
-- **The pages are written by the `get-started` phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.**  Until then `toc.yml` lists `../concepts.md`, a page here holds only what a move placed on it, and a change to getting started goes in `README.md`.
+- **The pages are written by the `get-started` phase of `docs/superpowers/specs/2026-11-12-docs-overhaul-epic-design.md`.**  Until then `toc.yml` lists `concepts.md`, a page here holds only what a move placed on it, and a change to getting started goes in `README.md`.
 - **The pages are read in the order of `toc.yml`**, and each ends with "Next:" and a link to the next page.
 - **One running example and the `repository` output.**  The samples are the files of `examples/PostgresExamples/Repository` and `examples/SqlServerExamples/Repository`, which compile.
 - **Give each step whole.**  Never send the reader to Reference in the middle of a step.  State a rule in its common form, and link its owner under "Rules:" near the end of the page.

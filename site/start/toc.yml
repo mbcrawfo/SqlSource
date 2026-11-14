@@ -1,4 +1,8 @@
 - name: Concepts
-  href: ../concepts.md
+  href: concepts.md
+- name: Run queries in a transaction (or with a timeout)
+  href: transactions.md
+- name: Test code that uses a repository (mock or fake)
+  href: testing.md
 - name: Keep your queries up to date
   href: keep-up-to-date.md

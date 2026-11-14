@@ -4,7 +4,7 @@
 
 ## Token or parameter
 
-A query takes things from the code that runs it in two ways.  A [query parameter](../concepts.md#query-parameter) carries a value: `@id` in `WHERE id = @id`.  A [token](../concepts.md#token) carries a piece of the SQL itself: `{{table}}` in `FROM {{table}}`.
+A query takes things from the code that runs it in two ways.  A [query parameter](parameters.md#query-parameters) carries a value: `@id` in `WHERE id = @id`.  A [token](#tokens) carries a piece of the SQL itself: `{{table}}` in `FROM {{table}}`.
 
 ```sql
 -- name: ListSince
@@ -24,6 +24,8 @@ A value cannot stand for a table name, a list of columns or a whole clause, and 
 <a id="tokens"></a>
 
 ## Tokens
+
+A place in a query's SQL, written `{{table}}`, that your code fills in with text when it asks for the SQL.  A query parameter cannot stand for a table name or a clause; a token can.  A token is replaced by plain text substitution and nothing is escaped, so it must only carry text that your own code chooses.
 
 ```sql
 -- name: ListFrom

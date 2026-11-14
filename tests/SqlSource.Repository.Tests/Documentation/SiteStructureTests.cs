@@ -15,10 +15,6 @@ namespace SqlSource.Repository.Tests.Documentation;
 // `limit-` anchor in it, is listed on site/guides/troubleshooting.md, for a reader who has a symptom and no error id.
 public sealed partial class SiteStructureTests
 {
-    // The pages that wait at the root of site/ for their phase of the documentation overhaul to move them.  The list
-    // only shrinks: the phase that moves a page removes its name.
-    internal static readonly IReadOnlyList<string> PagesNotYetMoved = ["concepts.md", "recipes.md"];
-
     private const string Troubleshooting = "site/guides/troubleshooting.md";
 
     // The folder of the made-up page of a test, written so that InboundSiteReferenceTests does not read it as a
@@ -51,28 +47,17 @@ public sealed partial class SiteStructureTests
         "query-methods.md",
     ];
 
-    // Fails when a .md file stands directly in site/ and is not index.md, diagnostics.md, a page not yet moved or a
-    // file of an agent, and when a name of PagesNotYetMoved has no file, so that a moved page cannot stay listed.
+    // Fails when a .md file stands directly in site/ and is not index.md, diagnostics.md or a file of an agent.
     [Fact]
-    public void RootPages_AreTheLandingPageTheErrorsAndThePagesNotYetMoved()
-    {
-        var files = Directory
+    public void RootPages_AreTheLandingPageAndTheErrors() =>
+        Directory
             .EnumerateFiles(RepositoryRoot.Path(UserDocs.Site), "*.md", SearchOption.TopDirectoryOnly)
             .Select(Path.GetFileName)
             .OfType<string>()
             .Where(name => name != "AGENTS.md" && !name.StartsWith("CLAUDE", StringComparison.Ordinal))
-            .ToList();
-
-        files
-            .Except([.. RootPages, .. PagesNotYetMoved], StringComparer.Ordinal)
+            .Except(RootPages, StringComparer.Ordinal)
             .Select(name => $"site/{name} is a page at the root: put it in start/, guides/ or reference/")
-            .Concat(
-                PagesNotYetMoved
-                    .Except(files, StringComparer.Ordinal)
-                    .Select(name => $"site/{name} is in PagesNotYetMoved and is not at the root: remove its name")
-            )
             .ShouldBeEmpty();
-    }
 
     // Fails when a folder directly in site/ is not start, guides or reference.
     [Fact]

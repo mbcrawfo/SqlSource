@@ -44,11 +44,11 @@
 - **System.Text.Json is on in `EndToEnd/Json/` alone**, by its `sqlsource.json`, which also holds the opt-in of `json_values.settings_meta`: a query that needs its types or a class in a JSON column goes in that folder, whose files `CheckTests` names below 2025, `JsonColumns.sql` left out.
 - **A column of `json_values` or `json_columns` changes `EndToEnd/app/schema.sql` or `EndToEnd/app/new-types.sql`, the queries of `Json/Queries/` and `Json/JsonQueryTests.cs`, and its copy in `tests/DatabaseTests/SqlServer.SqlClient61`, together**; a class of `Json/Types/` changes that project's copy too.
 
-## `all_types` and the recipe
+## `all_types` and the Dapper guide
 
 - **A column of `all_types` changes `EndToEnd/app/schema.sql`, `EndToEnd/app/seed.sql` and `tests/DatabaseTests/TestHarness/EndToEnd/SqlServerAllTypesRows.cs` together**, which holds its expectation and its property in `AllTypesProperties`, with its parameter in `WriteAllTypes`, declared `null`, and in `InsertAllTypes` or its row in `WriteSideLeftOut` of `EndToEnd/AllTypesQueryTests.cs`.
 - **`EndToEnd/ModelShapeTests.cs` and `tests/DatabaseTests/SqlServer.SqlClient61/AllTypesQueryTests.cs` compare the model with `AllTypesProperties`** and keep no list of their own.
-- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `site/recipes.md#dapper-with-sql-server`.**
-- **`EndToEnd/DapperRecipeTests.cs` proves what that part of the recipe says**, and `EndToEnd/Types/TypedParameter.cs`, `EndToEnd/Types/DateOnlyHandler.cs` and `EndToEnd/Types/TimeOnlyHandler.cs` are the same code as its samples, in this repository's layout: a change to one changes the other.
+- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `site/guides/dapper.md#dapper-with-sql-server`.**
+- **`EndToEnd/DapperRecipeTests.cs` proves what that part of the guide says**, and `EndToEnd/Types/TypedParameter.cs`, `EndToEnd/Types/DateOnlyHandler.cs` and `EndToEnd/Types/TimeOnlyHandler.cs` are the same code as its samples, in this repository's layout: a change to one changes the other.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

@@ -39,11 +39,11 @@
 - **System.Text.Json is on in `EndToEnd/Json/` alone**, by its `sqlsource.json`, since the library's default is off: a query that needs its types or a class in a JSON column goes in that folder, and its methods run on `EndToEndSources.App`, which calls no `EnableDynamicJson()`.
 - **A column of `json_values` changes `EndToEnd/app/schema.sql`, `Json/Queries/Json.sql` and `Json/JsonQueryTests.cs`, and its copy in `tests/DatabaseTests/Postgres.Npgsql8`, together**; a class of `Json/Types/` changes that project's copy too.
 
-## `all_types` and the recipe
+## `all_types` and the Dapper guide
 
 - **A column of `all_types` changes `EndToEnd/app/schema.sql`, `EndToEnd/app/seed.sql` and `tests/DatabaseTests/TestHarness/EndToEnd/AllTypesRows.cs` together**, with its parameter, declared `null`, in `InsertEveryType`, and its parameter in `InsertAllTypes` or its row in `WriteSideLeftOut` of `EndToEnd/AllTypesQueryTests.cs`.
 - **A type added to the map adds its key to `MapWritten` or `MapLeftOut` of `EndToEnd/ModelShapeTests.cs`.**
-- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `site/recipes.md#dapper-with-postgresql`.**
-- **`EndToEnd/DapperRecipeTests.cs` writes each of its columns by the recipe's remedy and proves the rest of that recipe**, and `EndToEnd/Types/TypedParameter.cs` and `EndToEnd/Types/EmailHandler.cs` are the same code as its samples, in this repository's layout: a change to one changes the other.
+- **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `site/guides/dapper.md#dapper-with-postgresql`.**
+- **`EndToEnd/DapperRecipeTests.cs` writes each of its columns by the guide's remedy and proves the rest of that section**, and `EndToEnd/Types/TypedParameter.cs` and `EndToEnd/Types/EmailHandler.cs` are the same code as its samples, in this repository's layout: a change to one changes the other.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

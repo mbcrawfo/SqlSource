@@ -21,7 +21,7 @@ $ dotnet new tool-manifest
 $ dotnet tool install SqlSource.Tool
 ```
 
-- **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, and the attributes you mark your types and converters with, their enums and the exception its methods throw, are compiled into your project.
+- **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, the attributes you mark your types, their connection sources and your converters with, and the exceptions its methods throw, are compiled into your project.
 - **`SqlSource.Tool`** adds the `sqlsource` command, which describes your queries ([step 5](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#5-describe-your-queries)).  Commit the `dotnet-tools.json` that `dotnet new tool-manifest` creates, and keep the tool at the version of the `SqlSource` package.  A project that only keeps its SQL out of code files does not need it.
 
 **Supported environments.**  A project that uses SqlSource targets .NET 8 or later and compiles C# 12 or later, the default for .NET 8.  It builds in the .NET SDK 9.0.300 or later, or in Visual Studio 2022 17.14 or later; the .NET 8 SDK and Visual Studio before 17.14 are not supported, and a build on one stops with [SQLSRC021](https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc021).  The tool runs on .NET 8 or later, with the .NET SDK that builds your project installed, since it asks MSBuild about your projects; it describes PostgreSQL 14 or later and SQL Server 2017 or later, and accepts Azure SQL, which is not tested.  A project that references Npgsql for its PostgreSQL queries references Npgsql 8 or later, and one that references Microsoft.Data.SqlClient for its SQL Server queries references version 6.1 or later; the methods that run the queries need that reference, and a SQL Server project on EF Core 8 or 9 references Microsoft.Data.SqlClient 6.1 itself, since EF Core brings 5.1.  The methods also need a connection whose commands take the driver's own parameters, which a connection that wraps the driver's may not: see [a limit](https://mbcrawfo.github.io/SqlSource/reference/query-methods.html#limit-wrapped-connection).
@@ -98,7 +98,7 @@ FindUsersDto[] named = await users.FindUsers(new FindUsersParams("Ada"));
 
 `GetUser` returns the user, or null when there is none, and `FindUsers` every row, in an array.  Each method also takes a cancellation token.  `UserRepository` also gets an interface of its methods, `IUserRepository`, so the code that uses it can take the interface, and a test can give it a fake.  A property can be null where its column can, and `FindUsersParams.Name` can be null because its `-- param:` says `null`.  Where you know a column is never null and the database cannot tell, an alias such as `AS "total!"`, or a `-- column: total not null` line, says so, and the method throws if the column is null after all: see which columns can be null for [PostgreSQL](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/nullability.html#nullability) and for [SQL Server](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/nullability.html#nullability).  A query that selects every column of a table, in the table's order, gets a row model named after the table instead: if `users` had exactly the columns `id`, `name` and `email`, in that order, both queries would share one model, `UsersDto`, and the code would use it in place of `GetUserDto` and `FindUsersDto`.  Each parameter is sent as the database type it was described with, not as a type the driver chooses from its C# type, and with SQL Server with that type's length, precision and scale: see [how a parameter is sent](https://mbcrawfo.github.io/SqlSource/reference/query-methods.html#method-parameters).  For `Async` names, `GetUserAsync`, add the generator parameter `async-method-suffix`: see [generator parameters](https://mbcrawfo.github.io/SqlSource/reference/generator-parameters.html#setting-generator-parameters).  For code that does not await, a query gets a synchronous method, in place of its asynchronous one or beside it, on the repository and in its interface, with the generator parameter `method-type=sync` or `method-type=both`: see [synchronous methods](https://mbcrawfo.github.io/SqlSource/reference/query-methods.html#synchronous-methods).
 
-More: [repository methods](https://mbcrawfo.github.io/SqlSource/reference/repositories.html#repository-methods), [models](https://mbcrawfo.github.io/SqlSource/reference/models.html#models), [running queries in a transaction](https://mbcrawfo.github.io/SqlSource/recipes.html#queries-in-a-transaction).
+More: [repository methods](https://mbcrawfo.github.io/SqlSource/reference/repositories.html#repository-methods), [models](https://mbcrawfo.github.io/SqlSource/reference/models.html#models), [running queries in a transaction](https://mbcrawfo.github.io/SqlSource/start/transactions.html#queries-in-a-transaction).
 
 ### 5. Describe your queries
 
@@ -121,7 +121,7 @@ postgres (postgres): 2 described, 0 skipped, 0 failed
 $ git add Queries/UserRepository.sql.json
 ```
 
-`postgres`, in the variable's name and first in the summary, is the name SqlSource gives the database your queries belong to: the dialect's name, until you [name your databases](https://mbcrawfo.github.io/SqlSource/recipes.html#use-several-databases).  The name in parentheses is its dialect.  The tool reads the `.env` in the folder of the project or solution it runs on, never one in a folder above it, and only its `SQLSOURCE_CONNECTION` variables, so the file can be your application's own too.  To keep one `.env` at the root of your repository, name it to the build with the property `SqlSourceEnvFile` in your `Directory.Build.props`, and to a run of your own with `--env-file`: see [the `.env` file](https://mbcrawfo.github.io/SqlSource/reference/connections.html#env-file).  The same variable set in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.  For SQL Server files the database's name is `mssql`, so the variable is `SQLSOURCE_CONNECTION_MSSQL`, and the connection string is SqlClient's, `Server=localhost,1433;Database=app;User ID=app;Password=secret`, with `TrustServerCertificate=True` for SQL Server in a local container: see [connecting to SQL Server](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/index.html#connecting).  The tool needs your schema, not your data.  Commit the sidecars with the project: every build reads them, and a copy of the project without them reports an error for each query.  Add `*.sql.json linguist-generated=true` to your `.gitattributes` so that GitHub collapses them in pull requests, and after a merge conflict in one, run `describe` again rather than merging it by hand: see [sidecars in git](https://mbcrawfo.github.io/SqlSource/reference/sidecars.html#sidecars-in-git).  A project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself, beside its `.sql` files: see [which `.sql` files are included](https://mbcrawfo.github.io/SqlSource/reference/msbuild.html#included-files).
+`postgres`, in the variable's name and first in the summary, is the name SqlSource gives the database your queries belong to: the dialect's name, until you [name your databases](https://mbcrawfo.github.io/SqlSource/guides/several-databases.html#use-several-databases).  The name in parentheses is its dialect.  The tool reads the `.env` in the folder of the project or solution it runs on, never one in a folder above it, and only its `SQLSOURCE_CONNECTION` variables, so the file can be your application's own too.  To keep one `.env` at the root of your repository, name it to the build with the property `SqlSourceEnvFile` in your `Directory.Build.props`, and to a run of your own with `--env-file`: see [the `.env` file](https://mbcrawfo.github.io/SqlSource/reference/connections.html#env-file).  The same variable set in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.  For SQL Server files the database's name is `mssql`, so the variable is `SQLSOURCE_CONNECTION_MSSQL`, and the connection string is SqlClient's, `Server=localhost,1433;Database=app;User ID=app;Password=secret`, with `TrustServerCertificate=True` for SQL Server in a local container: see [connecting to SQL Server](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/index.html#connecting).  The tool needs your schema, not your data.  Commit the sidecars with the project: every build reads them, and a copy of the project without them reports an error for each query.  Add `*.sql.json linguist-generated=true` to your `.gitattributes` so that GitHub collapses them in pull requests, and after a merge conflict in one, run `describe` again rather than merging it by hand: see [sidecars in git](https://mbcrawfo.github.io/SqlSource/reference/sidecars.html#sidecars-in-git).  A project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself, beside its `.sql` files: see [which `.sql` files are included](https://mbcrawfo.github.io/SqlSource/reference/msbuild.html#included-files).
 
 From then on, `dotnet build` and your IDE's build run `describe` themselves before they compile, on a machine where they find the project's `.env` file or `SQLSOURCE_CONNECTION` in the environment, and only when something changed: a query you change is described at the next build, and one your database rejects is a build error at the query.  Commit the sidecars it writes.  A build with no connection, and every build in CI, reads the committed sidecars instead, and `SqlSourceOnline` turns the build's run on or off for a project: see [running in the build](https://mbcrawfo.github.io/SqlSource/reference/msbuild.html#running-in-the-build).  To describe each query as you save it, leave `dotnet sqlsource describe --watch` running, or have your editor start it: see [describe on save](https://mbcrawfo.github.io/SqlSource/reference/describing.html#describe-on-save), which says when your editor shows what it writes, and [the recipe](https://mbcrawfo.github.io/SqlSource/guides/describe-on-save.html#start-the-watcher-with-your-editor).
 
@@ -129,161 +129,61 @@ Run `describe --force` after a change to the schema, which no build sees, and `d
 
 ## Only want to generate models?
 
-Set the output to `models`, to run the queries yourself, with Dapper or your own ADO.NET code.  A query whose output is `models` gets its models, once the tool has described it, as in step 5, and a constant that holds its SQL, or a method that returns it when the query has a token, in place of the method that runs it.  Add `output` to the `sqlsource.json` of step 3: this sample and those below show that one file again, not a file of their own:
-
-```jsonc
-// sqlsource.json, beside your project file
-{
-    "root": true,
-    "dialect": "postgres",
-    "output": "models",
-}
-```
-
-The constants are in a private class `Sql` of the type, `Sql.GetUser` and `Sql.FindUsers`, and are plain strings, so any library can run them: Dapper here (`dotnet add package Dapper`).
-
-```csharp
-using System.Data.Common;
-using Dapper;
-using SqlSource;
-
-[SqlSourceGenerate]
-public partial class UserRepository(DbConnection connection)
-{
-    public Task<GetUserDto?> Get(int id) =>
-        connection.QuerySingleOrDefaultAsync<GetUserDto>(Sql.GetUser, new GetUserParams(id));
-
-    public Task<IEnumerable<FindUsersDto>> Find(string? name) =>
-        connection.QueryAsync<FindUsersDto>(Sql.FindUsers, new FindUsersParams(name));
-}
-```
-
-Dapper reads the rows by the names of their columns.  For columns written in snake_case, such as `created_at`, set Dapper's `DefaultTypeMap.MatchNamesWithUnderscores` to `true` once when your application starts.  Write the parameters in camelCase, `@userId` and not `@user_id`: Dapper sends a property of `GetUserParams` only to the parameter written as its name, ignoring case but not `_`.  Set a column's nullability with a `-- column:` line, not a mark at the end of its alias, which changes the column's name.  All three are in [running the models through Dapper](https://mbcrawfo.github.io/SqlSource/recipes.html#models-through-dapper).  With SQL Server, send a `datetime2` parameter as a `datetime2`, since Dapper sends a `DateTime` as a `datetime`: see [with SQL Server](https://mbcrawfo.github.io/SqlSource/recipes.html#dapper-with-sql-server).
-
-More: [output](https://mbcrawfo.github.io/SqlSource/reference/settings.html#setting-output), which can also be set for one folder, one file or one query, [constants](https://mbcrawfo.github.io/SqlSource/reference/members.html#constants), and [models](https://mbcrawfo.github.io/SqlSource/reference/models.html#models), for their names, shape and properties.
+See [Use Dapper or your own ADO.NET code](https://mbcrawfo.github.io/SqlSource/guides/dapper.html#models).
 
 ## Just want to keep your SQL out of code files?
 
-Follow steps 1 to 3, set the output to `sql`, and skip the tool.  For a SQL Server project:
-
-```jsonc
-// sqlsource.json, beside your project file
-{
-    "root": true,
-    "dialect": "mssql",
-    "output": "sql",
-}
-```
-
-- **`sql` asks for each query's SQL and nothing else**: its constant, or, for a query with a `{{token}}`, a method that fills it in, which you run as [Only want to generate models?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models) shows, without the models.  It needs no database, no tool and no sidecar.  It tells the tool to leave these queries out, so a run on the project reports nothing for them, and the build to need no sidecar for them and to generate no models.  Without it the default output, `repository`, asks for every query to be described, and for a method that runs it, and the build reports an error for each file or query that is not.
-- **Any dialect works**: `mssql` for SQL Server, `mysql`, `sqlite`, the default `ansi` and the others.  Set the one named for your database, so that SqlSource reads your comments and strings as your database does.
-
-More: [output](https://mbcrawfo.github.io/SqlSource/reference/settings.html#setting-output), [database support](https://mbcrawfo.github.io/SqlSource/reference/databases/index.html#database-support).
+See [Use Dapper or your own ADO.NET code](https://mbcrawfo.github.io/SqlSource/guides/dapper.html#sql-only).
 
 ## FAQ
 
 ### How do I mock a repository?
 
-Have the code that uses the repository take its generated interface, `IUserRepository`, and give that code a fake of the interface in its tests, written by hand or by a mocking library: it holds the repository's public methods, with their signatures and documentation.  Register the repository as the interface, as in `services.AddSingleton<IUserRepository, UserRepository>()` beside its data source.  To put a method of your own on the interface, declare `public partial interface IUserRepository` with that member, and write it in the repository.  `<SqlSourceRepositoryInterfaces>false</SqlSourceRepositoryInterfaces>` in the project file turns the interfaces off, and `[SqlSourceGenerate(GenerateInterface = false)]` one type's; `InterfaceName` names one otherwise.  See [the interface](https://mbcrawfo.github.io/SqlSource/reference/repositories.html#repository-interface) and [repository interfaces](https://mbcrawfo.github.io/SqlSource/reference/repositories.html#repository-interfaces).
+See [Test code that uses a repository (mock or fake)](https://mbcrawfo.github.io/SqlSource/start/testing.html).
 
 ### How do I run queries in a transaction?
 
-A repository method takes no transaction and no command timeout: each call gets a connection of its own.  Give the queries that must run together `-- output: methods`, whose methods take the connection, a transaction and a timeout, and are by default `internal` extension methods of `DbConnection`.  Then write a method of your own on the repository that opens a connection from its data source, begins the transaction and calls them, as `await connection.GetBalance(new GetBalanceParams(id), transaction)`, and commits.  One file can hold queries of both outputs, and a query that needs a command timeout takes `methods` the same way.  To run one query for many items in one transaction, such as adding many rows, give it `-- generator: collection-method`: its second method takes a collection of its input models and runs them all in a transaction of its own, as [inserting many rows](https://mbcrawfo.github.io/SqlSource/recipes.html#insert-many-rows) shows.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#queries-in-a-transaction) and [methods that take a connection](https://mbcrawfo.github.io/SqlSource/reference/connection-methods.html#methods-that-take-a-connection).
+See [Run queries in a transaction (or with a timeout)](https://mbcrawfo.github.io/SqlSource/start/transactions.html#queries-in-a-transaction).
 
 ### I got an `InvalidCastException`; what does it mean and how do I fix it?
 
-A query method asked the driver to read a column, or send a parameter, as a C# type the driver does not read.  Most often a [type override](https://mbcrawfo.github.io/SqlSource/reference/type-mapping.html#setting-type-overrides), a [column type](https://mbcrawfo.github.io/SqlSource/reference/model-properties.html#setting-column-types) or a `-- param:` line names a type the driver was never taught: a C# enum for a PostgreSQL enum, or a type of your own, such as an id or an `Email`.  There are two fixes:
-
-- **Teach the driver the type**, on the data source of your application: Npgsql's `MapEnum<T>()` for an enum, `MapComposite<T>()` for a composite type, or the plugin of a library such as NodaTime or NetTopologySuite.
-- **Add converters**: two static methods marked `[SqlSourceConverter]`, one from the type the driver reads to your type and one back, which the generated method calls.  See [converters](https://mbcrawfo.github.io/SqlSource/reference/converters.html#converters) and [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#strongly-typed-id).
-
-When the message names a NodaTime type, such as "Reading as 'NodaTime.Instant' is not supported", the project references `Npgsql.NodaTime`, so its PostgreSQL query methods read NodaTime's types, and the data source they ran on never called `UseNodaTime()`, which inside EF Core's `UseNpgsql(...)` teaches EF Core's own data source alone: call it on the data source's builder, or turn NodaTime off.  A repository whose connection is a connection string makes a connection of its own with no plugin at all: give it the data source instead.  See [NodaTime on PostgreSQL](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/libraries.html#nodatime).
-
-When the message names a NetTopologySuite type, such as "Reading as 'NetTopologySuite.Geometries.Geometry' is not supported", it is the same for `Npgsql.NetTopologySuite` and `UseNetTopologySuite()`: see [NetTopologySuite on PostgreSQL](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/libraries.html#nettopologysuite).  When it is "Unable to cast object of type 'NetTopologySuite.Geometries.LineString' to type 'NetTopologySuite.Geometries.Point'", a column that you mapped to one shape held another: map it to `NetTopologySuite.Geometries.Geometry`, or keep the other shapes out in the query.
-
-When the message names a class of yours in a column of a string type that holds JSON, such as a `text` or an `nvarchar(max)`, say so with the JSON opt-in, `-> json OrderMetadata`, and the query methods read and send it through System.Text.Json's serializer: see [the JSON opt-in](https://mbcrawfo.github.io/SqlSource/reference/library-types-and-json.html#json-opt-in).
-
-When the message is "Column 'name' is null.", the column held a null though its property cannot be null; on SQL Server the same is Microsoft.Data.SqlClient's `SqlNullValueException`, "Data is Null.".  Give the column a nullable property, by its alias or a `-- column:` line, or keep the null out in the query.  "Column 'name' holds a null element." is the same for an element of a converted array, and "Column 'name' holds a JSON null." for a JSON column that holds the JSON `null`, which is no SQL `NULL`, read into a class or a `JsonNode` whose property cannot be null.  A method with parameters called on a connection that wraps the driver's, and whose commands create or accept only parameters of their own type, fails too, typically with an `InvalidCastException`: call it on the driver's connection inside.  See [the limit](https://mbcrawfo.github.io/SqlSource/reference/query-methods.html#limit-wrapped-connection).
+See [Troubleshooting: it built, but something is wrong](https://mbcrawfo.github.io/SqlSource/guides/troubleshooting.html#invalidcastexception).
 
 ### How do I change the namespace of the models?
 
-By default the models are in the namespace of the type that claims the query.  Set `"modelNamespace": "App.Models"` in the `sqlsource.json` beside your project file, or `-- model-namespace:` in a `.sql` file.  Two types in two namespaces that read one table each get a model of it, one in each namespace, and the setting gives them one.  A name with a period in an `-- output-model:` line, `App.Rows.UserRow`, is a full name and ignores the setting.  See [namespace of the models](https://mbcrawfo.github.io/SqlSource/reference/models.html#setting-model-namespace).
+See [Change names, namespaces and visibility](https://mbcrawfo.github.io/SqlSource/guides/naming-and-placement.html#model-namespace-task).
 
 ### My project uses several databases
 
-For several databases of one kind, name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name.  A repository that uses several marks a connection for each, `[SqlSourceConnection(Database = "billing")]`: see [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#use-several-databases).  For files written for another kind of database, give their folder its own dialect with a `sqlsource.json` of its own, or one file a `-- dialect:` line at its top: see [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#folder-with-another-dialect).
+See [Use several databases](https://mbcrawfo.github.io/SqlSource/guides/several-databases.html#use-several-databases).
 
 ### How do I keep migration scripts out?
 
-A `.sql` file that no `[SqlSourceGenerate]` type claims is not read, so scripts in a folder of their own do no harm.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#leave-migration-scripts-out) to keep them away from the compiler altogether.
+See [Give a folder its own settings, or leave files out](https://mbcrawfo.github.io/SqlSource/guides/folders-and-files.html#leave-migration-scripts-out).
 
 ### How do I choose a table name at run time?
 
-Write a token with a default, `{{table:orders}}`, where the name goes.  The query becomes a method that takes the text to put there.  The default is only a sample that the tool describes the query with; a query whose output is `sql` needs none.  Nothing is escaped, so pass only text that your own code chooses, never a value a user typed.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#table-name-at-run-time) and [tokens](https://mbcrawfo.github.io/SqlSource/reference/tokens.html#tokens).
+See [Choose a table or a clause at run time](https://mbcrawfo.github.io/SqlSource/guides/dynamic-sql.html#table-name-at-run-time).
 
 ### Can I pass a list to `IN`?
 
-Yes: write the parameter directly after `IN`, with no parentheses, `WHERE id IN @ids`.  Its property in the input model is an `IEnumerable<int>`, which takes an array, a `List<int>` or any other sequence, and the query method sends a parameter for each value, on PostgreSQL and on SQL Server.  `(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#filter-by-a-list) and [list parameters](https://mbcrawfo.github.io/SqlSource/reference/parameters.html#list-parameters).
+See [Pass a list of values (IN)](https://mbcrawfo.github.io/SqlSource/guides/lists.html#list-after-in).
 
 ### My test project sees the internals of my main project
 
-Both projects can use SqlSource, and the attributes that each gets do not conflict.  The test project uses the main project's `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException`, so it catches what a method of either project throws by its type.  When the main project uses the exceptions of a shared project, the shared project grants `InternalsVisibleTo` to the test project too.  See [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#test-project-sees-internals), and [the other recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#share-the-exceptions) for an app that sees two data projects.
+See [Use SqlSource in several projects](https://mbcrawfo.github.io/SqlSource/guides/several-projects.html#test-project-sees-internals).
 
 ### How do I report a wrong model?
 
-Run `dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip` where you run `describe`, with the same connection.  It describes that one query again and writes a bundle, a zip that lets a maintainer run SqlSource on your query with no database, after renaming your names and strings and checking that the renamed bundle still gives your query's answer.  Attach the zip to a [bug report](https://github.com/mbcrawfo/SqlSource/issues/new?template=bug-report.yml), and keep to yourself the mapping of the new names written beside it.  See [what is renamed before you share it](https://mbcrawfo.github.io/SqlSource/reference/bundles.html#bundle-contents) for what is renamed and kept, and [reporting a wrong model](https://mbcrawfo.github.io/SqlSource/guides/report-a-bug.html#raw-bundle) for what to do when a bundle cannot be renamed.
+See [Report a wrong model](https://mbcrawfo.github.io/SqlSource/guides/report-a-bug.html#report-a-bug).
 
 ## NodaTime and other libraries
 
-A PostgreSQL project that references `Npgsql.NodaTime` gets NodaTime's types, `Instant` for a `timestamptz` and `LocalDate` for a `date`, in its query methods, with no type override to write.  Its application calls `UseNodaTime()` on the `NpgsqlDataSourceBuilder` of the data source that the methods run on, the one its repositories take, and a query whose output is `models` keeps the types it had.  To turn it off for a project, a folder, a file or a query, use the library types.  See [NodaTime on PostgreSQL](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/libraries.html#nodatime) and [library types](https://mbcrawfo.github.io/SqlSource/reference/library-types-and-json.html#setting-library-types).
-
-A SQL Server project that references `NodaTime` gets NodaTime's types, `LocalDateTime` for a `datetime2` and `LocalDate` for a `date`, in its query methods when it turns NodaTime on, with `"libraryTypes": { "nodaTime": "on" }` in a settings file.  The query methods convert each value themselves, so there is nothing to call on the connection, and a type override gives a column an `Instant` or a `Duration` whether NodaTime is on or not.  See [NodaTime on SQL Server](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/libraries.html#nodatime).
-
-A PostgreSQL project that references `Npgsql.NetTopologySuite` gets NetTopologySuite's `Geometry` for PostGIS's `geometry` and `geography` in its query methods, read and sent by the plugin, so its application calls `UseNetTopologySuite()` on the `NpgsqlDataSourceBuilder` of the data source that the methods run on.  A SQL Server project that references `NetTopologySuite.IO.SqlServerBytes`, and NetTopologySuite 2.5.0 or later by name, since `NetTopologySuite.IO.SqlServerBytes` alone brings 2.0.0, gets it for `geography` and `geometry` when it turns NetTopologySuite on, with `"libraryTypes": { "netTopologySuite": "on" }`, and the query methods read and send each value themselves, with nothing to call on the connection.  On both, a type override gives a column a shape, such as `NetTopologySuite.Geometries.Point`.  See [NetTopologySuite on PostgreSQL](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/libraries.html#nettopologysuite) and [NetTopologySuite on SQL Server](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/libraries.html#nettopologysuite).
-
-Two things catch a PostgreSQL project out.  Entity Framework Core's `Npgsql.EntityFrameworkCore.PostgreSQL.NodaTime` and `Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite` bring the plugins, so the library is on for the query methods, while `UseNodaTime()` or `UseNetTopologySuite()` inside EF Core's `UseNpgsql(...)` teaches EF Core's own data source alone: call it on the builder of the data source the methods run on too, or turn the library off.  And on a data source that calls `UseNodaTime()`, Npgsql gives Dapper an `Instant` for a `timestamptz`, so a query read through Dapper into a `DateTime` fails: read Dapper's queries on another data source, or give them NodaTime's types with the type override.  See [what a method reads and throws](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/query-methods.html#method-results).
-
-A project's JSON columns are `string`s until it turns System.Text.Json on, with `"libraryTypes": { "json": "on" }` in a settings file: then PostgreSQL's `json` and `jsonb` and SQL Server's `json` are a `JsonElement` in its query methods.  A type override, a column type or a marker gives a JSON column a `JsonDocument` or a `JsonNode` instead, or a class of your own, which the query methods read and send through System.Text.Json's serializer.  Nothing is registered on the data source, and a column of a string type that holds JSON, such as an `nvarchar(max)`, takes a class by the JSON opt-in, `-> json OrderMetadata`.  See JSON on [PostgreSQL](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/libraries.html#json) and [SQL Server](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/libraries.html#json), and [the recipe](https://mbcrawfo.github.io/SqlSource/recipes.html#class-in-a-json-column).
-
-The deliveries of [the PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) and [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md), `Methods/DeliveryQueries.sql`, show all three libraries in a whole project.
+See [Use NodaTime and NetTopologySuite](https://mbcrawfo.github.io/SqlSource/guides/nodatime-and-spatial.html).
 
 ## Custom type mapping
 
-Each column and parameter of a PostgreSQL query whose output is `models`, `methods` or `repository`, and whose entry in its sidecar is current, gets the C# type that Npgsql reads its database type as, or NodaTime's or NetTopologySuite's in the query methods of a project that references `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and System.Text.Json's where it turns JSON on: see [the PostgreSQL types](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/types.html#type-map).  Those of a SQL Server query get the C# type that Microsoft.Data.SqlClient reads their database type as, or NodaTime's, NetTopologySuite's or System.Text.Json's in the query methods of a project that turns that library on: see [the SQL Server types](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/types.html#types).  A project at the output `models` that references no Microsoft.Data.SqlClient, such as a library that leaves the driver to its application, gets the same types, but for `vector`, which needs the reference: see [which version of Microsoft.Data.SqlClient](https://mbcrawfo.github.io/SqlSource/reference/databases/sqlserver/types.html#which-sqlclient).  A few PostgreSQL types follow the version of Npgsql that the project references: Npgsql 10 reads `date`, `time`, `cidr`, `daterange` and `datemultirange` as other types than Npgsql 8 and 9 do, and a project that references no Npgsql gives those types their C# types with the type override, `"date": "System.DateOnly"` and `"time": "System.TimeOnly"` in a settings file's `typeOverrides` for an application on Npgsql 10: see [which version of Npgsql](https://mbcrawfo.github.io/SqlSource/reference/databases/postgresql/types.html#which-npgsql).  The type override gives a database type the C# type of your choice instead, for the `.sql` files under a settings file, or in a `.sql` file with `-- type-override:`, and each place changes only the types it names:
-
-```jsonc
-// sqlsource.json, beside your project file
-{
-    "root": true,
-    "dialect": "postgres",
-    "typeOverrides": {
-        "timestamptz": "System.DateTimeOffset",
-        "public.user_status": "MyApp.UserStatus",
-    },
-}
-```
-
-Each property of a model has the type its database type maps to, and a query method asks the driver for that type, so it must be one the driver reads, or one that your [converters](https://mbcrawfo.github.io/SqlSource/reference/converters.html#converters) convert to and from one it reads; a class of yours in a JSON column is read and sent through System.Text.Json's serializer instead, as [a class in a JSON column](https://mbcrawfo.github.io/SqlSource/reference/library-types-and-json.html#json-class) says, and on SQL Server the query methods convert NodaTime's, NetTopologySuite's and System.Text.Json's types themselves, as [SqlSource's own conversions](https://mbcrawfo.github.io/SqlSource/reference/converters.html#converters) says.  For the driver's part, see [the FAQ](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#i-got-an-invalidcastexception-what-does-it-mean-and-how-do-i-fix-it).  An entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  See [type overrides](https://mbcrawfo.github.io/SqlSource/reference/type-mapping.html#setting-type-overrides).
-
-Where two columns of one database type need two C# types, `users.id` a `UserId` and `posts.id` a `PostId` though both are `bigint`, map the column a value is read from with `columnTypes` in a settings file, or with `-- column:` in a `.sql` file, and give a parameter its type on its `-- param:` line.  Either wins over the type override:
-
-```jsonc
-// sqlsource.json, beside your project file
-{
-    "root": true,
-    "dialect": "postgres",
-    "columnTypes": {
-        "users.id": "UserId",
-        "posts.id": "PostId",
-    },
-}
-```
-
-```sql fragment
--- param: @author -> UserId
-```
-
-A C# type may be written by its short name, `UserId`, wherever SqlSource takes one, when the project and its references have one type of that name that the project can see; the generated code writes its full name.  See [column types](https://mbcrawfo.github.io/SqlSource/reference/model-properties.html#setting-column-types) and [giving a parameter a type](https://mbcrawfo.github.io/SqlSource/reference/parameters.html#param-marker).
+See [Use your own types: ids, enums, value objects](https://mbcrawfo.github.io/SqlSource/guides/custom-types.html#type-override).
 
 ## Where to next
 

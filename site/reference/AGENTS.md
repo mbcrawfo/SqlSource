@@ -7,7 +7,7 @@ Reference: look-up, one page for each thing.  A reader arrives by search or by a
 - **A section opens with an example**, then the rules.
 - **Reference states rules, not how-to.**  A procedure is a guide; link it.
 - **A section stands alone.**  It names its subject, and links what it relies on, since the reader has not read the sections above it.
-- **A new page gets an entry in `toc.yml`, under its group.**  A page not yet moved is listed there as `../<page>.md`, in the group it will join, until its phase of the documentation overhaul moves it.
+- **A new page gets an entry in `toc.yml`, under its group.**
 - **`../diagnostics.md` is listed last, under Errors**, though it is at the root of `site/`.  `errors.md` holds how errors are reported and the areas with their ids, and no section of one error.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

@@ -4,7 +4,9 @@
 
 ## What the generator writes
 
-The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code.  For each described query it writes a type for its parameters and a type for its rows, its [models](models.md#models), and, under the default [output](settings.md#setting-output), `repository`, a [repository method](repositories.md#repository-methods): an instance method of your type that gets its own connection and runs the query.  Under the output `methods` a query gets a [method that takes the connection](connection-methods.md#methods-that-take-a-connection) instead, for a connection, a transaction or a timeout that your own code manages.  A query whose output is `sql` or `models` gets a string constant instead, or a method that returns its SQL where it has [tokens](../concepts.md#token), for your own code to run.  It needs no database, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](../diagnostics.md#sqlsrc003), [SQLSRC012](../diagnostics.md#sqlsrc012)).  It needs the package, one attribute, and one choice: a query whose output is `models`, `methods` or `repository`, the default, must be described by the [tool](describing.md#describe), and the build reports one that has no current entry in its sidecar, while a query whose output is `sql` needs nothing more.
+The part of the `SqlSource` package that runs in the compiler and writes C# from your `.sql` files.
+
+The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code.  For each described query it writes a type for its parameters and a type for its rows, its [models](models.md#models), and, under the default [output](settings.md#setting-output), `repository`, a [repository method](repositories.md#repository-methods): an instance method of your type that gets its own connection and runs the query.  Under the output `methods` a query gets a [method that takes the connection](connection-methods.md#methods-that-take-a-connection) instead, for a connection, a transaction or a timeout that your own code manages.  A query whose output is `sql` or `models` gets a string constant instead, or a method that returns its SQL where it has [tokens](tokens.md#tokens), for your own code to run.  It needs no database, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](../diagnostics.md#sqlsrc003), [SQLSRC012](../diagnostics.md#sqlsrc012)).  It needs the package, one attribute, and one choice: a query whose output is `models`, `methods` or `repository`, the default, must be described by the [tool](describing.md#describe), and the build reports one that has no current entry in its sidecar, while a query whose output is `sql` needs nothing more.
 
 ```sql postgres
 -- name: GetUser -> one-optional
@@ -31,9 +33,9 @@ GetUserDto? user = await users.GetUser(new GetUserParams(42));
 ListFromDto[] rows = await users.ListFrom("users", "name DESC");
 ```
 
-`GetUser` and `ListFrom` are the generated methods of the two queries, public instance methods of `UserRepository`.  Each opens a connection from the data source, sends the query's parameters, runs it, reads its rows into its output model and disposes the connection: `GetUser` one row or null, as its [result shape](sql-files.md#result-shapes) `one-optional` says, and `ListFrom` every row, the default for a query that returns rows.  `ListFrom` takes the text of each token, and its token defaults, `users` and `name`, are only samples for [describing](../concepts.md#describe) the query.  `GetUserParams`, `GetUserDto` and `ListFromDto` are the models of the two queries, generated from what the tool recorded when it described them.  `UserRepository` also gets an interface of the two methods, `IUserRepository`, for code that takes a repository and a test that fakes one: see [the interface](repositories.md#repository-interface).  A query that is renamed or removed is a compile error where it is used, and so is a column that is renamed or removed once the query is described again.
+`GetUser` and `ListFrom` are the generated methods of the two queries, public instance methods of `UserRepository`.  Each opens a connection from the data source, sends the query's parameters, runs it, reads its rows into its output model and disposes the connection: `GetUser` one row or null, as its [result shape](sql-files.md#result-shapes) `one-optional` says, and `ListFrom` every row, the default for a query that returns rows.  `ListFrom` takes the text of each token, and its token defaults, `users` and `name`, are only samples for [describing](describing.md#describe) the query.  `GetUserParams`, `GetUserDto` and `ListFromDto` are the models of the two queries, generated from what the tool recorded when it described them.  `UserRepository` also gets an interface of the two methods, `IUserRepository`, for code that takes a repository and a test that fakes one: see [the interface](repositories.md#repository-interface).  A query that is renamed or removed is a compile error where it is used, and so is a column that is renamed or removed once the query is described again.
 
-With the output `models`, the same queries give `Sql.GetUser`, a [constant](#constants) that holds the text of the first query, and `Sql.ListFrom("users", "name DESC")`, a [token method](#token-methods) that returns the text of the second with its tokens filled in, and their models, for Dapper, ADO.NET or any other library to run: see [the recipe](../recipes.md#dapper-and-adonet).
+With the output `models`, the same queries give `Sql.GetUser`, a [constant](#constants) that holds the text of the first query, and `Sql.ListFrom("users", "name DESC")`, a [token method](#token-methods) that returns the text of the second with its tokens filled in, and their models, for Dapper, ADO.NET or any other library to run: see [the recipe](../guides/dapper.md#dapper-and-adonet).
 
 <a id="locations"></a>
 
@@ -243,6 +245,8 @@ public User Load(int id) => throw new NotImplementedException();
 
 ## Token methods
 
+What a query with a [token](tokens.md#tokens) becomes in place of a constant: a static method that takes the text of each token and returns the SQL with the tokens filled in.  See [token methods](#token-methods).
+
 ```csharp
 var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
@@ -250,7 +254,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 
 A query with a token whose output is `sql` or `models` is a `static string` method with the name of the query, as visible as a constant would be, `ListFrom(string table, string orderBy)`, in place of a constant.  Under `methods` or `repository` the query's [method](query-methods.md#query-methods) takes the tokens instead, and runs the query.  Its parameters, and what it returns, are under [tokens](tokens.md#tokens).
 
-A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](../concepts.md#query-parameter) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [tokens](tokens.md#tokens).
+A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](parameters.md#query-parameters) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [tokens](tokens.md#tokens).
 
 <a id="intellisense"></a>
 

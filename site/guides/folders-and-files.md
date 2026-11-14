@@ -32,3 +32,29 @@ Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the
 The file in `Legacy/` applies to the `.sql` files of its subfolders too, `Legacy/Reports/` among them, unless a settings file nearer to them sets the same setting.  Every setting of a query comes from the settings files of its `.sql` file, whichever type claims it, and never from those of a type's C# file.
 
 Only the settings whose row in [the table](../reference/settings.md#all-settings) lists a settings file can be given this way.  To change a setting for one file, write its marker in the file header, which wins over every settings file.
+
+<a id="leave-migration-scripts-out"></a>
+
+## Leave migration scripts out
+
+A `.sql` file that no `[SqlSourceGenerate]` type claims is not read, so scripts in a folder of their own do no harm.  See [the recipe](#leave-migration-scripts-out) to keep them away from the compiler altogether.
+
+```text
+App/
+    App.csproj
+    Queries/
+        UserRepository.cs      [SqlSourceGenerate] on UserRepository
+        UserRepository.sql     belongs to UserRepository
+    Migrations/
+        001_create_users.sql   not claimed by any type
+```
+
+A `.sql` file that no type claims is not read, so a folder of migration scripts beside your queries does no harm.  To keep the scripts away from the compiler altogether, remove them from the files the package hands it:
+
+```xml
+<ItemGroup>
+    <AdditionalFiles Remove="Migrations/**/*.sql" />
+</ItemGroup>
+```
+
+Rules: [which files belong to a type](../reference/attributes.md#files-of-a-type), [which `.sql` files are included](../reference/msbuild.md#included-files).

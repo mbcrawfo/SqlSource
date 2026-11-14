@@ -4,6 +4,8 @@
 
 ## Reporting a wrong model
 
+Run `dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip` where you run `describe`, with the same connection.  It describes that one query again and writes a bundle, a zip that lets a maintainer run SqlSource on your query with no database, after renaming your names and strings and checking that the renamed bundle still gives your query's answer.  Attach the zip to a [bug report](https://github.com/mbcrawfo/SqlSource/issues/new?template=bug-report.yml), and keep to yourself the mapping of the new names written beside it.  See [what is renamed before you share it](../reference/bundles.md#bundle-contents) for what is renamed and kept, and [reporting a wrong model](#raw-bundle) for what to do when a bundle cannot be renamed.
+
 ```console
 $ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip
 sqlsource: bundle '/work/report.zip' written

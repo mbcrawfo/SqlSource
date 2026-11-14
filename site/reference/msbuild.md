@@ -14,13 +14,19 @@ A project can set five MSBuild properties of SqlSource.  Write each in the proje
 | `SqlSourcePublicExceptions` | Whether the exceptions that the query methods throw are `public`.  `true` makes them `public` | Off: they are `internal` | [Public exceptions](exceptions.md#public-exceptions) |
 | `SqlSourceRepositoryInterfaces` | Whether the project's repositories get their interfaces.  `false` turns them off | On | [Repository interfaces](repositories.md#repository-interfaces) |
 
+<a id="build-requirements"></a>
+
+## What the build needs
+
+**Supported environments.**  A project that uses SqlSource targets .NET 8 or later and compiles C# 12 or later, the default for .NET 8.  It builds in the .NET SDK 9.0.300 or later, or in Visual Studio 2022 17.14 or later; the .NET 8 SDK and Visual Studio before 17.14 are not supported, and a build on one stops with [SQLSRC021](../diagnostics.md#sqlsrc021).
+
 <a id="included-files"></a>
 
 ## Which `.sql` files are included
 
 The package hands every `.sql` file under the project's folder to the compiler, as an `AdditionalFiles` item: that is how a source generator sees a file that is not C#.  The output and intermediate folders are left out, and so are folders whose names start with a dot, as the SDK leaves them out of your C# files.  The `sqlsource` tool reads the same list of `.sql` files.  A `.sql` file outside the project's folder is not included; list it, and its sidecar, yourself.
 
-The package hands the [sidecar](../concepts.md#sidecar) beside a `.sql` file to the compiler too, the file `Users.sql.json` for `Users.sql`, under the same rules.  The build reads the sidecar of each `.sql` file that a type claims, and reports a query that must be described and has no current entry in it: see [Output](settings.md#setting-output).
+The package hands the [sidecar](sidecars.md#sidecar-files) beside a `.sql` file to the compiler too, the file `Users.sql.json` for `Users.sql`, under the same rules.  The build reads the sidecar of each `.sql` file that a type claims, and reports a query that must be described and has no current entry in it: see [Output](settings.md#setting-output).
 
 To leave some files out:
 

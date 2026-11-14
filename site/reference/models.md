@@ -33,7 +33,7 @@ namespace App
 }
 ```
 
-A model is a type that the generator writes for a described query, from the query's entry in its [sidecar](../concepts.md#sidecar): an input model for its parameters, and an output model for a row of its result.  Above, a `public` type in the namespace `App` claims `UserRepository.sql`, and the table `users` has the columns `id`, an identity column, `name` and `email`, both `NOT NULL`, and `deleted_at`, in that order.  The two models are shown together; each is a file of its own among the generated files, named after its full name, such as `App.GetUserDto-Model.g.cs`.
+A model is a type that the generator writes for a described query, from the query's entry in its [sidecar](sidecars.md#sidecar-files): an input model for its parameters, and an output model for a row of its result.  Above, a `public` type in the namespace `App` claims `UserRepository.sql`, and the table `users` has the columns `id`, an identity column, `name` and `email`, both `NOT NULL`, and `deleted_at`, in that order.  The two models are shown together; each is a file of its own among the generated files, named after its full name, such as `App.GetUserDto-Model.g.cs`.
 
 The models are built at every build from the committed sidecars, with no database.  After a change to a query, describe it again (see [sidecar files](sidecars.md#sidecar-files)): until then its entry is out of date, and the query has no models.
 
@@ -197,7 +197,7 @@ The shape of the [model](#models) generated for a query's parameters (input) and
 - It stands in the file header and inside a query, as two markers.  It can also be `inputModelType` or `outputModelType` in a settings file.
 - Two queries that share a model must give it one shape, or the later is [SQLSRC257](../diagnostics.md#sqlsrc257).
 
-What each shape looks like is under [Shape](#model-shape).  To read rows through Dapper into sorted models, make them classes: see [the recipe](../recipes.md#models-through-dapper).
+What each shape looks like is under [Shape](#model-shape).  To read rows through Dapper into sorted models, make them classes: see [the recipe](../guides/dapper.md#models-through-dapper).
 
 <a id="model-documentation"></a>
 

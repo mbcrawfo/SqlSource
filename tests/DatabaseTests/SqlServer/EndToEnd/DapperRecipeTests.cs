@@ -14,9 +14,9 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// What the Dapper recipe of site/recipes.md (#dapper-with-sql-server) says for SQL Server beyond the generated
-// queries, on the connection that the recipe sets up: the type each C# parameter is sent as; a DateTime for a
-// datetime2, written or compared, goes as a TypedParameter, the recipe's sample copied in Types/, or with its DbType
+// What the Dapper guide, site/guides/dapper.md#dapper-with-sql-server, says for SQL Server beyond the generated
+// queries, on the connection that the guide sets up: the type each C# parameter is sent as; a DateTime for a
+// datetime2, written or compared, goes as a TypedParameter, the guide's sample copied in Types/, or with its DbType
 // in DynamicParameters over the generated input model; a SqlVector<float>, which Dapper refuses, goes as a
 // TypedParameter; a string is written to json as it is; DateOnly, TimeOnly and an alias type mapped to a struct are
 // read through their handlers; a mark in an alias is matched neither by a record nor by a class; and a command on a

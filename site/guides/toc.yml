@@ -1,9 +1,35 @@
-- name: Recipes
-  href: ../recipes.md
+- name: Queries
+  items:
+    - name: Pass a list of values (IN)
+      href: lists.md
+    - name: Choose a table or a clause at run time
+      href: dynamic-sql.md
+- name: Running queries
+  items:
+    - name: Insert or update many rows in one call (bulk)
+      href: many-rows.md
+    - name: Call a query without await, or stream rows
+      href: sync-and-streaming.md
+    - name: Give a repository its connection
+      href: repository-connection.md
+    - name: Change names, namespaces and visibility
+      href: naming-and-placement.md
+- name: Types
+  items:
+    - name: "Use your own types: ids, enums, value objects"
+      href: custom-types.md
+    - name: Read and write JSON columns
+      href: json.md
+    - name: Use NodaTime and NetTopologySuite
+      href: nodatime-and-spatial.md
 - name: Projects
   items:
+    - name: Use several databases
+      href: several-databases.md
     - name: Give a folder its own settings, or leave files out
       href: folders-and-files.md
+    - name: Use SqlSource in several projects
+      href: several-projects.md
 - name: Workflow
   items:
     - name: Describe queries as you save (watch)
@@ -18,3 +44,5 @@
   items:
     - name: Use Dapper or your own ADO.NET code
       href: dapper.md
+    - name: Use MySQL, SQLite, Oracle or another database
+      href: other-databases.md

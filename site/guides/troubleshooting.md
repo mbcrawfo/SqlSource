@@ -15,6 +15,23 @@ Use this page when the build succeeds but something is wrong: an exception at ru
 - **`NotSupportedException` from a collection method, on a connection that wraps the driver's.**  Most such connections cannot run a batch of commands.  See [a collection method on a connection that wraps the driver's](../reference/collection-methods.md#limit-wrapped-connection).
 - **`InvalidCastException` for an id type made by Vogen or StronglyTypedId.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and such a type has no method marked so.  See [Vogen and StronglyTypedId](../reference/converters.md#limit-vogen-and-stronglytypedid).
 
+<a id="invalidcastexception"></a>
+
+### `InvalidCastException`
+
+A query method asked the driver to read a column, or send a parameter, as a C# type the driver does not read.  Most often a [type override](../reference/type-mapping.md#setting-type-overrides), a [column type](../reference/model-properties.md#setting-column-types) or a `-- param:` line names a type the driver was never taught: a C# enum for a PostgreSQL enum, or a type of your own, such as an id or an `Email`.  There are two fixes:
+
+- **Teach the driver the type**, on the data source of your application: Npgsql's `MapEnum<T>()` for an enum, `MapComposite<T>()` for a composite type, or the plugin of a library such as NodaTime or NetTopologySuite.
+- **Add converters**: two static methods marked `[SqlSourceConverter]`, one from the type the driver reads to your type and one back, which the generated method calls.  See [converters](../reference/converters.md#converters) and [the recipe](custom-types.md#strongly-typed-id).
+
+When the message names a NodaTime type, such as "Reading as 'NodaTime.Instant' is not supported", the project references `Npgsql.NodaTime`, so its PostgreSQL query methods read NodaTime's types, and the data source they ran on never called `UseNodaTime()`, which inside EF Core's `UseNpgsql(...)` teaches EF Core's own data source alone: call it on the data source's builder, or turn NodaTime off.  A repository whose connection is a connection string makes a connection of its own with no plugin at all: give it the data source instead.  See [NodaTime on PostgreSQL](../reference/databases/postgresql/libraries.md#nodatime).
+
+When the message names a NetTopologySuite type, such as "Reading as 'NetTopologySuite.Geometries.Geometry' is not supported", it is the same for `Npgsql.NetTopologySuite` and `UseNetTopologySuite()`: see [NetTopologySuite on PostgreSQL](../reference/databases/postgresql/libraries.md#nettopologysuite).  When it is "Unable to cast object of type 'NetTopologySuite.Geometries.LineString' to type 'NetTopologySuite.Geometries.Point'", a column that you mapped to one shape held another: map it to `NetTopologySuite.Geometries.Geometry`, or keep the other shapes out in the query.
+
+When the message names a class of yours in a column of a string type that holds JSON, such as a `text` or an `nvarchar(max)`, say so with the JSON opt-in, `-> json OrderMetadata`, and the query methods read and send it through System.Text.Json's serializer: see [the JSON opt-in](../reference/library-types-and-json.md#json-opt-in).
+
+When the message is "Column 'name' is null.", the column held a null though its property cannot be null; on SQL Server the same is Microsoft.Data.SqlClient's `SqlNullValueException`, "Data is Null.".  Give the column a nullable property, by its alias or a `-- column:` line, or keep the null out in the query.  "Column 'name' holds a null element." is the same for an element of a converted array, and "Column 'name' holds a JSON null." for a JSON column that holds the JSON `null`, which is no SQL `NULL`, read into a class or a `JsonNode` whose property cannot be null.  A method with parameters called on a connection that wraps the driver's, and whose commands create or accept only parameters of their own type, fails too, typically with an `InvalidCastException`: call it on the driver's connection inside.  See [the limit](../reference/query-methods.md#limit-wrapped-connection).
+
 <a id="wrong-model"></a>
 
 ## A model that looks wrong

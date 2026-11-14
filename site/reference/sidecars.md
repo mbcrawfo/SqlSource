@@ -4,6 +4,10 @@
 
 ## Sidecar files
 
+The tool's record of what the database said about each query's parameters and columns.  It is the file `Users.sql.json` beside `Users.sql`.  It is committed with the project, so that a build needs no database, and it is never edited by hand: the tool writes it.  The build checks it, and reports a query that must be described and has no current entry in it.  See [sidecar files](#sidecar-files).
+
+The generator builds the [models](models.md#models) and the [query method](query-methods.md#query-methods) of a query from its entry in the sidecar.
+
 A sidecar is the tool's record of what the database said about each query's parameters and columns.  It is a JSON file named after the `.sql` file, beside it: `Users.sql.json` for `Users.sql`.
 
 ```text
