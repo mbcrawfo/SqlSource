@@ -1,0 +1,189 @@
+# base 3a40cb138e5910c6332e892f5942c717514c854a
+unit	disposition	to	arg	words	note
+site/settings.md:1	move-split	-	-	-	The h1 Settings goes: the page's h1 is Settings: every setting, and where you write it, new
+site/settings.md:3	corrected	site/reference/settings.md	C-02	A setting is a named choice that changes what SqlSource generates or does	C-02: the one definition of the map; "Every setting is defined here" goes, since each setting is defined on the page of what it changes; its examples and its three reaches stay
+site/settings.md:5-12	move	site/reference/settings.md#places	-	-	-
+site/settings.md:14-21	move	site/reference/settings.md#places	-	-	-
+site/settings.md:23-26	move	site/reference/settings.md#places	-	-	-
+site/settings.md:32	move	site/reference/settings.md#all-settings	-	-	-
+site/settings.md:34	corrected	site/reference/settings.md#all-settings	C-02	SqlSourceRepositoryInterfaces	C-02: it explains the matrix's columns; "for the two settings of the build and the repository interfaces, a property of the project" becomes the five properties of the project (SqlSource.props, SqlSource.targets)
+site/settings.md:60	move	site/reference/settings.md#all-settings	-	-	-
+site/settings.md:64-81	move	site/reference/settings.md#precedence	-	-	-
+site/settings.md:83-89	move	site/reference/settings.md#precedence	-	-	-
+site/settings.md:93-98	move	site/reference/settings.md#a-value-that-is-wrong	-	-	-
+site/settings.md:102-130	move	site/reference/settings.md#setting-output	-	-	-
+site/settings.md:134-152	move	site/reference/settings.md#setting-database	-	-	-
+site/settings.md:153	corrected	site/reference/settings.md#setting-database	C-01	The build reads it to choose the connection source of a repository method	C-01: "Only the tool reads this setting.  The build does not, so a wrong database in a settings file is reported by the tool and not by the build" becomes three sentences; MethodPlanner.DatabaseOf calls QuerySettings.ResolveDatabase, RunPlanner 260, SQLSRC030 and SQLSRC031
+site/settings.md:155	move	site/reference/settings.md#setting-database	-	-	Its link goes to connections.md#connections in place of cli.md#command-reference, as the map's row says
+site/settings.md:159-181	move	site/reference/settings.md#setting-dialect	-	-	-
+site/settings.md:183	move	site/reference/settings.md#setting-dialect	-	-	Its words about the dialect's places; merges/MP-10.md, with the opening of the term Dialect
+site/settings.md:185-189	move	site/reference/settings.md#setting-dialect	-	-	-
+site/settings.md:193-208	move	site/reference/generator-parameters.md#setting-generator-parameters	-	-	-
+site/settings.md:210	move	site/reference/generator-parameters.md#setting-generator-parameters	-	-	The opening of the term Generator parameter, which phase 8 pairs with it; merges/MP-10.md
+site/settings.md:212	move-split	site/reference/generator-parameters.md#setting-generator-parameters	-	-	The header row loses its column Effect: the table keeps Parameter and Default, and each Effect cell is under its h3
+site/settings.md:214	move-split	site/reference/generator-parameters.md#gp-keep-comments	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-keep-comments; the Effect cell stands word for word under the h3 `keep-comments` (gp-keep-comments)
+site/settings.md:215	move-split	site/reference/generator-parameters.md#gp-token-validation	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-token-validation; the Effect cell stands word for word under the h3 `token-validation` (gp-token-validation)
+site/settings.md:216	move-split	site/reference/generator-parameters.md#gp-sort-input	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-sort-input; the Effect cell stands word for word under the h3 `sort-input`, `sort-output` (gp-sort-input)
+site/settings.md:217	move-split	site/reference/generator-parameters.md#gp-table-models	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-table-models; the Effect cell stands word for word under the h3 `table-models` (gp-table-models)
+site/settings.md:218	move-split	site/reference/generator-parameters.md#gp-async-method-suffix	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-async-method-suffix; the Effect cell stands word for word under the h3 `async-method-suffix` (gp-async-method-suffix)
+site/settings.md:219	move-split	site/reference/generator-parameters.md#gp-array-pool	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-array-pool; the Effect cell stands word for word under the h3 `array-pool` (gp-array-pool)
+site/settings.md:220	move-split	site/reference/generator-parameters.md#gp-list-padding	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-list-padding; the Effect cell stands word for word under the h3 `list-padding` (gp-list-padding)
+site/settings.md:221	move-split	site/reference/generator-parameters.md#gp-collection-method	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-collection-method; the Effect cell stands word for word under the h3 `collection-method` (gp-collection-method)
+site/settings.md:222	move-split	site/reference/generator-parameters.md#gp-transaction	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-transaction; the Effect cell stands word for word under the h3 `transaction` (gp-transaction)
+site/settings.md:223	move-split	site/reference/generator-parameters.md#gp-method-type	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-method-type; the Effect cell stands word for word under the h3 `method-type` (gp-method-type)
+site/settings.md:224	move-split	site/reference/generator-parameters.md#gp-default	-	-	The cells Parameter and Default stay a row of the table, the name a link to #gp-default; the Effect cell stands word for word under the h3 `default` (gp-default)
+site/settings.md:226-253	move	site/reference/generator-parameters.md#setting-generator-parameters	-	-	-
+site/settings.md:397-467	move	site/reference/type-mapping.md#setting-type-overrides	-	-	-
+site/settings.md:471	move	site/reference/converters.md#converters	-	-	level: h3 to h2, as spec step 2 lists it
+site/settings.md:473-526	move	site/reference/converters.md#converters	-	-	-
+site/settings.md:530	move	site/reference/library-types-and-json.md#json-class	-	-	level: h4 to h2, as spec step 2 lists it
+site/settings.md:532-560	move	site/reference/library-types-and-json.md#json-class	-	-	-
+site/settings.md:561	move	site/reference/library-types-and-json.md#json-class	-	-	position: "keeps the rules above" > "keeps the rules of [converters]", the words linked to converters.md#converters, which is on another page now
+site/settings.md:562	move	site/reference/library-types-and-json.md#json-class	-	-	position: "as for an array that a converter converts, above" > "as for an array that a [converter] converts", the word linked to converters.md#converters, which is on another page now
+site/settings.md:563-568	move	site/reference/library-types-and-json.md#json-class	-	-	-
+site/settings.md:623	move	site/reference/library-types-and-json.md#json-opt-in	-	-	level: h3 to h2, as spec step 2 lists it
+site/settings.md:625-657	move	site/reference/library-types-and-json.md#json-opt-in	-	-	-
+site/settings.md:661-712	move	site/reference/library-types-and-json.md#setting-library-types	-	-	-
+site/settings.md:822	merge-pair	site/reference/attributes.md#setting-source	MP-07	-	merges/MP-07.md; an h2 after files-of-a-type, before limits
+site/settings.md:824-845	merge-pair	site/reference/attributes.md#setting-source	MP-07	-	-
+site/settings.md:851-878	move	site/guides/folders-and-files.md#configure-a-folder	-	-	-
+site/settings.md:884-910	move	site/reference/msbuild.md#included-files	-	-	-
+site/settings.md:959	merge-pair	site/reference/msbuild.md#online-build	MP-06	-	merges/MP-06.md; an h2 after running-in-the-build, the two kept as two headings
+site/settings.md:961-980	merge-pair	site/reference/msbuild.md#online-build	MP-06	-	-
+site/settings.md:984-1007	move	site/reference/msbuild.md#setting-env-file	-	-	-
+site/settings.md:1011-1029	move	site/reference/settings-file.md#settings-files	-	-	-
+site/settings.md:1031	move	site/reference/settings-file.md#settings-files	-	-	The opening of the term Settings file, which phase 8 pairs with it; merges/MP-10.md
+site/settings.md:1033	move	site/reference/settings-file.md#settings-files	-	-	a new <a id="file-name"> stands above it
+site/settings.md:1035	move	site/reference/settings-file.md#settings-files	-	-	a new <a id="file-contents"> stands above it
+site/settings.md:1038-1040	move	site/reference/settings-file.md#settings-files	-	-	-
+site/settings.md:1042	move	site/reference/settings-file.md#settings-files	-	-	a new <a id="files-of-a-sql-file"> stands above it
+site/settings.md:1044-1045	move	site/reference/settings-file.md#settings-files	-	-	-
+site/settings.md:1047	corrected	site/reference/settings-file.md#settings-files	C-01	which only the tool checks	C-01: "which only the tool reads" > "which only the tool checks"; a new <a id="which-files-are-checked"> stands above it; position: "see [known issues]" > "see [the limit]", the link going to #limit-symbolic-link on the same page
+site/settings.md:1049	corrected	site/reference/settings-file.md#settings-files	C-02	The project file holds no key of a settings file	C-02: "The project file holds no setting: an MSBuild property or item metadata named after a setting is not read" > "The project file holds no key of a settings file: an MSBuild property or item metadata named after one is not read", and the list of the properties a project sets gains SqlSourceRepositoryInterfaces, the fifth (SqlSource.props 54 and 55, RepositoryInterfaces.Read); a new <a id="settings-file-in-the-build"> stands above it
+site/settings.md:1051	move	site/reference/settings-file.md#settings-files	-	-	-
+site/settings.md:1055	move-split	-	-	-	The heading Known issues goes, and the anchor known-issues retires: the six bullets are limits under ## Limits of their pages
+site/settings.md:1057	move	site/reference/settings-file.md#limit-symbolic-link	-	-	Still a bullet, under its h3
+site/settings.md:1058	move	site/reference/msbuild.md#limit-file-added-by-a-target	-	-	Still a bullet, under its h3
+site/settings.md:1060-1066	move	site/reference/msbuild.md#limit-file-added-by-a-target	-	-	The bullet's fenced block, indented as before
+site/settings.md:1068	move	site/reference/msbuild.md#limit-file-added-by-a-target	-	-	The bullet's last paragraph, indented as before
+site/settings.md:1069	move	site/reference/type-mapping.md#limit-key-in-brackets	-	-	Still a bullet, under its h3
+site/settings.md:1070	move	site/reference/type-mapping.md#limit-nullable-type-argument	-	-	Still a bullet, under its h3
+site/settings.md:1071	move	site/reference/converters.md#limit-vogen-and-stronglytypedid	-	-	Still a bullet, under its h3
+site/settings.md:1073-1084	move	site/reference/converters.md#limit-vogen-and-stronglytypedid	-	-	The bullet's fenced block, indented as before
+site/settings.md:1086	move	site/reference/converters.md#limit-vogen-and-stronglytypedid	-	-	The bullet's last paragraph, indented as before
+site/settings.md:1087	move	site/reference/converters.md#limit-one-conversion-per-type	-	-	Still a bullet, under its h3
+@site/settings.md:28	corrected	site/reference/settings.md#places	C-02	the fourth as an MSBuild property of the project	C-02: "Which of the three" > "Which of the five places", and the fourth sample gets its clause; phase 1's words (phase-01 row site/settings.md:28)
+@site/settings.md:36	move-split	site/reference/settings.md#all-settings	-	-	The header row of phase 1's table: the matrix has the columns Setting, sqlsource.json key, Marker, In the file header, Inside a query, Attribute property, MSBuild property and Default, and no Values column
+@site/settings.md:38	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Output; the Values cell is held by settings.md#setting-output; each fact of it is in that section, checked one by one
+@site/settings.md:39	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Database; the Values cell is held by settings.md#setting-database; each fact of it is in that section, checked one by one
+@site/settings.md:40	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Dialect; the Values cell is held by settings.md#setting-dialect and dialects.md#choosing-a-dialect; each fact of it is in that section, checked one by one
+@site/settings.md:41	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Generator parameters; the Values cell is held by generator-parameters.md, its opening and table; each fact of it is in that section, checked one by one
+@site/settings.md:42	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Input and output model suffix; the Values cell is held by models.md#setting-model-suffix; each fact of it is in that section, checked one by one
+@site/settings.md:43	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Model namespace; the Values cell is held by models.md#setting-model-namespace; each fact of it is in that section, checked one by one
+@site/settings.md:44	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Input and output model type; the Values cell is held by models.md#setting-model-type; each fact of it is in that section, checked one by one
+@site/settings.md:45	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of One query's model name; the Values cell is held by models.md#setting-model-name; each fact of it is in that section, checked one by one
+@site/settings.md:46	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Type overrides; the Values cell is held by type-mapping.md#setting-type-overrides; each fact of it is in that section, checked one by one
+@site/settings.md:47	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Column types; the Values cell is held by model-properties.md#setting-column-types and library-types-and-json.md#json-opt-in; each fact of it is in that section, checked one by one
+@site/settings.md:48	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Library types; the Values cell is held by library-types-and-json.md#setting-library-types; each fact of it is in that section, checked one by one
+@site/settings.md:49	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Member location; the Values cell is held by members.md#locations and #setting-member-location; each fact of it is in that section, checked one by one
+@site/settings.md:50	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Visibility; the Values cell is held by members.md#setting-visibility; each fact of it is in that section, checked one by one
+@site/settings.md:51	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Nested class; the Values cell is held by members.md#setting-nested-class; each fact of it is in that section, checked one by one
+@site/settings.md:52	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Source; the Values cell is held by attributes.md#setting-source; each fact of it is in that section, checked one by one
+@site/settings.md:53	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Collection type; the Values cell is held by return-types.md#setting-collection-type; each fact of it is in that section, checked one by one
+@site/settings.md:54	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Repository interfaces; the Values cell is held by repositories.md#repository-interfaces; each fact of it is in that section, checked one by one
+@site/settings.md:55	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of Running the tool in the build; the Values cell is held by msbuild.md#online-build; each fact of it is in that section, checked one by one
+@site/settings.md:56	move-split	site/reference/settings.md#all-settings	-	-	The cells Setting and Written as are the matrix row of The build's .env file; the Values cell is held by msbuild.md#setting-env-file; each fact of it is in that section, checked one by one
+@site/settings.md:80	move	site/reference/settings.md#precedence	-	-	Phase 1's words (phase-01 row site/settings.md:82)
+@site/settings.md:292	move	site/reference/type-mapping.md#setting-type-overrides	-	-	Phase 1's pointer to SQLSRC232 (phase-01 row site/README.md:101/2)
+@site/settings.md:386	move	site/reference/converters.md#converters	-	-	Phase 2's sentence (phase-02 row site/diagnostics.md:333/5)
+@site/settings.md:585	move	site/guides/folders-and-files.md#configure-a-folder	-	-	Phase 1's words (phase-01 row site/settings.md:880); its link goes to reference/settings.md#all-settings
+@site/settings.md:697	move	site/reference/settings-file.md#settings-files	-	-	Phase 1's words (phase-01 row site/settings.md:1037); its link goes to settings.md#all-settings
+@site/settings.md:552	merge-pair	site/reference/attributes.md#setting-source	MP-07	-	Phase 6's words (phase-06 row site/settings.md:847): "on [the Attributes page]", now true of its own page
+site/generator.md:352	move	site/reference/models.md	-	-	position: "but for the [known issue]" > "but for the [limit]"; the link goes to type-mapping.md#limit-nullable-type-argument
+site/sql-files.md:200	move	site/reference/sidecars.md	-	-	position: "as [the known issues of settings] describe" > "as [a limit] describes", and "as that known issue shows" > "as that limit shows"; the link goes to msbuild.md#limit-file-added-by-a-target
+site/sql-files.md:47	move	site/reference/sql-files.md	-	-	position: "links to its section of [the settings page], which also says" > "links to its section, and [the settings page] says"; the sections of the settings are on several pages now, and settings.md#all-settings says where else each can be given
+site/parameters-and-tokens.md:252	move	site/reference/tokens.md	-	-	position: "is on [the settings page]" > "is on [the generator parameters page]"; the link goes to generator-parameters.md#setting-generator-parameters
+@site/guides/troubleshooting.md:5	restated-from	-	site/guides/troubleshooting.md#wrong-model	-	Phase 3's sentence that pointed to the known issues of settings goes: each of the six limits it pointed to has its own entry on this page
+-	new	site/reference/settings.md	-	-	The h1 Settings: every setting, and where you write it; the sentence after the definition that links settings-file.md
+-	new	site/reference/settings.md#places	-	-	The anchor places and the h2 The places a setting is written; the fourth sample, the sample of public-exceptions (settings.md 916-920 at the baseline); the table of the five places; the sentence and the five bullets of what is not a setting
+-	new	site/reference/settings.md#all-settings	-	-	The matrix of 22 rows and eight columns, in place of phase 1's table: rows 1 to 17, 19 and 20 are the old rows, rows 18, 21 and 22 are new
+-	new	site/reference/settings-file.md	-	-	The h1 sqlsource.json and its opening of two sentences, which link settings.md#all-settings and settings.md#precedence; the five anchors file-name, file-contents, files-of-a-sql-file, which-files-are-checked and settings-file-in-the-build above the bold parts
+-	new	site/reference/settings-file.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/reference/generator-parameters.md	-	-	The h1 Generator parameters; the table's rows of Parameter and Default, each name a link to its h3, cut from the rows of lines 212-224 at the baseline; the eleven h3, each the parameter's name in code font, and the twelve anchors gp-
+-	new	site/reference/type-mapping.md#limits	-	-	The heading Limits and its anchor; the h3 of 2 limits and their anchors
+-	new	site/reference/converters.md	-	-	The h1 Converters
+-	new	site/reference/converters.md#limits	-	-	The heading Limits and its anchor; the h3 of 2 limits and their anchors
+-	new	site/reference/library-types-and-json.md	-	-	The h1 Library types and JSON
+-	new	site/reference/msbuild.md#properties	-	-	The anchor properties, the h2 The properties, its two sentences and its table of the five properties, each with what it sets, its default and its section
+-	new	site/reference/msbuild.md#limits	-	-	The heading Limits and its anchor; the h3 of 1 limit and its anchor
+-	new	site/guides/folders-and-files.md	-	-	The h1 Give a folder its own settings, or leave files out; phases 8 and 9 fill the page
+-	new	site/guides/troubleshooting.md	-	-	6 entries: 1 under at-run-time, 3 under wrong-model, 2 under not-described, one for each limit of this phase
+-	new	docs/tech-debt/TD-0067-nullability-inside-a-mapped-type-argument-is-not-checked.md	C-05	-	C-05, not a user document, so no unit: its link and its words name site/reference/type-mapping.md#limit-nullable-type-argument
+-	new	site/AGENTS.md	-	-	Not a user document: four rows of Where a new thing goes name SettingsReferenceTests; settings.md leaves the pages not yet moved, with the sentence on Known issues
+-	new	site/guides/AGENTS.md	-	-	Not a user document: the exception for a group of one page names Projects too, until phase 8 (owner question p07 Q1)
+-	new	tests/SqlSource.Repository.Tests/Documentation/SiteStructureTests.cs	-	-	Not a user document: settings.md leaves PagesNotYetMoved
+-	new	tests/SqlSource.Repository.Tests/Documentation/SettingsReferenceTests.cs	-	-	Not a user document: the new test of the matrix, the marker index, the generator parameters and the five properties
+site/settings.md:212/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The header cells Parameter and Default
+site/settings.md:212/2	restated-from	-	site/reference/generator-parameters.md#setting-generator-parameters	*	The header cell Effect: each Effect cell stands under the h3 of its parameter
+site/settings.md:214/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-keep-comments
+site/settings.md:214/2	move	site/reference/generator-parameters.md#gp-keep-comments	-	*	The Effect cell, word for word under its h3
+site/settings.md:215/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-token-validation
+site/settings.md:215/2	move	site/reference/generator-parameters.md#gp-token-validation	-	*	The Effect cell, word for word under its h3
+site/settings.md:216/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-sort-input
+site/settings.md:216/2	move	site/reference/generator-parameters.md#gp-sort-input	-	*	The Effect cell, word for word under its h3
+site/settings.md:217/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-table-models
+site/settings.md:217/2	move	site/reference/generator-parameters.md#gp-table-models	-	*	The Effect cell, word for word under its h3
+site/settings.md:218/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-async-method-suffix
+site/settings.md:218/2	move	site/reference/generator-parameters.md#gp-async-method-suffix	-	*	The Effect cell, word for word under its h3
+site/settings.md:219/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-array-pool
+site/settings.md:219/2	move	site/reference/generator-parameters.md#gp-array-pool	-	*	The Effect cell, word for word under its h3
+site/settings.md:220/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-list-padding
+site/settings.md:220/2	move	site/reference/generator-parameters.md#gp-list-padding	-	*	The Effect cell, word for word under its h3
+site/settings.md:221/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-collection-method
+site/settings.md:221/2	move	site/reference/generator-parameters.md#gp-collection-method	-	*	The Effect cell, word for word under its h3
+site/settings.md:222/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-transaction
+site/settings.md:222/2	move	site/reference/generator-parameters.md#gp-transaction	-	*	The Effect cell, word for word under its h3
+site/settings.md:223/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-method-type
+site/settings.md:223/2	move	site/reference/generator-parameters.md#gp-method-type	-	*	The Effect cell, word for word under its h3
+site/settings.md:224/1	move	site/reference/generator-parameters.md#setting-generator-parameters	-	*	The cells Parameter and Default, a row of the table, the name a link to #gp-default
+site/settings.md:224/2	move	site/reference/generator-parameters.md#gp-default	-	*	The Effect cell, word for word under its h3
+@site/settings.md:36/1	move	site/reference/settings.md#all-settings	-	*	The header cells Setting and Written as: the matrix's column Setting and its columns of the places
+@site/settings.md:36/2	restated-from	-	site/reference/settings.md#all-settings	*	The header cell Values: the matrix has no Values column, and its Default column holds each default
+@site/settings.md:38/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:38/2	restated-from	-	site/reference/settings.md#setting-output	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:39/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:39/2	restated-from	-	site/reference/settings.md#setting-database	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:40/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:40/2	restated-from	-	site/reference/settings.md#setting-dialect	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:41/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:41/2	restated-from	-	site/reference/generator-parameters.md#setting-generator-parameters	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:42/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:42/2	restated-from	-	site/reference/models.md#setting-model-suffix	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:43/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:43/2	restated-from	-	site/reference/models.md#setting-model-namespace	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:44/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:44/2	restated-from	-	site/reference/models.md#setting-model-type	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:45/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:45/2	restated-from	-	site/reference/models.md#setting-model-name	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:46/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:46/2	restated-from	-	site/reference/type-mapping.md#setting-type-overrides	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:47/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:47/2	restated-from	-	site/reference/model-properties.md#setting-column-types	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:48/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:48/2	restated-from	-	site/reference/library-types-and-json.md#setting-library-types	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:49/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:49/2	restated-from	-	site/reference/members.md#setting-member-location	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:50/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:50/2	restated-from	-	site/reference/members.md#setting-visibility	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:51/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:51/2	restated-from	-	site/reference/members.md#setting-nested-class	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:52/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:52/2	restated-from	-	site/reference/attributes.md#setting-source	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:53/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:53/2	restated-from	-	site/reference/return-types.md#setting-collection-type	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:54/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:54/2	restated-from	-	site/reference/repositories.md#repository-interfaces	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:55/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:55/2	restated-from	-	site/reference/msbuild.md#online-build	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column
+@site/settings.md:56/1	move	site/reference/settings.md#all-settings	-	*	The cells Setting and Written as: the row's link and its places, in the matrix's columns
+@site/settings.md:56/2	restated-from	-	site/reference/msbuild.md#setting-env-file	*	The Values cell: each fact of it is in that section, checked one by one, and its default is in the matrix's Default column

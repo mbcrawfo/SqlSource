@@ -179,7 +179,7 @@ SELECT id, kind FROM events;
 - Without a value, a query belongs to the database named after its file's dialect: `postgres` for a PostgreSQL file, `mssql` for a SQL Server file.
 - It can be a marker in the file header or inside a query, or `database` in a settings file.
 - One name is one database for a whole run, with one connection and one dialect.  Two files that give one name two dialects are [SQLSRC211](../diagnostics.md#sqlsrc211).
-- The tool reads the setting to choose the connection it describes a query through.  The build reads it to choose the [connection source](repositories.md#repository-connection) of a repository method.  A `database` value that is not valid in a settings file is reported by the tool alone.
+- The tool reads the setting to choose the connection it describes a query through.  The build reads it to choose the connection source of a [repository method](repositories.md#repository-connection).  A `database` value that is not valid in a settings file is reported by the tool alone.
 
 To give the tool a connection for a name, see [the command reference](connections.md#connections).
 
