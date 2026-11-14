@@ -19,10 +19,8 @@ public sealed partial class SiteStructureTests
     [
         "concepts.md",
         "generator.md",
-        "postgresql.md",
         "recipes.md",
         "settings.md",
-        "sqlserver.md",
         "tool.md",
     ];
 

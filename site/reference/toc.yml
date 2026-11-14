@@ -27,9 +27,29 @@
     - name: Supported databases and versions
       href: databases/index.md
     - name: PostgreSQL
-      href: ../postgresql.md
+      items:
+        - name: Connect and describe
+          href: databases/postgresql/index.md
+        - name: Which columns can be null
+          href: databases/postgresql/nullability.md
+        - name: Types
+          href: databases/postgresql/types.md
+        - name: NodaTime, NetTopologySuite and JSON
+          href: databases/postgresql/libraries.md
+        - name: Running queries
+          href: databases/postgresql/query-methods.md
     - name: SQL Server
-      href: ../sqlserver.md
+      items:
+        - name: Connect and describe
+          href: databases/sqlserver/index.md
+        - name: Which columns can be null
+          href: databases/sqlserver/nullability.md
+        - name: Types
+          href: databases/sqlserver/types.md
+        - name: NodaTime, NetTopologySuite and JSON
+          href: databases/sqlserver/libraries.md
+        - name: Running queries
+          href: databases/sqlserver/query-methods.md
     - name: Other databases
       href: databases/other.md
 - name: Errors

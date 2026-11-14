@@ -75,4 +75,4 @@ Before two messages are compared, every GUID in them is masked as `<guid>`, and 
 
 | Name | Reason | Manual |
 |----|----|----|
-| `NpgsqlMultiplexingRefusesSyncIo` | With `Multiplexing=true` in the data source's connection string, Npgsql refuses a synchronous command on a connection with no transaction open, with `NotSupportedException`, where the asynchronous method runs | [A synchronous method needs a data source without multiplexing](../../../site/postgresql.md#method-results) |
+| `NpgsqlMultiplexingRefusesSyncIo` | With `Multiplexing=true` in the data source's connection string, Npgsql refuses a synchronous command on a connection with no transaction open, with `NotSupportedException`, where the asynchronous method runs | [A synchronous method needs a data source without multiplexing](../../../site/reference/databases/postgresql/query-methods.md#method-results) |
