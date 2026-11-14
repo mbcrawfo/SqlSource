@@ -13,7 +13,7 @@ using Xunit;
 
 namespace SqlSource.Repository.Tests.Watching;
 
-// Holds the VS Code task of site/recipes.md#start-the-watcher-with-your-editor to what the tool writes.  A
+// Holds the VS Code task of site/guides/describe-on-save.md#vs-code to what the tool writes.  A
 // change to the watch's two markers, to the format of the tool's errors, or to the recipe without the other fails it:
 // the task's background patterns must match its own marker alone, and its problem matcher the first line of an error
 // alone, never a continuation line, a summary, a marker or an error about no file.
@@ -134,10 +134,10 @@ public sealed class EditorRecipeTests
     private static string Background(string name) =>
         VsCodeTask().GetProperty("problemMatcher").GetProperty("background").GetProperty(name).GetString()!;
 
-    // The one jsonc block of the recipes that holds a background pattern: the VS Code task.
+    // The one jsonc block of the guide that holds a background pattern: the VS Code task.
     private static JsonElement VsCodeTask()
     {
-        var lines = File.ReadAllLines(RepositoryRoot.Path("site", "recipes.md"));
+        var lines = File.ReadAllLines(RepositoryRoot.Path("site", "guides", "describe-on-save.md"));
         var blocks = lines
             .Select((line, index) => (line, index))
             .Where(static entry => entry.line == "```jsonc")

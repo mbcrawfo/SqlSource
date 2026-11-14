@@ -1,6 +1,6 @@
 # SQL Server
 
-SqlSource reads SQL Server and Azure SQL files by the `mssql` [dialect](../../../settings.md#setting-dialect), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](../../../tool.md#sidecar-files).  These pages are about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a T-SQL file, its comments, strings and `[bracketed]` names, is on [the dialects page](../../dialects.md#what-a-dialect-changes).
+SqlSource reads SQL Server and Azure SQL files by the `mssql` [dialect](../../../settings.md#setting-dialect), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](../../sidecars.md#sidecar-files).  These pages are about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a T-SQL file, its comments, strings and `[bracketed]` names, is on [the dialects page](../../dialects.md#what-a-dialect-changes).
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -15,7 +15,7 @@ $ dotnet sqlsource describe --connection mssql="Server=localhost,1433;Database=a
 mssql (mssql): 12 described, 0 skipped, 0 failed
 ```
 
-The connection is given for the query's [logical database](../../../tool.md#connections), which is `mssql` when you name none, so its variable is `SQLSOURCE_CONNECTION_MSSQL`, or `SQLSOURCE_CONNECTION` when it is the run's only database.  The summary names that database first, and its dialect in parentheses.
+The connection is given for the query's [logical database](../../connections.md#connections), which is `mssql` when you name none, so its variable is `SQLSOURCE_CONNECTION_MSSQL`, or `SQLSOURCE_CONNECTION` when it is the run's only database.  The summary names that database first, and its dialect in parentheses.
 
 Under `mssql`, a name that a query declares with `DECLARE @name` is a local variable and not a [query parameter](../../../concepts.md#query-parameter): see [variables declared with `DECLARE`](../../parameters.md#declared-variables).  The rest of what the dialect changes is on [the dialects page](../../dialects.md#what-a-dialect-changes).
 

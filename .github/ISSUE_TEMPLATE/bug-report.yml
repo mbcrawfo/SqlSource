@@ -9,7 +9,7 @@ body:
         For a query whose model is wrong, or that the tool refuses, make a bundle of it with
         `dotnet sqlsource diagnose --query <file>:<name> --out <path outside your project>.zip` and attach the
         zip below.  Your names and strings are renamed in it, and a maintainer can run SqlSource on it with no database:
-        see [reporting a wrong model](https://mbcrawfo.github.io/SqlSource/tool.html#report-a-bug).
+        see [reporting a wrong model](https://mbcrawfo.github.io/SqlSource/guides/report-a-bug.html#report-a-bug).
   - type: markdown
     attributes:
       value: >-

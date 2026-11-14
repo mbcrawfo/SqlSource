@@ -416,9 +416,9 @@ The error is at the project file.
 /repo/App/App.csproj : error SQLSRC025: The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars.
 ```
 
-Install the tool as a local tool of the repository, as under [install the tool](tool.md#install-the-tool), or run `dotnet tool restore` where the tool manifest names it already.  To build from the sidecars you have committed, without the tool, set `SqlSourceOnline` to `false`.
+Install the tool as a local tool of the repository, as under [install the tool](reference/cli.md#install-the-tool), or run `dotnet tool restore` where the tool manifest names it already.  To build from the sidecars you have committed, without the tool, set `SqlSourceOnline` to `false`.
 
-See: [Running in the build](tool.md#running-in-the-build)
+See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
 ## SQLSRC026
 
@@ -434,9 +434,9 @@ The warning is at the project file.  A project can list `SQLSRC026` in the MSBui
 /repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.
 ```
 
-Run `dotnet tool restore`, or install the tool as under [install the tool](tool.md#install-the-tool), and the next build describes the queries.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too: set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars, which also stops the warning.
+Run `dotnet tool restore`, or install the tool as under [install the tool](reference/cli.md#install-the-tool), and the next build describes the queries.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too: set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars, which also stops the warning.
 
-See: [Running in the build](tool.md#running-in-the-build)
+See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
 ## SQLSRC027
 
@@ -454,7 +454,7 @@ The build ran `dotnet sqlsource describe` on the project before it compiled, and
 
 Bring the tool to the version of the `SqlSource` package the project uses, with `dotnet tool update SqlSource.Tool --version <version>`: the two are released together under one version number.  If the versions are the same, run `dotnet sqlsource describe` in the project's folder to see what the tool says.
 
-See: [Running in the build](tool.md#running-in-the-build)
+See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
 ## SQLSRC028
 
@@ -1456,7 +1456,7 @@ sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.IO.FileNotFou
 
 Here the current folder was deleted while a terminal was still in it.  When the message names such a condition of your machine, mend that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
 
-See: [Environment variables](tool.md#environment-variables)
+See: [Environment variables](reference/cli.md#environment-variables)
 
 ## SQLSRC201
 
@@ -1472,7 +1472,7 @@ Run the command from the folder of the project or the solution, or name the one 
 $ dotnet sqlsource describe src/App/App.csproj
 ```
 
-See: [Arguments](tool.md#arguments)
+See: [Arguments](reference/cli.md#arguments)
 
 ## SQLSRC202
 
@@ -1488,7 +1488,7 @@ Name the one to run on:
 $ dotnet sqlsource describe App.slnx
 ```
 
-See: [Arguments](tool.md#arguments)
+See: [Arguments](reference/cli.md#arguments)
 
 ## SQLSRC203
 
@@ -1500,7 +1500,7 @@ The path given to `sqlsource describe` does not exist, or is a file that is not 
 
 Give the path of a solution, of a C# project, or of a folder that holds exactly one of them.
 
-See: [Arguments](tool.md#arguments)
+See: [Arguments](reference/cli.md#arguments)
 
 ## SQLSRC204
 
@@ -1518,7 +1518,7 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
 
 Add the package with `dotnet add package SqlSource` and restore, or run the command on the project that has the queries.  A project with several target frameworks is read by the first of them: one that references SqlSource for a later framework alone is this error.
 
-See: [Arguments](tool.md#arguments)
+See: [Arguments](reference/cli.md#arguments)
 
 ## SQLSRC205
 
@@ -1537,7 +1537,7 @@ $ dotnet sqlsource describe
 
 Mend what MSBuild reports; `dotnet build` of the project reports the same.  When MSBuild says that the target `SqlSourceWriteManifest` does not exist, the SqlSource package of the project is older than the tool: update the package.  When the reason is that the project file does not exist, the solution lists a project that is not on the disk: restore the file, or take the project out of the solution.  When the reason is that `dotnet` could not be started, the .NET SDK is not installed or not on the path: the tool needs it, and not only the runtime it runs on.
 
-See: [Requirements](tool.md#requirements)
+See: [Requirements](reference/cli.md#requirements)
 
 ## SQLSRC206
 
@@ -1558,7 +1558,7 @@ When the build runs the tool, the message names the manifest file the build wrot
 
 Any other reason, one that names a line for one, means that the package wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
-See: [Install the tool](tool.md#install-the-tool)
+See: [Install the tool](reference/cli.md#install-the-tool)
 
 ## SQLSRC207
 
@@ -1575,7 +1575,7 @@ sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App
 
 Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
 
-See: [Options](tool.md#options)
+See: [Options](reference/cli.md#options)
 
 ## SQLSRC208
 
@@ -1679,7 +1679,7 @@ sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file tha
 
 Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` file named for it beside its own source file, or the ones its `Source` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
 
-See: [Arguments](tool.md#arguments)
+See: [Arguments](reference/cli.md#arguments)
 
 ## SQLSRC213
 
@@ -1687,16 +1687,16 @@ See: [Arguments](tool.md#arguments)
 
 Reported by: the tool.
 
-A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment, or in a [`.env` file](tool.md#env-file), it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database that can be described: a database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), does not count.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`; the environment wins over the `.env` file, variable by variable.  A variable that is empty or holds only white space is not set.
+A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment, or in a [`.env` file](reference/connections.md#env-file), it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database that can be described: a database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), does not count.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`; the environment wins over the `.env` file, variable by variable.  A variable that is empty or holds only white space is not set.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
     help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env.  The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another
 ```
 
-Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run reads, whether or not it is there: the one in the folder of the solution or project it runs on, or the one `--env-file` names.  It ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`, so a `.env` that sits elsewhere, such as in a folder above the project's, is seen not to be read.  Under `--env-file none` it says `The run reads no .env file` instead.  The run never reads a `.env` in a folder above its own.  A run on a solution reads the `.env` beside the solution, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`, in the place of the sentence above.  Move the file, or its connection variables, to the solution's folder, or name the file with [`--env-file`](tool.md#env-file), or for a build with [`SqlSourceEnvFile`](settings.md#setting-env-file).  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](tool.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
+Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run reads, whether or not it is there: the one in the folder of the solution or project it runs on, or the one `--env-file` names.  It ends with `The run reads that file alone: --env-file, or SqlSourceEnvFile in a build, names another`, so a `.env` that sits elsewhere, such as in a folder above the project's, is seen not to be read.  Under `--env-file none` it says `The run reads no .env file` instead.  The run never reads a `.env` in a folder above its own.  A run on a solution reads the `.env` beside the solution, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads /work/.env alone, and --env-file, or SqlSourceEnvFile in a build, names another`, in the place of the sentence above.  Move the file, or its connection variables, to the solution's folder, or name the file with [`--env-file`](reference/connections.md#env-file), or for a build with [`SqlSourceEnvFile`](settings.md#setting-env-file).  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215), or a variable that two databases share is set, [SQLSRC214](#sqlsrc214).  Under `SqlSourceOnline` `true` it reports it for every database without one.
 
-See: [Connections](tool.md#connections)
+See: [Connections](reference/connections.md#connections)
 
 ## SQLSRC214
 
@@ -1710,9 +1710,9 @@ The variable of a database's name is the name in upper case with every character
 /work/App/Queries/Users.sql(1,10): error SQLSRC214: The databases 'app-v2' and 'app_v2' both read their connection from SQLSOURCE_CONNECTION_APP_V2
 ```
 
-Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.  A build that [runs the tool](tool.md#running-in-the-build) reports it too when the variable is set, in the environment or in the `.env` file, rather than going on with the committed sidecars.
+Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.  A build that [runs the tool](reference/msbuild.md#running-in-the-build) reports it too when the variable is set, in the environment or in the `.env` file, rather than going on with the committed sidecars.
 
-See: [Connections](tool.md#connections)
+See: [Connections](reference/connections.md#connections)
 
 ## SQLSRC215
 
@@ -1729,7 +1729,7 @@ Reported by: the tool.
 
 Set the variable of each database, as the `help:` line names them, or give each with `--connection`, or restrict the run to one database with `--database`.  The error stands in the place of [SQLSRC213](#sqlsrc213) and is reported as that one is: once for a database, at its first query that must be described.
 
-See: [Connections](tool.md#connections)
+See: [Connections](reference/connections.md#connections)
 
 ## SQLSRC216
 
@@ -1763,7 +1763,7 @@ A sidecar is written whole or not at all: when every query of its `.sql` file th
 
 Mend the queries that failed, or run `describe` without the filter that left a query out, so that every query of the file is described in one run.  The sidecar on the disk is as it was before the run.  The error is there so that a description that was not saved does not look like a success; a file that was held back with none of its queries described has only the errors of those queries.
 
-See: [Describing again](tool.md#describing-again)
+See: [Describing again](reference/sidecars.md#describing-again)
 
 ## SQLSRC218
 
@@ -1795,7 +1795,7 @@ For a bundle of `diagnose`:
 - **The path of `--out` ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, in any case.  The tool refuses it with the reason `a bundle is not written over a .sql file, a sidecar, a project or a solution`, before it describes anything, and touches nothing.  Give the bundle a name of its own, such as `report.zip`.
 - **The bundle or its mapping cannot be written**, because its folder is not there, it is a folder, or the system will not let the tool write it.  The query has been described by then, and nothing is written past the file that failed: when the mapping fails, the bundle is written and its line printed, and the error is at the mapping.  The exit code is 1.  Run the command again with an `--out` in a folder that exists and can be written.
 
-See: [Logs](tool.md#logs), [making a bundle with `diagnose`](tool.md#diagnose)
+See: [Logs](reference/cli.md#logs), [making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
 ## SQLSRC219
 
@@ -1836,7 +1836,7 @@ Reported by: the tool.
 
 The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
 
-See: [Check in CI](tool.md#check-in-ci)
+See: [Check in CI](reference/describing.md#check-in-ci)
 
 ## SQLSRC220
 
@@ -1854,7 +1854,7 @@ $ dotnet sqlsource describe
 
 Run `dotnet restore` on the solution or the project, then the command again.  In a solution every C# project is checked, one that has no SQL too: a run on a fresh checkout must not succeed by finding nothing.  A reference that keeps the package's MSBuild files out of the project, `ExcludeAssets="build"` for one, gives this error after a restore as well: remove that from the reference.
 
-See: [Requirements](tool.md#requirements)
+See: [Requirements](reference/cli.md#requirements)
 
 ## SQLSRC221
 
@@ -1918,7 +1918,7 @@ The tool could not open a session with the database of a query that must be desc
     help: check that the database is running and that the connection string names it
 ```
 
-**Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.  In a build that [runs the tool](tool.md#running-in-the-build), the error fails the build, and the `help:` line also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
+**Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.  In a build that [runs the tool](reference/msbuild.md#running-in-the-build), the error fails the build, and the `help:` line also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
 
 The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the error, listed in [PostgreSQL's error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
 
@@ -2400,7 +2400,7 @@ The sidecar of a `.sql` file, the `.sql.json` file beside it, is not a file that
 
 Run `dotnet sqlsource describe`, which writes the whole file again, and commit it.  After a merge conflict, leave the conflict in the file: the tool cannot read it, so it describes every query of the file again.  If you have already taken one side, run `dotnet sqlsource describe --force` on the `.sql` file instead, since the side you took may hold entries written before a schema change.  Either way, first bring your database to the schema of the merged code, such as by applying the other branch's migrations: the tool writes what your database says.  While the sidecar cannot be read, no query of the file gets an error about its entry.
 
-See: [Sidecars in git](tool.md#sidecars-in-git)
+See: [Sidecars in git](reference/sidecars.md#sidecars-in-git)
 
 ## SQLSRC238
 
@@ -2416,7 +2416,7 @@ The sidecar was written by a newer version of the `sqlsource` tool, in a format 
 
 Update the `SqlSource` package to the version of the tool that wrote the sidecar.  The package and the tool share a version, and a project should use the same one for both.  Until then, no query of the file gets an error about its entry.
 
-See: [Sidecar files](tool.md#sidecar-files)
+See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
 ## SQLSRC239
 
@@ -2432,7 +2432,7 @@ The sidecar was written by an older version of the `sqlsource` tool, in a format
 
 Run `dotnet sqlsource describe` with the tool of the package's version, and commit the sidecar it writes.  Until then, no query of the file gets an error about its entry.
 
-See: [Sidecar files](tool.md#sidecar-files)
+See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
 ## SQLSRC240
 
@@ -2458,7 +2458,7 @@ This is a warning, so that a build goes on while the sidecars are written again.
 </PropertyGroup>
 ```
 
-See: [Sidecar files](tool.md#sidecar-files)
+See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
 ## SQLSRC241
 
@@ -2518,7 +2518,7 @@ The query has changed since its entry in the sidecar was written: its SQL, the t
 
 Run `dotnet sqlsource describe` and commit the sidecar it writes.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 is the fix.
 
-See: [Describing again](tool.md#describing-again)
+See: [Describing again](reference/sidecars.md#describing-again)
 
 ## SQLSRC245
 
@@ -2538,7 +2538,7 @@ A `.sql` file that two projects include is the exception when one of them misses
 
 This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`.
 
-See: [Sidecar files](tool.md#sidecar-files)
+See: [Sidecar files](reference/sidecars.md#sidecar-files)
 
 ## SQLSRC246
 
@@ -3223,7 +3223,7 @@ The tool also reports a C# file in another encoding whose `[SqlSourceGenerate]` 
 
 Save the file as UTF-8, with the "Save with encoding" command of your editor, and run `dotnet sqlsource describe` again.  That fixes the entries the build reported as missing or out of date.  For a `.sql` file the error is reported once, at the file with no line or column; for a C# file it is reported at the `Source` argument or the type's name, with its line and column.  When the file has a parse error of its own, the tool reports this error instead of the parse errors, since what it read may not be what the build reads.  A file that is also [SQLSRC209](#sqlsrc209) gets this error alone.
 
-See: [Describing again](tool.md#describing-again)
+See: [Describing again](reference/sidecars.md#describing-again)
 
 ## SQLSRC272
 
@@ -3526,7 +3526,7 @@ $ dotnet sqlsource describe /work/App
 
 Give yourself the right to read the file, or remove it, or give the connections another way: `--connection`, or the variables of the environment, with `--env-file none`, or in a build [`SqlSourceEnvFile`](settings.md#setting-env-file) `none`, so that the run reads no file.
 
-See: [A `.env` file](tool.md#env-file)
+See: [A `.env` file](reference/connections.md#env-file)
 
 ## SQLSRC286
 
@@ -3551,7 +3551,7 @@ The reason is one of six:
 
 Fix the line named; for `it is not saved as UTF-8`, save the file as UTF-8 with the "Save with encoding" command of your editor.  A connection string that holds a `#`, a quote or a backslash is safest in single quotes, as `SQLSOURCE_CONNECTION_BILLING='Host=db;Password=a#b'`.
 
-See: [A `.env` file](tool.md#env-file)
+See: [A `.env` file](reference/connections.md#env-file)
 
 ## SQLSRC287
 
@@ -3573,7 +3573,7 @@ On Linux, raise the limit that the message names.  For a message about `inotify 
 
 A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder, such as one that you may not read, or one that was deleted where the watch was not also looking at the folder that held it, such as your repository's own folder, and then gives no help line.  It says so once while the folder stays that way, and sees the folder's changes again as soon as it can list it.
 
-See: [Describe on save](tool.md#describe-on-save)
+See: [Describe on save](reference/describing.md#describe-on-save)
 
 ## SQLSRC288
 
@@ -3590,7 +3590,7 @@ $ dotnet sqlsource replay /work/report.zip
 
 Check the path first, and that the zip file was not cut short by the download or the mail that carried it.  If the path is right, ask the person who made the bundle for it again; a bundle that was edited by hand, or unzipped and zipped again with a file left out, is read the same way as a damaged one.
 
-See: [Checking a bundle with `replay`](tool.md#replay)
+See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 ## SQLSRC289
 
@@ -3607,7 +3607,7 @@ $ dotnet sqlsource replay /work/report.zip
 
 Update the `sqlsource` tool to the latest version, and replay the bundle again.
 
-See: [Checking a bundle with `replay`](tool.md#replay)
+See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 ## SQLSRC290
 
@@ -3624,7 +3624,7 @@ $ dotnet sqlsource replay /work/report.zip
 
 Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and replay or scrub the bundle again.  When the message says `another version of sqlsource`, ask the person who made the bundle which version it was.  When it names the same version twice, the bundle was edited by hand or damaged, and installing another version does not help: ask the person who made the bundle for it again, since a bundle edited by hand cannot be replayed.
 
-See: [Checking a bundle with `replay`](tool.md#replay)
+See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 ## SQLSRC291
 
@@ -3641,7 +3641,7 @@ $ dotnet sqlsource replay /work/report.zip
 
 Update the `sqlsource` tool to the latest version, and replay the bundle again.
 
-See: [Checking a bundle with `replay`](tool.md#replay)
+See: [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 ## SQLSRC292
 
@@ -3660,7 +3660,7 @@ Reported by: the tool.
 
 Copy the name from the query's `-- name:` line, letter for letter.  A query whose output is `sql` gets no description to report: if its generated code is wrong, open an issue that shows the query and the code you got.
 
-See: [Making a bundle with `diagnose`](tool.md#diagnose)
+See: [Making a bundle with `diagnose`](reference/bundles.md#diagnose)
 
 ## SQLSRC293
 
@@ -3679,7 +3679,7 @@ The text found is yours, such as a name of your schema, so do not paste this err
 
 Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
 
-See: [When a bundle cannot be made safe](tool.md#raw-bundle)
+See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 ## SQLSRC294
 
@@ -3696,7 +3696,7 @@ Reported by: the tool.
 
 Make a raw bundle instead, by running the same command with `--no-obfuscate`.  It keeps every name of yours, so keep it to yourself.  Open an issue on GitHub that says a raw bundle is ready, and do not attach the bundle: a maintainer will say how to send it.
 
-See: [When a bundle cannot be made safe](tool.md#raw-bundle), [known issues](tool.md#known-issues)
+See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 ## SQLSRC295
 
@@ -3715,7 +3715,7 @@ Reported by: the tool.
 
 A bundle that is renamed already can be posted as it is, with the mapping that was written beside it kept to yourself.  For the other reason, make the raw bundle again with `diagnose --no-obfuscate`, and give `--scrub` that one.
 
-See: [When a bundle cannot be made safe](tool.md#raw-bundle)
+See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle)
 
 ## SQLSRC296
 
@@ -3731,7 +3731,7 @@ Reported by: the tool.
 
 Install the version of `sqlsource` that the message names as the maker of the bundle, for example with `dotnet tool update SqlSource.Tool --version 1.4.0`, and scrub the bundle again.  When it names the same version twice, the bundle was edited by hand or damaged: make the raw bundle again with `diagnose --no-obfuscate`.
 
-See: [When a bundle cannot be made safe](tool.md#raw-bundle), [Checking a bundle with `replay`](tool.md#replay)
+See: [When a bundle cannot be made safe](guides/report-a-bug.md#raw-bundle), [Checking a bundle with `replay`](reference/bundles.md#replay)
 
 ## SQLSRC297
 

@@ -1,6 +1,6 @@
 # PostgreSQL
 
-SqlSource reads PostgreSQL files by the `postgres` [dialect](../../../settings.md#setting-dialect), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](../../../tool.md#sidecar-files).  These pages are about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](../../dialects.md#what-a-dialect-changes).
+SqlSource reads PostgreSQL files by the `postgres` [dialect](../../../settings.md#setting-dialect), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](../../sidecars.md#sidecar-files).  These pages are about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](../../dialects.md#what-a-dialect-changes).
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -15,7 +15,7 @@ $ dotnet sqlsource describe --connection postgres="Host=localhost;Database=app;U
 postgres (postgres): 12 described, 0 skipped, 0 failed
 ```
 
-The connection is given for the query's [logical database](../../../tool.md#connections), which is `postgres` when you name none, so its variable is `SQLSOURCE_CONNECTION_POSTGRES`, or `SQLSOURCE_CONNECTION` when it is the run's only database.  The summary names that database first, and its dialect in parentheses.
+The connection is given for the query's [logical database](../../connections.md#connections), which is `postgres` when you name none, so its variable is `SQLSOURCE_CONNECTION_POSTGRES`, or `SQLSOURCE_CONNECTION` when it is the run's only database.  The summary names that database first, and its dialect in parentheses.
 
 <a id="connecting"></a>
 
@@ -115,4 +115,4 @@ A described PostgreSQL query gets the [models](../../../generator.md#models) tha
 
 ### Describing is slow on a table with thousands of partitions
 
-- **A query over a table with many partitions is slow to describe.**  The tool looks at every partition of a partitioned table, whatever the query's conditions, when it works out which columns can be null.  On a table of thousands of partitions each such query takes longer to describe, and the [log](../../../tool.md#logs) of the run grows.  Only describing is slower; nothing else is affected.
+- **A query over a table with many partitions is slow to describe.**  The tool looks at every partition of a partitioned table, whatever the query's conditions, when it works out which columns can be null.  On a table of thousands of partitions each such query takes longer to describe, and the [log](../../cli.md#logs) of the run grows.  Only describing is slower; nothing else is affected.

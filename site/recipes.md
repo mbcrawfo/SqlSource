@@ -5,9 +5,9 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Read one folder with another dialect](#folder-with-another-dialect)
 - [Leave migration scripts out](#leave-migration-scripts-out)
 - [Use several databases](#use-several-databases)
-- [Check the sidecars in CI](#check-sidecars-in-ci)
-- [Describe again after a schema change](#after-a-migration)
-- [Start the watcher with your editor](#start-the-watcher-with-your-editor)
+- [Check the sidecars in CI](guides/ci.md#check-sidecars-in-ci)
+- [Describe again after a schema change](start/keep-up-to-date.md#after-a-migration)
+- [Start the watcher with your editor](guides/describe-on-save.md#start-the-watcher-with-your-editor)
 - [Run queries in a transaction](#queries-in-a-transaction)
 - [Insert many rows in one call](#insert-many-rows)
 - [Run a query from code that does not await](#run-without-awaiting)
@@ -62,7 +62,7 @@ $ dotnet sqlsource describe
 
 Add `"output": "sql"` to `Reporting/sqlsource.json`, or `-- output: sql` to a file, when the reports want their SQL alone: the tool then leaves them out and needs no connection for them.
 
-Rules: [configure one folder differently](settings.md#configure-a-folder), [settings files](settings.md#settings-files), [dialect](settings.md#setting-dialect), [which place wins](settings.md#precedence), [connections](tool.md#connections).
+Rules: [configure one folder differently](settings.md#configure-a-folder), [settings files](settings.md#settings-files), [dialect](settings.md#setting-dialect), [which place wins](settings.md#precedence), [connections](reference/connections.md#connections).
 
 <a id="leave-migration-scripts-out"></a>
 
@@ -118,140 +118,7 @@ public partial class Accounting(
     [SqlSourceConnection(Database = "reports")] NpgsqlDataSource reports);
 ```
 
-Rules: [database](settings.md#setting-database), [connections](tool.md#connections), [a repository's connection](generator.md#repository-connection).
-
-<a id="check-sidecars-in-ci"></a>
-
-## Check the sidecars in CI
-
-In a PostgreSQL project (`"dialect": "postgres"` in its `sqlsource.json`), this GitHub Actions job starts PostgreSQL, creates the schema, and fails when a sidecar that is checked in does not match:
-
-```yaml
-jobs:
-  sidecars:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18.6
-        env:
-          POSTGRES_DB: app
-          POSTGRES_PASSWORD: ci
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-      - run: dotnet tool restore
-      - run: dotnet restore
-      - run: ./scripts/migrate.sh # creates your schema; replace with your own step
-      - run: dotnet sqlsource describe --check
-        env:
-          SQLSOURCE_CONNECTION: Host=localhost;Database=app;Username=postgres;Password=ci
-```
-
-In a SQL Server project (`"dialect": "mssql"` in its `sqlsource.json`), the service and the connection change; the steps are the same, and the step that creates your schema creates the database too:
-
-```yaml
-    services:
-      mssql:
-        image: mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04
-        env:
-          ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: Ci-Passw0rd
-        ports:
-          - 1433:1433
-        options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P Ci-Passw0rd -Q 'SELECT 1'"
-          --health-interval 5s --health-timeout 5s --health-retries 20
-```
-
-```yaml
-      - run: dotnet sqlsource describe --check
-        env:
-          SQLSOURCE_CONNECTION: Server=localhost,1433;Database=app;User ID=sa;Password=Ci-Passw0rd;TrustServerCertificate=True
-```
-
-`TrustServerCertificate=True` is for the job's own server, whose certificate nothing trusts: see [connecting to SQL Server](reference/databases/sqlserver/index.md#connecting).
-
-Name the server's exact version in the image, a PostgreSQL minor or a SQL Server cumulative update, and move it when you move your database: a tag such as `-latest` moves to a new server without a word, and a new server can describe a query otherwise than the one your sidecars were written on.
-
-Rules: [check in CI](tool.md#check-in-ci), [connections](tool.md#connections) for the variable, [exit codes](tool.md#exit-codes), [SQLSRC219](diagnostics.md#sqlsrc219).
-
-<a id="after-a-migration"></a>
-
-## Describe again after a schema change
-
-In a PostgreSQL project (`"dialect": "postgres"` in its `sqlsource.json`), after a migration:
-
-```console
-$ dotnet sqlsource describe --force
-billing (postgres): 16 described, 0 skipped, 0 failed
-$ git add '*.sql.json'
-$ git commit -m "Describe the queries again after the migration"
-```
-
-Rules: [after a schema change](tool.md#after-a-schema-change), [describing again](tool.md#describing-again).
-
-<a id="start-the-watcher-with-your-editor"></a>
-
-## Start the watcher with your editor
-
-Have your editor start `dotnet sqlsource describe --watch` for you, so the sidecars stay current as you save.  The rules are in [describe on save](tool.md#describe-on-save), and what your editor does with a sidecar the watch writes is in [what your editor shows](tool.md#what-your-editor-shows).
-
-### VS Code
-
-```jsonc
-// .vscode/tasks.json
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "sqlsource watch",
-      "type": "shell",
-      "command": "dotnet sqlsource describe --watch",
-      "isBackground": true,
-      "runOptions": { "runOn": "folderOpen" },
-      "presentation": { "reveal": "silent", "panel": "dedicated" },
-      "problemMatcher": {
-        "owner": "sqlsource",
-        "source": "sqlsource",
-        "fileLocation": ["autoDetect", "${workspaceFolder}"],
-        "pattern": {
-          "regexp": "^(?!sqlsource )(\\S.*?)(?:\\((\\d+),(\\d+)\\))?\\s?: (error|warning) (SQLSRC\\d+): (.*)$",
-          "file": 1, "line": 2, "column": 3, "severity": 4, "code": 5, "message": 6
-        },
-        "background": {
-          "activeBegin": true,
-          "beginsPattern": "^sqlsource: change detected; describing$",
-          "endsPattern": "^sqlsource: watching for changes; press Ctrl\\+C to stop$"
-        }
-      }
-    }
-  ]
-}
-```
-
-- **It starts when you open the folder.**  The first time, VS Code asks whether to allow automatic tasks in every folder you trust, and keeps your answer; it never runs one in a folder it does not trust.  The watch runs in a terminal panel of its own.  If it does not start when you open the folder, run **Tasks: Manage Automatic Tasks** from the Command Palette, choose **Allow Automatic Tasks** and open the folder again, or start it once with **Tasks: Run Task** and `sqlsource watch`.
-- **An error at a file is listed in the Problems panel**, at that file, and at the query's line and column when it has one, from the error's first line; the lines under it, such as `see:`, stay in the terminal.  An error about no file, such as [SQLSRC200](diagnostics.md#sqlsrc200), stays in the watch's terminal, which the task does not bring forward: look there when a pass reports errors and the panel shows none.
-- **Open the folder that holds your solution or project.**  If you open a folder above it, add `"options": { "cwd": "${workspaceFolder}/src/App" }` to the task, with the path of that folder.
-
-This recipe has not been checked in VS Code.
-
-### Rider
-
-1. **Run > Edit Configurations**, add a **Shell Script** configuration, choose **Script text** and give it `dotnet sqlsource describe --watch`, with the solution's folder as its working directory.
-2. **Settings > Tools > Startup Tasks**, add that configuration.
-
-The watch then starts when the solution opens, in a terminal pane, where the path of each error is a link to its file and line.  Checked in Rider 2026.2 on macOS.
-
-### Visual Studio
-
-Open **View > Terminal**, the Developer PowerShell, and run `dotnet sqlsource describe --watch` in the solution's folder.  It runs until you stop it with Ctrl+C or close the terminal.  This has not been checked in Visual Studio.
-
-Rules: [describe on save](tool.md#describe-on-save), [what your editor shows](tool.md#what-your-editor-shows).
+Rules: [database](settings.md#setting-database), [connections](reference/connections.md#connections), [a repository's connection](generator.md#repository-connection).
 
 <a id="queries-in-a-transaction"></a>
 

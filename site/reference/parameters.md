@@ -48,7 +48,7 @@ A `-- param:` marker inside a query declares one parameter.  The form is `@name`
 
 The marker goes inside a query, under its `-- name:` line.  In the file header it is [SQLSRC116](../diagnostics.md#sqlsrc116): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 
-A change to the type or the nullability of a `-- param:` marker, like a change to the SQL, makes the query's sidecar out of date, and so does adding or removing `not null`, since it is recorded apart from saying nothing.  Run `dotnet sqlsource describe` again: see [sidecar files](../tool.md#sidecar-files).  The C# type after `->`, with or without `json`, changes nothing that is described, so adding, changing or removing it leaves the sidecar current, and so does adding or removing a marker that gives neither a type nor a nullability, such as `-- param: @team -> TeamId` or `-- param: @team`.  A query with such a marker whose entry an earlier version of the tool wrote is out of date once: describe it again.
+A change to the type or the nullability of a `-- param:` marker, like a change to the SQL, makes the query's sidecar out of date, and so does adding or removing `not null`, since it is recorded apart from saying nothing.  Run `dotnet sqlsource describe` again: see [sidecar files](sidecars.md#sidecar-files).  The C# type after `->`, with or without `json`, changes nothing that is described, so adding, changing or removing it leaves the sidecar current, and so does adding or removing a marker that gives neither a type nor a nullability, such as `-- param: @team -> TeamId` or `-- param: @team`.  A query with such a marker whose entry an earlier version of the tool wrote is out of date once: describe it again.
 
 <a id="list-parameters"></a>
 

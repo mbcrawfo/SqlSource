@@ -23,7 +23,6 @@ public sealed partial class SiteStructureTests
         "generator.md",
         "recipes.md",
         "settings.md",
-        "tool.md",
     ];
 
     private const string Troubleshooting = "site/guides/troubleshooting.md";

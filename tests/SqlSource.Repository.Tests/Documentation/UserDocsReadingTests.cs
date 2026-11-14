@@ -361,11 +361,11 @@ public sealed class UserDocsReadingTests
         }
     }
 
-    // Fails when the real repository's Exists is a plain File.Exists: `site/Tool.md` is not a file, `site/tool.md` is.
+    // Fails when the real repository's Exists is a plain File.Exists: `site/Index.md` is no file, `site/index.md` is.
     [Fact]
     public void Exists_OfTheRepository_NeedsTheCaseOfTheFile()
     {
-        UserDocs.Exists("site/tool.md").ShouldBeTrue();
-        UserDocs.Exists("site/Tool.md").ShouldBeFalse();
+        UserDocs.Exists("site/index.md").ShouldBeTrue();
+        UserDocs.Exists("site/Index.md").ShouldBeFalse();
     }
 }
