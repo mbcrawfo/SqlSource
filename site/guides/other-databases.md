@@ -132,5 +132,5 @@ You get no models and no method that runs the query.  Nothing checks a query aga
 
 ## If it does not work
 
-- **SQLSRC209 for each query.**  The output of the query is not `sql`, and only PostgreSQL and SQL Server can be described.  Set the output to `sql`, as step 4 does.  See [SQLSRC209](../diagnostics.md#sqlsrc209).
+- **SQLSRC209 for each file.**  The output of a query in the file is not `sql`, and only PostgreSQL and SQL Server can be described.  Set the output to `sql`, as step 4 does.  See [SQLSRC209](../diagnostics.md#sqlsrc209).
 - **SQLSRC101 or SQLSRC102 on valid SQL, or SQL missing from a constant.**  SqlSource reads a few constructs differently from your database.  See [What is still read differently](../reference/dialects.md#still-read-differently).
