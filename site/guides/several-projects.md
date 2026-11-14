@@ -70,3 +70,61 @@ catch (UnexpectedRowCountException exception)
 Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](../diagnostics.md#sqlsrc022).  Data.Shared targets .NET 6 or later, or adds such a target to its `TargetFrameworks`, so that its `CollectionItemException` passes on `SqlState`, `IsTransient` and `BatchCommand`; on `netstandard2.0` or `netstandard2.1` alone, a data project gets [SQLSRC038](../diagnostics.md#sqlsrc038).
 
 Rules: [projects that share internals](../reference/exceptions.md#projects-that-share-internals), [SQLSRC022](../diagnostics.md#sqlsrc022), [SQLSRC038](../diagnostics.md#sqlsrc038).
+
+<a id="one-file-two-projects"></a>
+
+## One `.sql` file in two projects
+
+If two projects must use the same queries, keep the `.sql` file in one project and list it in the other:
+
+```text
+App.slnx
+App/
+    App.csproj
+    sqlsource.json                "dialect": "postgres"
+    Queries/
+        UserRepository.cs
+        UserRepository.sql        used by App and by Reports
+        UserRepository.sql.json   one sidecar for both projects
+Reports/
+    Reports.csproj
+    UserRepository.cs
+```
+
+```xml
+<!-- Reports/Reports.csproj: references the SqlSource package -->
+<ItemGroup>
+    <AdditionalFiles Include="../App/Queries/UserRepository.sql" />
+    <AdditionalFiles Include="../App/Queries/UserRepository.sql.json" />
+</ItemGroup>
+```
+
+```csharp
+// Reports/UserRepository.cs
+using Npgsql;
+using SqlSource;
+
+namespace Reports;
+
+[SqlSourceGenerate(Source = "../App/Queries/UserRepository.sql")]
+public partial class UserRepository(NpgsqlDataSource dataSource);
+```
+
+```console
+$ dotnet sqlsource describe App.slnx
+```
+
+**What you get.**  Each project gets its own `UserRepository`, with a method and models for each query of the file.  The file has one sidecar, and the run on the solution describes its queries for both projects.
+
+**The rules you need.**
+
+- A `.sql` file outside the project's folder is not included.  List it and its sidecar as `AdditionalFiles` items.  See [Which `.sql` files are included](../reference/msbuild.md#included-files).
+- `Source` is relative to the folder of the C# file, never to the project.  See [Source](../reference/attributes.md#setting-source).
+- Both projects read the settings of the file from its markers and the settings files of its own folder.  So both projects need the same entries in its sidecar.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
+- If one project finds a settings file that the other does not, a run on it can leave out or remove entries that the other needs.  Name every settings file `sqlsource.json`, and describe the whole solution in one run.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
+
+## If it does not work
+
+- **SQLSRC004 in the second project.**  The project does not list the `.sql` file.  Add it as an `AdditionalFiles` item.  See [SQLSRC004](../diagnostics.md#sqlsrc004).
+- **SQLSRC241 in the second project, and the sidecar has the entry.**  The project does not list the sidecar.  Add it as an `AdditionalFiles` item.  See [SQLSRC241](../diagnostics.md#sqlsrc241).
+- **SQLSRC241 in one project after a run on the other.**  The two projects read different settings for the file.  Describe the whole solution in one run.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).

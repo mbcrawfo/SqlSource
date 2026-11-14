@@ -14,6 +14,7 @@ Use this page when the build succeeds but something is wrong: an exception at ru
 - **`InvalidCastException` from a query method with parameters, on a connection that wraps the driver's.**  The method works only on a connection whose commands take the driver's own parameters.  See [a connection that wraps the driver's](../reference/query-methods.md#limit-wrapped-connection).
 - **`NotSupportedException` from a collection method, on a connection that wraps the driver's.**  Most such connections cannot run a batch of commands.  See [a collection method on a connection that wraps the driver's](../reference/collection-methods.md#limit-wrapped-connection).
 - **`InvalidCastException` for an id type made by Vogen or StronglyTypedId.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and such a type has no method marked so.  See [Vogen and StronglyTypedId](../reference/converters.md#limit-vogen-and-stronglytypedid).
+- **"Column 'name' is null.", or `SqlNullValueException`, "Data is Null.", on SQL Server.**  A null reached a property that cannot be null.  See [Say that a column can be null](nullability.md#nullable).
 
 <a id="invalidcastexception"></a>
 
@@ -47,6 +48,8 @@ When the message is "Column 'name' is null.", the column held a null though its 
 - **SQLSRC019 or SQLSRC111 for a type override's key written `[dbo].[Email]`.**  A key cannot be written in brackets, as T-SQL writes a name.  See [a key in brackets](../reference/type-mapping.md#limit-key-in-brackets).
 - **A compiler warning in a model for a `?` inside a type argument.**  SqlSource does not check a `?` inside a type argument against the constraints of a generic type.  See [a `?` inside a type argument](../reference/type-mapping.md#limit-nullable-type-argument).
 - **One C# type cannot be converted two ways in two files.**  The converters of a C# type serve every column and parameter of that type in the project.  See [one conversion for each type](../reference/converters.md#limit-one-conversion-per-type).
+- **A property is nullable, but its column is never null.**  You can say so in the `.sql` file.  See [Fix a nullable property](nullability.md).
+- **A model is wrong for what your database returns, and no entry here explains it.**  Report it with a bundle of the query.  See [Reporting a wrong model](report-a-bug.md#report-a-bug).
 
 <a id="wrong-result"></a>
 
@@ -73,6 +76,8 @@ When the message is "Column 'name' is null.", the column held a null though its 
 - **SQLSRC208, and nothing is described for a type whose `Source` is a constant or `nameof`.**  The tool reads `[SqlSourceGenerate]` from your C# files as text, without compiling them.  See [`Source` written as text](../reference/attributes.md#limit-source-written-as-text).
 - **A settings file or a `.sql` file is ignored when the project is built through a symbolic link.**  A path through a link and the real path reach different settings files.  See [a build through a symbolic link](../reference/settings-file.md#limit-symbolic-link).
 - **SQLSRC241 for a `.sql` file that a build target of your own adds.**  The tool leaves out a file that a target adds while the build runs.  See [a file added by a target](../reference/msbuild.md#limit-file-added-by-a-target).
+- **SQLSRC209 on MySQL, SQLite, Oracle or another database.**  Only PostgreSQL and SQL Server queries can be described, so give the file the output `sql`.  See [Use MySQL, SQLite, Oracle or another database](other-databases.md).
+- **SQLSRC241 or SQLSRC244 after you pull.**  A query changed, and its sidecar was not described with it.  Run `dotnet sqlsource describe` and commit the sidecars.  See [Describing again](../reference/sidecars.md#describing-again).
 
 <a id="watch"></a>
 

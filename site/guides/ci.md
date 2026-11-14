@@ -67,3 +67,32 @@ In a SQL Server project (`"dialect": "mssql"` in its `sqlsource.json`), the serv
 Name the server's exact version in the image, a PostgreSQL minor or a SQL Server cumulative update, and move it when you move your database: a tag such as `-latest` moves to a new server without a word, and a new server can describe a query otherwise than the one your sidecars were written on.
 
 Rules: [check in CI](../reference/describing.md#check-in-ci), [connections](../reference/connections.md#connections) for the variable, [exit codes](../reference/cli.md#exit-codes), [SQLSRC219](../diagnostics.md#sqlsrc219).
+
+<a id="exit-code"></a>
+
+## Read the exit code
+
+If your pipeline must tell a forgotten sidecar from a check that could not run, read the exit code of `describe --check`.  This step takes the place of the `describe --check` step of the PostgreSQL job:
+
+```yaml
+      - run: |
+          status=0
+          dotnet sqlsource describe --check || status=$?
+          if [ "$status" -eq 2 ]; then
+            echo "::error::A sidecar is out of date. Run 'dotnet sqlsource describe' and commit the sidecars."
+          elif [ "$status" -ne 0 ]; then
+            echo "::error::The check could not be made. Read the errors above."
+          fi
+          exit "$status"
+        env:
+          SQLSOURCE_CONNECTION: Host=localhost;Database=app;Username=postgres;Password=ci
+```
+
+**What you get.**  The step fails in both cases, and GitHub Actions shows which one as an error of the run.  `|| status=$?` keeps the code, since GitHub Actions stops a step at the first command that fails.
+
+**The rules you need.**
+
+- `0` means that the run reported no error: each sidecar matches what the database says.  See [Exit codes](../reference/cli.md#exit-codes).
+- `2` means that a sidecar is out of date, and nothing else went wrong.  Someone forgot to describe.  Run `dotnet sqlsource describe` and commit the sidecars.  See [Check in CI](../reference/describing.md#check-in-ci).
+- `1` means that the check could not be made, such as when the database could not be opened.  Read the errors above the summary.  See [Check in CI](../reference/describing.md#check-in-ci).
+- `--check` changes no file, so the job has nothing to commit.  See [Check in CI](../reference/describing.md#check-in-ci).

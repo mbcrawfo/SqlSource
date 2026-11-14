@@ -1,5 +1,31 @@
 # Describe queries as you save (watch)
 
+<a id="start-the-watch"></a>
+
+## Start the watch
+
+If you want your sidecars to stay current while you edit your queries, start the watch in the folder of your solution or project:
+
+```console
+$ dotnet sqlsource describe --watch
+billing (postgres): 0 described, 16 skipped, 0 failed
+sqlsource: watching for changes; press Ctrl+C to stop
+sqlsource: change detected; describing
+billing (postgres): 1 described, 15 skipped, 0 failed
+sqlsource: watching for changes; press Ctrl+C to stop
+```
+
+**What you get.**  The tool describes once, as `describe` does, and then waits.  When you save a `.sql` file, a settings file or a C# file of your projects, it describes again.  The sidecar of the query you saved is current a moment later.
+
+**The rules you need.**
+
+- Each pass is a whole `describe`, with the same connections.  It describes only the queries whose sidecar entry is no longer current, and prints its summary.  See [Describe on save](../reference/describing.md#describe-on-save).
+- A pass that reports errors does not stop the watch.  Fix the error and save again.  See [Describe on save](../reference/describing.md#describe-on-save).
+- After every pass, the tool writes `sqlsource: watching for changes; press Ctrl+C to stop` alone on its line.  Before every later pass, it writes `sqlsource: change detected; describing`.  A task of your editor can wait for these two lines.  See [Describe on save](../reference/describing.md#describe-on-save).
+- Stop the watch with Ctrl+C, or close its terminal.  It exits with `0`, whatever its passes reported.  See [Describe on save](../reference/describing.md#describe-on-save).
+- Run one watch for a repository.  A second watch, or a build while the watch runs, does no harm, but does the work twice.  See [Describe on save](../reference/describing.md#describe-on-save).
+- Your editor shows the new models when it reads the sidecar again.  In Rider, if you change a query and save it in Rider, build to see its new models.  See [What your editor shows](../reference/describing.md#what-your-editor-shows).
+
 <a id="start-the-watcher-with-your-editor"></a>
 
 ## Start the watcher with your editor
@@ -63,3 +89,10 @@ The watch then starts when the solution opens, in a terminal pane, where the pat
 Open **View > Terminal**, the Developer PowerShell, and run `dotnet sqlsource describe --watch` in the solution's folder.  It runs until you stop it with Ctrl+C or close the terminal.  This has not been checked in Visual Studio.
 
 Rules: [describe on save](../reference/describing.md#describe-on-save), [what your editor shows](../reference/describing.md#what-your-editor-shows).
+
+## If it does not work
+
+- **Saving a file starts no pass.**  The saves of an editor were checked with Rider on macOS alone.  Stop the watch, set `DOTNET_USE_POLLING_FILE_WATCHER` to `true`, and start it again.  See [saves that are not seen](../reference/describing.md#limit-saves-not-seen).
+- **SQLSRC287 on Linux.**  The system's limit on watching folders was reached.  Raise the limit that the message names, or set `DOTNET_USE_POLLING_FILE_WATCHER` to `true`.  See [SQLSRC287](../diagnostics.md#sqlsrc287).
+- **In Visual Studio or VS Code, the models do not change after a pass.**  Save any file, or build.  See [editors that have not been checked](../reference/describing.md#limit-editors-not-checked).
+- **After a folder is deleted and made again, saves in it start no pass.**  Stop the watch and start it again.  See [folder changes that are not seen](../reference/describing.md#limit-folder-changes-not-seen).
