@@ -15,18 +15,26 @@ public sealed partial class ReadmeTests
 {
     private const string InstallPage = "site/start/install.md";
 
-    // The info strings, by their first word, of a fenced block of shell commands.
-    private static readonly IReadOnlyList<string> ShellInfos = ["console", "bash", "sh", "shell"];
-
-    // How an install or update command starts, after it is normalised.
-    private static readonly IReadOnlyList<string> CommandStarts =
+    // The info strings, by their first word, of a fenced block that can hold commands: a shell's, a console's, plain
+    // text, or none.
+    private static readonly IReadOnlyList<string> ShellInfos =
     [
-        "dotnet add package ",
-        "dotnet new tool-manifest",
-        "dotnet tool install ",
-        "dotnet tool update ",
-        "dotnet tool restore",
+        "",
+        "console",
+        "bash",
+        "sh",
+        "shell",
+        "zsh",
+        "text",
+        "powershell",
+        "pwsh",
+        "ps1",
+        "cmd",
+        "bat",
     ];
+
+    // The prompts a command line of a block can start with.
+    private static readonly IReadOnlyList<string> Prompts = ["$ ", "PS> ", "> "];
 
     // Fails when a readme is over its cap.  The cure is to move the text to the site and link it, not to raise the cap.
     [Theory]
@@ -69,16 +77,50 @@ public sealed partial class ReadmeTests
                     ("console", "$ dotnet add package SqlSource\n$  dotnet  tool install   SqlSource.Tool\nAdded."),
                     ("csharp", "dotnet tool restore"),
                     ("bash title", "dotnet new tool-manifest"),
+                    ("", "$ dotnet tool install SqlSource.Tool --prerelease"),
+                    ("powershell", "PS> dotnet tool update --global SqlSource.Tool"),
+                    ("cmd", "> dotnet tool restore"),
+                    ("jsonc", "// dotnet add package SqlSource"),
                 ],
-                ["dotnet add package Npgsql", "dotnet sqlsource describe", " dotnet tool update SqlSource.Tool "]
+                [
+                    "dotnet add package Npgsql",
+                    "dotnet sqlsource describe",
+                    " dotnet tool update SqlSource.Tool ",
+                    "dotnet package add SqlSource",
+                    "dotnet add App.csproj package SqlSource",
+                    "dotnet tool installer",
+                ]
             )
             .ShouldBe([
                 "dotnet add package SqlSource",
                 "dotnet tool install SqlSource.Tool",
                 "dotnet new tool-manifest",
+                "dotnet tool install SqlSource.Tool --prerelease",
+                "dotnet tool update --global SqlSource.Tool",
+                "dotnet tool restore",
                 "dotnet add package Npgsql",
                 "dotnet tool update SqlSource.Tool",
+                "dotnet package add SqlSource",
+                "dotnet add App.csproj package SqlSource",
             ]);
+
+    // Fails when a block of one of these info strings, a shell's, a console's, plain text or none, is not read.  The
+    // rows are written out, so that an info string taken off ShellInfos fails here.
+    [Theory]
+    [InlineData("")]
+    [InlineData("console")]
+    [InlineData("bash")]
+    [InlineData("sh")]
+    [InlineData("shell")]
+    [InlineData("zsh")]
+    [InlineData("text")]
+    [InlineData("powershell")]
+    [InlineData("pwsh")]
+    [InlineData("ps1")]
+    [InlineData("cmd")]
+    [InlineData("bat")]
+    public void Commands_OfABlockOfACommandLanguage_AreRead(string info) =>
+        Commands([(info, "dotnet tool restore")], []).ShouldBe(["dotnet tool restore"]);
 
     private static List<string> CommandsOf(string file) =>
         Commands(
@@ -86,8 +128,8 @@ public sealed partial class ReadmeTests
             UserDocs.CodeSpans(file).Select(span => span.Text)
         );
 
-    // The install and update commands of each line of a shell block and of each code span, normalised: a leading `$ `
-    // taken off, the ends trimmed, and each run of spaces made one space.
+    // The install and update commands of each line of a block of ShellInfos and of each code span, normalised: a
+    // leading prompt taken off, the ends trimmed, and each run of spaces made one space.
     internal static List<string> Commands(IEnumerable<(string Info, string Text)> blocks, IEnumerable<string> spans) =>
         [
             .. blocks
@@ -95,19 +137,27 @@ public sealed partial class ReadmeTests
                 .SelectMany(block => block.Text.Split('\n'))
                 .Concat(spans)
                 .Select(Normalised)
-                .Where(command => CommandStarts.Any(start => command.StartsWith(start, StringComparison.Ordinal))),
+                .Where(command => InstallCommandPattern().IsMatch(command)),
         ];
 
     private static string Normalised(string line)
     {
         var text = line.Trim();
-        if (text.StartsWith("$ ", StringComparison.Ordinal))
+        var prompt = Prompts.FirstOrDefault(start => text.StartsWith(start, StringComparison.Ordinal));
+        if (prompt is not null)
         {
-            text = text[2..];
+            text = text[prompt.Length..];
         }
 
         return SpacesPattern().Replace(text.Trim(), " ");
     }
+
+    // A command that adds a package, in either order of the SDK's words and with or without a project, or that makes a
+    // tool manifest, or installs, updates or restores a tool.
+    [GeneratedRegex(
+        @"^dotnet (?:add(?: \S+)? package|package add|new tool-manifest|tool (?:install|update|restore))(?: |$)"
+    )]
+    private static partial Regex InstallCommandPattern();
 
     [GeneratedRegex(" +")]
     private static partial Regex SpacesPattern();

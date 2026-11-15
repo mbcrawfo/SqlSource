@@ -19,7 +19,7 @@ Give the tool the connection string of your database in a `.env` file:
 SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password=secret"
 ```
 
-Keep that file out of git, since it holds your password.  Put it in the folder of your project: the tool does not look for a `.env` file in a folder above it.  See [the `.env` file](https://mbcrawfo.github.io/SqlSource/reference/connections.html#env-file).  Then run the tool from the folder of your project:
+For SQL Server, the variable is `SQLSOURCE_CONNECTION_MSSQL`, with SqlClient's connection string.  Keep that file out of git, since it holds your password.  Put it in the folder of your project: the tool does not look for a `.env` file in a folder above it.  See [the `.env` file](https://mbcrawfo.github.io/SqlSource/reference/connections.html#env-file).  Then run the tool from the folder of your project:
 
 ```console
 $ dotnet sqlsource describe

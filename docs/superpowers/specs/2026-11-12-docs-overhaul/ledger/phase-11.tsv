@@ -118,7 +118,9 @@ src/SqlSource.Tool/README.md:22/2	restated-from	-	site/reference/connections.md#
 src/SqlSource.Tool/README.md:22/3	restated-from	-	site/reference/connections.md#connections	The same variable in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.	The environment and --connection on R/connections.md#connections, which Documentation links
 src/SqlSource.Tool/README.md:22/4	restated-from	-	site/reference/cli.md#arguments	Then run the tool from the folder of your project or solution, or name it: `dotnet sqlsource describe src/App/App.csproj`.	Use keeps: run the tool from the folder of your project.  A solution, or a project named on the command line, is R/cli.md#arguments
 src/SqlSource.Tool/README.md:24	move	src/SqlSource.Tool/README.md#use	-	-	The four describe commands stay
-src/SqlSource.Tool/README.md:31	restated-from	-	site/reference/settings.md#setting-database	-	Goes, as the map says: the link to R/connections.md covers it
+src/SqlSource.Tool/README.md:31	move-split	-	-	-	The SQL Server variable stays, in new words; the name of the logical database goes
+src/SqlSource.Tool/README.md:31/1	restated-from	-	site/reference/settings.md#setting-database	`postgres` is the name of the database your queries belong to, which is the dialect's name unless you name it	Goes, as the map says: the link to R/connections.md covers it
+src/SqlSource.Tool/README.md:31/2	move	src/SqlSource.Tool/README.md#use	fact	for SQL Server it is `mssql`, read from `SQLSOURCE_CONNECTION_MSSQL`	In new words: for SQL Server, the variable is SQLSOURCE_CONNECTION_MSSQL, with SqlClient's connection string (S/first-query.md#connection, SQL Server tab); the review of round 1 kept it, since a SQL Server user needs it
 src/SqlSource.Tool/README.md:33	move	src/SqlSource.Tool/README.md#use	fact	-	One line
 src/SqlSource.Tool/README.md:34	move	src/SqlSource.Tool/README.md#use	fact	-	One line
 src/SqlSource.Tool/README.md:35	move	src/SqlSource.Tool/README.md#use	fact	-	One line: run it in CI, as S/keep-up-to-date.md#in-ci says
