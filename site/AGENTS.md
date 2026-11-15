@@ -24,7 +24,7 @@ Rules for the user documentation, this folder and the two packed readmes, beside
 - **Three folders, one job each.**  `start/` is the path of a newcomer, read in order; `guides/` holds one task on each page; `reference/` is look-up, one page for each thing.  The root holds `index.md`, the landing page and the site's root, and `diagnostics.md`.
 - **A fact has one home.**  A rule, a value, a default or a limit is stated in one reference section; every other page restates it in a sentence or two and links there.
 - **A new page** gets an entry in the `toc.yml` of its folder, under its group.  Aim at 600 to 3,500 words for a page and at most nine entries for a group; a reviewer holds both.
-- **`README.md`**, beyond root rule 4: under "Only want to generate models?", "Just want to keep your SQL out of code files?", each FAQ heading, "NodaTime and other libraries" and "Custom type mapping" stands one sentence that links the page of the site that holds the text.  Add no text there.
+- **The two packed readmes.**  `README.md` holds the outline of root rule 4, and neither readme states anything that a page of this folder does not own.
 - **The site.**  docfx publishes every page here but each `AGENTS.md`.  `tools/build-site.sh` builds it and fails on any docfx warning.  The tests are in `tests/SqlSource.Repository.Tests/Documentation/` and `Diagnostics/`; none checks whether a page is true and free of internals.
 
 ## Write effects, never internals

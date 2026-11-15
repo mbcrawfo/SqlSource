@@ -283,6 +283,7 @@ public sealed partial class SupportedVersionsTests
     [Theory]
     [InlineData("site/index.md")]
     [InlineData("site/start/install.md")]
+    [InlineData("README.md")]
     public void Restatement_OfTheMinimumServerVersions_IsTheTables(string page)
     {
         var (postgres, sqlServer) = ServerMinimums();

@@ -5,7 +5,7 @@ How the generator works: [`docs/architecture/generator.md`](../../docs/architect
 The generator runs inside its consumers' C# compiler, which limits what the project may target and reference.
 
 - **`netstandard2.0` only.**  The compiler loads Roslyn components built for `netstandard2.0`.  Do not add or change target frameworks in `SqlSource.csproj`.
-- **The Roslyn pin is the support floor.**  `Microsoft.CodeAnalysis.CSharp` is pinned to 4.14.0 in `Directory.Packages.props`.  An API added after 4.14.0 means raising the pin, which drops consumers: ask the user first, and update the support target in `README.md` in the same commit.
+- **The Roslyn pin is the support floor.**  `Microsoft.CodeAnalysis.CSharp` is pinned to 4.14.0 in `Directory.Packages.props`.  An API added after 4.14.0 means raising the pin, which drops consumers: ask the user first, and update each statement of the SDK and Visual Studio floor in the same commit: `git grep -n -E '9\.0\.300|17\.14' -- README.md site`.
 - **Language features need runtime support.**  One whose types `netstandard2.0` lacks, other than `init` and records (`required` members, say), needs a polyfill beside `Polyfills/IsExternalInit.cs`, in the namespace of the type it stands in for.
 - **Existing `ImmutableArray` calls stay.**  `Create`, `Empty`, builders and `ToImmutableArray` become collection expressions only with a measurement (TD-0094), never in bulk.  New code may use one.
 - **Models need value equality.**  A type the pipeline caches is a record, and holds its collections in `EquatableArray<T>`, never `ImmutableArray<T>`.

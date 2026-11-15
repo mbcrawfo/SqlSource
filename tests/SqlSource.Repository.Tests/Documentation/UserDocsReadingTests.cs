@@ -184,6 +184,12 @@ public sealed class UserDocsReadingTests
         UserDocs.Read(["~~~ a`b", "text", "~~~"]).BlockList.ShouldBe([(1, "a`b", "text")]);
 
     [Fact]
+    public void CodeSpans_OutsideFencedBlocks_AreReadWithoutTheirBackticks() =>
+        UserDocs
+            .Read(["Run `dotnet build`, then `` a`b ``.", "```console", "`not a span`", "```", "`x`"])
+            .CodeSpanList.ShouldBe([(1, "dotnet build"), (1, "a`b"), (5, "x")]);
+
+    [Fact]
     public void Blocks_IndentedFence_LosesItsIndentationInTheText() =>
         UserDocs
             .Read(["  ```sql fragment", "  SELECT 1;", "    FROM t;", "  ```"])
