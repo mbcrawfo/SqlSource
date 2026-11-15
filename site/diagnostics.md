@@ -817,9 +817,11 @@ See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 Reported by: the build and the tool.
 
-Two `-- name:` markers in one file have the same name.  The error is at the second.
+Two `-- name:` markers in one file have the same name.  The error is at the second marker.
 
-Rename one of the queries.
+**Fix:**
+
+1. Rename one of the two queries.
 
 See: [Queries and names](reference/sql-files.md#queries-and-names)
 
