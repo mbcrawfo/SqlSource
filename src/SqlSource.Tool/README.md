@@ -1,6 +1,6 @@
 # SqlSource.Tool
 
-`sqlsource describe`, a command of the [SqlSource](https://github.com/mbcrawfo/SqlSource/blob/main/README.md) tool, asks your database about the parameters and columns of each query.  It writes the answers to sidecar files beside your `.sql` files: see [what describe does](https://mbcrawfo.github.io/SqlSource/reference/describing.html#describe).  You commit the sidecar files with your project, since every build reads them.  The tool describes PostgreSQL and SQL Server queries.
+`sqlsource describe`, part of [SqlSource](https://github.com/mbcrawfo/SqlSource/blob/main/README.md), asks your database about the parameters and columns of each query.  It writes the answers to sidecar files beside your `.sql` files: see [what describe does](https://mbcrawfo.github.io/SqlSource/reference/describing.html#describe).  You commit the sidecar files with your project, since every build reads them.  The tool describes PostgreSQL and SQL Server queries.
 
 ## Install
 
