@@ -1,4 +1,4 @@
-# base db3285d4adf7542f6e80e96d7f0b8182cd091a9f
+# base d243af81648beffc6884efd59b17ccb48b009e34
 # words by page, base > this phase (check rewrite 12): ci.md 511 > 853; custom-types.md 1663 > 1974; dapper.md 2741 > 3404; describe-on-save.md 895 > 1082; dynamic-sql.md 621 > 623; folders-and-files.md 800 > 874; json.md 977 > 1403; lists.md 943 > 1222; many-rows.md 784 > 836; naming-and-placement.md 1058 > 1183; nodatime-and-spatial.md 442 > 2124; other-databases.md 706 > 724; report-a-bug.md 1323 > 1604; repository-connection.md 771 > 867; several-databases.md 749 > 955; several-projects.md 811 > 994; sync-and-streaming.md 776 > 901; troubleshooting.md 2159 > 2314; all 18: 18730 > 23937; none over 3,500
 unit	disposition	to	arg	words	note
 -	new	site/guides/dapper.md	-	-	The opening sentence with the search words of the map (Dapper, ADO.NET, models only, SQL constants) and Use this when; its link to output-modes.md#the-four-outputs is the default repository of decision 4
