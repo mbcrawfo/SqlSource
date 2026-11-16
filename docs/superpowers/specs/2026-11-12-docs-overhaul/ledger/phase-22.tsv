@@ -1,5 +1,5 @@
-# base db3285d4adf7542f6e80e96d7f0b8182cd091a9f
-# Words (wc -w): the range SQLSRC122 to SQLSRC225, 11,321 at the base and 12,270 after; site/diagnostics.md 45,381 and 46,330.
+# base c338a501de2b1557d9a32d4c6650fa3c9ac15845
+# Words (wc -w): the range SQLSRC122 to SQLSRC225, 11,321 at the base and 12,270 after; site/diagnostics.md 46,338 and 47,287.
 unit	disposition	to	arg	words	note
 site/diagnostics.md:1458-1480	move	site/diagnostics.md#sqlsrc122	-	-	Rewritten in the shape: the two cases are bullets, in the old order (`models` or `sql`, then `repository`), each output kept with its rule; outputs inside each list reordered with `repository` first.  `sql` 2 > 3 and `extension-class` 3 > 4: the first case and the lead-in of the sample name them.  The Fix sentence keeps 'a `repository` query takes only `class`' in its first bullet
 site/diagnostics.md:1482-1529	move	site/diagnostics.md#sqlsrc123	-	-	Rewritten in the shape: the four reasons are bullets in their order, each with its cost under 'What the error costs'; the marker order `-- visibility:`, else `-- member-location:`, else the name, kept.  The three scenes are bold paragraphs, each with its `console` block after it, and their three fixes one Fix list.  `public` 3 > 4: the second reason names it.  `Constants.sql` and `App.Outer.Sample` 1 > 2: the sentence of the second example split in two.  'only that method is left out' kept as a bullet of the second scene
