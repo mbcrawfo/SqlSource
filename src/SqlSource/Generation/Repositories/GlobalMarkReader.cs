@@ -17,22 +17,26 @@ namespace SqlSource.Generation.Repositories;
 internal static class GlobalMarkReader
 {
     /// <summary>
-    /// Whether a node that carries the attribute is read: a field's variable, a property, a method, an operator, a
-    /// constructor, an accessor, a local function or a parameter.
+    /// Whether a node that carries the attribute is read: anything the attribute's targets allow, a field's variable,
+    /// an enum member, a property, a method, an operator, an accessor, a local function, a lambda or a parameter.
     /// </summary>
     /// <param name="node">The node that carries the attribute.</param>
     public static bool IsCandidate(SyntaxNode node) =>
         node
             is VariableDeclaratorSyntax
+                or EnumMemberDeclarationSyntax
                 or PropertyDeclarationSyntax
-                or BaseMethodDeclarationSyntax
+                or MethodDeclarationSyntax
+                or OperatorDeclarationSyntax
+                or ConversionOperatorDeclarationSyntax
                 or AccessorDeclarationSyntax
                 or LocalFunctionStatementSyntax
+                or LambdaExpressionSyntax
                 or ParameterSyntax;
 
     /// <summary>
-    /// The mark of a static member, of a local function or of a parameter, or null for an instance member, which is a
-    /// factory's, read through the holders that hold it.
+    /// The mark of a static member, of a local function, of a lambda or of a parameter, or null for an instance member,
+    /// which is a factory's, read through the holders that hold it.
     /// </summary>
     /// <param name="context">The marked node and its symbol.</param>
     /// <param name="cancellationToken">Cancels the read.</param>

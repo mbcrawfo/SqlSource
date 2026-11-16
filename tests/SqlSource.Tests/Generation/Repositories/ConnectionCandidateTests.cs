@@ -38,6 +38,15 @@ public sealed class ConnectionCandidateTests
         candidate.DisplayName.ShouldBe("Db.Reports");
     }
 
+    // A message names a type as a value, without the @ that its text keeps for access.
+    [Fact]
+    public void DisplayName_GlobalOfAKeywordType_IsWithoutTheEscape()
+    {
+        var candidate = Candidate("Main") with { Tier = CandidateTier.Global, GlobalTypeText = "global::App.@class" };
+
+        candidate.DisplayName.ShouldBe("class.Main");
+    }
+
     [Fact]
     public void DisplayName_HeldWithoutHolder_IsItsName() =>
         (Candidate("Open") with { Tier = CandidateTier.Held }).DisplayName.ShouldBe("Open");

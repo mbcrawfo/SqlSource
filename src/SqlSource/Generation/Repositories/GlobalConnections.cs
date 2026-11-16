@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
@@ -12,9 +13,12 @@ namespace SqlSource.Generation.Repositories;
 /// Decides what the project's <see cref="GlobalMark" />s are over the compilation, since a mark's repository, the type
 /// its member gives and who can reach it may be declared in another file: each broken one, which
 /// <see cref="Check" /> reports once, and the valid ones a repository can reach, its
-/// <see cref="CandidateTier.Global" /> candidates.  A static member of a type marked <c>[SqlSourceGenerate]</c> and a
-/// parameter of such a type's primary constructor are the type's own, which <see cref="ConnectionCandidateReader" />
-/// reads, and both methods pass over them.
+/// <see cref="CandidateTier.Global" /> candidates.  A global is broken when its member cannot give a connection, when
+/// no type arguments can be chosen for a generic type around it, when it is a <c>static abstract</c> or
+/// <c>static virtual</c> interface member, or when a type around it is file-local, which the generated code, in
+/// another file, can never reach.  A static member of a type marked <c>[SqlSourceGenerate]</c> and a parameter of such
+/// a type's primary constructor are the type's own, which <see cref="ConnectionCandidateReader" /> reads, and both
+/// methods pass over them.
 /// </summary>
 internal static class GlobalConnections
 {
@@ -28,14 +32,19 @@ internal static class GlobalConnections
 
     /// <summary>
     /// <c>SQLSRC032</c> at each broken mark, in the order of the marks: a parameter, but of a repository's primary
-    /// constructor; a member that cannot give a connection; a member of a generic type, or of a type in one, for which
-    /// no type arguments can be chosen; and a <c>static abstract</c> or <c>static virtual</c> interface member.
+    /// constructor, and a broken global.  A static member of a type marked <c>[SqlSourceGenerate]</c> or of one of its
+    /// base types is passed over: the repository's own candidates read it, and report it once for each repository
+    /// that derives from it, as they did before there were globals.
     /// </summary>
     /// <param name="marks">The project's marks, from <see cref="GlobalMarkReader" />.</param>
+    /// <param name="repositories">
+    /// The metadata names of the types marked <c>[SqlSourceGenerate]</c>, whether they have a repository query or not.
+    /// </param>
     /// <param name="compilation">The compilation the marks are in.</param>
     /// <param name="token">Cancels the check.</param>
     public static EquatableArray<DiagnosticInfo> Check(
         EquatableArray<GlobalMark> marks,
+        EquatableArray<string> repositories,
         Compilation compilation,
         CancellationToken token
     )
@@ -45,6 +54,7 @@ internal static class GlobalConnections
             return EquatableArray<DiagnosticInfo>.Empty;
         }
 
+        var repositoryTypes = RepositoriesAndTheirBasesOf(repositories, compilation);
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         foreach (var mark in marks)
         {
@@ -54,7 +64,8 @@ internal static class GlobalConnections
             {
                 IParameterSymbol parameter => IsRepositoryParameter(parameter, token) ? null : parameter.Name,
                 null => null,
-                _ => IsOwnMember(symbol) ? null : BrokenNameOf(symbol, mark.Location),
+                _ when IsOwnMember(symbol) || IsInheritedByARepository(symbol, repositoryTypes) => null,
+                _ => BrokenNameOf(symbol, mark.Location),
             };
             if (name is not null && symbol?.ContainingType is { } type)
             {
@@ -74,8 +85,9 @@ internal static class GlobalConnections
 
     /// <summary>
     /// The valid globals that the repository can reach, in the order of the marks, each with its
-    /// <see cref="ConnectionCandidate.GlobalTypeText" />.  A member of a file-local type is reached from its own file
-    /// alone, and the generated code is in another, so it is no repository's.
+    /// <see cref="ConnectionCandidate.GlobalTypeText" />: every valid global but a member of a type marked
+    /// <c>[SqlSourceGenerate]</c>, a repository's base type's too, which its derived repositories find first in their
+    /// own candidates.
     /// </summary>
     /// <param name="marks">The project's marks, from <see cref="GlobalMarkReader" />.</param>
     /// <param name="repository">The repository.</param>
@@ -98,7 +110,6 @@ internal static class GlobalConnections
                 mark is not { ParameterOrdinal: null, DeclarationId.Length: > 0 }
                 || Resolve(mark, compilation, CancellationToken.None) is not { } member
                 || IsOwnMember(member)
-                || IsInFileLocalType(member)
                 || !ConnectionCandidateReader.IsReachable(member, repository, compilation)
             )
             {
@@ -117,7 +128,10 @@ internal static class GlobalConnections
 
     // The global that the member gives, of what ReadMarkedMember reads of it, or null when it is broken.
     private static ConnectionCandidate? GlobalOf(ISymbol member, ConnectionCandidate? read) =>
-        read is null || read.Type == CandidateType.Unsupported || IsInGenericType(member) || IsOverridable(member)
+        read is null
+        || read.Type == CandidateType.Unsupported
+        || IsOverridable(member)
+        || TypesAround(member).Any(static type => type.TypeParameters.Length > 0 || type.IsFileLocal)
             ? null
             : read with
             {
@@ -129,11 +143,18 @@ internal static class GlobalConnections
     private static string? BrokenNameOf(ISymbol member, LocationInfo fallback)
     {
         var read = ConnectionCandidateReader.ReadMarkedMember(member, isInherited: false, fallback);
-        return GlobalOf(member, read) is null ? read?.Name ?? member.Name : null;
+        if (GlobalOf(member, read) is not null)
+        {
+            return null;
+        }
+
+        var name = read?.Name ?? member.Name;
+        return name.Length > 0 ? name : member.ToDisplayString();
     }
 
     // The member or parameter of the mark: a member by its id in the project's own assembly, a parameter by its place
-    // in that member, and a local function or a parameter of one by its location.
+    // in that member, and one that is no member's by its location.  Two types of one name, one of them file-local, give
+    // one id, so the symbol declared at the mark is taken when there is one.
     private static ISymbol? Resolve(GlobalMark mark, Compilation compilation, CancellationToken token)
     {
         if (mark.DeclarationId.Length == 0)
@@ -141,16 +162,28 @@ internal static class GlobalConnections
             return AtLocation(mark.Location, compilation, token);
         }
 
-        var owner = DocumentationCommentId
-            .GetSymbolsForDeclarationId(mark.DeclarationId, compilation)
-            .FirstOrDefault(symbol =>
-                SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, compilation.Assembly)
-            );
-        if (mark.ParameterOrdinal is not { } ordinal)
+        ISymbol? first = null;
+        foreach (var owner in DocumentationCommentId.GetSymbolsForDeclarationId(mark.DeclarationId, compilation))
         {
-            return owner;
+            if (!SymbolEqualityComparer.Default.Equals(owner.ContainingAssembly, compilation.Assembly))
+            {
+                continue;
+            }
+
+            var symbol = mark.ParameterOrdinal is { } ordinal ? ParameterOf(owner, ordinal) : owner;
+            if (symbol is not null && IsDeclaredAt(symbol, mark.Location))
+            {
+                return symbol;
+            }
+
+            first ??= symbol;
         }
 
+        return first;
+    }
+
+    private static IParameterSymbol? ParameterOf(ISymbol owner, int ordinal)
+    {
         var parameters = owner switch
         {
             IMethodSymbol method => method.Parameters,
@@ -160,23 +193,76 @@ internal static class GlobalConnections
         return ordinal < parameters.Length ? parameters[ordinal] : null;
     }
 
-    // The local function, or the parameter, declared at the location.
+    private static bool IsDeclaredAt(ISymbol symbol, LocationInfo location) =>
+        symbol.Locations.Any(each =>
+            each.IsInSource
+            && each.SourceSpan == location.Span
+            && string.Equals(each.SourceTree?.FilePath, location.Path, StringComparison.Ordinal)
+        );
+
+    // The local function, lambda or parameter declared at the location that carries the mark, in the first file of the
+    // location's path that has one, so that two trees of one path, or of none, do not hide it.
     private static ISymbol? AtLocation(LocationInfo location, Compilation compilation, CancellationToken token)
     {
-        var tree = compilation.SyntaxTrees.FirstOrDefault(tree =>
-            string.Equals(tree.FilePath, location.Path, StringComparison.Ordinal)
-        );
-        var root = tree?.GetRoot(token);
-        if (tree is null || root is null || !root.FullSpan.Contains(location.Span))
+        foreach (var tree in compilation.SyntaxTrees)
         {
-            return null;
+            if (!string.Equals(tree.FilePath, location.Path, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var root = tree.GetRoot(token);
+            if (!root.FullSpan.Contains(location.Span))
+            {
+                continue;
+            }
+
+            var declaration = root.FindNode(location.Span, getInnermostNodeForTie: true)
+                .AncestorsAndSelf()
+                .FirstOrDefault(static node =>
+                    node is ParameterSyntax or LocalFunctionStatementSyntax or LambdaExpressionSyntax
+                );
+            if (declaration is null)
+            {
+                continue;
+            }
+
+            var model = compilation.GetSemanticModel(tree);
+            var symbol = model.GetDeclaredSymbol(declaration, token) ?? model.GetSymbolInfo(declaration, token).Symbol;
+            if (symbol is not null && ConnectionCandidateReader.FindMarking(symbol) is not null)
+            {
+                return symbol;
+            }
         }
 
-        var declaration = root.FindNode(location.Span, getInnermostNodeForTie: true)
-            .AncestorsAndSelf()
-            .FirstOrDefault(static node => node is ParameterSyntax or LocalFunctionStatementSyntax);
-        return declaration is null ? null : compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration, token);
+        return null;
     }
+
+    // Each type marked [SqlSourceGenerate] and each of their base types, as declared, whose static members are the
+    // repositories' own.
+    private static HashSet<ISymbol> RepositoriesAndTheirBasesOf(
+        EquatableArray<string> repositories,
+        Compilation compilation
+    )
+    {
+        var types = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (var name in repositories)
+        {
+            for (var type = compilation.GetTypeByMetadataName(name); type is not null; type = type.BaseType)
+            {
+                if (!types.Add(type.OriginalDefinition))
+                {
+                    break;
+                }
+            }
+        }
+
+        return types;
+    }
+
+    // A member of a type among the repositories and their base types.
+    private static bool IsInheritedByARepository(ISymbol symbol, HashSet<ISymbol> repositoryTypes) =>
+        GlobalMarkReader.IsMember(symbol) && repositoryTypes.Contains(symbol.ContainingType.OriginalDefinition);
 
     // A member of a type marked [SqlSourceGenerate], which the type's own candidates read.
     private static bool IsOwnMember(ISymbol symbol) =>
@@ -202,30 +288,13 @@ internal static class GlobalConnections
                     .Equals(AttributeSource.AttributeMetadataName, StringComparison.Ordinal)
             );
 
-    private static bool IsInGenericType(ISymbol member)
+    // The type that declares the member, and each type it is nested in.
+    private static IEnumerable<INamedTypeSymbol> TypesAround(ISymbol member)
     {
         for (var type = member.ContainingType; type is not null; type = type.ContainingType)
         {
-            if (type.TypeParameters.Length > 0)
-            {
-                return true;
-            }
+            yield return type;
         }
-
-        return false;
-    }
-
-    private static bool IsInFileLocalType(ISymbol member)
-    {
-        for (var type = member.ContainingType; type is not null; type = type.ContainingType)
-        {
-            if (type.IsFileLocal)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     // A static abstract or static virtual interface member, which only a type argument names.

@@ -52,7 +52,8 @@ internal sealed record ConnectionCandidate(
 {
     /// <summary>
     /// The name that a message gives the candidate: its own for an own one, the holder's then a dot then its own for a
-    /// held one, and the declaring type's simple name then a dot then its own for a global one.
+    /// held one, and the declaring type's simple name, without the <c>@</c> of an escaped keyword, then a dot then its
+    /// own for a global one.
     /// </summary>
     public string DisplayName =>
         Tier switch
@@ -63,9 +64,15 @@ internal sealed record ConnectionCandidate(
             _ => Name,
         };
 
+    // The last name of the text, as a value: without the @ of an escaped keyword, which the text keeps for access.
     private static string SimpleNameOf(string typeText)
     {
-        var dot = typeText.LastIndexOf('.');
-        return dot < 0 ? typeText : typeText.Substring(dot + 1);
+        var start = typeText.LastIndexOf('.') + 1;
+        if (start < typeText.Length && typeText[start] == '@')
+        {
+            start++;
+        }
+
+        return typeText.Substring(start);
     }
 }

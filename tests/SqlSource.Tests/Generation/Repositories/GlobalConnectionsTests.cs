@@ -99,6 +99,57 @@ public sealed class GlobalConnectionsTests
         shape.GlobalCandidates.ShouldBeEmpty();
     }
 
+    // The mark on one partial declaration and the attribute on another are still one repository's member.
+    [Fact]
+    public void Global_MarkOnAnotherPartialDeclarationOfTheRepository_IsTheRepositorysOwn()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class UserRepository;
+
+                public partial class UserRepository
+                {
+                    [SqlSourceConnection]
+                    public static NpgsqlDataSource Main { get; set; } = null!;
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldHaveSingleItem().Name.ShouldBe("Main");
+        shape.GlobalCandidates.ShouldBeEmpty();
+    }
+
+    // A static class nested in a repository is a type of its own, whose marked statics are globals.
+    [Fact]
+    public void Global_StaticClassNestedInARepository_IsAGlobal()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class UserRepository
+                {
+                    public static class Db
+                    {
+                        [SqlSourceConnection]
+                        public static string Main = "";
+                    }
+                }
+            }
+            """
+        );
+
+        shape.Candidates.ShouldBeEmpty();
+        var candidate = shape.GlobalCandidates.ShouldHaveSingleItem();
+        candidate.GlobalTypeText.ShouldBe("global::App.UserRepository.Db");
+        candidate.DisplayName.ShouldBe("Db.Main");
+    }
+
     [Fact]
     public void Global_Unreachable_IsNotACandidate()
     {
@@ -146,7 +197,8 @@ public sealed class GlobalConnectionsTests
         shape.GlobalCandidates.ShouldBeEmpty();
     }
 
-    // A file-local type is reachable from its own file alone, and the generated code is in another.
+    // A file-local type is reachable from its own file alone, and the generated code is in another, so its global is
+    // broken, which its own stage reports, and never a candidate.
     [Fact]
     public void Global_InFileLocalType_IsNotACandidate()
     {
@@ -229,6 +281,31 @@ public sealed class GlobalConnectionsTests
         candidate.DisplayName.ShouldBe("Db.ConnectionString");
     }
 
+    [Fact]
+    public void Global_StaticClassNestedInANonStaticClass_IsReachedThroughItsFullName()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class Outer
+                {
+                    public static class Db
+                    {
+                        [SqlSourceConnection]
+                        public static string Main = "";
+                    }
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository;
+            }
+            """
+        );
+
+        shape.GlobalCandidates.ShouldHaveSingleItem().GlobalTypeText.ShouldBe("global::App.Outer.Db");
+    }
+
     // A type named as a keyword keeps its @, so that the generated code compiles.
     [Fact]
     public void Global_TypeNamedAsAKeyword_KeepsItsEscape()
@@ -249,7 +326,9 @@ public sealed class GlobalConnectionsTests
             """
         );
 
-        shape.GlobalCandidates.ShouldHaveSingleItem().GlobalTypeText.ShouldBe("global::App.@class");
+        var candidate = shape.GlobalCandidates.ShouldHaveSingleItem();
+        candidate.GlobalTypeText.ShouldBe("global::App.@class");
+        candidate.DisplayName.ShouldBe("class.Main");
     }
 
     // A broken global, whatever makes it so, is reported once by its own stage and is never a candidate.
