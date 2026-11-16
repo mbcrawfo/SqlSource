@@ -2308,7 +2308,7 @@ Reported by: the build and the tool.
 
 A query whose output is `repository`, `methods` or `models` is described by a database.  The dialects that the tool can describe are `postgres` and `mssql`.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.
 
-The default output is `repository`, and the default dialect is `ansi`.  So a project that sets neither gets this error for each file that a class reads.
+The default output is `repository`, and the default dialect is `ansi`.  So a project that sets neither gets this error for each file that a type claims.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'methods' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
