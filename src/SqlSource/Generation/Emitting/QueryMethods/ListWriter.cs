@@ -181,7 +181,11 @@ internal static class ListWriter
         engine switch
         {
             DatabaseEngine.PostgreSql => new EngineLimit(65535, "PostgreSQL", ", or send them as an array with = ANY"),
-            DatabaseEngine.SqlServer => new EngineLimit(2098, "SQL Server", ", or use a table-valued parameter"),
+            DatabaseEngine.SqlServer => new EngineLimit(
+                2098,
+                "SQL Server",
+                ", or send them as one JSON array read with OPENJSON"
+            ),
             _ => throw UnexpectedEnumValueException.Of(engine),
         };
 
