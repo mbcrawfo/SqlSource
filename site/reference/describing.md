@@ -78,13 +78,13 @@ sqlsource: watching for changes; press Ctrl+C to stop
 
 **What starts a pass.**  One of these starts a pass:
 
-- **A file that the tool reads is saved.**  That is a `.sql` file of your projects, a [settings file](settings-file.md#settings-files) that applies to one, or a C# file of a project.
+- **A file that the tool reads is saved or deleted.**  That is a `.sql` file of your projects, a [settings file](settings-file.md#settings-files) that applies to one, or a C# file of a project.
 - **What a project includes may have changed.**  That is one of these changes:
   - a new `.sql`, C# or `sqlsource.json` file, or a new folder, in the folder of a project or in a folder that a project lists a file from;
   - a new `sqlsource.json` in a folder above a file that the tool reads, up to the root of your repository;
-  - a `.sql` file renamed, or a `.sql` file deleted and still gone when the pass starts;
-  - a project file or a solution file saved;
-  - a `Directory.Build.props`, `Directory.Build.targets` or `Directory.Packages.props` saved in the folder of a project or of the solution, in a folder below it, or in a folder above it up to the root of your repository;
+  - a `.sql` file, a C# file or a settings file that the tool reads renamed, or deleted and still gone when the pass starts;
+  - a project file or a solution file saved or deleted;
+  - a `Directory.Build.props`, `Directory.Build.targets` or `Directory.Packages.props` saved or deleted in the folder of a project or of the solution, in a folder below it, or in a folder above it up to the root of your repository;
   - a `dotnet restore`, into the `obj` folder of the project or into the `artifacts` folder of `UseArtifactsOutput`.
 
   The pass then reads your projects again before it describes.  So the pass describes a new file, or a new project of the solution.
