@@ -91,7 +91,7 @@ Counts are of findings.  The guard is **mutation** (the scope's run before and a
 | # | Phase | Scope | Delete | Fold | Strengthen | Loosen | Demote | Guard | State |
 |----|----|----|----|----|----|----|----|----|----|
 | 01 | [generator-driver-deletes](2026-11-13-test-cleanup-phase-01-generator-driver-deletes-design.md) | `tests/SqlSource.Tests/Generator` | 13 |  |  |  |  | mutation: `generator-root`; covers and run time for 10 | not started |
-| 02 | [generator-diagnostics-deletes](2026-11-13-test-cleanup-phase-02-generator-diagnostics-deletes-design.md) | `tests/SqlSource.Tests/Diagnostics` | 2 |  |  |  |  | mutation: `generator-diagnostics`; covers and run time for 2 | not started |
+| 02 | [generator-diagnostics-deletes](2026-11-13-test-cleanup-phase-02-generator-diagnostics-deletes-design.md) | `tests/SqlSource.Tests/Diagnostics` | 2 |  |  |  |  | mutation: `generator-diagnostics`; covers and run time for 2 | done |
 | 03 | [generator-generation-deletes](2026-11-13-test-cleanup-phase-03-generator-generation-deletes-design.md) | `tests/SqlSource.Tests/Generation` | 1 |  |  |  |  | mutation: `generator-generation` | not started |
 | 04 | [generator-generation-emitting-deletes](2026-11-13-test-cleanup-phase-04-generator-generation-emitting-deletes-design.md) | `tests/SqlSource.Tests/Generation/Emitting` | 6 |  |  |  |  | mutation: `generator-generation-emitting`; covers and run time for 1 | not started |
 | 05 | [generator-generation-types-deletes](2026-11-13-test-cleanup-phase-05-generator-generation-types-deletes-design.md) | `tests/SqlSource.Tests/Generation/Types` | 7 |  |  |  |  | mutation: `generator-generation-types`; covers and run time for 4 | not started |
