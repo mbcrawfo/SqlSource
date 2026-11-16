@@ -4,10 +4,6 @@
 
 ## What the generator writes
 
-The part of the `SqlSource` package that runs in the compiler and writes C# from your `.sql` files.
-
-The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code.  For each described query it writes a type for its parameters and a type for its rows, its [models](models.md#models), and, under the default [output](settings.md#setting-output), `repository`, a [repository method](repositories.md#repository-methods): an instance method of your type that gets its own connection and runs the query.  Under the output `methods` a query gets a [method that takes the connection](connection-methods.md#methods-that-take-a-connection) instead, for a connection, a transaction or a timeout that your own code manages.  A query whose output is `sql` or `models` gets a string constant instead, or a method that returns its SQL where it has [tokens](tokens.md#tokens), for your own code to run.  It needs no database, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](../diagnostics.md#sqlsrc003), [SQLSRC012](../diagnostics.md#sqlsrc012)).  It needs the package, one attribute, and one choice: a query whose output is `models`, `methods` or `repository`, the default, must be described by the [tool](describing.md#describe), and the build reports one that has no current entry in its sidecar, while a query whose output is `sql` needs nothing more.
-
 ```sql postgres
 -- name: GetUser -> one-optional
 -- summary: Loads one user by id.
@@ -33,13 +29,72 @@ GetUserDto? user = await users.GetUser(new GetUserParams(42));
 ListFromDto[] rows = await users.ListFrom("users", "name DESC");
 ```
 
-`GetUser` and `ListFrom` are the generated methods of the two queries, public instance methods of `UserRepository`.  Each opens a connection from the data source, sends the query's parameters, runs it, reads its rows into its output model and disposes the connection: `GetUser` one row or null, as its [result shape](sql-files.md#result-shapes) `one-optional` says, and `ListFrom` every row, the default for a query that returns rows.  `ListFrom` takes the text of each token, and its token defaults, `users` and `name`, are only samples for [describing](describing.md#describe) the query.  `GetUserParams`, `GetUserDto` and `ListFromDto` are the models of the two queries, generated from what the tool recorded when it described them.  `UserRepository` also gets an interface of the two methods, `IUserRepository`, for code that takes a repository and a test that fakes one: see [the interface](repositories.md#repository-interface).  A query that is renamed or removed is a compile error where it is used, and so is a column that is renamed or removed once the query is described again.
+The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# from them, beside your own code.  It needs no database.
 
-With the output `models`, the same queries give `Sql.GetUser`, a [constant](#constants) that holds the text of the first query, and `Sql.ListFrom("users", "name DESC")`, a [token method](#token-methods) that returns the text of the second with its tokens filled in, and their models, for Dapper, ADO.NET or any other library to run: see [the recipe](../guides/dapper.md#dapper-and-adonet).
+For each described query, the generator writes its [models](models.md#models): a type for its parameters and a type for its rows.  The [output](settings.md#setting-output) of the query says what else it gets:
+
+- **`repository`, the default:** a [repository method](repositories.md#repository-methods).  This is an instance method of your type that gets its own connection and runs the query.
+- **`methods`:** a [method that takes the connection](connection-methods.md#methods-that-take-a-connection), for a connection, a transaction or a timeout that your own code manages.
+- **`models` or `sql`:** a string constant, or a method that returns its SQL where it has [tokens](tokens.md#tokens), for your own code to run.
+
+The generator needs the package, one attribute and one choice, the output of each query.  The [tool](describing.md#describe) must describe each query whose output is `repository`, `methods` or `models`.  The build reports such a query when its sidecar has no current entry for it.  A query whose output is `sql` needs nothing more.
+
+The project must target .NET 8 or later and compile C# 12 or later, as [what the build needs](msbuild.md#build-requirements) says.  An older target framework is [SQLSRC003](../diagnostics.md#sqlsrc003), and an older language version is [SQLSRC012](../diagnostics.md#sqlsrc012).
+
+In the sample, `GetUser` and `ListFrom` are the generated methods of the two queries.  They are public instance methods of `UserRepository`.  Each method opens a connection from the data source, sends the parameters of its query and runs it.  It then reads the rows into its output model, and disposes the connection.  `GetUser` reads one row or null, as its [result shape](sql-files.md#result-shapes) `one-optional` says.  `ListFrom` reads every row, the default for a query that returns rows.
+
+`ListFrom` takes the text of each token.  Its token defaults, `users` and `name`, are only samples for [describing](describing.md#describe) the query.  `GetUserParams`, `GetUserDto` and `ListFromDto` are the models of the two queries.  The generator makes them from what the tool recorded when it described the queries.  `UserRepository` also gets `IUserRepository`, an interface of the two methods, for code that takes a repository and for a test that fakes one: see [the interface](repositories.md#repository-interface).
+
+If a query is renamed or removed, the code that uses it does not compile.  If a column is renamed or removed, the same happens once the query is described again.
+
+Under the output `models`, the same queries give their models and two members, for Dapper, ADO.NET or any other library to run: see [the recipe](../guides/dapper.md#dapper-and-adonet).  `Sql.GetUser` is a [constant](#constants) that holds the text of the first query.  `Sql.ListFrom("users", "name DESC")` is a [token method](#token-methods) that returns the text of the second with its tokens filled in.
 
 <a id="locations"></a>
 
+<a id="setting-member-location"></a>
+
 ## Where the members go
+
+```sql postgres
+-- output: methods
+
+-- name: GetUser -> one-optional
+-- member-location: class
+-- visibility: public
+SELECT id, name FROM users WHERE id = @id;
+
+-- name: CountUsers
+-- output: sql
+SELECT count(*) FROM users;
+```
+
+```csharp
+[SqlSourceGenerate]
+public static partial class UserQueries
+{
+    public static string CountText => Sql.CountUsers;
+}
+
+// elsewhere
+GetUserDto? user = await UserQueries.GetUser(connection, new GetUserParams(42));
+```
+
+The member location of a query says where its generated members go.  Those are its [query method](query-methods.md#query-methods), for the output `repository` or `methods`, and its constant or token method, for `models` or `sql`.  The [visibility](#setting-visibility) of the query says how visible the members are.  Both are settings of the query's `.sql` file.
+
+Above, `GetUser` is a public static method of `UserQueries` that takes the connection.  `CountUsers` writes no member location, so it is a constant of the private class `Sql` nested in `UserQueries`.
+
+| Member location | The members are | Used as |
+|----|----|----|
+| `class`, the default for `repository` | Members of the type itself: a [repository method](repositories.md#repository-methods) is an instance method, which gets its own connection, and any other member is static, a `methods` method taking the connection as its first argument | `users.GetUser(...)` for a repository method, `UserQueries.GetUser`, or `UserQueries.GetUser(connection, ...)` for a `methods` method |
+| `extension-class`, the default for `methods` | Extension methods of `DbConnection`, in a static class beside the type, named after it with `Extensions` after it.  Only a `methods` method can go there | `connection.GetUser(...)` |
+| `nested-class`, the default for `models` and `sql` | Public static members of a static class nested in the type, `Sql` unless [the nested class](#setting-nested-class) names it.  A `methods` method there takes the connection as its first argument | `Sql.GetUser`, or `Sql.GetUser(connection, ...)` for a `methods` method |
+
+Without a member location, the members of each output go to its default, as the table shows.  The setting is written `-- member-location:`, in the file header or inside a query.  In a settings file it is `memberLocation`, as `"memberLocation": "class"`.
+
+- **Each query has its own.**  A file can put the members of some queries on the type, some in a nested class and some in the extension class.  Two files of one type can place theirs differently.
+- **A value in the file header or in a settings file reaches every query below it, whatever its output.**  [A placement for a whole file or folder](#placement-for-a-file) says what to do where it does not fit.
+- **A repository method is always on the type.**  `class` fits a query whose output is `repository`.  On such a query, `extension-class` or `nested-class` is [SQLSRC122](../diagnostics.md#sqlsrc122).
+- **Only a `methods` method can go in the extension class.**  On a query whose output is `repository`, `models` or `sql`, `extension-class` is [SQLSRC122](../diagnostics.md#sqlsrc122), since a constant extends nothing.
 
 ```sql postgres
 -- name: GetUser -> one-optional
@@ -67,23 +122,33 @@ GetUserDto? user = await users.GetUser(new GetUserParams(42));
 ListUsersDto[] all = await UserRepository.ListUsers(connection);
 ```
 
-Each query's members go where its [member location](#setting-member-location) says, with the accessibility its [visibility](#setting-visibility) gives, two settings of its `.sql` file.  Without them, as for `GetUser` and `CountUsers`, a repository method is a `public` instance method of the type, and a constant or token method is a public member of a private class `Sql` nested in the type, for the type's own code.  A query whose output is `methods` is by default an `internal` extension method of `DbConnection`, in the class `UserRepositoryExtensions`; `ListUsers` writes `class`, so it is a static method of the type, which takes the connection, `public` since the type is.  The settings' sections give their values and defaults; what follows is what to know of the code you get.
+In this sample, `GetUser` and `CountUsers` write no member location and no visibility, so they take the defaults.  `GetUser` is a repository method, a `public` instance method of the type.  `CountUsers` is a constant, and a constant or token method is a public member of a private class `Sql` nested in the type, for the type's own code.  A query whose output is `methods` is by default an `internal` extension method of `DbConnection`, in the class `UserRepositoryExtensions`.  `ListUsers` writes `class`, so it is a static method of the type that takes the connection.  It is `public`, since the type is.
 
-- **The models follow the type, and the members follow `visibility`.**  A model is `public` or `internal` by the type that claims its query, as [accessibility](models.md#model-accessibility) says, whatever the visibility of the query's members.  So a `private` method of a `public` type still has public models, and a `public` extension method of a type that is not `public` is [SQLSRC123](../diagnostics.md#sqlsrc123) when it takes or returns a model that is internal, as its models are unless a `public` type shares them.  One with no parameters and no rows takes no models, and compiles.
-- **A nested class is `static partial`**, and is written for the members it holds alone: a class of query methods only is in the file of the type's methods, and a class of constants and methods has a part in each file.  Its members are `public`, and the class has the visibility.  A type none of whose queries can be used, such as one whose only file has an error, keeps an empty private class `Sql`, or the one that the `nestedClass` of its first file's settings files names, so that code that uses one of its members reports the member missing, and not the class.
-- **In a nested class**, the type cannot have a member, a nested type or a type parameter named like the class, nor that name itself ([SQLSRC007](../diagnostics.md#sqlsrc007)).  A query is not named like its class, with `Async` after a query method's name under `async-method-suffix` ([SQLSRC009](../diagnostics.md#sqlsrc009)).
-- **On the type**, a constant or token method is not named like the type ([SQLSRC009](../diagnostics.md#sqlsrc009)), nor like a member, a nested type or a type parameter that the type declares, nor like a nested class of the type's queries ([SQLSRC125](../diagnostics.md#sqlsrc125)).  So a token method does not overload a method of yours of the same name.  A query method's name is checked as [its output's section](repositories.md#repository-signature) says for a repository method, and where [the methods go](connection-methods.md#method-location) for a `methods` method.
-- **A placement error leaves its file out.**  A query whose member location or visibility does not fit ([SQLSRC122](../diagnostics.md#sqlsrc122), [SQLSRC123](../diagnostics.md#sqlsrc123)), or whose members would take a name that is taken ([SQLSRC007](../diagnostics.md#sqlsrc007), [SQLSRC125](../diagnostics.md#sqlsrc125)), or whose nested class has two visibilities ([SQLSRC124](../diagnostics.md#sqlsrc124)), leaves its whole file without members and without models for the type, as [a name used twice](attributes.md#files-of-a-type) does; the type's other files keep theirs.  A visibility that does not fit only the models a query method takes or returns, also SQLSRC123, leaves out that method alone, as a [method's other errors](query-methods.md#query-methods) do.
-- A query may share its name with a member that the type inherits, such as `ToString`.  The constant hides it, with no warning in the generated code.
+- **The models follow the type, and the members follow `visibility`.**  A model is `public` or `internal` by the type that claims its query, whatever the visibility of the query's members: see [accessibility](models.md#model-accessibility).  So a `private` method of a `public` type still has public models.
+- **A `public` extension method of a type that is not `public` is [SQLSRC123](../diagnostics.md#sqlsrc123) when it takes or returns a model that is internal.**  The models of such a type are internal, unless a `public` type shares them.  A method with no parameters and no rows takes no models, and compiles.
+- **A nested class is `static partial`, and is written for the members that it holds alone.**  A class that holds only query methods is in the file of the type's methods.  A class that holds constants and methods has a part in each file.
+- **The members of a nested class are `public`, and the class has the visibility.**
+- **A type with no query that it can use keeps an empty private class `Sql`.**  An example is a type whose only file has an error.  If the settings files of its first file set a `nestedClass`, the empty class has that name.  So code that uses one of its members reports the member missing, and not the class.
+- **In a nested class, the type cannot have a member, a nested type or a type parameter with the name of the class.**  The type cannot have that name itself either.  Each of these is [SQLSRC007](../diagnostics.md#sqlsrc007).
+- **A query cannot have the name of its nested class** ([SQLSRC009](../diagnostics.md#sqlsrc009)).  Under `async-method-suffix`, this holds for the name of a query method with `Async` after it.
+- **On the type, a constant or token method cannot have the name of the type** ([SQLSRC009](../diagnostics.md#sqlsrc009)).
+- **On the type, a constant or token method cannot have the name of anything that the type declares, or of a nested class of its queries** ([SQLSRC125](../diagnostics.md#sqlsrc125)).  What the type declares is a member, a nested type or a type parameter.  So a token method does not overload a method of yours of the same name.
+- **The name of a query method is checked where its output says.**  For a repository method, see [its output's section](repositories.md#repository-signature).  For a `methods` method, see [where the methods go](connection-methods.md#method-location).
+- **A placement error leaves its file out.**  The file then has no members and no models for the type, as with [a name used twice](attributes.md#files-of-a-type), and the type's other files keep theirs.  A placement error is one of these:
+  - a member location or a visibility that does not fit the query ([SQLSRC122](../diagnostics.md#sqlsrc122), [SQLSRC123](../diagnostics.md#sqlsrc123));
+  - a member that would take a name that is taken ([SQLSRC007](../diagnostics.md#sqlsrc007), [SQLSRC125](../diagnostics.md#sqlsrc125));
+  - a nested class with two visibilities ([SQLSRC124](../diagnostics.md#sqlsrc124)).
+- **A visibility that does not fit only the models of a query method leaves out that method alone.**  This is also SQLSRC123, and it acts as the [other errors of a method](query-methods.md#query-methods) do.
+- **A query can have the name of a member that the type inherits, such as `ToString`.**  The constant hides the inherited member, and the generated code gives no warning.
 
 <a id="placement-for-a-file"></a>
 
 ### A placement for a whole file or folder
 
-A member location or a visibility written in a file header or a settings file reaches every query below it, whatever its output, and a query where it does not fit is an error that leaves its file without members and without models for the type until it is fixed, or only its method when what does not fit is the method's models.  The message says where the value was written.  Two cases catch a project out:
+A member location or a visibility in a file header or a settings file reaches every query below it, whatever its output.  If the value does not fit a query, that is an error.  The error leaves the file without members and without models for the type until it is fixed.  If only the models of the query's method do not fit, the error leaves out only that method.  The message says where the value was written.  Two cases catch a project out:
 
-- **`"memberLocation": "ExtensionClass"` in a settings file** is [SQLSRC122](../diagnostics.md#sqlsrc122) at every query whose output is `sql`, `models` or `repository`, in its folder and the folders below it, since only a `methods` method can go in the extension class, and so is `"memberLocation": "NestedClass"` at every repository query, whose method is always an instance method of the type.  Leave it out: each output's members go to its own default.
-- **A visibility in the header of a file that mixes outputs** reaches its query methods too:
+- **`"memberLocation": "ExtensionClass"` in a settings file is [SQLSRC122](../diagnostics.md#sqlsrc122) at every query whose output is `repository`, `models` or `sql`.**  This holds in its folder and the folders below it, since only a `methods` method can go in the extension class.  In the same way, `"memberLocation": "NestedClass"` is an error at every repository query, whose method is always an instance method of the type.  Write `-- member-location:` on the queries that the value does not fit, or leave it out: each output's members then go to its own default.
+- **A visibility in the header of a file that mixes outputs reaches its query methods too:**
 
 ```sql postgres
 -- visibility: private
@@ -101,7 +166,12 @@ SELECT id, name FROM users WHERE id = @id;
 error SQLSRC123: The query 'GetUser' of 'App.UserRepository' cannot be private, which the file header sets, at the member location extension-class, because an extension method is public or internal.  Write -- visibility: or -- member-location: on the query.
 ```
 
-`CountUsers` would be a constant of a private nested class, its default anyway, and `GetUser`, whose method goes to the extension class, cannot be private.  Write the visibility on the query that needs another, which wins over the header, or give it a member location where it fits:
+`CountUsers` would be a constant of a private nested class, its default anyway.  `GetUser` cannot be private, since its method goes to the extension class.  To fix the file, do one of these:
+
+- Write the visibility on the query that needs another.  It wins over the header.
+- Give the query a member location where the visibility fits.
+
+The file below takes the first way:
 
 ```sql postgres
 -- visibility: private
@@ -116,49 +186,6 @@ SELECT count(*) FROM users;
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-<a id="setting-member-location"></a>
-
-### Where the members go
-
-```sql postgres
--- output: methods
-
--- name: GetUser -> one-optional
--- member-location: class
--- visibility: public
-SELECT id, name FROM users WHERE id = @id;
-
--- name: CountUsers
--- output: sql
-SELECT count(*) FROM users;
-```
-
-```csharp
-[SqlSourceGenerate]
-public static partial class UserQueries
-{
-    public static string CountText => Sql.CountUsers;
-}
-
-// elsewhere
-GetUserDto? user = await UserQueries.GetUser(connection, new GetUserParams(42));
-```
-
-The member location of a query says where its generated members go: its constant or token method, for the output `sql` or `models`, and its [query method](query-methods.md#query-methods), for `methods` or `repository`.  Above, `GetUser` is a public static method of `UserQueries` that takes the connection, and `CountUsers`, which writes no member location, is a constant of the private class `Sql` nested in it.
-
-| Member location | The members are | Used as |
-|----|----|----|
-| `nested-class`, the default for `sql` and `models` | Public static members of a static class nested in the type, `Sql` unless [the nested class](#setting-nested-class) names it.  A `methods` method there takes the connection as its first argument | `Sql.GetUser`, or `Sql.GetUser(connection, ...)` for a `methods` method |
-| `class`, the default for `repository` | Members of the type itself: a [repository method](repositories.md#repository-methods) is an instance method, which gets its own connection, and any other member is static, a `methods` method taking the connection as its first argument | `users.GetUser(...)` for a repository method, `UserQueries.GetUser`, or `UserQueries.GetUser(connection, ...)` for a `methods` method |
-| `extension-class`, the default for `methods` | Extension methods of `DbConnection`, in a static class beside the type, named after it with `Extensions` after it.  Only a `methods` method can go there | `connection.GetUser(...)` |
-
-It is written `-- member-location:`, in the file header or inside a query, and `memberLocation` in a settings file, as `"memberLocation": "class"`.
-
-- **Each query has its own.**  A file may put some of its queries' members on the type, some in a nested class and some in the extension class, and two files of one type may place theirs differently.
-- **A repository method is always on the type.**  `class` fits a query whose output is `repository`, and `extension-class` or `nested-class` is [SQLSRC122](../diagnostics.md#sqlsrc122).
-- **A value written in the file header or in a settings file reaches every query below it, whatever its output.**  `extension-class` on a query whose output is `sql`, `models` or `repository`, or `nested-class` on one whose output is `repository`, is [SQLSRC122](../diagnostics.md#sqlsrc122), and its file gets no members and no models for the type until it is fixed, since a constant extends nothing and a repository method is the type's.  So `"memberLocation": "ExtensionClass"` in a settings file is an error at every such query of its folder and the folders below it.  Write `-- member-location:` on the queries it does not fit, or leave it out: each output's members go to its own default.
-- **The names a member cannot have**, and how the generated code is laid out, are under [Where the members go](#locations).
-
 <a id="setting-visibility"></a>
 
 ## Visibility
@@ -170,7 +197,9 @@ It is written `-- member-location:`, in the file header or inside a query, and `
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-The visibility says how visible the members of a query's member location are: `public`, `internal`, `protected` or `private`.  Above, `GetUser` is an `internal` repository method of the type, which its interface leaves out.  It is written `-- visibility:`, in the file header or inside a query, and `visibility` in a settings file.  Without one, a repository method is `public`, whatever the accessibility of the type, unless that does not fit its models, as below, and any other query takes the default of its member location:
+The visibility of a query says how visible its members are at their member location.  Above, `GetUser` is an `internal` repository method of the type, and its interface leaves it out.
+
+The values are `public`, `internal`, `protected` and `private`.  What a value sets, and the default, depend on the member location:
 
 | Member location | `visibility` sets | Default |
 |----|----|----|
@@ -178,12 +207,48 @@ The visibility says how visible the members of a query's member location are: `p
 | `nested-class` | The nested class's own accessibility.  Its members are always `public` inside it | `private` |
 | `extension-class` | Each query method's accessibility.  The class is `public` when one of the type's methods in it is, and `internal` otherwise | `internal` |
 
-- **A value written in the file header or in a settings file reaches every query below it**, as a member location does, and is [SQLSRC123](../diagnostics.md#sqlsrc123) where it does not fit, which leaves its file without members and without models for the type until it is fixed, or only the query's method when what does not fit is the models the method takes or returns.  A file of `sql` and `methods` queries with `-- visibility: private` in its header gives its constants a private nested class, and its query methods, which go to the extension class, the error: write `-- visibility:` or `-- member-location:` on those queries.  [A placement for a whole file or folder](#placement-for-a-file) shows such a file.
-- **What does not fit**: `private` or `protected` in the extension class, which a class that is not nested cannot be; `public` in the extension class of a type that is not `public` with every type around it, for a query method that takes or returns a model, since the type's models are internal and such a method cannot take or return them; `public` or `protected` for a query method that takes or returns a model that is internal, on the type or for its nested class, when the type, or a type around it, is `protected` or `protected internal`, and none of them is `internal`, `private` or `private protected`, since a class derived from it in another assembly could call the method, and its models are internal; and `protected` where C# forbids it, on the type when it is a static class, a struct or a record struct, and for the nested class of a struct or a record struct.
-- **What fits, with no diagnostic**: `public` for members on a type that is `internal`, which are then internal in effect, as a repository method is by default; `protected` for the repository methods of an abstract base repository, whose derived types call them; `public` or `internal` for a nested class, which code outside the type then uses as `UserRepository.Sql.GetUser`; `protected` on a sealed class or record, which compiles with no warning from the generated code; a protected nested class in a static class; and, on a type that is `protected` or `protected internal`, or inside one, an `internal` or `private` query method or nested class, and constants and token methods of any visibility, which take no models.  A query method with no parameters and no rows takes no models either, so it fits wherever the visibility alone does, and so does one whose models a `public` type shares, which makes them public.
-- **A nested class has one visibility.**  A query that writes none for its class takes the one that another query of the type writes for it, in any of the type's files.  Two queries that write two different ones are [SQLSRC124](../diagnostics.md#sqlsrc124), and every file with a query in that class gets no members and no models for the type until it is fixed.  A query method that writes none is [SQLSRC123](../diagnostics.md#sqlsrc123) when the visibility it takes does not fit the models it takes or returns, which leaves out that method alone.
-- **A repository method's default can not fit either.**  On a type that is `protected` or `protected internal`, or inside one, with none of them `internal`, `private` or `private protected`, the default `public` does not fit a repository method that takes or returns a model, and is [SQLSRC123](../diagnostics.md#sqlsrc123), which leaves out that method alone: write `-- visibility: internal` on the query, or in the file header for all of them.
-- **The models do not follow it.**  A query's models are `public` or `internal` by the type that claims it, whatever the visibility of its members: see [accessibility](models.md#model-accessibility).
+Without a visibility, a repository method is `public` whatever the accessibility of the type, unless `public` does not fit its models, as below.  Any other query takes the default of its member location.  The setting is written `-- visibility:`, in the file header or inside a query, and `visibility` in a settings file.
+
+- **A value in the file header or in a settings file reaches every query below it**, as a member location does.  Where the value does not fit a query, it is [SQLSRC123](../diagnostics.md#sqlsrc123), and [A placement for a whole file or folder](#placement-for-a-file) says what the error leaves out.
+- **`-- visibility: private` in the header of a file of `methods` and `sql` queries is an error at its query methods.**  It gives the constants a private nested class, but the query methods go to the extension class.  Write `-- visibility:` or `-- member-location:` on those queries, as that section shows.
+- **A nested class has one visibility.**  If a query writes no visibility for its class, it takes the one that another query of the type writes for the class, in any of the type's files.
+- **Two queries that write two different visibilities for one nested class are [SQLSRC124](../diagnostics.md#sqlsrc124).**  Every file with a query in that class then gets no members and no models for the type until it is fixed.
+- **A query method that writes no visibility for its nested class can still be [SQLSRC123](../diagnostics.md#sqlsrc123).**  This happens when the visibility that it takes does not fit the models that it takes or returns, and it leaves out that method alone.
+- **The models do not follow the visibility.**  The models of a query are `public` or `internal` by the type that claims it, whatever the visibility of its members: see [accessibility](models.md#model-accessibility).
+
+**What does not fit.**  A visibility does not fit when one of these is true:
+
+- **`private` or `protected` in the extension class.**  A class that is not nested cannot be private or protected.
+- **`public` in the extension class, for a query method that takes or returns a model, when the type, or a type around it, is not `public`.**  The models of such a type are internal, and the method cannot take or return them.
+- **`public` or `protected` for a query method, when all of these are true:**
+  - The visibility is for a method on the type, or for the nested class that holds the method.
+  - The method takes or returns a model that is internal.
+  - The type, or a type around it, is `protected` or `protected internal`.
+  - Neither the type nor any type around it is `internal`, `private` or `private protected`.
+
+  A class in another assembly can derive from the type and call the method, but the models are internal.
+- **`protected` where C# forbids it.**  That is one of these:
+  - on the type, when it is a static class, a struct or a record struct;
+  - for the nested class of a struct or a record struct.
+
+**What fits, with no diagnostic.**  A visibility fits, and nothing is reported, when one of these is true:
+
+- **`public` for the members on a type that is `internal`.**  They are then internal in effect, as a repository method is by default.
+- **`protected` for the repository methods of an abstract base repository.**  Its derived types call them.
+- **`public` or `internal` for a nested class.**  Code outside the type then uses it as `UserRepository.Sql.GetUser`.
+- **`protected` on a sealed class or record.**  It compiles with no warning from the generated code.
+- **`protected` for a nested class in a static class.**
+- **`internal` or `private` for a query method or a nested class on a type that is `protected` or `protected internal`, or inside one.**
+- **Any visibility for constants and token methods on such a type.**  They take no models.
+
+A query method with no parameters and no rows takes no models either, so it fits wherever the visibility alone does.  So does a query method whose models a `public` type shares, which makes them public.
+
+**The default of a repository method does not always fit.**  The default `public` does not fit a repository method that takes or returns a model when all of these are true:
+
+- The type, or a type around it, is `protected` or `protected internal`.
+- Neither the type nor any type around it is `internal`, `private` or `private protected`.
+
+This is [SQLSRC123](../diagnostics.md#sqlsrc123), which leaves out that method alone.  Write `-- visibility: internal` on the query, or in the file header for all of its queries.
 
 <a id="setting-nested-class"></a>
 
@@ -214,13 +279,19 @@ public partial class UserRepository
 }
 ```
 
-This names the class nested in the type that holds a query's members when its [member location](#setting-member-location) is `nested-class`.  It is written `-- nested-class:`, in the file header or inside a query, and `nestedClass` in a settings file, and is `Sql` without one.  Above, the queries of the project are in a class `Queries`, and those of `UserRepository.sql` in `Statements`.
+The nested class names the class, nested in the type, that holds the members of a query whose [member location](#setting-member-location) is `nested-class`.  Above, the queries of the project are in a class `Queries`, and those of `UserRepository.sql` in `Statements`.
 
-- **Each query has its own**, so one file can fill two classes, as `Users.Get` and `Orders.List`, and two files of one type can fill one.  A class is written only when a query of the type puts a member in it.
-- **It is a setting of the `.sql` file**, taken from the settings files of its folder and the folders above it, as every other setting is, and not from those of the type's C# file.  For a type that reads the file named for it beside its C# file, as it does without [`Source`](attributes.md#setting-source), the two are the same folder.
-- **It is ignored where the member location is not `nested-class`**, so a `nestedClass` for a whole project beside a file whose queries go on the type is no error.
-- **The value is one C# identifier that is not a keyword**: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  Nor is `file`, `required`, `scoped` or `extension`, which C# does not take as a class's name, or `var`, with which the query methods of the type would not compile.  A name in lower case, such as `queries`, or `record`, is fine, and gives no compiler warning in the generated code.  A value that is not valid is [SQLSRC111](../diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](../diagnostics.md#sqlsrc019) in a settings file, where a farther settings file or the default then gives the name.
-- **A type that already has the name**, as a member, a nested type or a type parameter, or as its own name, is [SQLSRC007](../diagnostics.md#sqlsrc007), and every file with a query in that class gets no members and no models for it until it is fixed.  The other names its members cannot have are under [Where the members go](#locations).
+- **The value must be one C# identifier that is not a keyword.**  `Queries` is valid, and `class`, `My-Sql` or `App.Sql` is not.
+- **`file`, `required`, `scoped`, `extension` and `var` are not valid either.**  C# does not take the first four as the name of a class.  With `var`, the query methods of the type would not compile.
+- **A name in lower case, such as `queries`, or `record`, is valid.**  It gives no compiler warning in the generated code.
+
+Without a value, the class is `Sql`.  The setting is written `-- nested-class:`, in the file header or inside a query, and `nestedClass` in a settings file.
+
+- **Each query has its own.**  So one file can fill two classes, as `Users.Get` and `Orders.List`, and two files of one type can fill one.  A class is written only when a query of the type puts a member in it.
+- **It is a setting of the `.sql` file.**  It comes from the settings files of the folder of the `.sql` file and the folders above it, as every other setting does, and not from those of the type's C# file.  For a type that reads the file named for it beside its C# file, as it does without [`Source`](attributes.md#setting-source), the two are the same folder.
+- **It is ignored where the member location is not `nested-class`.**  So a `nestedClass` for a whole project, beside a file whose queries go on the type, is no error.
+- **A value that is not valid is [SQLSRC111](../diagnostics.md#sqlsrc111) in a marker, and [SQLSRC019](../diagnostics.md#sqlsrc019) in a settings file.**  After SQLSRC019, a farther settings file or the default gives the name.
+- **A type that already has the name is [SQLSRC007](../diagnostics.md#sqlsrc007).**  The name can be a member, a nested type or a type parameter of the type, or its own name.  Every file with a query in that class then gets no members and no models for the type until it is fixed.  The other names that its members cannot have are under [Where the members go](#locations).
 
 <a id="constants"></a>
 
@@ -230,9 +301,11 @@ This names the class nested in the type that holds a query's members when its [m
 public const string GetUser = "SELECT id, name\nFROM users\nWHERE id = @id;";
 ```
 
-A query without tokens whose output is `sql` or `models` is a `const string` with the name of the query, `public` in a nested class and of the query's [visibility](#setting-visibility) on the type: see [where the members go](#locations).  Its value is the SQL you wrote, with the markers and comments taken out and line endings made `\n`: [what reaches the generated SQL](sql-files.md#generated-sql) lists everything done to it.  A query parameter such as `@id` stays in it as written; you give the database its value when you run the query.
+If a query has no tokens and its output is `models` or `sql`, it becomes a `const string` with the name of the query.  The constant is `public` in a nested class, and has the query's [visibility](#setting-visibility) on the type: see [where the members go](#locations).
 
-Because it is a constant, it can be used wherever C# wants one, such as another `const` or an attribute argument:
+Its value is the SQL that you wrote, with the markers and comments taken out and the line endings made `\n`.  [What reaches the generated SQL](sql-files.md#generated-sql) lists everything done to it.  A query parameter such as `@id` stays in the value as written.  You give the database its value when you run the query.
+
+You can use the constant wherever C# needs a constant, such as in another `const` or in an attribute argument:
 
 ```csharp
 public const string LoadUser = UserQueries.GetUser;
@@ -245,22 +318,22 @@ public User Load(int id) => throw new NotImplementedException();
 
 ## Token methods
 
-What a query with a [token](tokens.md#tokens) becomes in place of a constant: a static method that takes the text of each token and returns the SQL with the tokens filled in.  See [token methods](#token-methods).
-
 ```csharp
 var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
 ```
 
-A query with a token whose output is `sql` or `models` is a `static string` method with the name of the query, as visible as a constant would be, `ListFrom(string table, string orderBy)`, in place of a constant.  Under `methods` or `repository` the query's [method](query-methods.md#query-methods) takes the tokens instead, and runs the query.  Its parameters, and what it returns, are under [tokens](tokens.md#tokens).
+A token method is what a query with a [token](tokens.md#tokens) becomes in place of a constant, when its output is `models` or `sql`.  It is a `static string` method with the name of the query, such as `ListFrom(string table, string orderBy)`.  It takes the text of each token, and returns the SQL with the tokens filled in.  It is as visible as a constant would be.
 
-A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](parameters.md#query-parameters) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [tokens](tokens.md#tokens).
+Under `repository` or `methods`, the query gets no token method: its [method](query-methods.md#query-methods) takes the tokens instead, and runs the query.  The parameters of a token method, and what it returns, are under [tokens](tokens.md#tokens).
+
+A token is replaced by plain text substitution, and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](parameters.md#query-parameters) for every value.  By default, the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are under [tokens](tokens.md#tokens).
 
 <a id="intellisense"></a>
 
 ## Documentation in IntelliSense
 
-Every generated member has a documentation comment, so your editor shows it where the member is used.  For `GetUser`, the comment is:
+Every generated member has a documentation comment, so your editor shows the comment where the member is used.  For `GetUser`, the comment is:
 
 ```csharp
 /// <summary>
@@ -276,9 +349,9 @@ Every generated member has a documentation comment, so your editor shows it wher
 public const string GetUser = "SELECT id, name\nFROM users\nWHERE id = @id;";
 ```
 
-The summary is the query's `-- summary:` ([summaries](sql-files.md#summaries)), or "The `GetUser` query from `UserRepository.sql`." when it has none.  The remarks hold the SQL of the constant, so a reader sees what a query does without opening the `.sql` file.
+The summary is the query's `-- summary:` ([summaries](sql-files.md#summaries)).  If the query has none, the summary is "The `GetUser` query from `UserRepository.sql`."  The remarks hold the SQL of the constant, so a reader sees what a query does without opening the `.sql` file.
 
-A token method adds a line for each token and one for the result, and shows its tokens as `{{table}}`, without their defaults:
+A token method adds a line for each token and one for the result.  It shows its tokens as `{{table}}`, without their defaults:
 
 ```csharp
 /// <summary>
@@ -295,6 +368,16 @@ A token method adds a line for each token and one for the result, and shows its 
 public static string ListFrom(string table, string orderBy)
 ```
 
-A [query method](query-methods.md#query-methods) has the same summary and remarks, a line for each of its arguments and one for what it returns, but for a [synchronous method](query-methods.md#synchronous-methods) of the shape `none`, which returns nothing, and, for the shapes `one` and `one-optional`, a line for the [exception](exceptions.md#unexpected-row-count) it throws.  On SQL Server, every method also has a line for the `InvalidOperationException` it throws when it is given a transaction that has [completed](databases/sqlserver/query-methods.md#method-results), and a method of the shapes `one`, `one-optional` and `many` one for [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back).  A [collection method](collection-methods.md#collection-methods) has a line for [`CollectionItemException`](exceptions.md#collection-item-exception), one for `UnexpectedRowCountException` under `one` and `one-optional`, and on SQL Server, when it reads rows, one for the `InvalidOperationException` of a query that returns [more than one result set](databases/sqlserver/query-methods.md#collection-methods).  The extension class of the methods has a summary that names the type, and so does a nested class that is `public` or `protected`.
+A [query method](query-methods.md#query-methods) has the same summary and remarks.  It also has these lines:
 
-Every generated member is documented, so a project that treats a missing comment on a public member (CS1591) as an error gets none from generated code.
+- a line for each of its arguments;
+- a line for what it returns, but not for a [synchronous method](query-methods.md#synchronous-methods) of the shape `none`, which returns nothing;
+- for the shapes `one` and `one-optional`, a line for the [exception](exceptions.md#unexpected-row-count) that it throws;
+- on SQL Server, a line for the `InvalidOperationException` that it throws when it is given a transaction that has [completed](databases/sqlserver/query-methods.md#method-results);
+- on SQL Server, for the shapes `one`, `one-optional` and `many`, a line for [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back).
+
+A [collection method](collection-methods.md#collection-methods) has a line for [`CollectionItemException`](exceptions.md#collection-item-exception), and one for `UnexpectedRowCountException` under `one` and `one-optional`.  On SQL Server, a collection method that reads rows also has a line for the `InvalidOperationException` of a query that returns [more than one result set](databases/sqlserver/query-methods.md#collection-methods).
+
+The extension class of the methods has a summary that names the type.  So does a nested class that is `public` or `protected`.
+
+If a project treats a missing comment on a public member (CS1591) as an error, the generated code gives it none, since every generated member is documented.
