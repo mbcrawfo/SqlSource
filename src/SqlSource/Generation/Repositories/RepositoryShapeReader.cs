@@ -24,11 +24,15 @@ internal static class RepositoryShapeReader
     /// <param name="types">The types that have a repository query, from <see cref="RepositoryTypes" />.</param>
     /// <param name="compilation">The compilation the types are in.</param>
     /// <param name="interfacesOn">The project's <c>SqlSourceRepositoryInterfaces</c>.</param>
+    /// <param name="globalMarks">
+    /// The project's marks of global connections, from <see cref="GlobalMarkReader" />.
+    /// </param>
     /// <param name="token">Cancels the read.</param>
     public static EquatableArray<RepositoryShape> Read(
         EquatableArray<TargetType> types,
         Compilation compilation,
         bool interfacesOn,
+        EquatableArray<GlobalMark> globalMarks,
         CancellationToken token
     )
     {
@@ -55,7 +59,9 @@ internal static class RepositoryShapeReader
                     symbol is null || type.IsStatic
                         ? EquatableArray<ConnectionCandidate>.Empty
                         : HeldFactoryReader.Read(symbol, compilation, type.AttributeLocation, token),
-                    EquatableArray<ConnectionCandidate>.Empty,
+                    symbol is null || type.IsStatic
+                        ? EquatableArray<ConnectionCandidate>.Empty
+                        : GlobalConnections.CandidatesFor(globalMarks, symbol, compilation),
                     heldParameters,
                     interfaceOn,
                     interfaceName,

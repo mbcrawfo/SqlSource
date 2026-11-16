@@ -12,8 +12,8 @@ namespace SqlSource.Generation.Repositories;
 /// <summary>
 /// Reads the members of a repository, of its base types and of its primary constructor that can give its methods a
 /// connection, as <see cref="ConnectionCandidate" />s, and holds the rules of what a member gives that
-/// <see cref="HeldFactoryReader" /> shares.  Only <see cref="RepositoryShapeReader" /> and
-/// <see cref="HeldFactoryReader" /> call it, and it calls neither.
+/// <see cref="HeldFactoryReader" /> and <see cref="GlobalConnections" /> share.  Only
+/// <see cref="RepositoryShapeReader" /> and those two call it, and it calls none of them.
 /// </summary>
 internal static class ConnectionCandidateReader
 {
