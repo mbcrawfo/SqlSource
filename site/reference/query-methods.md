@@ -4,8 +4,6 @@
 
 ## Query methods
 
-What a described query whose [output](settings.md#setting-output) is `repository` or `methods` becomes: an asynchronous method that sends the query's parameters, runs it and reads its rows into its models, or, under the generator parameter `method-type`, a [synchronous one](#synchronous-methods) instead or beside it.  Under `repository` it is an instance method of a [repository](repositories.md#repository-methods), which gets its own connection; under `methods` it takes the connection, and opens it when it is closed.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](#query-methods).
-
 ```sql postgres
 -- name: GetUser -> one-optional
 -- summary: Loads one user by id.
@@ -22,29 +20,63 @@ GetUserDto? user = await users.GetUser(new GetUserParams(42));
 GetUserDto? user = await connection.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](settings.md#setting-output) is `repository`, the default, or `methods` gets an asynchronous method that runs it, in place of its constant or token method, and a [synchronous method](#synchronous-methods) instead or beside it when you ask for one.  The two outputs differ in where the connection comes from:
+A query method is the generated method that runs a query.  It is what a described query becomes when its [output](settings.md#setting-output) is `repository`, the default, or `methods`: see [which queries get a method](#which-methods).  It is a [repository method](repositories.md#repository-methods) or a [method that takes a connection](connection-methods.md#methods-that-take-a-connection).  A [token method](members.md#token-methods) is not a query method: it returns SQL, and runs nothing.
+
+The query method holds the SQL of the query, in place of a constant or a token method.  It sends each parameter, runs the query, and reads the rows into the output model by the [result shape](sql-files.md#result-shapes) of the query.  In the sample, the shape `one-optional` gives one row or null.
+
+By default, a query method is asynchronous.  Under the generator parameter `method-type`, the query gets a [synchronous method](#synchronous-methods) in place of the asynchronous one, or beside it.  The two outputs differ in where the connection comes from:
 
 | Output | The method | Called as |
 |----|----|----|
 | `repository`, the default | A [repository method](repositories.md#repository-methods): a `public` instance method of the type, which gets its own connection from a member of the type, and takes no connection, transaction or timeout | `users.GetUser(...)` |
 | `methods` | A [method that takes a connection](connection-methods.md#methods-that-take-a-connection): by default an `internal` extension method of `DbConnection`, which takes the connection, a transaction and a timeout | `connection.GetUser(...)` |
 
-Either method sends each parameter, runs the query and reads its rows into the output model, here one row or null, by its [result shape](sql-files.md#result-shapes).  It runs on ADO.NET's `DbConnection`, through the driver your project references, Npgsql for PostgreSQL and Microsoft.Data.SqlClient for SQL Server, and uses no reflection and no library of SqlSource's.  Its SQL is built inside the method, from the query's text, its [tokens](tokens.md#tokens) and its [lists](parameters.md#list-parameters), and your code cannot reach it: a project that runs a query's SQL itself, through Dapper or its own code, gives it the output `models`.  One type can have queries of both outputs, in one file or in several: a repository keeps the queries that run alone at `repository`, and gives those that its own code runs in a transaction the output `methods`.  What each shape returns, how a row is read and a parameter sent, and the exceptions are the same for both.  A query can also get a [collection method](collection-methods.md#collection-methods), an overload of its method that runs it over a collection of its input models.
+- **A method that takes a connection opens the connection only when it is closed.**  If the connection was open, the method leaves it as it was: see [the connection](connection-methods.md#method-connection).
+- **A query method runs on the `DbConnection` of ADO.NET, through the driver that your project references.**  The driver is Npgsql for PostgreSQL, and Microsoft.Data.SqlClient for SQL Server.  The method uses no reflection, and no library of SqlSource's.
+- **The method builds its SQL inside itself**, from the text of the query, its [tokens](tokens.md#tokens) and its [lists](parameters.md#list-parameters).  Your code cannot reach that SQL.  If your project runs the SQL of a query itself, through Dapper or its own code, give the query the output `models`.
+- **One type can have queries of both outputs**, in one file or in several.  A repository keeps the queries that run alone at `repository`.  It gives the output `methods` to the queries that its own code runs in a transaction.
+- **What each shape returns, how a row is read, how a parameter is sent, and the exceptions are the same for both outputs.**
+- **A query can also get a [collection method](collection-methods.md#collection-methods).**  It is an overload of the query method that runs the query over a collection of input models.
 
 <a id="which-methods"></a>
 
 ## Which queries get a method
 
-A query gets its method from a type that claims its file when, for that type:
+A type that claims the file of a query gives the query its methods when all of these are true for that type:
 
-- **its output is `repository` or `methods`**;
-- **it has what its models need**: a current entry in its sidecar, a C# type for each column and parameter, and every model it needs, an input model when it has parameters and an output model when it returns rows.  A query with neither needs no model;
-- **its method can be written**: a result shape that its rows allow ([SQLSRC272](../diagnostics.md#sqlsrc272)), a name that nothing else takes, for each of its methods ([SQLSRC274](../diagnostics.md#sqlsrc274)), no stream under `method-type=sync` ([SQLSRC298](../diagnostics.md#sqlsrc298)), no token named as an argument a query method can have ([SQLSRC275](../diagnostics.md#sqlsrc275)), and, in the extension class, a class to hold it ([SQLSRC276](../diagnostics.md#sqlsrc276));
-- **for a repository query, its type has its connection**: the type is not static ([SQLSRC034](../diagnostics.md#sqlsrc034)), and one member of it, or a pair, gives the connection of the query's database, as [the connection](repositories.md#repository-connection) says ([SQLSRC028](../diagnostics.md#sqlsrc028) to [SQLSRC033](../diagnostics.md#sqlsrc033), [SQLSRC036](../diagnostics.md#sqlsrc036)), and, for a synchronous method, a member that returns no task ([SQLSRC299](../diagnostics.md#sqlsrc299));
-- **its [converters](converters.md#converters) serve it**: a column or parameter whose type a type override, a column type or a `-- param:` marker chose, and whose type has converters, has one it can use: of the direction it needs ([SQLSRC280](../diagnostics.md#sqlsrc280)), between it and the type the driver reads when it is a type of yours that the driver never reads ([SQLSRC279](../diagnostics.md#sqlsrc279)), and the only one of that direction, with nothing wrong with it ([SQLSRC277](../diagnostics.md#sqlsrc277), [SQLSRC278](../diagnostics.md#sqlsrc278));
-- **the project references the driver of its dialect** ([SQLSRC273](../diagnostics.md#sqlsrc273)), at Npgsql 8.0 or later ([SQLSRC247](../diagnostics.md#sqlsrc247)) or Microsoft.Data.SqlClient 6.1 or later ([SQLSRC267](../diagnostics.md#sqlsrc267)).
+- **The output of the query is `repository` or `methods`.**
+- **The query has what its models need.**  It has a current entry in its sidecar, and a C# type for each column and parameter.  It has every model that it needs: an input model if it has parameters, and an output model if it returns rows.  A query with no parameters and no rows needs no model.
+- **Each method of the query can be written.**  All of these are true:
+  - The rows of the query allow its result shape ([SQLSRC272](../diagnostics.md#sqlsrc272)).
+  - Nothing else takes the name of any of its methods ([SQLSRC274](../diagnostics.md#sqlsrc274)).
+  - The query does not stream its rows under `method-type=sync` ([SQLSRC298](../diagnostics.md#sqlsrc298)).
+  - No token has the name of an argument that a query method can have ([SQLSRC275](../diagnostics.md#sqlsrc275)).
+  - If the method goes in the extension class, that class can be written ([SQLSRC276](../diagnostics.md#sqlsrc276)).
+- **For a repository query, the type has the connection of the query.**  All of these are true:
+  - The type is not static ([SQLSRC034](../diagnostics.md#sqlsrc034)).
+  - One member of the type, or a pair of members, gives the connection of the database of the query, as [the connection](repositories.md#repository-connection) says ([SQLSRC028](../diagnostics.md#sqlsrc028) to [SQLSRC033](../diagnostics.md#sqlsrc033), [SQLSRC036](../diagnostics.md#sqlsrc036)).
+  - For a synchronous method, one member that gives the connection returns no task ([SQLSRC299](../diagnostics.md#sqlsrc299)).
+- **The [converters](converters.md#converters) of the query serve it.**  This is for a column or parameter whose type has converters, and whose type a type override, a column type or a `-- param:` marker chose.  It has a converter that it can use, and all of these are true:
+  - The converter is of the direction that the column or parameter needs ([SQLSRC280](../diagnostics.md#sqlsrc280)).
+  - If the type is a type of yours that the driver never reads, the converter converts between it and the type that the driver reads ([SQLSRC279](../diagnostics.md#sqlsrc279)).
+  - It is the only converter of that direction ([SQLSRC278](../diagnostics.md#sqlsrc278)).
+  - Nothing is wrong with it ([SQLSRC277](../diagnostics.md#sqlsrc277)).
+- **The project references the driver of the dialect of the query** ([SQLSRC273](../diagnostics.md#sqlsrc273)).  For PostgreSQL, the driver is [Npgsql 8.0 or later](databases/index.md#supported-versions) ([SQLSRC247](../diagnostics.md#sqlsrc247)).  For SQL Server, it is [Microsoft.Data.SqlClient 6.1 or later](databases/index.md#supported-versions) ([SQLSRC267](../diagnostics.md#sqlsrc267)).
 
-A query whose output is `repository` or `methods` that fails any of the others has an error, and gets neither its methods nor a constant until it is fixed, but for [SQLSRC299](../diagnostics.md#sqlsrc299), which costs a repository query only its synchronous methods.  Its models are still generated when it has them, and the type's other queries get their methods.  A [placement error](members.md#locations), such as a visibility that does not fit the query's member location ([SQLSRC123](../diagnostics.md#sqlsrc123)), is different: it leaves the query's whole file without members and without models for the type.  A visibility that does not fit only the models the method takes or returns, also SQLSRC123, leaves out the method alone, as the others here do.  Each type that claims a file gets its own methods from it, by its own settings, and [where the methods go](connection-methods.md#method-location) says when two such types give one `methods` method twice.  Only the queries of a dialect that can be described, `postgres` or `mssql`, have entries: a query of another dialect whose output is `repository` or `methods` is [SQLSRC209](../diagnostics.md#sqlsrc209), and wants the output `sql`.  A statement that the tool cannot describe, such as PostgreSQL's `CALL` ([SQLSRC233](../diagnostics.md#sqlsrc233)), gets no method either, so on PostgreSQL no method calls a procedure: give such a query `-- output: sql` and run its constant yourself.
+If a query whose output is `repository` or `methods` fails one of the other conditions, it has an error.  What the error costs depends on the error:
+
+- **The query gets neither its methods nor a constant until you fix the error.**  This holds for each error of the conditions, except SQLSRC299.
+- **[SQLSRC299](../diagnostics.md#sqlsrc299) costs a repository query only its synchronous methods.**
+- **The models of the query are still generated, if it has them.**
+- **The other queries of the type still get their methods.**
+- **A [placement error](members.md#locations) leaves the whole file of the query without members, and without models for the type.**  An example is a visibility that does not fit the member location of the query ([SQLSRC123](../diagnostics.md#sqlsrc123)).
+- **If a visibility does not fit only the models that the method takes or returns, the query loses its method alone.**  This is also SQLSRC123, and it costs what an error of the conditions costs.
+- **Each type that claims a file gets its own methods from the file, by its own settings.**  [Where the methods go](connection-methods.md#method-location) says when two such types give one method that takes a connection twice.
+
+Some queries whose output is `repository` or `methods` cannot get a method.  Give each of them the output `sql`:
+
+- **A query of a dialect that cannot be described is [SQLSRC209](../diagnostics.md#sqlsrc209).**  Only the queries of `postgres` or `mssql` have entries.  See [the output setting](settings.md#setting-output) and [databases that are not described](databases/other.md#not-described).
+- **A statement that the tool cannot describe gets no method either**, such as PostgreSQL's `CALL` ([SQLSRC233](../diagnostics.md#sqlsrc233)).  So on PostgreSQL, no method calls a procedure.  Give such a query `-- output: sql`, and run its constant yourself.
 
 <a id="synchronous-methods"></a>
 
@@ -79,16 +111,36 @@ internal static async Task<GetUserDto?> GetUserAsync(
 GetUserDto? user = connection.GetUser(new GetUserParams(42));
 ```
 
-The [generator parameter](generator-parameters.md#setting-generator-parameters) `method-type` gives a query whose output is `methods` or `repository` a synchronous method, for code that does not await, such as a console tool or a library whose API is synchronous.  Under `sync` the query gets a synchronous method in place of its asynchronous one, and under `both` it gets the two, as `GetUser` above does.  The default, `async`, gives the asynchronous method alone.  A synchronous method runs the query on the calling thread, with the driver's synchronous calls, and never waits on a task.
+The [generator parameter](generator-parameters.md#setting-generator-parameters) `method-type` gives a query a synchronous method, when the output of the query is `repository` or `methods`.  A synchronous method is for code that does not await, such as a console tool or a library whose API is synchronous.  It runs the query on the calling thread, with the synchronous calls of the driver, and never waits on a task.  `method-type` takes one of these values:
 
-- **Its name is the query's**, never with `Async` after it, whatever `async-method-suffix` says.  Under `both`, the asynchronous method's name always has `Async` after it, with or without `async-method-suffix`, since two methods that differ only by `cancellationToken`, an argument with a default, would make every call ambiguous.  Each of a query's names is checked as [where the methods go](connection-methods.md#method-location) says, and one that something else takes is [SQLSRC274](../diagnostics.md#sqlsrc274): the query gets none of its methods until it is fixed, or, for a clash with a method of another type in an extension class, none of that name.
-- **Its arguments are the asynchronous method's without `cancellationToken`**: the connection, the input model, a `string` for each [token](tokens.md#tokens), `transaction` and `commandTimeout`, as [the signature](connection-methods.md#method-signature) says, and for a [repository method](repositories.md#synchronous-repository-methods) the input model and the tokens alone.  Nothing cancels it, as ADO.NET's synchronous calls take no token; `commandTimeout` still limits the command.  A token still cannot be named `cancellationToken`, under any `method-type` ([SQLSRC275](../diagnostics.md#sqlsrc275)).
-- **It returns what the asynchronous method's task holds**, as [what each shape returns](return-types.md#method-shapes) says: the collection for `many`, the row for `one`, the row or null for `one-optional`, the count for `rowcount`, and nothing, `void`, for `none`.
-- **It does what the asynchronous method does**: it opens a closed connection and closes it again before it returns or throws, as [the connection](connection-methods.md#method-connection) says, or a repository's gets its connection from the repository, runs in the `transaction` it is given, sends each parameter and reads each row in the same way, and throws the same exceptions, [`UnexpectedRowCountException`](exceptions.md#unexpected-row-count), the driver's exceptions and, on SQL Server, [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back).  Its documentation in IntelliSense is the asynchronous method's, without `cancellationToken`, and for `none` without a line for what it returns.
-- **A stream has no synchronous method.**  A `many` query whose [collection type](return-types.md#setting-collection-type) is `IAsyncEnumerable` gives each row to the caller's loop as it is read, which only an asynchronous method does.  Under `both` it gets its asynchronous method alone, named with `Async`, and, with a [collection method](collection-methods.md#collection-methods), which reads its rows into an array and never streams them, both collection methods: `ListUsers(IEnumerable<ListUsersParams> parameters, ...)` and `ListUsersAsync(IEnumerable<ListUsersParams> parameters, ...)` for a query `ListUsers`.  Under `sync` it is [SQLSRC298](../diagnostics.md#sqlsrc298), and gets no method and no collection method.  For a synchronous method, give it a collection type that is read whole, such as `List`.
-- **On PostgreSQL**, a data source with `Multiplexing=true` refuses a synchronous method on a connection that has no transaction open, such as the one a repository method gets from its data source: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).
+- `async`, the default, gives the asynchronous method alone.
+- `sync` gives a synchronous method in place of the asynchronous one.
+- `both` gives the two, as `GetUser` in the sample has.
 
-A query's [collection method](collection-methods.md#collection-methods) follows `method-type` as its method does.  Under `sync` it is synchronous, named as the query, an overload of the synchronous method by its `IEnumerable` argument, and under `both` the query gets the two, the synchronous one named as the query and the asynchronous one with `Async` after it:
+The names follow these rules:
+
+- **A synchronous method has the name of the query, never with `Async` after it**, whatever `async-method-suffix` says.
+- **Under `both`, the name of the asynchronous method always has `Async` after it**, with or without `async-method-suffix`.  Two methods that differ only by `cancellationToken`, an argument with a default, would make every call ambiguous.
+- **Otherwise, the name of the asynchronous method has `Async` after it only under [`async-method-suffix`](generator-parameters.md#gp-async-method-suffix)**, which is off by default.
+- **Each name of a query is checked as [where the methods go](connection-methods.md#method-location) says.**  If something else takes a name, the query is [SQLSRC274](../diagnostics.md#sqlsrc274), and gets none of its methods until you fix it.  For a clash with a method of another type in an extension class, the query gets none of the methods of that name.
+- **A synchronous repository method with no argument cannot be named `Finalize`** ([SQLSRC274](../diagnostics.md#sqlsrc274)).  The compiler would take it for the finalizer of the type: see [the signature](repositories.md#repository-signature).
+- **A synchronous method takes the arguments of the asynchronous method, without `cancellationToken`.**  A method that takes a connection takes the connection, the input model, a `string` for each [token](tokens.md#tokens), `transaction` and `commandTimeout`, as [the signature](connection-methods.md#method-signature) says.  A [repository method](repositories.md#synchronous-repository-methods) takes the input model and the tokens alone.
+- **Nothing cancels a synchronous method**, as the synchronous calls of ADO.NET take no token.  `commandTimeout` still limits the command.
+- **A token still cannot be named `cancellationToken`**, under any `method-type` ([SQLSRC275](../diagnostics.md#sqlsrc275)).
+- **A synchronous method returns what the task of the asynchronous method holds**, as [what each shape returns](return-types.md#method-shapes) says.  It returns the collection for `many`, the row for `one`, the row or null for `one-optional`, the count for `rowcount`, and nothing, `void`, for `none`.
+- **A synchronous method does what the asynchronous method does.**  It does each of these in the same way:
+  - It opens a closed connection, and closes it again before it returns or throws, as [the connection](connection-methods.md#method-connection) says.  A repository method gets its connection from the repository instead.
+  - It runs in the `transaction` that it is given.
+  - It sends each parameter, and reads each row.
+  - It throws the same exceptions: [`UnexpectedRowCountException`](exceptions.md#unexpected-row-count), the exceptions of the driver and, on SQL Server, [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back).
+- **The documentation of a synchronous method in IntelliSense is that of the asynchronous method**, without `cancellationToken`.  For `none`, it has no line for what the method returns.
+- **A synchronous repository method needs a member that gives the connection and returns no task** ([SQLSRC299](../diagnostics.md#sqlsrc299)).  See [synchronous repository methods](repositories.md#synchronous-repository-methods).
+- **On PostgreSQL, a data source with `Multiplexing=true` refuses a synchronous method on a connection that has no transaction open.**  An example is the connection that a repository method gets from its data source.  See [what a method reads and throws](databases/postgresql/query-methods.md#method-results).
+- **A stream has no synchronous method.**  A `many` query whose [collection type](return-types.md#setting-collection-type) is `IAsyncEnumerable` gives each row to the loop of the caller as it is read.  Only an asynchronous method does that.
+- **Under `both`, a stream gets its asynchronous method alone, named with `Async`.**  If it has a [collection method](collection-methods.md#collection-methods), it gets both collection methods, as a collection method reads its rows into an array and never streams them.  For a query `ListUsers`, they are `ListUsers(IEnumerable<ListUsersParams> parameters, ...)` and `ListUsersAsync(IEnumerable<ListUsersParams> parameters, ...)`.
+- **Under `sync`, a stream is [SQLSRC298](../diagnostics.md#sqlsrc298)**, and gets no method and no collection method.  For a synchronous method, give the query a collection type that is read whole, such as `List`.
+
+The [collection method](collection-methods.md#collection-methods) of a query follows `method-type` as the query method does.  Under `sync`, the collection method is synchronous, and has the name of the query.  It is an overload of the synchronous method, by its `IEnumerable` argument.  Under `both`, the query gets the two collection methods.  The synchronous one has the name of the query, and the asynchronous one has `Async` after it:
 
 ```csharp
 // -- name: GetUser -> one-optional, with -- generator: collection-method method-type=both,
@@ -107,31 +159,56 @@ internal static async Task<GetUserDto[]> GetUserAsync(
     CancellationToken cancellationToken = default)
 ```
 
-- **A synchronous collection method's arguments are the asynchronous one's without `cancellationToken`**, and it returns what the asynchronous one's task holds: the collection, the count, or nothing, `void`, for `none`, as [what it returns](collection-methods.md#collection-methods) says.
-- **It does what the asynchronous one does**: it reads the collection once, runs the items 1,000 at a time, begins a transaction of its own unless it is given one or one is ambient, by the generator parameter [`transaction`](collection-methods.md#collection-transactions), and throws the same exceptions, [`CollectionItemException`](exceptions.md#collection-item-exception) with the item's `ItemIndex`, `UnexpectedRowCountException` and, on SQL Server, `TransactionRolledBackException` and the `InvalidOperationException` of a query that returns more than one result set, as [what it throws](collection-methods.md#collection-failures) says.
-- **Its name, the query's, is checked as a method's is**, by [where the methods go](connection-methods.md#method-location), and one that something else takes is [SQLSRC274](../diagnostics.md#sqlsrc274).  That holds for a stream's too, which has no synchronous method of that name.
+- **A synchronous collection method takes the arguments of the asynchronous one, without `cancellationToken`.**
+- **A synchronous collection method returns what the task of the asynchronous one holds**: the collection, the count, or nothing, `void`, for `none`, as [what it returns](collection-methods.md#collection-methods) says.
+- **A synchronous collection method does what the asynchronous one does.**  It does each of these in the same way:
+  - It reads the collection once, and runs the items 1,000 at a time.
+  - It begins a transaction of its own, unless it is given one or one is ambient, by the generator parameter [`transaction`](collection-methods.md#collection-transactions).
+  - It throws the same exceptions: [`CollectionItemException`](exceptions.md#collection-item-exception) with the `ItemIndex` of the item, `UnexpectedRowCountException` and, on SQL Server, `TransactionRolledBackException` and the `InvalidOperationException` of a query that returns more than one result set, as [what it throws](collection-methods.md#collection-failures) says.
+- **The name of a synchronous collection method, the name of the query, is checked as the name of a method is**, by [where the methods go](connection-methods.md#method-location).  If something else takes it, the query is [SQLSRC274](../diagnostics.md#sqlsrc274).  This holds for the collection method of a stream too, which has no synchronous method of that name.
 
 <a id="reading-rows"></a>
 
 ## How a row is read
 
-- **Each column is read by its position** into the property the output model has for it, so its name does not matter: a `!` or `?` at the end of an alias works as well as a [`-- column:` marker](model-properties.md#column-marker).  A record is made with its constructor, a class by setting its properties, and a [sorted](model-properties.md#property-order) model as well as any other.
-- **A property that can be null** is null when its column is.
-- **A property that cannot be null is read with no check**, so a null in its column throws, as the driver reports it: Npgsql's `InvalidCastException` "Column 'name' is null.", and Microsoft.Data.SqlClient's `SqlNullValueException` "Data is Null.".  Microsoft.Data.SqlClient gives no error for a null `vector`, so the method checks such a column itself, and throws `InvalidCastException` "Column 'embedding' is null." with the column's name.  A `!` at the end of an alias, a `-- column:` marker that says `not null`, or a column that the tool showed is never null, is so checked the first time a null arrives, and never read as a default value.
-- **A JSON `null` is not a null.**  A JSON column that holds the text `null` is read as a value: a `JsonElement` of the kind `Null`, a `JsonDocument` whose root is one, and for a `JsonNode`, a `JsonObject`, a `JsonArray` or a class of yours read through System.Text.Json's serializer, null into a property that can be null, and into one that cannot, the method's own `InvalidCastException`, "Column 'metadata' holds a JSON null.", with the column's name.  A struct of yours read through the serializer is the same: null when its property can be null, and the method's `InvalidCastException` when it cannot.  See JSON on [PostgreSQL](databases/postgresql/libraries.md#json) and [SQL Server](databases/sqlserver/libraries.md#json), and [a class in a JSON column](library-types-and-json.md#json-class).
-- **Each column is read as its property's C# type**, and each parameter sent as one, unless a converter converts it.  A C# type that a [type override](type-mapping.md#setting-type-overrides), a [column type](model-properties.md#setting-column-types) or a `-- param:` marker names, with no converter, is given to the driver as it is, which suits a type the driver knows or was taught, and throws the driver's `InvalidCastException` for one it was never taught: see [converters](converters.md#converters).  A class of yours in a column that holds JSON is read and sent through System.Text.Json's serializer instead: see [a class in a JSON column](library-types-and-json.md#json-class).  A type that the query methods convert themselves is not given to the driver either, whichever place chose it: on SQL Server NodaTime's, NetTopologySuite's and System.Text.Json's, and on Npgsql 8 and 9 `JsonNode`, `JsonObject` and `JsonArray`, as [SqlSource's own conversions](converters.md#converters) says.
-- **A column or parameter whose type a library gives**, by the [library types](library-types-and-json.md#setting-library-types), is read and sent on PostgreSQL by Npgsql: NodaTime's and NetTopologySuite's through their plugins, which your application registers on its data source, as [what a method reads and throws](databases/postgresql/query-methods.md#method-results) says, and without which the driver throws `InvalidCastException`, and System.Text.Json's `JsonElement` with nothing to register.  On SQL Server it is read and sent by the query method itself, with nothing to register: NodaTime's and System.Text.Json's are read as the type that Microsoft.Data.SqlClient reads and converted, and converted before they are sent, as [NodaTime on SQL Server](databases/sqlserver/libraries.md#nodatime) and [JSON on SQL Server](databases/sqlserver/libraries.md#json) say, and NetTopologySuite's is read and written as [NetTopologySuite on SQL Server](databases/sqlserver/libraries.md#nettopologysuite) says.  Either way, a [converter](converters.md#converters) of yours of the direction it needs is used instead, but for NetTopologySuite's on SQL Server.
-- **A column whose type a type override or a column type chose, and that has a [converter](converters.md#converters)**, is read as the type the driver reads its database type as, and that value given to the converter, whose result is the property's value.  A null never reaches the converter: a property that cannot be null throws as above, before the converter is called.
+- **The method reads each column by its position**, into the property that the output model has for the column.  So the name of the column does not matter.  A `!` or `?` at the end of an alias works as well as a [`-- column:` marker](model-properties.md#column-marker).
+- **The method makes a record with its constructor, and a class by setting its properties.**  It makes a [sorted](model-properties.md#property-order) model as well as any other.
+- **If a column is null and its property can be null, the property is null.**
+- **If a property cannot be null, the method reads it with no check.**  So a null in its column throws, as the driver reports it:
+  - Npgsql throws `InvalidCastException`, "Column 'name' is null.".
+  - Microsoft.Data.SqlClient throws `SqlNullValueException`, "Data is Null.".
+  - Microsoft.Data.SqlClient gives no error for a null `vector`.  So the method checks such a column itself, and throws `InvalidCastException`, "Column 'embedding' is null.", with the name of the column.
+- **A null in a column that is never null throws, and is never read as a default value.**  A column is never null when its alias ends in `!`, when a `-- column:` marker says `not null`, or when the tool showed that it is never null.  The method reads such a column with no check too, so the first null that arrives throws, as above.
+- **A JSON `null` is not a null.**  A JSON column that holds the text `null` is read as a value.  What the property gets depends on its C# type:
+  - A `JsonElement` is an element of the kind `Null`.
+  - A `JsonDocument` is a document whose root is such an element.
+  - A `JsonNode`, a `JsonObject` or a `JsonArray` is null, if its property can be null.  If its property cannot be null, the method throws its own `InvalidCastException`, "Column 'metadata' holds a JSON null.", with the name of the column.
+  - A class of yours, read through the serializer of System.Text.Json, is the same as a `JsonNode`.
+  - A struct of yours, read through the serializer, is the same too: null if its property can be null, and the `InvalidCastException` of the method if it cannot.
+
+  See JSON on [PostgreSQL](databases/postgresql/libraries.md#json) and [SQL Server](databases/sqlserver/libraries.md#json), and [a class in a JSON column](library-types-and-json.md#json-class).
+- **The method reads each column as the C# type of its property, and sends each parameter as one, unless a converter converts it.**
+- **If a type override, a column type or a `-- param:` marker names a C# type with no converter, the method gives that type to the driver as it is.**  That suits a type that the driver knows, or was taught.  For a type that the driver was never taught, the driver throws `InvalidCastException`: see [converters](converters.md#converters).
+- **A class of yours in a column that holds JSON is read and sent through the serializer of System.Text.Json instead.**  See [a class in a JSON column](library-types-and-json.md#json-class).
+- **The method does not give the driver a type that the query methods convert themselves**, whichever place chose it.  These are the types of NodaTime, NetTopologySuite and System.Text.Json on SQL Server, and `JsonNode`, `JsonObject` and `JsonArray` on Npgsql 8 and 9.  See [SqlSource's own conversions](converters.md#converters).
+- **A column or parameter whose type a [library](library-types-and-json.md#setting-library-types) gives is read and sent by Npgsql on PostgreSQL, and by the query method itself on SQL Server.**  On PostgreSQL, the types of NodaTime and NetTopologySuite need their plugins on the data source of your application, and Npgsql throws `InvalidCastException` without them: see [what a method reads and throws](databases/postgresql/query-methods.md#method-results).  On SQL Server, see [NodaTime](databases/sqlserver/libraries.md#nodatime), [JSON](databases/sqlserver/libraries.md#json) and [NetTopologySuite](databases/sqlserver/libraries.md#nettopologysuite).
+- **A [converter](converters.md#converters) of yours of the direction that a library type needs is used in place of the library**, but for the types of NetTopologySuite on SQL Server.
+- **If a type override or a column type chose the type of a column, and that type has a [converter](converters.md#converters), the converter gives the value of the property.**  The method reads the column as the type that the driver reads its database type as, and gives that value to the converter.
+- **A null never reaches the converter.**  If the property cannot be null, the method throws as above, before it calls the converter.
 
 <a id="method-parameters"></a>
 
 ## How a parameter is sent
 
-- **Each parameter is sent by its name**, without its `@`, with the value of its property of the input model, in the order of the query's [parameter list](parameters.md#query-parameters).  Both drivers match a name ignoring case, as SqlSource does, so `@Id` and `@id` are one parameter, and one value fills both; under `mssql`, a second spelling is the warning [SQLSRC121](../diagnostics.md#sqlsrc121).  A parameter written in snake_case, `@user_id`, is filled from its property `UserId` like any other.
-- **A null value is sent as the database's `NULL`**: that of a property that can be null, and that of a property of a reference type that cannot be, which a caller can set to null all the same.
-- **A [list parameter](parameters.md#list-parameters) is sent as one parameter for each value**, each named after the list and sent as a parameter of the values' type, padded to one of a few sizes unless the query has `list-padding=off`.  A null list is sent as an empty one, and a list that the query tests for null also sends a parameter of its own name, null when the list is null.
-- **A parameter whose type a type override or its `-- param:` marker chose, and that has a [converter](converters.md#converters)**, is given to the converter, and the value it returns is sent.  A null is sent as `NULL`, without the converter.  A class of yours in a parameter that holds JSON is given to System.Text.Json's serializer in the same way, and its text sent: see [a class in a JSON column](library-types-and-json.md#json-class).
-- **Each parameter is sent as the database type it was described with**, or that its [`-- param:` marker](parameters.md#param-marker) declares, and not as a type chosen from the C# type of its value.  On SQL Server it is sent with the type's length, precision and scale.  See how a parameter is sent on [PostgreSQL](databases/postgresql/query-methods.md#method-parameters) and on [SQL Server](databases/sqlserver/query-methods.md#method-parameters).
+- **The method sends each parameter by its name, without its `@`.**  It sends the value of the property of the input model for the parameter, in the order of the [parameter list](parameters.md#query-parameters) of the query.
+- **Both drivers match a name ignoring case, as SqlSource does.**  So `@Id` and `@id` are one parameter, and one value fills both.  Under `mssql`, a second spelling is the warning [SQLSRC121](../diagnostics.md#sqlsrc121).
+- **A parameter written in snake_case, `@user_id`, is filled from its property `UserId`**, like any other.
+- **The method sends a null value as the `NULL` of the database.**  This holds for a property that can be null.  It also holds for a property of a reference type that cannot be null, as a caller can set it to null all the same.
+- **The method sends a [list parameter](parameters.md#list-parameters) as one parameter for each value.**  Each is named after the list, and sent as a parameter of the type of the values.  The list is padded to one of a few sizes, unless the query has `list-padding=off`.
+- **If a list is null, the method sends it as an empty list.**  If the query tests the list for null, the method also sends a parameter with the name of the list, which is null when the list is null.
+- **A parameter that has a [converter](converters.md#converters) is sent as the value that the converter returns.**  This is for a parameter whose type a type override or its `-- param:` marker chose.  The method sends a null as `NULL`, without the converter.
+- **A class of yours in a parameter that holds JSON goes through the serializer of System.Text.Json in the same way.**  The method sends its text: see [a class in a JSON column](library-types-and-json.md#json-class).
+- **The method sends each parameter as the database type that it was described with**, or that its [`-- param:` marker](parameters.md#param-marker) declares.  It does not send it as a type chosen from the C# type of its value.  On SQL Server, it sends the length, precision and scale of the type too.  See how a parameter is sent on [PostgreSQL](databases/postgresql/query-methods.md#method-parameters) and on [SQL Server](databases/sqlserver/query-methods.md#method-parameters).
 
 <a id="limits"></a>
 
@@ -141,4 +218,14 @@ internal static async Task<GetUserDto[]> GetUserAsync(
 
 ### `InvalidCastException` from a method with parameters on a connection that wraps the driver's
 
-- **A query method with parameters works only on a connection whose commands take its driver's own parameters.**  It works on the connections of the drivers, such as `NpgsqlConnection`, the one an `NpgsqlDataSource` gives, and `SqlConnection`, and so on those a repository makes from a connection string or a data source.  A `DbConnection` that wraps one of them, and whose commands create or accept only parameters of their own type, fails before the query is sent: on PostgreSQL with the wrapper's own exception, typically an `InvalidCastException`, and on SQL Server with `InvalidCastException`, "Unable to cast object of type '...' to type 'Microsoft.Data.SqlClient.SqlParameter'.".  Give the method the driver's connection that the wrapper holds, from a repository's factory method or a connection it borrows too, or give the query the output `models` and send its parameters through the wrapper yourself.
+**What you see.**  A query method with parameters can fail on a `DbConnection` that wraps the connection of the driver.  It fails before the query is sent:
+
+- On PostgreSQL, it throws the exception of the wrapper, typically an `InvalidCastException`.
+- On SQL Server, it throws `InvalidCastException`, "Unable to cast object of type '...' to type 'Microsoft.Data.SqlClient.SqlParameter'.".
+
+**Why.**  A query method with parameters works only on a connection whose commands take its driver's own parameters.  The commands of such a wrapper create or accept only parameters of their own type.  The method works on the connections of the drivers, such as `NpgsqlConnection`, the one that an `NpgsqlDataSource` gives, and `SqlConnection`.  So it works on the connections that a repository makes from a connection string or a data source.
+
+**What to do.**  Do one of these:
+
+- Give the method the connection of the driver that the wrapper holds.  For a repository, give that connection from its factory method, or as the connection that it borrows.
+- Give the query the output `models`, and send its parameters through the wrapper yourself.
