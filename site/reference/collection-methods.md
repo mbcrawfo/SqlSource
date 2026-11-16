@@ -93,8 +93,7 @@ The [generator parameter `transaction`](generator-parameters.md#gp-transaction) 
 | `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot` | The same, at that isolation level.  Each database has its own rules: see below |
 | `off` | Begins none.  The items run as the database runs statements outside a transaction, so a failure leaves some of them in the database |
 
-- **On PostgreSQL, `read-uncommitted` and `snapshot` are [SQLSRC297](../diagnostics.md#sqlsrc297).**  PostgreSQL has neither level.
-- **On SQL Server, `snapshot` needs the database to allow it.**  See [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
+- **The rules of each database for a level are in [the generator parameter `transaction`](generator-parameters.md#gp-transaction).**
 - **Under `off`, what a failed item leaves in the database depends on the database.**  On both, the round trips before the one of the failed item stay, and those after it do not run.  See [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
 - **On PostgreSQL under `off`, the round trip of the failed item is rolled back.**
 - **On SQL Server under `off`, each item is committed on its own.**  With `XACT_ABORT` off, an error such as a duplicate key fails its item alone: the other items of its round trip stay, those after it included.  Under `SET XACT_ABORT ON`, or at an error that ends the batch, the items before it stay, and the items after it do not run.

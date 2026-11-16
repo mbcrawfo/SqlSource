@@ -39,7 +39,7 @@ For each described query, the generator writes its [models](models.md#models): a
 
 The generator needs the package, one attribute and one choice, the output of each query.  The [tool](describing.md#describe) must describe each query whose output is `repository`, `methods` or `models`.  The build reports such a query when its sidecar has no current entry for it.  A query whose output is `sql` needs nothing more.
 
-The project must target .NET 8 or later and compile C# 12 or later, as [what the build needs](msbuild.md#build-requirements) says.  An older target framework is [SQLSRC003](../diagnostics.md#sqlsrc003), and an older language version is [SQLSRC012](../diagnostics.md#sqlsrc012).
+The project must target .NET 8 or later and compile C# 12 or later, as [what the build needs](msbuild.md#build-requirements) says.
 
 In the sample, `GetUser` and `ListFrom` are the generated methods of the two queries.  They are public instance methods of `UserRepository`.  Each method opens a connection from the data source, sends the parameters of its query and runs it.  It then reads the rows into its output model, and disposes the connection.  `GetUser` reads one row or null, as its [result shape](sql-files.md#result-shapes) `one-optional` says.  `ListFrom` reads every row, the default for a query that returns rows.
 

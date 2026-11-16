@@ -32,6 +32,10 @@ This table gives each property, what it sets, its default and the section that d
 
 The .NET 8 SDK and Visual Studio before 17.14 are not supported.  A build on one of them stops with [SQLSRC021](../diagnostics.md#sqlsrc021).
 
+An older target framework is [SQLSRC003](../diagnostics.md#sqlsrc003), and an older language version is [SQLSRC012](../diagnostics.md#sqlsrc012).
+
+If the project targets several frameworks, put the attributed types under a condition that excludes the older frameworks.
+
 <a id="included-files"></a>
 
 ## Which `.sql` files are included

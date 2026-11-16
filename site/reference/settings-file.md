@@ -63,6 +63,7 @@ A settings file holds one JSON object, whose members are the settings.  It can h
   - `typeOverrides` and `libraryTypes` are each an object whose values are strings.
   - `columnTypes` is an object whose values are strings, or objects of a `type` and a `json` for [the JSON opt-in](library-types-and-json.md#json-opt-in).
 - **A value of another JSON type is [SQLSRC018](../diagnostics.md#sqlsrc018).**  This includes `null`.
+- An array that has elements, none of them a string, sets nothing.  `[]` sets nothing too.
 - **SqlSource reads a string as JSON writes it.**  It ignores the white space around the string, and keeps every character inside it, such as a `;` or a `#`.  There is no escape but the escapes of JSON.
 - **A string that is empty or white space sets nothing.**  It is not an error.  To leave a setting to the files above, or to its default, leave its key out.
 - **`$schema` is for your editor.**  With it, the editor checks the keys and values as you write them, and offers them as you type.  Its value is `https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json`.  SqlSource reads nothing of it.

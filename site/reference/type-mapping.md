@@ -37,6 +37,7 @@ A parameter has the C# type that its [`-- param:` marker](parameters.md#param-ma
 - **On SQL Server, the query method reads and sends a type of NetTopologySuite, whatever place chose it.**  No converter of yours replaces that: see [NetTopologySuite on SQL Server](databases/sqlserver/libraries.md#nettopologysuite).
 - **In a query whose output is `repository` or `methods`, a PostgreSQL array parameter is an `IEnumerable<T>` of its element.**  It replaces `T[]`: an `int4[]` gives an `IEnumerable<int>`.  See [array parameters](databases/postgresql/query-methods.md#array-parameters).  The property of a column, and of a parameter of a query whose output is `models`, stays `T[]`.
 - **A [list parameter](list-parameters.md#list-parameters) is an `IEnumerable<T>` of the C# type of its values**, under `repository`, `methods` and `models`.  A list parameter is written after `IN` with no parentheses.  A list of `integer` is an `IEnumerable<int>`.  Its values get their C# type as a parameter does, and their type is never nullable.
+- **A [column type](model-properties.md#setting-column-types) never reaches a query parameter**, even one compared with the column that it maps.
 
 <a id="setting-type-overrides"></a>
 

@@ -90,6 +90,7 @@ These rules say which place wins:
 
 - **A mistake in a `-- generator:` line leaves its file without members until you fix it.**  See [a value that is wrong](settings.md#a-value-that-is-wrong).
 - **The same value given twice is not a mistake.**  Nor is `default` beside other words.
+- **A dialect is not a generator parameter.**  It has a marker of its own, `-- dialect: name`.
 
 <a id="gp-keep-comments"></a>
 
@@ -195,6 +196,8 @@ The rules:
 - **The collection method uses a transaction that the caller gives it, or an ambient one, in place of its own**, whatever `transaction` says.  See [transactions](collection-methods.md#collection-transactions).
 - **`transaction` changes nothing for a query without `collection-method`.**
 - **An isolation level that the query's database does not have is [SQLSRC297](../diagnostics.md#sqlsrc297).**
+- **On PostgreSQL, `read-uncommitted` and `snapshot` are [SQLSRC297](../diagnostics.md#sqlsrc297).**  PostgreSQL has neither level.
+- **On SQL Server, `snapshot` needs the database to allow it.**  See [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
 
 <a id="gp-method-type"></a>
 
