@@ -90,7 +90,7 @@ A `.env` file keeps the connections of your machine in one place.  Then you do n
 - **The tool refuses an `--env-file` value that is empty or holds only white space.**  It also refuses a path that holds `=` or `;`, as it does for `--log`.
 - **A build reads the `.env` in the folder of the project**, as a run on the project does.  The property [`SqlSourceEnvFile`](msbuild.md#setting-env-file) names another file, only for the build's own run.
 - **The tool reads only the connection variables**: `SQLSOURCE_CONNECTION`, and the variables that start with `SQLSOURCE_CONNECTION_`.  They are written in upper case: `sqlsource_connection_billing` is not one of them.
-- **The tool passes over every other line of the file without a word, whatever it holds.**  The rest of the file belongs to your application or to other tools.  One line is not passed over.  A line that sets a name that starts with `SQLSOURCE_CONNECTION` and holds a character other than a letter, a digit or `_` is [SQLSRC286](../diagnostics.md#sqlsrc286).  An example is `SQLSOURCE_CONNECTION-A`.
+- **The tool passes over every other line of the file without a word, whatever it holds.**  The rest of the file belongs to your application or to other tools.  One line is not passed over.  A line that names a connection variable but cannot be read is [SQLSRC286](../diagnostics.md#sqlsrc286).  Such a line can set a name that starts with `SQLSOURCE_CONNECTION` and holds a character other than a letter, a digit or `_`, such as `SQLSOURCE_CONNECTION-A`.
 - **The environment wins over the file**, variable by variable, as the table of [connections](#connections) shows.
 - **`--verbose` names the file that a connection came from, and never the value**, as `connection from SQLSOURCE_CONNECTION_BILLING in /work/.env`.  A [log](cli.md#logs) names the file in the same way.
 - **Keep the file out of git**, because it holds credentials.  Add `.env` to your `.gitignore`.  To show others what to set, commit a `.env.example` file with the variables and no passwords.  Each person copies it to `.env`.
@@ -143,7 +143,7 @@ SQL Server can name the login in an error about a query.  The tool prints and lo
 
 On the command line, the tool guards against a connection string typed in the wrong place:
 
-- It does not print a connection string typed where a path goes, or as the value of `--project`.
+- It does not print a connection string typed where a path goes, or as the value of `--project`, `--query`, `--scrub` or `--out`.
 - It does not print a connection string typed after `--database`.
 - It does not print a connection string typed after `--connection` without its `name=`, except for its first word.  It prints that word, such as `Host`, only when the word is close to the name of a database of the run.  Nothing after the first `=` is printed.
 - In the log, it writes `***` for every value of `--database` and `--connection`.
