@@ -1,5 +1,9 @@
 # Change names, namespaces and visibility
 
+Add the Async suffix, rename Dto and Params, set the namespace of the models, make them classes, return a `List<T>`, or make a method `internal`.
+
+**Use this when** the names or the shapes of the generated code do not fit the conventions of your project.  Use it too when a method must go on your own class, or must be hidden from other code.
+
 <a id="async-names"></a>
 
 ## End the method names with Async
@@ -61,7 +65,22 @@ SELECT id, name FROM users WHERE id = @id;
 
 ## The namespace of the models
 
-By default the models are in the namespace of the type that claims the query.  Set `"modelNamespace": "App.Models"` in the `sqlsource.json` beside your project file, or `-- model-namespace:` in a `.sql` file.  Two types in two namespaces that read one table each get a model of it, one in each namespace, and the setting gives them one.  A name with a period in an `-- output-model:` line, `App.Rows.UserRow`, is a full name and ignores the setting.  See [namespace of the models](../reference/models.md#setting-model-namespace).
+If you want the models in a namespace of their own, write `-- model-namespace:` in the file header of a `.sql` file:
+
+```sql postgres
+-- model-namespace: App.Models
+
+-- name: ListUsers
+SELECT id, name FROM users;
+```
+
+**What you get.**  The models of `ListUsers` are in `App.Models`.  Without the setting, the models are in the namespace of the type that claims the query.
+
+**The rules you need.**
+
+- **For the whole project, set `"modelNamespace": "App.Models"` in the `sqlsource.json` beside your project file.**  See [namespace of the models](../reference/models.md#setting-model-namespace).
+- **Two types in two namespaces that read one table each get a model of it, one in each namespace.**  The setting gives them one model.  See [namespace of the models](../reference/models.md#setting-model-namespace).
+- **A name with a period in an `-- output-model:` line, `App.Rows.UserRow`, is a full name, and ignores the setting.**  See [namespace of the models](../reference/models.md#setting-model-namespace).
 
 <a id="record-or-class"></a>
 
@@ -103,7 +122,7 @@ ORDER BY created_at DESC, id;
 **The rules you need.**
 
 - The collection is filled before the task completes, so reading it runs no query.  To read rows one at a time, see [Read rows one at a time](sync-and-streaming.md#stream-rows).  See [Collection type](../reference/return-types.md#setting-collection-type).
-- It changes nothing for a query whose shape is not `many`, and nothing under the output `sql` or `models`.  See [Collection type](../reference/return-types.md#setting-collection-type).
+- It changes nothing for a query whose shape is not `many`, and nothing under the output `models` or `sql`.  See [Collection type](../reference/return-types.md#setting-collection-type).
 
 <a id="placement"></a>
 

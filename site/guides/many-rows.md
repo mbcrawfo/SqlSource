@@ -1,5 +1,9 @@
 # Insert or update many rows in one call (bulk)
 
+Run one query for many rows in one call, such as a bulk insert or a batch of updates, with a collection method.
+
+**Use this when** your code holds many items, such as new users, and each item needs the same insert or update.  Use it too when a failure must name the item that the database refused.
+
 <a id="insert-many-rows"></a>
 
 ## Insert many rows in one call
@@ -21,9 +25,13 @@ var newUsers = signups.Select(signup => new AddUserParams(signup.Name, signup.Em
 AddUserDto[] added = await users.AddUser(newUsers, cancellationToken);
 ```
 
-`-- generator: collection-method` gives `AddUser` a second method, which takes the input model of every user, adds them all in one transaction of its own, 1,000 to a round trip, and returns their ids in the order of the users.  When the database refuses one, such as a user whose row breaks a constraint, it throws `CollectionItemException`, whose `ItemIndex` is that user's position, and no user is added.  The same query runs on SQL Server with `OUTPUT inserted.id` before `VALUES` in place of `RETURNING id`.  At the output `methods`, the method also takes a transaction that your code began, and runs in it.
+**What you get.**  `-- generator: collection-method` gives `AddUser` a second method.  It takes the input model of every user, and adds them all in one transaction of its own.  It returns their ids in the order of the users.
 
-Rules: [collection methods](../reference/collection-methods.md#collection-methods), [transactions](../reference/collection-methods.md#collection-transactions), [`CollectionItemException`](../reference/exceptions.md#collection-item-exception).
+**The rules you need.**
+
+- **On SQL Server, the same query runs with `OUTPUT inserted.id` before `VALUES`, in place of `RETURNING id`.**  See [collection methods](../reference/collection-methods.md#collection-methods).
+- **To run the method in a transaction that your code began**, see [The transaction it runs in](#transaction), below, and [transactions](../reference/collection-methods.md#collection-transactions).
+- **To find the user that the database refused**, see [When one item fails](#failures), below, and [`CollectionItemException`](../reference/exceptions.md#collection-item-exception).
 
 <a id="transaction"></a>
 
@@ -54,7 +62,7 @@ await transaction.CommitAsync(cancellationToken);
 
 - If you give it no transaction, a collection method begins its own.  It commits it after the last item, and rolls it back if anything throws, so no item is left.  See [Transactions](../reference/collection-methods.md#collection-transactions).
 - To set the isolation level of that transaction, write it on the same line: `-- generator: collection-method transaction=serializable`.  `transaction=off` begins no transaction, so a failure leaves the items before it.  See [`transaction`](../reference/generator-parameters.md#gp-transaction).
-- At the output `methods`, the method uses the transaction that you give it, whatever `transaction` says.  After an exception, what ran is still in your transaction, and you decide whether to roll it back or commit it.  See [Transactions](../reference/collection-methods.md#collection-transactions).
+- At the output `methods`, the method uses the transaction that you give it, whatever `transaction` says.  After an exception, what ran stays in your transaction, unless a database error aborted the transaction or rolled it back.  On PostgreSQL, every database error aborts the transaction, so roll it back.  See [Transactions](../reference/collection-methods.md#collection-transactions).
 - If a `TransactionScope` is open, the method begins no transaction, and runs in the scope's.  This is how to put a repository's collection method, which takes no transaction, in a larger one.  A connection that is not in the scope, such as one opened before it, runs the items in no transaction at all.  See [Transactions and timeouts](../reference/repositories.md#repository-transactions).
 
 <a id="failures"></a>

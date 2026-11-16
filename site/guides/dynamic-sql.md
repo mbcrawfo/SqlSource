@@ -1,10 +1,14 @@
 # Choose a table or a clause at run time
 
+Put a table name or a clause, such as `ORDER BY`, in a query at run time, and keep this dynamic SQL safe from SQL injection.
+
+**Use this when** your code chooses a part of a query that a query parameter cannot carry, such as a table name or the order of the rows.  A value, such as an id, goes in a query parameter instead.
+
 <a id="table-name-at-run-time"></a>
 
 ## Choose a table name at run time
 
-Write a token with a default, `{{table:orders}}`, where the name goes.  The query becomes a method that takes the text to put there.  The default is only a sample that the tool describes the query with; a query whose output is `sql` needs none.  Nothing is escaped, so pass only text that your own code chooses, never a value a user typed.  See [the recipe](#table-name-at-run-time) and [tokens](../reference/tokens.md#tokens).
+Write a token with a default, `{{table:orders}}`, where the name goes:
 
 ```sql postgres
 -- name: CountRows -> one
@@ -17,9 +21,13 @@ var counted = await reports.CountRows(table);
 // runs SELECT COUNT(*) AS total FROM orders_archive; counted.Total is the count
 ```
 
-The query's method takes the text of the token, and runs the query with the token replaced.  Under the output `sql` or `models`, the query is instead a method that returns the SQL, `Sql.CountRows(table)`, for your own code to run.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
+**What you get.**  The query's method, `CountRows`, takes the text of the token.  It runs the query with the token replaced, here by `orders_archive` or `orders`.
 
-Rules: [tokens](../reference/tokens.md#tokens), [the signature](../reference/repositories.md#repository-signature), [token methods](../reference/members.md#token-methods), [defaults](../reference/tokens.md#token-defaults).
+**The rules you need.**
+
+- **A query whose output is `sql` needs no default**, since the tool does not describe it.  See [Defaults](../reference/tokens.md#token-defaults).
+- **Each rule under [Choose a clause at run time](#clause), below, holds for a table name too.**  See [the signature](../reference/repositories.md#repository-signature) of the method and [token methods](../reference/members.md#token-methods).
+- **Read [Keep it safe from SQL injection](#safety) before your code passes a table name.**  See [Tokens](../reference/tokens.md#tokens).
 
 <a id="clause"></a>
 
@@ -47,7 +55,7 @@ ListUsersSortedByDto[] sorted = await users.ListUsersSortedBy(orderBy);
 - The default after the `:`, here `name`, is only a sample, which the tool describes the query with.  The method never uses it, so your code always passes the text.  See [Defaults](../reference/tokens.md#token-defaults).
 - If a token is written several times, or its sample is long, give its default once.  Write it in a line such as `-- token: {{orderBy:name}}` inside the query.  See [`-- token:`](../reference/tokens.md#token-marker).
 - A change to a default makes the query's sidecar out of date.  Run `dotnet sqlsource describe` again.  See [`-- token:`](../reference/tokens.md#token-marker).
-- Under the output `sql` or `models`, the query is a method that returns its SQL, `Sql.ListUsersSortedBy(orderBy)`.  See [Token methods](../reference/members.md#token-methods).
+- Under the output `models` or `sql`, the query is a method that returns its SQL, `Sql.ListUsersSortedBy(orderBy)`.  See [Token methods](../reference/members.md#token-methods).
 
 <a id="safety"></a>
 

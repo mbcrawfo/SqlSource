@@ -1,5 +1,9 @@
 # Call a query without await, or stream rows
 
+Call a query from synchronous code with a sync method, or read a large result one row at a time as an `IAsyncEnumerable`.
+
+**Use this when** code that cannot await, such as a command of a console tool, must run a query.  Use it too when a result is too large to hold in an array.
+
 <a id="run-without-awaiting"></a>
 
 ## Run a query from code that does not await
@@ -28,7 +32,7 @@ public int Run(int id)
 GetUserNameDto? user = await connection.GetUserNameAsync(new GetUserNameParams(id), cancellationToken: cancellationToken);
 ```
 
-`-- generator: method-type=both` gives `GetUserName` a synchronous method, `GetUserName`, which returns the row or null and takes no cancellation token, beside its asynchronous method, `GetUserNameAsync`.  `method-type=sync` gives it the synchronous method alone.  A query with [`collection-method`](../reference/collection-methods.md#collection-methods) gets its collection method the same way, synchronous, asynchronous or both.  Write it in the file header, or in `generatorParameters` of the folder's `sqlsource.json`, for every query it reaches.  On PostgreSQL, the data source it runs on has no `Multiplexing=true`.
+**What you get.**  `-- generator: method-type=both` gives the query two methods.  The synchronous method, `GetUserName`, returns the row or null, and takes no cancellation token.  Beside it, `GetUserNameAsync` is the asynchronous method.
 
 ```csharp
 // The same query at the default output, repository, without -- output: methods
@@ -40,9 +44,16 @@ public int Run(int id)
 }
 ```
 
-A repository gets the same methods, and its interface a member for each, so `users` can be the interface.  Each gets its connection from the repository: a repository whose only connection is a method that returns a task marks a second one that returns none, as [the recipe](repository-connection.md#connection-from-a-provider) does.
+A repository gets the same methods, and its interface a member for each, so `users` can be the interface.
 
-Rules: [synchronous methods](../reference/query-methods.md#synchronous-methods), [synchronous repository methods](../reference/repositories.md#synchronous-repository-methods), [generator parameters](../reference/generator-parameters.md#setting-generator-parameters).
+**The rules you need.**
+
+- **`method-type=sync` gives the query the synchronous method alone.**  See [synchronous methods](../reference/query-methods.md#synchronous-methods).
+- **A query with [`collection-method`](../reference/collection-methods.md#collection-methods) gets its collection method the same way**: synchronous, asynchronous or both.
+- **The line can reach more than one query.**  See [generator parameters](../reference/generator-parameters.md#setting-generator-parameters) for where to write it.
+- **On PostgreSQL, run a synchronous method on a data source without `Multiplexing=true`.**  See [what a method reads and throws](../reference/databases/postgresql/query-methods.md#method-results).
+- **A repository method gets its connection from the repository.**  See [synchronous repository methods](../reference/repositories.md#synchronous-repository-methods).
+- **If the only connection of a repository is a method that returns a task, mark a second one that returns none.**  See [a connection from a service of your own](repository-connection.md#connection-from-a-provider).
 
 <a id="stream-rows"></a>
 
@@ -95,6 +106,7 @@ public sealed partial class UserQueries(DbConnection connection)
 
 ## If it does not work
 
+- **`NotSupportedException` from a synchronous method, on PostgreSQL.**  The data source has `Multiplexing=true`.  Give the code that calls the method a data source without it, or call the asynchronous method.  See [what a method reads and throws](../reference/databases/postgresql/query-methods.md#method-results).
 - **`NpgsqlOperationInProgressException`, or `InvalidOperationException` on SQL Server, in the body of the loop.**  A command ran on the connection that the loop holds.  Run it on another connection, or read the rows into a collection first.  See [Streaming rows](../reference/return-types.md#streaming-rows).
 - **The loop throws an error of the database in place of your own exception.**  An unread row raised the error as the loop ended.  Catch your exception in the body of the loop, keep it in a variable, and `break`.  Then throw the kept exception, after the loop or in place of the database's exception.  See [Streaming rows](../reference/return-types.md#streaming-rows).
 - **SQLSRC298.**  The query streams its rows and has `method-type=sync`.  Write `method-type=both`, or a collection type that is read whole, such as `List`.  See [SQLSRC298](../diagnostics.md#sqlsrc298).
