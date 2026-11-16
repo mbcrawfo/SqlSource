@@ -1124,7 +1124,12 @@ A string or a quoted identifier starts and never ends.  The error is at the open
 SELECT 'unfinished FROM users;
 ```
 
-Close the quote.  If the SQL is valid for your database, SqlSource is reading it by the rules of another one: `'it\'s'` is one string in MySQL and an unclosed one elsewhere.  Set the dialect of the file.  A few constructs are read differently from the database whatever the dialect: see [what is still read differently](reference/dialects.md#still-read-differently).
+**Fix:** do one of these.
+
+- Close the quote.
+- If the SQL is valid for your database, SqlSource is reading it by the rules of another database.  Set the dialect of the file.  For example, `'it\'s'` is one string in MySQL, and a string that is not closed elsewhere.
+
+A few constructs are read differently from the database, whatever the dialect.  See [what is still read differently](reference/dialects.md#still-read-differently).
 
 See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
@@ -1141,9 +1146,14 @@ A block comment or a hint starts with `/*` and never ends.  The error is at the 
 SELECT 1;
 ```
 
-Close the comment.  Whether a `/*` inside a comment needs its own `*/` depends on the dialect: it does in the default dialect, in SQL Server and in PostgreSQL, and it does not in MySQL, MariaDB, SQLite and Oracle.  If the SQL is valid for your database, set the dialect of the file.
+**Fix:** do one of these.
 
-SQLite accepts a comment that is still open at the end of the file.  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
+- Close the comment.
+- If the SQL is valid for your database, set the dialect of the file.
+
+Whether a `/*` inside a comment needs its own `*/` depends on the dialect.  It does in the default dialect, in SQL Server and in PostgreSQL.  It does not in MySQL, MariaDB, SQLite and Oracle.
+
+- **SQLite accepts a comment that is still open at the end of the file.**  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
 
 See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
@@ -1153,16 +1163,20 @@ See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
 Reported by: the build and the tool.
 
-The value of a `-- name:` marker becomes the name of a C# member, so it must be a C# identifier and must not be a reserved keyword such as `class`.
+The name of the query cannot be the name of a C# member.  It is not a C# identifier, or it is a reserved keyword such as `class`.
+
+The value of a `-- name:` marker becomes the name of a C# member.
 
 ```sql error
 -- name: get-user
 SELECT 1;
 ```
 
-Rename the query, for example to `GetUser`.
+**Fix:**
 
-The name ends at `->`, when the marker has one.
+1. Rename the query, for example to `GetUser`.
+
+- **The name ends at `->`, when the marker has one.**
 
 See: [Queries and names](reference/sql-files.md#queries-and-names)
 
@@ -1186,14 +1200,19 @@ See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 Reported by: the build and the tool.
 
-A file without a `-- name:` marker is one query, named after the file without its extension.  This file's name cannot be the name of a C# member.
+A file without a `-- name:` marker is one query, named after the file without its extension.  The name of this file cannot be the name of a C# member.
 
 ```text
 001_init.sql
 get-user.sql
 ```
 
-Add a `-- name:` marker at the top of the file, or rename the file.  If the file is not meant to be a query of this type, move it out of the type's folder or point the type's `Source` somewhere else.
+**Fix:** do one of these.
+
+- Add a `-- name:` marker at the top of the file.
+- Rename the file.
+- If the file is not meant to be a query of this type, move it out of the folder of the type.
+- If the file is not meant to be a query of this type, point the `Source` of the type somewhere else.
 
 See: [A file with no `-- name:`](reference/sql-files.md#a-file-with-no-name)
 
@@ -1203,7 +1222,9 @@ See: [A file with no `-- name:`](reference/sql-files.md#a-file-with-no-name)
 
 Reported by: the build and the tool.
 
-In a file that has `-- name:` markers, only comments and the markers that describe the whole file may come before the first one: the table of [SQLSRC116](#sqlsrc116) has the list.  SQL there would belong to no query.
+SQL stands before the first `-- name:` marker of the file.  There it would belong to no query.
+
+In a file that has these markers, only comments and the markers that describe the whole file can come before the first one.  The table of [SQLSRC116](#sqlsrc116) lists those markers.
 
 ```sql error
 SET search_path TO app;
@@ -1212,7 +1233,10 @@ SET search_path TO app;
 SELECT 1;
 ```
 
-Move the SQL below a `-- name:` marker, or delete it.
+**Fix:** do one of these.
+
+- Move the SQL below a `-- name:` marker.
+- Delete the SQL.
 
 See: [The file header](reference/sql-files.md#the-file-header)
 
@@ -1222,7 +1246,9 @@ See: [The file header](reference/sql-files.md#the-file-header)
 
 Reported by: the build and the tool.
 
-A `-- summary:` marker describes the query it is in.  One in the file header, before the first `-- name:` line, is in no query.
+A `-- summary:` marker stands in the file header, before the first `-- name:` line.  There it is in no query.
+
+A summary describes the query that it is in.
 
 ```sql error
 -- summary: Loads one user.
@@ -1230,7 +1256,9 @@ A `-- summary:` marker describes the query it is in.  One in the file header, be
 SELECT 1;
 ```
 
-Move the summary below the `-- name:` marker.
+**Fix:**
+
+1. Move the summary below the `-- name:` marker.
 
 See: [Summaries](reference/sql-files.md#summaries)
 
@@ -1240,7 +1268,9 @@ See: [Summaries](reference/sql-files.md#summaries)
 
 Reported by: the build and the tool.
 
-A marker comes before the SQL it describes.  This one stands after the last SQL of its query, where a reader would take it to belong to the next one.  That usually means it was written above the next `-- name:` marker and was meant for that query.
+A marker stands after the last SQL of its query.
+
+A marker comes before the SQL that it describes.  In this place, a reader would take the marker to belong to the next query.  That usually means that it was written above the next `-- name:` marker, and was meant for that query.
 
 ```sql error
 -- name: GetUser
@@ -1250,7 +1280,10 @@ SELECT 1;
 SELECT 2;
 ```
 
-Move the marker below the `-- name:` marker of the query it describes, or delete it.
+**Fix:** do one of these.
+
+- Move the marker below the `-- name:` marker of the query that it describes.
+- Delete the marker.
 
 See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
@@ -1260,13 +1293,26 @@ See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-pl
 
 Reported by: the build and the tool.
 
-A `-- generator:` marker holds a word whose name is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` and `method-type`, each alone or followed by `=on`, `=off` or `=default`, and `default` alone.  `transaction` also takes `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` and `snapshot`, and `method-type` takes only `=async`, `=sync`, `=both` and `=default`.  The name is what stands before an `=`, so `keep-coments=off` is this error too.  The words `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews are not generator parameters: write `token-validation=off`, `table-models=off` and `array-pool=off`.  If you used `token-ignore` as a generator parameter in an earlier preview, write it as a marker inside the query, `-- token-ignore: name`.
+A `-- generator:` marker holds a word whose name is not a generator parameter.  The name is what stands before an `=`, so `keep-coments=off` is this error too.
 
 ```sql error
 -- generator: keep-comment
 ```
 
-Correct the parameter.  A dialect is not a generator parameter: it has a marker of its own, `-- dialect: name`.
+**Fix:**
+
+1. Correct the name of the generator parameter.
+
+A word is one of these:
+
+- A generator parameter, alone or followed by `=on`, `=off` or `=default`.  The generator parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` and `method-type`.
+- `default` alone.
+
+`transaction` also takes `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` and `snapshot`.  `method-type` takes only `=async`, `=sync`, `=both` and `=default`.
+
+- **The words `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews are not generator parameters.**  Write `token-validation=off`, `table-models=off` and `array-pool=off`.
+- **If you used `token-ignore` as a generator parameter in an earlier preview, write it as a marker inside the query.**  The marker is `-- token-ignore: name`.
+- **A dialect is not a generator parameter.**  It has a marker of its own, `-- dialect: name`.
 
 See: [Generator parameters](reference/generator-parameters.md#setting-generator-parameters)
 
@@ -1278,7 +1324,10 @@ Reported by: the build and the tool.
 
 A `-- generator:` marker has nothing after the colon.
 
-Add a generator parameter, or delete the line.
+**Fix:** do one of these.
+
+- Add a generator parameter.
+- Delete the line.
 
 See: [Generator parameters](reference/generator-parameters.md#setting-generator-parameters)
 
@@ -1288,11 +1337,28 @@ See: [Generator parameters](reference/generator-parameters.md#setting-generator-
 
 Reported by: the build and the tool.
 
-A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+The value of a marker is not valid.  The cause is one of these:
 
-- A generator parameter's value is one of its own words, `on` or `off`, and for `transaction` also `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`, and `async`, `sync` or `both` for `method-type`, which takes no `on` or `off`, or `default`, and the message lists them: `keep-comments=true` is this error, and so is `method-type` alone, which is `method-type=on`, and `default` followed by `=`, as in `default=on`.  See [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
-- What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
-- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of a settings file's `dialect`, in [SQLSRC019](#sqlsrc019).  The value is the rest of the line, so nothing else may follow it.
+- A generator parameter has a value that it does not take.
+- What follows a name in a `-- name:` marker is not a shape.
+- A `-- dialect:` marker does not name a dialect.
+- A marker that holds a setting has a value that the setting does not take.  Examples are `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` and `-- library-types:`.
+- A `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+
+The values that each marker takes follow.
+
+- **The value of a generator parameter is one of its own words, or `default`.**  The message lists them.  See [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
+  - Most generator parameters take `on` or `off`.
+  - `transaction` also takes `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`.
+  - `method-type` takes `async`, `sync` or `both`, and takes no `on` or `off`.
+  - `keep-comments=true` is this error.  So is `method-type` alone, which is `method-type=on`, and `default` followed by `=`, as in `default=on`.
+- **What follows the name in a `-- name:` marker must be `->` and a shape.**  The shape is one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
+- **`-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`.**
+  - Any options follow the name, as in `-- dialect: mysql, ansi-quotes`.
+  - The names and the options are those of `dialect` in a settings file, listed in [SQLSRC019](#sqlsrc019).
+  - The value is the rest of the line, so nothing else can follow it.
+
+Each line of this sample is this error:
 
 ```sql error
 -- generator: keep-comments=true
@@ -1300,25 +1366,53 @@ A generator parameter has a value it does not take; what follows a name in a `--
 -- dialect: mysql keep-comments
 ```
 
-- `-- output:` takes `sql`, `models`, `methods` or `repository`.  `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
-- `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`.
-- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.
-- `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  No part of either is a reserved keyword or `file`, `required`, `scoped` or `extension`, and no generic type is named.
-- `-- nested-class:` takes one identifier that is none of those and not `var`, with which the query methods of the type would not compile: `Queries`, and not `class`, `file` or `App.Sql`.  `-- member-location:` takes `extension-class`, `class` or `nested-class`, and `-- visibility:` takes `public`, `internal`, `protected` or `private`, in any case and with or without hyphens and spaces.
-- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](reference/type-mapping.md#setting-type-overrides).
-- The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
-- A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- `-- library-types:` takes one entry or more, each `name=state` with no space around its `=`, separated by white space, as in `-- library-types: nodatime=off`.  The library is `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`, matched ignoring case, hyphens and spaces.  A line with no entry, an entry without `=`, `nodatime = on` with spaces, and a library or a state that is not one are this error, which the message lists.  See [library types](reference/library-types-and-json.md#setting-library-types).
+The other markers that hold a setting take these values:
+
+- `-- output:` takes `repository`, `methods`, `models` or `sql`.
+- `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
+- `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.
+- `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`.
+- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier.
+- **`-- model-namespace:` takes a namespace such as `App.Models`.**  None of its parts can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  C# does not take these as the name of a type.
+- **`-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace.**  Examples are `UserRow` and `App.Models.UserRow`.  No part of the name can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  The marker cannot name a generic type.
+- **`-- nested-class:` takes one identifier.**  It cannot be one of those words, and it cannot be `var`, with which the query methods of the type would not compile.  So `Queries` is valid, and `class`, `file` or `App.Sql` is not.
+- **`-- member-location:` and `-- visibility:` take their values in any case, and with or without hyphens and spaces.**
+  - `-- member-location:` takes `extension-class`, `class` or `nested-class`.
+  - `-- visibility:` takes `public`, `internal`, `protected` or `private`.
+- **`-- type-override:` takes one entry, `key = type` or `key = default`.**  See [type overrides](reference/type-mapping.md#setting-type-overrides).
+  - The key is the one-word name of a type: `timestamptz` and not `timestamp with time zone`.
+  - A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema: `public.user_status` or `dbo.Email`.
+  - A schema or a name can be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`.
+  - A schema or a name can also be in `U&"..."` with escapes: `public.U&"Order\000AItem"`.  An escape is `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF.  Any other escape is not valid.  A character beyond FFFF is one `\+` escape, or the escapes of its two surrogates.
+  - The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.
+- **The dialect of the file decides how the key of a `-- type-override:` marker is read.**
+  - In an `mssql` file, the key is the name of a SQL Server type, such as `int`, `nvarchar` or `sys.int`.  A name that SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.
+  - In a file of any other dialect, a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.
+  - A type of a schema of your own, `dbo.Email`, is read in either.
+- **A key is not written in brackets.**  `-- type-override: [dbo].[Email] = MyApp.Email` is this error.  The message shows the forms that SqlSource reads:
+  - `dbo.Email`, which matches the name of the type in any case.
+  - `"dbo"."Email"`, which matches its case exactly.
+  - For a key without a schema, the plain form alone: `[INT]` is `INT`.  A quoted name without a schema must be in lower case.
+  - For a part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, the quoted form alone: `"my schema"`.
+- **`-- library-types:` takes one entry or more, separated by white space, as in `-- library-types: nodatime=off`.**  See [library types](reference/library-types-and-json.md#setting-library-types).
+  - Each entry is `name=state`, with no space around its `=`.
+  - The library is `nodaTime`, `netTopologySuite` or `json`, and the state is `on`, `off` or `default`.  Both are matched ignoring case, hyphens and spaces.
+  - A line with no entry is this error, and so is an entry without `=`.  So are `nodatime = on` with spaces, and a library or a state that is not one.  The message lists the libraries and the states.
 
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
-A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
+A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else.  A quote or a block comment inside the default must close there.
 
-A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space or `->`.  What follows its `->` is a C# type, written as a type override's is, and never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
+A `-- param:` marker starts with the query parameter as the SQL writes it, `@name`.  The parameter stands alone, or a space or `->` follows it.  What follows its `->` is a C# type, written as the type of a type override is.  It is never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
 
-Inside a query, a `-- column:` marker holds a column's name, then `null` or `not null`, `->` and a C# type or `default`, or both in that order, as in `-- column: total not null` or `-- column: note null -> NoteText`.  A name with white space or a `.`, or one that is the word `null` or `not`, is written in double quotes, with a quote inside it doubled: `-- column: "total due" not null`.  A name with a `.` outside quotes, `-- column: users.id -> UserId`, is this error, whose message says that a column's source is mapped in the file header.
+Inside a query, a `-- column:` marker holds the name of a column, then one of these, or both in this order:
 
-In the file header, a `-- column:` marker holds a column's source, `table.column` or `schema.table.column`, then `->` and a C# type or `default`, as in `-- column: users.id -> UserId`.  A marker without `->`, one that says `null` or `not null`, and one whose key has one part are this error.
+- `null` or `not null`;
+- `->` and a C# type or `default`.
+
+Examples are `-- column: total not null` and `-- column: note null -> NoteText`.  A name with white space or a `.` is written in double quotes, and so is a name that is the word `null` or `not`.  A quote inside such a name is doubled: `-- column: "total due" not null`.  A name with a `.` outside quotes, `-- column: users.id -> UserId`, is this error.  Its message says that a column's source is mapped in the file header.
+
+In the file header, a `-- column:` marker holds the source of a column, `table.column` or `schema.table.column`, then `->` and a C# type or `default`.  An example is `-- column: users.id -> UserId`.  A marker without `->` is this error.  So are a marker that says `null` or `not null`, and one whose key has one part.
 
 ```sql error
 -- column: users.id not null
@@ -1330,7 +1424,11 @@ In the file header, a `-- column:` marker holds a column's source, `table.column
 SELECT id FROM users WHERE team_id = @team;
 ```
 
-Add the missing value, correct the one that is wrong, or remove the one that does not belong.
+**Fix:** do one of these.
+
+- Add the missing value.
+- Correct the value that is wrong.
+- Remove the value that does not belong.
 
 See: [Marker index](reference/sql-files.md#marker-index)
 
@@ -1342,16 +1440,29 @@ Reported by: the build and the tool.
 
 Two settings contradict each other.  The error is at the second.
 
-- Two words of `-- generator:` markers that give one generator parameter two different states, in the file header or inside one query, on one line or two: `keep-comments` and `keep-comments=off`.  `keep-comments=default` beside either is one too, even where the default is the same.  The later word is not applied.  In a file with no `-- name:` line every `-- generator:` line is in one place.
-- Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
-- Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
-- Two `-- column:` markers inside one query for one column, its name compared ignoring case, of which one says `null` and the other `not null`, or which give it two C# types, `default` among them.  One may give the nullability and the other the type.
-- Two `-- column:` markers in the file header that give one key two C# types.  The key is compared as [column types](reference/model-properties.md#setting-column-types) compares it, so `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` two.
-- Two `-- param:` markers for one parameter that give different types, different nullability or different C# types after `->`.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
-- Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
-- Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
-- Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](reference/type-mapping.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two; and the C# types are compared by how they are named, so `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.  The same holds for the C# types of `-- column:` and `-- param:` markers.
-- Two entries of `-- library-types:` markers that give one library two states, in the file header or inside one query, on one line or two: `nodatime=on` and `nodatime=off`.
+The conflict is one of these:
+
+- **Two words of `-- generator:` markers give one generator parameter two different states.**  An example is `keep-comments` and `keep-comments=off`.
+  - The two words can be in the file header or inside one query, on one line or two.
+  - `keep-comments=default` beside either is a conflict too, even where the default is the same.
+  - The later word is not applied.
+  - In a file with no `-- name:` line, every `-- generator:` line is in one place.
+- **Two `-- dialect:` markers name different dialects, or one dialect with different options.**  A file has one dialect.
+- **Two defaults for one token of a query differ.**  They can be two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
+- **Two `-- column:` markers inside one query, for one column, say different things.**  The name of the column is compared ignoring case.
+  - One says `null` and the other `not null`, or the two give the column two C# types, `default` among them.
+  - One marker can give the nullability and the other the type.
+- **Two `-- column:` markers in the file header give one key two C# types.**  The key is compared as [column types](reference/model-properties.md#setting-column-types) compares it.  So `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` are two.
+- **Two `-- param:` markers for one parameter give different types, different nullability or different C# types after `->`.**  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
+- **Two `-- output:` markers give different values, or two `-- database:` markers name different databases.**  The two can be in the file header or inside one query.  `billing` and `Billing` are different databases.
+- **Two markers of any other setting of the models and the collection type give different values.**  The two can be in the file header or inside one query.  Examples are two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
+- **Two `-- type-override:` markers give one database type different C# types.**  The two can be in the file header or inside one query.
+  - The key is compared as [type overrides](reference/type-mapping.md#setting-type-overrides) compares it.  So `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two.
+  - The C# types are compared by how they are named.  So `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.
+  - The same holds for the C# types of `-- column:` and `-- param:` markers.
+- **Two entries of `-- library-types:` markers give one library two states.**  An example is `nodatime=on` and `nodatime=off`.  The two entries can be in the file header or inside one query, on one line or two.
+
+In this sample, the second `-- output:` marker conflicts with the first:
 
 ```sql error
 -- name: ListUsers
@@ -1360,7 +1471,18 @@ Two settings contradict each other.  The error is at the second.
 SELECT id, name FROM users;
 ```
 
-Remove one of the two.  A query's `-- generator:` word for a generator parameter replaces the file header's for that parameter, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either, nor is `default` beside other words of `-- generator:`.
+**Fix:**
+
+1. Remove one of the two settings.
+
+These are not a conflict:
+
+- A query's `-- generator:` word for a generator parameter.  It replaces the file header's word for that parameter.
+- A query's `-- type-override:` for a type.  It replaces the file header's for that type.
+- A query's `-- library-types:` for a library.  It replaces the file header's for that library.
+- A query's `-- column:` for a column whose source the file header maps.
+- The same dialect given twice with the same options.
+- `default` beside other words of `-- generator:`.
 
 See: [A value that is wrong](reference/settings.md#a-value-that-is-wrong)
 
@@ -1377,7 +1499,10 @@ A query, or a whole file without `-- name:` markers, holds nothing but whitespac
 -- TODO: write this query
 ```
 
-Write the SQL, or delete the query.
+**Fix:** do one of these.
+
+- Write the SQL.
+- Delete the query.
 
 See: [Queries and names](reference/sql-files.md#queries-and-names)
 
@@ -1387,15 +1512,22 @@ See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 Reported by: the build and the tool.
 
-A token `{{name}}` becomes a parameter of a generated method, so its name must not be a reserved C# keyword.
+The name of a token is a reserved C# keyword.
+
+A token `{{name}}` becomes a parameter of a generated method.  So its name must not be a reserved C# keyword.
 
 ```sql error
 SELECT * FROM {{class}};
 ```
 
-The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members and no models for that type.
+The same holds for the name in a `-- token:` marker.  It also holds for a token in a comment of a query that keeps its comments.
 
-Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
+A token in a comment is an error only for a type that keeps the comments.  The file that holds the token then produces no members and no models for that type.
+
+**Fix:** do one of these.
+
+- Rename the token.
+- If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
 See: [Tokens](reference/tokens.md#tokens)
 
@@ -1405,7 +1537,9 @@ See: [Tokens](reference/tokens.md#tokens)
 
 Reported by: the build and the tool.
 
-A `-- dialect:` marker sets the dialect of a whole file, and it changes how the text after it is read.  So it must stand in the file header, before the file's first `-- name:` line and before its first SQL.  This one is inside a named query, or after SQL.
+A `-- dialect:` marker stands inside a named query, or after SQL.
+
+A `-- dialect:` marker sets the dialect of a whole file, and it changes how the text after it is read.  So it must stand in the file header, before the first `-- name:` line of the file and before its first SQL.
 
 ```sql error
 -- name: GetUser
@@ -1413,9 +1547,11 @@ A `-- dialect:` marker sets the dialect of a whole file, and it changes how the 
 SELECT 1;
 ```
 
-A marker after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
+**Fix:**
 
-Move the marker to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
+1. Move the marker to the top of the file.  In a file with no `-- name:` marker, which is one query, put it above the SQL of the query.
+
+Comments can come before the marker, such as a licence header.  In this sample, the marker stands at the top of the file:
 
 ```sql
 -- dialect: mysql
@@ -1424,7 +1560,8 @@ Move the marker to the top of the file.  Comments may come before it, such as a 
 SELECT 1;
 ```
 
-A file cannot mix dialects.  Put the queries for another database in a file of their own.
+- **A marker after the last SQL of its query gets two errors.**  They are this error and [SQLSRC108](#sqlsrc108).
+- **A file cannot mix dialects.**  Put the queries for another database in a file of their own.
 
 See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
@@ -1434,7 +1571,9 @@ See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-pl
 
 Reported by: the build and the tool.
 
-A marker stands in the wrong part of its file.  Some markers describe one query and go inside it, after its `-- name:` line; some describe the whole file and go before the first `-- name:` line.  The message says which this one is.
+A marker stands in the wrong part of its file.  The message says which of the two kinds this marker is.
+
+Some markers describe one query.  They go inside the query, after its `-- name:` line.  Other markers describe the whole file.  They go before the first `-- name:` line.
 
 ```sql error
 -- token: {{filter:AND deleted_at IS NULL}}
@@ -1443,7 +1582,11 @@ A marker stands in the wrong part of its file.  Some markers describe one query 
 SELECT id FROM users WHERE 1 = 1 {{filter}};
 ```
 
-Move the marker to where the message says.  A file with no `-- name:` line is one query, and takes every marker.
+**Fix:**
+
+1. Move the marker to the place that the message names.
+
+A file with no `-- name:` line is one query, and takes every marker.
 
 | Marker | File header | Inside a query |
 |----|----|----|
@@ -1461,11 +1604,17 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- input-model-type:`, `-- output-model-type:` | yes | yes |
 | `-- input-model:`, `-- output-model:` | no | yes |
 | `-- collection-type:` | yes | yes |
+| `-- member-location:` | yes | yes |
+| `-- visibility:` | yes | yes |
+| `-- nested-class:` | yes | yes |
 | `-- type-override:` | yes | yes |
 | `-- column:` | yes | yes |
 | `-- library-types:` | yes | yes |
 
-The table is this error's, with two exceptions.  A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
+The table is this error's, with two exceptions:
+
+- A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107).
+- A `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
 See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
@@ -1475,7 +1624,15 @@ See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-pl
 
 Reported by: the build and the tool.
 
-A `-- param:` marker without a type names a parameter that does not stand as a parameter in the query's SQL: it appears only in a token's default, or, under `mssql`, only where SqlSource reads it as a variable declared with `DECLARE`, or nowhere, as when its name is misspelt.  Nothing but the marker can then say its type.
+A `-- param:` marker without a type names a parameter that does not stand as a parameter in the SQL of the query.  One of these is true:
+
+- The parameter appears only in the default of a token.
+- Under `mssql`, the parameter appears only where SqlSource reads it as a variable declared with `DECLARE`.
+- The parameter appears nowhere, as when its name is misspelt.
+
+Nothing but the marker can then say its type.
+
+The first sample shows the first case, and the second sample the second case:
 
 ```sql error
 -- name: ListUsers
@@ -1492,9 +1649,14 @@ DECLARE @n int = 1;
 SELECT * FROM events WHERE id > @n;
 ```
 
-A marker that gives only a C# type, `-- param: @page -> PageNumber`, has no type either: the C# type is not the database's.
+A marker that gives only a C# type, `-- param: @page -> PageNumber`, has no type either.  The C# type is not the database's.
 
-Give the type, in the database's own words: `-- param: @page int`, or `-- param: @page int -> PageNumber`.  Under `mssql`, remove the marker when the name is a variable that the query declares, and give the type when it is a parameter that SqlSource took for a variable: see [variables declared with `DECLARE`](reference/parameters.md#declared-variables).  Correct a misspelt name.
+**Fix:** do one of these.
+
+- Give the type, in the database's own words: `-- param: @page int`, or `-- param: @page int -> PageNumber`.
+- Under `mssql`, if the name is a variable that the query declares, remove the marker.
+- Under `mssql`, if the name is a parameter that SqlSource took for a variable, give the type.  See [variables declared with `DECLARE`](reference/parameters.md#declared-variables).
+- If the name is misspelt, correct it.
 
 See: [Giving a parameter a type: `-- param:`](reference/parameters.md#param-marker)
 
@@ -1504,14 +1666,18 @@ See: [Giving a parameter a type: `-- param:`](reference/parameters.md#param-mark
 
 Reported by: the build and the tool.
 
-A parameter appears in the default of a token, in the SQL or in a `-- token:` marker, and nowhere else in the query.  A default is a sample, and a type taken from a sample alone would be a guess.
+A parameter appears in the default of a token, in the SQL or in a `-- token:` marker, and nowhere else in the query.
+
+A default is a sample, and a type taken from a sample alone would be a guess.
 
 ```sql error
 -- name: ListUsers
 SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 ```
 
-Declare the parameter with its type: `-- param: @page int`.
+**Fix:**
+
+1. Declare the parameter with its type, as in `-- param: @page int`.
 
 See: [Defaults](reference/tokens.md#token-defaults)
 
@@ -1521,7 +1687,9 @@ See: [Defaults](reference/tokens.md#token-defaults)
 
 Reported by: the build and the tool.
 
-An `-- input-model:` marker names the type of a query's parameters, and this query has none: no `@name` in its SQL and no `-- param:` marker.  Under the `mssql` dialect a name that the query declares with `DECLARE` is a local variable, and is not a parameter.
+An `-- input-model:` marker names the type of the parameters of a query, and this query has none.  It has no `@name` in its SQL and no `-- param:` marker.
+
+Under the `mssql` dialect, a name that the query declares with `DECLARE` is a local variable, and is not a parameter.
 
 ```sql error
 -- name: CountUsers
@@ -1529,7 +1697,9 @@ An `-- input-model:` marker names the type of a query's parameters, and this que
 SELECT COUNT(*) FROM users;
 ```
 
-Remove the marker.
+**Fix:**
+
+1. Remove the marker.
 
 See: [Name of one query's model](reference/models.md#setting-model-name)
 
@@ -1539,9 +1709,13 @@ See: [Name of one query's model](reference/models.md#setting-model-name)
 
 Reported by: the build and the tool.
 
-A token and a comment overlap: the comment is not wholly inside the token's default, nor outside the token.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](reference/generator-parameters.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens three ways.
+A token and a comment overlap.  The comment is not wholly inside the default of the token, nor outside the token.
 
-A comment inside a default holds `}}`.  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
+Comments are removed before tokens are found.  A query that keeps its comments (the `keep-comments` [generator parameter](reference/generator-parameters.md#setting-generator-parameters)) also has its tokens found in the SQL with the comments.  So the two would read different tokens.
+
+It happens in three ways.
+
+**A comment inside a default holds `}}`.**  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
 
 ```sql error
 -- name: ListUsers
@@ -1549,7 +1723,7 @@ SELECT id FROM users WHERE 1 = 1 {{filter:AND active -- only live rows}}
 ORDER BY {{orderBy:name}};
 ```
 
-A comment opens a default, `{{name:`, and the SQL after the comment closes it.  Without comments the query is as you wrote it, but where comments are kept the default runs from the comment to the next `}}`, and the token after it is lost.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
+**A comment opens a default, `{{name:`, and the SQL after the comment closes it.**  Without comments, the query is as you wrote it.  Where comments are kept, the default runs from the comment to the next `}}`, and the token after it is lost.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
 
 ```sql error
 -- name: ListUsers
@@ -1558,7 +1732,7 @@ SELECT id -- e.g. {{note: here
 FROM users WHERE {{filter}};
 ```
 
-A comment stands inside a token's braces before its default: between `{{` and the name, or between the name and the `:` or the closing `}}`.  Without comments the token is read, but where comments are kept the braces stay in the SQL as written, and the method has no argument for the token.
+**A comment stands inside the braces of a token, before its default.**  It stands between `{{` and the name, or between the name and the `:` or the closing `}}`.  Without comments, the token is read.  Where comments are kept, the braces stay in the SQL as written, and the method has no argument for the token.
 
 ```sql error
 -- name: ListFrom
@@ -1566,7 +1740,13 @@ A comment stands inside a token's braces before its default: between `{{` and th
 SELECT id FROM {{table/* users or archive */}};
 ```
 
-The second and third are errors only for a type that keeps the query's comments, and that type gets no members and no models from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
+The second and third are errors only for a type that keeps the comments of the query.  That type gets no members and no models from the file until it is fixed.
+
+All three hold for a name in a `-- token-ignore:` marker too.  Its text runs to its closing `}}`, as the text of a token does.  So a comment there changes which tokens the rest of the query has.
+
+**Fix:**
+
+1. Keep the comment wholly inside the default of the token, or outside the token.  Move it onto a line of its own, or after the `}}` of the token.
 
 See: [Defaults](reference/tokens.md#token-defaults)
 
@@ -1576,7 +1756,15 @@ See: [Defaults](reference/tokens.md#token-defaults)
 
 Reported by: the build.
 
-A query in the `mssql` dialect writes one parameter in two spellings that differ only in case: `@Id`, and then `@id`.  SqlSource reads the two as one parameter, and binds it under the spelling that the SQL first writes outside a token's default: a spelling in a default or in a `-- param:` marker does not choose it.  A SQL Server whose server collation is case-sensitive reads the other spelling as another variable, which the query does not declare, and fails the query when it runs.  A server whose collation ignores case, which is the usual one, runs the query as written.  The collation that counts is the server's, which `SELECT SERVERPROPERTY('Collation')` shows; the collation of the database does not change how the query's variables are read, except in a contained database, where they ignore case whatever the server's collation.  The warning is at the place of the other spelling, and names both.  Each further spelling of a parameter is warned of once in a query, at its first place.  A parameter that only a token's default writes, and that a `-- param:` marker declares, is bound as the marker spells it, and the spellings in the defaults are compared against that.
+A query in the `mssql` dialect writes one parameter in two spellings that differ only in case: `@Id`, and then `@id`.  The warning is at the place of the other spelling, and names both.  The build warns of each further spelling of a parameter once in a query, at its first place.
+
+SqlSource reads the two spellings as one parameter.  It binds the parameter under the spelling that the SQL first writes outside a token's default.  A spelling in a default or in a `-- param:` marker does not choose it.
+
+The collation that counts is the server's, which `SELECT SERVERPROPERTY('Collation')` shows:
+
+- If the server collation of a SQL Server is case-sensitive, the server reads the other spelling as another variable.  The query does not declare that variable, so the server fails the query when it runs.
+- If the server collation ignores case, which is the usual one, the server runs the query as written.
+- The collation of the database does not change how the variables of the query are read, except in a contained database.  In a contained database, the variables ignore case, whatever the collation of the server.
 
 ```sql error
 -- name: GetUser
@@ -1587,9 +1775,15 @@ SELECT name FROM dbo.users WHERE id = @Id OR parent_id = @id;
 /work/App/Queries/Users.sql(2,58): warning SQLSRC121: The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose server collation is case-sensitive reads '@id' as another variable, which the query does not declare.  Write it '@Id' throughout the query.
 ```
 
-Write the parameter in one spelling throughout the query.  A parameter written in the default of a token is checked as the rest of the query is.
+**Fix:**
 
-This is a warning, since a query runs as written when the server collation ignores case, and a project that uses only such servers may want no warning.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+1. Write the parameter in one spelling throughout the query.
+
+The build checks a parameter written in the default of a token as it checks the rest of the query.
+
+- **A parameter that only a token's default writes, and that a `-- param:` marker declares, is bound as the marker spells it.**  The spellings in the defaults are compared against that spelling.
+
+This is a warning, since a query runs as written when the server collation ignores case, and a project that uses only such servers may want no warning.  A project can list it in `NoWarn` to turn it off.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning:
 
 ```xml
 <PropertyGroup>
