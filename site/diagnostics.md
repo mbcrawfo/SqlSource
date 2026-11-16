@@ -1451,13 +1451,12 @@ The conflict is one of these:
   - In a file with no `-- name:` line, every `-- generator:` line is in one place.
 - **Two `-- dialect:` markers name different dialects, or one dialect with different options.**  A file has one dialect.
 - **Two defaults for one token of a query differ.**  They can be two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
-- **Two `-- column:` markers inside one query, for one column, say different things.**  The name of the column is compared ignoring case.
-  - One says `null` and the other `not null`, or the two give the column two C# types, `default` among them.
-  - One marker can give the nullability and the other the type.
+- **Two `-- column:` markers inside one query give one column two nullabilities, or two C# types.**  The name of the column is compared ignoring case.  One marker says `null` and the other `not null`, or the two give two C# types, `default` among them.
 - **Two `-- column:` markers in the file header give one key two C# types.**  The key is compared as [column types](reference/model-properties.md#setting-column-types) compares it.  So `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` are two.
 - **Two `-- param:` markers for one parameter give different types, different nullability or different C# types after `->`.**  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
 - **Two `-- output:` markers give different values, or two `-- database:` markers name different databases.**  The two can be in the file header or inside one query.  `billing` and `Billing` are different databases.
 - **Two markers of any other setting of the models and the collection type give different values.**  The two can be in the file header or inside one query.  Examples are two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
+- **Two `-- member-location:`, `-- visibility:` or `-- nested-class:` markers give different values.**  The two can be in the file header or inside one query.
 - **Two `-- type-override:` markers give one database type different C# types.**  The two can be in the file header or inside one query.
   - The key is compared as [type overrides](reference/type-mapping.md#setting-type-overrides) compares it.  So `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two.
   - The C# types are compared by how they are named.  So `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.
@@ -1483,6 +1482,7 @@ These are not a conflict:
 - A query's `-- type-override:` for a type.  It replaces the file header's for that type.
 - A query's `-- library-types:` for a library.  It replaces the file header's for that library.
 - A query's `-- column:` for a column whose source the file header maps.
+- Two `-- column:` markers inside one query for one column, of which one gives the nullability and the other the C# type.
 - The same dialect given twice with the same options.
 - `default` beside other words of `-- generator:`.
 
