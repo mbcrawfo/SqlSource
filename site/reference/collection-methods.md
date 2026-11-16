@@ -27,9 +27,14 @@ var newUsers = new List<AddUserParams>
 AddUserDto[] added = await users.AddUser(newUsers); // added[1].Id is Grace's id
 ```
 
-The [generator parameter](generator-parameters.md#setting-generator-parameters) `collection-method` gives a query a second method, its collection method: an overload of its query method that takes a collection of the query's input models, runs the query once for each of them, the items, in a transaction of its own by default, and returns what every item returned, in the order of the items.  It sends the items 1,000 at a time, each 1,000 in one round trip to the database, where a loop that calls the query method takes a round trip for each.  Above, `AddUser` is a repository's.  `-- generator: collection-method` in a file header, or `"generatorParameters": ["collection-method"]` in a settings file, gives one to every query it reaches.
+The [generator parameter](generator-parameters.md#setting-generator-parameters) `collection-method` gives a query a second method, its *collection method*.  A collection method is an overload of the query method of the query.  It takes a collection of the input models of the query, the *items*.  It runs the query once for each item, in a transaction of its own by default.  It returns what every item returned, in the order of the items.  In the sample, `AddUser` is a method of a repository.
 
-What it returns depends on the query's [result shape](sql-files.md#result-shapes), as a query method's does, with the rows of every item.  A synchronous collection method returns what the task holds, with no `Task`, and nothing, `void`, for `none`:
+A collection method sends the items 1,000 at a time, each 1,000 in one round trip to the database.  A loop that calls the query method takes a round trip for each item.  Each of these gives a collection method to every query that it reaches:
+
+- `-- generator: collection-method` in a file header;
+- `"generatorParameters": ["collection-method"]` in a settings file.
+
+What a collection method returns depends on the [result shape](sql-files.md#result-shapes) of the query, as for a query method.  It holds the rows of every item.  A synchronous collection method returns what the task holds, with no `Task`.  For `none`, it returns nothing, `void`:
 
 | Shape | Returns |
 |----|----|
@@ -39,16 +44,35 @@ What it returns depends on the query's [result shape](sql-files.md#result-shapes
 | `none` | `Task` |
 | `rowcount` | `Task<int>`: the counts of every item, added up.  An item whose count is not reported, as under SQL Server's `SET NOCOUNT ON`, adds 0 |
 
-Its rows are read as a `many` method reads them, through .NET's shared array pool unless the query has `array-pool=off`.
+A collection method reads its rows as a `many` method reads them.  It reads them through the shared array pool of .NET, unless the query has [`array-pool=off`](generator-parameters.md#gp-array-pool).
 
-- **A query gets one when it gets a query method and has parameters.**  `collection-method` is off by default.  A query whose output is `repository` or `methods` gets its collection method beside its query method, and one that gets no query method, as when the method has an error, gets neither.  A query without parameters gets none, and no error, so a folder that turns `collection-method` on keeps its queries without parameters as they are.  Under the output `sql` or `models` the parameter does nothing.  A [`transaction`](#collection-transactions) that names an isolation level the query's database does not have is [SQLSRC297](../diagnostics.md#sqlsrc297), which leaves the query its query method alone.
-- **It is an overload of the query method**, with its name, `Async` included under `async-method-suffix`, its visibility and its place, and the same arguments in the same order, but `IEnumerable<TParams> parameters`, of the query's input model, in place of `TParams parameters`.  A `methods` method still takes the connection, `transaction`, `commandTimeout` and `cancellationToken`, and a repository's takes `cancellationToken`; the repository's interface gets it beside the query method.  A synchronous collection method takes no `cancellationToken`.  A [token](tokens.md#tokens) is one `string` argument, as in the query method, and its text is used for every item.  Once a query has one, a call of its query method that passes `new(...)`, `null` or `default` as the input model no longer compiles: either method takes it, so the call is ambiguous, the compiler's error CS0121.  Name the input model's type, as in `new AddUserParams("Ada", email)` or `default(AddUserParams)`.
-- **It follows [`method-type`](query-methods.md#synchronous-methods)**, as the query method does, at either output: under `sync` it is synchronous, under `both` the query gets a synchronous collection method and an asynchronous one, each an overload of the query method of the same name, as [synchronous methods](query-methods.md#synchronous-methods) name them, and under `async`, the default, it is asynchronous.
-- **The collection is read once**, as the method goes, and never held whole, so it can be a LINQ query or an iterator of your own.  A null `parameters` throws `ArgumentNullException` before anything runs.  An empty collection returns an empty collection, `0` or, for `none`, nothing, and opens no connection and begins no transaction.
-- **Each item is checked as the method reads it.**  A null item throws `ArgumentNullException`, "Item 1499 of the collection is null.", with the item's position, counted from 0, and an item's [list parameter](parameters.md#list-limit) throws as the query method's does.
-- **The items run 1,000 at a time.**  The method reads and checks up to 1,000 items, runs them, and only then reads the next 1,000.  So a bad item is found only after every round trip before its own has run: in the method's own transaction those items are rolled back, and under `transaction=off` or in the caller's transaction they stay.  To refuse the whole collection for one bad item there, check the items before the call.
-- **`commandTimeout` is the timeout of each 1,000 items**, not of the whole method, and is otherwise the query method's.  `cancellationToken` cancels opening the connection, running the items and reading their rows, and the method's own transaction is rolled back; nothing cancels a synchronous collection method, which has no `cancellationToken`.  What each driver throws is on the pages of [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
-- **The connection** is the query method's: a `methods` method opens a closed connection and closes it again before it returns or throws, as [the connection](connection-methods.md#method-connection) says, and a repository's gets one from its [connection source](repositories.md#repository-connection) for the call.
+- **A query gets a collection method when it gets a query method and has parameters.**  `collection-method` is off by default.
+- **A query whose output is `repository` or `methods` gets its collection method beside its query method.**  Under the output `models` or `sql`, the generator parameter does nothing.
+- **If a query gets no query method, it gets no collection method either.**  An example is a query whose method has an error.
+- **A query without parameters gets no collection method, and no error.**  So if a folder turns `collection-method` on, its queries without parameters stay as they are.
+- **If [`transaction`](#collection-transactions) names an isolation level that the database of the query does not have, the build reports [SQLSRC297](../diagnostics.md#sqlsrc297).**  The query then keeps its query method alone.
+- **A collection method is an overload of the query method.**  It has the name, the visibility and the place of the query method.  Its name has `Async` under [`async-method-suffix`](generator-parameters.md#gp-async-method-suffix), as the name of the query method does.
+- **It takes the arguments of the query method, in the same order, but for one.**  In place of `TParams parameters`, it takes `IEnumerable<TParams> parameters`, where `TParams` is the input model of the query.
+- **At the output `methods`, a collection method takes the connection, `transaction`, `commandTimeout` and `cancellationToken`**, as the query method does.
+- **A collection method of a repository takes `cancellationToken`.**  The [interface](repositories.md#repository-interface) of the repository gets the collection method beside the query method.
+- **A synchronous collection method takes no `cancellationToken`.**
+- **A [token](tokens.md#tokens) is one `string` argument, as in the query method.**  The collection method uses its text for every item.
+- **Once a query has a collection method, a call of its query method that passes `new(...)`, `null` or `default` as the input model no longer compiles.**  Either method takes it, so the call is ambiguous: the compiler's error CS0121.  Name the type of the input model, as in `new AddUserParams("Ada", email)` or `default(AddUserParams)`.
+- **A collection method follows [`method-type`](query-methods.md#synchronous-methods)**, as the query method does, at either output:
+  - under `async`, the default, it is asynchronous;
+  - under `sync`, it is synchronous;
+  - under `both`, the query gets a synchronous collection method and an asynchronous one.  Each is an overload of the query method of the same name, as [synchronous methods](query-methods.md#synchronous-methods) name them.
+- **The method reads the collection once, as it goes, and never holds it whole.**  So the collection can be a LINQ query or an iterator of your own.
+- **If `parameters` is null, the method throws `ArgumentNullException` before anything runs.**
+- **An empty collection opens no connection and begins no transaction.**  The method returns an empty collection, `0` or, for `none`, nothing.
+- **The method checks each item as it reads it.**  If an item is null, the method throws `ArgumentNullException`, "Item 1499 of the collection is null.".  The message gives the position of the item, counted from 0.  A [list parameter](parameters.md#list-limit) of an item throws as the list parameter of the query method does.
+- **The items run 1,000 at a time.**  The method reads and checks up to 1,000 items, and runs them.  Only then does it read the next 1,000.
+- **The method finds a bad item only after every round trip before its own has run.**  In the method's own transaction, those items are rolled back.  Under `transaction=off`, or in the caller's transaction, they stay.  So in those two cases, to refuse the whole collection for one bad item, check the items before the call.
+- **`commandTimeout` is the timeout of each 1,000 items, not of the whole method.**  Otherwise it is the `commandTimeout` of the query method.
+- **`cancellationToken` cancels opening the connection, running the items and reading their rows.**  The method's own transaction is then rolled back.  What each driver throws is on the pages of [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
+- **Nothing cancels a synchronous collection method.**  It has no `cancellationToken`.
+- **A collection method gets its connection as its query method does.**  At the output `methods`, it opens a closed connection, and closes it again before it returns or throws.  If the connection was not closed, the method leaves it as it was.  See [the connection](connection-methods.md#method-connection).
+- **A collection method of a repository gets a connection from its [connection source](repositories.md#repository-connection) for the call.**
 
 <a id="collection-transactions"></a>
 
@@ -61,27 +85,42 @@ INSERT INTO readings (sensor_id, taken_at, value)
 VALUES (@sensorId, @takenAt, @value);
 ```
 
-The generator parameter `transaction` says which transaction a collection method begins of its own.  It changes nothing for a query without `collection-method`.
+The [generator parameter `transaction`](generator-parameters.md#gp-transaction) says which transaction a collection method begins of its own.  The sample begins one at the level `serializable`.  `transaction` changes nothing for a query without `collection-method`.
 
 | `transaction` | The collection method |
 |----|----|
 | `on`, the default | Begins a transaction at the database's default isolation level, commits it after the last item, and rolls it back when anything throws |
-| `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot` | The same, at that isolation level.  PostgreSQL has no `read-uncommitted` and no `snapshot`, which are [SQLSRC297](../diagnostics.md#sqlsrc297) there, and SQL Server's `snapshot` needs the database to allow it: see [SQL Server](databases/sqlserver/query-methods.md#collection-methods) |
-| `off` | Begins none: the items run as the database runs statements outside a transaction, so a failure leaves some of them in it, as the pages of [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods) say |
+| `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot` | The same, at that isolation level.  Each database has its own rules: see below |
+| `off` | Begins none.  The items run as the database runs statements outside a transaction, so a failure leaves some of them in the database |
 
-- **Its own transaction's isolation level is that transaction's alone**, under `on` as under a level: the connection's later statements run at the level they ran at before the call.
-- **Its own transaction is all or nothing.**  It holds every item, and when anything throws, an item's database error, an exception of the method's own such as `UnexpectedRowCountException`, a null item or a cancellation, it is rolled back and nothing of any item is left.  When the database has already rolled it back, as SQL Server does at some errors, the method throws the first exception all the same.
-- **The caller's transaction is used as it is.**  A `methods` method given a `transaction` runs every item in it, whatever `transaction` says, and neither commits it nor rolls it back: after an exception, what ran is still in it, and whether to roll it back or commit it is yours to decide.  On SQL Server, a transaction that has completed is refused, as for a query method: see [the connection](connection-methods.md#method-connection).
-- **So is an ambient transaction.**  When `System.Transactions.Transaction.Current` is set as the method starts, as inside a `TransactionScope`, the method begins none, whatever `transaction` says, and runs in that one, which a connection opened inside the scope takes part in.  A connection that is not in it, such as one opened before the scope and never enlisted, or one whose connection string turns enlisting off, runs the items in no transaction at all, as under `transaction=off`.  That is the way to put a repository's collection method in a larger transaction, since it takes no `transaction`.
+- **On PostgreSQL, `read-uncommitted` and `snapshot` are [SQLSRC297](../diagnostics.md#sqlsrc297).**  PostgreSQL has neither level.
+- **On SQL Server, `snapshot` needs the database to allow it.**  See [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
+- **Under `off`, what a failed item leaves in the database depends on the database.**  On PostgreSQL, the round trip of the failed item is rolled back, and the round trips before it stay.  On SQL Server, each item is committed on its own, so the items before the failed one stay.  On both, the round trips after it do not run.  See [PostgreSQL](databases/postgresql/query-methods.md#collection-methods) and [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
+- **The isolation level of its own transaction is for that transaction alone.**  This is so under `on`, and under a level.  The later statements of the connection run at the level that they ran at before the call.
+- **Its own transaction is all or nothing.**  It holds every item.  If anything throws, the method rolls the transaction back, and nothing of any item is left.  This holds for a database error at an item, an exception of the method's own such as `UnexpectedRowCountException`, a null item and a cancellation.
+- **If the database has already rolled its own transaction back, the method throws the first exception all the same.**  SQL Server does so at some errors.
+- **The caller's transaction is used as it is.**  At the output `methods`, a collection method that is given a `transaction` runs every item in it, whatever `transaction` says.  It neither commits that transaction nor rolls it back.
+- **After an exception, what ran is still in the caller's transaction.**  Whether to roll it back or commit it is yours to decide.
+- **On PostgreSQL, a database error aborts the caller's transaction.**  PostgreSQL then takes no other command in it until you roll it back, and what ran in it is rolled back with it.  See [PostgreSQL](databases/postgresql/query-methods.md#collection-methods).
+- **On SQL Server, a transaction that has completed is refused**, as for a query method.  See [the connection](connection-methods.md#method-connection).
+- **An ambient transaction is used as it is too.**  If `System.Transactions.Transaction.Current` is set as the method starts, as inside a `TransactionScope`, the method begins no transaction, whatever `transaction` says.  It runs the items in the ambient transaction.  A connection opened inside the scope takes part in that transaction.
+- **A connection that is not in the ambient transaction runs the items in no transaction at all**, as under `transaction=off`.  Examples are a connection opened before the scope and never enlisted, and one whose connection string turns enlisting off.
+- **An ambient transaction is the way to put the collection method of a repository in a larger transaction.**  That method takes no `transaction`: see [transactions](repositories.md#repository-transactions).
 
 <a id="collection-failures"></a>
 
 ## What it throws
 
-- **A database error at an item** is thrown as [`CollectionItemException`](exceptions.md#collection-item-exception), whose `ItemIndex` is the item's position, counted from 0, and whose `InnerException` is the driver's exception, a `PostgresException` or a `SqlException`.
-- **An error that no item raised is the driver's own.**  One that the database raises after every item of a round trip has run, such as that of a PostgreSQL constraint declared `DEFERRABLE INITIALLY DEFERRED`, which is checked at the commit, is thrown as the driver's exception, as it is.
-- **Every other exception is the query method's**: `UnexpectedRowCountException`, whose message and `ItemIndex` name the item, a null in a column whose property cannot be null, a converter's exception.
-- **On SQL Server**, a method that reads rows and is given a transaction can throw [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back), and a query whose statements return more than one result set throws `InvalidOperationException`: see [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
+A collection method throws the exceptions of its query method, and one of its own for a database error at an item.
+
+- **A database error at an item is thrown as [`CollectionItemException`](exceptions.md#collection-item-exception).**  Its `ItemIndex` is the position of the item, counted from 0.  Its `InnerException` is the exception of the driver: a `PostgresException` or a `SqlException`.
+- **An error that no item raised is thrown as the exception of the driver, as it is.**  An example is an error that the database raises after every item of a round trip has run.  A PostgreSQL constraint declared `DEFERRABLE INITIALLY DEFERRED` raises one, since PostgreSQL checks it at the commit.
+- **Every other exception is the exception of the query method.**  These include:
+  - `UnexpectedRowCountException`, whose message and `ItemIndex` name the item;
+  - the exception for a null in a column whose property cannot be null;
+  - the exception of a converter.
+- **On SQL Server, a collection method that reads rows and is given a transaction can throw [`TransactionRolledBackException`](exceptions.md#transaction-rolled-back).**
+- **On SQL Server, a query whose statements return more than one result set throws `InvalidOperationException`.**  See [SQL Server](databases/sqlserver/query-methods.md#collection-methods).
 
 <a id="limits"></a>
 
@@ -91,4 +130,16 @@ The generator parameter `transaction` says which transaction a collection method
 
 ### `NotSupportedException` from a collection method, or an error that names no item, on a connection that wraps the driver's
 
-- **A collection method works fully only on the driver's own connection.**  On a `DbConnection` that wraps the driver's, it can fail where the query method works, in three ways.  A wrapper that cannot run a batch of commands, as most cannot, makes every collection method throw `NotSupportedException`, "Specified method is not supported.", before any item runs.  A wrapper whose batch commands create or accept only parameters of their own type fails as the query method does, with `InvalidCastException`, before the items are sent.  And a wrapper whose batches hold commands of its own runs the items, but a database error at an item is thrown as the driver's own exception, a `PostgresException` or a `SqlException`, not as [`CollectionItemException`](exceptions.md#collection-item-exception), so nothing names the item.  Give the method the driver's connection that the wrapper holds, as for [the query method](query-methods.md#limit-wrapped-connection).
+**What you see.**  On a `DbConnection` that wraps the connection of the driver, a collection method can fail where the query method works.  You see one of these:
+
+- Every collection method throws `NotSupportedException`, "Specified method is not supported.", before any item runs.
+- The method throws `InvalidCastException` before the items are sent, as the query method does.
+- The items run, but a database error at an item is thrown as the exception of the driver, a `PostgresException` or a `SqlException`.  It is not thrown as [`CollectionItemException`](exceptions.md#collection-item-exception), so nothing names the item.
+
+**Why.**  A collection method works fully only on the connection of the driver itself.  Each symptom comes from one kind of wrapper:
+
+- A wrapper that cannot run a batch of commands, as most cannot, gives `NotSupportedException`.
+- A wrapper whose batch commands create or accept only parameters of their own type gives `InvalidCastException`.
+- A wrapper whose batches hold commands of its own gives the error that names no item.
+
+**What to do.**  Give the method the connection of the driver that the wrapper holds, as for [the query method](query-methods.md#limit-wrapped-connection).
