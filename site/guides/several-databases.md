@@ -1,12 +1,14 @@
 # Use several databases
 
+Query a second database from one project, and give the tool two connection strings, one for each database.
+
+**Use this when** the queries of one project run against two or more databases.  Use it too when the files of one folder are written for another kind of database.
+
 <a id="use-several-databases"></a>
 
 ## Use several databases
 
-For several databases of one kind, name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name.  A repository that uses several marks a connection for each, `[SqlSourceConnection(Database = "billing")]`: see [the recipe](#use-several-databases).  For files written for another kind of database, give their folder its own dialect with a `sqlsource.json` of its own, or one file a `-- dialect:` line at its top: see [the recipe](#folder-with-another-dialect).
-
-In a PostgreSQL project (`"dialect": "postgres"` in its `sqlsource.json`), name the logical database of each file, and give the tool a connection for each name:
+This PostgreSQL project sets `"dialect": "postgres"` in its `sqlsource.json`.  Name the logical database of each file with a line such as `-- database: billing` at its top:
 
 ```sql postgres
 -- database: billing
@@ -14,6 +16,8 @@ In a PostgreSQL project (`"dialect": "postgres"` in its `sqlsource.json`), name 
 -- name: ListInvoices
 SELECT id, total FROM invoices;
 ```
+
+The files of `reports` start with `-- database: reports`.  Give the tool a connection for each name.  Then describe the queries:
 
 ```console
 $ export SQLSOURCE_CONNECTION_BILLING="Host=localhost;Database=billing;Username=app;Password=secret"
@@ -23,7 +27,7 @@ billing (postgres): 4 described, 0 skipped, 0 failed
 reports (postgres): 2 described, 0 skipped, 0 failed
 ```
 
-The files of `reports` start with `-- database: reports`.  A repository that claims files of both marks the connection of each:
+A repository that claims files of both databases marks the connection of each:
 
 ```csharp
 [SqlSourceGenerate(Source = ".")]
@@ -32,7 +36,15 @@ public partial class Accounting(
     [SqlSourceConnection(Database = "reports")] NpgsqlDataSource reports);
 ```
 
-Rules: [database](../reference/settings.md#setting-database), [connections](../reference/connections.md#connections), [a repository's connection](../reference/repositories.md#repository-connection).
+**What you get.**  The tool describes the files of each database through the connection of its name.  Its summary has a line for each database.  `Accounting` runs the queries of each database on the data source marked for it.
+
+**The rules you need.**
+
+- **Several databases can share one dialect.**  Here `billing` and `reports` are both `postgres`.  See [database](../reference/settings.md#setting-database).
+- **The variable of a name is `SQLSOURCE_CONNECTION_` and the name in upper case**: `SQLSOURCE_CONNECTION_BILLING` for `billing`.  See [connections](../reference/connections.md#connections).
+- **The build reads the database of each query too.**  It chooses the connection of each repository method by it.  See [database](../reference/settings.md#setting-database).
+- **A repository that uses several databases marks one connection for each**, as `[SqlSourceConnection(Database = "billing")]`.  See [One repository on two databases](#repository-on-two) and [a repository's connection](../reference/repositories.md#repository-connection).
+- **For files written for another kind of database, set their dialect.**  See [Read one folder with another dialect](#folder-with-another-dialect).
 
 <a id="repository-on-two"></a>
 
@@ -101,7 +113,7 @@ SQLSOURCE_CONNECTION_BILLING="Server=localhost,1433;Database=billing;User ID=app
 
 ## Read one folder with another dialect
 
-A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`.  A settings file in that folder gives it its own dialect:
+A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`.  A settings file in that folder sets the dialect of its files:
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -118,7 +130,7 @@ A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`. 
 }
 ```
 
-For one file, a marker in its file header does the same:
+To set the dialect of one file, write a `-- dialect:` marker in its file header:
 
 ```sql mssql
 -- dialect: mssql
@@ -127,7 +139,7 @@ For one file, a marker in its file header does the same:
 SELECT [month], SUM(total) AS total FROM invoices GROUP BY [month];
 ```
 
-The reports are described against SQL Server, as the database `mssql`, beside the database `postgres` of the other files, so the tool needs a connection for each:
+Give the tool a [connection](../reference/connections.md#connections) for each of the two databases, `postgres` and `mssql`:
 
 ```console
 $ export SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password=secret"
@@ -135,9 +147,13 @@ $ export SQLSOURCE_CONNECTION_MSSQL="Server=localhost,1433;Database=reports;User
 $ dotnet sqlsource describe
 ```
 
-Add `"output": "sql"` to `Reporting/sqlsource.json`, or `-- output: sql` to a file, when the reports want their SQL alone: the tool then leaves them out and needs no connection for them.
+**What you get.**  SqlSource reads the files under `Reporting/` as `mssql`, and every other file of the project as `postgres`.  It reads a file with the marker as `mssql` too.  The tool describes the reports against SQL Server, as the database `mssql`, beside the database `postgres` of the other files.
 
-Rules: [configure one folder differently](folders-and-files.md#configure-a-folder), [settings files](../reference/settings-file.md#settings-files), [dialect](../reference/settings.md#setting-dialect), [which place wins](../reference/settings.md#precedence), [connections](../reference/connections.md#connections).
+**The rules you need.**
+
+- **A settings file sets the dialect of the `.sql` files of its folder and of the folders below it.**  See [settings files](../reference/settings-file.md#settings-files) and [configure one folder differently](folders-and-files.md#configure-a-folder).
+- **A `-- dialect:` marker in the file header wins over every settings file.**  See [dialect](../reference/settings.md#setting-dialect) and [which place wins](../reference/settings.md#precedence).
+- **If the reports need only their SQL, set their output to `sql`**, as `"output": "sql"` in `Reporting/sqlsource.json`.  The tool then leaves them out, and needs no connection for them.  See [output](../reference/settings.md#setting-output).
 
 ## If it does not work
 

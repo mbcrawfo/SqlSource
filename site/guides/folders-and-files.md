@@ -1,10 +1,14 @@
 # Give a folder its own settings, or leave files out
 
+Give one folder its own settings, leave a folder of migration scripts out, or write one class for a whole folder.
+
+**Use this when** the `.sql` files of one folder need other settings than the rest of the project.  Use it too when a folder holds `.sql` files that are not queries, such as migration scripts.
+
 <a id="configure-a-folder"></a>
 
 ## Configure one folder differently
 
-A project reads its `.sql` files as PostgreSQL and keeps the comments of its queries.  One folder, `Legacy/`, holds MySQL files, and their queries take token fragments that are sometimes empty, so the folder turns the token check off.  A [settings file](../reference/settings-file.md#settings-files) in a folder gives it its own settings:
+A project reads its `.sql` files as PostgreSQL and keeps the comments of its queries.  One folder, `Legacy/`, holds MySQL files.  Their queries take token fragments that are sometimes empty, so the folder turns the token check off.  A [settings file](../reference/settings-file.md#settings-files) in a folder gives it its own settings:
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -23,21 +27,21 @@ A project reads its `.sql` files as PostgreSQL and keeps the comments of its que
 }
 ```
 
-Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the token check.  Every other file is untouched: it is read as `postgres`, keeps its comments, and checks its tokens.  Three things to notice:
+**What you get.**  SqlSource reads every file under `Legacy/` as `mysql`.  Those files keep their comments and skip the token check.  Every other file is unchanged: SqlSource reads it as `postgres`, and it keeps its comments and checks its tokens.
 
-- The folder's list names only `token-validation=off`.  It adds to the project's list, so the files of `Legacy/` keep their comments without saying so.  A folder that wants none of the project's list starts its own with `default`: `["default", "token-validation=off"]` would give `Legacy/` every default but the token check.
-- The dialect takes the nearest value whole.  Had the project's file set `"mysql,ansi-quotes"` as its dialect, this folder would still be read as plain `mysql`.
-- A file's own markers still win.  A `-- generator:` line in one of the files adds its words to the list of both settings files, and `-- generator: default` drops that list, and a `-- dialect: mariadb` overrides both settings files.  See [which place wins](../reference/settings.md#precedence).
+**The rules you need.**
 
-The file in `Legacy/` applies to the `.sql` files of its subfolders too, `Legacy/Reports/` among them, unless a settings file nearer to them sets the same setting.  Every setting of a query comes from the settings files of its `.sql` file, whichever type claims it, and never from those of a type's C# file.
-
-Only the settings whose row in [the table](../reference/settings.md#all-settings) lists a settings file can be given this way.  To change a setting for one file, write its marker in the file header, which wins over every settings file.
+- **The folder's list of generator parameters adds to the project's list.**  So the files of `Legacy/` keep their comments, though the folder's list names only `token-validation=off`.  See [generator parameters](../reference/generator-parameters.md#setting-generator-parameters).
+- **To drop the project's list, start the folder's list with `default`.**  `["default", "token-validation=off"]` gives `Legacy/` every default but the token check.  See [which place wins](../reference/settings.md#precedence).
+- **The dialect takes the nearest value whole.**  If the project's file sets `"mysql,ansi-quotes"` as its dialect, SqlSource still reads this folder as plain `mysql`.  See [dialect](../reference/settings.md#setting-dialect).
+- **A `-- generator:` line in one of the files adds its words to the list of both settings files.**  A `-- generator: default` line drops that list.  See [which place wins](../reference/settings.md#precedence).
+- **The file in `Legacy/` applies to the `.sql` files of its subfolders too**, such as `Legacy/Reports/`.  It applies there unless a settings file nearer to them sets the same setting.
+- **A settings file can give only the settings whose row in [the table](../reference/settings.md#all-settings) lists a settings file.**
+- **To change a setting for one file, write its marker in the file header.**  The marker wins over every settings file, so a `-- dialect: mariadb` line overrides both of them.  See [which place wins](../reference/settings.md#precedence).
 
 <a id="leave-migration-scripts-out"></a>
 
 ## Leave migration scripts out
-
-A `.sql` file that no `[SqlSourceGenerate]` type claims is not read, so scripts in a folder of their own do no harm.  See [the recipe](#leave-migration-scripts-out) to keep them away from the compiler altogether.
 
 ```text
 App/
@@ -49,7 +53,9 @@ App/
         001_create_users.sql   not claimed by any type
 ```
 
-A `.sql` file that no type claims is not read, so a folder of migration scripts beside your queries does no harm.  To keep the scripts away from the compiler altogether, remove them from the files the package hands it:
+**What you get.**  No type claims `001_create_users.sql`, so SqlSource ignores it.  A folder of migration scripts beside your queries does no harm.
+
+To keep the scripts away from the compiler altogether, remove them from the files that the package hands it:
 
 ```xml
 <ItemGroup>
@@ -57,7 +63,10 @@ A `.sql` file that no type claims is not read, so a folder of migration scripts 
 </ItemGroup>
 ```
 
-Rules: [which files belong to a type](../reference/attributes.md#files-of-a-type), [which `.sql` files are included](../reference/msbuild.md#included-files).
+**The rules you need.**
+
+- **SqlSource ignores a `.sql` file that no `[SqlSourceGenerate]` type claims.**  A type claims the file named for it, or the files that its `Source` names.  See [which files belong to a type](../reference/attributes.md#files-of-a-type).
+- **The package hands every `.sql` file under the project's folder to the compiler.**  An `AdditionalFiles` item with `Remove` takes files out of that list.  See [which `.sql` files are included](../reference/msbuild.md#included-files).
 
 <a id="class-for-a-folder"></a>
 
