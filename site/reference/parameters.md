@@ -213,8 +213,8 @@ Under `mssql`, the opposite can happen too: SqlSource takes a name for a variabl
 
 ### A parameter is missing from the input model after a `DECLARE`
 
-**What you see.**  Under `mssql`, a query parameter that follows a `DECLARE` with no `;` can be missing from the query's input model.
+**What you see.**  Under `mssql`, describing a query stops with [SQLSRC231](../diagnostics.md#sqlsrc231): "SQL Server reads '@id' as a parameter and SqlSource does not".  The query parameter follows a `DECLARE` with no `;`.
 
-**Why.**  SqlSource takes the query parameter for a declared variable.  After a `DECLARE` with no `;`, a statement can start with a word that SqlSource does not know to start a statement, such as `SEND`, or with a label.  That statement does not end the list of declarations.  A query parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the list of query parameters.
+**Why.**  SqlSource takes the query parameter for a declared variable.  After a `DECLARE` with no `;`, a statement can start with a word that SqlSource does not know to start a statement, such as `SEND`, or with a label.  That statement does not end the list of declarations.  A query parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the list of query parameters.  SQL Server reads it as a parameter, so the tool stops when it describes the query.
 
 **What to do.**  End the `DECLARE` with a `;`, or declare the query parameter with its type: `-- param: @id int`.
