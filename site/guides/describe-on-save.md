@@ -39,7 +39,7 @@ Have your editor start `dotnet sqlsource describe --watch` for you, so the sidec
 **The rules you need.**
 
 - The watch that your editor starts follows the rules of [Start the watch](#start-the-watch).  See [describe on save](../reference/describing.md#describe-on-save).
-- Each editor reads a sidecar that the watch writes at its own time, and then shows the new models.  See [what your editor shows](../reference/describing.md#what-your-editor-shows).
+- When the watch writes a sidecar, your editor shows what it holds once the editor reads it again.  When that happens depends on the editor, as [Start the watch](#start-the-watch) says for Rider.  See [what your editor shows](../reference/describing.md#what-your-editor-shows).
 
 <a id="vs-code"></a>
 

@@ -8,7 +8,7 @@ Read a `json` or `jsonb` column as System.Text.Json's `JsonElement`, or as a cla
 
 ## Turn JSON on
 
-Turn System.Text.Json on with `"libraryTypes": { "json": "on" }` in a settings file.  The settings file of the SQL Server example project turns it on, beside NodaTime and NetTopologySuite:
+Turn System.Text.Json on with `"libraryTypes": { "json": "on" }` in a settings file.  The settings file of the SQL Server example project turns it on, beside NodaTime and NetTopologySuite.  Below is a part of that file.  Its type override, above this part, makes every `date` a `DateOnly`:
 
 ```jsonc
   "libraryTypes": {
@@ -21,7 +21,7 @@ Turn System.Text.Json on with `"libraryTypes": { "json": "on" }` in a settings f
   },
 ```
 
-**What you get.**  PostgreSQL's `json` and `jsonb` columns and SQL Server's `json` columns are a `JsonElement` in your query methods.  Until you turn System.Text.Json on, they are a `string`.  The deliveries of [the PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) and [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md), `Methods/DeliveryQueries.sql`, show System.Text.Json in a whole project.
+**What you get.**  PostgreSQL's `json` and `jsonb` columns and SQL Server's `json` columns are a `JsonElement` in your query methods.  Until you turn System.Text.Json on, they are a `string`.  The deliveries of [the PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) and [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md), `Methods/DeliveryQueries.sql`, show System.Text.Json in a whole project.  Both read `details` as a class of the project.  The SQL Server example also turns JSON on, and reads `events` as a `JsonElement`.
 
 **The rules you need.**
 

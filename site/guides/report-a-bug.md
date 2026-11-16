@@ -33,7 +33,7 @@ If a bundle cannot be renamed safely, `diagnose` writes nothing.  Then see [When
 - **`--query` names the `.sql` file, a colon and the name of the query.**  Write the name as the `-- name:` line of the query gives it, letter for letter ([SQLSRC292](../diagnostics.md#sqlsrc292)).
 - **`--out` is required**: the path of the zip.  The mapping is written beside it, with `.mapping.json` added to its name.  A file at either path is overwritten.
 - **Give `--out` a path outside the folder of your project**, such as `../report.zip`.  A build can copy a `.json` file of the folder of the project into its output, and the mapping is such a file.
-- **`diagnose` refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, before it describes anything ([SQLSRC218](../diagnostics.md#sqlsrc218)).
+- **`diagnose` refuses an `--out` path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, before it describes anything ([SQLSRC218](../diagnostics.md#sqlsrc218)).
 - **If the tool refuses the query, `diagnose` makes a bundle too**, which holds the error.  The run prints `sqlsource: the query was refused: SQLSRC226`, with the id of the error, before the line of the bundle.  The exit code is `0`.  The error itself is not printed again, since `describe` showed it to you.
 - **If the database cannot be opened, `diagnose` makes no bundle.**  It prints the error as `describe` prints it, and the exit code is `1`.
 - **An error in another `.sql` file of the project is not printed.**  It does not stop the bundle or change the exit code, since it cannot change the query.  `describe` shows it, and the log holds it.
@@ -77,7 +77,7 @@ $ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zi
 - a bundle that would still hold a text of yours ([SQLSRC293](../diagnostics.md#sqlsrc293));
 - a bundle whose renamed copy no longer gives the answer of your query ([SQLSRC294](../diagnostics.md#sqlsrc294)).
 
-The error in the sample names the text that it found.  That text is yours, such as a name of your schema, so do not paste the error into an issue.
+The error names the text that it found, as `ssn_hash` in the sample.  That text is yours, such as a name of your schema, so do not paste the error into an issue.
 
 Take the private route instead:
 
@@ -99,7 +99,7 @@ sqlsource: this bundle holds your own names and SQL, and must not be posted: ope
 **The rules you need.**
 
 - **`--scrub` renames a raw bundle later**, with no database, no project and no connection.  It uses the same steps and checks as `diagnose` without `--no-obfuscate`.  It writes the renamed bundle and its mapping at `--out`.
-- **`--scrub` takes no other option.**
+- **`--scrub` takes no option but `--out`.**
 - **`--scrub` refuses a bundle that is renamed already** ([SQLSRC295](../diagnostics.md#sqlsrc295)).
 - **`--scrub` refuses a raw bundle that another version made, when this version does not answer it as it was made.**  Scrub it with the version that made it ([SQLSRC290](../diagnostics.md#sqlsrc290), [SQLSRC296](../diagnostics.md#sqlsrc296)).
 
