@@ -1,10 +1,14 @@
 # Use your own types: ids, enums, value objects
 
+Give a column an enum, a strongly typed id, a Vogen type or another type of yours, and avoid `InvalidCastException` with a converter.
+
+**Use this when** a column or a parameter needs a C# type of yours, such as an id type or an enum.  Use it too when two columns of one database type need two C# types.
+
 <a id="type-override"></a>
 
 ## Give a database type a C# type
 
-Each column and parameter of a PostgreSQL query whose output is `models`, `methods` or `repository`, and whose entry in its sidecar is current, gets the C# type that Npgsql reads its database type as, or NodaTime's or NetTopologySuite's in the query methods of a project that references `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and System.Text.Json's where it turns JSON on: see [the PostgreSQL types](../reference/databases/postgresql/types.md#type-map).  Those of a SQL Server query get the C# type that Microsoft.Data.SqlClient reads their database type as, or NodaTime's, NetTopologySuite's or System.Text.Json's in the query methods of a project that turns that library on: see [the SQL Server types](../reference/databases/sqlserver/types.md#types).  A project at the output `models` that references no Microsoft.Data.SqlClient, such as a library that leaves the driver to its application, gets the same types, but for `vector`, which needs the reference: see [which version of Microsoft.Data.SqlClient](../reference/databases/sqlserver/types.md#which-sqlclient).  A few PostgreSQL types follow the version of Npgsql that the project references: Npgsql 10 reads `date`, `time`, `cidr`, `daterange` and `datemultirange` as other types than Npgsql 8 and 9 do, and a project that references no Npgsql gives those types their C# types with the type override, `"date": "System.DateOnly"` and `"time": "System.TimeOnly"` in a settings file's `typeOverrides` for an application on Npgsql 10: see [which version of Npgsql](../reference/databases/postgresql/types.md#which-npgsql).  The type override gives a database type the C# type of your choice instead, for the `.sql` files under a settings file, or in a `.sql` file with `-- type-override:`, and each place changes only the types it names:
+To give every column and parameter of one database type a C# type of your choice, write a type override in a settings file:
 
 ```jsonc
 // sqlsource.json, beside your project file
@@ -18,13 +22,24 @@ Each column and parameter of a PostgreSQL query whose output is `models`, `metho
 }
 ```
 
-Each property of a model has the type its database type maps to, and a query method asks the driver for that type, so it must be one the driver reads, or one that your [converters](../reference/converters.md#converters) convert to and from one it reads; a class of yours in a JSON column is read and sent through System.Text.Json's serializer instead, as [a class in a JSON column](../reference/library-types-and-json.md#json-class) says, and on SQL Server the query methods convert NodaTime's, NetTopologySuite's and System.Text.Json's types themselves, as [SqlSource's own conversions](../reference/converters.md#converters) says.  For the driver's part, see [troubleshooting](troubleshooting.md#invalidcastexception).  An entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  See [type overrides](../reference/type-mapping.md#setting-type-overrides).
+**What you get.**  In the `.sql` files under this settings file, each `timestamptz` column and parameter is a `System.DateTimeOffset`, and each `public.user_status` a `MyApp.UserStatus`.  The other database types keep their C# types.
+
+**The rules you need.**
+
+- **Without a type override, a column or a parameter gets the C# type that the driver reads its database type as.**  In a query method it can get the type of a library instead: NodaTime, NetTopologySuite or System.Text.Json.  On PostgreSQL, NodaTime is on when the project references `Npgsql.NodaTime`, and NetTopologySuite when it references `Npgsql.NetTopologySuite`.  On SQL Server, and for System.Text.Json, a library is on only when you turn it on.  See the types of [PostgreSQL](../reference/databases/postgresql/types.md#type-map) and [SQL Server](../reference/databases/sqlserver/types.md#types), and [library types](../reference/library-types-and-json.md#setting-library-types).
+- **On PostgreSQL, a few C# types follow the version of Npgsql.**  A project that references no Npgsql gives those database types their C# types with a type override.  See [which version of Npgsql](../reference/databases/postgresql/types.md#which-npgsql).
+- **On SQL Server, a project at the output `models` that references no Microsoft.Data.SqlClient gets the C# types of a project that references it, but for `vector`.**  `vector` needs the reference.  See [which version of Microsoft.Data.SqlClient](../reference/databases/sqlserver/types.md#which-sqlclient).
+- **A type override can be in a settings file, for the `.sql` files under it, or in a `.sql` file, with `-- type-override:`.**  Each place changes only the types it names.  See [type overrides](../reference/type-mapping.md#setting-type-overrides).
+- **The C# type must be one that the driver reads, or one that your [converters](../reference/converters.md#converters) convert to and from one that it reads.**  A query method asks the driver for the C# type of each property.  For the error of the driver, see [troubleshooting](troubleshooting.md#invalidcastexception).
+- **A class of yours in a JSON column needs no converters.**  The query methods read and send it through System.Text.Json's serializer.  See [a class in a JSON column](../reference/library-types-and-json.md#json-class).
+- **On SQL Server, the query methods convert the types of NodaTime, NetTopologySuite and System.Text.Json themselves.**  See [SqlSource's own conversions](../reference/converters.md#converters).
+- **An entry that is not written correctly is a build error.**  So is an entry whose key has no schema and is not a type that SqlSource knows.  A C# type that the project cannot find or use is a build error at each query that uses it.  See [type overrides](../reference/type-mapping.md#setting-type-overrides).
 
 <a id="one-column"></a>
 
 ## Give one column or one parameter its own type
 
-Where two columns of one database type need two C# types, `users.id` a `UserId` and `posts.id` a `PostId` though both are `bigint`, map the column a value is read from with `columnTypes` in a settings file, or with `-- column:` in a `.sql` file, and give a parameter its type on its `-- param:` line.  Either wins over the type override:
+Two columns of one database type can need two C# types: `users.id` a `UserId` and `posts.id` a `PostId`, though both are `bigint`.  Map each column with `columnTypes` in a settings file:
 
 ```jsonc
 // sqlsource.json, beside your project file
@@ -38,11 +53,19 @@ Where two columns of one database type need two C# types, `users.id` a `UserId` 
 }
 ```
 
+Give a parameter its type on its `-- param:` line:
+
 ```sql fragment
 -- param: @author -> UserId
 ```
 
-A C# type may be written by its short name, `UserId`, wherever SqlSource takes one, when the project and its references have one type of that name that the project can see; the generated code writes its full name.  See [column types](../reference/model-properties.md#setting-column-types) and [giving a parameter a type](../reference/parameters.md#param-marker).
+**What you get.**  `users.id` is a `UserId` and `posts.id` a `PostId`, in every query that reads them.  The parameter `@author` is a `UserId`.
+
+**The rules you need.**
+
+- **A column type maps the column that a value is read from.**  You can also map it with `-- column:` in a `.sql` file.  See [column types](../reference/model-properties.md#setting-column-types).
+- **A column type and a `-- param:` line each win over the type override.**  See [giving a parameter a type](../reference/parameters.md#param-marker).
+- **You can write a C# type by its short name, `UserId`, wherever SqlSource takes one.**  The project and its references must have one type of that name that the project can see.  The generated code writes its full name.  See [type overrides](../reference/type-mapping.md#setting-type-overrides).
 
 <a id="strongly-typed-id"></a>
 
@@ -85,9 +108,9 @@ GetCustomerDto? customer = await customers.GetCustomer(new GetCustomerParams(cus
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
-The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The other `bigint` columns of the project keep their `long`, and the same entries work on SQL Server.  A computed column, such as `max(customer_id)`, takes the type from a [`-- column:` marker](../reference/model-properties.md#column-marker) inside its query.
+**What you get.**  `GetCustomerDto.Id` and `GetCustomerParams.Id` are a `CustomerId`.  The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them.  The `-- param:` marker gives it to `@id`, which is no column.  The other `bigint` columns of the project keep their `long`.
 
-Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN customer_id AS bigint`, or on SQL Server an alias type, map that type with the type override, and on PostgreSQL declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
+Here is the same query, with the ids as a domain on PostgreSQL.  It maps the domain, and declares `@id` as the domain:
 
 ```sql postgres
 -- name: GetCustomer -> one-optional
@@ -96,7 +119,14 @@ Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN cus
 SELECT id, name FROM customers WHERE id = @id;
 ```
 
-Rules: [column types](../reference/model-properties.md#setting-column-types), [giving a parameter a type](../reference/parameters.md#param-marker), [converters](../reference/converters.md#converters), [type overrides](../reference/type-mapping.md#setting-type-overrides).
+**The rules you need.**
+
+- **A parameter is no column, so it takes its type from its `-- param:` marker.**  See [giving a parameter a type](../reference/parameters.md#param-marker).
+- **The same entries work on SQL Server.**  See [column types](../reference/model-properties.md#setting-column-types).
+- **A computed column, such as `max(customer_id)`, takes its type from a [`-- column:` marker](../reference/model-properties.md#column-marker) inside its query.**
+- **`CustomerId` needs its two converters.**  A column needs the one from the `long` that the driver reads, and a parameter the one back.  See [converters](../reference/converters.md#converters).
+- **If your schema makes the ids a type of their own, map that type with the type override.**  That type is a domain on PostgreSQL, `CREATE DOMAIN customer_id AS bigint`, or an alias type on SQL Server.  See [type overrides](../reference/type-mapping.md#setting-type-overrides).
+- **On PostgreSQL, declare each parameter that is compared with such an id as the domain.**  Otherwise PostgreSQL gives the parameter the base type of the domain, `bigint`.
 
 <a id="vogen"></a>
 
@@ -237,3 +267,5 @@ public enum Priority : byte
 - **`InvalidCastException` for an enum, on PostgreSQL, though your data source calls `MapEnum<T>()`.**  A repository made from a connection string makes connections that have none of the mappings of your data source.  Give the repository your data source.  See [a repository made from a connection string](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository).
 - **`InvalidCastException` for an enum, on SQL Server.**  The enum is not over the type of its column, such as an enum over `int` for a `tinyint`.  Declare it over the type of the column.  See [Reading a row](../reference/databases/sqlserver/query-methods.md#reading-a-row).
 - **SQLSRC279.**  A converter takes or returns another type than the driver reads, such as an `int` for a `bigint`.  Change it to the type that the error names.  See [SQLSRC279](../diagnostics.md#sqlsrc279).
+- **A build error at an entry of a type override, or at a query that uses it.**  The entry is not written correctly, or its key has no schema and names no type that SqlSource knows.  Or the project cannot find or use its C# type.  Correct the entry.  See [type overrides](../reference/type-mapping.md#setting-type-overrides).
+- **On PostgreSQL, a parameter compared with an id over a domain does not get your id type.**  PostgreSQL gives the parameter the base type of the domain.  Declare the parameter as the domain, such as `-- param: @id public.customer_id`.  See [Give an id a type of its own](#strongly-typed-id).

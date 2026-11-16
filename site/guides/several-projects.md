@@ -1,10 +1,14 @@
 # Use SqlSource in several projects
 
+Use `InternalsVisibleTo` between a test project, class libraries and an app that use SqlSource, and catch the exception of a method by its type.
+
+**Use this when** more than one project of a solution uses SqlSource, such as a main project and its test project.  Use it too when two projects need the queries of one `.sql` file.
+
 <a id="test-project-sees-internals"></a>
 
 ## Let a test project see the internals of the main project
 
-Both projects can use SqlSource, and the attributes that each gets do not conflict.  The test project uses the main project's `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException`, so it catches what a method of either project throws by its type.  When the main project uses the exceptions of a shared project, the shared project grants `InternalsVisibleTo` to the test project too.  See [the recipe](#test-project-sees-internals), and [the other recipe](#share-the-exceptions) for an app that sees two data projects.
+The main project grants `InternalsVisibleTo` to its test project:
 
 ```xml
 <!-- App.csproj -->
@@ -12,6 +16,8 @@ Both projects can use SqlSource, and the attributes that each gets do not confli
     <InternalsVisibleTo Include="App.Tests" />
 </ItemGroup>
 ```
+
+The test project can use SqlSource too:
 
 ```csharp
 // App.Tests, which references the SqlSource package too, with "output": "methods" in the sqlsource.json of
@@ -22,14 +28,19 @@ using SqlSource;
 internal static partial class TestQueries;
 ```
 
+It catches by its type the exception that a method of App throws:
+
 ```csharp
 // App.Tests catches the exception that a method of App throws by its type
 await Should.ThrowAsync<UnexpectedRowCountException>(() => users.GetActiveUser(new GetActiveUserParams(email)));
 ```
 
-The test project uses App's `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException`, whether it uses SqlSource or not, and the attributes of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
+**What you get.**  The test project uses App's `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException`, whether it uses SqlSource or not.  So it catches by its type what a method of either project throws.  The attributes that each project gets do not conflict.
 
-Rules: [projects that share internals](../reference/exceptions.md#projects-that-share-internals).
+**The rules you need.**
+
+- **A project that sees the exceptions in a project it references gets none of its own.**  Its query methods throw the exceptions of the other project.  See [projects that share internals](../reference/exceptions.md#projects-that-share-internals).
+- **If App uses the exceptions of a shared project, the shared project grants `InternalsVisibleTo` to App.Tests too.**  See [the shared project of an app that sees two data projects](#share-the-exceptions).
 
 <a id="share-the-exceptions"></a>
 
@@ -67,9 +78,16 @@ catch (UnexpectedRowCountException exception)
 }
 ```
 
-Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](../diagnostics.md#sqlsrc022).  Data.Shared targets .NET 6 or later, or adds such a target to its `TargetFrameworks`, so that its `CollectionItemException` passes on `SqlState`, `IsTransient` and `BatchCommand`; on `netstandard2.0` or `netstandard2.1` alone, a data project gets [SQLSRC038](../diagnostics.md#sqlsrc038).
+**What you get.**  Each data project uses the exceptions of Data.Shared instead of writing its own.  So the app sees one copy, and catches by its type what a method of either data project throws.
 
-Rules: [projects that share internals](../reference/exceptions.md#projects-that-share-internals), [SQLSRC022](../diagnostics.md#sqlsrc022), [SQLSRC038](../diagnostics.md#sqlsrc038).
+**The rules you need.**
+
+- **Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions.**
+- **Grant `InternalsVisibleTo` from Data.Shared to every project that uses SqlSource and sees the internals of a data project.**  The test projects of the data projects are among them.
+- **A project that uses SqlSource and does not see the copy of Data.Shared gets its own copy.**  Its `catch` compiles, but misses what a data project throws.
+- **Without the shared project, an app that uses SqlSource and sees the internals of both data projects gets [SQLSRC022](../diagnostics.md#sqlsrc022).**  See [projects that share internals](../reference/exceptions.md#projects-that-share-internals).
+- **Data.Shared must target .NET 6 or later, or add such a target to its `TargetFrameworks`.**  On `netstandard2.0` or `netstandard2.1` alone, a data project gets [SQLSRC038](../diagnostics.md#sqlsrc038).
+- **On .NET 6 or later, the `CollectionItemException` of Data.Shared passes on `SqlState`, `IsTransient` and `BatchCommand`.**
 
 <a id="one-file-two-projects"></a>
 
@@ -128,3 +146,6 @@ $ dotnet sqlsource describe App.slnx
 - **SQLSRC004 in the second project.**  The project does not list the `.sql` file.  Add it as an `AdditionalFiles` item.  See [SQLSRC004](../diagnostics.md#sqlsrc004).
 - **SQLSRC241 in the second project, and the sidecar has the entry.**  The project does not list the sidecar.  Add it as an `AdditionalFiles` item.  See [SQLSRC241](../diagnostics.md#sqlsrc241).
 - **SQLSRC241 in one project after a run on the other.**  The two projects read different settings for the file.  Describe the whole solution in one run.  See [a file in two projects](../reference/sidecars.md#limit-file-in-two-projects).
+- **SQLSRC022 in the app.**  Put the exceptions in a shared project, as [Share the exceptions between two data projects and an app](#share-the-exceptions) shows.  See [SQLSRC022](../diagnostics.md#sqlsrc022).
+- **SQLSRC038 in a data project.**  Add a target of .NET 6 or later to Data.Shared.  See [SQLSRC038](../diagnostics.md#sqlsrc038).
+- **A `catch` compiles, but misses what a data project throws.**  Grant the project `InternalsVisibleTo` from Data.Shared.  See [Share the exceptions between two data projects and an app](#share-the-exceptions).

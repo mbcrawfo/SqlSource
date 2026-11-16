@@ -1,10 +1,52 @@
 # Pass a list of values (IN)
 
+Pass an array or a list to an `IN` clause, make it an optional filter, or send it as one array with `ANY` on PostgreSQL.
+
+**Use this when** a query must find the rows whose column matches one of several values that your code holds.  Use it too when the list can be null or empty, or can hold thousands of values.
+
 <a id="list-after-in"></a>
 
 ## Pass a list after IN
 
-Write the parameter directly after `IN`, with no parentheses, `WHERE id IN @ids`.  Its property in the input model is an `IEnumerable<int>`, which takes an array, a `List<int>` or any other sequence, and the query method sends a parameter for each value, on PostgreSQL and on SQL Server.  `(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.  See [the recipe](#filter-by-a-list) and [list parameters](../reference/parameters.md#list-parameters).
+The [PostgreSQL example project](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) writes this query in `Methods/OrderQueries.sql`:
+
+```sql postgres
+-- name: ListOrdersByStatuses -> many
+-- summary: The orders in any of the given statuses, or every order when the list is null, newest first.
+-- member-location: class
+-- visibility: public
+SELECT id, status, placed_at
+FROM orders
+WHERE (@statuses IS NULL OR status IN @statuses)
+ORDER BY placed_at DESC;
+```
+
+Its class, in `Methods/OrderQueries.cs`, passes an array:
+
+```csharp
+    // A method of your own that passes a list: ListOrdersByStatusesParams.Statuses is an IEnumerable<string>?, which
+    // takes this array, a List<string> or any other sequence, and the method sends one parameter for each value.  See
+    // site/reference/parameters.md#list-parameters.
+    public static Task<ListOrdersByStatusesDto[]> ListOrdersNotCancelledAsync(
+        DbConnection connection,
+        CancellationToken cancellationToken = default
+    )
+    {
+        string[] notCancelled = ["pending", "shipped"];
+        return ListOrdersByStatusesAsync(
+            connection,
+            new ListOrdersByStatusesParams(notCancelled),
+            cancellationToken: cancellationToken
+        );
+    }
+```
+
+**What you get.**  `ListOrdersByStatusesParams.Statuses` is an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The query method sends a parameter for each value, on PostgreSQL and on SQL Server.  The test `@statuses IS NULL` makes the filter optional, as [Filter by an optional list of values](#filter-by-a-list) shows.  In the example, the folder sets the [output](../reference/settings.md#setting-output) `methods`, and the file header turns on [`async-method-suffix`](naming-and-placement.md#async-names).  The query's `-- member-location: class` puts the method on its class.  So the method is `OrderQueries.ListOrdersByStatusesAsync`, and takes the connection first.
+
+**The rules you need.**
+
+- **Write the parameter directly after `IN`, with no parentheses: `WHERE id IN @ids`.**  See [list parameters](../reference/parameters.md#list-parameters).
+- **The property of a list in the input model is an `IEnumerable<T>`**, such as an `IEnumerable<int>` for `int` values.  See [list parameters](../reference/parameters.md#list-parameters).
 
 <a id="filter-by-a-list"></a>
 
@@ -24,9 +66,13 @@ var shown = await orders.ListOrdersByStatuses(new ListOrdersByStatusesParams(not
 var everyOrder = await orders.ListOrdersByStatuses(new ListOrdersByStatusesParams(null));
 ```
 
-`@statuses`, written after `IN` with no parentheses, is a list, and `ListOrdersByStatusesParams.Statuses` an `IEnumerable<string>?`, which takes an array, a `List<string>` or any other sequence.  The method sends a parameter for each status.  A null list returns every order, by the test `@statuses IS NULL`, and an empty one returns none.  The same query runs on SQL Server as it is.  On PostgreSQL, `status = ANY(@statuses)` sends the list as one array instead.
+**What you get.**  `shown` holds the orders whose status is `pending` or `shipped`.  `everyOrder` holds every order, since the test `@statuses IS NULL` is true for a null list.  An empty list returns no order.
 
-Rules: [list parameters](../reference/parameters.md#list-parameters), [array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
+**The rules you need.**
+
+- **`(@ids IS NULL OR id IN @ids)` makes the filter optional, and a null list then keeps every row.**  See [Large and empty lists](#large-and-empty-lists) and [list parameters](../reference/parameters.md#list-parameters).
+- **The same query runs on SQL Server as it is.**  See [Lists on SQL Server](../reference/databases/sqlserver/query-methods.md#list-parameters).
+- **To send the list as one array on PostgreSQL**, see [On PostgreSQL: one array with ANY](#postgresql-arrays) and [array parameters](../reference/databases/postgresql/query-methods.md#array-parameters).
 
 <a id="postgresql-arrays"></a>
 
