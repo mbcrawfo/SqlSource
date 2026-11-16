@@ -33,24 +33,50 @@ namespace App
 GetUserDto? user = await connection.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](settings.md#setting-output) is `methods` gets a method that takes the connection to run on, for code that manages its connections, its transactions and its timeouts itself.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, and leaves a connection that was open as it was.
+A query whose [output](settings.md#setting-output) is `methods` gets a method that takes the connection to run on.  The output `methods` is for your own code structures, above all a transaction or a timeout that your code controls.  Your code manages its connections, its transactions and its timeouts itself, and gives each to the method.  In the sample, a `public` type `App.UserRepository` claims `UserRepository.sql`.
+
+The method takes the connection and the input model of the query.  Then it does these things, in this order:
+
+1. It opens the connection, if the connection is closed.
+2. It sends each parameter.
+3. It runs the query.
+4. It reads the row into the output model.
+
+If the connection was open, the method leaves it as it was.
 
 <a id="method-location"></a>
 
 ## Where the methods go
 
-A `methods` method goes where its query's [member location](members.md#setting-member-location) says, with its [visibility](members.md#setting-visibility).  Without either, it is an `internal` extension method of `DbConnection`, called on the connection as `connection.GetUser(...)`, in a generated `static partial class` named after the type with `Extensions` after it, `UserRepositoryExtensions` for `UserRepository`.
+By default, the method `GetUser` of `UserRepository` is an `internal` extension method of `DbConnection`, in the class `UserRepositoryExtensions`.  You call it on the connection: `connection.GetUser(...)`.
 
-- **The extension class is in the type's namespace**, not nested in the types around the type, and is named after the type's own name alone: `Outer.Queries<T>` gives `QueriesExtensions`.  Code in another namespace calls the methods with a `using` of that namespace.
-- **It is `public` when one of the type's methods in it is**, as `-- visibility: public` asks and a type that is `public` with every type around it allows, and `internal` otherwise.  Each method keeps its own visibility in it.
-- **Two types whose classes have one name in one namespace share it**, as two types `Queries` nested in two types of one namespace do, when the class is `public` for both or `internal` for both.  When it is not, or when a type of your project or a model has the class's full name, the type gets none of its methods there: [SQLSRC276](../diagnostics.md#sqlsrc276).
-- **A method there is not named like a member of `DbConnection` or `object`**, such as `Open` or `ToString`, which a call on a connection would find instead, nor like the class itself ([SQLSRC274](../diagnostics.md#sqlsrc274)).
+A method that takes a connection goes where the [member location](members.md#setting-member-location) of its query says.  It has the [visibility](members.md#setting-visibility) of its query.  If the query sets neither, the method is an `internal` extension method of `DbConnection`.  It is in a generated `static partial class` with the name of the type and `Extensions` after it.
 
-Under `class`, the methods are static methods of the type itself, which take the connection as their first argument: `UserRepository.GetUser(connection, ...)`.  A method is then not named like a member of the type, the type itself or one of its type parameters, nor like a constant or token method that another query puts on the type, nor like a nested class of the type's queries ([SQLSRC274](../diagnostics.md#sqlsrc274)).
+- **The extension class is in the namespace of the type.**  It is not nested in the types around the type.  Code in another namespace calls the methods with a `using` of that namespace.
+- **The extension class is named after the name of the type alone.**  `Outer.Queries<T>` gives `QueriesExtensions`.
+- **The extension class is `public` when one of the methods of the type in it is `public`.**  A method is `public` when `-- visibility: public` asks for it, and the type and every type around it are `public`.  Otherwise the class is `internal`.  Each method keeps its own visibility in the class.
+- **Two types share one extension class when their classes have one name in one namespace.**  An example is two types `Queries`, nested in two types of one namespace.  They share it only when the class is `public` for both or `internal` for both.
+- **A type gets none of its methods in an extension class that cannot be written** ([SQLSRC276](../diagnostics.md#sqlsrc276)).  This is so when two types that share the class give it two visibilities.  It is also so when a type of your project, or a model, has the full name of the class.
+- **A method in the extension class cannot have the name of a member of `DbConnection` or `object`** ([SQLSRC274](../diagnostics.md#sqlsrc274)).  A call on a connection would find a member such as `Open` or `ToString` instead of the method.
+- **A method in the extension class cannot have the name of the class itself** ([SQLSRC274](../diagnostics.md#sqlsrc274)).
 
-Under `nested-class`, the methods are public static methods of the nested class, which take the connection as their first argument, since a nested class cannot hold extension methods: `Sql.GetUser(connection, ...)` in the type's code, and `UserRepository.Sql.GetUser(connection, ...)` outside it when the class is `public` or `internal`.  A method is then not named like a constant or token method that another query of the type, in any of its files, puts in that class ([SQLSRC274](../diagnostics.md#sqlsrc274)), nor like the class ([SQLSRC009](../diagnostics.md#sqlsrc009)).
+Under the member location `class`, each method is a static method of the type itself.  It takes the connection as its first argument: `UserRepository.GetUser(connection, ...)`.  The method cannot have the name of one of these ([SQLSRC274](../diagnostics.md#sqlsrc274)):
 
-Two methods of one name in one class, as those of a query `Get` under `async-method-suffix` and a query `GetAsync` without it, or of a query `Get` under `method-type=both` and a query `GetAsync`, are SQLSRC274, and so are two methods of one name and one list of arguments in two extension classes of one namespace, which a call could not tell apart.  A type's methods, wherever they go, are in a file of their own among the generated files, named after the type's full name, `App.UserRepository-Methods.g.cs`.
+- a member of the type, the type itself, or one of its type parameters;
+- a constant or a token method that another query puts on the type;
+- a nested class of the queries of the type.
+
+Under the member location `nested-class`, each method is a public static method of the nested class.  A nested class cannot hold extension methods, so the method takes the connection as its first argument.  In the code of the type, the call is `Sql.GetUser(connection, ...)`.  When the class is `public` or `internal`, code outside the type calls `UserRepository.Sql.GetUser(connection, ...)`.  The method cannot have the name of one of these:
+
+- a constant or a token method that another query of the type, in any of its files, puts in that class ([SQLSRC274](../diagnostics.md#sqlsrc274));
+- the class ([SQLSRC009](../diagnostics.md#sqlsrc009)).
+
+Two methods are [SQLSRC274](../diagnostics.md#sqlsrc274) in one of these cases:
+
+- They have one name in one class.  Examples are a query `Get` under `async-method-suffix` and a query `GetAsync` without it, or a query `Get` under `method-type=both` and a query `GetAsync`.
+- They have one name and one list of arguments, in two extension classes of one namespace.  A call could not tell them apart.
+
+Wherever the methods of a type go, they are in a generated file of their own.  The file is named after the full name of the type: `App.UserRepository-Methods.g.cs`.
 
 <a id="method-signature"></a>
 
@@ -66,7 +92,7 @@ internal static async Task<ListFromDto[]> ListFrom(
     CancellationToken cancellationToken = default)
 ```
 
-The method has the name of the query, with `Async` after it under the [generator parameter](generator-parameters.md#setting-generator-parameters) `async-method-suffix`: `ListFromAsync`.  A [synchronous method](query-methods.md#synchronous-methods) has the query's name alone, and beside one, under `method-type=both`, the asynchronous method always has `Async` after it.  Its arguments, in this order:
+A method that takes a connection has the name of its query: `ListFrom`.  Under the [generator parameter](generator-parameters.md#setting-generator-parameters) `async-method-suffix`, the name has `Async` after it: `ListFromAsync`.  A [synchronous method](query-methods.md#synchronous-methods) has the name of the query alone.  Under `method-type=both`, the asynchronous method beside it always has `Async` after its name.  The method takes these arguments, in this order:
 
 | Argument | What it is |
 |----|----|
@@ -77,14 +103,31 @@ The method has the name of the query, with `Async` after it under the [generator
 | `commandTimeout` | The command's timeout in seconds, or null for the driver's |
 | `cancellationToken` | Cancels opening the connection, running the query and reading its rows.  What each driver throws then is on the pages of [PostgreSQL](databases/postgresql/query-methods.md#method-results) and [SQL Server](databases/sqlserver/query-methods.md#method-results) |
 
-The method of a query with tokens raises no CA2100 ("Review SQL queries for security vulnerabilities") in your build, though it runs SQL made with their text: that text is your own code's choice, never a user's, as [tokens](tokens.md#tokens) says.  Nor does the method of a query with a [list parameter](parameters.md#list-parameters), whose SQL is the query's own with a parameter for each value.
+- **The method of a query with tokens raises no CA2100 ("Review SQL queries for security vulnerabilities") in your build.**  The method runs SQL made with the text of the tokens.  That text is the choice of your own code, never of a user, as [tokens](tokens.md#tokens) says.
+- **The method of a query with a [list parameter](parameters.md#list-parameters) raises no CA2100 either.**  Its SQL is the SQL of the query, with a parameter for each value.
+- **If `connection` or `parameters` is null, the method throws `ArgumentNullException`.**
+- **If its query would send more parameters than its database takes, a method with a list parameter throws `ArgumentException`.**  See [list parameters](parameters.md#list-limit).
+- **If a list changed after the method counted it, a method with a list parameter throws `InvalidOperationException`.**  See [list parameters](parameters.md#list-limit).
+- **A token cannot have the name of an argument that a query method can have** ([SQLSRC275](../diagnostics.md#sqlsrc275)).  These names are `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.
 
-A null `connection` or `parameters` throws `ArgumentNullException`.  A method with a list parameter throws `ArgumentException` when its query would send more parameters than its database takes, and `InvalidOperationException` when a list changed after the method counted it, as [list parameters](parameters.md#list-limit) say.  The names of the arguments a query method can have, `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`, are not names a token can have ([SQLSRC275](../diagnostics.md#sqlsrc275)).  What the method returns depends on the query's result shape, as [what each shape returns](return-types.md#method-shapes) says.
+What the method returns depends on the result shape of the query: see [what each shape returns](return-types.md#method-shapes).
 
 <a id="method-connection"></a>
 
 ## The connection
 
-The method opens the connection when its `State` is `Closed`, and closes it again before it returns or throws.  A method that [streams its rows](return-types.md#streaming-rows) opens it when the loop asks for the first row, and closes it again when the loop ends, and the connection is busy with the query until then, so the loop's body cannot run another command on it, on PostgreSQL or on a SQL Server connection without `MultipleActiveResultSets`.  A connection that was not closed is left as it was: it stays open, in the transaction and with the session's settings it had, unless, on SQL Server, an error that the method does not report rolls the transaction back, as [what a method reads and throws](databases/sqlserver/query-methods.md#method-results) says.  So to run several queries on one open connection, or in a transaction, open the connection yourself.
+A method that takes a connection opens the connection only when it is closed.  To run several queries on one open connection, or in a transaction, open the connection yourself.
 
-**Give the method the transaction.**  The method gives its command the `transaction` it is given, or none when it is given null.  On SQL Server, Microsoft.Data.SqlClient refuses a command on a connection that has a transaction the command was not given, and throws `InvalidOperationException` ("... requires the command to have a transaction when the connection assigned to the command is in a pending local transaction ...") before anything is sent.  Npgsql runs such a command in the connection's transaction.  A SQL Server method given a Microsoft.Data.SqlClient transaction that has completed, committed or rolled back, throws `InvalidOperationException` and runs nothing, where Microsoft.Data.SqlClient would run its command outside any transaction: see [what a method reads and throws](databases/sqlserver/query-methods.md#method-results).  Pass the transaction to every method you call inside one, on both: see [the recipe](../start/transactions.md#queries-in-a-transaction).
+- **If the `State` of the connection is `Closed`, the method opens the connection, and closes it again.**  It closes the connection before it returns or throws.
+- **If the connection was not closed, the method leaves it as it was.**  It stays open, in its transaction and with its session settings, unless an error rolls the transaction back on SQL Server.  The method does not report that error: see [what a method reads and throws](databases/sqlserver/query-methods.md#method-results).
+- **A method that [streams its rows](return-types.md#streaming-rows) opens a closed connection when the loop asks for the first row.**  It closes the connection again when the loop ends.
+- **While the loop of a streaming method runs, the connection is busy with the query.**  So the body of the loop cannot run another command on it.  This is so on PostgreSQL, and on a SQL Server connection without `MultipleActiveResultSets`.
+
+**Give the method the transaction.**  Pass the transaction to every method that you call inside it, on both databases: see [the recipe](../start/transactions.md#queries-in-a-transaction).  The method gives its command the `transaction` it is given.  If it is given null, the command gets no transaction.
+
+If a command was not given the transaction of its connection, each driver does a different thing:
+
+- **On SQL Server, Microsoft.Data.SqlClient refuses the command.**  It throws `InvalidOperationException` ("... requires the command to have a transaction when the connection assigned to the command is in a pending local transaction ...") before anything is sent.
+- **On PostgreSQL, Npgsql runs the command in the transaction of the connection.**
+
+On SQL Server, a completed transaction is one that was committed or rolled back.  If a method is given a completed Microsoft.Data.SqlClient transaction, it throws `InvalidOperationException` and runs nothing.  Microsoft.Data.SqlClient alone would run the command outside any transaction.  See [what a method reads and throws](databases/sqlserver/query-methods.md#method-results).
