@@ -1,4 +1,4 @@
-# base db3285d4adf7542f6e80e96d7f0b8182cd091a9f
+# base d243af81648beffc6884efd59b17ccb48b009e34
 # Words (wc -w) of the range, from ## SQLSRC261 to the end of the file: 11,206 at the base and 12,256 after (10,565 at the baseline 28e20e3c, before phase 2's lines).
 unit	disposition	to	arg	words	note
 site/diagnostics.md:2972-2985	move	site/diagnostics.md#sqlsrc261	fact	-	In the one shape; Fix as two alternatives, rename or remove, and the two forms of the renamed entry after it; where and what it costs as its own paragraph; the type named with _ as a note; outputs repository first
@@ -40,7 +40,7 @@ site/diagnostics.md:3642-3655	move	site/diagnostics.md#sqlsrc296	fact	-	In the o
 site/diagnostics.md:3656-3669	move	site/diagnostics.md#sqlsrc297	fact	-	In the one shape; `postgres`, `on`, `off` 1>2: the step names on and off, and the sentence before the list names the dialect whose levels it holds, the one that gets this error.  Numeral 1: the numbered step; the values as a list
 site/diagnostics.md:3670-3683	move	site/diagnostics.md#sqlsrc298	fact	-	In the one shape; Fix as three alternatives; the other shapes as a note
 site/diagnostics.md:3684-3707	move	site/diagnostics.md#sqlsrc299	fact	-	In the one shape; Fix as two alternatives; what it costs under both and sync as a paragraph before the samples, and a sentence names the csharp block; the query under async as a note
-@site/diagnostics.md:3487	move	site/diagnostics.md#sqlsrc284	fact	-	Phase 2's paragraph, kept but for its list of outputs, now `repository`, `methods` or `models`, as section 7 of the rewrite guide asks
+@site/diagnostics.md:3923	move	site/diagnostics.md#sqlsrc284	fact	-	Phase 2's paragraph, kept but for its list of outputs, now `repository`, `methods` or `models`, as section 7 of the rewrite guide asks
 -	new	site/diagnostics.md#sqlsrc267	site/reference/databases/index.md#supported-versions	-	The first link of See:, Supported versions, the table of the minimum that the error enforces (map section 5, brief)
 -	new	site/diagnostics.md#sqlsrc293	site/reference/bundles.md#diagnose	-	The first link of See:, Making a bundle with `diagnose`, which documents --no-obfuscate and --scrub (brief)
 -	new	site/diagnostics.md#sqlsrc294	site/reference/bundles.md#diagnose	-	The first link of See:, Making a bundle with `diagnose`, which documents --no-obfuscate and --scrub (brief)
