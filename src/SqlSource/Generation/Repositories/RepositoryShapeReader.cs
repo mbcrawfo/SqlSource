@@ -52,6 +52,8 @@ internal static class RepositoryShapeReader
                             out heldParameters,
                             token
                         ),
+                    EquatableArray<ConnectionCandidate>.Empty,
+                    EquatableArray<ConnectionCandidate>.Empty,
                     heldParameters,
                     interfaceOn,
                     interfaceName,

@@ -7,7 +7,10 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="Member">
 /// What kind of member it is: a method, a connection string's included, is called, and anything else read.
 /// </param>
-/// <param name="MemberName">The member's name, as a value: without the <c>@</c> of an escaped keyword.</param>
+/// <param name="MemberName">
+/// The candidate's <see cref="ConnectionCandidate.DisplayName" />: its name as a value, without the <c>@</c> of an
+/// escaped keyword, after the holder's or the type's for a held or a global one.
+/// </param>
 /// <param name="AccessText">
 /// The member as a method of the type reaches it, without the call of a method: <c>this.X</c> for an instance member,
 /// <c>X</c> for a primary-constructor parameter, and the type's name as its own code writes it, with its type
@@ -28,6 +31,11 @@ namespace SqlSource.Generation.Repositories;
 /// Whether the repository is a struct, whose local functions reach neither <c>this</c> nor a primary-constructor
 /// parameter, so that a streaming method reads the source before its iterator.
 /// </param>
+/// <param name="HolderAccessText">
+/// The holder as a method of the type reaches it, for a held candidate, which <paramref name="AccessText" /> is then
+/// reached from; else null.
+/// </param>
+/// <param name="HolderName">The holder's name, as a value, for a held candidate; else null.</param>
 internal sealed record ConnectionSource(
     ConnectionSourceKind Kind,
     CandidateMember Member,
@@ -37,5 +45,7 @@ internal sealed record ConnectionSource(
     bool TakesCancellationToken,
     string? LeadingName,
     string TypeName,
-    bool InStruct
+    bool InStruct,
+    string? HolderAccessText = null,
+    string? HolderName = null
 );

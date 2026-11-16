@@ -720,7 +720,7 @@ public sealed class ConnectionResolverTests
         ConnectionResolver.Resolve(TestModels.Type(), Shape(candidates), needed);
 
     private static RepositoryShape Shape(params ConnectionCandidate[] candidates) =>
-        new("App.UserRepository", TestSidecars.Of(candidates), [], true, "IUserRepository", null);
+        new("App.UserRepository", TestSidecars.Of(candidates), [], [], [], true, "IUserRepository", null);
 
     // A candidate declared at a place of its own in the type's file, a field of a string unless the test says
     // otherwise.

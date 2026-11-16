@@ -24,6 +24,15 @@ namespace SqlSource.Generation.Repositories;
 /// <param name="Location">
 /// Where the member is declared, or where the type's attribute is for a member of a base type in metadata.
 /// </param>
+/// <param name="Tier">
+/// Where the candidate is found: in the repository, in a holder it holds, or anywhere in the project.
+/// </param>
+/// <param name="Holder">
+/// The member of the repository that holds the candidate's object, for a held candidate; else null.
+/// </param>
+/// <param name="GlobalTypeText">
+/// The fully qualified type that declares a global candidate, such as <c>global::App.Outer.Db</c>; else null.
+/// </param>
 internal sealed record ConnectionCandidate(
     string Name,
     CandidateMember Member,
@@ -35,5 +44,28 @@ internal sealed record ConnectionCandidate(
     bool IsMarked,
     string? Database,
     string DeclaredTypeName,
-    LocationInfo Location
-);
+    LocationInfo Location,
+    CandidateTier Tier = CandidateTier.Own,
+    CandidateHolder? Holder = null,
+    string? GlobalTypeText = null
+)
+{
+    /// <summary>
+    /// The name that a message gives the candidate: its own for an own one, the holder's then a dot then its own for a
+    /// held one, and the declaring type's simple name then a dot then its own for a global one.
+    /// </summary>
+    public string DisplayName =>
+        Tier switch
+        {
+            CandidateTier.Own => Name,
+            CandidateTier.Held when Holder is not null => Holder.Name + "." + Name,
+            CandidateTier.Global when GlobalTypeText is not null => SimpleNameOf(GlobalTypeText) + "." + Name,
+            _ => Name,
+        };
+
+    private static string SimpleNameOf(string typeText)
+    {
+        var dot = typeText.LastIndexOf('.');
+        return dot < 0 ? typeText : typeText.Substring(dot + 1);
+    }
+}

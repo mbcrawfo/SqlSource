@@ -405,7 +405,7 @@ internal static class ConnectionResolver
             new(
                 KindOf(candidate.Type),
                 candidate.Member,
-                candidate.Name,
+                candidate.DisplayName,
                 AccessTextOf(candidate),
                 candidate.IsAsync,
                 candidate.TakesCancellationToken,
