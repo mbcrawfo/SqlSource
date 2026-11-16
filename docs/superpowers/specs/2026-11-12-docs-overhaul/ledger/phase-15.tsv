@@ -1,4 +1,4 @@
-# base db3285d4adf7542f6e80e96d7f0b8182cd091a9f
+# base c338a501de2b1557d9a32d4c6650fa3c9ac15845
 # words: site/reference/type-mapping.md 3220 > 3712 (over 3,500; its cut for phase 25 is between #property-types, 499 words, and #setting-type-overrides); site/reference/library-types-and-json.md 2538 > 2864; site/reference/converters.md 1926 > 2143; phase 7684 > 8719
 unit	disposition	to	arg	words	note
 site/generator.md:385	move	site/reference/type-mapping.md#property-types	-	-	The heading reworded to the map's words, "How a C# type is chosen" (content map section 3); no file outside site/ quotes "Property types"
