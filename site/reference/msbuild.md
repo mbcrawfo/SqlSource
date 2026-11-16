@@ -97,7 +97,7 @@ Some builds use the committed sidecars, as a build without the tool does.  These
 
   If nothing changed after the last run, the build does not start the tool.  A change to the schema changes none of these: run `describe --force`, as [after a schema change](describing.md#after-a-schema-change) says.
 - **The tool describes the whole project**, as `describe` with no path does.  It writes the sidecar of each file whose queries changed, and deletes a sidecar that no query needs any more.  The same build compiles with what the tool wrote, and this includes a sidecar that the tool wrote for the first time.
-- **Apart from a sidecar written for the first time, a build compiles only the sidecars that your project lists.**  A build offline or in CI does the same.  So a project that [lists its own files](#included-files) must list their sidecars too, and so must a project with a `.sql` file from outside its folder.  If the project leaves out a sidecar, the next build reports [SQLSRC241](../diagnostics.md#sqlsrc241) for the queries of that sidecar, as CI would.
+- **Apart from a sidecar written for the first time, a build compiles only the sidecars that your project lists.**  A build offline or in CI does the same.  So a project that [lists its own files](#included-files) must list their sidecars too.  A project with a `.sql` file from outside its folder must also list the sidecar of that file.  If the project leaves out a sidecar, the next build reports [SQLSRC241](../diagnostics.md#sqlsrc241) for the queries of that sidecar, as CI would.
 - **The tool reads the `.env` in the project's folder, or the one that `SqlSourceEnvFile` names.**  This is true in a build of a solution too.  Unless `SqlSourceEnvFile` names one, the tool never reads a `.env` in a folder above the project's folder.
 - **The tool gets the environment of the build.**  So a connection variable that your IDE sets reaches the tool.
 - **The tool must be installed** in the tool manifest of the repository and restored, at the version of the `SqlSource` package.  [Install the tool](cli.md#install-the-tool) says how.
@@ -127,7 +127,12 @@ Some builds use the committed sidecars, as a build without the tool does.  These
 - **While one of these errors is in the project, the tool deletes no sidecar.**  The tool also writes no sidecar for a `.sql` file that does not parse.  So the generator can then report the queries of that file as having no entry, [SQLSRC241](../diagnostics.md#sqlsrc241).
 - **A database that cannot be opened is [SQLSRC224](../diagnostics.md#sqlsrc224)**, and fails the build.  Its `help:` line says how to build without the database: remove its connection, or set `SqlSourceOnline` to `false`.
 
-**Several target frameworks.**  The tool runs once in a build, for the first framework that `TargetFrameworks` lists.  This is the framework that `describe` reads.  Every framework compiles with the sidecars that the tool wrote.  A build of another framework alone still runs the tool, for the first framework: a build with `-f`, or a build through a reference from a project of that framework.  A query that only another framework claims is not described: see [a limit](describing.md#limit-several-target-frameworks).
+**Several target frameworks.**  The tool runs once in a build, for the first framework that `TargetFrameworks` lists.  This is the framework that `describe` reads.  Every framework compiles with the sidecars that the tool wrote.  A build of another framework alone still runs the tool, for the first framework.  Each of these is such a build:
+
+- a build with `-f`;
+- a build through a reference from a project of that framework.
+
+A query that only another framework claims is not described: see [a limit](describing.md#limit-several-target-frameworks).
 
 **In CI**, a build never runs the tool, whatever `SqlSourceOnline` says: see [running the tool in the build](#online-build).  Describe in a step of its own, with `describe --check`: see [check in CI](describing.md#check-in-ci).
 
@@ -135,7 +140,7 @@ Some builds use the committed sidecars, as a build without the tool does.  These
 
 **Logs.**  You cannot give `--log` to the run of the build, and a failed build does not suggest it.  To get a log, set the variable `SQLSOURCE_LOG` to any value.  Then each build that runs the tool writes the log of its run to a file of the project and framework in the intermediate folder, such as `obj/Debug/net10.0/App.csproj.SqlSource.log`.  The build does not use the value of the variable as a path, since projects built at once would write one file.  [Read a log before you share it](cli.md#logs).
 
-**Your connection in the build's logs.**  The build itself reads only whether `SQLSOURCE_CONNECTION` is set.  It never reads the value of the variable or what a `.env` file says, so neither reaches the logs of the build, at any verbosity or in a binary log.  What the tool prints is in the logs, and the tool hides a connection there as it does in your terminal ([a limit](connections.md#limit-short-password)).  `MSBUILDLOGALLENVIRONMENTVARIABLES=1`, a setting of MSBuild, writes every variable of the environment into the logs of the build, every connection variable among them.  On a machine whose environment holds a connection, do one of these:
+**Your connection in the build's logs.**  The build itself reads only whether `SQLSOURCE_CONNECTION` is set.  It never reads the value of the variable or what a `.env` file says.  So neither reaches the logs of the build, at any verbosity or in a binary log.  What the tool prints is in the logs, and the tool hides a connection there as it does in your terminal ([a limit](connections.md#limit-short-password)).  `MSBUILDLOGALLENVIRONMENTVARIABLES=1`, a setting of MSBuild, writes every variable of the environment into the logs of the build, every connection variable among them.  On a machine whose environment holds a connection, do one of these:
 
 - Leave `MSBUILDLOGALLENVIRONMENTVARIABLES` unset.
 - Search such a log for your password before you share it.
@@ -210,9 +215,9 @@ Some builds use the committed sidecars, as a build without the tool does.  These
 
 ### SQLSRC241 for a `.sql` file that a build target of your own adds
 
-**What you see.**  A target in your project adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as a target that writes the file or copies it in.  The build compiles the file, but it reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query of the file that must be described.
+**What you see.**  A target in your project adds a `.sql` file to the `AdditionalFiles` items while the build runs.  For example, the target writes the file or copies it in.  The build compiles the file, but it reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query of the file that must be described.
 
-**Why.**  `sqlsource` leaves out the queries of such a file, so it describes none of them.  In a project with one target framework, a build that [runs the tool](#running-in-the-build) describes the file even without the `BeforeTargets` line.  In a project with several, the run of the tool in the build leaves the file out, as a `sqlsource describe` that you run yourself does.  A project that is not of the .NET SDK can have one more effect, and so can a project that sets `AfterMicrosoftNETSdkTargets` without keeping its value.  There, a target that runs later also leaves the file without some settings.  These are the settings of a `sqlsource.json` that only the file reaches, such as the one beside it.  No error says so.
+**Why.**  `sqlsource` leaves out the queries of such a file, so it describes none of them.  In a project with one target framework, a build that [runs the tool](#running-in-the-build) describes the file even without the `BeforeTargets` line.  In a project with several, the run of the tool in the build leaves the file out, as a `sqlsource describe` that you run yourself does.  A project that is not of the .NET SDK can have one more effect.  A project that sets `AfterMicrosoftNETSdkTargets` without keeping its value can have it too.  In either project, a target that runs later also leaves the file without some settings.  These are the settings of a `sqlsource.json` that only the file reaches, such as the one beside it.  No error says so.
 
 **What to do.**  Tell your target to run before the package lists the files of the project.  This works wherever the target is declared:
 

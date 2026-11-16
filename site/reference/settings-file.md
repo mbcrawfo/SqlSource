@@ -89,7 +89,7 @@ The settings files of a `.sql` file are the `sqlsource.json` of its folder and o
 The build reads each settings file that the search of a `.sql` file or a C# file of the project reaches.  It reads the file whether or not a type claims that `.sql` file.  It reports each mistake in the file at its file, line and column.
 
 - **A `sqlsource.json` beyond the first `"root": true` is never read.**  So it cannot fail a build.
-- **The C# files that the build writes into its output and intermediate folders reach no settings file.**  This is true wherever those folders are, with one exception.  The exception is a build that names the project through a symbolic link, while those folders are outside the project's folder and set by a relative path.  See [the limit](#limit-symbolic-link).
+- **The C# files that the build writes into its output and intermediate folders reach no settings file.**  This is true wherever those folders are, with one exception.  The exception is a build that names the project through a symbolic link.  It is the exception only while those folders are outside the project's folder and set by a relative path.  See [the limit](#limit-symbolic-link).
 - **The C# files that a NuGet package adds to your project from the folder where NuGet keeps its packages reach no settings file.**  Polyfill is a package that adds such files.  So the build does not read a broken `sqlsource.json` above that folder, such as one in your home folder, because of these files.
 - **Your own `.sql` and C# files still reach a settings file in a folder above your project, unless a `"root": true` stands between them.**
 - **If your files reach a broken settings file, its mistakes fail the build or `sqlsource describe`, each on the mistakes that it reports.**  A build that [runs the tool](msbuild.md#running-in-the-build) fails on the tool's mistakes too.  To prevent this, put `"root": true` in the settings file of the project's folder, or of the repository's.
@@ -126,7 +126,7 @@ SqlSource keeps a settings file out of the output and publish folders.  Otherwis
 - A settings file in a folder above the link applies only if that folder is also above the folder the link leads to.  So one in `/` applies, and one in `~` does not.
 - A `.sql` or C# file that your project lists by its full path gets only the settings files outside the link.  Here, those are in `~` or `/`.  It gets none of those in `~/code` or below it.  `$(MSBuildThisFileDirectory)` and `$(MSBuildProjectDirectory)` are two ways to list a file by its full path.
 - A query in such a file can report [SQLSRC209](../diagnostics.md#sqlsrc209).
-- If the type's C# file is listed by a relative path, as the SDK lists it, the type does not find such a `.sql` file: [SQLSRC004](../diagnostics.md#sqlsrc004) or [SQLSRC005](../diagnostics.md#sqlsrc005).
+- If the type's C# file is listed by a relative path, the type does not find such a `.sql` file: [SQLSRC004](../diagnostics.md#sqlsrc004) or [SQLSRC005](../diagnostics.md#sqlsrc005).  The SDK lists a C# file by a relative path.
 - Your build can put its output or intermediate folder outside the project's folder, by a relative path.  Then a broken `sqlsource.json` above your `"root": true` can fail the build.  `<BaseIntermediateOutputPath>../../obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>` is such a path.
 
 **Why.**  Through a symbolic link, one folder has two paths.  The build does not always match a file by one path with a settings file by the other.

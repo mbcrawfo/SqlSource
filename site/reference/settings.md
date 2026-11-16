@@ -73,7 +73,7 @@ These are not settings, and have no row in [the table of all settings](#all-sett
 Each name links to the section of its setting, which gives its values and its rules.  The other columns give every place where you can write the setting:
 
 - A key of a [settings file](settings-file.md#settings-files).
-- A marker, as [the marker index](sql-files.md#marker-index) shows.  Two columns say whether the marker can stand in the **file header**, the part of a `.sql` file before its first `-- name:` line, and **inside a query**, under a `-- name:` line.
+- A marker, as [the marker index](sql-files.md#marker-index) shows.  Two columns say whether the marker can stand in each of two places.  The **file header** is the part of a `.sql` file before its first `-- name:` line.  **Inside a query** means under a `-- name:` line.
 - A property of an attribute.
 - A property of the project: one of `SqlSourceRepositoryInterfaces`, `SqlSourceOnline`, `SqlSourceEnvFile`, `SqlSourceIncludeFiles` and `SqlSourcePublicExceptions`.
 
@@ -110,7 +110,7 @@ SqlSource ignores case, hyphens and spaces when it matches a value from a list. 
 - `SealedRecord` and `sealed record`
 - `NestedClass` and `nested-class`
 
-A dialect's name and options, and a generator parameter's name and value, are the exception: SqlSource ignores only their case.  So `sql-server` is not `sqlserver`.
+A dialect's name and options, and a generator parameter's name and value, are the exception.  SqlSource ignores their case, but not a hyphen or a space inside them.  So `sql-server` is not `sqlserver`.
 
 <a id="precedence"></a>
 
@@ -151,7 +151,7 @@ There are three exceptions to these rules:
 
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no place inside a query, because a file has one dialect.  The dialect of a file is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
 - **`Source` exists only on the attribute.**  So it has no other place to choose between.
-- **A type override, a column type, a library of the library types, or a generator parameter, replaces only what it names.**  Each place adds its entries to the entries of the places below it.  Each settings file is a place of its own, so the settings file of a folder adds to the entries of the settings files above it.
+- **A type override, a column type, a library of the library types, or a generator parameter, replaces only what it names.**  Each place adds its entries to the entries of the places below it.  Each settings file is a place of its own.  So the settings file of a folder adds to the entries of the settings files above it.
 
   An entry replaces the entry below it that has the same key: a database type, a column, a library or a generator parameter.  An entry whose value is `default` takes its key out.  The generator parameters also take `default` alone, which takes every parameter out, back to its default.  See [type overrides](type-mapping.md#setting-type-overrides), [column types](model-properties.md#setting-column-types), [library types](library-types-and-json.md#setting-library-types) and [generator parameters](generator-parameters.md#setting-generator-parameters).
 
@@ -207,11 +207,15 @@ Two rules complete the table:
 - **A query whose output is `repository`, `methods` or `models` gets its [models](models.md#models) when its entry in its sidecar is current.**  A query whose output is `sql` gets no models.
 - **A query whose output is `repository` or `methods` gets no constant and no token method.**  Its [method](query-methods.md#query-methods) holds its SQL and runs it, when the query meets the conditions of [which queries get a method](query-methods.md#which-methods).
 
-You can write the output as a `-- output:` marker in the file header, for every query of the file, or inside a query, or as `output` in a settings file.
+You can write the output in these places:
+
+- a `-- output:` marker in the file header, for every query of the file;
+- the same marker inside a query;
+- `output` in a settings file.
 
 **`Output` decides which queries must be described.**  `sqlsource describe` asks a database about each query whose output is `repository`, `methods` or `models`.  The build checks that each of these queries has a current entry in the [sidecar](sidecars.md#sidecar-files) of its file.  A query that has no entry is [SQLSRC241](../diagnostics.md#sqlsrc241).  A query that changed after it was described is [SQLSRC244](../diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry and no connection, and belongs to no [logical database](#setting-database).
 
-If two types claim a file, or two projects list it, the tool describes the file once, and the build of a project checks its entries once for the file.
+If two types claim a file, or two projects list it, the tool describes the file once.  The build of a project also checks the entries of the file once.
 
 The tool can describe only some dialects: see [the database support table](databases/index.md#database-support).  The default output is `repository` and the default dialect is `ansi`.  So a project that sets neither gets [SQLSRC209](../diagnostics.md#sqlsrc209) for each file that a type claims.  The build and the tool both report it.  To correct it, do one of these:
 
@@ -286,5 +290,5 @@ The dialect is the set of rules by which SqlSource reads a `.sql` file: where a 
 - **A file has one dialect.**  The marker must stand in the file header, before the first SQL, and not inside a query.  Anywhere else it is [SQLSRC115](../diagnostics.md#sqlsrc115).
 - **The marker takes effect on the line after it.**  So SqlSource reads the comments above the marker by the dialect that the settings files give.
 - **A value replaces the one below it whole.**  A file with `-- dialect: mysql` under a settings file that sets `"mysql,ansi-quotes"` is read as plain `mysql`.  A folder whose settings file sets `"mysql"`, under a settings file that sets `"mysql,ansi-quotes"`, is read as plain `mysql` too.
-- **A value that is not a dialect is [SQLSRC111](../diagnostics.md#sqlsrc111) in a marker and [SQLSRC019](../diagnostics.md#sqlsrc019) in a settings file.**  The build and the tool both report each of them.  While the `dialect` of a settings file is wrong, the files under it are read by the dialect of a farther settings file, or as `ansi` when none sets one.
+- **A value that is not a dialect is [SQLSRC111](../diagnostics.md#sqlsrc111) in a marker and [SQLSRC019](../diagnostics.md#sqlsrc019) in a settings file.**  The build and the tool both report each of them.  While the `dialect` of a settings file is wrong, the files under it are read by the dialect of a farther settings file.  If no farther settings file sets one, they are read as `ansi`.
 - **The tool reads the dialect too.**  The dialect decides which kind of database the tool asks about a query, and whether there is a database to ask.  The tool can describe a file whose dialect is `postgres` or `mssql`.  See [database support](databases/index.md#database-support).
