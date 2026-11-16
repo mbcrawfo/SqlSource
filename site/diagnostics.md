@@ -581,13 +581,23 @@ See: [What the build needs](reference/msbuild.md#build-requirements)
 
 Reported by: the build.
 
-A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException` in two or more of the projects or packages it references, each of which uses SqlSource and either grants this project `InternalsVisibleTo` or makes its exceptions public.  The query methods of this project throw one type of each, and they cannot take one copy over the other.  The message names the assemblies.  The project still gets its own exceptions, so the error is the only one, but code that names the exceptions may also get the compiler's warning CS0436.
+A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException` in two or more of the projects or packages that it references.  Each of those uses SqlSource, and either grants this project `InternalsVisibleTo` or makes its exceptions public.  The message names the assemblies.  The error has no file and line, because it is about the project's references.
+
+The query methods of this project throw one type of each, and they cannot take one copy over the other.  The project still gets its own exceptions, so the error is the only one.  Code that names the exceptions can also get the compiler's warning CS0436.
 
 ```console
 CSC : error SQLSRC022: This project sees UnexpectedRowCountException, TransactionRolledBackException or CollectionItemException in more than one referenced assembly: DataA, DataB.  Use SqlSource in one project that the others reference and that grants them InternalsVisibleTo, so that they all use its exceptions.
 ```
 
-Add a shared project that references SqlSource, needs no query, and grants `InternalsVisibleTo` to each project that uses SqlSource and sees it, this project among them.  Have those projects reference it.  Each then uses the shared project's exceptions instead of writing its own, and this project sees one copy: see [the recipe](guides/several-projects.md#share-the-exceptions).  The shared project grants `InternalsVisibleTo` to every project that catches the exceptions by type, and to every project that uses SqlSource and sees a data project's internals, the data projects' test projects among them: such a project that does not see the shared project's copy gets its own, and its `catch (UnexpectedRowCountException)` compiles but does not catch what a data project's method throws.  The error has no file and line, because it is about the project's references.
+**Fix:**
+
+1. Add a shared project that references SqlSource and needs no query.
+2. Have the shared project grant `InternalsVisibleTo` to each project that uses SqlSource and sees it, this project among them.
+3. Have those projects reference the shared project.
+
+Each of those projects then uses the exceptions of the shared project instead of writing its own, and this project sees one copy.  See [the recipe](guides/several-projects.md#share-the-exceptions).
+
+- **The shared project grants `InternalsVisibleTo` to every project that catches the exceptions by type.**  It also grants it to every project that uses SqlSource and sees the internals of a data project.  The test projects of the data projects are among them.  If such a project does not see the copy of the shared project, it gets its own.  Its `catch (UnexpectedRowCountException)` then compiles, but does not catch what a method of a data project throws.
 
 See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
@@ -597,13 +607,17 @@ See: [Projects that share internals](reference/exceptions.md#projects-that-share
 
 Reported by: the build.
 
-A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException` in a project or package it references, but not as this version of SqlSource writes them: one of them is missing, or its constructors differ from this version's.  That happens when the other project uses another version of SqlSource.  The message names the assembly.  The project still gets its own exceptions, so the error is the only one from SqlSource, but code that names the exceptions, its query methods among them, may also get the compiler's warning CS0436.
+A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException` in a project or package that it references.  They are not as this version of SqlSource writes them: one of them is missing, or its constructors differ from this version's.  The message names the assembly.  The error has no file and line, because it is about the project's references.
+
+That happens when the other project uses another version of SqlSource.  The project still gets its own exceptions, so the error is the only one from SqlSource.  Code that names the exceptions, its query methods among them, can also get the compiler's warning CS0436.
 
 ```console
 CSC : error SQLSRC023: The UnexpectedRowCountException, TransactionRolledBackException and CollectionItemException that this project sees in Data are not those of this version of SqlSource.  Use the same version of SqlSource in both projects.
 ```
 
-Use the same version of SqlSource in every project of the solution, for example with central package management.  The error has no file and line, because it is about the project's references.
+**Fix:**
+
+1. Use the same version of SqlSource in every project of the solution, for example with central package management.
 
 See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
@@ -615,13 +629,20 @@ Reported by: the build.
 
 The error is at the project file.
 
-The project sets the MSBuild property `SqlSourceOnline` to a value that is not `auto`, `true` or `false`.  The case of the value and the white space around it do not matter, so ` True ` is `true`, and an empty value is `auto`.  The message names the value, without the white space around it.  The build stops before it compiles anything.
+The project sets the MSBuild property `SqlSourceOnline` to a value that is not `auto`, `true` or `false`.  The message names the value, without the white space around it.  The build stops before it compiles anything.
 
 ```console
 /repo/App/App.csproj : error SQLSRC024: SqlSourceOnline is 'yes', which is not auto, true or false.  Set it to one of the three, or leave it empty for auto.
 ```
 
-Set `SqlSourceOnline` to `auto`, `true` or `false`, or remove it to get `auto`.  The property can come from the project file or from a `Directory.Build.props` above it.
+**Fix:** do one of these.
+
+- Set `SqlSourceOnline` to `auto`, `true` or `false`.
+- Remove the property to get `auto`.
+
+The property can come from the project file or from a `Directory.Build.props` above it.
+
+- **The case of the value and the white space around it do not matter.**  So ` True ` is `true`, and an empty value is `auto`.
 
 See: [Running the tool in the build](reference/msbuild.md#online-build)
 
@@ -633,13 +654,22 @@ Reported by: the build.
 
 The error is at the project file.
 
-`SqlSourceOnline` is `true`, so a build that is not in CI runs `dotnet sqlsource describe` on the project before it compiles, and it could not start the tool: no tool manifest in the project's folder or a folder above it names `SqlSource.Tool`, or the tool it names was never restored on this machine.  The build stops.
+The build could not start the tool, and stops.  `SqlSourceOnline` is `true`, so a build that is not in CI runs `dotnet sqlsource describe` on the project before it compiles.
+
+The cause is one of these:
+
+- No tool manifest in the folder of the project, or in a folder above it, names `SqlSource.Tool`.
+- The tool that the manifest names was never restored on this machine.
 
 ```console
 /repo/App/App.csproj : error SQLSRC025: The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars.
 ```
 
-Install the tool as a local tool of the repository, as under [install the tool](reference/cli.md#install-the-tool), or run `dotnet tool restore` where the tool manifest names it already.  To build from the sidecars you have committed, without the tool, set `SqlSourceOnline` to `false`.
+**Fix:** do one of these.
+
+- Install the tool as a local tool of the repository, as [install the tool](reference/cli.md#install-the-tool) says.
+- If the tool manifest names the tool already, run `dotnet tool restore`.
+- To build from the sidecars that you committed, without the tool, set `SqlSourceOnline` to `false`.
 
 See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
@@ -651,13 +681,25 @@ Reported by: the build.
 
 The warning is at the project file.  A project can list `SQLSRC026` in the MSBuild property `MSBuildWarningsAsMessages`, which turns the warning into a message.
 
-`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) names, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
+`SqlSourceOnline` is `auto`, or not set, and the build found a connection.  So it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool.
+
+The connection that the build found is the variable `SQLSOURCE_CONNECTION` or the build's `.env` file.  That file is the one in the folder of the project, or the one that [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) names.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too.
+
+The cause is one of these:
+
+- No tool manifest names `SqlSource.Tool`.
+- The tool that the manifest names was never restored on this machine.
 
 ```console
 /repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.
 ```
 
-Run `dotnet tool restore`, or install the tool as under [install the tool](reference/cli.md#install-the-tool), and the next build describes the queries.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too: set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars, which also stops the warning.
+**Fix:** do one of these.
+
+- Run `dotnet tool restore`, or install the tool as [install the tool](reference/cli.md#install-the-tool) says.  The next build then describes the queries.
+- Set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars.  That also stops the warning.
+
+This is a warning: the build goes on with the sidecars that it has, as a build with no connection does.  The next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
 See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
@@ -669,13 +711,18 @@ Reported by: the build.
 
 The error is at the project file.
 
-The build ran `dotnet sqlsource describe` on the project before it compiled, and the tool ended with an exit code other than 0 without reporting an error of its own, so the build cannot tell whether the sidecars are current, and stops.  The message names the exit code and the first line the tool printed.  The usual cause is a tool older than the `SqlSource` package, which does not know an option the build gives it and prints a line such as `sqlsource: unknown option at position 2`; the message then says to update the tool.
+The build ran `dotnet sqlsource describe` on the project before it compiled.  The tool ended with an exit code other than 0, and it reported no error of its own.  The message names the exit code and the first line that the tool printed.
+
+The build cannot tell whether the sidecars are current, so it stops.  The usual cause is a tool older than the `SqlSource` package.  Such a tool does not know an option that the build gives it, and prints a line such as `sqlsource: unknown option at position 2`.  The message then says to update the tool.
 
 ```console
 /repo/App/App.csproj : error SQLSRC027: The sqlsource tool exited with the code 1 and reported no error, so the sidecars may not be current.  The tool may be older than the SqlSource package, and not know the options the build gives it: update it to the package's version with 'dotnet tool update SqlSource.Tool --version <version>'.  It printed first: 'sqlsource: unknown option at position 2'.
 ```
 
-Bring the tool to the version of the `SqlSource` package the project uses, with `dotnet tool update SqlSource.Tool --version <version>`: the two are released together under one version number.  If the versions are the same, run `dotnet sqlsource describe` in the project's folder to see what the tool says.
+**Fix:**
+
+1. Bring the tool to the version of the `SqlSource` package that the project uses, with `dotnet tool update SqlSource.Tool --version <version>`.  The two are released together under one version number.
+2. If the versions are the same, run `dotnet sqlsource describe` in the folder of the project to see what the tool says.
 
 See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
@@ -687,7 +734,15 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A query whose output is `repository` gets an instance method of the type that claims it, and the method takes its connection from a member of the type: a `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`, or one of a type that derives from `DbDataSource`, or the member you mark `[SqlSourceConnection]`.  The type has none of these for a database that its repository queries use.
+The type has no member that gives a connection for a database that its repository queries use.  The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection.
+
+A query whose output is `repository` gets an instance method of the type that claims it.  The method takes its connection from one of these members of the type:
+
+- a `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`;
+- a field, property or primary-constructor parameter of a type that derives from `DbDataSource`;
+- the member that you mark `[SqlSourceConnection]`.
+
+The repository queries of a database without a connection get no method.  The database is the one that the [database](reference/settings.md#setting-database) setting of the queries names, or the name of their dialect.
 
 ```csharp
 [SqlSourceGenerate]
@@ -701,13 +756,13 @@ public partial class UserRepository
 /work/App/UserRepository.cs(1,2): error SQLSRC028: 'App.UserRepository' has no connection for the database 'postgres', which its repository queries use.  Add a string field, property or primary-constructor parameter named connectionString, or one of a DbDataSource type, or mark the member that gives the connection [SqlSourceConnection].  Or set the output of its repository queries to methods.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection, and the repository queries of that database get no method.  The database is the one the queries' [database](reference/settings.md#setting-database) setting names, or their dialect's name.
+**Fix:** do one of these.
 
-- Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`, or mark the member that gives the connection `[SqlSourceConnection]`.
-- When a member is marked, no other is found by its name or type: mark the one for this database too.
-- A primary-constructor parameter that the type also passes to its base type, or uses to initialize a field or property, is not found by its name or type, and the message names it: keep the value in a field or property named `connectionString` or of a `DbDataSource` type, or mark the parameter `[SqlSourceConnection]`.
-- When the type's repository queries use more than one database, no member is found by its name or type, since nothing says which database it is for: mark one member for each, `[SqlSourceConnection(Database = "reports")]`.
-- Or set the queries' [output](reference/settings.md#setting-output) to `methods`, whose methods take the connection as an argument.
+- Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`.  Or mark the member that gives the connection `[SqlSourceConnection]`.
+- **When a member is marked, no other is found by its name or type.**  Mark the member for this database too.
+- **The type passes a primary-constructor parameter to its base type, or uses it to initialize a field or property.**  Then the parameter is not found by its name or type, and the message names it.  Keep the value in a field or property named `connectionString` or of a `DbDataSource` type.  Or mark the parameter `[SqlSourceConnection]`.
+- **When the repository queries of the type use more than one database, no member is found by its name or type.**  Nothing says which database the member is for.  Mark one member for each database, as `[SqlSourceConnection(Database = "reports")]`.
+- Set the [output](reference/settings.md#setting-output) of the queries to `methods`.  Their methods take the connection as an argument.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -719,7 +774,13 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The type has more than one member that could give its repository queries their connection for one database: two members that the build finds by their name or type, two marked `[SqlSourceConnection]` for the same database that both return a `Task` or `ValueTask`, or both do not, or three or more marked for it.
+The type has more than one member that could give its repository queries their connection for one database.  The error is at the type's `[SqlSourceGenerate]`, and the message lists the members.  The repository queries of that database get no method.
+
+The members are one of these:
+
+- two members that the build finds by their name or type;
+- two members marked `[SqlSourceConnection]` for the same database that both return a `Task` or `ValueTask`, or both do not;
+- three or more marked members for the same database.
 
 ```csharp
 [SqlSourceGenerate]
@@ -734,11 +795,12 @@ public partial class UserRepository
 /work/App/UserRepository.cs(1,2): error SQLSRC029: 'App.UserRepository' has more than one connection for the database 'postgres': '_connectionString', '_dataSource'.  Mark only the one to use [SqlSourceConnection], or two of which only one returns a task: the asynchronous methods use that one, and the synchronous methods the other.
 ```
 
-The error is at the type's `[SqlSourceGenerate]` and lists the members, and the repository queries of that database get no method.  A primary-constructor parameter is found by its name or type only when no field or property of the type or of a base type is, so a parameter that the type stores in a field of its own gives one connection, the field.
+**Fix:** do one of these.
 
-Mark the one to use `[SqlSourceConnection]`, which leaves the others alone; when several are marked, leave one marked for the database, or set each one's `Database` to the database it connects to.
+- Mark the member to use `[SqlSourceConnection]`.  The others are then left alone.
+- **When several members are marked**, leave one marked for the database.  Or set the `Database` of each to the database that it connects to.
 
-A database may keep two marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection: its asynchronous methods get their connection from that one, and its synchronous methods from the other, which can be a connection string, a data source, a connection or a method that returns a connection.
+A database can keep two marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection.  Its asynchronous methods get their connection from that one, and its synchronous methods from the other.  The other can be a connection string, a data source, a connection or a method that returns a connection.  This sample shows such a pair, which is allowed:
 
 ```csharp
 [SqlSourceGenerate]
@@ -752,6 +814,8 @@ public partial class UserRepository
 }
 ```
 
+- **A primary-constructor parameter is found by its name or type only when no field or property of the type or of a base type is.**  So a parameter that the type stores in a field of its own gives one connection, the field.
+
 See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC030
@@ -762,7 +826,9 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A member is marked `[SqlSourceConnection]` without a `Database`, and the type's repository queries use more than one database, so it cannot tell which one the member connects to.
+A member is marked `[SqlSourceConnection]` without a `Database`, and the repository queries of the type use more than one database.  The error is at the member.
+
+The build cannot tell which database the member connects to.  Each database that no member is marked for by name gets no repository method until it is fixed.
 
 ```csharp
 [SqlSourceGenerate]
@@ -777,7 +843,10 @@ public partial class UserRepository
 /work/App/UserRepository.cs(4,39): error SQLSRC030: '_dataSource' of 'App.UserRepository' is marked [SqlSourceConnection] without a Database, and the repository queries of 'App.UserRepository' use more than one database: 'main', 'reports'.  Set its Database to the one it connects to.
 ```
 
-The error is at the member.  Each database that no member is marked for by name gets no repository method until it is fixed.  Set the member's `Database`, `[SqlSourceConnection(Database = "main")]`, and mark a member for each other database.
+**Fix:**
+
+1. Set the `Database` of the member, as `[SqlSourceConnection(Database = "main")]`.
+2. Mark a member for each other database.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -789,7 +858,15 @@ Reported by: the build.
 
 A type gets this warning only when it claims a query whose output is `repository`.
 
-A member is marked `[SqlSourceConnection]` for a database that no repository query of the type uses: its `Database` is misspelt, or the queries of that database have another output, or are gone.
+A member is marked `[SqlSourceConnection]` for a database that no repository query of the type uses.  The warning is at the member.
+
+The cause is one of these:
+
+- The `Database` of the member is misspelt.
+- The queries of that database have another output.
+- The queries of that database are gone.
+
+The member gives no method its connection, so the warning leaves out no method.  The build compares the name of a database without regard to case.
 
 ```csharp
 [SqlSourceGenerate]
@@ -807,9 +884,12 @@ public partial class UserRepository
 /work/App/UserRepository.cs(4,39): warning SQLSRC031: '_archive' of 'App.UserRepository' is marked [SqlSourceConnection] for the database 'archive', and no repository query of 'App.UserRepository' uses it: they use 'main'.  Correct its Database, or remove the mark.
 ```
 
-The warning is at the member, and leaves out no method: the member gives no method its connection.  A database's name is compared without regard to case.  Correct the `Database`, or remove the mark from a member that your own code uses for other queries.
+**Fix:** do one of these.
 
-This is a warning, since a type that keeps a member for queries whose output is `methods` for a while still builds.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+- Correct the `Database`.
+- Remove the mark from a member that your own code uses for other queries.
+
+This is a warning, since a type that keeps a member for queries whose output is `methods` for a while still builds.  A project can list it in `NoWarn` to turn it off.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning:
 
 ```xml
 <PropertyGroup>
@@ -827,7 +907,16 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  A connection comes from a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`, or from a method that is not generic, takes nothing or one `CancellationToken`, and returns a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of one.
+A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  The error is at the member.
+
+The repository queries of the database of the member get no method.  When the member names no database, the repository queries of every database get no method.
+
+A connection comes from one of these members:
+
+- a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`;
+- a method that is not generic, takes nothing or one `CancellationToken`, and returns a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of such a type.
+
+An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.
 
 ```csharp
 [SqlSourceGenerate]
@@ -842,7 +931,9 @@ public partial class UserRepository
 /work/App/UserRepository.cs(4,30): error SQLSRC032: 'Connect' of 'App.UserRepository' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a method that is not generic, takes nothing or a CancellationToken, and returns a string, a DbConnection, or a Task or ValueTask of a DbConnection.
 ```
 
-The error is at the member, and the repository queries of its database, or of every database when it names none, get no method.  An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.  Mark a member of one of the shapes above.
+**Fix:**
+
+1. Mark a member of one of the shapes above.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -854,7 +945,12 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The member that gives a database its connection is of a type of the other engine's driver: an Npgsql type, such as `NpgsqlDataSource`, for a SQL Server database, or a Microsoft.Data.SqlClient type, such as `SqlConnection`, for a PostgreSQL one.
+The member that gives a database its connection is of a type of the other engine's driver.  The error is at the member.  The type of the member is one of these:
+
+- an Npgsql type, such as `NpgsqlDataSource`, for a SQL Server database;
+- a Microsoft.Data.SqlClient type, such as `SqlConnection`, for a PostgreSQL database.
+
+The repository queries of that database get no method.
 
 ```csharp
 [SqlSourceGenerate]
@@ -865,7 +961,10 @@ public partial class OrderRepository(NpgsqlDataSource dataSource);
 /work/App/OrderRepository.cs(2,55): error SQLSRC033: 'dataSource' of 'App.OrderRepository' is a 'Npgsql.NpgsqlDataSource', of another engine's driver, and the database 'mssql' is SQL Server.  Give the database a connection of Microsoft.Data.SqlClient.
 ```
 
-The error is at the member, and the repository queries of that database get no method.  Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`, and mark it for the database when the type uses several.
+**Fix:**
+
+1. Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`.
+2. If the type uses several databases, mark the member for the database.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -877,7 +976,9 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A query whose output is `repository` gets an instance method, and the type that claims it is `static`, so it has no instance.
+The type is `static`.  The error is at the type's `[SqlSourceGenerate]`, once for the type.
+
+A query whose output is `repository` gets an instance method, and the type has no instance.  So none of the repository queries of the type gets a method.
 
 ```csharp
 [SqlSourceGenerate]
@@ -888,7 +989,10 @@ public static partial class UserQueries;
 /work/App/UserQueries.cs(1,2): error SQLSRC034: 'App.UserQueries' is static, and the method of a repository query is an instance method.  Set the output of its repository queries to methods, or remove static.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of its repository queries gets a method.  Set their [output](reference/settings.md#setting-output) to `methods`, whose methods are static or extension methods that take the connection, or remove `static` and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
+**Fix:** do one of these.
+
+- Set the [output](reference/settings.md#setting-output) of the repository queries to `methods`.  Their methods are static or extension methods that take the connection.
+- Remove `static`, and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
 
 See: [Repository methods](reference/repositories.md#repository-methods)
 
@@ -898,12 +1002,14 @@ See: [Repository methods](reference/repositories.md#repository-methods)
 
 Reported by: the build.
 
-A type that claims a query whose output is `repository` gets an interface of its public repository methods, named `I` and the type's name unless `InterfaceName` names it, beside the type: in its namespace, or in the type it is nested in.  Something there already has that name:
+A type that claims a query whose output is `repository` gets an interface of its public repository methods.  Something beside the type already has the name of that interface.  The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface.
+
+The interface is named `I` and the type's name, unless `InterfaceName` names it.  It stands beside the type: in its namespace, or in the type it is nested in.  What has the name is one of these:
 
 - a type of the project, other than an interface whose every declaration is `partial`, or a type of a referenced assembly;
 - a type parameter of the type, or of a type it is nested in;
 - for a nested type, the type it is nested in, or a member of it;
-- something else that SqlSource writes beside it: a model, the extension class of a type's `methods` queries, a namespace that holds models, or the interface of another type, in which case each of the two types gets the error.
+- something else that SqlSource writes beside it: a model, the extension class of a type's `methods` queries, a namespace that holds models, or the interface of another type.  When it is the interface of another type, each of the two types gets the error.
 
 ```csharp
 public class IUserRepository { }
@@ -916,7 +1022,13 @@ public partial class UserRepository(NpgsqlDataSource dataSource);
 /work/App/UserRepository.cs(3,2): error SQLSRC035: 'App.UserRepository' cannot get its interface 'IUserRepository', because the class App.IUserRepository already has that name.  Set InterfaceName on its [SqlSourceGenerate] to another name, or set GenerateInterface to false.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface.  Name the interface otherwise with `[SqlSourceGenerate(InterfaceName = "IUserStore")]`, rename what has the name, or turn the interface off with `GenerateInterface = false`.  To add members to the interface yourself, declare it `partial interface IUserRepository`, which the generated part joins.
+**Fix:** do one of these.
+
+- Name the interface otherwise, with `[SqlSourceGenerate(InterfaceName = "IUserStore")]`.
+- Rename what has the name.
+- Turn the interface off with `GenerateInterface = false`.
+
+To add members to the interface yourself, declare it `partial interface IUserRepository`.  The generated part joins it.
 
 See: [The interface](reference/repositories.md#repository-interface), [repository interfaces](reference/repositories.md#repository-interfaces)
 
@@ -928,7 +1040,12 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The primary-constructor parameter that gives a database its connection is named `cancellationToken`, which every asynchronous repository method takes as an argument, and which is refused whatever the queries' `method-type`, or `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.  Inside a method the argument hides the parameter, so the method could not reach its connection.
+The primary-constructor parameter that gives a database its connection has the name of an argument of the repository methods.  The error is at the parameter.  The name is one of these:
+
+- `cancellationToken`, which every asynchronous repository method takes as an argument.  This name is refused whatever the `method-type` of the queries.
+- `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.
+
+Inside a method the argument hides the parameter, so the method could not reach its connection.  The repository queries of that database get no method.
 
 ```csharp
 [SqlSourceGenerate]
@@ -939,7 +1056,10 @@ public partial class UserRepository(NpgsqlDataSource parameters);
 /work/App/UserRepository.cs(2,54): error SQLSRC036: 'parameters' of 'App.UserRepository' is the primary-constructor parameter that gives the database 'postgres' its connection, and the repository methods have an argument named 'parameters', which hides it.  Rename the parameter, or store it in a field or property and give the connection from that.
 ```
 
-The error is at the parameter, and the repository queries of that database get no method.  Rename the parameter, or store it in a field or property of the type, which is then the connection, marked `[SqlSourceConnection]` when it is not found by its name or type.
+**Fix:** do one of these.
+
+- Rename the parameter.
+- Store the parameter in a field or property of the type, which is then the connection.  Mark that member `[SqlSourceConnection]` when it is not found by its name or type.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -949,7 +1069,11 @@ See: [The connection](reference/repositories.md#repository-connection)
 
 Reported by: the build.
 
-A type that claims a query whose output is `repository` gets an interface of its public repository methods, and its `[SqlSourceGenerate]` names it with `InterfaceName`, but the name is not a C# identifier: it holds a character that an identifier cannot, such as `-`, a namespace, type parameters, or an `@`.  A keyword such as `"class"`, or a contextual keyword such as `"file"`, is an identifier, and is written `@class` or `@file`.
+A type that claims a query whose output is `repository` gets an interface of its public repository methods.  Its `[SqlSourceGenerate]` names the interface with `InterfaceName`, but the name is not a C# identifier.  The error is at the type's `[SqlSourceGenerate]`.
+
+The name holds a character that an identifier cannot hold, such as `-`, a namespace, type parameters, or an `@`.  A keyword such as `"class"`, or a contextual keyword such as `"file"`, is an identifier, and is written `@class` or `@file`.
+
+The type gets no interface, and its repository methods are still generated.
 
 ```csharp
 [SqlSourceGenerate(InterfaceName = "I-Users")]
@@ -960,7 +1084,10 @@ public partial class UserRepository(NpgsqlDataSource dataSource);
 /work/App/UserRepository.cs(1,2): error SQLSRC037: 'App.UserRepository' cannot get its interface 'I-Users', because the name is not a C# identifier.  Set InterfaceName on its [SqlSourceGenerate] to an identifier, without an @ or a namespace, or remove it.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface; its repository methods are still generated.  Write the interface's name alone, such as `InterfaceName = "IUserStore"`, which is declared beside the type with the type's type parameters, or remove `InterfaceName` to get `I` and the type's name.
+**Fix:** do one of these.
+
+- Write the name of the interface alone, such as `InterfaceName = "IUserStore"`.  The interface is declared beside the type, with the type parameters of the type.
+- Remove `InterfaceName` to get `I` and the name of the type.
 
 See: [The interface](reference/repositories.md#repository-interface), [repository interfaces](reference/repositories.md#repository-interfaces)
 
@@ -970,13 +1097,18 @@ See: [The interface](reference/repositories.md#repository-interface), [repositor
 
 Reported by: the build.
 
-A project on .NET 6 or later that uses SqlSource takes its exceptions from a project it references, such as the [shared project](guides/several-projects.md#share-the-exceptions) of the recipe, and that project targets a framework before .NET 6, such as `netstandard2.0` or `netstandard2.1`.  Its `CollectionItemException` was built without the `SqlState`, `IsTransient` and `BatchCommand` that .NET 6 added to `DbException`, so it cannot pass on the database error's: a retry policy that tests `IsTransient` would never retry a deadlock.  The message names the project.  This project still uses that project's exceptions, so the error is the only one.
+A project on .NET 6 or later uses SqlSource, and takes its exceptions from a project that it references.  That project targets a framework before .NET 6, such as `netstandard2.0` or `netstandard2.1`.  An example is the [shared project](guides/several-projects.md#share-the-exceptions) of the recipe.  The message names the project.  The error has no file and line, because it is about the project's references.
+
+The `CollectionItemException` of that project was built without the `SqlState`, `IsTransient` and `BatchCommand` that .NET 6 added to `DbException`.  So it cannot pass on those of the database's error: a retry policy that tests `IsTransient` would never retry a deadlock.  This project still uses the exceptions of that project, so the error is the only one.
 
 ```console
 CSC : error SQLSRC038: The CollectionItemException that this project sees in Data.Shared was compiled for a framework before .NET 6, so it does not pass on the SqlState, IsTransient and BatchCommand of the database's error.  Make Data.Shared target .NET 6 or later, or add such a target to its TargetFrameworks.
 ```
 
-Make the project that holds the exceptions target .NET 6 or later, as `<TargetFramework>net8.0</TargetFramework>`, or add such a target beside the one it has, as `<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>`: a project on .NET 6 or later then gets the build for .NET 8.  The error has no file and line, because it is about the project's references.
+**Fix:** do one of these.
+
+- Make the project that holds the exceptions target .NET 6 or later, as `<TargetFramework>net8.0</TargetFramework>`.
+- Add such a target beside the one that it has, as `<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>`.  A project on .NET 6 or later then gets the build for .NET 8.
 
 See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
