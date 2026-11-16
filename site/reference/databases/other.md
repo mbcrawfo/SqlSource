@@ -12,7 +12,7 @@ A query whose output is `repository`, `methods` or `models` must be described.  
 
 The output for these databases is `sql`.  It asks for the SQL alone and needs no database, so SQLSRC209 goes away.  See [the output setting](../settings.md#setting-output).
 
-- **The default output is `repository`.**  So a project that sets neither the dialect nor the output gets SQLSRC209 for each file that a class reads.
+- **The default output is `repository`.**  So a project that sets neither the dialect nor the output gets SQLSRC209 for each file that a type claims.
 - **Under the output `models`, the query still gets its constant or token method.**
 - **Under the output `methods`, the query gets neither a method nor a constant.**
 
