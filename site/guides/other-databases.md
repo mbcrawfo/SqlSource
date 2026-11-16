@@ -64,8 +64,6 @@ public sealed partial class UserQueries;
 
 ## Set the dialect of your database and the output `sql`
 
-- **Any dialect works**: `mssql` for SQL Server, `mysql`, `sqlite`, the default `ansi` and the others.  Set the one named for your database, so that SqlSource reads your comments and strings as your database does.
-
 **Step 4.**  Save this `sqlsource.json`:
 
 ```jsonc
@@ -77,10 +75,13 @@ public sealed partial class UserQueries;
 }
 ```
 
+**What you get.**  SqlSource reads every `.sql` file of the project as SQLite.  Each query gets a constant or a method that returns its SQL, which step 5 runs.
+
 Use `mysql`, `mariadb`, `sqlite`, `oracle` (also for Firebird) or `cockroachdb` for that database, `postgres` for DuckDB, and `ansi` for any other.
 
 **The rules you need.**
 
+- **Any dialect works with the output `sql`.**  Set the one named for your database, such as `mysql` or `sqlite`.  See [Choosing a dialect](../reference/dialects.md#choosing-a-dialect).
 - The dialect tells SqlSource where a comment or a string ends.  See [Choosing a dialect](../reference/dialects.md#choosing-a-dialect).
 - The output `sql` gives each query its SQL alone, and needs no sidecar and no connection.  See [Output](../reference/settings.md#setting-output).
 

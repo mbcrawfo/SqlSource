@@ -1,5 +1,9 @@
 # Give a repository its connection
 
+Give a repository its connection string, data source or connection factory, from dependency injection or a service of your own.
+
+**Use this when** a repository must get its connection from a member that the build does not find by itself, such as a service of yours.  Use it too to make a SQL Server repository from a connection string.
+
 <a id="connection-from-a-provider"></a>
 
 ## Give a repository its connection from a service of your own
@@ -39,9 +43,13 @@ public partial class OrderRepository(IConnectionFactory connections)
 }
 ```
 
-A member that the build does not find by its name or type is marked `[SqlSourceConnection]`.  `UserRepository`'s property gives a connection string, from which each method makes a connection and disposes it; on PostgreSQL that is a bare connection, without your data source's plugins or mappings, as [the limit](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository) says.  `OrderRepository`'s methods are factories: each repository method calls one, opens the connection it returns when it is closed, and disposes it, an asynchronous method `OpenAsync` and a [synchronous one](../reference/repositories.md#synchronous-repository-methods) `Open`.  A type whose queries are all asynchronous needs only `OpenAsync`.  A property or field of a `DbConnection` is borrowed instead, and never disposed.
+**What you get.**  The property of `UserRepository` gives a connection string.  Each method of the repository makes a connection from it, and disposes it.  The methods of `OrderRepository` are factories.  Each repository method calls one: `OpenAsync` for an asynchronous method, and `Open` for a [synchronous one](../reference/repositories.md#synchronous-repository-methods).  It opens the connection that the factory returns when it is closed, and disposes it.
 
-Rules: [the connection](../reference/repositories.md#repository-connection).
+**The rules you need.**
+
+- **Mark `[SqlSourceConnection]` on a member that the build does not find by its name or type.**  See [the connection](../reference/repositories.md#repository-connection) and [Mark the member yourself](#mark-the-member), below.
+- **On PostgreSQL, a connection string gives a bare connection**, without the plugins or mappings of your data source.  See [the limit](../reference/databases/postgresql/query-methods.md#limit-connection-string-repository).
+- **A type whose queries are all asynchronous needs only `OpenAsync`.**
 
 <a id="sql-server-repository"></a>
 
@@ -66,9 +74,11 @@ builder.Services.AddSingleton<IOrderRepository>(
     new OrderRepository(builder.Configuration.GetConnectionString("App")!));
 ```
 
-Microsoft.Data.SqlClient has no data source, so a SQL Server repository takes the connection string, found by its name, `connectionString`.  Each method makes a `SqlConnection` of it, opens it, runs the query and disposes the connection, which returns it to Microsoft.Data.SqlClient's pool.  The code that uses the repository takes the generated `IOrderRepository`.
+**What you get.**  Each method of `OrderRepository` makes a `SqlConnection` of the connection string, opens it, and runs the query.  Then it disposes the connection, which returns it to the pool of Microsoft.Data.SqlClient.  The code that uses the repository takes the generated [interface](../reference/repositories.md#repository-interface), `IOrderRepository`.
 
-Rules: [the connection](../reference/repositories.md#repository-connection), [the interface](../reference/repositories.md#repository-interface), [connecting to SQL Server](../reference/databases/sqlserver/index.md#connecting).
+**The rules you need.**
+
+- **Microsoft.Data.SqlClient has no data source, so a SQL Server repository takes the connection string.**  The build finds it by its name, `connectionString`.  See [the connection](../reference/repositories.md#repository-connection) and [connecting to SQL Server](../reference/databases/sqlserver/index.md#connecting).
 
 <a id="mark-the-member"></a>
 
