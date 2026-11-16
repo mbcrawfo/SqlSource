@@ -8,7 +8,7 @@ For the steps to use SqlSource with one of these databases, with the output `sql
 
 ## Databases that are not described
 
-A query whose output is `repository`, `methods` or `models` must be described.  If its dialect is one of the rows marked No, the query has no database to ask.  It is then [SQLSRC209](../../diagnostics.md#sqlsrc209), from the tool and in the build.
+A query whose output is `repository`, `methods` or `models` must be described.  If its dialect is the dialect of a row marked No, the query has no database to ask.  Its file is then [SQLSRC209](../../diagnostics.md#sqlsrc209), once, at the first such query, from the tool and in the build.
 
 The output for these databases is `sql`.  It asks for the SQL alone and needs no database, so SQLSRC209 goes away.  See [the output setting](../settings.md#setting-output).
 

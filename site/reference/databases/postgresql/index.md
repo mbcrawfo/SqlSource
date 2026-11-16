@@ -1,6 +1,8 @@
 # PostgreSQL
 
-SqlSource reads PostgreSQL files by the `postgres` [dialect](../../settings.md#setting-dialect).  The `sqlsource` tool can describe their queries: it asks your database what the parameters and the columns of each query are, and it writes the answer to the [sidecar](../../sidecars.md#sidecar-files) of the query.  These pages are about describing, the C# types that the columns and parameters of a described query get, the models built from them, and the query methods that run them.  [The dialects page](../../dialects.md#what-a-dialect-changes) says how SqlSource reads a PostgreSQL file, with its comments and its strings.
+SqlSource reads PostgreSQL files by the `postgres` [dialect](../../settings.md#setting-dialect).  The `sqlsource` tool can describe their queries.  It asks your database what the parameters and the columns of each query are.  It writes the answer to the [sidecar](../../sidecars.md#sidecar-files) of the query.
+
+These pages are about describing and the C# types that the columns and parameters of a described query get.  They are also about the models built from those types, and the query methods that run the queries.  [The dialects page](../../dialects.md#what-a-dialect-changes) says how SqlSource reads a PostgreSQL file, with its comments and its strings.
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -81,7 +83,17 @@ PostgreSQL gives each [query parameter](../../parameters.md#query-parameters) a 
 
 ## What can be described
 
-The tool describes a query that is one statement of one of these kinds: `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE` (PostgreSQL 15 and later), `VALUES` and `TABLE`.  Each kind can have a `WITH` in front of it, or not.  For any other query, give the query `-- output: sql`.  The query then keeps its constant or its token method, and the tool does not describe it.
+The tool describes a query that is one statement of one of these kinds, with a `WITH` in front of it or not:
+
+- `SELECT` (without `INTO`);
+- `INSERT`;
+- `UPDATE`;
+- `DELETE`;
+- `MERGE` (PostgreSQL 15 and later);
+- `VALUES`;
+- `TABLE`.
+
+For any other query, give the query `-- output: sql`.  The query then keeps its constant or its token method, and the tool does not describe it.
 
 | The query | Reported as | What to do |
 |----|----|----|

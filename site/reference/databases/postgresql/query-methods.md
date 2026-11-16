@@ -20,7 +20,7 @@ AddEventDto added = await events.AddEvent(
     new AddEventParams("signup", """{"plan": "free"}""", DateTime.UtcNow));
 ```
 
-Each described query whose output is `repository` or `methods` gets a method that runs it through Npgsql: see [query methods](../../query-methods.md#query-methods).  In the sample, `kind` is an enum `event_kind`, `payload` is a `jsonb` and `happened_at` is a `timestamptz`.  So the method sends the `string` of `@kind` as an `event_kind`, the `string` of `@payload` as a `jsonb`, and the `DateTime` of `@happenedAt` as a `timestamptz`.  The SQL needs no cast.
+Each described query whose output is `repository` or `methods` gets a method that runs it through Npgsql: see [query methods](../../query-methods.md#query-methods).  In the sample, `kind` is an enum `event_kind`, `payload` is a `jsonb` and `happened_at` is a `timestamptz`.  So the method sends the `string` of `@kind` as an `event_kind` and the `string` of `@payload` as a `jsonb`.  It sends the `DateTime` of `@happenedAt` as a `timestamptz`.  The SQL needs no cast.
 
 - **A repository method runs on a connection from its [connection source](../../repositories.md#repository-connection).**  The best source is an `NpgsqlDataSource`, as in the sample.  The data source that your application builds has its plugins and mappings, and it gives each method a connection that has them.
 - **A connection string makes a bare `NpgsqlConnection`**, which has none of these plugins and mappings: see [the limit](#limit-connection-string-repository).
@@ -76,9 +76,14 @@ In a query method, an array parameter takes any `IEnumerable<T>` of its element 
 
 The same holds for an array of a library's type, such as NodaTime's or NetTopologySuite's.  It holds for a parameter that can be null too, an `IEnumerable<T>?`, whose null is sent as `NULL`.
 
-- **A sequence is read once.**  An array, a `List<T>`, an `ImmutableArray<T>`, a `ReadOnlyCollection<T>` and any other `IList<T>` are sent as they are.  The method copies these into an array once, as it sends them: a `HashSet<T>`, a type that is only an `ICollection<T>` or an `IReadOnlyList<T>`, and a lazy sequence.  So a lazy sequence is enumerated once, and never twice.  The order of a `HashSet<T>` is the set's own, and so is the order of the array that it gives.
+- **A sequence is read once.**  An array, a `List<T>`, an `ImmutableArray<T>`, a `ReadOnlyCollection<T>` and any other `IList<T>` are sent as they are.  The method copies these into an array once, as it sends them:
+  - a `HashSet<T>`;
+  - a type that is only an `ICollection<T>` or an `IReadOnlyList<T>`;
+  - a lazy sequence.
+
+  So a lazy sequence is enumerated once, and never twice.  The order of a `HashSet<T>` is the set's own, and so is the order of the array that it gives.
 - **A null element is sent as a `NULL` element.**  So the element type must be one that can be null: see [what to know about some types](types.md#type-notes).
-- **The `models` output keeps `T[]`.**  An input model of a query whose output is `models` holds an array as an array, so that a library such as Dapper can send it as one.  If a query whose output is `repository` or `methods` and a query whose output is `models` share a model name, the two models differ.  That is [SQLSRC257](../../../diagnostics.md#sqlsrc257), which names both property types.  Name the models apart with [`-- output-model:`](../../models.md#setting-model-name) or `-- input-model:`.
+- **The `models` output keeps `T[]`.**  An input model of a query whose output is `models` holds an array as an array.  So a library such as Dapper can send it as one.  If a query whose output is `repository` or `methods` and a query whose output is `models` share a model name, the two models differ.  That is [SQLSRC257](../../../diagnostics.md#sqlsrc257), which names both property types.  Name the models apart with [`-- output-model:`](../../models.md#setting-model-name) or `-- input-model:`.
 - **A C# type that a `-- param:` marker gives is taken as written.**  `-- param: @ids -> int[]` makes the property an `int[]`.
 - **A [type override](../../type-mapping.md#setting-type-overrides) to a type that is not an array of one rank is taken as written too.**  `int4[]=System.Collections.Generic.List<int>` makes the property that `List<int>`.
 - **A type override to an array still becomes an `IEnumerable<T>` of its element**, as the type of the type table does.  `int4[]=long[]` gives an `IEnumerable<long>`.  So does `int4=long`, which makes the array a `long[]`.
@@ -101,7 +106,9 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
 - **A repository method takes no transaction**, and runs in no transaction of yours: see [transactions and timeouts](../../repositories.md#repository-transactions).
 - **A column is read as the C# type of its property**, which [the types](types.md#type-map) give it.  Npgsql reads some types only once it is taught them, such as an enum mapped to a C# enum, or the type of a plugin.  Such a type needs the teaching on the data source, such as `MapEnum<T>()`.
 - **A type of yours that Npgsql never reads takes [converters](../../converters.md#converters) instead.**  The column is read as the type that [the table](types.md#type-table) gives, a domain as its base type, and then converted.
-- **Every type that [the table](types.md#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10**, as the C# type in the column of that version.  SqlSource is tested on Npgsql 8 and 10.  Npgsql 8 and 9 do not read `cube`, which is sent and read on Npgsql 10.  Each type of [NodaTime](libraries.md#nodatime) is sent and read on each version too, with its `Npgsql.NodaTime`.  So is each type of [NetTopologySuite](libraries.md#nettopologysuite), with its `Npgsql.NetTopologySuite`.
+- **Every type that [the table](types.md#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10.**  Each is sent and read as the C# type in the column of that version.  SqlSource is tested on Npgsql 8 and 10.
+- **Npgsql 8 and 9 do not read `cube`.**  It is sent and read on Npgsql 10.
+- **The types of NodaTime and NetTopologySuite are sent and read on each version of Npgsql too.**  A type of [NodaTime](libraries.md#nodatime) is sent and read with its `Npgsql.NodaTime`, and a type of [NetTopologySuite](libraries.md#nettopologysuite) with its `Npgsql.NetTopologySuite`.
 - **NodaTime's types need `UseNodaTime()` on the data source.**  A method that reads or sends a [NodaTime](libraries.md#nodatime) type runs only on a connection of a data source whose builder called `UseNodaTime()`, of `Npgsql.NodaTime`.  For a repository, that is the data source that is its connection source, or the one that its factory method opens connections from.  It is never a connection string.  Without the call, Npgsql throws `InvalidCastException` when the query runs: "Reading as 'NodaTime.Instant' is not supported for fields having DataTypeName 'timestamp with time zone'", or the same for writing.  Call it on the builder:
 
   ```csharp
@@ -124,16 +131,20 @@ The same holds for an array of a library's type, such as NodaTime's or NetTopolo
 - **Such a `models` query needs NodaTime's types, or a data source without the plugin.**  Give it NodaTime's types with the [type override](../../type-mapping.md#setting-type-overrides), `"timestamptz": "NodaTime.Instant"` in a settings file of its folder.  Or read it on a data source without the plugin.
 - **System.Text.Json's types, and a class of yours in a [JSON](libraries.md#json) column, need nothing on the data source.**  This holds on Npgsql 8, 9 and 10: you call no `EnableDynamicJson()`.
 - **If a column holds a null and its property cannot be null, the method throws Npgsql's `InvalidCastException`**, "Column 'name' is null.".  It throws before any converter is called.  A JSON `null` in such a column is not a null: what it gives is under [JSON](libraries.md#json).
-- **`rowcount` is `-1` for a `SELECT`**, and for a `WITH` whose last statement is a `SELECT`, even when its `WITH` updates rows: see [what each shape returns](../../return-types.md#method-shapes).
+- **`rowcount` is `-1` for a `SELECT`**, and for a `WITH` whose last statement is a `SELECT`, even when its `WITH` updates rows.  See [what each shape returns](../../return-types.md#method-shapes).
 - **When the `commandTimeout` of a `methods` method passes, the method throws Npgsql's `NpgsqlException`.**  Its inner exception is a `TimeoutException`.
 - **A synchronous method needs a data source without multiplexing.**  Multiplexing is on when the connection string of the data source has `Multiplexing=true`.  On such a data source:
   - A [synchronous method](../../query-methods.md#synchronous-methods) given a connection that has no transaction open throws `NotSupportedException`, and runs nothing.
   - A synchronous method given a connection in a transaction that the caller has begun on it runs.
-  - A synchronous [collection method](../../collection-methods.md#collection-methods) runs in the transaction that it begins of its own.  So it runs on such a data source too, except where it begins none: under `transaction=off`, or when a `System.Transactions` transaction is open, as inside a `TransactionScope`.
-  - A [synchronous repository method](../../repositories.md#synchronous-repository-methods) runs on a connection with no transaction open, so it throws too.  It runs on a borrowed connection in which your code began a transaction, as above.  The synchronous collection method of the repository runs, as above.
+  - A synchronous [collection method](../../collection-methods.md#collection-methods) runs in the transaction that it begins of its own.  So it runs on such a data source too, except where it begins no transaction.  It begins none under `transaction=off`, or when a `System.Transactions` transaction is open, as inside a `TransactionScope`.
+  - A [synchronous repository method](../../repositories.md#synchronous-repository-methods) throws too, except on a borrowed connection in which your code began a transaction.  It throws since it runs on a connection with no transaction open.
+  - On a borrowed connection in which your code began a transaction, a synchronous repository method runs, as above.
+  - The synchronous collection method of the repository runs, as above.
 - **Give the code that calls synchronous methods a data source without multiplexing**, which is the default.  Or call the asynchronous method that `method-type=both` gives beside the synchronous one.
 - **A cancelled method throws `OperationCanceledException`.**  This holds whether the token was cancelled before the call, while the command runs, or while the rows are read.
-- **A loop over [streamed rows](../../return-types.md#streaming-rows) that ends early throws the error of a row that it left unread.**  The loop ends early at a `break`, or at an exception in its body.  Then the rows still to come are read, and PostgreSQL can raise a `PostgresException` for one of them, such as `22012` for a division by zero.  That exception is thrown when the loop ends, in place of the exception of the body.  It also aborts the transaction that the query ran in.  To keep the exception of the body too, see [streamed rows](../../return-types.md#streaming-rows).
+- **A loop over [streamed rows](../../return-types.md#streaming-rows) that ends early throws the error of a row that it left unread.**  The loop ends early at a `break`, or at an exception in its body.  Then the rows still to come are read.  PostgreSQL can raise a `PostgresException` for one of them, such as `22012` for a division by zero.  That exception is thrown when the loop ends, in place of the exception of the body.  It also aborts the transaction that the query ran in.
+
+  To keep the exception of the body too, see [streamed rows](../../return-types.md#streaming-rows).
 - **A query method with parameters needs a connection whose commands take Npgsql's own parameters.**  The commands of an `NpgsqlConnection` take them.  A connection that wraps Npgsql's and creates parameters of its own fails before the query is sent, as [the limit](../../query-methods.md#limit-wrapped-connection) says.
 
 <a id="collection-methods"></a>
@@ -170,7 +181,7 @@ A query's [collection method](../../collection-methods.md#collection-methods) ru
 
 ### `InvalidCastException` for a NodaTime, PostGIS, enum or composite type in a repository made from a connection string
 
-**What you see.**  A repository method compiles, and throws Npgsql's `InvalidCastException` when it runs, such as "Reading as 'NodaTime.Instant' is not supported".  The method reads or sends a type that needs a plugin or a mapping: a NodaTime type, a PostGIS type, an enum or a composite type.  The connection source of the repository is a connection string.
+**What you see.**  A repository method compiles, and throws Npgsql's `InvalidCastException` when it runs, such as "Reading as 'NodaTime.Instant' is not supported".  The method reads or sends a type that needs a plugin or a mapping.  It is a NodaTime type, a PostGIS type, an enum or a composite type.  The connection source of the repository is a connection string.
 
 **Why.**  For each call, the methods of such a repository make a new `NpgsqlConnection` of the string.  That connection has none of the setup of your application's data source:
 

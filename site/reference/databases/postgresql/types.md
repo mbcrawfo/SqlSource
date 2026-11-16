@@ -29,7 +29,7 @@ The build gives these types to each query whose output is `repository`, `methods
 - **The [`-- param:` marker](../../parameters.md#param-marker) gives one query parameter another C# type.**  For example, `-- param: @id -> MyApp.UserId`.
 - **A type of yours that Npgsql does not read needs [converters](../../converters.md#converters).**  A query method reads and sends the C# type that you give as it is.  So a type such as an id, or an `Email` over a domain, needs converters to and from the C# type of the table below.
 - **A project that references `Npgsql.NodaTime` gets the types of NodaTime for the date and time types.**  This holds for its queries whose output is `repository` or `methods`.  See [NodaTime](libraries.md#nodatime).
-- **A project that references `Npgsql.NetTopologySuite` gets the types of NetTopologySuite for the types of PostGIS.**  See [NetTopologySuite](libraries.md#nettopologysuite).
+- **A project that references `Npgsql.NetTopologySuite` gets the types of NetTopologySuite for the types of PostGIS.**  This holds for its queries whose output is `repository` or `methods`.  See [NetTopologySuite](libraries.md#nettopologysuite).
 - **A project can read its JSON columns as the types of System.Text.Json, or as classes of its own.**  See [JSON](libraries.md#json).
 
 <a id="which-npgsql"></a>
@@ -38,7 +38,7 @@ The build gives these types to each query whose output is `repository`, `methods
 
 Npgsql 10 reads a few types as other C# types than Npgsql 8 and 9 do.  So the C# types follow the `Npgsql` package that the project references, directly or through another package.
 
-- **Npgsql 8, 9 or 10 gets the column of the table below for its version.**  If you update Npgsql from 9 to 10, the C# types of `date`, `time`, `cidr`, `daterange` and `datemultirange` change, as Npgsql 10 reads them as other types.
+- **Npgsql 8, 9 or 10 gets the column of the table below for its version.**  If you update Npgsql from 9 to 10, the C# types of `date`, `time`, `cidr`, `daterange` and `datemultirange` change.  Npgsql 10 reads them as other types.
 - **The supported versions of Npgsql** are in [Supported versions](../index.md#supported-versions).  An older Npgsql is [SQLSRC247](../../../diagnostics.md#sqlsrc247).  Update it.
 - **Npgsql 11 or later gets the types of Npgsql 10.**  The build reports the information [SQLSRC248](../../../diagnostics.md#sqlsrc248), since this version of SqlSource does not know a newer Npgsql.
 - **A project with no Npgsql gets every type that Npgsql 8, 9 and 10 read alike, and models alone.**  An example is a library that holds the queries and leaves the driver to the application.  Give its queries the output `models`.  A query method needs the driver: without it, a query whose output is `repository` or `methods` is [SQLSRC273](../../../diagnostics.md#sqlsrc273).

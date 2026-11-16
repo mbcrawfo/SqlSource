@@ -118,7 +118,7 @@ SqlSource treats a column as one that can be null when one of these is true:
   - `sum(total)` without `GROUP BY`, or with a `GROUP BY` whose every column the `WHERE` sets to one value;
   - `EXISTS (...)` before PostgreSQL 17.
 - **It is a function or an operator of a name that another schema of the database holds as well.**  An example is a `count` or a `*` that an extension installs, in its own schema or in `pg_catalog`.  This holds even for a column that the list above would count as never null.  The tool cannot tell which one the query calls.
-- **It is a column of a `UNION`, an `INTERSECT` or an `EXCEPT`** where a branch can give null, or where SqlSource cannot tell whether a branch gives null.
+- **It is a column of a `UNION`, an `INTERSECT` or an `EXCEPT` where a branch can give null.**  The same holds where SqlSource cannot tell whether a branch gives null.
 - **It is an expression computed in one of these places:**
   - in a subquery in `FROM` or a `WITH` query, such as a `count(*)` that a `WITH` query returns;
   - over a `UNION`, an `INTERSECT` or an `EXCEPT`, such as `count(*)` of a subquery that holds one.
@@ -129,7 +129,7 @@ SqlSource treats a column as one that can be null when one of these is true:
 - **The search path of the connection puts another schema before `pg_catalog`, and the column is one of these.**  This holds even for one that the list above says is never null:
   - `count(*)`, `count(x)`, a ranking, `array_agg`, a JSON builder, or a range constructor or intersection;
   - arithmetic, a comparison, a function, a cast, an aggregate or a subquery;
-  - an `EXISTS (...)` that PostgreSQL runs as an `IN`.  PostgreSQL can do so when the subquery of the `EXISTS` compares one of its columns with one of the outer query's, as the list above says;
+  - an `EXISTS (...)` that PostgreSQL runs as an `IN`.  PostgreSQL can do so when the subquery of the `EXISTS` compares one of its columns with one of the outer query's.  The list above says so too;
   - a `COALESCE`, `GREATEST` or `LEAST` over both sides of a `FULL JOIN`.
 
   These are not affected: constants, tests, `COALESCE` over columns that are never null, any other `EXISTS (...)`, and `merge_action()`.  To avoid this, keep `pg_catalog` first on the search path of the connection that the tool uses.  Or leave `pg_catalog` off the path: PostgreSQL then searches it first.
