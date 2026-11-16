@@ -34,7 +34,7 @@ The attribute has three properties:
 
 | Property | Sets |
 |----|----|
-| `Source` | Which `.sql` files belong to the type: [Source](#setting-source) |
+| `Source` | Which `.sql` files the type claims: [Source](#setting-source) |
 | `GenerateInterface` | Whether a repository gets its interface, over the project's choice: [repository interfaces](repositories.md#repository-interfaces) |
 | `InterfaceName` | The name of a repository's interface, `IUserRepository` by default: [repository interfaces](repositories.md#repository-interfaces) |
 
@@ -133,7 +133,7 @@ A type can claim only a file that the project includes.  [Which files the compil
 - `sqlsource describe` reports [SQLSRC208](../diagnostics.md#sqlsrc208) and describes nothing for the type.  The `Source` of the type is a constant, `nameof`, a concatenation or a cast.  The build then reports [SQLSRC241](../diagnostics.md#sqlsrc241) for each query of the type that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](../diagnostics.md#sqlsrc209) for the file instead.
 - The type is marked with an alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`).  The alias works in the build, but the tool does not see it.  So the tool does not describe the queries of the type, and the build reports SQLSRC241 for them in the same way.
 
-**Why.**  The tool reads the attribute without compiling your code.  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text.  So `Source` must be written out where the attribute is, as a string: `Source = "Queries"`.  A constant, `nameof`, a concatenation or a cast there compiles, but the tool cannot read it.  For the same reason, the tool reads an attribute inside `#if` with the compilation constants that it gets from your project.  These can differ from the constants of the configuration that you build.
+**Why.**  The tool reads the attribute without compiling your code.  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text.  So the tool can read `Source` only when it is written out where the attribute is, as a string: `Source = "Queries"`.  A constant, `nameof`, a concatenation or a cast there compiles, but the tool cannot read it.  For the same reason, the tool reads an attribute inside `#if` with the compilation constants that it gets from your project.  These can differ from the constants of the configuration that you build.
 
 **What to do.**
 
