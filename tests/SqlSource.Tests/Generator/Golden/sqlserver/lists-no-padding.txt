@@ -82,7 +82,7 @@ namespace App
                 throw new global::System.ArgumentException(
                     "The query 'ListIds' would send "
                         + total.ToString(global::System.Globalization.CultureInfo.InvariantCulture)
-                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or use a table-valued parameter.",
+                        + " parameters; SQL Server accepts 2098.  Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON.",
                     "parameters"
                 );
             }

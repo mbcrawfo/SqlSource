@@ -378,7 +378,7 @@ public sealed class ListQueryTests(AppContainer app)
         exception.ParamName.ShouldBe("parameters");
         exception.Message.ShouldStartWith(
             "The query 'ListAccountsByIds' would send 2099 parameters; SQL Server accepts 2098.  "
-                + "Pass fewer values in 'Ids', or use a table-valued parameter."
+                + "Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON."
         );
         connection.State.ShouldBe(ConnectionState.Closed);
     }
@@ -431,7 +431,7 @@ public sealed class ListQueryTests(AppContainer app)
         exception.ParamName.ShouldBe("parameters");
         exception.Message.ShouldStartWith(
             "The query 'ListAccountsByIdsAndStatuses' would send 2099 parameters; SQL Server accepts 2098.  "
-                + "Pass fewer values in 'Ids', or use a table-valued parameter."
+                + "Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON."
         );
         connection.State.ShouldBe(ConnectionState.Closed);
     }
@@ -467,7 +467,7 @@ public sealed class ListQueryTests(AppContainer app)
         exception.ParamName.ShouldBe("parameters");
         exception.Message.ShouldStartWith(
             "The query 'ListAccountsOptional' would send 2099 parameters; SQL Server accepts 2098.  "
-                + "Pass fewer values in 'Ids', or use a table-valued parameter."
+                + "Pass fewer values in 'Ids', or send them as one JSON array read with OPENJSON."
         );
         connection.State.ShouldBe(ConnectionState.Closed);
     }
