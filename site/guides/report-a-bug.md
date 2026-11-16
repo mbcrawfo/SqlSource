@@ -1,10 +1,14 @@
 # Report a wrong model
 
+Make a bug report of one query that gets a wrong type, a wrong nullability or a wrong model, with your own names renamed.
+
+**Use this when** a query gets a model, a type or a nullability that is wrong for what your database returns.  Use it too when the tool refuses a query that your database runs.
+
 <a id="report-a-bug"></a>
 
 ## Reporting a wrong model
 
-Run `dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip` where you run `describe`, with the same connection.  It describes that one query again and writes a bundle, a zip that lets a maintainer run SqlSource on your query with no database, after renaming your names and strings and checking that the renamed bundle still gives your query's answer.  Attach the zip to a [bug report](https://github.com/mbcrawfo/SqlSource/issues/new?template=bug-report.yml), and keep to yourself the mapping of the new names written beside it.  See [what is renamed before you share it](../reference/bundles.md#bundle-contents) for what is renamed and kept, and [reporting a wrong model](#raw-bundle) for what to do when a bundle cannot be renamed.
+Run `diagnose` where you run `describe`, with the same connection.  Name the query with `--query`, and the zip to write with `--out`:
 
 ```console
 $ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip
@@ -13,15 +17,31 @@ sqlsource: mapping '/work/report.zip.mapping.json' written
 sqlsource: the mapping holds your own names: keep it private, outside your project's folder, since a build may copy a .json file into its output
 ```
 
-When a query gets a model, a type or a nullability that is wrong for what your database returns, or the tool refuses a query that your database runs, `diagnose` makes a bug report of that one query: a zip file, the bundle, which a maintainer runs SqlSource on with no database and no schema of yours.  Your names and strings in it are renamed first, as [what is renamed](../reference/bundles.md#bundle-contents) says, so you can attach it to a [bug report on GitHub](https://github.com/mbcrawfo/SqlSource/issues/new?template=bug-report.yml).
+1. Run the command above.
+2. To see what the maintainer sees, run [`replay`](../reference/bundles.md#replay) on the zip.  It says `reproduced`, and its lines name the new names.
+3. Attach the zip to a [bug report on GitHub](https://github.com/mbcrawfo/SqlSource/issues/new?template=bug-report.yml).
+4. Keep the mapping to yourself.  With it, you can read what a maintainer finds in your own names.
 
-- **Run it where you run `describe`**, with the same project or solution, `--project`, connections, `.env` file or `--env-file`, `--verbose` and `--log`.  It describes the one query again against your database, whether or not its sidecar is current, and writes no sidecar.  `--query` names the `.sql` file, a colon and the query's name as its `-- name:` line gives it, letter for letter ([SQLSRC292](../diagnostics.md#sqlsrc292)).
-- **`--out` is required**: the path of the zip.  The mapping is written beside it, with `.mapping.json` added to its name, and a file at either path is overwritten.  Give a path outside your project's folder, such as `../report.zip`, since a build may copy a `.json` file of the project's folder, such as the mapping, into its output.  A path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx` is refused before anything is described ([SQLSRC218](../diagnostics.md#sqlsrc218)).
-- **A query that the tool refuses makes a bundle too**, which holds the error.  The run prints `sqlsource: the query was refused: SQLSRC226`, with the error's id, before the bundle's line, and exits with `0`.  The error itself is not printed again, since `describe` showed it to you.
-- **A database that cannot be opened makes no bundle.**  Its error is printed as `describe` prints it, and the exit code is `1`.
-- **An error in another `.sql` file of the project is not printed**, and does not stop the bundle or change the exit code, since it cannot change the query: `describe` shows it, and the log holds it.  Any other error, such as one in the query's own file, in another query of that file, in a settings file, in a project or in the `.env` file, is printed and makes no bundle, since it may change the query, and the exit code is `1`: fix it and run `diagnose` again.
+**What you get.**  `diagnose` describes that one query again, and writes a bundle of it: a zip file.  A maintainer runs SqlSource on the bundle with no database and no schema of yours.  Before `diagnose` writes the bundle, it renames your names and strings in it.  It also checks that the renamed bundle still gives the answer of your query.  So you can attach the bundle to a bug report.  See [What is renamed before you share it](../reference/bundles.md#bundle-contents) for what is renamed and kept.
 
-Attach the zip to the issue, and keep the mapping to yourself: it lists each new name beside the name of yours it stands for, so that you can read what a maintainer finds in your own names.  To see what the maintainer will see, run [`replay`](../reference/bundles.md#replay) on the zip: it says `reproduced`, and its lines name the new names.
+If a bundle cannot be renamed safely, `diagnose` writes nothing.  Then see [When a bundle cannot be made safe](#raw-bundle).
+
+**The rules you need.**
+
+- **Run it where you run `describe`**, with the same project or solution, `--project`, connections, `.env` file or `--env-file`, `--verbose` and `--log`.  See [Making a bundle with `diagnose`](../reference/bundles.md#diagnose).
+- **It describes the one query again against your database, whether or not its sidecar is current.**  It writes no sidecar.
+- **`--query` names the `.sql` file, a colon and the name of the query.**  Write the name as the `-- name:` line of the query gives it, letter for letter ([SQLSRC292](../diagnostics.md#sqlsrc292)).
+- **`--out` is required**: the path of the zip.  The mapping is written beside it, with `.mapping.json` added to its name.  A file at either path is overwritten.
+- **Give `--out` a path outside the folder of your project**, such as `../report.zip`.  A build can copy a `.json` file of the folder of the project into its output, and the mapping is such a file.
+- **`diagnose` refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`**, before it describes anything ([SQLSRC218](../diagnostics.md#sqlsrc218)).
+- **If the tool refuses the query, `diagnose` makes a bundle too**, which holds the error.  The run prints `sqlsource: the query was refused: SQLSRC226`, with the id of the error, before the line of the bundle.  The exit code is `0`.  The error itself is not printed again, since `describe` showed it to you.
+- **If the database cannot be opened, `diagnose` makes no bundle.**  It prints the error as `describe` prints it, and the exit code is `1`.
+- **An error in another `.sql` file of the project is not printed.**  It does not stop the bundle or change the exit code, since it cannot change the query.  `describe` shows it, and the log holds it.
+- **Any other error is printed, and makes no bundle**, since it can change the query.  The exit code is `1`.  Fix the error, and run `diagnose` again.  These errors include an error in:
+  - the file of the query, or another query of that file;
+  - a settings file;
+  - a project;
+  - the `.env` file.
 
 <a id="what-is-safe"></a>
 
@@ -52,9 +72,21 @@ $ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zi
     see: https://mbcrawfo.github.io/SqlSource/diagnostics.html#sqlsrc293
 ```
 
-`diagnose` writes nothing rather than a bundle it cannot make safe: one that would still hold a text of yours ([SQLSRC293](../diagnostics.md#sqlsrc293)), or whose renamed copy no longer gives your query's answer ([SQLSRC294](../diagnostics.md#sqlsrc294)).  The line names what it found, which is yours, such as a name of your schema: do not paste it into an issue.
+`diagnose` writes nothing rather than a bundle that it cannot make safe.  That is one of these:
 
-Take the private route instead.  Run the same command with `--no-obfuscate`, which writes a raw bundle, with your names and SQL as they are, what the server said in full, and no mapping:
+- a bundle that would still hold a text of yours ([SQLSRC293](../diagnostics.md#sqlsrc293));
+- a bundle whose renamed copy no longer gives the answer of your query ([SQLSRC294](../diagnostics.md#sqlsrc294)).
+
+The error in the sample names the text that it found.  That text is yours, such as a name of your schema, so do not paste the error into an issue.
+
+Take the private route instead:
+
+1. Run the same command with `--no-obfuscate`.
+2. Keep the raw bundle.
+3. Open an issue on GitHub.  Say in it that a raw bundle is ready.
+4. Do not attach the bundle.  A maintainer tells you how to send it.
+
+The command of step 1, and what it prints:
 
 ```console
 $ dotnet sqlsource diagnose --query Queries/Users.sql:GetUser --out ../report.zip --no-obfuscate
@@ -62,9 +94,16 @@ sqlsource: raw bundle '/work/report.zip' written
 sqlsource: this bundle holds your own names and SQL, and must not be posted: open an issue that says a raw bundle is ready, without attaching it, and a maintainer will say how to send it
 ```
 
-Keep the raw bundle, and open an issue on GitHub that says a raw bundle is ready, without attaching it: a maintainer will say how to send it.
+**What you get.**  `--no-obfuscate` writes a raw bundle.  It holds your names and SQL as they are, and what the server said in full.  It writes no mapping.
 
-`--scrub` renames a raw bundle later, with no database, no project and no connection, by the same steps and checks as `diagnose` without `--no-obfuscate`, and writes the renamed bundle and its mapping at `--out`.  It takes no other option.  A bundle that is renamed already is refused ([SQLSRC295](../diagnostics.md#sqlsrc295)).  So is a raw bundle that another version made, when this version does not answer it as it was made: scrub it with the version that made it ([SQLSRC290](../diagnostics.md#sqlsrc290), [SQLSRC296](../diagnostics.md#sqlsrc296)).
+**The rules you need.**
+
+- **`--scrub` renames a raw bundle later**, with no database, no project and no connection.  It uses the same steps and checks as `diagnose` without `--no-obfuscate`.  It writes the renamed bundle and its mapping at `--out`.
+- **`--scrub` takes no other option.**
+- **`--scrub` refuses a bundle that is renamed already** ([SQLSRC295](../diagnostics.md#sqlsrc295)).
+- **`--scrub` refuses a raw bundle that another version made, when this version does not answer it as it was made.**  Scrub it with the version that made it ([SQLSRC290](../diagnostics.md#sqlsrc290), [SQLSRC296](../diagnostics.md#sqlsrc296)).
+
+Here `--scrub` renames the raw bundle of step 1:
 
 ```console
 $ dotnet sqlsource diagnose --scrub ../report.zip --out ../report-renamed.zip
@@ -72,3 +111,11 @@ sqlsource: bundle '/work/report-renamed.zip' written
 sqlsource: mapping '/work/report-renamed.zip.mapping.json' written
 sqlsource: the mapping holds your own names: keep it private, outside your project's folder, since a build may copy a .json file into its output
 ```
+
+## If it does not work
+
+- **SQLSRC293 or SQLSRC294, and no bundle is written.**  `diagnose` cannot make the bundle safe to post.  Make a raw bundle, and send it by the private route.  See [When a bundle cannot be made safe](#raw-bundle).
+- **SQLSRC292 for the query.**  The name after the colon of `--query` must be the name on the `-- name:` line, letter for letter.  See [SQLSRC292](../diagnostics.md#sqlsrc292).
+- **SQLSRC218 for the path of `--out`.**  `diagnose` refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`.  Give the zip a name of its own, outside the folder of your project.  See [SQLSRC218](../diagnostics.md#sqlsrc218).
+- **An error is printed, and no bundle is written.**  The database could not be opened, or an error can change the query.  Fix the error, and run `diagnose` again.  See [Reporting a wrong model](#report-a-bug).
+- **SQLSRC295, SQLSRC290 or SQLSRC296 from `--scrub`.**  `--scrub` refuses a bundle that is renamed already, and a raw bundle that this version does not answer as it was made.  Scrub such a raw bundle with the version that made it.  See [When a bundle cannot be made safe](#raw-bundle).
