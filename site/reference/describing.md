@@ -50,7 +50,7 @@ billing (postgres): 16 described, 0 skipped, 0 failed
 
 `describe --force` describes every query of the run again, current or not.  Run it after a migration, or after any other change to the database that a query reads.  Some examples of such a change:
 
-- a column that can now be null;
+- a column that can be null after the change;
 - a type that changed;
 - a table that was renamed.
 
@@ -80,7 +80,7 @@ sqlsource: watching for changes; press Ctrl+C to stop
 
 - **A file that the tool reads is saved or deleted.**  That is a `.sql` file of your projects, a [settings file](settings-file.md#settings-files) that applies to one, or a C# file of a project.
 - **What a project includes may have changed.**  That is one of these changes:
-  - a new `.sql`, C# or `sqlsource.json` file, or a new folder, in the folder of a project or in a folder that a project lists a file from;
+  - a new `.sql`, C# or `sqlsource.json` file, or a new folder, in the folder of a project or a folder below it, or in a folder that a project lists a file from;
   - a new `sqlsource.json` in a folder above a file that the tool reads, up to the root of your repository;
   - a `.sql` file, a C# file or a settings file that the tool reads renamed, or deleted and still gone when the pass starts;
   - a project file or a solution file saved or deleted;
