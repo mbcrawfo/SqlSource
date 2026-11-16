@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -240,7 +239,8 @@ internal static class HeldFactoryReader
             .All(static pair => pair.One.RefKind == pair.Other.RefKind && AreOneType(pair.One.Type, pair.Other.Type));
 
     // Whether two parameter types are one in a signature: a type parameter of each method is the one of its position,
-    // since each method declares its own; an array or a generic type is one when its parts are.
+    // since each method declares its own; an array or a generic type is one when its parts are, the type it is nested
+    // in among them.
     private static bool AreOneType(ITypeSymbol first, ITypeSymbol second) =>
         (first, second) switch
         {
@@ -252,14 +252,21 @@ internal static class HeldFactoryReader
                 && AreOneType(one.ElementType, other.ElementType),
             (INamedTypeSymbol { IsGenericType: true } one, INamedTypeSymbol { IsGenericType: true } other) =>
                 SymbolEqualityComparer.Default.Equals(one.OriginalDefinition, other.OriginalDefinition)
-                    && one.TypeArguments.Zip(other.TypeArguments, AreOneType).All(static same => same),
+                    && one.TypeArguments.Zip(other.TypeArguments, AreOneType).All(static same => same)
+                    && AreOneContainer(one.ContainingType, other.ContainingType),
             _ => SymbolEqualityComparer.Default.Equals(first, second),
         };
 
-    // Whether the member is an interface's that the factory's class or struct implements, as a type parameter's class
-    // constraint can: a class member hides an interface member there.
+    // Whether two types are nested in one type, or neither in any.
+    private static bool AreOneContainer(INamedTypeSymbol? first, INamedTypeSymbol? second) =>
+        first is null || second is null ? first is null && second is null : AreOneType(first, second);
+
+    // Whether the member is an interface's that the factory's class or struct implements with a member of its own, as a
+    // type parameter's class constraint can: a class member hides an interface member there.  A default member that
+    // the class does not implement is its own implementation, and stays the interface's to call.
     private static bool IsImplementedBy(ISymbol member, INamedTypeSymbol? implementer) =>
         implementer is not null
         && member.ContainingType.TypeKind == TypeKind.Interface
-        && implementer.FindImplementationForInterfaceMember(member) is not null;
+        && implementer.FindImplementationForInterfaceMember(member) is { } implementation
+        && !SymbolEqualityComparer.Default.Equals(implementation, member);
 }

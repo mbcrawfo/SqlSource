@@ -775,4 +775,95 @@ public sealed class HeldFactoryReaderTests
 
         shape.HeldCandidates.Select(static candidate => candidate.Name).ShouldBe(["Open", "Open"]);
     }
+
+    [Fact]
+    public void Read_UnmarkedNewMethodOfTheSameSignature_HidesTheBases()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Open() => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public new DbConnection Open() => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        shape.HeldCandidates.ShouldBeEmpty();
+    }
+
+    // A type nested in two constructions of one generic type is two types, so the overload hides nothing.
+    [Fact]
+    public void Read_OverloadOfAnotherConstructionsNestedType_DoesNotHideTheBases()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public class Outer<T>
+                {
+                    public class Inner { }
+                }
+
+                public class FactoryBase
+                {
+                    [SqlSourceConnection]
+                    public DbConnection Open(Outer<int>.Inner options) => null!;
+                }
+
+                public sealed class DatabaseFactory : FactoryBase
+                {
+                    public DbConnection Open(Outer<string>.Inner options) => null!;
+                }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository(DatabaseFactory dbf);
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.IsMarked.ShouldBeTrue();
+    }
+
+    // A call through a type parameter reaches an interface's default member that its class constraint does not
+    // implement.
+    [Fact]
+    public void Read_DefaultInterfaceMemberThroughATypeParameter_IsACandidate()
+    {
+        var shape = RepositoryShapes.Of(
+            """
+            namespace App
+            {
+                public interface IDatabaseFactory
+                {
+                    [SqlSourceConnection]
+                    DbConnection Open() => null!;
+                }
+
+                public class FactoryBase : IDatabaseFactory { }
+
+                [SqlSourceGenerate]
+                public partial class UserRepository<TFactory>(TFactory dbf)
+                    where TFactory : FactoryBase, IDatabaseFactory;
+            }
+            """
+        );
+
+        var candidate = shape.HeldCandidates.ShouldHaveSingleItem();
+        candidate.Name.ShouldBe("Open");
+        candidate.Holder.ShouldNotBeNull().TypeName.ShouldBe("TFactory");
+    }
 }
