@@ -1,4 +1,4 @@
-# base 60df03a0ac5f2dfe389ea5e3398e988adfcd57cf
+# base 4667ffffa8d6008a8c1d72d8b178ae1ebd48d0cd
 # Words (check rewrite, old > new): members.md 3900 > 4246; models.md 3394 > 3630; model-properties.md 2729 > 2934; return-types.md 1759 > 1968; phase 11782 > 12778.  members.md and models.md are over 3,500.
 unit	disposition	to	arg	words	note
 @site/reference/members.md:7	merge-pair	site/reference/members.md#generator	MP-10	-	The term Generator, merged with the opening of the section into one definition after the samples: the part of the `SqlSource` package that runs in the compiler and writes C# from your `.sql` files.  `SqlSource` 2 > 1 and `.sql` 2 > 1: each was said in the term and in the opening; merges/MP-10.md
