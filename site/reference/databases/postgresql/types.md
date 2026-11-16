@@ -11,26 +11,51 @@ FROM orders
 WHERE id = @id;
 ```
 
-Each column and each parameter of a described PostgreSQL query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided in [Which columns can be null](nullability.md#nullability), not by its type.
+Each column and each parameter of a described PostgreSQL query gets a C# type.  It is the type that Npgsql reads a value of the PostgreSQL type as.  Suppose that the columns of the sample have these types.  Then they get these C# types:
 
-The build gives these types to each query whose output is `models`, `methods` or `repository` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](../../../diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](index.md#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](../../type-mapping.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](../../model-properties.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](../../parameters.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](../../converters.md#converters) to and from the type of the table below.  A project that references `Npgsql.NodaTime` gets NodaTime's types for the date and time types of its queries whose output is `methods` or `repository`: see [NodaTime](libraries.md#nodatime).  One that references `Npgsql.NetTopologySuite` gets NetTopologySuite's for PostGIS's types: see [NetTopologySuite](libraries.md#nettopologysuite).  A project can read its JSON columns as System.Text.Json's types or as classes of its own: see [JSON](libraries.md#json).
+- `id`, a `bigint`, is a `long`.  The parameter `@id` is a `long` too.
+- `placed_at`, a `timestamp with time zone`, is a `System.DateTime`.
+- `total`, a `numeric(12,2)`, is a `decimal`.
+- `tags`, a `text[]`, is a `string[]`.
+- `born`, a `date`, is a `System.DateTime` on Npgsql 8 and 9, or a `System.DateOnly` on Npgsql 10.
+
+The type of a column does not decide whether the column can be null.  See [Which columns can be null](nullability.md#nullability).
+
+The build gives these types to each query whose output is `repository`, `methods` or `models`, and whose entry in its sidecar is current.  They are the types of the properties of the [models](index.md#models) of the query.
+
+- **The build reports an error for a column or a parameter that has no C# type.**  For example, a type that Npgsql cannot read is [SQLSRC246](../../../diagnostics.md#sqlsrc246).  A query with such an error has no models.
+- **The [type override](../../type-mapping.md#setting-type-overrides) gives a type another C# type.**  For example, `"timestamptz": "System.DateTimeOffset"` in the `typeOverrides` of a settings file.
+- **A [column type](../../model-properties.md#setting-column-types) gives one column another C# type.**  For example, `"users.id": "MyApp.UserId"` in the `columnTypes` of a settings file.
+- **The [`-- param:` marker](../../parameters.md#param-marker) gives one query parameter another C# type.**  For example, `-- param: @id -> MyApp.UserId`.
+- **A type of yours that Npgsql does not read needs [converters](../../converters.md#converters).**  A query method reads and sends the C# type that you give as it is.  So a type such as an id, or an `Email` over a domain, needs converters to and from the C# type of the table below.
+- **A project that references `Npgsql.NodaTime` gets the types of NodaTime for the date and time types.**  This holds for its queries whose output is `repository` or `methods`.  See [NodaTime](libraries.md#nodatime).
+- **A project that references `Npgsql.NetTopologySuite` gets the types of NetTopologySuite for the types of PostGIS.**  See [NetTopologySuite](libraries.md#nettopologysuite).
+- **A project can read its JSON columns as the types of System.Text.Json, or as classes of its own.**  See [JSON](libraries.md#json).
 
 <a id="which-npgsql"></a>
 
 ## Which version of Npgsql
 
-A few types are read as another C# type by Npgsql 10 than by Npgsql 8 and 9, so the types follow the `Npgsql` package that the project references, directly or through another package:
+Npgsql 10 reads a few types as other C# types than Npgsql 8 and 9 do.  So the C# types follow the `Npgsql` package that the project references, directly or through another package.
 
-- **Npgsql 8, 9 or 10** gets the column of the table below for its version.  Updating Npgsql from 9 to 10 changes the C# types of `date`, `time`, `cidr`, `daterange` and `datemultirange`, as it changes what Npgsql reads.
-- **Npgsql older than 8** is [SQLSRC247](../../../diagnostics.md#sqlsrc247).  Update it.
-- **Npgsql 11 or later** gets the types of Npgsql 10, with the information [SQLSRC248](../../../diagnostics.md#sqlsrc248), since this version of SqlSource does not know a newer one.
-- **No Npgsql**, as in a library that holds the queries and leaves the driver to the application, gets every type that Npgsql 8, 9 and 10 read alike, and models alone: give its queries the output `models`, since a query method needs the driver ([SQLSRC273](../../../diagnostics.md#sqlsrc273)).  A type that they read differently, and a type of Npgsql's own `NpgsqlTypes` namespace, have no C# type without the driver: each is [SQLSRC249](../../../diagnostics.md#sqlsrc249), unless the type override names it.  For the types that differ, the override says which Npgsql the application runs on: `"date": "System.DateOnly"` and `"time": "System.TimeOnly"` in a settings file's `typeOverrides` for Npgsql 10.
+- **Npgsql 8, 9 or 10 gets the column of the table below for its version.**  If you update Npgsql from 9 to 10, the C# types of `date`, `time`, `cidr`, `daterange` and `datemultirange` change, as Npgsql 10 reads them as other types.
+- **The supported versions of Npgsql** are in [Supported versions](../index.md#supported-versions).  An older Npgsql is [SQLSRC247](../../../diagnostics.md#sqlsrc247).  Update it.
+- **Npgsql 11 or later gets the types of Npgsql 10.**  The build reports the information [SQLSRC248](../../../diagnostics.md#sqlsrc248), since this version of SqlSource does not know a newer Npgsql.
+- **A project with no Npgsql gets every type that Npgsql 8, 9 and 10 read alike, and models alone.**  An example is a library that holds the queries and leaves the driver to the application.  Give its queries the output `models`.  A query method needs the driver: without it, a query whose output is `repository` or `methods` is [SQLSRC273](../../../diagnostics.md#sqlsrc273).
+- **Without Npgsql, each of these types is [SQLSRC249](../../../diagnostics.md#sqlsrc249), unless the type override names it.**  The type has no C# type without the driver.
+  - A type that Npgsql 8, 9 and 10 read differently.
+  - A type of the `NpgsqlTypes` namespace, which is Npgsql's own.
+- **For a type that differs, the type override says which Npgsql the application runs on.**  For Npgsql 10, write `"date": "System.DateOnly"` and `"time": "System.TimeOnly"` in the `typeOverrides` of a settings file.
 
 <a id="type-table"></a>
 
 ## The types
 
-The names are those of PostgreSQL's catalog, which are the [type override's](../../type-mapping.md#setting-type-overrides) keys, with the other spellings PostgreSQL accepts in parentheses.  A type of your own schema is written in a key with its schema, `public.user_status`, and a schema or a name created in double quotes keeps its quotes there: `public."Order Status"`.  A type's length, precision or scale does not change its C# type, but for `bit` and `varbit`.  A cell "Same" is the C# type of Npgsql 8 and 9.
+The table names each type as the catalog of PostgreSQL names it.  These names are the keys of the [type override](../../type-mapping.md#setting-type-overrides).  The other spellings that PostgreSQL accepts are in parentheses.
+
+- **A type of your own schema is written in a key with its schema**, as `public.user_status`.  If the schema or the name was created in double quotes, it keeps its quotes in the key: `public."Order Status"`.
+- **The length, precision or scale of a type does not change its C# type**, except for `bit` and `varbit`.
+- **A cell "Same" is the C# type of Npgsql 8 and 9.**
 
 | PostgreSQL type | Npgsql 8 and 9 | Npgsql 10 | Without Npgsql |
 |----|----|----|----|
@@ -73,7 +98,9 @@ The names are those of PostgreSQL's catalog, which are the [type override's](../
 | `pg_snapshot`, `txid_snapshot`, `pg_node_tree` | None: SQLSRC246.  Cast the column to `text` in the query | Same | Same |
 | `geometry`, `geography`, PostGIS's types, with or without a modifier such as `(Point,4326)` | None: SQLSRC246.  In the query methods of a project that references `Npgsql.NetTopologySuite`, `NetTopologySuite.Geometries.Geometry`: see [NetTopologySuite](libraries.md#nettopologysuite) | Same | Same |
 
-`citext`, `hstore`, `ltree`, `lquery`, `ltxtquery` and `cube` are the types of extensions, and are known by their name in whatever schema the extension was created.  So are PostGIS's `geometry` and `geography`, but a type override names them with that schema, `public.geometry`.  A type that the table does not name gets its C# type by its kind:
+`citext`, `hstore`, `ltree`, `lquery`, `ltxtquery` and `cube` are types of extensions.  SqlSource knows each of them by its name, whatever schema the extension was created in.  The same holds for `geometry` and `geography` of PostGIS, but a type override names these two with that schema: `public.geometry`.
+
+A type that the table does not name gets its C# type by its kind:
 
 | Kind | C# type |
 |----|----|
@@ -89,12 +116,15 @@ The names are those of PostgreSQL's catalog, which are the [type override's](../
 
 ## What to know about some types
 
-- **`timestamptz`** is read as a `System.DateTime` whose `Kind` is `Utc`.  `timestamp`, and `date` on Npgsql 8 and 9, are read with the `Kind` `Unspecified`.  `infinity` and `-infinity` in a `timestamptz` are read as `DateTime.MaxValue` and `DateTime.MinValue`, with the `Kind` `Unspecified`.  To give a `timestamptz` the C# type `System.DateTimeOffset`, map it: `timestamptz=System.DateTimeOffset`.  A query method reads and sends it with nothing more; rows read through Dapper need a type handler: see [the recipe](../../../guides/dapper.md#dapper-with-postgresql).
-- **`numeric`** values `NaN`, `Infinity` and `-Infinity` cannot be read as a `decimal`, and reading one throws.  Keep them out of the column, or cast it to `float8` in the query, which reads them as a `double`.
-- **An `interval` with months or years** cannot be read as a `System.TimeSpan`, and reading one throws.  Map it, `interval=NpgsqlTypes.NpgsqlInterval`, or give one column that type with a [column type](../../model-properties.md#setting-column-types), and a query method reads and sends it as an `NpgsqlInterval`.
-- **`inet`** is read as a `System.Net.IPAddress`, which drops the netmask.  Map it, `inet=NpgsqlTypes.NpgsqlInet`, or give one column that type with a column type, and a query method reads and sends it as an `NpgsqlInet`, which keeps the netmask.
-- **`char(n)`**, `char(1)` included, is a `string`.  The `char` of the table is PostgreSQL's one-byte type, which is written `"char"` with its quotes.
-- **`bit(1)`** is a `bool`, and a `bit(1)[]` column a `bool[]`.  A parameter's type has no length, so a parameter of `bit(1)` is a `System.Collections.BitArray`.
-- **An array that holds a `NULL` element** needs a nullable element, `int?[]`, for an element of a value type, and the type override gives it: `int4[]=int?[]`.  Npgsql also refuses to read such an array under its default `Array Nullability Mode=Never`, so set `Array Nullability Mode=Always` or `PerInstance` in the application's connection string.  An array of a reference type, `text[]`, is read with its `NULL` elements whatever the mode; map `text[]=string?[]` to say that an element can be null.
-- **A multidimensional array** is read as `int[,]` and not `int[]`, and its column's type does not say how many dimensions it has, so a column of `int4[]` that holds a two-dimensional array cannot be read into an `int[]`.  Map it, `int4[]=int[,]`, where every value of the column has two dimensions.
-- **The settings of the application's data source can change what Npgsql reads**, and SqlSource cannot see them.  The table is what a data source made with `NpgsqlDataSourceBuilder`, or a plain `NpgsqlConnection`, reads.  `NpgsqlSlimDataSourceBuilder` reads fewer types until its `Enable...()` methods are called.  The AppContext switch `Npgsql.EnableLegacyTimestampBehavior`, and Npgsql 10's legacy date and time resolver, read some date and time types as other C# types; map those types with the type override to the C# types the application reads.
+- **`timestamptz` is read as a `System.DateTime` whose `Kind` is `Utc`.**  `timestamp` is read with the `Kind` `Unspecified`, and so is `date` on Npgsql 8 and 9.  `infinity` and `-infinity` in a `timestamptz` are read as `DateTime.MaxValue` and `DateTime.MinValue`, with the `Kind` `Unspecified`.
+- **To read a `timestamptz` as a `System.DateTimeOffset`, map it with the type override**: `timestamptz=System.DateTimeOffset`.  A query method then reads and sends it with nothing more.  Rows that Dapper reads need a type handler: see [the recipe](../../../guides/dapper.md#dapper-with-postgresql).
+- **The `numeric` values `NaN`, `Infinity` and `-Infinity` cannot be read as a `decimal`.**  Reading one throws.  Keep them out of the column, or cast the column to `float8` in the query.  They are then read as a `double`.
+- **An `interval` with months or years cannot be read as a `System.TimeSpan`.**  Reading one throws.  Map the type, `interval=NpgsqlTypes.NpgsqlInterval`, or give one column that type with a [column type](../../model-properties.md#setting-column-types).  A query method then reads and sends it as an `NpgsqlInterval`.
+- **`inet` is read as a `System.Net.IPAddress`, which drops the netmask.**  To keep the netmask, map the type, `inet=NpgsqlTypes.NpgsqlInet`, or give one column that type with a column type.  A query method then reads and sends it as an `NpgsqlInet`.
+- **`char(n)` is a `string`, and so is `char(1)`.**  The `char` of the table is the one-byte type of PostgreSQL.  You write it as `"char"`, with its quotes.
+- **`bit(1)` is a `bool`, and a `bit(1)[]` column is a `bool[]`.**  The type of a parameter has no length.  So a parameter of `bit(1)` is a `System.Collections.BitArray`.
+- **An array of a value type that holds a `NULL` element needs a nullable element**, such as `int?[]`.  The type override gives it: `int4[]=int?[]`.  Npgsql also refuses to read such an array under its default `Array Nullability Mode=Never`.  So set `Array Nullability Mode=Always` or `PerInstance` in the connection string of the application.
+- **An array of a reference type, such as `text[]`, is read with its `NULL` elements, whatever the mode.**  To say that an element can be null, map `text[]=string?[]`.
+- **A multidimensional array is read as `int[,]`, not as `int[]`.**  The type of its column does not say how many dimensions it has.  So a column of `int4[]` that holds a two-dimensional array cannot be read into an `int[]`.  If every value of the column has two dimensions, map it: `int4[]=int[,]`.
+- **The settings of the data source of the application can change what Npgsql reads.**  SqlSource cannot see them.  The table shows what a data source made with `NpgsqlDataSourceBuilder` reads, and what a plain `NpgsqlConnection` reads.  `NpgsqlSlimDataSourceBuilder` reads fewer types until its `Enable...()` methods are called.
+- **The legacy behaviours of Npgsql read some date and time types as other C# types.**  They are the AppContext switch `Npgsql.EnableLegacyTimestampBehavior` and the legacy date and time resolver of Npgsql 10.  If the application uses one of them, map those types with the type override to the C# types that the application reads.
