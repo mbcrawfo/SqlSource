@@ -41,7 +41,7 @@ public partial class Accounting(
 **The rules you need.**
 
 - **Several databases can share one dialect.**  Here `billing` and `reports` are both `postgres`.  See [database](../reference/settings.md#setting-database).
-- **The variable of a name is `SQLSOURCE_CONNECTION_` and the name in upper case**: `SQLSOURCE_CONNECTION_BILLING` for `billing`.  See [connections](../reference/connections.md#connections).
+- **The variable of a name is `SQLSOURCE_CONNECTION_` and the name in upper case**, with each character that is not a letter or a digit written as `_`: `SQLSOURCE_CONNECTION_BILLING_V2` for `billing-v2`.  See [connections](../reference/connections.md#connections).
 - **The build reads the database of each query too.**  It chooses the connection of each repository method by it.  See [database](../reference/settings.md#setting-database).
 - **A repository that uses several databases marks one connection for each**, as `[SqlSourceConnection(Database = "billing")]`.  See [One repository on two databases](#repository-on-two) and [a repository's connection](../reference/repositories.md#repository-connection).
 - **For files written for another kind of database, set their dialect.**  See [Read one folder with another dialect](#folder-with-another-dialect).
