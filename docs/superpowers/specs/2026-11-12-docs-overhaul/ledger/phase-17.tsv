@@ -1,4 +1,4 @@
-# base b8bbc9493fea6bf2ff9f159ac243e5429bc69876
+# base d243af81648beffc6884efd59b17ccb48b009e34
 # Word counts (old > new): connection-methods.md 1271 > 1559; exceptions.md 1777 > 2134; collection-methods.md 1710 > 2223; query-methods.md 2909 > 3546; repositories.md 3194 > 3593
 unit	disposition	to	arg	words	note
 site/generator.md:774	move	site/reference/connection-methods.md#methods-that-take-a-connection	-	-	In plain language; reframing: the output methods is for your own code structures, above all a transaction or a timeout that your code controls (`methods` 1 to 2: the sentence of the reframing names it).  Numerals 1 to 4 are new: the steps of the method as a numbered list, in the old order
