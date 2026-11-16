@@ -163,7 +163,7 @@ A [synchronous method](#synchronous-repository-methods) gets its connection in t
 - **On a borrowed connection, a repository method gives its command no transaction.**  To run queries in a transaction, give them the output `methods`: see [transactions and timeouts](#repository-transactions).
 - **On SQL Server, Microsoft.Data.SqlClient refuses the command on a borrowed connection that has a pending transaction.**  It throws `InvalidOperationException`, from a synchronous method as from an asynchronous one.
 - **On PostgreSQL, Npgsql runs the command in the transaction of the borrowed connection.**
-- **An open connection that a factory returns, with a transaction that your code began on it, is the same case.**  Microsoft.Data.SqlClient refuses the command, and Npgsql runs it in that transaction.
+- **An open connection that a factory returns, with a transaction that your code began on it, is the same case.**  Microsoft.Data.SqlClient refuses the command, and Npgsql runs it in that transaction.  The method then disposes the connection, which ends that transaction.
 - **On PostgreSQL, a connection string makes a bare connection.**  The connection knows none of the plugins and mappings of your data source: see [limits](databases/postgresql/query-methods.md#limit-connection-string-repository).  Give a PostgreSQL repository a data source.
 
 The attribute is `SqlSource.SqlSourceConnectionAttribute`.  SqlSource generates it into your project beside `[SqlSourceGenerate]`.  Its one property, `Database`, names the [logical database](settings.md#setting-database) as the `database` setting does.
@@ -233,8 +233,8 @@ By default, every repository gets its interface, named `I` and the name of the t
 
 A repository method takes no transaction and no command timeout.  It runs on the connection that its source gives, under the default timeout of the driver, and gives its command no transaction.  It can still run in a transaction of your code's in two cases:
 
-- **On PostgreSQL, on a connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  This holds for a borrowed connection, and for an open connection that a factory returns.  See [the connection](#repository-connection).
-- **Inside a `TransactionScope`, a connection opened inside the scope takes part in the ambient transaction**, unless its connection string turns enlisting off.  This holds whether the method, a factory or your code opened the connection.  A connection opened before the scope does not.  On PostgreSQL, a data source with `Multiplexing=true` cannot take part: Npgsql throws when the connection is opened.
+- **On PostgreSQL, on a connection on which your code has begun a transaction, Npgsql runs the command in that transaction.**  This holds for a borrowed connection.  It holds for an open connection that a factory returns too, but the method then disposes that connection, which rolls your transaction back.  See [the connection](#repository-connection).
+- **Inside a `TransactionScope`, a connection opened inside the scope takes part in the ambient transaction**, unless its connection string turns enlisting off.  This holds whether the method, a factory or your code opened the connection.  A connection opened before the scope does not, unless your code enlists it with `EnlistTransaction`.  On PostgreSQL, a data source with `Multiplexing=true` cannot take part: Npgsql throws when the connection is opened.
 
 If a query needs to run in a transaction with other queries, or needs its own timeout, give it the output `methods` instead.  Put the query in a file of its own with that output, or write `-- output: methods` on the query.  Your own code in the repository then opens a connection, begins the transaction, and calls the [method that takes a connection](connection-methods.md#methods-that-take-a-connection) of the query.  See [the recipe](../start/transactions.md#queries-in-a-transaction).
 
