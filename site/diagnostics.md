@@ -8,14 +8,18 @@ Each section of this page is one `SQLSRC` diagnostic, under its id.  The help li
 
 Reported by: the build.
 
-SqlSource adds members through a second declaration of the type, which C# allows only when every declaration is `partial`.  The same holds for each type the type is nested in.
+The type, or a type that it is nested in, is not declared `partial`.
+
+SqlSource adds members through a second declaration of the type, and of each type that it is nested in.  C# allows a second declaration only when every declaration is `partial`.
 
 ```csharp
 [SqlSourceGenerate]
 public class UserRepository { }
 ```
 
-Add `partial` to the type named in the message.
+**Fix:**
+
+1. Add `partial` to the type that the message names.
 
 See: [The attribute](reference/attributes.md#attribute)
 
@@ -25,14 +29,19 @@ See: [The attribute](reference/attributes.md#attribute)
 
 Reported by: the build.
 
-A type declared with the `file` modifier exists only in its own source file, so generated code cannot add to it.  The same holds for a type nested in a file-local type.
+The type is file-local, or it is nested in a file-local type.
+
+A type declared with the `file` modifier exists only in its own source file.  So generated code cannot add to it, or to a type nested in it.
 
 ```csharp
 [SqlSourceGenerate]
 file partial class UserRepository { }
 ```
 
-Remove the `file` modifier, or move the attribute to a type that is not file-local.
+**Fix:** do one of these.
+
+- Remove the `file` modifier.
+- Move the attribute to a type that is not file-local.
 
 See: [The attribute](reference/attributes.md#attribute)
 
@@ -42,9 +51,16 @@ See: [The attribute](reference/attributes.md#attribute)
 
 Reported by: the build.
 
+The project targets a framework older than .NET 8.
+
 The generated code uses API that first appeared in .NET 8.
 
-Target `net8.0` or later.  For a project that targets several frameworks, put the attributed types under a condition that excludes the older ones.
+**Fix:** do one of these.
+
+- Target `net8.0` or later.
+- If the project targets several frameworks, put the attributed types under a condition that excludes the older frameworks.
+
+See: [What the build needs](reference/msbuild.md#build-requirements)
 
 ## SQLSRC004
 
@@ -52,14 +68,25 @@ Target `net8.0` or later.  For a project that targets several frameworks, put th
 
 Reported by: the build.
 
-`Source` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it; subfolders are not searched.
+No `.sql` file matches the `Source` of the attribute.
+
+`Source` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it.  Subfolders are not searched.
 
 ```csharp
 [SqlSourceGenerate(Source = "Queries/User.sql")] // The file is Queries/Users.sql.
 public partial class UserRepository { }
 ```
 
-Check the spelling, and that the path starts from the folder of this source file and not from the project.  If the file exists, check that the build sees it.  The package registers the `.sql` files under the project's own folder, so a file outside it, such as a linked file, must be listed as an `AdditionalFiles` item.  So must every `.sql` file of a project that sets `SqlSourceIncludeFiles` to `false`.
+**Fix:**
+
+1. Check the spelling of the path.
+2. Check that the path starts from the folder of this source file, and not from the project.
+3. If the file exists, check that the build sees it.
+
+The package registers the `.sql` files under the folder of the project.  A file must be listed as an `AdditionalFiles` item in these cases:
+
+- The file is outside the folder of the project, such as a linked file.
+- The project sets `SqlSourceIncludeFiles` to `false`.  Then every `.sql` file of the project must be listed.
 
 See: [Source](reference/attributes.md#setting-source)
 
@@ -69,13 +96,20 @@ See: [Source](reference/attributes.md#setting-source)
 
 Reported by: the build.
 
-Without `Source`, the type gets the `.sql` file named for it in the folder of the source file that carries the attribute, `UserRepository.sql` for `UserRepository`.  That folder has no file of that name.
+The folder of the source file that carries the attribute has no SQL file named for the type.
+
+Without `Source`, the type gets the `.sql` file named for it in that folder: `UserRepository.sql` for `UserRepository`.
 
 ```console
 /work/App/Queries/UserRepository.cs(3,2): error SQLSRC005: No 'UserRepository.sql' beside this file.  Add it, or set Source.
 ```
 
-Add `UserRepository.sql` next to the source file, or rename the file you have.  For a file of another name, or several, set `Source`: `Source = "Users.sql"` for one file, `Source = "."` for every `.sql` file of the folder.  If the file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
+**Fix:** do one of these.
+
+- Add `UserRepository.sql` next to the source file.
+- Rename the file you have.
+- For a file of another name, or for several files, set `Source`.  `Source = "Users.sql"` is one file, and `Source = "."` is every `.sql` file of the folder.
+- If the file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
 
 See: [Source](reference/attributes.md#setting-source)
 
@@ -85,7 +119,11 @@ See: [Source](reference/attributes.md#setting-source)
 
 Reported by: the build.
 
-A query whose [member location](reference/members.md#locations) is `nested-class` puts its members in a class nested in the type, named `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and the type already has a member with that name.  The message names it.  The same error is reported when the type itself, or one of its type parameters, has the name: a nested class cannot share either name.
+A query whose [member location](reference/members.md#locations) is `nested-class` puts its members in a class nested in the type.  That class is named `Sql`, unless [the nested class](reference/members.md#setting-nested-class) is named otherwise.  The type already has a member with that name, and the message names it.
+
+The build reports the same error when the type itself, or one of its type parameters, has that name.  A nested class cannot share either name.
+
+The build reports the error at the `[SqlSourceGenerate]` of the type, once for each name that is taken.  A file of the type can have a query whose members would go in a class of that name.  Such a file produces no members and no models for the type.  The other files of the type keep theirs.
 
 ```csharp
 [SqlSourceGenerate]
@@ -99,9 +137,11 @@ public partial class UserRepository
 /work/App/Queries/UserRepository.cs(3,2): error SQLSRC007: 'UserRepository' already has a member named 'Sql', which a file of it names as its nested class.  Rename the member, or set -- nested-class: or -- member-location: in the file.
 ```
 
-The error is reported at the type's `[SqlSourceGenerate]`, once for each name that is taken.  Each file of the type with a query whose members would go in a class of that name produces no members and no models for it, and the type's other files keep theirs.
+**Fix:** do one of these.
 
-Rename the member, the type or the type parameter, give the nested class another name with `-- nested-class:` in the file or `nestedClass` in a settings file, or write `-- member-location: class` so that the queries become members of the type itself.
+- Rename the member, the type or the type parameter.
+- Give the nested class another name, with `-- nested-class:` in the file or `nestedClass` in a settings file.
+- Write `-- member-location: class`, so that the queries become members of the type itself.
 
 See: [Where the members go](reference/members.md#locations)
 
@@ -111,9 +151,13 @@ See: [Where the members go](reference/members.md#locations)
 
 Reported by: the build.
 
-Two `.sql` files of one type each have a query with the same name, and a type cannot have two members with one name.  The error is at the second query, and the message names the file that holds the first.  The file that holds the second query produces no members and no models for that type.
+Two `.sql` files of one type each have a query with the same name.  The error is at the second query, and the message names the file that holds the first.
 
-Rename one of the queries.
+A type cannot have two members with one name.  The file that holds the second query produces no members and no models for that type.
+
+**Fix:**
+
+1. Rename one of the two queries.
 
 See: [Which files belong to a type](reference/attributes.md#files-of-a-type)
 
@@ -123,7 +167,28 @@ See: [Which files belong to a type](reference/attributes.md#files-of-a-type)
 
 Reported by: the build.
 
-A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type, and to a query whose output is `methods` whose method is in a nested class.  Under the [member location](reference/members.md#locations) `nested-class` that type is the generated class, so no query there can have its name, `Sql` unless [the nested class](reference/members.md#setting-nested-class) is named otherwise, and no query method there can have it either.  An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `both`, and a synchronous method, under `sync` or `both`, has the query's name alone, so under `both` the class can have neither name, whatever the query's shape.  Under `class` it is the attributed type, so no query whose output is `sql` or `models` can have that type's name.
+The member of a query would have the name of the type that contains the member.  The error is at the name of the query.
+
+A member cannot have the name of the type that contains it.  The file produces no members and no models for the type until the error is fixed.
+
+The rule applies to two kinds of query:
+
+- A query whose output is `models` or `sql`, whose constant or token method is a member of that type.
+- A query whose output is `methods`, whose method is in a nested class.
+
+The type that contains the member depends on the [member location](reference/members.md#locations):
+
+- **Under `nested-class`, it is the generated class.**  No query there can have the name of that class: `Sql`, unless [the nested class](reference/members.md#setting-nested-class) is named otherwise.  No query method there can have that name either.
+- **Under `class`, it is the attributed type.**  No query whose output is `models` or `sql` can have the name of that type.
+
+A query method takes its name from the query:
+
+- An asynchronous method has the query's name, with `Async` after it under `async-method-suffix`, and always under the generator parameter [`method-type`](reference/generator-parameters.md#setting-generator-parameters) `both`.
+- A synchronous method, under `sync` or `both`, has the query's name alone.
+
+So under `both`, the generated class can have neither of the two names, whatever the shape of the query.
+
+A query method on the type or in the extension class has no member of the class to clash with.  What its name cannot be is [SQLSRC274](#sqlsrc274).
 
 ```sql
 -- name: Sql
@@ -131,7 +196,11 @@ A member cannot have the name of the type that contains it.  This applies to a q
 SELECT 1;
 ```
 
-The error is at the query's name, and the file produces no members and no models for the type until it is fixed.  Rename the query, or write `-- nested-class:` or `-- member-location:` on it.  A query method on the type or in the extension class has no member of the class to clash with: what its name cannot be is [SQLSRC274](#sqlsrc274).
+**Fix:** do one of these.
+
+- Rename the query.
+- Write `-- nested-class:` on the query.
+- Write `-- member-location:` on the query.
 
 See: [Where the members go](reference/members.md#locations)
 
@@ -141,7 +210,9 @@ See: [Where the members go](reference/members.md#locations)
 
 Reported by: the build.
 
-The code SqlSource generates for a type is C# 12, the default language version of a project that targets .NET 8, and the project sets `LangVersion` to an older one.  The message quotes the version the project uses.
+The project sets `LangVersion` to a version older than the code that SqlSource generates.  The message quotes the version that the project uses.
+
+That code is C# 12, the default language version of a project that targets .NET 8.  The build reports the error at each `[SqlSourceGenerate]` attribute, and no type gets members until it is fixed.
 
 ```xml
 <PropertyGroup>
@@ -150,9 +221,16 @@ The code SqlSource generates for a type is C# 12, the default language version o
 </PropertyGroup>
 ```
 
-Remove `LangVersion` to get the default of the target framework, or set it to `12` or later.  It can be set in the project file, in `Directory.Build.props`, and by a `-p:` argument of the build command.
+**Fix:** do one of these.
 
-The error is reported at each `[SqlSourceGenerate]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
+- Remove `LangVersion` to get the default of the target framework.
+- Set `LangVersion` to `12` or later.
+
+The project file, `Directory.Build.props` and a `-p:` argument of the build command can each set it.
+
+- **A project that targets a framework older than .NET 8 gets [SQLSRC003](#sqlsrc003) and not this error.**  Its language version is older by default, and targeting .NET 8 fixes both errors.
+
+See: [What the build needs](reference/msbuild.md#build-requirements)
 
 ## SQLSRC013
 
@@ -160,11 +238,19 @@ The error is reported at each `[SqlSourceGenerate]` attribute, and no type gets 
 
 Reported by: the build.
 
-Two `.sql` files of the project have paths that differ only by upper and lower case: `Users.sql` and `users.sql` in one folder, or a file of the same name in `Queries` and in `queries`.  SqlSource compares paths ignoring case, so that a project builds the same on every operating system, and the two are one file to it.  It would use the one the project lists first and ignore the other.  The error is at the start of the file that would be ignored, and the message names the other one.
+Two `.sql` paths of the project differ only by upper and lower case.  The error is at the start of the file that SqlSource would ignore, and the message names the other one.  The build reports the error only for a `.sql` file that a type claims.
 
-Rename one of the files, or one of the folders.  Such a pair can exist only on a file system that tells upper case from lower, and already breaks a checkout of the repository on Windows and on macOS.
+SqlSource compares paths ignoring case, so that a project builds the same on every operating system.  So the two paths are one file to it.  It would use the one that the project lists first, and ignore the other.
 
-A project that lists one file twice, with spellings that differ by case, gets the same error, because SqlSource may not ask the file system whether two paths are one file.  That takes an `AdditionalFiles` item written by hand for a file that the package already includes, here `Queries/Users.sql`:
+The cause is one of these.
+
+**Two files have paths that differ only by case.**  Examples are `Users.sql` and `users.sql` in one folder, or a file of the same name in `Queries` and in `queries`.  Such a pair can exist only on a file system that tells upper case from lower.  It already breaks a checkout of the repository on Windows and on macOS.
+
+**Fix:**
+
+1. Rename one of the files, or one of the folders.
+
+**The project lists one file twice, with spellings that differ by case.**  SqlSource is not allowed to ask the file system whether two paths are one file, so the build reports the same error.  An `AdditionalFiles` item written by hand, for a file that the package already includes, causes it.  Here the file is `Queries/Users.sql`:
 
 ```xml
 <ItemGroup>
@@ -172,9 +258,10 @@ A project that lists one file twice, with spellings that differ by case, gets th
 </ItemGroup>
 ```
 
-Remove the item, since the package already includes the file.  To change the item the package adds, write `Update` in place of `Include`, and spell the path as it is on disk.
+**Fix:** do one of these.
 
-The error is reported only for a `.sql` file that a type uses.
+- Remove the item, since the package already includes the file.
+- To change the item that the package adds, write `Update` in place of `Include`.  Spell the path as it is on disk.
 
 See: [Source](reference/attributes.md#setting-source)
 
@@ -184,7 +271,16 @@ See: [Source](reference/attributes.md#setting-source)
 
 Reported by: the build and the tool.
 
-A settings file, `sqlsource.json`, holds one JSON object, and this one does not: its text is not JSON, or it is JSON whose top level is an array, a string or another value that is not an object.  The message says which.  The JSON of a settings file may have `//` and `/* */` comments, and a comma after the last member of an object or the last element of an array; anything else that JSON does not allow is this error, a missing comma or a key without quotes among them, and so is a value nested more than 64 levels deep.  The error is at the first character that breaks the JSON, or at the end of a file that is cut short; for a top level that is not an object, it is at the whole value.
+A settings file, `sqlsource.json`, holds one JSON object, and this one does not.  The message says which of these is the cause:
+
+- The text is not JSON.
+- The text is JSON whose top level is an array, a string or another value that is not an object.
+
+The JSON of a settings file can have `//` and `/* */` comments.  It can also have a comma after the last member of an object or the last element of an array.  Anything else that JSON does not allow is this error, such as a missing comma or a key without quotes.  So is a value nested more than 64 levels deep.
+
+The error is at the first character that breaks the JSON, or at the end of a file that is cut short.  For a top level that is not an object, the error is at the whole value.
+
+While the JSON is wrong, the file gives nothing.  None of its settings applies, and neither does its `root`.
 
 ```jsonc
 {
@@ -194,7 +290,9 @@ A settings file, `sqlsource.json`, holds one JSON object, and this one does not:
 }
 ```
 
-Correct the JSON.  While it is wrong the file gives nothing: none of its settings applies, and neither does its `root`.
+**Fix:**
+
+1. Correct the JSON.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -204,7 +302,9 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A key of the top-level object of a settings file is not one of its keys.  Keys are matched exactly, case included, so `Dialect` is reported.  The message quotes the key, and the error is at it.
+A key of the top-level object of a settings file is not one of the keys of a settings file.  The message quotes the key, and the error is at the key.
+
+Keys are matched exactly, case included, so `Dialect` gets this error.  While the key is wrong, its value is not read, and the other members still apply.
 
 ```jsonc
 {
@@ -213,7 +313,12 @@ A key of the top-level object of a settings file is not one of its keys.  Keys a
 }
 ```
 
-The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes`, `nestedClass`, `memberLocation` and `visibility`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
+**Fix:** do one of these.
+
+- Correct the key.
+- Remove the member.
+
+The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes`, `nestedClass`, `memberLocation` and `visibility`.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -223,7 +328,7 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A key is written twice in the top-level object of a settings file.  The first member applies, and each later one is reported at its key, whatever its value.
+A key is written twice in the top-level object of a settings file.  The first member applies.  Each later member gets this error at its key, whatever its value.
 
 ```jsonc
 {
@@ -233,7 +338,9 @@ A key is written twice in the top-level object of a settings file.  The first me
 }
 ```
 
-Remove one of the two members, and keep the value you want.
+**Fix:**
+
+1. Remove the member whose value you do not want.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -243,7 +350,22 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides` and `libraryTypes` an object whose values are strings, `columnTypes` an object whose values are strings or objects of a `"type"` string and an optional `"json"` boolean, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
+A value of a settings file is not of the JSON type that its key takes.  The message names the key and what it takes, and the error is at the value.
+
+Each key takes one JSON type:
+
+- `root` takes `true` or `false`.
+- `generatorParameters` takes an array of strings.
+- `typeOverrides` and `libraryTypes` take an object whose values are strings.
+- `columnTypes` takes an object whose values are strings, or objects of a `"type"` string and an optional `"json"` boolean.
+- Every other key takes a string.
+
+`null` is of the wrong type for every key.
+
+While a value is of the wrong type, the file does not set its setting.  Arrays and objects follow these rules:
+
+- An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, that is of the wrong type gets this error on its own.  It is left out, and the others still apply.
+- An array that has elements, none of them a string, sets nothing.  `[]` sets nothing too.
 
 ```jsonc
 {
@@ -257,7 +379,12 @@ A value of a settings file is not of the JSON type its key takes.  `root` takes 
 }
 ```
 
-Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, and so does `[]`.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
+**Fix:** do one of these.
+
+- Write the value as its key takes it, such as `"root": true` or `"generatorParameters": ["keep-comments"]`.
+- To leave a setting unset, remove its member.
+
+For a key that takes a string, an empty string also sets nothing, and so does a string of white space.  Such a string is not an error.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -267,9 +394,18 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build and the tool.
 
-A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides`, `columnTypes` or `libraryTypes` it quotes the member as `key: value`.  The error is at the string, or for a member from its key to its value.
+A value of a settings file has the JSON type that its key takes, but its setting does not take the value.  The message quotes the value, trimmed, and names the key.  For a member of `typeOverrides`, `columnTypes` or `libraryTypes`, the message quotes the member as `key: value`.  The error is at the string.  For a member, the error runs from its key to its value.
 
-A member of `columnTypes` written as an object takes a `"type"` string, its C# type, and may take `"json"`, `true` or `false`, and no other member; with `"json": true` its type cannot be `default`.  An object that has no `"type"` string, a `"json"` that is not `true` or `false`, a member twice or any other member is quoted by its key alone, and one whose type is not valid as `key: type`, and the message says what the object takes.
+A member of `columnTypes` can be written as an object.  The object takes a `"type"` string, its C# type.  It can also take `"json"`, `true` or `false`, and no other member.  With `"json": true`, its type cannot be `default`.  The message quotes the object by its key alone when the object has one of these:
+
+- no `"type"` string;
+- a `"json"` that is not `true` or `false`;
+- a member twice;
+- any other member.
+
+If the type of the object is not valid, the message quotes it as `key: type`.  In each case, the message says what the object takes.
+
+While the value is wrong, this file does not set the setting, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides`, `columnTypes` and `libraryTypes`, each element or member that is not valid gets this error on its own.  The others still apply.
 
 ```jsonc
 {
@@ -290,25 +426,87 @@ A member of `columnTypes` written as an object takes a `"type"` string, its C# t
 }
 ```
 
-Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides`, `columnTypes` and `libraryTypes` each element or member that is not valid is reported on its own, and the others still apply.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides`, `columnTypes` or `libraryTypes` whose key or value is empty or white space is reported.
+**Fix:** do one of these.
 
-`dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.  After `mysql` or `mariadb` the value may name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
+- Correct the value.
+- Remove the value.
 
-`output` takes `sql`, `models`, `methods` or `repository`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`, `memberLocation` takes `extension-class`, `class` or `nested-class`, and `visibility` takes `public`, `internal`, `protected` or `private`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name, and `nestedClass` takes one identifier that is none of those and not `var`.  `database` takes one word of letters, digits, `-`, `_` and `.`.
+The values that each key takes follow.
 
-`generatorParameters` takes one word in each element: a generator parameter, `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` or `method-type`, alone or followed by `=on`, `=off` or `=default`, or `default` alone, in any case; `transaction` also takes the words of an isolation level, and `method-type` takes only `=async`, `=sync`, `=both` or `=default`.  A name that is not one is reported, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them, and so is a value that is not one of the parameter's or `default`, and `default` followed by `=`.  `[]` names no parameter and changes nothing, and `["default"]` gives every parameter its default.  The rules are in [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
+`dialect` takes the name of a dialect, in any case: `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`.  Some names have another spelling:
 
-`typeOverrides` takes members `"key": "type"`, and the key and the type of each are trimmed:
+- `sqlserver` and `tsql` also mean `mssql`.
+- `postgresql` also means `postgres`.
+- `cockroach` also means `cockroachdb`.
 
-- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, each written `\"` in JSON, as in `"\"my schema\".\"order-status\""`, and a part may be in `U&"..."` with escapes, an escape that is not valid making the member not valid.
-- **A key is not written in brackets.**  `"[dbo].[Email]"` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly and is written `"\"dbo\".\"Email\""` as a JSON key.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `"int4": "int"` and not `"int4": "int?"`.  It may also be `default`.
+After `mysql` or `mariadb`, the value can name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  Each of these makes the whole value wrong:
+
+- an option that does not exist;
+- an option after any other dialect;
+- a comma with nothing before it or after it.
+
+These keys take one value from a list.  The value matches in any case, and with or without hyphens and spaces:
+
+- `output` takes `repository`, `methods`, `models` or `sql`.
+- `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`.
+- `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`.
+- `memberLocation` takes `extension-class`, `class` or `nested-class`.
+- `visibility` takes `public`, `internal`, `protected` or `private`.
+
+These keys take a name or a word:
+
+- `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier.
+- `modelNamespace` takes a namespace such as `App.Models`.  None of its parts can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  C# does not take these as the name of a type.
+- `nestedClass` takes one identifier.  It cannot be one of those words, and it cannot be `var`.
+- `database` takes one word of letters, digits, `-`, `_` and `.`.
+
+`generatorParameters` takes one word in each element, in any case.  The word is one of these:
+
+- A generator parameter, alone or followed by `=on`, `=off` or `=default`.  The generator parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` and `method-type`.
+- `default` alone.
+
+`transaction` also takes the words of an isolation level.  `method-type` takes only `=async`, `=sync`, `=both` or `=default`.
+
+In `generatorParameters`, each of these gets this error:
+
+- a name that is not a generator parameter, `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews among them;
+- a value that is neither one of the values of the generator parameter nor `default`;
+- `default` followed by `=`.
+
+`[]` names no generator parameter and changes nothing.  `["default"]` gives every generator parameter its default.  The rules are in [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
+
+`typeOverrides` takes members `"key": "type"`.  The key and the type of each member are trimmed.
+
+- **The key is the one-word name of a type.**  Write `timestamptz` and not `timestamp with time zone`, and `float8` and not `double precision`.  Every built-in type has one.
+- **A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema.**  Examples are `public.user_status` and `dbo.Email`.  A name without a schema must be a type that SqlSource knows.  So `user_status` and the misspelling `timestampz` get this error.
+- **A value serves PostgreSQL and SQL Server alike.**  So a name of the types of either database, such as `int4` or `nvarchar`, does not get this error.
+- **A schema or a name can be in double quotes.**  Each quote is written `\"` in JSON, as in `"\"my schema\".\"order-status\""`.
+- **A part can be in `U&"..."` with escapes.**  An escape that is not valid makes the member not valid.
+- **A key is not written in brackets.**  `"[dbo].[Email]"` gets this error.  The message shows the forms that SqlSource reads:
+  - `dbo.Email`, which matches the name of the type in any case.
+  - `"dbo"."Email"`, which matches its case exactly.  As a JSON key, it is written `"\"dbo\".\"Email\""`.
+  - For a key without a schema, the plain form alone: `[INT]` is `INT`.  A quoted name without a schema must be in lower case.
+  - For a part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, the quoted form alone: `"my schema"`.
+- **The C# type is a keyword, a full name or a short name**, such as `System.DateTimeOffset` or `DateTimeOffset`.  It has no `?` at the end: `"int4": "int"` and not `"int4": "int?"`.  It can also be `default`.
 
 The rules are in [type overrides](reference/type-mapping.md#setting-type-overrides).
 
-`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](reference/model-properties.md#setting-column-types).
+`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column that a value is read from: `table.column` or `schema.table.column`.  Each part is plain or in double quotes.  So each of these gets this error:
 
-`libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime`, `netTopologySuite` or `json`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](reference/library-types-and-json.md#setting-library-types).
+- `id`, a key of one part;
+- a key of four parts;
+- a key in brackets;
+- a key with `[]`.
+
+Its C# type is read as the type of a type override is, or is `default`.  The rules are in [column types](reference/model-properties.md#setting-column-types).
+
+`libraryTypes` takes members `"library": "state"`.  Each is trimmed and matched ignoring case, hyphens and spaces.  The library is `nodaTime`, `netTopologySuite` or `json`, and the state is `on`, `off` or `default`.  The message names them.  The rules are in [library types](reference/library-types-and-json.md#setting-library-types).
+
+Values that are empty or white space follow these rules:
+
+- **For a key that takes a string, a value that is empty or white space sets nothing.**  It is not an error.
+- **An element of `generatorParameters` that is empty or white space is skipped.**
+- **A member of `typeOverrides`, `columnTypes` or `libraryTypes` whose key or value is empty or white space gets this error.**
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -318,9 +516,23 @@ See: [Settings files](reference/settings-file.md#settings-files)
 
 Reported by: the build.
 
-Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, have one key, or two elements of `generatorParameters` give one generator parameter two different states.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, `nodaTime` and `NodaTime` one library, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
+An entry of a settings file repeats another entry of the same setting.  The cause is one of these:
 
-In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states of one parameter, and so are `keep-comments=default` and either of them, even where the default is the same.  The first applies, and the second is reported at its element.  The same state twice is no error.
+- Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, have one key.
+- Two elements of `generatorParameters` give one generator parameter two different states.
+
+Of two members that are one, the first applies, and the build reports the second at its key.  The message quotes both keys and names the setting.
+
+Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved.  So each of these pairs is one key:
+
+- `integer` and `int4` name one PostgreSQL type.
+- `"users".id` and `users.id` name one column.
+- `nodaTime` and `NodaTime` name one library.
+- `timestamptz` and `TIMESTAMPTZ` are one key, since an unqualified built-in type name is one in any case.
+
+Keys that differ only in the case of a plain part of a qualified name are two keys, and the build reports nothing.  So `users.id` and `Users.ID` both apply, and so do `dbo.Email` and `DBO.EMAIL`.  A type or column whose name matches one of them exactly takes that one.
+
+In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states of one generator parameter.  So are `keep-comments=default` and either of them, even where the default is the same.  The first applies, and the build reports the second at its element.  The same state twice is no error.
 
 ```jsonc
 {
@@ -336,7 +548,9 @@ In `generatorParameters`, `keep-comments` and `keep-comments=off` are two states
 }
 ```
 
-Remove one of the two, and keep the C# type or the state you want.
+**Fix:**
+
+1. Remove one of the two entries.  Keep the one with the C# type or the state that you want.
 
 See: [Settings files](reference/settings-file.md#settings-files)
 
@@ -348,9 +562,18 @@ Reported by: the build.
 
 The error comes before the build compiles anything.
 
-The build's C# compiler is older than the one SqlSource needs, which is the compiler of the .NET SDK 9.0.300 and later, and of Visual Studio 2022 17.14 and later.  The message names the version of the compiler the build found.  The build stops, and no query gets a method: a compiler that old cannot run SqlSource at all.
+The C# compiler of the build is older than the compiler that SqlSource needs.  The message names the version of the compiler that the build found.
 
-Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later.  A project can still target .NET 8: the SDK builds it, and what it runs on is the framework it targets.  A `global.json` that pins an older SDK keeps the build on the old compiler, so change the version it pins.
+SqlSource needs the compiler of the .NET SDK 9.0.300 or later, or of Visual Studio 2022 17.14 or later.  A compiler that old cannot run SqlSource at all.  So the build stops, and no query gets a method.
+
+**Fix:**
+
+1. Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later.
+2. If a `global.json` pins an older SDK, change the version that it pins.  Such a file keeps the build on the old compiler.
+
+- **A project can still target .NET 8.**  The SDK builds it, and the project runs on the framework that it targets.
+
+See: [What the build needs](reference/msbuild.md#build-requirements)
 
 ## SQLSRC022
 
@@ -358,13 +581,23 @@ Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later
 
 Reported by: the build.
 
-A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException` in two or more of the projects or packages it references, each of which uses SqlSource and either grants this project `InternalsVisibleTo` or makes its exceptions public.  The query methods of this project throw one type of each, and they cannot take one copy over the other.  The message names the assemblies.  The project still gets its own exceptions, so the error is the only one, but code that names the exceptions may also get the compiler's warning CS0436.
+A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` or `CollectionItemException` in two or more of the projects or packages that it references.  Each of those uses SqlSource, and either grants this project `InternalsVisibleTo` or makes its exceptions public.  The message names the assemblies.  The error has no file and line, because it is about the project's references.
+
+The query methods of this project throw one type of each, and they cannot take one copy over the other.  The project still gets its own exceptions, so the error is the only one.  Code that names the exceptions can also get the compiler's warning CS0436.
 
 ```console
 CSC : error SQLSRC022: This project sees UnexpectedRowCountException, TransactionRolledBackException or CollectionItemException in more than one referenced assembly: DataA, DataB.  Use SqlSource in one project that the others reference and that grants them InternalsVisibleTo, so that they all use its exceptions.
 ```
 
-Add a shared project that references SqlSource, needs no query, and grants `InternalsVisibleTo` to each project that uses SqlSource and sees it, this project among them.  Have those projects reference it.  Each then uses the shared project's exceptions instead of writing its own, and this project sees one copy: see [the recipe](guides/several-projects.md#share-the-exceptions).  The shared project grants `InternalsVisibleTo` to every project that catches the exceptions by type, and to every project that uses SqlSource and sees a data project's internals, the data projects' test projects among them: such a project that does not see the shared project's copy gets its own, and its `catch (UnexpectedRowCountException)` compiles but does not catch what a data project's method throws.  The error has no file and line, because it is about the project's references.
+**Fix:**
+
+1. Add a shared project that references SqlSource and needs no query.
+2. Have the shared project grant `InternalsVisibleTo` to each project that uses SqlSource and sees it, this project among them.
+3. Have those projects reference the shared project.
+
+Each of those projects then uses the exceptions of the shared project instead of writing its own, and this project sees one copy.  See [the recipe](guides/several-projects.md#share-the-exceptions).
+
+- **The shared project grants `InternalsVisibleTo` to every project that catches the exceptions by type.**  It also grants it to every project that uses SqlSource and sees the internals of a data project.  The test projects of the data projects are among them.  If such a project does not see the copy of the shared project, it gets its own.  Its `catch (UnexpectedRowCountException)` then compiles, but does not catch what a method of a data project throws.
 
 See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
@@ -374,13 +607,17 @@ See: [Projects that share internals](reference/exceptions.md#projects-that-share
 
 Reported by: the build.
 
-A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException` in a project or package it references, but not as this version of SqlSource writes them: one of them is missing, or its constructors differ from this version's.  That happens when the other project uses another version of SqlSource.  The message names the assembly.  The project still gets its own exceptions, so the error is the only one from SqlSource, but code that names the exceptions, its query methods among them, may also get the compiler's warning CS0436.
+A project that uses SqlSource sees `UnexpectedRowCountException`, `TransactionRolledBackException` and `CollectionItemException` in a project or package that it references.  They are not as this version of SqlSource writes them: one of them is missing, or its constructors differ from this version's.  The message names the assembly.  The error has no file and line, because it is about the project's references.
+
+That happens when the other project uses another version of SqlSource.  The project still gets its own exceptions, so the error is the only one from SqlSource.  Code that names the exceptions, its query methods among them, can also get the compiler's warning CS0436.
 
 ```console
 CSC : error SQLSRC023: The UnexpectedRowCountException, TransactionRolledBackException and CollectionItemException that this project sees in Data are not those of this version of SqlSource.  Use the same version of SqlSource in both projects.
 ```
 
-Use the same version of SqlSource in every project of the solution, for example with central package management.  The error has no file and line, because it is about the project's references.
+**Fix:**
+
+1. Use the same version of SqlSource in every project of the solution, for example with central package management.
 
 See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
@@ -392,13 +629,20 @@ Reported by: the build.
 
 The error is at the project file.
 
-The project sets the MSBuild property `SqlSourceOnline` to a value that is not `auto`, `true` or `false`.  The case of the value and the white space around it do not matter, so ` True ` is `true`, and an empty value is `auto`.  The message names the value, without the white space around it.  The build stops before it compiles anything.
+The project sets the MSBuild property `SqlSourceOnline` to a value that is not `auto`, `true` or `false`.  The message names the value, without the white space around it.  The build stops before it compiles anything.
 
 ```console
 /repo/App/App.csproj : error SQLSRC024: SqlSourceOnline is 'yes', which is not auto, true or false.  Set it to one of the three, or leave it empty for auto.
 ```
 
-Set `SqlSourceOnline` to `auto`, `true` or `false`, or remove it to get `auto`.  The property can come from the project file or from a `Directory.Build.props` above it.
+**Fix:** do one of these.
+
+- Set `SqlSourceOnline` to `auto`, `true` or `false`.
+- Remove the property to get `auto`.
+
+The property can come from the project file or from a `Directory.Build.props` above it.
+
+- **The case of the value and the white space around it do not matter.**  So ` True ` is `true`, and an empty value is `auto`.
 
 See: [Running the tool in the build](reference/msbuild.md#online-build)
 
@@ -410,13 +654,22 @@ Reported by: the build.
 
 The error is at the project file.
 
-`SqlSourceOnline` is `true`, so a build that is not in CI runs `dotnet sqlsource describe` on the project before it compiles, and it could not start the tool: no tool manifest in the project's folder or a folder above it names `SqlSource.Tool`, or the tool it names was never restored on this machine.  The build stops.
+The build could not start the tool, and stops.  `SqlSourceOnline` is `true`, so a build that is not in CI runs `dotnet sqlsource describe` on the project before it compiles.
+
+The cause is one of these:
+
+- No tool manifest in the folder of the project, or in a folder above it, names `SqlSource.Tool`.
+- The tool that the manifest names was never restored on this machine.
 
 ```console
 /repo/App/App.csproj : error SQLSRC025: The build could not start the sqlsource tool, and SqlSourceOnline is true.  Install SqlSource.Tool as a local tool, run 'dotnet tool restore' if the tool manifest names it already, or set SqlSourceOnline to false to build from the committed sidecars.
 ```
 
-Install the tool as a local tool of the repository, as under [install the tool](reference/cli.md#install-the-tool), or run `dotnet tool restore` where the tool manifest names it already.  To build from the sidecars you have committed, without the tool, set `SqlSourceOnline` to `false`.
+**Fix:** do one of these.
+
+- Install the tool as a local tool of the repository, as [install the tool](reference/cli.md#install-the-tool) says.
+- If the tool manifest names the tool already, run `dotnet tool restore`.
+- To build from the sidecars that you committed, without the tool, set `SqlSourceOnline` to `false`.
 
 See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
@@ -428,13 +681,26 @@ Reported by: the build.
 
 The warning is at the project file.  A project can list `SQLSRC026` in the MSBuild property `MSBuildWarningsAsMessages`, which turns the warning into a message.
 
-`SqlSourceOnline` is `auto`, or not set, and the build found a connection, the variable `SQLSOURCE_CONNECTION` or the build's `.env` file, the one in the project's folder or the one [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) names, so it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool: no tool manifest names `SqlSource.Tool`, or the tool it names was never restored on this machine.  It is a warning: the build goes on with the sidecars it has, as a build with no connection does, and the next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
+`SqlSourceOnline` is `auto`, or not set, and the build found a connection.  So it ran `dotnet sqlsource describe` on the project before it compiled, and it could not start the tool.
+
+The connection that the build found is the variable `SQLSOURCE_CONNECTION` or the build's `.env` file.  That file is the one in the folder of the project, or the one that [`SqlSourceEnvFile`](reference/msbuild.md#setting-env-file) names.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too.
+
+The cause is one of these:
+
+- No tool manifest names `SqlSource.Tool`.
+- The tool that the manifest names was never restored on this machine.
 
 ```console
 /repo/App/App.csproj : warning SQLSRC026: The build could not start the sqlsource tool, and goes on with the committed sidecars.  Run 'dotnet tool restore', or install SqlSource.Tool as a local tool, for the build to describe the queries; or set SqlSourceOnline to false to build from the sidecars without this warning.
 ```
 
-Run `dotnet tool restore`, or install the tool as under [install the tool](reference/cli.md#install-the-tool), and the next build describes the queries.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too: set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars, which also stops the warning.
+**Fix:** do one of these.
+
+- Run `dotnet tool restore`.  The next build then describes the queries.
+- Install the tool as [install the tool](reference/cli.md#install-the-tool) says.  The next build then describes the queries.
+- To build the project from its committed sidecars, set `SqlSourceOnline` to `false`.  That also stops the warning.
+
+This is a warning: the build goes on with the sidecars that it has, as a build with no connection does.  The next build tries the tool again.  It stays a warning under `-warnaserror`, and the project's `TreatWarningsAsErrors` does not reach it.
 
 See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
@@ -446,13 +712,18 @@ Reported by: the build.
 
 The error is at the project file.
 
-The build ran `dotnet sqlsource describe` on the project before it compiled, and the tool ended with an exit code other than 0 without reporting an error of its own, so the build cannot tell whether the sidecars are current, and stops.  The message names the exit code and the first line the tool printed.  The usual cause is a tool older than the `SqlSource` package, which does not know an option the build gives it and prints a line such as `sqlsource: unknown option at position 2`; the message then says to update the tool.
+The build ran `dotnet sqlsource describe` on the project before it compiled.  The tool ended with an exit code other than 0, and it reported no error of its own.  The message names the exit code and the first line that the tool printed.
+
+The build cannot tell whether the sidecars are current, so it stops.  The usual cause is a tool older than the `SqlSource` package.  Such a tool does not know an option that the build gives it, and prints a line such as `sqlsource: unknown option at position 2`.  The message then says to update the tool.
 
 ```console
 /repo/App/App.csproj : error SQLSRC027: The sqlsource tool exited with the code 1 and reported no error, so the sidecars may not be current.  The tool may be older than the SqlSource package, and not know the options the build gives it: update it to the package's version with 'dotnet tool update SqlSource.Tool --version <version>'.  It printed first: 'sqlsource: unknown option at position 2'.
 ```
 
-Bring the tool to the version of the `SqlSource` package the project uses, with `dotnet tool update SqlSource.Tool --version <version>`: the two are released together under one version number.  If the versions are the same, run `dotnet sqlsource describe` in the project's folder to see what the tool says.
+**Fix:**
+
+1. Bring the tool to the version of the `SqlSource` package that the project uses, with `dotnet tool update SqlSource.Tool --version <version>`.  The two are released together under one version number.
+2. If the versions are the same, run `dotnet sqlsource describe` in the folder of the project to see what the tool says.
 
 See: [Running in the build](reference/msbuild.md#running-in-the-build)
 
@@ -464,7 +735,15 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A query whose output is `repository` gets an instance method of the type that claims it, and the method takes its connection from a member of the type: a `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`, or one of a type that derives from `DbDataSource`, or the member you mark `[SqlSourceConnection]`.  The type has none of these for a database that its repository queries use.
+The type has no member that gives a connection for a database that its repository queries use.  The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection.
+
+A query whose output is `repository` gets an instance method of the type that claims it.  The method takes its connection from one of these members of the type:
+
+- a `string` field, property or primary-constructor parameter named `connectionString`, `_connectionString` or `ConnectionString`;
+- a field, property or primary-constructor parameter of a type that derives from `DbDataSource`;
+- the member that you mark `[SqlSourceConnection]`.
+
+The repository queries of a database without a connection get no method.  The database is the one that the [database](reference/settings.md#setting-database) setting of the queries names, or the name of their dialect.
 
 ```csharp
 [SqlSourceGenerate]
@@ -478,13 +757,14 @@ public partial class UserRepository
 /work/App/UserRepository.cs(1,2): error SQLSRC028: 'App.UserRepository' has no connection for the database 'postgres', which its repository queries use.  Add a string field, property or primary-constructor parameter named connectionString, or one of a DbDataSource type, or mark the member that gives the connection [SqlSourceConnection].  Or set the output of its repository queries to methods.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, once for each database without a connection, and the repository queries of that database get no method.  The database is the one the queries' [database](reference/settings.md#setting-database) setting names, or their dialect's name.
+**Fix:** do one of these.
 
-- Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`, or mark the member that gives the connection `[SqlSourceConnection]`.
-- When a member is marked, no other is found by its name or type: mark the one for this database too.
-- A primary-constructor parameter that the type also passes to its base type, or uses to initialize a field or property, is not found by its name or type, and the message names it: keep the value in a field or property named `connectionString` or of a `DbDataSource` type, or mark the parameter `[SqlSourceConnection]`.
-- When the type's repository queries use more than one database, no member is found by its name or type, since nothing says which database it is for: mark one member for each, `[SqlSourceConnection(Database = "reports")]`.
-- Or set the queries' [output](reference/settings.md#setting-output) to `methods`, whose methods take the connection as an argument.
+- Give the type a member that the build finds by its name or type, such as a primary-constructor parameter `NpgsqlDataSource dataSource`.
+- Mark the member that gives the connection `[SqlSourceConnection]`.
+- **When a member is marked, no other is found by its name or type.**  Also mark the member that gives this database its connection.
+- **The type passes a primary-constructor parameter to its base type, or uses it to initialize a field or property.**  Then the parameter is not found by its name or type, and the message names it.  Keep the value in a field or property named `connectionString` or of a `DbDataSource` type.  Or mark the parameter `[SqlSourceConnection]`.
+- **When the repository queries of the type use more than one database, no member is found by its name or type.**  Nothing says which database the member is for.  Mark one member for each database, as `[SqlSourceConnection(Database = "reports")]`.
+- Set the [output](reference/settings.md#setting-output) of the queries to `methods`.  Their methods take the connection as an argument.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -496,7 +776,13 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The type has more than one member that could give its repository queries their connection for one database: two members that the build finds by their name or type, two marked `[SqlSourceConnection]` for the same database that both return a `Task` or `ValueTask`, or both do not, or three or more marked for it.
+The type has more than one member that could give its repository queries their connection for one database.  The error is at the type's `[SqlSourceGenerate]`, and the message lists the members.  The repository queries of that database get no method.
+
+The members are one of these:
+
+- two members that the build finds by their name or type;
+- two members marked `[SqlSourceConnection]` for the same database that both return a `Task` or `ValueTask`, or both do not;
+- three or more marked members for the same database.
 
 ```csharp
 [SqlSourceGenerate]
@@ -511,11 +797,12 @@ public partial class UserRepository
 /work/App/UserRepository.cs(1,2): error SQLSRC029: 'App.UserRepository' has more than one connection for the database 'postgres': '_connectionString', '_dataSource'.  Mark only the one to use [SqlSourceConnection], or two of which only one returns a task: the asynchronous methods use that one, and the synchronous methods the other.
 ```
 
-The error is at the type's `[SqlSourceGenerate]` and lists the members, and the repository queries of that database get no method.  A primary-constructor parameter is found by its name or type only when no field or property of the type or of a base type is, so a parameter that the type stores in a field of its own gives one connection, the field.
+**Fix:** do one of these.
 
-Mark the one to use `[SqlSourceConnection]`, which leaves the others alone; when several are marked, leave one marked for the database, or set each one's `Database` to the database it connects to.
+- Mark the member to use `[SqlSourceConnection]`.  The others are then left alone.
+- **When several members are marked**, leave one marked for the database.  Or set the `Database` of each to the database that it connects to.
 
-A database may keep two marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection: its asynchronous methods get their connection from that one, and its synchronous methods from the other, which can be a connection string, a data source, a connection or a method that returns a connection.
+A database can keep two marked members when exactly one of them is a method that returns a `Task` or `ValueTask` of a connection.  Its asynchronous methods get their connection from that one, and its synchronous methods from the other.  The other can be a connection string, a data source, a connection or a method that returns a connection.  This sample shows such a pair, which is allowed:
 
 ```csharp
 [SqlSourceGenerate]
@@ -529,6 +816,8 @@ public partial class UserRepository
 }
 ```
 
+- **A primary-constructor parameter is found by its name or type only when no field or property of the type or of a base type is.**  So a parameter that the type stores in a field of its own gives one connection, the field.
+
 See: [The connection](reference/repositories.md#repository-connection)
 
 ## SQLSRC030
@@ -539,7 +828,9 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A member is marked `[SqlSourceConnection]` without a `Database`, and the type's repository queries use more than one database, so it cannot tell which one the member connects to.
+A member is marked `[SqlSourceConnection]` without a `Database`, and the repository queries of the type use more than one database.  The error is at the member.
+
+The build cannot tell which database the member connects to.  Each database that no member is marked for by name gets no repository method until it is fixed.
 
 ```csharp
 [SqlSourceGenerate]
@@ -554,7 +845,10 @@ public partial class UserRepository
 /work/App/UserRepository.cs(4,39): error SQLSRC030: '_dataSource' of 'App.UserRepository' is marked [SqlSourceConnection] without a Database, and the repository queries of 'App.UserRepository' use more than one database: 'main', 'reports'.  Set its Database to the one it connects to.
 ```
 
-The error is at the member.  Each database that no member is marked for by name gets no repository method until it is fixed.  Set the member's `Database`, `[SqlSourceConnection(Database = "main")]`, and mark a member for each other database.
+**Fix:**
+
+1. Set the `Database` of the member, as `[SqlSourceConnection(Database = "main")]`.
+2. Mark a member for each other database.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -566,7 +860,15 @@ Reported by: the build.
 
 A type gets this warning only when it claims a query whose output is `repository`.
 
-A member is marked `[SqlSourceConnection]` for a database that no repository query of the type uses: its `Database` is misspelt, or the queries of that database have another output, or are gone.
+A member is marked `[SqlSourceConnection]` for a database that no repository query of the type uses.  The warning is at the member.
+
+The cause is one of these:
+
+- The `Database` of the member is misspelt.
+- The queries of that database have another output.
+- The queries of that database are gone.
+
+The member gives no method its connection, so the warning leaves out no method.  The build compares the name of a database without regard to case.
 
 ```csharp
 [SqlSourceGenerate]
@@ -584,9 +886,12 @@ public partial class UserRepository
 /work/App/UserRepository.cs(4,39): warning SQLSRC031: '_archive' of 'App.UserRepository' is marked [SqlSourceConnection] for the database 'archive', and no repository query of 'App.UserRepository' uses it: they use 'main'.  Correct its Database, or remove the mark.
 ```
 
-The warning is at the member, and leaves out no method: the member gives no method its connection.  A database's name is compared without regard to case.  Correct the `Database`, or remove the mark from a member that your own code uses for other queries.
+**Fix:** do one of these.
 
-This is a warning, since a type that keeps a member for queries whose output is `methods` for a while still builds.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+- Correct the `Database`.
+- Remove the mark from a member that your own code uses for other queries.
+
+This is a warning, since a type that keeps a member for queries whose output is `methods` for a while still builds.  A project can list it in `NoWarn` to turn it off.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning:
 
 ```xml
 <PropertyGroup>
@@ -604,7 +909,16 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  A connection comes from a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`, or from a method that is not generic, takes nothing or one `CancellationToken`, and returns a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of one.
+A member marked `[SqlSourceConnection]` cannot give a repository method its connection.  The error is at the member.
+
+The repository queries of the database of the member get no method.  When the member names no database, the repository queries of every database get no method.
+
+A connection comes from one of these members:
+
+- a field, property or primary-constructor parameter of a `string`, of a type that derives from `DbDataSource`, or of a type that derives from `DbConnection`;
+- a method that is not generic and takes nothing or one `CancellationToken`.  It must return a `string`, a type that derives from `DbConnection`, or a `Task` or `ValueTask` of such a type.
+
+An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.
 
 ```csharp
 [SqlSourceGenerate]
@@ -619,7 +933,9 @@ public partial class UserRepository
 /work/App/UserRepository.cs(4,30): error SQLSRC032: 'Connect' of 'App.UserRepository' is marked [SqlSourceConnection], and cannot give a connection.  Mark a field, property or primary-constructor parameter of a string, a DbDataSource or a DbConnection, or a method that is not generic, takes nothing or a CancellationToken, and returns a string, a DbConnection, or a Task or ValueTask of a DbConnection.
 ```
 
-The error is at the member, and the repository queries of its database, or of every database when it names none, get no method.  An indexer, a property without a getter, an accessor, an operator and an explicit implementation of an interface's member are none of these either.  Mark a member of one of the shapes above.
+**Fix:**
+
+1. Mark a member of one of the shapes above.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -631,7 +947,12 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The member that gives a database its connection is of a type of the other engine's driver: an Npgsql type, such as `NpgsqlDataSource`, for a SQL Server database, or a Microsoft.Data.SqlClient type, such as `SqlConnection`, for a PostgreSQL one.
+The member that gives a database its connection is of a type of the other engine's driver.  The error is at the member.  The type of the member is one of these:
+
+- an Npgsql type, such as `NpgsqlDataSource`, for a SQL Server database;
+- a Microsoft.Data.SqlClient type, such as `SqlConnection`, for a PostgreSQL database.
+
+The repository queries of that database get no method.
 
 ```csharp
 [SqlSourceGenerate]
@@ -642,7 +963,11 @@ public partial class OrderRepository(NpgsqlDataSource dataSource);
 /work/App/OrderRepository.cs(2,55): error SQLSRC033: 'dataSource' of 'App.OrderRepository' is a 'Npgsql.NpgsqlDataSource', of another engine's driver, and the database 'mssql' is SQL Server.  Give the database a connection of Microsoft.Data.SqlClient.
 ```
 
-The error is at the member, and the repository queries of that database get no method.  Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`, and mark it for the database when the type uses several.
+**Fix:**
+
+1. Give the database a member of its own engine's driver, or of `DbDataSource` or `DbConnection`.
+2. If the member is a connection, mark it `[SqlSourceConnection]`.
+3. If the type uses several databases, mark the member for its database, as `[SqlSourceConnection(Database = "mssql")]`.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -654,7 +979,9 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-A query whose output is `repository` gets an instance method, and the type that claims it is `static`, so it has no instance.
+The type is `static`.  The error is at the type's `[SqlSourceGenerate]`, once for the type.
+
+A query whose output is `repository` gets an instance method, and the type has no instance.  So none of the repository queries of the type gets a method.
 
 ```csharp
 [SqlSourceGenerate]
@@ -665,7 +992,10 @@ public static partial class UserQueries;
 /work/App/UserQueries.cs(1,2): error SQLSRC034: 'App.UserQueries' is static, and the method of a repository query is an instance method.  Set the output of its repository queries to methods, or remove static.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, once for the type, and none of its repository queries gets a method.  Set their [output](reference/settings.md#setting-output) to `methods`, whose methods are static or extension methods that take the connection, or remove `static` and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
+**Fix:** do one of these.
+
+- Set the [output](reference/settings.md#setting-output) of the repository queries to `methods`.  Their methods are static or extension methods that take the connection.
+- Remove `static`, and give the type a connection, as [SQLSRC028](#sqlsrc028) says.
 
 See: [Repository methods](reference/repositories.md#repository-methods)
 
@@ -675,12 +1005,14 @@ See: [Repository methods](reference/repositories.md#repository-methods)
 
 Reported by: the build.
 
-A type that claims a query whose output is `repository` gets an interface of its public repository methods, named `I` and the type's name unless `InterfaceName` names it, beside the type: in its namespace, or in the type it is nested in.  Something there already has that name:
+A type that claims a query whose output is `repository` gets an interface of its public repository methods.  Something beside the type already has the name of that interface.  The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface.
+
+The interface is named `I` and the type's name, unless `InterfaceName` names it.  It stands beside the type: in its namespace, or in the type it is nested in.  What has the name is one of these:
 
 - a type of the project, other than an interface whose every declaration is `partial`, or a type of a referenced assembly;
 - a type parameter of the type, or of a type it is nested in;
 - for a nested type, the type it is nested in, or a member of it;
-- something else that SqlSource writes beside it: a model, the extension class of a type's `methods` queries, a namespace that holds models, or the interface of another type, in which case each of the two types gets the error.
+- something else that SqlSource writes beside it.  That is a model, the extension class of a type's `methods` queries, a namespace that holds models, or the interface of another type.  When it is the interface of another type, each of the two types gets the error.
 
 ```csharp
 public class IUserRepository { }
@@ -693,7 +1025,13 @@ public partial class UserRepository(NpgsqlDataSource dataSource);
 /work/App/UserRepository.cs(3,2): error SQLSRC035: 'App.UserRepository' cannot get its interface 'IUserRepository', because the class App.IUserRepository already has that name.  Set InterfaceName on its [SqlSourceGenerate] to another name, or set GenerateInterface to false.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface.  Name the interface otherwise with `[SqlSourceGenerate(InterfaceName = "IUserStore")]`, rename what has the name, or turn the interface off with `GenerateInterface = false`.  To add members to the interface yourself, declare it `partial interface IUserRepository`, which the generated part joins.
+**Fix:** do one of these.
+
+- Name the interface otherwise, with `[SqlSourceGenerate(InterfaceName = "IUserStore")]`.
+- Rename what has the name.
+- Turn the interface off with `GenerateInterface = false`.
+
+To add members to the interface yourself, declare it `partial interface IUserRepository`.  The generated part joins it.
 
 See: [The interface](reference/repositories.md#repository-interface), [repository interfaces](reference/repositories.md#repository-interfaces)
 
@@ -705,7 +1043,12 @@ Reported by: the build.
 
 A type gets this error only when it claims a query whose output is `repository`.  The queries that get no method still get their models.
 
-The primary-constructor parameter that gives a database its connection is named `cancellationToken`, which every asynchronous repository method takes as an argument, and which is refused whatever the queries' `method-type`, or `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.  Inside a method the argument hides the parameter, so the method could not reach its connection.
+The primary-constructor parameter that gives a database its connection has the name of an argument of the repository methods.  The error is at the parameter.  The name is one of these:
+
+- `cancellationToken`, which every asynchronous repository method takes as an argument.  This name is refused whatever the `method-type` of the queries.
+- `parameters`, which a method takes as its input model when its query has parameters.  A parameter named `parameters` is an error only when a repository query of that database has parameters.
+
+Inside a method the argument hides the parameter, so the method could not reach its connection.  The repository queries of that database get no method.
 
 ```csharp
 [SqlSourceGenerate]
@@ -716,7 +1059,10 @@ public partial class UserRepository(NpgsqlDataSource parameters);
 /work/App/UserRepository.cs(2,54): error SQLSRC036: 'parameters' of 'App.UserRepository' is the primary-constructor parameter that gives the database 'postgres' its connection, and the repository methods have an argument named 'parameters', which hides it.  Rename the parameter, or store it in a field or property and give the connection from that.
 ```
 
-The error is at the parameter, and the repository queries of that database get no method.  Rename the parameter, or store it in a field or property of the type, which is then the connection, marked `[SqlSourceConnection]` when it is not found by its name or type.
+**Fix:** do one of these.
+
+- Rename the parameter.
+- Store the parameter in a field or property of the type, which is then the connection.  Mark that member `[SqlSourceConnection]` when it is not found by its name or type.
 
 See: [The connection](reference/repositories.md#repository-connection)
 
@@ -726,7 +1072,11 @@ See: [The connection](reference/repositories.md#repository-connection)
 
 Reported by: the build.
 
-A type that claims a query whose output is `repository` gets an interface of its public repository methods, and its `[SqlSourceGenerate]` names it with `InterfaceName`, but the name is not a C# identifier: it holds a character that an identifier cannot, such as `-`, a namespace, type parameters, or an `@`.  A keyword such as `"class"`, or a contextual keyword such as `"file"`, is an identifier, and is written `@class` or `@file`.
+A type that claims a query whose output is `repository` gets an interface of its public repository methods.  Its `[SqlSourceGenerate]` names the interface with `InterfaceName`, but the name is not a C# identifier.  The error is at the type's `[SqlSourceGenerate]`.
+
+The name holds a character that an identifier cannot hold, such as `-`, a namespace, type parameters, or an `@`.  A keyword such as `"class"`, or a contextual keyword such as `"file"`, is an identifier, and is written `@class` or `@file`.
+
+The type gets no interface, and its repository methods are still generated.
 
 ```csharp
 [SqlSourceGenerate(InterfaceName = "I-Users")]
@@ -737,7 +1087,10 @@ public partial class UserRepository(NpgsqlDataSource dataSource);
 /work/App/UserRepository.cs(1,2): error SQLSRC037: 'App.UserRepository' cannot get its interface 'I-Users', because the name is not a C# identifier.  Set InterfaceName on its [SqlSourceGenerate] to an identifier, without an @ or a namespace, or remove it.
 ```
 
-The error is at the type's `[SqlSourceGenerate]`, and the type gets no interface; its repository methods are still generated.  Write the interface's name alone, such as `InterfaceName = "IUserStore"`, which is declared beside the type with the type's type parameters, or remove `InterfaceName` to get `I` and the type's name.
+**Fix:** do one of these.
+
+- Write the name of the interface alone, such as `InterfaceName = "IUserStore"`.  The interface is declared beside the type, with the type parameters of the type.
+- Remove `InterfaceName` to get `I` and the name of the type.
 
 See: [The interface](reference/repositories.md#repository-interface), [repository interfaces](reference/repositories.md#repository-interfaces)
 
@@ -747,13 +1100,18 @@ See: [The interface](reference/repositories.md#repository-interface), [repositor
 
 Reported by: the build.
 
-A project on .NET 6 or later that uses SqlSource takes its exceptions from a project it references, such as the [shared project](guides/several-projects.md#share-the-exceptions) of the recipe, and that project targets a framework before .NET 6, such as `netstandard2.0` or `netstandard2.1`.  Its `CollectionItemException` was built without the `SqlState`, `IsTransient` and `BatchCommand` that .NET 6 added to `DbException`, so it cannot pass on the database error's: a retry policy that tests `IsTransient` would never retry a deadlock.  The message names the project.  This project still uses that project's exceptions, so the error is the only one.
+A project on .NET 6 or later uses SqlSource.  It takes its exceptions from a project that it references, such as the [shared project](guides/several-projects.md#share-the-exceptions) of the recipe.  That project targets a framework before .NET 6, such as `netstandard2.0` or `netstandard2.1`.  The message names the project.  The error has no file and line, because it is about the project's references.
+
+The `CollectionItemException` of that project was built without the `SqlState`, `IsTransient` and `BatchCommand` that .NET 6 added to `DbException`.  So it cannot pass on those of the database's error: a retry policy that tests `IsTransient` would never retry a deadlock.  This project still uses the exceptions of that project, so the error is the only one.
 
 ```console
 CSC : error SQLSRC038: The CollectionItemException that this project sees in Data.Shared was compiled for a framework before .NET 6, so it does not pass on the SqlState, IsTransient and BatchCommand of the database's error.  Make Data.Shared target .NET 6 or later, or add such a target to its TargetFrameworks.
 ```
 
-Make the project that holds the exceptions target .NET 6 or later, as `<TargetFramework>net8.0</TargetFramework>`, or add such a target beside the one it has, as `<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>`: a project on .NET 6 or later then gets the build for .NET 8.  The error has no file and line, because it is about the project's references.
+**Fix:** do one of these.
+
+- Make the project that holds the exceptions target .NET 6 or later, as `<TargetFramework>net8.0</TargetFramework>`.
+- Add such a target beside the one that it has, as `<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>`.  A project on .NET 6 or later then gets the build for .NET 8.
 
 See: [Projects that share internals](reference/exceptions.md#projects-that-share-internals)
 
@@ -769,7 +1127,12 @@ A string or a quoted identifier starts and never ends.  The error is at the open
 SELECT 'unfinished FROM users;
 ```
 
-Close the quote.  If the SQL is valid for your database, SqlSource is reading it by the rules of another one: `'it\'s'` is one string in MySQL and an unclosed one elsewhere.  Set the dialect of the file.  A few constructs are read differently from the database whatever the dialect: see [what is still read differently](reference/dialects.md#still-read-differently).
+**Fix:** do one of these.
+
+- Close the quote.
+- If the SQL is valid for your database, SqlSource is reading it by the rules of another database.  Set the dialect of the file.  For example, `'it\'s'` is one string in MySQL, and a string that is not closed elsewhere.
+
+A few constructs are read differently from the database, whatever the dialect.  See [what is still read differently](reference/dialects.md#still-read-differently).
 
 See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
@@ -786,9 +1149,14 @@ A block comment or a hint starts with `/*` and never ends.  The error is at the 
 SELECT 1;
 ```
 
-Close the comment.  Whether a `/*` inside a comment needs its own `*/` depends on the dialect: it does in the default dialect, in SQL Server and in PostgreSQL, and it does not in MySQL, MariaDB, SQLite and Oracle.  If the SQL is valid for your database, set the dialect of the file.
+**Fix:** do one of these.
 
-SQLite accepts a comment that is still open at the end of the file.  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
+- Close the comment.
+- If the SQL is valid for your database, set the dialect of the file.
+
+Whether a `/*` inside a comment needs its own `*/` depends on the dialect.  It does in the default dialect, in SQL Server, in PostgreSQL and in CockroachDB.  It does not in MySQL, MariaDB, SQLite and Oracle.
+
+- **SQLite accepts a comment that is still open at the end of the file.**  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
 
 See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
@@ -798,16 +1166,20 @@ See: [What each dialect changes](reference/dialects.md#what-a-dialect-changes)
 
 Reported by: the build and the tool.
 
-The value of a `-- name:` marker becomes the name of a C# member, so it must be a C# identifier and must not be a reserved keyword such as `class`.
+The name of the query cannot be the name of a C# member.  It is not a C# identifier, or it is a reserved keyword such as `class`.
+
+The value of a `-- name:` marker becomes the name of a C# member.
 
 ```sql error
 -- name: get-user
 SELECT 1;
 ```
 
-Rename the query, for example to `GetUser`.
+**Fix:**
 
-The name ends at `->`, when the marker has one.
+1. Rename the query, for example to `GetUser`.
+
+- **The name ends at `->`, when the marker has one.**
 
 See: [Queries and names](reference/sql-files.md#queries-and-names)
 
@@ -817,9 +1189,11 @@ See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 Reported by: the build and the tool.
 
-Two `-- name:` markers in one file have the same name.  The error is at the second.
+Two `-- name:` markers in one file have the same name.  The error is at the second marker.
 
-Rename one of the queries.
+**Fix:**
+
+1. Rename one of the two queries.
 
 See: [Queries and names](reference/sql-files.md#queries-and-names)
 
@@ -829,14 +1203,19 @@ See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 Reported by: the build and the tool.
 
-A file without a `-- name:` marker is one query, named after the file without its extension.  This file's name cannot be the name of a C# member.
+A file without a `-- name:` marker is one query, named after the file without its extension.  The name of this file cannot be the name of a C# member.
 
 ```text
 001_init.sql
 get-user.sql
 ```
 
-Add a `-- name:` marker at the top of the file, or rename the file.  If the file is not meant to be a query of this type, move it out of the type's folder or point the type's `Source` somewhere else.
+**Fix:** do one of these.
+
+- Add a `-- name:` marker at the top of the file.
+- Rename the file.
+- If the file is not meant to be a query of this type, move it out of the type's folder.
+- If the file is not meant to be a query of this type, point the type's `Source` elsewhere.
 
 See: [A file with no `-- name:`](reference/sql-files.md#a-file-with-no-name)
 
@@ -846,7 +1225,9 @@ See: [A file with no `-- name:`](reference/sql-files.md#a-file-with-no-name)
 
 Reported by: the build and the tool.
 
-In a file that has `-- name:` markers, only comments and the markers that describe the whole file may come before the first one: the table of [SQLSRC116](#sqlsrc116) has the list.  SQL there would belong to no query.
+SQL stands before the first `-- name:` marker of the file.  There it would belong to no query.
+
+In a file that has `-- name:` markers, only comments and the markers that describe the whole file can come before the first one.  The table of [SQLSRC116](#sqlsrc116) lists those markers.
 
 ```sql error
 SET search_path TO app;
@@ -855,7 +1236,10 @@ SET search_path TO app;
 SELECT 1;
 ```
 
-Move the SQL below a `-- name:` marker, or delete it.
+**Fix:** do one of these.
+
+- Move the SQL below a `-- name:` marker.
+- Delete the SQL.
 
 See: [The file header](reference/sql-files.md#the-file-header)
 
@@ -865,7 +1249,9 @@ See: [The file header](reference/sql-files.md#the-file-header)
 
 Reported by: the build and the tool.
 
-A `-- summary:` marker describes the query it is in.  One in the file header, before the first `-- name:` line, is in no query.
+A `-- summary:` marker stands in the file header, before the first `-- name:` line.  There it is in no query.
+
+A summary describes the query that it is in.
 
 ```sql error
 -- summary: Loads one user.
@@ -873,7 +1259,9 @@ A `-- summary:` marker describes the query it is in.  One in the file header, be
 SELECT 1;
 ```
 
-Move the summary below the `-- name:` marker.
+**Fix:**
+
+1. Move the summary below the `-- name:` marker.
 
 See: [Summaries](reference/sql-files.md#summaries)
 
@@ -883,7 +1271,9 @@ See: [Summaries](reference/sql-files.md#summaries)
 
 Reported by: the build and the tool.
 
-A marker comes before the SQL it describes.  This one stands after the last SQL of its query, where a reader would take it to belong to the next one.  That usually means it was written above the next `-- name:` marker and was meant for that query.
+A marker stands after the last SQL of its query.
+
+A marker comes before the SQL that it describes.  In this place, a reader would take the marker to belong to the next query.  That usually means that it was written above the next `-- name:` marker, and was meant for that query.
 
 ```sql error
 -- name: GetUser
@@ -893,7 +1283,10 @@ SELECT 1;
 SELECT 2;
 ```
 
-Move the marker below the `-- name:` marker of the query it describes, or delete it.
+**Fix:** do one of these.
+
+- Move the marker below the `-- name:` marker of the query that it describes.
+- Delete the marker.
 
 See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
@@ -903,13 +1296,26 @@ See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-pl
 
 Reported by: the build and the tool.
 
-A `-- generator:` marker holds a word whose name is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` and `method-type`, each alone or followed by `=on`, `=off` or `=default`, and `default` alone.  `transaction` also takes `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` and `snapshot`, and `method-type` takes only `=async`, `=sync`, `=both` and `=default`.  The name is what stands before an `=`, so `keep-coments=off` is this error too.  The words `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews are not generator parameters: write `token-validation=off`, `table-models=off` and `array-pool=off`.  If you used `token-ignore` as a generator parameter in an earlier preview, write it as a marker inside the query, `-- token-ignore: name`.
+A `-- generator:` marker holds a word whose name is not a generator parameter.  The name is what stands before an `=`, so `keep-coments=off` is this error too.
 
 ```sql error
 -- generator: keep-comment
 ```
 
-Correct the parameter.  A dialect is not a generator parameter: it has a marker of its own, `-- dialect: name`.
+**Fix:**
+
+1. Correct the name of the generator parameter.
+
+A word is one of these:
+
+- A generator parameter, alone or followed by `=on`, `=off` or `=default`.  The generator parameters are `keep-comments`, `token-validation`, `sort-input`, `sort-output`, `table-models`, `async-method-suffix`, `array-pool`, `list-padding`, `collection-method`, `transaction` and `method-type`.
+- `default` alone.
+
+`transaction` also takes `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` and `snapshot`.  `method-type` takes only `=async`, `=sync`, `=both` and `=default`.
+
+- **The words `no-token-validation`, `no-table-models` and `no-array-pool` of earlier previews are not generator parameters.**  Write `token-validation=off`, `table-models=off` and `array-pool=off`.
+- **If you used `token-ignore` as a generator parameter in an earlier preview, write it as a marker inside the query.**  The marker is `-- token-ignore: name`.
+- **A dialect is not a generator parameter.**  It has a marker of its own, `-- dialect: name`.
 
 See: [Generator parameters](reference/generator-parameters.md#setting-generator-parameters)
 
@@ -921,7 +1327,10 @@ Reported by: the build and the tool.
 
 A `-- generator:` marker has nothing after the colon.
 
-Add a generator parameter, or delete the line.
+**Fix:** do one of these.
+
+- Add a generator parameter.
+- Delete the line.
 
 See: [Generator parameters](reference/generator-parameters.md#setting-generator-parameters)
 
@@ -931,11 +1340,28 @@ See: [Generator parameters](reference/generator-parameters.md#setting-generator-
 
 Reported by: the build and the tool.
 
-A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+The value of a marker is not valid.  The cause is one of these:
 
-- A generator parameter's value is one of its own words, `on` or `off`, and for `transaction` also `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`, and `async`, `sync` or `both` for `method-type`, which takes no `on` or `off`, or `default`, and the message lists them: `keep-comments=true` is this error, and so is `method-type` alone, which is `method-type=on`, and `default` followed by `=`, as in `default=on`.  See [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
-- What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
-- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of a settings file's `dialect`, in [SQLSRC019](#sqlsrc019).  The value is the rest of the line, so nothing else may follow it.
+- A generator parameter has a value that it does not take.
+- What follows a name in a `-- name:` marker is not a shape.
+- A `-- dialect:` marker does not name a dialect.
+- A marker that holds a setting has a value that the setting does not take.  Examples are `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` and `-- library-types:`.
+- A `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+
+The values that each marker takes follow.
+
+- **The value of a generator parameter is one of its own words, or `default`.**  The message lists them.  See [generator parameters](reference/generator-parameters.md#setting-generator-parameters).
+  - Most generator parameters take `on` or `off`.
+  - `transaction` also takes `read-uncommitted`, `read-committed`, `repeatable-read`, `serializable` or `snapshot`.
+  - `method-type` takes `async`, `sync` or `both`, and takes no `on` or `off`.
+  - `keep-comments=true` is this error.  So is `method-type` alone, which is `method-type=on`, and `default` followed by `=`, as in `default=on`.
+- **What follows the name in a `-- name:` marker must be `->` and a shape.**  The shape is one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
+- **`-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`.**
+  - Any options follow the name, as in `-- dialect: mysql, ansi-quotes`.
+  - The names and the options are those of `dialect` in a settings file, listed in [SQLSRC019](#sqlsrc019).
+  - The value is the rest of the line, so nothing else can follow it.
+
+Each line of this sample is this error:
 
 ```sql error
 -- generator: keep-comments=true
@@ -943,25 +1369,52 @@ A generator parameter has a value it does not take; what follows a name in a `--
 -- dialect: mysql keep-comments
 ```
 
-- `-- output:` takes `sql`, `models`, `methods` or `repository`.  `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
-- `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`.
-- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`, none of whose parts is a reserved keyword or `file`, `required`, `scoped` or `extension`, which C# does not take as a type's name.
-- `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  No part of either is a reserved keyword or `file`, `required`, `scoped` or `extension`, and no generic type is named.
-- `-- nested-class:` takes one identifier that is none of those and not `var`, with which the query methods of the type would not compile: `Queries`, and not `class`, `file` or `App.Sql`.  `-- member-location:` takes `extension-class`, `class` or `nested-class`, and `-- visibility:` takes `public`, `internal`, `protected` or `private`, in any case and with or without hyphens and spaces.
-- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](reference/type-mapping.md#setting-type-overrides).
-- The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
-- A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- `-- library-types:` takes one entry or more, each `name=state` with no space around its `=`, separated by white space, as in `-- library-types: nodatime=off`.  The library is `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`, matched ignoring case, hyphens and spaces.  A line with no entry, an entry without `=`, `nodatime = on` with spaces, and a library or a state that is not one are this error, which the message lists.  See [library types](reference/library-types-and-json.md#setting-library-types).
+The other markers that hold a setting take these values.  `-- output:`, `-- input-model-type:`, `-- output-model-type:`, `-- collection-type:`, `-- member-location:` and `-- visibility:` match their values in any case, and with or without hyphens and spaces.
+
+- `-- output:` takes `repository`, `methods`, `models` or `sql`.
+- `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
+- `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.
+- `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` or `IAsyncEnumerable`.
+- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier.
+- **`-- model-namespace:` takes a namespace such as `App.Models`.**  None of its parts can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  C# does not take these as the name of a type.
+- **`-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace.**  Examples are `UserRow` and `App.Models.UserRow`.  No part of the name can be a reserved keyword or `file`, `required`, `scoped` or `extension`.  The marker cannot name a generic type.
+- **`-- nested-class:` takes one identifier.**  It cannot be one of those words, and it cannot be `var`, with which the query methods of the type would not compile.  So `Queries` is valid, and `class`, `file` or `App.Sql` is not.
+- `-- member-location:` takes `extension-class`, `class` or `nested-class`.
+- `-- visibility:` takes `public`, `internal`, `protected` or `private`.
+- **`-- type-override:` takes one entry, `key = type` or `key = default`.**  See [type overrides](reference/type-mapping.md#setting-type-overrides).
+  - The key is the one-word name of a type: `timestamptz` and not `timestamp with time zone`.
+  - A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema: `public.user_status` or `dbo.Email`.
+  - A schema or a name can be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`.
+  - A schema or a name can also be in `U&"..."` with escapes: `public.U&"Order\000AItem"`.  An escape is `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF.  Any other escape is not valid.  A character beyond FFFF is one `\+` escape, or the escapes of its two surrogates.
+  - The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.
+- **The dialect of the file decides how the key of a `-- type-override:` marker is read.**
+  - In an `mssql` file, the key is the name of a SQL Server type, such as `int`, `nvarchar` or `sys.int`.  A name that SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.
+  - In a file of any other dialect, a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.
+  - A type of a schema of your own, `dbo.Email`, is read in either.
+- **A key is not written in brackets.**  `-- type-override: [dbo].[Email] = MyApp.Email` is this error.  The message shows the forms that SqlSource reads:
+  - `dbo.Email`, which matches the name of the type in any case.
+  - `"dbo"."Email"`, which matches its case exactly.
+  - For a key without a schema, the plain form alone: `[INT]` is `INT`.  A quoted name without a schema must be in lower case.
+  - For a part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, the quoted form alone: `"my schema"`.
+- **`-- library-types:` takes one entry or more, separated by white space, as in `-- library-types: nodatime=off`.**  See [library types](reference/library-types-and-json.md#setting-library-types).
+  - Each entry is `name=state`, with no space around its `=`.
+  - The library is `nodaTime`, `netTopologySuite` or `json`, and the state is `on`, `off` or `default`.  Both are matched ignoring case, hyphens and spaces.
+  - A line with no entry is this error, and so is an entry without `=`.  So are `nodatime = on` with spaces, and a library or a state that is not one.  The message lists the libraries and the states.
 
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
-A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
+A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else.  A quote or a block comment inside the default must close there.
 
-A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space or `->`.  What follows its `->` is a C# type, written as a type override's is, and never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
+A `-- param:` marker starts with the query parameter as the SQL writes it, `@name`.  The parameter stands alone, or a space or `->` follows it.  What follows its `->` is a C# type, written as the type of a type override is.  It is never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
 
-Inside a query, a `-- column:` marker holds a column's name, then `null` or `not null`, `->` and a C# type or `default`, or both in that order, as in `-- column: total not null` or `-- column: note null -> NoteText`.  A name with white space or a `.`, or one that is the word `null` or `not`, is written in double quotes, with a quote inside it doubled: `-- column: "total due" not null`.  A name with a `.` outside quotes, `-- column: users.id -> UserId`, is this error, whose message says that a column's source is mapped in the file header.
+Inside a query, a `-- column:` marker holds the name of a column, then one of these, or both in this order:
 
-In the file header, a `-- column:` marker holds a column's source, `table.column` or `schema.table.column`, then `->` and a C# type or `default`, as in `-- column: users.id -> UserId`.  A marker without `->`, one that says `null` or `not null`, and one whose key has one part are this error.
+- `null` or `not null`;
+- `->` and a C# type or `default`.
+
+Examples are `-- column: total not null` and `-- column: note null -> NoteText`.  A name with white space or a `.` is written in double quotes, and so is a name that is the word `null` or `not`.  A quote inside such a name is doubled: `-- column: "total due" not null`.  A name with a `.` outside quotes, `-- column: users.id -> UserId`, is this error.  Its message says that a column's source is mapped in the file header.
+
+In the file header, a `-- column:` marker holds the source of a column, `table.column` or `schema.table.column`, then `->` and a C# type or `default`.  An example is `-- column: users.id -> UserId`.  A marker without `->` is this error.  So are a marker that says `null` or `not null`, and one whose key has one part.
 
 ```sql error
 -- column: users.id not null
@@ -973,7 +1426,11 @@ In the file header, a `-- column:` marker holds a column's source, `table.column
 SELECT id FROM users WHERE team_id = @team;
 ```
 
-Add the missing value, correct the one that is wrong, or remove the one that does not belong.
+**Fix:** do one of these.
+
+- Add the missing value.
+- Correct the value that is wrong.
+- Remove the value that does not belong.
 
 See: [Marker index](reference/sql-files.md#marker-index)
 
@@ -985,16 +1442,28 @@ Reported by: the build and the tool.
 
 Two settings contradict each other.  The error is at the second.
 
-- Two words of `-- generator:` markers that give one generator parameter two different states, in the file header or inside one query, on one line or two: `keep-comments` and `keep-comments=off`.  `keep-comments=default` beside either is one too, even where the default is the same.  The later word is not applied.  In a file with no `-- name:` line every `-- generator:` line is in one place.
-- Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
-- Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
-- Two `-- column:` markers inside one query for one column, its name compared ignoring case, of which one says `null` and the other `not null`, or which give it two C# types, `default` among them.  One may give the nullability and the other the type.
-- Two `-- column:` markers in the file header that give one key two C# types.  The key is compared as [column types](reference/model-properties.md#setting-column-types) compares it, so `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` two.
-- Two `-- param:` markers for one parameter that give different types, different nullability or different C# types after `->`.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
-- Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
-- Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
-- Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](reference/type-mapping.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two; and the C# types are compared by how they are named, so `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.  The same holds for the C# types of `-- column:` and `-- param:` markers.
-- Two entries of `-- library-types:` markers that give one library two states, in the file header or inside one query, on one line or two: `nodatime=on` and `nodatime=off`.
+The conflict is one of these:
+
+- **Two words of `-- generator:` markers give one generator parameter two different states.**  An example is `keep-comments` and `keep-comments=off`.
+  - The two words can be in the file header or inside one query, on one line or two.
+  - `keep-comments=default` beside either is a conflict too, even where the default is the same.
+  - The later word is not applied.
+  - In a file with no `-- name:` line, every `-- generator:` line is in one place.
+- **Two `-- dialect:` markers name different dialects, or one dialect with different options.**  A file has one dialect.
+- **Two defaults for one token of a query differ.**  They can be two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
+- **Two `-- column:` markers inside one query give one column two nullabilities, or two C# types.**  The name of the column is compared ignoring case.  One marker says `null` and the other `not null`, or the two give two C# types, `default` among them.
+- **Two `-- column:` markers in the file header give one key two C# types.**  The key is compared as [column types](reference/model-properties.md#setting-column-types) compares it.  So `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` are two.
+- **Two `-- param:` markers for one parameter give different types, different nullability or different C# types after `->`.**  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
+- **Two `-- output:` markers give different values, or two `-- database:` markers name different databases.**  The two can be in the file header or inside one query.  `billing` and `Billing` are different databases.
+- **Two markers of any other setting of the models and the collection type give different values.**  The two can be in the file header or inside one query.  Examples are two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
+- **Two `-- member-location:`, `-- visibility:` or `-- nested-class:` markers give different values.**  The two can be in the file header or inside one query.
+- **Two `-- type-override:` markers give one database type different C# types.**  The two can be in the file header or inside one query.
+  - The key is compared as [type overrides](reference/type-mapping.md#setting-type-overrides) compares it.  So `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two.
+  - The C# types are compared by how they are named.  So `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.
+  - The same holds for the C# types of `-- column:` and `-- param:` markers.
+- **Two entries of `-- library-types:` markers give one library two states.**  An example is `nodatime=on` and `nodatime=off`.  The two entries can be in the file header or inside one query, on one line or two.
+
+In this sample, the second `-- output:` marker conflicts with the first:
 
 ```sql error
 -- name: ListUsers
@@ -1003,7 +1472,19 @@ Two settings contradict each other.  The error is at the second.
 SELECT id, name FROM users;
 ```
 
-Remove one of the two.  A query's `-- generator:` word for a generator parameter replaces the file header's for that parameter, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either, nor is `default` beside other words of `-- generator:`.
+**Fix:**
+
+1. Remove one of the two settings.
+
+These are not a conflict:
+
+- A query's `-- generator:` word for a generator parameter.  It replaces the file header's word for that parameter.
+- A query's `-- type-override:` for a type.  It replaces the file header's for that type.
+- A query's `-- library-types:` for a library.  It replaces the file header's for that library.
+- A query's `-- column:` for a column whose source the file header maps.
+- Two `-- column:` markers inside one query for one column, of which one gives the nullability and the other the C# type.
+- The same dialect given twice with the same options.
+- `default` beside other words of `-- generator:`.
 
 See: [A value that is wrong](reference/settings.md#a-value-that-is-wrong)
 
@@ -1020,7 +1501,10 @@ A query, or a whole file without `-- name:` markers, holds nothing but whitespac
 -- TODO: write this query
 ```
 
-Write the SQL, or delete the query.
+**Fix:** do one of these.
+
+- Write the SQL.
+- Delete the query.
 
 See: [Queries and names](reference/sql-files.md#queries-and-names)
 
@@ -1030,15 +1514,22 @@ See: [Queries and names](reference/sql-files.md#queries-and-names)
 
 Reported by: the build and the tool.
 
-A token `{{name}}` becomes a parameter of a generated method, so its name must not be a reserved C# keyword.
+The name of a token is a reserved C# keyword.
+
+A token `{{name}}` becomes a parameter of a generated method.  So its name must not be a reserved C# keyword.
 
 ```sql error
 SELECT * FROM {{class}};
 ```
 
-The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members and no models for that type.
+The same holds for the name in a `-- token:` marker.  It also holds for a token in a comment of a query that keeps its comments.
 
-Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
+A token in a comment is an error only for a type that keeps the comments.  The file that holds the token then produces no members and no models for that type.
+
+**Fix:** do one of these.
+
+- Rename the token.
+- If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
 See: [Tokens](reference/tokens.md#tokens)
 
@@ -1048,7 +1539,9 @@ See: [Tokens](reference/tokens.md#tokens)
 
 Reported by: the build and the tool.
 
-A `-- dialect:` marker sets the dialect of a whole file, and it changes how the text after it is read.  So it must stand in the file header, before the file's first `-- name:` line and before its first SQL.  This one is inside a named query, or after SQL.
+A `-- dialect:` marker stands inside a named query, or after SQL.
+
+A `-- dialect:` marker sets the dialect of a whole file, and it changes how the text after it is read.  So it must stand in the file header, before the first `-- name:` line of the file and before its first SQL.
 
 ```sql error
 -- name: GetUser
@@ -1056,9 +1549,13 @@ A `-- dialect:` marker sets the dialect of a whole file, and it changes how the 
 SELECT 1;
 ```
 
-A marker after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
+**Fix:**
 
-Move the marker to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
+1. Move the marker to the top of the file.
+
+In a file with no `-- name:` marker, which is one query, the top of the file is above the SQL of the query.
+
+Comments can come before the marker, such as a licence header.  In this sample, the marker stands at the top of the file:
 
 ```sql
 -- dialect: mysql
@@ -1067,7 +1564,8 @@ Move the marker to the top of the file.  Comments may come before it, such as a 
 SELECT 1;
 ```
 
-A file cannot mix dialects.  Put the queries for another database in a file of their own.
+- **A `-- dialect:` marker after the last SQL of its query gets two errors.**  They are this error and [SQLSRC108](#sqlsrc108).
+- **A file cannot mix dialects.**  Put the queries for another database in a file of their own.
 
 See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
@@ -1077,7 +1575,9 @@ See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-pl
 
 Reported by: the build and the tool.
 
-A marker stands in the wrong part of its file.  Some markers describe one query and go inside it, after its `-- name:` line; some describe the whole file and go before the first `-- name:` line.  The message says which this one is.
+A marker stands in the wrong part of its file.  The message says which of the two kinds this marker is.
+
+Some markers describe one query.  They go inside the query, after its `-- name:` line.  Other markers describe the whole file.  They go before the first `-- name:` line.
 
 ```sql error
 -- token: {{filter:AND deleted_at IS NULL}}
@@ -1086,7 +1586,11 @@ A marker stands in the wrong part of its file.  Some markers describe one query 
 SELECT id FROM users WHERE 1 = 1 {{filter}};
 ```
 
-Move the marker to where the message says.  A file with no `-- name:` line is one query, and takes every marker.
+**Fix:**
+
+1. Move the marker to the place that the message names.
+
+A file with no `-- name:` line is one query, and takes every marker.
 
 | Marker | File header | Inside a query |
 |----|----|----|
@@ -1104,11 +1608,17 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- input-model-type:`, `-- output-model-type:` | yes | yes |
 | `-- input-model:`, `-- output-model:` | no | yes |
 | `-- collection-type:` | yes | yes |
+| `-- member-location:` | yes | yes |
+| `-- visibility:` | yes | yes |
+| `-- nested-class:` | yes | yes |
 | `-- type-override:` | yes | yes |
 | `-- column:` | yes | yes |
 | `-- library-types:` | yes | yes |
 
-The table is this error's, with two exceptions.  A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
+The table is this error's, with two exceptions:
+
+- A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107).
+- A `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
 See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-place)
 
@@ -1118,7 +1628,15 @@ See: [Markers in the wrong place](reference/sql-files.md#markers-in-the-wrong-pl
 
 Reported by: the build and the tool.
 
-A `-- param:` marker without a type names a parameter that does not stand as a parameter in the query's SQL: it appears only in a token's default, or, under `mssql`, only where SqlSource reads it as a variable declared with `DECLARE`, or nowhere, as when its name is misspelt.  Nothing but the marker can then say its type.
+A `-- param:` marker without a type names a parameter that does not stand as a parameter in the SQL of the query.  One of these is true:
+
+- The parameter appears only in the default of a token.
+- Under `mssql`, the parameter appears only where SqlSource reads it as a variable declared with `DECLARE`.
+- The parameter appears nowhere, as when its name is misspelt.
+
+Nothing but the marker can then say its type.
+
+The first sample shows the first case, and the second sample the second case:
 
 ```sql error
 -- name: ListUsers
@@ -1135,9 +1653,14 @@ DECLARE @n int = 1;
 SELECT * FROM events WHERE id > @n;
 ```
 
-A marker that gives only a C# type, `-- param: @page -> PageNumber`, has no type either: the C# type is not the database's.
+A marker that gives only a C# type, `-- param: @page -> PageNumber`, has no type either.  The C# type is not the database's.
 
-Give the type, in the database's own words: `-- param: @page int`, or `-- param: @page int -> PageNumber`.  Under `mssql`, remove the marker when the name is a variable that the query declares, and give the type when it is a parameter that SqlSource took for a variable: see [variables declared with `DECLARE`](reference/parameters.md#declared-variables).  Correct a misspelt name.
+**Fix:** do one of these.
+
+- Give the type, in the database's own words: `-- param: @page int`, or `-- param: @page int -> PageNumber`.
+- Under `mssql`, if the name is a variable that the query declares, remove the marker.
+- Under `mssql`, if the name is a parameter that SqlSource took for a variable, give the type.  See [variables declared with `DECLARE`](reference/parameters.md#declared-variables).
+- If the name is misspelt, correct it.
 
 See: [Giving a parameter a type: `-- param:`](reference/parameters.md#param-marker)
 
@@ -1147,14 +1670,18 @@ See: [Giving a parameter a type: `-- param:`](reference/parameters.md#param-mark
 
 Reported by: the build and the tool.
 
-A parameter appears in the default of a token, in the SQL or in a `-- token:` marker, and nowhere else in the query.  A default is a sample, and a type taken from a sample alone would be a guess.
+A parameter appears in the default of a token, in the SQL or in a `-- token:` marker, and nowhere else in the query.
+
+A default is a sample, and a type taken from a sample alone would be a guess.
 
 ```sql error
 -- name: ListUsers
 SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 ```
 
-Declare the parameter with its type: `-- param: @page int`.
+**Fix:**
+
+1. Declare the parameter with its type, as in `-- param: @page int`.
 
 See: [Defaults](reference/tokens.md#token-defaults)
 
@@ -1164,7 +1691,9 @@ See: [Defaults](reference/tokens.md#token-defaults)
 
 Reported by: the build and the tool.
 
-An `-- input-model:` marker names the type of a query's parameters, and this query has none: no `@name` in its SQL and no `-- param:` marker.  Under the `mssql` dialect a name that the query declares with `DECLARE` is a local variable, and is not a parameter.
+An `-- input-model:` marker names the type of the parameters of a query, and this query has none.  It has no `@name` in its SQL and no `-- param:` marker.
+
+Under the `mssql` dialect, a name that the query declares with `DECLARE` is a local variable, and is not a parameter.
 
 ```sql error
 -- name: CountUsers
@@ -1172,7 +1701,9 @@ An `-- input-model:` marker names the type of a query's parameters, and this que
 SELECT COUNT(*) FROM users;
 ```
 
-Remove the marker.
+**Fix:**
+
+1. Remove the marker.
 
 See: [Name of one query's model](reference/models.md#setting-model-name)
 
@@ -1182,9 +1713,13 @@ See: [Name of one query's model](reference/models.md#setting-model-name)
 
 Reported by: the build and the tool.
 
-A token and a comment overlap: the comment is not wholly inside the token's default, nor outside the token.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](reference/generator-parameters.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens three ways.
+A token and a comment overlap.  The comment is not wholly inside the default of the token, nor outside the token.
 
-A comment inside a default holds `}}`.  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
+Comments are removed before tokens are found.  A query that keeps its comments (the `keep-comments` [generator parameter](reference/generator-parameters.md#setting-generator-parameters)) also has its tokens found in the SQL with the comments.  So the two would read different tokens.
+
+It happens in three ways.
+
+**A comment inside a default holds `}}`.**  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
 
 ```sql error
 -- name: ListUsers
@@ -1192,7 +1727,7 @@ SELECT id FROM users WHERE 1 = 1 {{filter:AND active -- only live rows}}
 ORDER BY {{orderBy:name}};
 ```
 
-A comment opens a default, `{{name:`, and the SQL after the comment closes it.  Without comments the query is as you wrote it, but where comments are kept the default runs from the comment to the next `}}`, and the token after it is lost.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
+**A comment opens a default, `{{name:`, and the SQL after the comment closes it.**  Without comments, the query is as you wrote it.  Where comments are kept, the default runs from the comment to the next `}}`, and the token after it is lost.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
 
 ```sql error
 -- name: ListUsers
@@ -1201,7 +1736,7 @@ SELECT id -- e.g. {{note: here
 FROM users WHERE {{filter}};
 ```
 
-A comment stands inside a token's braces before its default: between `{{` and the name, or between the name and the `:` or the closing `}}`.  Without comments the token is read, but where comments are kept the braces stay in the SQL as written, and the method has no argument for the token.
+**A comment stands inside the braces of a token, before its default.**  It stands between `{{` and the name, or between the name and the `:` or the closing `}}`.  Without comments, the token is read.  Where comments are kept, the braces stay in the SQL as written, and the method has no argument for the token.
 
 ```sql error
 -- name: ListFrom
@@ -1209,7 +1744,13 @@ A comment stands inside a token's braces before its default: between `{{` and th
 SELECT id FROM {{table/* users or archive */}};
 ```
 
-The second and third are errors only for a type that keeps the query's comments, and that type gets no members and no models from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
+The second and third are errors only for a type that keeps the comments of the query.  That type gets no members and no models from the file until it is fixed.
+
+All three hold for a name in a `-- token-ignore:` marker too.  Its text runs to its closing `}}`, as the text of a token does.  So a comment there changes which tokens the rest of the query has.
+
+**Fix:**
+
+1. Keep the comment wholly inside the default of the token, or outside the token.  Move it onto a line of its own, or after the `}}` of the token.
 
 See: [Defaults](reference/tokens.md#token-defaults)
 
@@ -1219,7 +1760,15 @@ See: [Defaults](reference/tokens.md#token-defaults)
 
 Reported by: the build.
 
-A query in the `mssql` dialect writes one parameter in two spellings that differ only in case: `@Id`, and then `@id`.  SqlSource reads the two as one parameter, and binds it under the spelling that the SQL first writes outside a token's default: a spelling in a default or in a `-- param:` marker does not choose it.  A SQL Server whose server collation is case-sensitive reads the other spelling as another variable, which the query does not declare, and fails the query when it runs.  A server whose collation ignores case, which is the usual one, runs the query as written.  The collation that counts is the server's, which `SELECT SERVERPROPERTY('Collation')` shows; the collation of the database does not change how the query's variables are read, except in a contained database, where they ignore case whatever the server's collation.  The warning is at the place of the other spelling, and names both.  Each further spelling of a parameter is warned of once in a query, at its first place.  A parameter that only a token's default writes, and that a `-- param:` marker declares, is bound as the marker spells it, and the spellings in the defaults are compared against that.
+A query in the `mssql` dialect writes one parameter in two spellings that differ only in case: `@Id`, and then `@id`.  The warning is at the place of the other spelling, and names both.  The build warns of each further spelling of a parameter once in a query, at its first place.
+
+SqlSource reads the two spellings as one parameter.  It binds the parameter under the spelling that the SQL first writes outside a token's default.  A spelling in a default or in a `-- param:` marker does not choose it.
+
+The collation that counts is the server's, which `SELECT SERVERPROPERTY('Collation')` shows:
+
+- If the server collation of a SQL Server is case-sensitive, the server reads the other spelling as another variable.  The query does not declare that variable, so the server fails the query when it runs.
+- If the server collation ignores case, which is the usual one, the server runs the query as written.
+- The collation of the database does not change how the variables of the query are read, except in a contained database.  In a contained database, the variables ignore case, whatever the collation of the server.
 
 ```sql error
 -- name: GetUser
@@ -1230,9 +1779,15 @@ SELECT name FROM dbo.users WHERE id = @Id OR parent_id = @id;
 /work/App/Queries/Users.sql(2,58): warning SQLSRC121: The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose server collation is case-sensitive reads '@id' as another variable, which the query does not declare.  Write it '@Id' throughout the query.
 ```
 
-Write the parameter in one spelling throughout the query.  A parameter written in the default of a token is checked as the rest of the query is.
+**Fix:**
 
-This is a warning, since a query runs as written when the server collation ignores case, and a project that uses only such servers may want no warning.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+1. Write the parameter in one spelling throughout the query.
+
+The build checks a parameter written in the default of a token as it checks the rest of the query.
+
+- **A parameter that only a token's default writes, and that a `-- param:` marker declares, is bound as the marker spells it.**  The spellings in the defaults are compared against that spelling.
+
+This is a warning, since a query runs as written when the server collation ignores case.  So a project that uses only such servers can do without it.  A project can list it in `NoWarn` to turn it off.  A project that sets `TreatWarningsAsErrors` can list it in `WarningsNotAsErrors` to keep it a warning:
 
 ```xml
 <PropertyGroup>
